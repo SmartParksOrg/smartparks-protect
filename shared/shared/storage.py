@@ -28,12 +28,25 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+_known_buckets: set[str] = set()
+
+
+def _ensure_bucket(client: Minio, bucket: str) -> None:
+    """Create the bucket on first use. Compose creates them up front; tests and CI do not."""
+    if bucket in _known_buckets:
+        return
+    if not client.bucket_exists(bucket):
+        client.make_bucket(bucket)
+    _known_buckets.add(bucket)
+
+
 async def put_object(
     bucket: str, key: str, data: bytes, content_type: str = "application/octet-stream"
 ) -> None:
     client = get_client()
 
     def _put() -> None:
+        _ensure_bucket(client, bucket)
         client.put_object(
             bucket, key, io.BytesIO(data), length=len(data), content_type=content_type
         )
