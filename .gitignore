@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+npm-debug.log*
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+credentials.json
+secrets.yaml
+*.pem
+*.key
+!*.example
+
+# Docker and local data
+docker-compose.override.yml
+data/
+
+# Ansible: the repo ships the shape of a deployment, not anyone's servers
+ansible/inventory.yml
+ansible/group_vars/all/main.yml
+ansible/host_vars/*.yml
+ansible/*.retry
+!ansible/**/*.example
+
+# IDE and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*:Zone.Identifier
+
+# Logs and databases
+*.log
+logs/
+*.db
+*.sqlite3
+
+# Build outputs
+site/
+services/frontend/ui-sweep-output/
+*.bak
+*.backup
+
+# Claude
+.claude
