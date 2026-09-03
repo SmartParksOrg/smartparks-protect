@@ -43,6 +43,7 @@ class Topic:
     COMMAND_UPDATED = "command.updated"
     DELIVERY_UPDATED = "delivery.updated"
     NEEDS_ATTENTION_CREATED = "needs_attention.created"
+    EXPORT_REQUESTED = "export.requested"
 
 
 SCHEMA_VERSION = 1
@@ -167,11 +168,25 @@ class RedisStreamsBus:
         return float(self.settings.bus_retry_base_seconds * (2 ** max(delivery_count - 1, 0)))
 
     async def consume(
-        self, topic: str, group: str, consumer: str, handler: Handler, *, once: bool = False
+        self,
+        topic: str,
+        group: str,
+        consumer: str,
+        handler: Handler,
+        *,
+        once: bool = False,
+        concurrency: int | None = None,
     ) -> int:
         """Consume until stopped. With `once`, handle what is available now and return the count
-        of handled messages (used by tests and one-shot commands)."""
+        of handled messages (used by tests and one-shot commands).
+
+        A batch is handled in lanes: messages with the same `device_id` in their payload stay in
+        order in one lane, different lanes run concurrently (`BUS_CONCURRENCY` lanes at most).
+        Handlers are idempotent by design (canonical keys, time-guarded current state), so the
+        ordering across devices does not matter, but keeping one device sequential avoids
+        needless unique-key collisions."""
         await self.ensure_group(topic, group)
+        lanes = concurrency or self.settings.bus_concurrency
         handled = 0
         while not self._stop.is_set():
             await self.heartbeat(consumer)
@@ -179,18 +194,38 @@ class RedisStreamsBus:
             response = cast(
                 "list[tuple[str, list[tuple[str, dict[str, str]]]]]",
                 await self.redis.xreadgroup(
-                    group, consumer, {topic: ">"}, count=10, block=None if once else 2000
+                    group, consumer, {topic: ">"}, count=lanes * 4, block=None if once else 2000
                 ),
             )
             batch = response[0][1] if response else []
-            for message_id, fields in batch:
-                await self._handle(
-                    topic, group, Message.from_fields(topic, message_id, fields), handler
-                )
-                handled += 1
+            messages = [
+                Message.from_fields(topic, message_id, fields) for message_id, fields in batch
+            ]
+            await self._handle_batch(topic, group, messages, handler, lanes)
+            handled += len(messages)
             if once:
                 return handled
         return handled
+
+    async def _handle_batch(
+        self, topic: str, group: str, messages: list[Message], handler: Handler, lanes: int
+    ) -> None:
+        if len(messages) <= 1 or lanes <= 1:
+            for message in messages:
+                await self._handle(topic, group, message, handler)
+            return
+        by_lane: dict[str, list[Message]] = {}
+        for message in messages:
+            key = str(message.payload.get("device_id") or message.id)
+            by_lane.setdefault(key, []).append(message)
+        semaphore = asyncio.Semaphore(lanes)
+
+        async def run(lane: list[Message]) -> None:
+            async with semaphore:
+                for message in lane:
+                    await self._handle(topic, group, message, handler)
+
+        await asyncio.gather(*(run(lane) for lane in by_lane.values()))
 
     async def _reclaim(self, topic: str, group: str, consumer: str, handler: Handler) -> int:
         """Re-deliver pending messages whose backoff has passed; dead-letter exhausted ones."""

@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: v0.1.0, the first vertical slice. Phases 0 to 3 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: v0.1.1 released, phase 4 in progress (analyze, export, benchmark). Phases 0 to 3 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -46,6 +46,7 @@ smartparks-protect/
 │   ├── api/                 # FastAPI service `protect_api`: auth/, routers/, schemas/, deps.py, alembic/, bootstrap.py
 │   ├── ingest/              # `protect_ingest`: runs adapter event connectors (MQTT, polling, websocket)
 │   ├── decoder/             # `protect_decoder`: source events to canonical rows
+│   ├── export/              # `protect_export`: export jobs to MinIO
 │   └── frontend/            # React + Vite + TypeScript, nginx Dockerfile, FRONTEND_CONVENTIONS.md
 ├── shared/shared/           # package `shared`: config, database, logger, version, enums, permissions,
 │                            # models/, domain/assignments.py, trace.py, timeutil.py, secrets.py, bus.py,
@@ -145,7 +146,7 @@ Requirements: Docker with Compose v2, [uv](https://docs.astral.sh/uv/), Node 24.
 ```bash
 cp .env.example .env
 scripts/dev.sh hooks                      # git config core.hooksPath .githooks
-scripts/dev.sh up                         # docker compose up -d --build: postgres, redis, minio, migrate, api, ingest, decoder, frontend
+scripts/dev.sh up                         # docker compose up -d --build: postgres, redis, minio, migrate, api, ingest, decoder, export, frontend
 scripts/dev.sh bootstrap-admin you@example.org   # invitation link for the first server admin (once)
 docker compose --profile chirpstack up -d # adds a local ChirpStack (web UI on :8080, MQTT on :1883, REST on :8090)
 uv sync --all-groups                      # python environment for tests, linters and docs
@@ -181,6 +182,16 @@ How the app is put together:
 - Map: `useMap` creates one MapLibre map with OpenFreeMap styles (D37) and sends the bearer token on requests to our own origin; `layers.ts` owns the entity, track and feature sources. Live updates come from `useProjectStream` over the WebSocket and patch the current-state query cache.
 
 Screenshot sweep: `npm run sweep` (Playwright, routes derived from `src/App.tsx`) logs in with `SWEEP_EMAIL` and `SWEEP_PASSWORD`, opens every route at 390, 768 and 1440 px, flags console errors and horizontal overflow and writes `ui-sweep-output/`. Chromium needs a few system libraries (`libnspr4 libnss3 libasound2t64` on Ubuntu 24.04); without them run the sweep in the Playwright image from `services/frontend`: `docker run --rm --network host --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work -e SWEEP_EMAIL=... -e SWEEP_PASSWORD=... mcr.microsoft.com/playwright:v1.58.0-noble node scripts/ui-sweep.mjs`. The `--user` flag keeps the output owned by you.
+
+## Analytics and exports
+
+`shared/analytics.py` holds the aggregation statement the API and the export worker share: the bucket ladder and the automatic resolution (decision D41), the bound of 5,000 points per series and 20 series per request, and `aggregate_statement` built on `time_bucket`, `first` and `last`. The router is `protect_api/routers/analytics.py` (series, drill-down rows, metrics with data, saved views).
+
+`shared/exports/` is the export engine: `ExportParameters` (what a job stores), `datasets.py` (one streamed query per dataset, rows as dicts, `yield_per` server-side cursor), `writers.py` (CSV, XLSX in write-only mode with sheet splitting, JSON, GeoJSON, GPX; rows in, bytes out) and `runner.py` (a job to a temporary file to MinIO, or a direct stream bounded at 100,000 rows). Progress writes go through a separate session, because a commit on the streaming session closes the cursor. The export service (`services/export`) consumes `export.requested`. Docs: `docs/analytics/`.
+
+## Benchmark
+
+`scripts/benchmark/generate.py --scale 0.01` loads a synthetic dataset at a fraction of the reference envelope (architecture 13.9) with COPY: eight benchmark projects, devices walking around a home range, four measurements per position. `scripts/benchmark/run.py --email ... --password ... --manifest ...` times the map, tiles, tracks, Data Explorer, exports and an ingest burst against the running stack and writes `docs/operations/benchmarks.md`. `generate.py --reset` removes the dataset. See `docs/architecture/scalability.md` for the reading of the results.
 
 ## Database migrations
 

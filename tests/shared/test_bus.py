@@ -167,3 +167,28 @@ async def test_lag_counts_undelivered(bus):
     await bus.publish(topic, {"a": 2})
     await bus.ensure_group(topic, "g")
     assert await bus.lag(topic, "g") == 2
+
+
+async def test_batches_run_in_lanes_per_device(bus):
+    """Different devices are handled concurrently, one device stays in publish order."""
+    topic = topic_name()
+    order: dict[str, list[int]] = {}
+    running = 0
+    peak = 0
+
+    async def handler(message: Message) -> None:
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.02)
+        order.setdefault(str(message.payload["device_id"]), []).append(int(message.payload["n"]))
+        running -= 1
+
+    for n in range(12):
+        await bus.publish(topic, {"device_id": f"dev-{n % 4}", "n": n})
+    handled = await bus.consume(topic, "lanes", "c1", handler, once=True, concurrency=4)
+    assert handled == 12
+    assert peak > 1, "lanes did not overlap"
+    for device, seen in order.items():
+        assert seen == sorted(seen), f"{device} handled out of order: {seen}"
+    assert sorted(len(v) for v in order.values()) == [3, 3, 3, 3]

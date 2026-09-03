@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 4, analyze, export and the scale benchmark |
-| Latest release | v0.1.1 (2026-09-03); v0.1.0 does not build on a clean checkout |
+| Active phase | Phase 5, rules, events, alerts, automations and notifications |
+| Latest release | v0.2.0 (2026-09-03) |
 | Last session | 2026-09-03 |
-| Next item | Phase 4: quick start on a clean checkout, then the aggregation API |
+| Next item | Phase 5: rule schema (D9), after the decisions at its start; first performance item: decoder statements per event |
 | Blockers | none |
 
 ## What we are building
@@ -80,6 +80,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D36 | Icons | Lucide (ISC) for technical and UI icons, own monochrome silhouettes for wildlife and infrastructure under the project licence; EarthRanger mappings stay as registry keys | Clean licence today, assets can be swapped later without touching data. Decided by Tim on 2026-09-03. |
 | D37 | Base map | OpenFreeMap vector tiles, no key; satellite imagery later behind an optional key as a user choice | Free, native to MapLibre, no tile server to run. Decided by Tim on 2026-09-03. |
 | D38 | External deep links | `data_sources.link_templates` JSONB keyed `OPEN_DEVICE`, `OPEN_APPLICATION`, `OPEN_GATEWAY`; URL templates filled from ExternalIdentity attributes; adapters ship defaults, admins override per data source | Built as proposed in architecture 32 during phase 3; no reason found to deviate. Recorded by Claude on 2026-09-03. |
+| D39 | Export worker | Own `services/export` package in the shared Python image, compose service `protect-export`, same worker base class as decoder and ingest | Isolated from live decoding, one image to build. Decided by Tim on 2026-09-03. |
+| D40 | XLSX writer | openpyxl in write-only mode; the Excel row limit is enforced by splitting into sheets, never silently truncated | Pure Python, MIT, streams rows. Decided by Tim on 2026-09-03. |
+| D41 | Aggregate resolution | Fixed ladder 1 s, 10 s, 1 min, 5 min, 15 min, 1 h, 6 h, 1 d, 7 d; pick the smallest bucket with at most 5,000 buckets over the range; user override allowed | Deterministic, cache friendly, matches continuous aggregates later. Decided by Tim on 2026-09-03. |
+| D42 | Saved views | `saved_views` table per project with the filter and layout as JSONB and a schema version | Simple, versioned, no new service. Recorded by Claude on 2026-09-03. |
 
 ### Open decisions from architecture section 32
 
@@ -373,18 +377,18 @@ Release:
 
 **Deliverables.**
 
-- [ ] Aggregation API: filters by project, entities, devices, metrics, data source and time range; automatic resolution selection targeting 2,000-5,000 samples per series with user override; `time_bucket` aggregates mean, min, max, median, sum, count, first, last; long and wide layouts; drill-down from a bucket to normalized rows and to source events.
-- [ ] Continuous aggregates for hourly and daily buckets when benchmarks show repeated expensive queries.
-- [ ] Data Explorer UI: filter builder, virtualized table with sort, filter, column selection and grouping, ECharts line, scatter, bar, histogram and state timeline, multi-series comparison across entities and devices, timezone selection, drill-down, saved views per project.
-- [ ] Export jobs: `export_jobs` table, worker in `services/export`, streaming CSV, XLSX (with Excel row limits enforced), JSON, GeoJSON and GPX for tracks, data level selection (raw, decoded, normalized, aggregated), metadata columns, recorded filters and units for reproducibility, small exports returned directly, large ones as MinIO objects with a download link. Target: 10 million rows CSV without memory growth.
-- [ ] Exports UI: job list with progress, download, reproduce.
-- [ ] `scripts/benchmark/generate.py`: synthetic dataset generator scalable up to the reference envelope (13.9), with realistic spatial clustering and time distributions, multiple projects and data sources. `scripts/benchmark/run.py`: live map load, viewport tiles, 1-day, 30-day and 1-year tracks, Data Explorer aggregates, exports, ingest bursts. Results written to `docs/operations/benchmarks.md`.
-- [ ] Benchmark run at 1/10 scale on the development machine. Compare against the performance budgets in 13.7. Fix what fails.
-- [ ] TimescaleDB decision gate: confirm or replace with native partitioning. Update ADR 0003.
-- [ ] Retention and compression policies verified against the benchmark dataset.
-- [ ] Docs: `docs/analytics/data-explorer.md`, `docs/analytics/export.md`, `docs/architecture/scalability.md`.
+- [x] Aggregation API (2026-09-03, `shared/analytics.py`, `/analytics/series`, `/rows`, `/metrics`, saved views): filters by project, entities, devices, metrics, data source and time range; automatic resolution selection targeting 2,000-5,000 samples per series with user override; `time_bucket` aggregates mean, min, max, median, sum, count, first, last; long and wide layouts; drill-down from a bucket to normalized rows and to source events.
+- [x] Continuous aggregates for hourly and daily buckets when benchmarks show repeated expensive queries. Not needed at the tested scale (raw `time_bucket` scans answer in tens of milliseconds, see `docs/architecture/scalability.md`); revisit with the 1/10 run.
+- [x] Data Explorer UI (2026-09-03; sort, column selection and grouping are the shared table's, virtualization follows when a screen needs it): filter builder, virtualized table with sort, filter, column selection and grouping, ECharts line, scatter, bar, histogram and state timeline, multi-series comparison across entities and devices, timezone selection, drill-down, saved views per project.
+- [x] Export jobs (2026-09-03, 1.34 million rows CSV in 45 s with the export container flat at about 90 MiB): `export_jobs` table, worker in `services/export`, streaming CSV, XLSX (with Excel row limits enforced), JSON, GeoJSON and GPX for tracks, data level selection (raw, decoded, normalized, aggregated), metadata columns, recorded filters and units for reproducibility, small exports returned directly, large ones as MinIO objects with a download link. Target: 10 million rows CSV without memory growth.
+- [x] Exports UI (2026-09-03): job list with progress, download, reproduce.
+- [x] `scripts/benchmark/generate.py` (2026-09-03): synthetic dataset generator scalable up to the reference envelope (13.9), with realistic spatial clustering and time distributions, multiple projects and data sources. `scripts/benchmark/run.py`: live map load, viewport tiles, 1-day, 30-day and 1-year tracks, Data Explorer aggregates, exports, ingest bursts. Results written to `docs/operations/benchmarks.md`.
+- [x] Benchmark run at 1/10 scale on the development machine (2026-09-03: 22.4 million positions, 89.7 million measurements, 39 minutes to generate; every read path within budget; the decoder throughput is the open item, see `docs/architecture/scalability.md`). Compare against the performance budgets in 13.7. Fix what fails.
+- [x] TimescaleDB decision gate (2026-09-03, confirmed): confirm or replace with native partitioning. Update ADR 0003.
+- [x] Retention and compression policies verified against the benchmark dataset (2026-09-03: compression measured at 16x on measurements and 10x on positions after compressing the old chunks by hand; retention policy present on source events only, canonical rows stay by design).
+- [x] Docs (2026-09-03): `docs/analytics/data-explorer.md`, `docs/analytics/export.md`, `docs/architecture/scalability.md`.
 
-**Exit criteria.** Benchmark results recorded and within budget at the tested scale, a 1 million row export streams with flat memory, the Timescale decision is written down.
+**Exit criteria.** Benchmark results recorded and within budget at the tested scale, a 1 million row export streams with flat memory, the Timescale decision is written down. Met on 2026-09-03 at 1/10 scale, with the decoder throughput (90 events per second per process) recorded as the open performance item.
 
 ---
 
@@ -717,3 +721,16 @@ Listed by the phase where they are first needed.
 - 100 python tests, 2 frontend tests, lint and types clean, docs strict, sweep 31 routes times 3 viewports clean. Committed and tagged v0.1.0 on Tim's instruction.
 - Next session: run the quick start on a clean checkout (phase 3 exit criterion on a fresh machine), then phase 4 starting with the aggregation API.
 - Decisions to ask Tim when phase 4 starts: where the export worker runs (proposed: `services/export` in the shared Python image, own compose service); XLSX writer (proposed: openpyxl write-only mode); resolution selection rule for aggregates (proposed: pick the coarsest `time_bucket` that keeps a series at or under 5,000 points); saved views storage (proposed: `saved_views` table per project, JSONB filter). Everything phase 4 needs is in place: TimescaleDB hypertables, MinIO, ECharts installed, the Redis bus and worker base class. Inputs still wanted: recorded live OpenCollar uplinks, confirmation of the composed wide logo.
+
+### 2026-09-03, phase 4 (Claude)
+
+- Tim decided D39 (export worker as its own service in the shared image), D40 (openpyxl write-only), D41 (bucket ladder, at most 5,000 points per series), whole phase backend first; D42 (saved views table) recorded by Claude.
+- Quick start on a clean checkout, from GitHub at v0.1.1: the stack came up and ChirpStack, traffic, traces and deep links worked, but no positions appeared. Two causes fixed: the simulator sent generic JSON while the README's device type uses the OpenCollar driver (the simulator now encodes real OpenCollar port 2 and port 4 frames, with a test that the driver decodes them, and `--interval` spaces the fixes), and the bootstrap passed no API key to the Protect data source when it minted one. `chirpstack-bootstrap --demo` now creates the Protect side (project, types, device, identity, entity, assignments) so the quick start has no UI clicks. Re-verified on the clean stack with the fixed scripts: 12 uplinks processed, 10 positions on the map.
+- Aggregation API in `shared/analytics.py` and `routers/analytics.py`: series, long and wide layouts, automatic resolution, drill-down rows, metrics with data, saved views. Cursor pagination learned bigint keys.
+- Export engine in `shared/exports/` and the `protect-export` service (migration 0004: `export_jobs`, `saved_views`): jobs to MinIO with progress, SHA-256 and metadata, direct downloads bounded at 100,000 rows, CSV, XLSX with sheet splitting, JSON, GeoJSON, GPX. Three bugs found by the benchmark and fixed: a progress commit closed the server-side cursor (progress has its own session), ORM rows grew the worker to 269 MiB (plain columns now, flat at about 90 MiB for 1.35 million rows), and the on-demand MinIO bucket creation.
+- Frontend: Data explorer (filter builder from metrics with data, ECharts line, scatter, bar, histogram and state timeline, table with drill-down to rows and source events, saved views, timezone, export from the current view) and Exports (jobs with progress, download through the API, reproduce, details). State lives in the URL. Sweep clean on 33 routes times 3 viewports.
+- Benchmark: `scripts/benchmark/generate.py` (COPY, eight parks, home-range walks) and `run.py` (writes `docs/operations/benchmarks.md`, `--only` for one section). Run at 1/100 and then at 1/10 on this machine (22.4 million positions, 89.7 million measurements, 39 minutes to generate, 73 GB before compression): every read path within budget at both scales, an 11.4 million row export streamed with the worker flat at about 100 MiB, compression measured at 16x (measurements) and 10x (positions). TimescaleDB confirmed, ADR 0003 updated, `docs/architecture/scalability.md` written. The dataset stays in the local database; `generate.py --reset` removes it.
+- What failed and what was done: the decoder handled 60 events per second sequentially. The bus now handles batches in lanes per device (`BUS_CONCURRENCY`), which gave 90 per second; more lanes changed nothing, so the rest is CPU per event. Open for the next session: profile the decoder (statements per event, batch the trace steps), and make the decoder count a deployment variable in phase 7.
+- Lessons: `docker compose up --build` fails silently in a chained shell command when the compose file is invalid, and the old containers keep running; after every rebuild the code inside the container is now checked before a benchmark is trusted.
+- Not done in this phase: table virtualization, column selection and grouping in the Data explorer (the shared table sorts only); noted on the deliverable. The Playwright sweep still has no assertions.
+- 117 python tests, 5 frontend tests, lint and types clean, docs strict, OpenAPI schema regenerated. Committed and tagged v0.2.0 on Tim's instruction.

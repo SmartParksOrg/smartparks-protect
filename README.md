@@ -41,14 +41,14 @@ docker compose --profile chirpstack up -d             # database, redis, minio, 
 scripts/dev.sh bootstrap-admin you@example.org        # prints the registration link for the first server admin
 ```
 
-Open the link, create your account, sign in at <http://localhost:3000>. Then, under Server admin, create a project, an entity type and a device type with the OpenCollar driver, or let the bootstrap do the ChirpStack part:
+Open the link, create your account, sign in at <http://localhost:3000>. Then let the bootstrap set up the local ChirpStack (tenant, application, device profile, gateway, device) and the demo project in Protect (project, OpenCollar device type, device `SP05-sim` with its DevEUI, entity `Rhino 14`):
 
 ```bash
-scripts/dev.sh chirpstack-bootstrap --protect-email you@example.org --protect-password '...'
+scripts/dev.sh chirpstack-bootstrap --demo --protect-email you@example.org --protect-password '...'
 scripts/dev.sh simulate --application-id <id printed by the bootstrap> --count 20 --rate 2
 ```
 
-The simulator publishes uplinks the way ChirpStack does. Create the device `SP05-sim` with the external identity `70B3D57ED0001234` on the ChirpStack data source (or accept it from Needs attention), assign it to your project and an entity, and watch it move on the live map. Traffic, traces and health are under Network and Server admin.
+The simulator publishes OpenCollar uplinks the way ChirpStack does: a GNSS position per uplink and a status message every fifth. Open the live map of Demo park and watch the rhino move. Traffic, traces and health are under Network and Server admin. Without `--demo` you create the project, types, device and entity yourself under Server admin, or accept the unknown DevEUI from Needs attention.
 
 Endpoints: API docs <http://localhost:8000/api/docs>, health <http://localhost:8000/api/health>, ChirpStack <http://localhost:8080> (admin / admin), MinIO console <http://localhost:9001>.
 

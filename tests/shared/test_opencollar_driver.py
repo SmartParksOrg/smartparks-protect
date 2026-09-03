@@ -195,3 +195,29 @@ def test_bad_frames_are_decode_failures():
                 device_type_settings={},
             )
         )
+
+
+def test_simulator_frames_decode_to_positions_and_status():
+    """The quick start relies on the simulator's synthetic frames being real OpenCollar messages."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "simulate_opencollar", Path(__file__).parents[2] / "scripts/simulate_opencollar.py"
+    )
+    simulator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(simulator)
+    items = simulator.synthetic(10, -24.9, 31.5, 60.0)
+    assert [i["f_port"] for i in items].count(2) == 10 and [i["f_port"] for i in items].count(
+        4
+    ) == 2
+    driver = OpenCollarDriver()
+    positions = []
+    status_metrics = set()
+    for item in items:
+        records = driver.decode(event(item["f_port"], item["data_hex"]))
+        positions += records.positions
+        status_metrics |= {m.metric_key for m in records.measurements if m.record_type == "status"}
+    assert len(positions) == 10
+    assert all(abs(p.latitude + 24.9) < 0.02 and abs(p.longitude - 31.5) < 0.02 for p in positions)
+    assert positions[0].time < positions[-1].time and positions[-1].speed_mps is not None
+    assert {"battery_voltage", "device_temperature"} <= status_metrics

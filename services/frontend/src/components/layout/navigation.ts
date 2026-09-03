@@ -54,8 +54,8 @@ export const projectSections: NavSection[] = [
   {
     label: "Analyze",
     items: [
-      { label: "Data explorer", icon: ChartLine, phase: 4 },
-      { label: "Exports", icon: FileClock, phase: 4 },
+      { label: "Data explorer", icon: ChartLine, to: "analyze/explorer" },
+      { label: "Exports", icon: FileClock, to: "analyze/exports" },
     ],
   },
   {

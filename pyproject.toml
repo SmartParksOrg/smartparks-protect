@@ -17,6 +17,7 @@ smartparks-protect-shared = { workspace = true }
 smartparks-protect-api = { workspace = true }
 smartparks-protect-ingest = { workspace = true }
 smartparks-protect-decoder = { workspace = true }
+smartparks-protect-export = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -24,12 +25,14 @@ dev = [
     "smartparks-protect-api",
     "smartparks-protect-ingest",
     "smartparks-protect-decoder",
+    "smartparks-protect-export",
     "ruff==0.16.5",
     "mypy==2.3.1",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "httpx==0.28.1",
     "httpx-ws==0.9.0",
+    "types-openpyxl==3.1.5.20260827",
 ]
 docs = [
     "mkdocs<2",
@@ -39,7 +42,7 @@ docs = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["shared", "services/api", "services/ingest", "services/decoder", "tests"]
+src = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF", "ANN"]
@@ -58,7 +61,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "f
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = ["shared", "services/api", "services/ingest", "services/decoder"]
+mypy_path = ["shared", "services/api", "services/ingest", "services/decoder", "services/export"]
 packages = ["shared", "protect_api", "protect_ingest", "protect_decoder"]
 plugins = ["pydantic.mypy"]
 

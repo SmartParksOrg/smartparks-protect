@@ -155,3 +155,27 @@ class ErrorSeverity(StrEnum):
     WARNING = "warning"
     ERROR = "error"
     CRITICAL = "critical"
+
+
+class ExportFormat(StrEnum):
+    CSV = "csv"
+    XLSX = "xlsx"
+    JSON = "json"
+    GEOJSON = "geojson"
+    GPX = "gpx"
+
+
+class ExportDataset(StrEnum):
+    """What an export contains (architecture 14, data level)."""
+
+    SOURCE_EVENTS = "source_events"  # raw: inbound messages with their payload
+    POSITIONS = "positions"  # normalized
+    MEASUREMENTS = "measurements"  # normalized
+    AGGREGATES = "aggregates"  # bucketed series, same query as the Data Explorer
+
+
+class ExportStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"

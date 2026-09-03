@@ -59,6 +59,7 @@ nav:
       - architecture/index.md
       - Data model: architecture/data-model.md
       - Processing pipeline: architecture/processing-pipeline.md
+      - Scalability: architecture/scalability.md
       - AddaxAI Connect reuse audit: architecture/addaxai-connect-reuse-audit.md
   - Devices:
       - devices/index.md
@@ -69,12 +70,17 @@ nav:
       - integrations/index.md
       - Adapter interface: integrations/adapter-interface.md
       - ChirpStack: integrations/chirpstack/index.md
-  - Analytics: analytics/index.md
+  - Analytics:
+      - analytics/index.md
+      - Data Explorer: analytics/data-explorer.md
+      - Export: analytics/export.md
   - Rules: rules/index.md
   - Administration:
       - administration/index.md
       - Permissions: administration/permissions.md
-  - Operations: operations/index.md
+  - Operations:
+      - operations/index.md
+      - Benchmarks: operations/benchmarks.md
   - Troubleshooting: troubleshooting/index.md
   - API: api/index.md
   - MCP: mcp/index.md

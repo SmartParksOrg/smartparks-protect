@@ -31,6 +31,13 @@ State colours on the map communicate status, not object type; the icon communica
 - Symbol layers use `text-font: ["Noto Sans Regular"]`, the glyphs OpenFreeMap serves. The MapLibre default font is not available there.
 - Marker images come from `components/icons/markers.ts`; never hand-build marker images in a page.
 
+## Charts
+
+- ECharts through `echarts/core` with only the charts and components a screen uses registered (`components/analytics/SeriesChart.tsx`); never import the full `echarts` bundle.
+- One chart instance per mount, resized by a `ResizeObserver`, options rebuilt from data in an effect; the component owns no data fetching.
+- Series colours come from the brand palette in `SeriesChart.tsx`; a chart never invents colours.
+- The Data Explorer state lives in the URL (`pages/project/ExplorerPage.tsx`), so a saved view is its search parameters and a link reproduces a view.
+
 ## Z-index ladder
 
 Do not invent z-index values. Pick the layer; ties are broken by DOM order.

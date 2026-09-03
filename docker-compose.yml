@@ -110,6 +110,7 @@ services:
       BUS_DEAD_MAXLEN: ${BUS_DEAD_MAXLEN:-10000}
       BUS_MAX_ATTEMPTS: ${BUS_MAX_ATTEMPTS:-5}
       BUS_RETRY_BASE_SECONDS: ${BUS_RETRY_BASE_SECONDS:-5}
+      BUS_CONCURRENCY: ${BUS_CONCURRENCY:-8}
       HEARTBEAT_STALE_MINUTES: ${HEARTBEAT_STALE_MINUTES:-15}
       PAYLOAD_INLINE_MAX_BYTES: ${PAYLOAD_INLINE_MAX_BYTES:-65536}
 
@@ -162,6 +163,20 @@ services:
     build: *python-build
     restart: unless-stopped
     command: ["/app/.venv/bin/python", "-m", "protect_decoder.main"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment: *python-env
+
+  export:
+    container_name: protect-export
+    build: *python-build
+    restart: unless-stopped
+    command: ["/app/.venv/bin/python", "-m", "protect_export.main"]
     depends_on:
       migrate:
         condition: service_completed_successfully

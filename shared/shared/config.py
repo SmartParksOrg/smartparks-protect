@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     bus_retry_base_seconds: float = Field(
         default=5.0, description="First retry delay, doubles per attempt"
     )
+    bus_concurrency: int = Field(
+        default=8, ge=1, description="Concurrent lanes per consumer; one device stays in one lane"
+    )
     heartbeat_stale_minutes: int = 15
     payload_inline_max_bytes: int = Field(
         default=65_536, description="Bigger raw payloads go to MinIO"

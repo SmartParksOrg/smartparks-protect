@@ -32,6 +32,13 @@ export type CurrentState = Schemas["CurrentStateResponse"];
 export type AuditEntry = Schemas["AuditRead"];
 export type UserAdmin = Schemas["UserAdminRead"];
 export type InvitationInfo = Schemas["InvitationInfo"];
+export type SeriesResponse = Schemas["SeriesResponse"];
+export type Series = Schemas["Series"];
+export type MeasurementRow = Schemas["MeasurementRow"];
+export type MetricWithData = Schemas["MetricWithData"];
+export type SavedView = Schemas["SavedViewRead"];
+export type ExportJob = Schemas["ExportJobRead"];
+export type ExportParameters = Schemas["ExportParameters"];
 
 export interface Page<T> {
   items: T[];

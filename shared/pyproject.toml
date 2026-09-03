@@ -15,6 +15,7 @@ dependencies = [
     "cryptography==50.0.1",
     "aiomqtt==2.5.1",
     "minio==7.2.20",
+    "openpyxl==3.1.5",
 ]
 
 [build-system]

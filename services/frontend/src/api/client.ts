@@ -102,3 +102,18 @@ export function wsUrl(projectId: string, token: string): string {
   const protocol = base.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${base.host}/api/v1/ws/projects/${projectId}?token=${encodeURIComponent(token)}`;
 }
+
+/** Download a file that needs the bearer token: fetch it, then hand the browser a blob link. */
+export async function downloadFile(path: string, fallbackName: string, query?: Query): Promise<void> {
+  const token = useAuthStore.getState().token;
+  const response = await fetch(buildUrl(path, query), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new ApiError(response.status, await errorDetail(response));
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

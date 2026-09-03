@@ -8,6 +8,7 @@ from shared.models.access import (
     ProjectMembership,
     User,
 )
+from shared.models.analytics import ExportJob, SavedView
 from shared.models.base import Base
 from shared.models.domain import (
     DataSource,
@@ -56,6 +57,7 @@ __all__ = [
     "EntityCurrentState",
     "EntityType",
     "Event",
+    "ExportJob",
     "ExternalIdentity",
     "Feature",
     "GatewayReception",
@@ -70,6 +72,7 @@ __all__ = [
     "ProjectMembership",
     "Rule",
     "RuleVersion",
+    "SavedView",
     "SourceDelivery",
     "SourceEvent",
     "User",

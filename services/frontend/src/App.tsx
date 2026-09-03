@@ -16,6 +16,8 @@ const DevicesPage = lazy(() => import("@/pages/project/DevicesPage").then((m) =>
 const DevicePage = lazy(() => import("@/pages/project/DevicePage").then((m) => ({ default: m.DevicePage })));
 const TrafficPage = lazy(() => import("@/pages/project/TrafficPage").then((m) => ({ default: m.TrafficPage })));
 const TracesPage = lazy(() => import("@/pages/project/TracesPage").then((m) => ({ default: m.TracesPage })));
+const ExplorerPage = lazy(() => import("@/pages/project/ExplorerPage").then((m) => ({ default: m.ExplorerPage })));
+const ExportsPage = lazy(() => import("@/pages/project/ExportsPage").then((m) => ({ default: m.ExportsPage })));
 const MembersPage = lazy(() => import("@/pages/project/MembersPage").then((m) => ({ default: m.MembersPage })));
 const FeaturesPage = lazy(() => import("@/pages/project/FeaturesPage").then((m) => ({ default: m.FeaturesPage })));
 const ProjectSettingsPage = lazy(() => import("@/pages/project/ProjectSettingsPage").then((m) => ({ default: m.ProjectSettingsPage })));
@@ -53,6 +55,8 @@ export default function App() {
               <Route path="devices" element={<DevicesPage />} />
               <Route path="devices/:deviceId" element={<DevicePage />} />
               <Route path="alerts" element={<ComingSoonPage title="Alerts" phase={5} />} />
+              <Route path="analyze/explorer" element={<ExplorerPage />} />
+              <Route path="analyze/exports" element={<ExportsPage />} />
               <Route path="network/traffic" element={<TrafficPage />} />
               <Route path="network/traces" element={<TracesPage />} />
               <Route path="admin/members" element={<MembersPage />} />

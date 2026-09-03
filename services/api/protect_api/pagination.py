@@ -53,9 +53,10 @@ async def paginate(
 
 
 def _parse_cursor(key: InstrumentedAttribute[Any], cursor: str) -> Any:
-    if key.type.python_type is uuid.UUID:
+    python_type = key.type.python_type
+    if python_type in (uuid.UUID, int):
         try:
-            return uuid.UUID(cursor)
+            return python_type(cursor)
         except ValueError:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid cursor") from None
     return cursor

@@ -10,7 +10,7 @@ the local compose stack with --mint-key. Minting inserts a row into ChirpStack's
 through `docker exec` and signs a JWT with CHIRPSTACK_API_SECRET from `.env`; ChirpStack keys
 are exactly that, so the result is a normal key. Development only.
 
-    uv run scripts/chirpstack_bootstrap.py --mint-key \
+    uv run scripts/chirpstack_bootstrap.py --mint-key --demo \
         --protect-email admin@example.org --protect-password '...' \
         [--codec shared/shared/device_drivers/opencollar/codec.js]
 """
@@ -220,6 +220,102 @@ def register_data_source(
     )
 
 
+def _find_or_create(
+    client: httpx.Client, headers: dict[str, str], path: str, match: dict, body: dict
+) -> dict:
+    """Return the first item whose fields equal `match`, or create one from `body`."""
+    items = client.get(path, headers=headers, params={"limit": 500}).raise_for_status().json()
+    for item in items["items"] if isinstance(items, dict) else items:
+        if all(item.get(k) == v for k, v in match.items()):
+            return dict(item)
+    return dict(client.post(path, json=body, headers=headers).raise_for_status().json())
+
+
+def create_demo(protect_url: str, email: str, password: str, source_id: str) -> dict[str, str]:
+    """The Protect side of the quick start: a project, the OpenCollar device type, the simulated
+    device with its DevEUI on the ChirpStack data source, and an entity carrying it. Idempotent:
+    existing rows with the same names are reused."""
+    client = httpx.Client(base_url=protect_url, timeout=15)
+    token = (
+        client.post("/api/v1/auth/login", data={"username": email, "password": password})
+        .raise_for_status()
+        .json()["access_token"]
+    )
+    h = {"Authorization": f"Bearer {token}"}
+    project = _find_or_create(
+        client,
+        h,
+        "/api/v1/projects",
+        {"slug": "demo-park"},
+        {"name": "Demo park", "slug": "demo-park"},
+    )
+    scopes = (
+        client.get(f"/api/v1/data-sources/{source_id}", headers=h)
+        .raise_for_status()
+        .json()["project_ids"]
+    )
+    if project["id"] not in scopes:
+        client.patch(
+            f"/api/v1/data-sources/{source_id}",
+            json={"project_ids": [*scopes, project["id"]]},
+            headers=h,
+        ).raise_for_status()
+    entity_type = _find_or_create(
+        client,
+        h,
+        "/api/v1/entity-types",
+        {"key": "rhino"},
+        {"key": "rhino", "label": "Rhino", "group_key": "tracked", "icon_key": "wildlife.rhino"},
+    )
+    device_type = _find_or_create(
+        client,
+        h,
+        "/api/v1/device-types",
+        {"key": "opencollar_edge"},
+        {
+            "key": "opencollar_edge",
+            "label": "OpenCollar Edge",
+            "driver_key": "opencollar",
+            "manufacturer": "Smart Parks",
+        },
+    )
+    device = _find_or_create(
+        client,
+        h,
+        "/api/v1/devices",
+        {"name": "SP05-sim"},
+        {"device_type_id": device_type["id"], "name": "SP05-sim", "status": "active"},
+    )
+    detail = client.get(f"/api/v1/devices/{device['id']}", headers=h).raise_for_status().json()
+    if not any(i["external_id"].lower() == DEVICE_EUI for i in detail["external_identities"]):
+        client.post(
+            f"/api/v1/devices/{device['id']}/identities",
+            json={"data_source_id": source_id, "external_id": DEVICE_EUI.upper()},
+            headers=h,
+        ).raise_for_status()
+    since = "2026-01-01T00:00:00Z"
+    if not detail["project_assignments"]:
+        client.post(
+            f"/api/v1/devices/{device['id']}/project-assignments",
+            json={"project_id": project["id"], "valid_from": since},
+            headers=h,
+        ).raise_for_status()
+    entity = _find_or_create(
+        client,
+        h,
+        f"/api/v1/projects/{project['id']}/entities",
+        {"name": "Rhino 14"},
+        {"entity_type_id": entity_type["id"], "name": "Rhino 14"},
+    )
+    if not detail["entity_assignments"]:
+        client.post(
+            f"/api/v1/projects/{project['id']}/entity-assignments",
+            json={"device_id": device["id"], "entity_id": entity["id"], "valid_from": since},
+            headers=h,
+        ).raise_for_status()
+    return {"project": project["id"], "device": device["id"], "entity": entity["id"]}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -236,6 +332,11 @@ def main() -> None:
     parser.add_argument("--protect-email")
     parser.add_argument("--protect-password")
     parser.add_argument("--codec", type=Path, help="JavaScript codec for the device profile")
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="also create the Protect project, device type, device and entity for the simulator",
+    )
     args = parser.parse_args()
 
     if not args.chirpstack_api_key and not args.mint_key:
@@ -256,10 +357,15 @@ def main() -> None:
             args.protect_email,
             args.protect_password,
             tenant_id=tenant_id,
-            api_key=args.chirpstack_api_key,
+            api_key=api_key,
             application_id=application_id,
         )
         sys.stdout.write(f"protect data source {source_id}\n")
+        if args.demo:
+            demo = create_demo(
+                args.protect_url, args.protect_email, args.protect_password, source_id
+            )
+            sys.stdout.write("".join(f"protect {k} {v}\n" for k, v in demo.items()))
         sys.stdout.write(
             f"simulate: uv run scripts/simulate_opencollar.py --dev-eui {DEVICE_EUI} --application-id {application_id}\n"
         )

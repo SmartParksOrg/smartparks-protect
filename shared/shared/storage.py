@@ -6,6 +6,7 @@ The MinIO SDK is synchronous; calls run in a thread so they do not block the eve
 import asyncio
 import hashlib
 import io
+from collections.abc import AsyncIterator
 from functools import lru_cache
 
 from minio import Minio
@@ -66,3 +67,31 @@ async def get_object(bucket: str, key: str) -> bytes:
             response.release_conn()
 
     return await asyncio.to_thread(_get)
+
+
+async def put_file(
+    bucket: str, key: str, path: str, content_type: str = "application/octet-stream"
+) -> None:
+    """Upload a file from disk; MinIO streams it, so the size does not matter for memory."""
+    client = get_client()
+
+    def _put() -> None:
+        _ensure_bucket(client, bucket)
+        client.fput_object(bucket, key, path, content_type=content_type)
+
+    await asyncio.to_thread(_put)
+
+
+async def stream_object(bucket: str, key: str, chunk_size: int = 1 << 20) -> AsyncIterator[bytes]:
+    """Yield an object in chunks, for proxying a download without holding it in memory."""
+    client = get_client()
+    response = await asyncio.to_thread(client.get_object, bucket, key)
+    try:
+        while True:
+            chunk = await asyncio.to_thread(response.read, chunk_size)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        response.close()
+        response.release_conn()

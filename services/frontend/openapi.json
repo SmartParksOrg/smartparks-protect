@@ -6004,6 +6004,1231 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/analytics/series": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Series",
+    "description": "Bucketed aggregates of measurements attributed to the project. One series per metric and\nentity (or device). Boolean metrics aggregate as 0 and 1, so `mean` is the fraction true.",
+    "operationId": "series_api_v1_projects__project_id__analytics_series_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "metric",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "minItems": 1,
+       "maxItems": 20,
+       "title": "Metric"
+      }
+     },
+     {
+      "name": "entity_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "maxItems": 20,
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "maxItems": 20,
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "data_source_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Data Source Id"
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     },
+     {
+      "name": "bucket",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "One of 1s, 10s, 1m, 5m, 15m, 1h, 6h, 1d, 7d or `all`; default automatic",
+       "title": "Bucket"
+      },
+      "description": "One of 1s, 10s, 1m, 5m, 15m, 1h, 6h, 1d, 7d or `all`; default automatic"
+     },
+     {
+      "name": "agg",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/components/schemas/Aggregate"
+       },
+       "title": "Agg"
+      }
+     },
+     {
+      "name": "group_by",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "$ref": "#/components/schemas/GroupBy",
+       "default": "entity"
+      }
+     },
+     {
+      "name": "layout",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "$ref": "#/components/schemas/Layout",
+       "default": "series"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SeriesResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analytics/rows": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Rows",
+    "description": "Normalized measurement rows behind a bucket: the drill-down from an aggregate. Each row\ncarries its source event and trace, so the next step down is the source event detail.",
+    "operationId": "rows_api_v1_projects__project_id__analytics_rows_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "metric",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Metric"
+      }
+     },
+     {
+      "name": "entity_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "data_source_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Data Source Id"
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_MeasurementRow_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analytics/metrics": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Metrics With Data",
+    "description": "Metrics that have measurements in this project within the range (default 30 days), for\nthe filter builder.",
+    "operationId": "metrics_with_data_api_v1_projects__project_id__analytics_metrics_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/MetricWithData"
+         },
+         "title": "Response Metrics With Data Api V1 Projects  Project Id  Analytics Metrics Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analytics/saved-views": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "List Saved Views",
+    "description": "Data Explorer configurations shared by the project (decision D42).",
+    "operationId": "list_saved_views_api_v1_projects__project_id__analytics_saved_views_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_SavedViewRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Create Saved View",
+    "description": "Any member can save a view; names are unique per project.",
+    "operationId": "create_saved_view_api_v1_projects__project_id__analytics_saved_views_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SavedViewCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SavedViewRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analytics/saved-views/{view_id}": {
+   "patch": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Update Saved View",
+    "operationId": "update_saved_view_api_v1_projects__project_id__analytics_saved_views__view_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "view_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "View Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SavedViewUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SavedViewRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Delete Saved View",
+    "operationId": "delete_saved_view_api_v1_projects__project_id__analytics_saved_views__view_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "view_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "View Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/exports": {
+   "post": {
+    "tags": [
+     "exports"
+    ],
+    "summary": "Create Export",
+    "description": "Queue an export job. The export service writes the file to MinIO; poll the job, then\ndownload it. Nothing is limited in size here, the file streams from the database.",
+    "operationId": "create_export_api_v1_projects__project_id__exports_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ExportParameters"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExportJobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "exports"
+    ],
+    "summary": "List Exports",
+    "operationId": "list_exports_api_v1_projects__project_id__exports_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_ExportJobRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/exports/direct": {
+   "get": {
+    "tags": [
+     "exports"
+    ],
+    "summary": "Direct",
+    "description": "Download a small export at once (at most DIRECT_MAX_ROWS rows, architecture 13.8).\nLarger requests get 413 and should become a job.",
+    "operationId": "direct_api_v1_projects__project_id__exports_direct_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "dataset",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "$ref": "#/components/schemas/ExportDataset"
+      }
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "$ref": "#/components/schemas/ExportFormat"
+      }
+     },
+     {
+      "name": "time_from",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date-time",
+       "title": "Time From"
+      }
+     },
+     {
+      "name": "time_to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date-time",
+       "title": "Time To"
+      }
+     },
+     {
+      "name": "entity_ids",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "maxItems": 500,
+       "title": "Entity Ids"
+      }
+     },
+     {
+      "name": "device_ids",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "maxItems": 500,
+       "title": "Device Ids"
+      }
+     },
+     {
+      "name": "metric_keys",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 100,
+       "title": "Metric Keys"
+      }
+     },
+     {
+      "name": "data_source_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Data Source Id"
+      }
+     },
+     {
+      "name": "timezone",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "description": "IANA name; times are written in this zone",
+       "default": "UTC",
+       "title": "Timezone"
+      },
+      "description": "IANA name; times are written in this zone"
+     },
+     {
+      "name": "include_names",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Entity, device and metric names as columns",
+       "default": true,
+       "title": "Include Names"
+      },
+      "description": "Entity, device and metric names as columns"
+     },
+     {
+      "name": "bucket",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Ladder key, `all`, or empty for automatic",
+       "title": "Bucket"
+      },
+      "description": "Ladder key, `all`, or empty for automatic"
+     },
+     {
+      "name": "aggregates",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "$ref": "#/components/schemas/Aggregate"
+       },
+       "title": "Aggregates"
+      }
+     },
+     {
+      "name": "group_by",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "$ref": "#/components/schemas/GroupBy",
+       "default": "entity"
+      }
+     },
+     {
+      "name": "layout",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "$ref": "#/components/schemas/Layout",
+       "default": "long"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/exports/{job_id}": {
+   "get": {
+    "tags": [
+     "exports"
+    ],
+    "summary": "Get Export",
+    "operationId": "get_export_api_v1_projects__project_id__exports__job_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExportJobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/exports/{job_id}/download": {
+   "get": {
+    "tags": [
+     "exports"
+    ],
+    "summary": "Download Export",
+    "description": "The finished file, streamed from MinIO through the API (the browser never talks to\nMinIO).",
+    "operationId": "download_export_api_v1_projects__project_id__exports__job_id__download_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/exports/{job_id}/reproduce": {
+   "post": {
+    "tags": [
+     "exports"
+    ],
+    "summary": "Reproduce Export",
+    "description": "Run the same parameters again as a new job (architecture 14: reproducible from explicit\nfilters). Late data makes the result differ; the metadata of both jobs shows how.",
+    "operationId": "reproduce_export_api_v1_projects__project_id__exports__job_id__reproduce_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExportJobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/version": {
    "get": {
     "tags": [
@@ -6028,6 +7253,20 @@
  },
  "components": {
   "schemas": {
+   "Aggregate": {
+    "type": "string",
+    "enum": [
+     "mean",
+     "min",
+     "max",
+     "median",
+     "sum",
+     "count",
+     "first",
+     "last"
+    ],
+    "title": "Aggregate"
+   },
    "AssignmentEnd": {
     "properties": {
      "valid_to": {
@@ -7985,6 +9224,317 @@
     ],
     "title": "ErrorModel"
    },
+   "ExportDataset": {
+    "type": "string",
+    "enum": [
+     "source_events",
+     "positions",
+     "measurements",
+     "aggregates"
+    ],
+    "title": "ExportDataset",
+    "description": "What an export contains (architecture 14, data level)."
+   },
+   "ExportFormat": {
+    "type": "string",
+    "enum": [
+     "csv",
+     "xlsx",
+     "json",
+     "geojson",
+     "gpx"
+    ],
+    "title": "ExportFormat"
+   },
+   "ExportJobRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "created_by": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "dataset": {
+      "type": "string",
+      "title": "Dataset"
+     },
+     "format": {
+      "type": "string",
+      "title": "Format"
+     },
+     "parameters": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Parameters"
+     },
+     "metadata": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Metadata"
+     },
+     "source_job_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Job Id"
+     },
+     "progress_rows": {
+      "type": "integer",
+      "title": "Progress Rows"
+     },
+     "row_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Row Count"
+     },
+     "size_bytes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Size Bytes"
+     },
+     "sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sha256"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "created_by",
+     "status",
+     "dataset",
+     "format",
+     "parameters",
+     "metadata",
+     "source_job_id",
+     "progress_rows",
+     "row_count",
+     "size_bytes",
+     "sha256",
+     "error_code",
+     "error_message",
+     "created_at",
+     "started_at",
+     "finished_at",
+     "expires_at"
+    ],
+    "title": "ExportJobRead"
+   },
+   "ExportParameters": {
+    "properties": {
+     "dataset": {
+      "$ref": "#/components/schemas/ExportDataset"
+     },
+     "format": {
+      "$ref": "#/components/schemas/ExportFormat"
+     },
+     "time_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time From"
+     },
+     "time_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time To"
+     },
+     "entity_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Entity Ids"
+     },
+     "device_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Device Ids"
+     },
+     "metric_keys": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 100,
+      "title": "Metric Keys"
+     },
+     "data_source_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Source Id"
+     },
+     "timezone": {
+      "type": "string",
+      "title": "Timezone",
+      "description": "IANA name; times are written in this zone",
+      "default": "UTC"
+     },
+     "include_names": {
+      "type": "boolean",
+      "title": "Include Names",
+      "description": "Entity, device and metric names as columns",
+      "default": true
+     },
+     "bucket": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bucket",
+      "description": "Ladder key, `all`, or empty for automatic"
+     },
+     "aggregates": {
+      "items": {
+       "$ref": "#/components/schemas/Aggregate"
+      },
+      "type": "array",
+      "title": "Aggregates"
+     },
+     "group_by": {
+      "$ref": "#/components/schemas/GroupBy",
+      "default": "entity"
+     },
+     "layout": {
+      "$ref": "#/components/schemas/Layout",
+      "default": "long"
+     }
+    },
+    "type": "object",
+    "required": [
+     "dataset",
+     "format",
+     "time_from",
+     "time_to"
+    ],
+    "title": "ExportParameters",
+    "description": "Everything an export needs; stored on the job so it can be reproduced."
+   },
    "ExternalIdentityCreate": {
     "properties": {
      "data_source_id": {
@@ -8400,6 +9950,14 @@
     ],
     "title": "GeoJSONGeometry"
    },
+   "GroupBy": {
+    "type": "string",
+    "enum": [
+     "entity",
+     "device"
+    ],
+    "title": "GroupBy"
+   },
    "HTTPValidationError": {
     "properties": {
      "detail": {
@@ -8731,6 +10289,15 @@
     ],
     "title": "InvitationRead"
    },
+   "Layout": {
+    "type": "string",
+    "enum": [
+     "series",
+     "long",
+     "wide"
+    ],
+    "title": "Layout"
+   },
    "LinkIdentity": {
     "properties": {
      "device_id": {
@@ -8749,6 +10316,122 @@
      "device_id"
     ],
     "title": "LinkIdentity"
+   },
+   "MeasurementRow": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "metric_key": {
+      "type": "string",
+      "title": "Metric Key"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "data_source_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Source Id"
+     },
+     "source_event_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Id"
+     },
+     "source_event_ingested_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Ingested At"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "time",
+     "metric_key",
+     "value",
+     "device_id",
+     "entity_id",
+     "data_source_id",
+     "source_event_id",
+     "source_event_ingested_at",
+     "trace_id"
+    ],
+    "title": "MeasurementRow"
    },
    "MemberCreate": {
     "properties": {
@@ -8993,6 +10676,63 @@
     "type": "object",
     "title": "MetricUpdate"
    },
+   "MetricWithData": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "value_type": {
+      "type": "string",
+      "title": "Value Type"
+     },
+     "category": {
+      "type": "string",
+      "title": "Category"
+     },
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     },
+     "first_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "First Time"
+     },
+     "last_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Last Time"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "unit",
+     "value_type",
+     "category",
+     "count",
+     "first_time",
+     "last_time"
+    ],
+    "title": "MetricWithData"
+   },
    "PageResponse_DataSourceRead_": {
     "properties": {
      "items": {
@@ -9155,6 +10895,33 @@
     ],
     "title": "PageResponse[EntityTypeRead]"
    },
+   "PageResponse_ExportJobRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ExportJobRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[ExportJobRead]"
+   },
    "PageResponse_ExternalIdentityRead_": {
     "properties": {
      "items": {
@@ -9236,6 +11003,33 @@
     ],
     "title": "PageResponse[InvitationRead]"
    },
+   "PageResponse_MeasurementRow_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/MeasurementRow"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[MeasurementRow]"
+   },
    "PageResponse_MemberRead_": {
     "properties": {
      "items": {
@@ -9316,6 +11110,33 @@
      "items"
     ],
     "title": "PageResponse[ProjectWithRole]"
+   },
+   "PageResponse_SavedViewRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/SavedViewRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[SavedViewRead]"
    },
    "PageResponse_UnknownIdentity_": {
     "properties": {
@@ -10046,6 +11867,326 @@
     ],
     "title": "Role",
     "description": "Project roles. Server admin is `User.is_superuser`, not a membership row."
+   },
+   "SavedViewCreate": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "view": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "View"
+     },
+     "schema_version": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Schema Version",
+      "default": 1
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "view"
+    ],
+    "title": "SavedViewCreate"
+   },
+   "SavedViewRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "created_by": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "view": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "View"
+     },
+     "schema_version": {
+      "type": "integer",
+      "title": "Schema Version"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "created_by",
+     "name",
+     "view",
+     "schema_version",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "SavedViewRead"
+   },
+   "SavedViewUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "view": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "View"
+     },
+     "schema_version": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Schema Version"
+     }
+    },
+    "type": "object",
+    "title": "SavedViewUpdate"
+   },
+   "Series": {
+    "properties": {
+     "metric_key": {
+      "type": "string",
+      "title": "Metric Key"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "points": {
+      "items": {
+       "$ref": "#/components/schemas/SeriesPoint"
+      },
+      "type": "array",
+      "title": "Points"
+     }
+    },
+    "type": "object",
+    "required": [
+     "metric_key",
+     "unit",
+     "entity_id",
+     "device_id",
+     "points"
+    ],
+    "title": "Series"
+   },
+   "SeriesPoint": {
+    "properties": {
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "values": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Values"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time",
+     "values"
+    ],
+    "title": "SeriesPoint"
+   },
+   "SeriesResponse": {
+    "properties": {
+     "time_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time From"
+     },
+     "time_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time To"
+     },
+     "bucket": {
+      "type": "string",
+      "title": "Bucket"
+     },
+     "bucket_seconds": {
+      "type": "integer",
+      "title": "Bucket Seconds"
+     },
+     "automatic_bucket": {
+      "type": "boolean",
+      "title": "Automatic Bucket"
+     },
+     "aggregates": {
+      "items": {
+       "$ref": "#/components/schemas/Aggregate"
+      },
+      "type": "array",
+      "title": "Aggregates"
+     },
+     "group_by": {
+      "$ref": "#/components/schemas/GroupBy"
+     },
+     "layout": {
+      "$ref": "#/components/schemas/Layout"
+     },
+     "series": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/Series"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Series"
+     },
+     "columns": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Columns"
+     },
+     "rows": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "items": {
+         "items": {},
+         "type": "array"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rows"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time_from",
+     "time_to",
+     "bucket",
+     "bucket_seconds",
+     "automatic_bucket",
+     "aggregates",
+     "group_by",
+     "layout"
+    ],
+    "title": "SeriesResponse"
    },
    "ServerAdminInvitationCreate": {
     "properties": {

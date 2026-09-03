@@ -1255,6 +1255,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/analytics/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Series
+         * @description Bucketed aggregates of measurements attributed to the project. One series per metric and
+         *     entity (or device). Boolean metrics aggregate as 0 and 1, so `mean` is the fraction true.
+         */
+        get: operations["series_api_v1_projects__project_id__analytics_series_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analytics/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rows
+         * @description Normalized measurement rows behind a bucket: the drill-down from an aggregate. Each row
+         *     carries its source event and trace, so the next step down is the source event detail.
+         */
+        get: operations["rows_api_v1_projects__project_id__analytics_rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analytics/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metrics With Data
+         * @description Metrics that have measurements in this project within the range (default 30 days), for
+         *     the filter builder.
+         */
+        get: operations["metrics_with_data_api_v1_projects__project_id__analytics_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analytics/saved-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Saved Views
+         * @description Data Explorer configurations shared by the project (decision D42).
+         */
+        get: operations["list_saved_views_api_v1_projects__project_id__analytics_saved_views_get"];
+        put?: never;
+        /**
+         * Create Saved View
+         * @description Any member can save a view; names are unique per project.
+         */
+        post: operations["create_saved_view_api_v1_projects__project_id__analytics_saved_views_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analytics/saved-views/{view_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Saved View */
+        delete: operations["delete_saved_view_api_v1_projects__project_id__analytics_saved_views__view_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Saved View */
+        patch: operations["update_saved_view_api_v1_projects__project_id__analytics_saved_views__view_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Exports */
+        get: operations["list_exports_api_v1_projects__project_id__exports_get"];
+        put?: never;
+        /**
+         * Create Export
+         * @description Queue an export job. The export service writes the file to MinIO; poll the job, then
+         *     download it. Nothing is limited in size here, the file streams from the database.
+         */
+        post: operations["create_export_api_v1_projects__project_id__exports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/exports/direct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Direct
+         * @description Download a small export at once (at most DIRECT_MAX_ROWS rows, architecture 13.8).
+         *     Larger requests get 413 and should become a job.
+         */
+        get: operations["direct_api_v1_projects__project_id__exports_direct_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/exports/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Export */
+        get: operations["get_export_api_v1_projects__project_id__exports__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/exports/{job_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Export
+         * @description The finished file, streamed from MinIO through the API (the browser never talks to
+         *     MinIO).
+         */
+        get: operations["download_export_api_v1_projects__project_id__exports__job_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/exports/{job_id}/reproduce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reproduce Export
+         * @description Run the same parameters again as a new job (architecture 14: reproducible from explicit
+         *     filters). Late data makes the result differ; the metadata of both jobs shows how.
+         */
+        post: operations["reproduce_export_api_v1_projects__project_id__exports__job_id__reproduce_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/version": {
         parameters: {
             query?: never;
@@ -1276,6 +1483,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * Aggregate
+         * @enum {string}
+         */
+        Aggregate: "mean" | "min" | "max" | "median" | "sum" | "count" | "first" | "last";
         /** AssignmentEnd */
         AssignmentEnd: {
             /**
@@ -2015,6 +2227,120 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /**
+         * ExportDataset
+         * @description What an export contains (architecture 14, data level).
+         * @enum {string}
+         */
+        ExportDataset: "source_events" | "positions" | "measurements" | "aggregates";
+        /**
+         * ExportFormat
+         * @enum {string}
+         */
+        ExportFormat: "csv" | "xlsx" | "json" | "geojson" | "gpx";
+        /** ExportJobRead */
+        ExportJobRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Created By */
+            created_by: string | null;
+            /** Status */
+            status: string;
+            /** Dataset */
+            dataset: string;
+            /** Format */
+            format: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Source Job Id */
+            source_job_id: string | null;
+            /** Progress Rows */
+            progress_rows: number;
+            /** Row Count */
+            row_count: number | null;
+            /** Size Bytes */
+            size_bytes: number | null;
+            /** Sha256 */
+            sha256: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Expires At */
+            expires_at: string | null;
+        };
+        /**
+         * ExportParameters
+         * @description Everything an export needs; stored on the job so it can be reproduced.
+         */
+        ExportParameters: {
+            dataset: components["schemas"]["ExportDataset"];
+            format: components["schemas"]["ExportFormat"];
+            /**
+             * Time From
+             * Format: date-time
+             */
+            time_from: string;
+            /**
+             * Time To
+             * Format: date-time
+             */
+            time_to: string;
+            /** Entity Ids */
+            entity_ids?: string[];
+            /** Device Ids */
+            device_ids?: string[];
+            /** Metric Keys */
+            metric_keys?: string[];
+            /** Data Source Id */
+            data_source_id?: string | null;
+            /**
+             * Timezone
+             * @description IANA name; times are written in this zone
+             * @default UTC
+             */
+            timezone: string;
+            /**
+             * Include Names
+             * @description Entity, device and metric names as columns
+             * @default true
+             */
+            include_names: boolean;
+            /**
+             * Bucket
+             * @description Ladder key, `all`, or empty for automatic
+             */
+            bucket?: string | null;
+            /** Aggregates */
+            aggregates?: components["schemas"]["Aggregate"][];
+            /** @default entity */
+            group_by: components["schemas"]["GroupBy"];
+            /** @default long */
+            layout: components["schemas"]["Layout"];
+        };
         /** ExternalIdentityCreate */
         ExternalIdentityCreate: {
             /**
@@ -2174,6 +2500,11 @@ export interface components {
             /** Coordinates */
             coordinates: unknown[];
         };
+        /**
+         * GroupBy
+         * @enum {string}
+         */
+        GroupBy: "entity" | "device";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2303,6 +2634,11 @@ export interface components {
              */
             mail_sent: boolean;
         };
+        /**
+         * Layout
+         * @enum {string}
+         */
+        Layout: "series" | "long" | "wide";
         /** LinkIdentity */
         LinkIdentity: {
             /**
@@ -2315,6 +2651,37 @@ export interface components {
              * @default true
              */
             reprocess: boolean;
+        };
+        /** MeasurementRow */
+        MeasurementRow: {
+            /** Id */
+            id: number;
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Metric Key */
+            metric_key: string;
+            /** Value */
+            value: number | boolean | string | {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Data Source Id */
+            data_source_id: string | null;
+            /** Source Event Id */
+            source_event_id: number | null;
+            /** Source Event Ingested At */
+            source_event_ingested_at: string | null;
+            /** Trace Id */
+            trace_id: string | null;
         };
         /** MemberCreate */
         MemberCreate: {
@@ -2397,6 +2764,31 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** MetricWithData */
+        MetricWithData: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string | null;
+            /** Value Type */
+            value_type: string;
+            /** Category */
+            category: string;
+            /** Count */
+            count: number;
+            /**
+             * First Time
+             * Format: date-time
+             */
+            first_time: string;
+            /**
+             * Last Time
+             * Format: date-time
+             */
+            last_time: string;
+        };
         /** PageResponse[DataSourceRead] */
         PageResponse_DataSourceRead_: {
             /** Items */
@@ -2439,6 +2831,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PageResponse[ExportJobRead] */
+        PageResponse_ExportJobRead_: {
+            /** Items */
+            items: components["schemas"]["ExportJobRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** PageResponse[ExternalIdentityRead] */
         PageResponse_ExternalIdentityRead_: {
             /** Items */
@@ -2460,6 +2859,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PageResponse[MeasurementRow] */
+        PageResponse_MeasurementRow_: {
+            /** Items */
+            items: components["schemas"]["MeasurementRow"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** PageResponse[MemberRead] */
         PageResponse_MemberRead_: {
             /** Items */
@@ -2478,6 +2884,13 @@ export interface components {
         PageResponse_ProjectWithRole_: {
             /** Items */
             items: components["schemas"]["ProjectWithRole"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** PageResponse[SavedViewRead] */
+        PageResponse_SavedViewRead_: {
+            /** Items */
+            items: components["schemas"]["SavedViewRead"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -2737,6 +3150,120 @@ export interface components {
          * @enum {string}
          */
         Role: "project-viewer" | "project-admin";
+        /** SavedViewCreate */
+        SavedViewCreate: {
+            /** Name */
+            name: string;
+            /** View */
+            view: {
+                [key: string]: unknown;
+            };
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+        };
+        /** SavedViewRead */
+        SavedViewRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Created By */
+            created_by: string | null;
+            /** Name */
+            name: string;
+            /** View */
+            view: {
+                [key: string]: unknown;
+            };
+            /** Schema Version */
+            schema_version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** SavedViewUpdate */
+        SavedViewUpdate: {
+            /** Name */
+            name?: string | null;
+            /** View */
+            view?: {
+                [key: string]: unknown;
+            } | null;
+            /** Schema Version */
+            schema_version?: number | null;
+        };
+        /** Series */
+        Series: {
+            /** Metric Key */
+            metric_key: string;
+            /** Unit */
+            unit: string | null;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Device Id */
+            device_id: string | null;
+            /** Points */
+            points: components["schemas"]["SeriesPoint"][];
+        };
+        /** SeriesPoint */
+        SeriesPoint: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Values */
+            values: {
+                [key: string]: number | null;
+            };
+        };
+        /** SeriesResponse */
+        SeriesResponse: {
+            /**
+             * Time From
+             * Format: date-time
+             */
+            time_from: string;
+            /**
+             * Time To
+             * Format: date-time
+             */
+            time_to: string;
+            /** Bucket */
+            bucket: string;
+            /** Bucket Seconds */
+            bucket_seconds: number;
+            /** Automatic Bucket */
+            automatic_bucket: boolean;
+            /** Aggregates */
+            aggregates: components["schemas"]["Aggregate"][];
+            group_by: components["schemas"]["GroupBy"];
+            layout: components["schemas"]["Layout"];
+            /** Series */
+            series?: components["schemas"]["Series"][] | null;
+            /** Columns */
+            columns?: string[] | null;
+            /** Rows */
+            rows?: {
+                [key: string]: unknown;
+            }[] | unknown[][] | null;
+        };
         /** ServerAdminInvitationCreate */
         ServerAdminInvitationCreate: {
             /**
@@ -6559,6 +7086,475 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    series_api_v1_projects__project_id__analytics_series_get: {
+        parameters: {
+            query: {
+                metric: string[];
+                entity_id?: string[];
+                device_id?: string[];
+                data_source_id?: string | null;
+                from?: string | null;
+                to?: string | null;
+                /** @description One of 1s, 10s, 1m, 5m, 15m, 1h, 6h, 1d, 7d or `all`; default automatic */
+                bucket?: string | null;
+                agg?: components["schemas"]["Aggregate"][];
+                group_by?: components["schemas"]["GroupBy"];
+                layout?: components["schemas"]["Layout"];
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeriesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rows_api_v1_projects__project_id__analytics_rows_get: {
+        parameters: {
+            query: {
+                metric: string;
+                entity_id?: string | null;
+                device_id?: string | null;
+                data_source_id?: string | null;
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_MeasurementRow_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    metrics_with_data_api_v1_projects__project_id__analytics_metrics_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricWithData"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_saved_views_api_v1_projects__project_id__analytics_saved_views_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_SavedViewRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_saved_view_api_v1_projects__project_id__analytics_saved_views_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_saved_view_api_v1_projects__project_id__analytics_saved_views__view_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_saved_view_api_v1_projects__project_id__analytics_saved_views__view_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_exports_api_v1_projects__project_id__exports_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_ExportJobRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_export_api_v1_projects__project_id__exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportParameters"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportJobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    direct_api_v1_projects__project_id__exports_direct_get: {
+        parameters: {
+            query: {
+                dataset: components["schemas"]["ExportDataset"];
+                format: components["schemas"]["ExportFormat"];
+                time_from: string;
+                time_to: string;
+                entity_ids?: string[];
+                device_ids?: string[];
+                metric_keys?: string[];
+                data_source_id?: string | null;
+                /** @description IANA name; times are written in this zone */
+                timezone?: string;
+                /** @description Entity, device and metric names as columns */
+                include_names?: boolean;
+                /** @description Ladder key, `all`, or empty for automatic */
+                bucket?: string | null;
+                aggregates?: components["schemas"]["Aggregate"][];
+                group_by?: components["schemas"]["GroupBy"];
+                layout?: components["schemas"]["Layout"];
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_api_v1_projects__project_id__exports__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportJobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_export_api_v1_projects__project_id__exports__job_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reproduce_export_api_v1_projects__project_id__exports__job_id__reproduce_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportJobRead"];
                 };
             };
             /** @description Validation Error */

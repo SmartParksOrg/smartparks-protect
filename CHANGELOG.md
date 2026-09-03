@@ -4,6 +4,24 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+## v0.2.0, 2026-09-03
+
+Analyze: the Data Explorer and exports as backend capabilities with their screens, the synthetic scale benchmark, and TimescaleDB confirmed at the decision gate.
+
+### Added
+
+- Data Explorer backend (phase 4): bucketed aggregates with automatic resolution from a fixed ladder, `mean`, `min`, `max`, `median`, `sum`, `count`, `first`, `last`, series, long and wide layouts, drill-down rows with source event and trace, metrics with data per project, saved views per project.
+- Export as a backend capability: export jobs run by the new `protect-export` service into MinIO with progress, SHA-256 and reproducibility metadata; direct downloads up to 100,000 rows; CSV, XLSX (sheets split at the Excel limit), JSON, GeoJSON and GPX; datasets positions, measurements, source events and aggregates; timezone selection; reproduce a job.
+- Data Explorer and Exports screens in the frontend: filter builder, ECharts line, scatter, bar, histogram and state timeline, table with drill-down to rows and source events, saved views, export dialog for direct downloads and jobs, job list with progress, download and reproduce.
+- Benchmark scripts: synthetic dataset generator scalable to the reference envelope and a runner that writes `docs/operations/benchmarks.md`. TimescaleDB confirmed at the phase 4 gate (ADR 0003).
+- Bootstrap `--demo` creates the demo project, device type, device and entity for the simulator; the simulator sends real OpenCollar frames by default.
+
+### Fixed
+
+- Bootstrap passed no API key to the Protect data source when it minted one.
+- Cursor pagination on bigint keys.
+- The bus handles batches in lanes per device (`BUS_CONCURRENCY`), which took one decoder from about 60 to about 90 events per second.
+
 ## v0.1.1, 2026-09-03
 
 The v0.1.0 tag does not build the frontend on a clean checkout; use this tag instead.

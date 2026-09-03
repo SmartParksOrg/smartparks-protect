@@ -11,8 +11,10 @@ bootstrap script and by a real gateway.
 
 Fixture lines are JSON objects with at least `f_port` and `data_hex`; optional `time` (offset from
 now in seconds, negative for the past), `f_cnt`, `rssi`, `snr`, `spreading_factor`.
-Without `--fixtures`, a synthetic track around the given start point is produced from the
-generic JSON driver's payload format, so the pipeline can be watched without OpenCollar payloads.
+Without `--fixtures`, a synthetic track around the given start point is produced as OpenCollar
+frames: a GNSS position on port 2 for every uplink and a status message on port 4 every fifth
+uplink, encoded the way the firmware does it, so the OpenCollar driver decodes them. `--generic`
+sends the same track in the generic JSON driver's format on port 1 instead.
 """
 
 import argparse
@@ -21,12 +23,15 @@ import base64
 import json
 import math
 import random
+import struct
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import aiomqtt
+
+from shared.device_drivers.opencollar import KNOWN_PORTS, PORT_POSITION, PORT_STATUS
 
 
 def chirpstack_event(
@@ -90,7 +95,93 @@ def load_fixtures(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+def _frame(port: int, data: bytes) -> bytes:
+    """OpenCollar message: `[msg_id][len][data]`, ids and lengths from the driver's port table."""
+    msg_id, length = KNOWN_PORTS[port]
+    assert length is None or len(data) == length, (port, len(data))
+    return bytes([msg_id, len(data)]) + data
+
+
+def _byte(value: float) -> int:
+    """Inverse of the firmware's -100..100 to one byte mapping."""
+    return max(0, min(255, round((value + 100) * 255 / 200)))
+
+
 def synthetic(count: int, lat: float, lon: float, interval: float) -> list[dict]:
+    """OpenCollar frames walking a slow circle, one every `interval` seconds: a port 2 position
+    per uplink, a port 4 status every fifth uplink (before the position, as the firmware does)."""
+    items: list[dict] = []
+    now = datetime.now(UTC)
+    f_cnt = 0
+    for i in range(count):
+        angle = i / count * 2 * math.pi
+        when = now - timedelta(seconds=(count - i) * interval)
+        radio = {
+            "rssi": random.uniform(-110, -60),
+            "snr": random.uniform(-5, 10),
+            "spreading_factor": random.choice([7, 9, 12]),
+        }
+        offset = {"time": (when - now).total_seconds()}
+        if i % 5 == 0:
+            f_cnt += 1
+            status = struct.pack(
+                "<14B",
+                0,  # reset reason
+                0,  # errors
+                round((3900 - i - 2500) / 10),  # battery, 10 mV steps above 2.5 V
+                0x80,  # operation: 8 satellites seen, no flags
+                _byte(25 + 5 * math.sin(angle)),  # temperature
+                min(255, i // 288),  # uptime in days
+                _byte(0.0),
+                _byte(0.0),
+                _byte(-9.8),  # resting on its back
+                0x14,  # hardware 1.4
+                0x73,  # firmware 7.3
+                0x05,  # device type
+                0,  # no charger
+                0,  # features
+            )
+            items.append(
+                {
+                    "f_port": PORT_STATUS,
+                    "data_hex": _frame(PORT_STATUS, status).hex(),
+                    "f_cnt": f_cnt,
+                    **radio,
+                    **offset,
+                }
+            )
+        f_cnt += 1
+        position = struct.pack(
+            "<BBBHiiiBBHBIB",
+            1,  # success
+            0,
+            0,
+            random.randint(5, 40),  # time to fix, s
+            round((lat + 0.01 * math.sin(angle)) * 1e7),
+            round((lon + 0.01 * math.cos(angle)) * 1e7),
+            round((300 + random.uniform(-5, 5)) * 1000),  # altitude, mm
+            3,  # fix type
+            random.randint(6, 12),  # satellites in view
+            random.randint(3, 30),  # horizontal accuracy, m
+            random.randint(1, 5),  # pdop
+            int(when.timestamp()),
+            1,  # active tracking: course and speed follow
+        ) + struct.pack(
+            "<HB", round(18000 + math.degrees(angle) * 100) % 36000, random.randint(0, 2)
+        )
+        items.append(
+            {
+                "f_port": PORT_POSITION,
+                "data_hex": _frame(PORT_POSITION, position).hex(),
+                "f_cnt": f_cnt,
+                **radio,
+                **offset,
+            }
+        )
+    return items
+
+
+def synthetic_generic(count: int, lat: float, lon: float, interval: float) -> list[dict]:
     """Generic JSON payloads on port 1 walking a slow circle, one every `interval` seconds."""
     items = []
     for i in range(count):
@@ -137,14 +228,26 @@ async def main() -> None:
     parser.add_argument("--lat", type=float, default=-24.9)
     parser.add_argument("--lon", type=float, default=31.5)
     parser.add_argument("--rate", type=float, default=1.0, help="uplinks per second")
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=60.0,
+        help="seconds between synthetic fixes; the track ends now and starts count * interval ago",
+    )
     parser.add_argument("--loop", action="store_true", help="repeat forever")
+    parser.add_argument(
+        "--generic",
+        action="store_true",
+        help="synthetic payloads for the generic JSON driver on port 1 instead of OpenCollar frames",
+    )
     args = parser.parse_args()
 
-    items = (
-        load_fixtures(args.fixtures)
-        if args.fixtures
-        else synthetic(args.count, args.lat, args.lon, 1 / args.rate)
-    )
+    if args.fixtures:
+        items = load_fixtures(args.fixtures)
+    elif args.generic:
+        items = synthetic_generic(args.count, args.lat, args.lon, args.interval)
+    else:
+        items = synthetic(args.count, args.lat, args.lon, args.interval)
     topic = f"application/{args.application_id}/device/{args.dev_eui.lower()}/event/up"
     sent = 0
     async with aiomqtt.Client(

@@ -17,6 +17,7 @@ COPY shared/pyproject.toml shared/pyproject.toml
 COPY services/api/pyproject.toml services/api/pyproject.toml
 COPY services/ingest/pyproject.toml services/ingest/pyproject.toml
 COPY services/decoder/pyproject.toml services/decoder/pyproject.toml
+COPY services/export/pyproject.toml services/export/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-workspace --all-packages
 
@@ -24,6 +25,7 @@ COPY shared shared
 COPY services/api services/api
 COPY services/ingest services/ingest
 COPY services/decoder services/decoder
+COPY services/export services/export
 # VERSION exists from the first release on; the glob keeps the build working without it.
 COPY VERSIO[N] ./
 RUN --mount=type=cache,target=/root/.cache/uv \
