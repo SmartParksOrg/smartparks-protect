@@ -59,3 +59,7 @@ services/frontend/ui-sweep-output/
 
 # Claude
 .claude
+
+# Brand source files (Illustrator, PDF, PNG). The SVGs derived from them live in
+# services/frontend/src/assets/brand/. Remove this line to commit the sources.
+LOGO_Smartparks_Typo/

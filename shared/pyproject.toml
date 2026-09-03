@@ -1,0 +1,20 @@
+[project]
+name = "smartparks-protect-shared"
+version = "0.0.0"
+description = "Code shared by every Smart Parks Protect service. Imported as `shared`."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "sqlalchemy[asyncio]==2.0.52",
+    "asyncpg==0.31.0",
+    "redis==8.1.0",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "shared"
+module-root = ""

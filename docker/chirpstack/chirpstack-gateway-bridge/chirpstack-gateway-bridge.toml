@@ -1,0 +1,17 @@
+# Gateway bridge for the local development profile: Semtech UDP on 1700 to MQTT (protobuf).
+
+[integration]
+  marshaler="protobuf"
+
+  [integration.mqtt]
+    event_topic_template="eu868/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+    state_topic_template="eu868/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
+    command_topic_template="eu868/gateway/{{ .GatewayID }}/command/#"
+
+    [integration.mqtt.auth]
+      type="generic"
+
+      [integration.mqtt.auth.generic]
+        servers=["tcp://$MQTT_BROKER_HOST:1883"]
+        username=""
+        password=""

@@ -1,0 +1,59 @@
+[project]
+name = "smartparks-protect"
+version = "0.0.0"
+description = "Workspace root for Smart Parks Protect. Services live in services/, shared code in shared/."
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["shared", "services/*"]
+exclude = ["services/frontend"]
+
+[tool.uv.sources]
+smartparks-protect-shared = { workspace = true }
+smartparks-protect-api = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "smartparks-protect-shared",
+    "smartparks-protect-api",
+    "ruff==0.16.5",
+    "mypy==2.3.1",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "httpx==0.28.1",
+]
+docs = [
+    "mkdocs<2",
+    "mkdocs-material==9.7.7",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["shared", "services/api", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF", "ANN"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = ["shared", "services/api"]
+packages = ["shared", "protect_api"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: needs running Postgres, Redis and MinIO (see .env.example)",
+]

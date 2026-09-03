@@ -1,0 +1,19 @@
+[project]
+name = "smartparks-protect-api"
+version = "0.0.0"
+description = "Smart Parks Protect API: REST, WebSocket, OpenAPI, auth, admin, vector tiles."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "smartparks-protect-shared",
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.4",
+    "httpx==0.28.1",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "protect_api"
+module-root = ""

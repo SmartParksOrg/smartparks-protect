@@ -1,0 +1,29 @@
+# ChirpStack configuration for the local development profile. Variables come from docker compose.
+# Reference: https://www.chirpstack.io/docs/chirpstack/configuration.html
+
+[logging]
+  level="info"
+
+[postgresql]
+  dsn="postgres://chirpstack:$CHIRPSTACK_POSTGRES_PASSWORD@$POSTGRESQL_HOST/chirpstack?sslmode=disable"
+  max_open_connections=10
+  min_idle_connections=0
+
+[redis]
+  servers=["redis://$REDIS_HOST/"]
+  cluster=false
+
+[network]
+  net_id="000000"
+  enabled_regions=["eu868"]
+
+[api]
+  bind="0.0.0.0:8080"
+  secret="$CHIRPSTACK_API_SECRET"
+
+[integration]
+  enabled=["mqtt"]
+
+  [integration.mqtt]
+    server="tcp://$MQTT_BROKER_HOST:1883/"
+    json=true

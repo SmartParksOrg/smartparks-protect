@@ -1,0 +1,232 @@
+# Smart Parks Protect development stack.
+#   cp .env.example .env
+#   docker compose up -d                        # infrastructure, api, frontend
+#   docker compose --profile chirpstack up -d   # adds a local ChirpStack for LoRaWAN testing
+# Every container is named protect-<service> and joins protect-network. Data lives in named volumes.
+
+name: smartparks-protect
+
+services:
+  postgres:
+    container_name: protect-postgres
+    image: timescale/timescaledb-ha:pg17.10-ts2.29.2
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    container_name: protect-redis
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  minio:
+    container_name: protect-minio
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    container_name: protect-minio-init
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_UPLOADS: ${MINIO_BUCKET_UPLOADS:-uploads}
+      MINIO_BUCKET_EXPORTS: ${MINIO_BUCKET_EXPORTS:-exports}
+      MINIO_BUCKET_LOG_FILES: ${MINIO_BUCKET_LOG_FILES:-device-log-files}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" &&
+      mc mb --ignore-existing local/$$MINIO_BUCKET_UPLOADS local/$$MINIO_BUCKET_EXPORTS local/$$MINIO_BUCKET_LOG_FILES &&
+      echo buckets ready"
+
+  api:
+    container_name: protect-api
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_SECURE: "false"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_UPLOADS: ${MINIO_BUCKET_UPLOADS:-uploads}
+      MINIO_BUCKET_EXPORTS: ${MINIO_BUCKET_EXPORTS:-exports}
+      MINIO_BUCKET_LOG_FILES: ${MINIO_BUCKET_LOG_FILES:-device-log-files}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_LIFETIME_SECONDS: ${JWT_LIFETIME_SECONDS:-3600}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/version', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    container_name: protect-frontend
+    build:
+      context: services/frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+  # ChirpStack profile: a local LoRaWAN network server for end-to-end testing (phase 3).
+  chirpstack-postgres:
+    container_name: protect-chirpstack-postgres
+    image: postgres:16-alpine
+    profiles: ["chirpstack"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chirpstack
+      POSTGRES_PASSWORD: ${CHIRPSTACK_POSTGRES_PASSWORD}
+      POSTGRES_DB: chirpstack
+    volumes:
+      - chirpstack-postgres-data:/var/lib/postgresql/data
+      - ./docker/chirpstack/postgresql/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chirpstack -d chirpstack"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  chirpstack-redis:
+    container_name: protect-chirpstack-redis
+    image: redis:7.4-alpine
+    profiles: ["chirpstack"]
+    restart: unless-stopped
+    command: ["redis-server", "--save", "300", "1", "--save", "60", "100", "--appendonly", "no"]
+    volumes:
+      - chirpstack-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  chirpstack-mosquitto:
+    container_name: protect-chirpstack-mosquitto
+    image: eclipse-mosquitto:2.0.22
+    profiles: ["chirpstack"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CHIRPSTACK_MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./docker/chirpstack/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  chirpstack:
+    container_name: protect-chirpstack
+    image: chirpstack/chirpstack:4.19.1
+    profiles: ["chirpstack"]
+    restart: unless-stopped
+    command: ["-c", "/etc/chirpstack"]
+    depends_on:
+      chirpstack-postgres:
+        condition: service_healthy
+      chirpstack-redis:
+        condition: service_healthy
+      chirpstack-mosquitto:
+        condition: service_started
+    environment:
+      MQTT_BROKER_HOST: chirpstack-mosquitto
+      REDIS_HOST: chirpstack-redis
+      POSTGRESQL_HOST: chirpstack-postgres
+      CHIRPSTACK_POSTGRES_PASSWORD: ${CHIRPSTACK_POSTGRES_PASSWORD}
+      CHIRPSTACK_API_SECRET: ${CHIRPSTACK_API_SECRET}
+    ports:
+      - "127.0.0.1:${CHIRPSTACK_WEB_PORT:-8080}:8080"
+    volumes:
+      - ./docker/chirpstack/chirpstack:/etc/chirpstack:ro
+
+  chirpstack-gateway-bridge:
+    container_name: protect-chirpstack-gateway-bridge
+    image: chirpstack/chirpstack-gateway-bridge:4.1.2
+    profiles: ["chirpstack"]
+    restart: unless-stopped
+    depends_on:
+      - chirpstack-mosquitto
+    environment:
+      MQTT_BROKER_HOST: chirpstack-mosquitto
+    ports:
+      - "127.0.0.1:1700:1700/udp"
+    volumes:
+      - ./docker/chirpstack/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge:ro
+
+  chirpstack-rest-api:
+    container_name: protect-chirpstack-rest-api
+    image: chirpstack/chirpstack-rest-api:4.19.0
+    profiles: ["chirpstack"]
+    restart: unless-stopped
+    command: ["--server", "chirpstack:8080", "--bind", "0.0.0.0:8090", "--insecure"]
+    depends_on:
+      - chirpstack
+    ports:
+      - "127.0.0.1:${CHIRPSTACK_REST_PORT:-8090}:8090"
+
+networks:
+  default:
+    name: protect-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  chirpstack-postgres-data:
+  chirpstack-redis-data:

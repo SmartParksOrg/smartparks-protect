@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/*
+  Smart Parks colour system. Brand colours from the architecture (section 23) and the logo files.
+  Semantic tokens below feed shadcn/ui components. Change a token here, never a hex value in a
+  component.
+*/
+:root {
+  --brand-green-dark: #52735e;
+  --brand-green-light: #90ae9b;
+  --brand-sand: #c6b187;
+  --brand-blue: #bed2d4;
+  --brand-coral: #eda08f;
+
+  --radius: 0.5rem;
+
+  --background: #ffffff;
+  --foreground: #1f2a24;
+  --card: #ffffff;
+  --card-foreground: #1f2a24;
+  --popover: #ffffff;
+  --popover-foreground: #1f2a24;
+  --primary: var(--brand-green-dark);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-green-light);
+  --secondary-foreground: #1f2a24;
+  --muted: #eef2ef;
+  --muted-foreground: #5b6a62;
+  --accent: #e4ece7;
+  --accent-foreground: #1f2a24;
+  --destructive: #a13d2d;
+  --destructive-foreground: #ffffff;
+  --border: #d9e1dc;
+  --input: #d9e1dc;
+  --ring: var(--brand-green-light);
+}
+
+@theme inline {
+  --color-brand-green-dark: var(--brand-green-dark);
+  --color-brand-green-light: var(--brand-green-light);
+  --color-brand-sand: var(--brand-sand);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-coral: var(--brand-coral);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    overscroll-behavior-y: none;
+    scrollbar-gutter: stable;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+  /* 16px inputs stop iOS from zooming on focus. */
+  @media (pointer: coarse) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+}

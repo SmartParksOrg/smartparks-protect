@@ -1,0 +1,74 @@
+site_name: Smart Parks Protect
+site_description: Self-hosted operational data platform for Smart Parks deployments
+repo_url: https://github.com/SmartParksOrg/smartparks-protect
+edit_uri: edit/main/docs/
+strict: true
+not_in_nav: |
+  adr/template.md
+
+theme:
+  name: material
+  logo: assets/logo-mark.svg
+  favicon: assets/favicon.svg
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+
+extra_css:
+  - assets/custom.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started/index.md
+  - Concepts: concepts/index.md
+  - Architecture:
+      - architecture/index.md
+      - AddaxAI Connect reuse audit: architecture/addaxai-connect-reuse-audit.md
+  - Devices: devices/index.md
+  - Integrations: integrations/index.md
+  - Analytics: analytics/index.md
+  - Rules: rules/index.md
+  - Administration: administration/index.md
+  - Operations: operations/index.md
+  - Troubleshooting: troubleshooting/index.md
+  - API: api/index.md
+  - MCP: mcp/index.md
+  - Decisions:
+      - adr/index.md
+      - adr/0001-record-architecture-decisions.md
+      - adr/0002-start-from-scratch.md
+      - adr/0003-postgresql-timescaledb-postgis.md
+      - adr/0004-redis-streams-event-bus.md
+      - adr/0005-backend-and-frontend-stack.md
+      - adr/0006-schema-versioning.md

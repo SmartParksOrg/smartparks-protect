@@ -1,0 +1,52 @@
+"""FastAPI application for Smart Parks Protect."""
+
+import os
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from protect_api.health import router as health_router
+from protect_api.middleware import RequestIdMiddleware
+from shared.config import get_settings
+from shared.logger import configure_logging, get_logger
+from shared.version import __version__
+
+log = get_logger("protect_api")
+
+
+class VersionResponse(BaseModel):
+    version: str
+    commit: str
+
+
+def create_app() -> FastAPI:
+    settings = get_settings()
+    configure_logging("api", level=settings.log_level, log_format=settings.log_format)
+
+    app = FastAPI(
+        title="Smart Parks Protect",
+        version=__version__,
+        docs_url="/api/docs",
+        redoc_url=None,
+        openapi_url="/api/openapi.json",
+    )
+    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(health_router)
+
+    @app.get("/api/version", response_model=VersionResponse, tags=["health"])
+    async def version() -> VersionResponse:
+        return VersionResponse(version=__version__, commit=os.environ.get("GIT_COMMIT", "unknown"))
+
+    log.info("api configured", version=__version__, environment=settings.environment)
+    return app
+
+
+app = create_app()

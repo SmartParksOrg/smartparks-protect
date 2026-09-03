@@ -19,8 +19,8 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 0, repository foundation |
 | Latest release | none (first target v0.1.0 at the end of phase 3) |
 | Last session | 2026-09-03 |
-| Next item | Phase 0: README, contributor files, reuse audit and repository skeleton |
-| Blockers | none |
+| Next item | Phase 0: push to GitHub and confirm CI is green, then phase 1: Alembic and migration 0001 |
+| Blockers | CI is written but only runs after the first push |
 
 ## What we are building
 
@@ -69,6 +69,7 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D25 | Merged plan | One `PROJECT_PLAN.md` for Claude and Codex, delivery-ordered phases as the spine, Codex's thematic checklists folded in as sub-items | Two trackers drift. The delivery order follows architecture section 31; the thematic order put observability and scalability late, which the architecture forbids. |
 | D26 | Database reconfirmed | TimescaleDB from migration 1 stays (D3) | The Codex plan proposed plain PostGIS with a later evaluation. Retrofitting hypertables on 250 million row tables is the expensive path; the gate in phase 4 keeps the exit open. |
 | D27 | Assignment attribution | Canonical rows persist `project_id` and `entity_id` resolved at processing time and keep `device_id`; assignment tables stay the source for audit and recomputation | Both plans proposed this. Fast historical queries without range joins; timestamp curation in phase 12 reruns the resolution. |
+| D28 | Commit trailers | Strip `Co-Authored-By` lines with the same commit-msg hook as AddaxAI Connect | Both repos behave the same and git history shows human authors only. Decided by Tim on 2026-09-03. |
 
 ### Open decisions from architecture section 32
 
@@ -78,7 +79,7 @@ These are not decided yet. A proposed default is given so work can start; each i
 - [ ] **Control action schema versioning.** Proposed: action definitions are Python dataclasses in the driver with a `schema_version`; parameters are Pydantic models exported as JSON schema for the UI and rules. Decide in phase 6.
 - [ ] **Integration delivery idempotency.** Proposed: `integration_deliveries` row per (integration, object type, object id, object version) with a unique key; backfill creates rows in batches. Decide in phase 8.
 - [ ] **Raw payload placement for very large events.** Proposed: payloads above a size threshold (raw log file uploads) go to MinIO with a reference; normal uplinks stay in JSONB. Decide in phase 2.
-- [ ] **Commit trailers.** AddaxAI Connect strips `Co-Authored-By: Claude` lines with a commit-msg hook. Decide whether this repo does the same. Tim decides.
+- [x] **Commit trailers.** Decided on 2026-09-03: strip them, see D28.
 
 ## Definition of done
 
@@ -243,20 +244,20 @@ Each phase has a goal, a reason for its place in the sequence, deliverables with
 - [x] Create `DEVELOPERS.md` and `PROJECT_PLAN.md` (2026-09-03).
 - [x] `.gitignore` based on AddaxAI Connect, plus WSL `Zone.Identifier` files; remove the committed Zone.Identifier file (2026-09-03).
 - [x] Compare the Claude and Codex plans and merge them into this file (2026-09-03). What was taken from each is in the session log.
-- [ ] Reuse audit of AddaxAI Connect: `docs/architecture/addaxai-connect-reuse-audit.md` with a matrix of mechanisms to mirror, adapt as a pattern, or leave out (auth and invitation flow, RBAC, queue and worker liveness, logging, deployment roles and hardening, frontend shell and conventions, notification workers, backup scripts). Reading only, no code is copied.
-- [ ] `README.md`: what Smart Parks Protect is, status (pre-alpha, nothing runs yet), core concepts in ten lines, link to the architecture document, plan and developer docs. Quick start is added at the end of phase 3.
-- [ ] `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md` with an Unreleased section. `VERSION` is created with the first release.
-- [ ] `docs/` skeleton from architecture 28.2 (getting-started, architecture, concepts, devices, integrations, analytics, rules, administration, operations, troubleshooting, api, mcp, adr) with an index page each, `mkdocs.yml` (Material), `mkdocs build --strict` passing.
-- [ ] ADR template and ADR 0001 "Record architecture decisions". ADRs 0002-0005 for D1 (from scratch), D3 (database), D4 (event bus), D5 + D12 (stack). ADR 0006: schema versioning policy for bus messages, webhook payloads and API responses (architecture 28.6). Remaining ADRs are written in the phase where the decision lands.
-- [ ] Python workspace: root `pyproject.toml` with `uv` workspace members `shared/` and `services/*`, `ruff` (lint and format), `mypy` strict for `shared/`, `pytest` config with markers. Python 3.12.
-- [ ] `shared/` skeleton: `config.py`, `database.py` (async engine, session factory), `logger.py` (JSON, `trace_id` and `request_id` fields), package metadata, version reading from `VERSION`.
-- [ ] `docker-compose.yml`: `protect-postgres` (`timescale/timescaledb-ha`, PostgreSQL 17), `protect-redis` (Redis 7), `protect-minio` and `protect-minio-init`, `protect-api`, `protect-frontend`. Profile `chirpstack` with ChirpStack, its MQTT broker and Postgres, ready for phase 3. `.env.example` with every variable documented. Named volumes, healthchecks, `restart: unless-stopped`.
-- [ ] `services/api` skeleton: FastAPI app, `/api/health` returning database, Redis and MinIO status, request id middleware, OpenAPI at `/api/docs`, Dockerfile.
-- [ ] `services/frontend` skeleton: Vite, React 19, TypeScript strict, Tailwind, shadcn/ui initialised, Smart Parks colours as CSS variables, MapLibre GL, ECharts, TanStack Query, React Router, Zustand, RHF + Zod installed. Login placeholder page. `npm run build` runs `tsc --noEmit && vite build`. Nginx Dockerfile. `FRONTEND_CONVENTIONS.md` written for this repo (colour system, z-index ladder, responsive rules, viewport targets 390/768/1440).
-- [ ] CI (`.github/workflows/ci.yml`): ruff, mypy, pytest per package against Postgres/Timescale and Redis service containers, `pip check` equivalent via `uv sync --frozen`, frontend `npm ci && npm run build && npm run test`, `mkdocs build --strict`. Fail-fast off.
-- [ ] `scripts/dev.sh` or `Makefile` with the daily commands: up, down, logs, migrate, test, lint, sweep.
+- [x] Reuse audit of AddaxAI Connect (2026-09-03): `docs/architecture/addaxai-connect-reuse-audit.md` with a matrix of mechanisms to mirror, adapt as a pattern, or leave out (auth and invitation flow, RBAC, queue and worker liveness, logging, deployment roles and hardening, frontend shell and conventions, notification workers, backup scripts). Reading only, no code is copied.
+- [x] `README.md` (2026-09-03): what Smart Parks Protect is, status (pre-alpha, nothing runs yet), core concepts in ten lines, link to the architecture document, plan and developer docs. Quick start is added at the end of phase 3.
+- [x] `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md` with an Unreleased section (2026-09-03). `VERSION` is created with the first release.
+- [x] `docs/` skeleton (2026-09-03) from architecture 28.2 (getting-started, architecture, concepts, devices, integrations, analytics, rules, administration, operations, troubleshooting, api, mcp, adr) with an index page each, `mkdocs.yml` (Material), `mkdocs build --strict` passing.
+- [x] ADR template and ADR 0001 (2026-09-03) "Record architecture decisions". ADRs 0002-0005 for D1 (from scratch), D3 (database), D4 (event bus), D5 + D12 (stack). ADR 0006: schema versioning policy for bus messages, webhook payloads and API responses (architecture 28.6). Remaining ADRs are written in the phase where the decision lands.
+- [x] Python workspace (2026-09-03): root `pyproject.toml` with `uv` workspace members `shared/` and `services/*`, `ruff` (lint and format), `mypy` strict for `shared/`, `pytest` config with markers. Python 3.12.
+- [x] `shared/` skeleton (2026-09-03): `config.py`, `database.py` (async engine, session factory), `logger.py` (JSON, `trace_id` and `request_id` fields), package metadata, version reading from `VERSION`.
+- [x] `docker-compose.yml` (2026-09-03): `protect-postgres` (`timescale/timescaledb-ha`, PostgreSQL 17), `protect-redis` (Redis 7), `protect-minio` and `protect-minio-init`, `protect-api`, `protect-frontend`. Profile `chirpstack` with ChirpStack, its MQTT broker and Postgres, ready for phase 3. `.env.example` with every variable documented. Named volumes, healthchecks, `restart: unless-stopped`.
+- [x] `services/api` skeleton (2026-09-03): FastAPI app, `/api/health` returning database, Redis and MinIO status, request id middleware, OpenAPI at `/api/docs`, Dockerfile.
+- [x] `services/frontend` skeleton (2026-09-03): Vite, React 19, TypeScript strict, Tailwind, shadcn/ui initialised, Smart Parks colours as CSS variables, MapLibre GL, ECharts, TanStack Query, React Router, Zustand, RHF + Zod installed. Login placeholder page. `npm run build` runs `tsc --noEmit && vite build`. Nginx Dockerfile. `FRONTEND_CONVENTIONS.md` written for this repo (colour system, z-index ladder, responsive rules, viewport targets 390/768/1440).
+- [ ] CI (`.github/workflows/ci.yml`) (written 2026-09-03, ticked when the first push is green): ruff, mypy, pytest per package against Postgres/Timescale and Redis service containers, `pip check` equivalent via `uv sync --frozen`, frontend `npm ci && npm run build && npm run test`, `mkdocs build --strict`. Fail-fast off.
+- [x] `scripts/dev.sh` (2026-09-03, `make` is not installed on the dev machine and a shell script needs nothing else) with the daily commands: up, down, logs, migrate, test, lint, sweep.
 
-**Exit criteria.** `docker compose up` starts the infrastructure, the empty API answers `/api/health` with all three dependencies OK, the frontend serves the placeholder, CI is green, docs build.
+**Exit criteria.** `docker compose up` starts the infrastructure, the empty API answers `/api/health` with all three dependencies OK, the frontend serves the placeholder, CI is green, docs build. Verified locally on 2026-09-03 except CI, which runs on the first push.
 
 ---
 
@@ -624,9 +625,9 @@ Release:
 
 Listed by the phase where they are first needed.
 
-- [ ] Phase 0: decide on the commit trailer hook (open decision above).
-- [ ] Phase 0: if Codex wrote a `DEVELOPERS.md` before 11:45 on 2026-09-03, ask it to output that version again; the file on disk is the Claude version and may have overwritten it.
-- [ ] Phase 0: Smart Parks logo as SVG (wide and square) and confirmation of the two brand colours.
+- [x] Phase 0: decide on the commit trailer hook (D28, 2026-09-03).
+- [x] Phase 0: Codex `DEVELOPERS.md` question closed on 2026-09-03, the file on disk stands.
+- [x] Phase 0: Smart Parks logo received on 2026-09-03 as Illustrator, PDF and PNG in `LOGO_Smartparks_Typo/` (gitignored). SVGs derived from the PDF in `services/frontend/src/assets/brand/`. The wide variant is composed from the delivered emblem and wordmark; confirm with Smart Parks before public use. Colours #52735E and #90AE9B confirmed.
 - [ ] Phase 3: recorded OpenCollar uplinks (ChirpStack, KPN or LORIOT exports) and links to the public Smart Parks decoder and protocol repositories.
 - [ ] Phase 3: confirmation which EarthRanger icons may be reused and under which licence.
 - [ ] Phase 7: KPN/ThingPark and LORIOT test accounts, a dev VM (Ubuntu 24.04) and a domain.
@@ -651,3 +652,14 @@ Listed by the phase where they are first needed.
 - Codex decisions folded in: resolved project and entity ids persisted on canonical rows (D27), `REQUEST_STATUS` as the first command (phase 6 keeps RESET as well).
 - Open: whether Codex's `DEVELOPERS.md` was overwritten by the Claude version (see inputs needed).
 - Next: phase 0 in order, starting with README and contributor files, then the reuse audit.
+
+### 2026-09-03, phase 0 (Claude)
+
+- Tim decided: strip commit trailers (D28), the Codex `DEVELOPERS.md` question is closed, the whole of phase 0 in one session, logo delivered in `LOGO_Smartparks_Typo/` (Illustrator, PDF, PNG; no SVG). Three SVGs were extracted from the vector PDF: stacked, mark and a composed wide variant.
+- Dev machine setup: `uv` installed in `~/.local/bin`, Node 24 through nvm, Docker Desktop WSL integration switched on by Tim. `make` is not installed, so the task runner is `scripts/dev.sh`.
+- Reuse audit done with three parallel read-only passes over AddaxAI Connect (backend, tooling and deployment, frontend). Result in `docs/architecture/addaxai-connect-reuse-audit.md`. Main findings: no lockfile, linters, changelog or database tests there; Redis lists without acknowledgement; the commit hook exists but nothing installs it; forms use `useState` although React Hook Form is installed. The Ansible tree, backup interlocks and `verify-server.sh` are the parts to mirror closely.
+- Built: uv workspace with exact pins (FastAPI 0.141.1, SQLAlchemy 2.0.52, Pydantic 2.13.5, redis-py 8.1.0, ruff 0.16.5, mypy 2.3.1, pytest 9.1.1), `shared` (config, database, logger, version), `protect_api` (health with three concurrent dependency checks, request id middleware, `/api/version`), tests (unit and integration), compose stack (TimescaleDB pg17.10, Redis 7.4, MinIO pinned, ChirpStack 4.19.1 profile with gateway bridge, Mosquitto and REST API), frontend (Vite 8, React 19, TypeScript 6, Tailwind 4, shadcn/ui on Radix, React Router 8, TanStack Query 5, Zustand 5, RHF 7, Zod 4, MapLibre 6, ECharts 6, Vitest 4, ESLint 10), nginx image with immutable assets, no-cache index, gzip and security headers, MkDocs site with six ADRs, CI workflow with a Python matrix, frontend, docs and compose jobs, Dependabot security-only.
+- Verified locally: ruff, mypy strict, 9 python tests (3 integration against the running stack), frontend lint, type check, build and 2 tests, `docker compose up` with `/api/health` reporting database, Redis and MinIO OK, frontend on :3000 serving the placeholder and proxying `/api/version`, `mkdocs build --strict`.
+- Decisions taken without a table entry: MkDocs stays on 1.x (`mkdocs<2`; MkDocs 2 removes the plugin system), API path versioning `/api/v1` from phase 1 (ADR 0006), frontend reads the root `.env` so there is one env file, shadcn `components.json` written by hand because the new CLI preset prompt cannot run non-interactively, uvicorn access logs not yet routed through the structured logger.
+- Not committed. Tim reviews and commits.
+- Next: push and watch CI, then phase 1 in order starting with Alembic and migration 0001.

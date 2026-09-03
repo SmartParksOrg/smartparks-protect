@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: pre-alpha. The repository holds documentation and the project plan. No service runs yet. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: pre-alpha. Phase 0 is done: the workspace, an empty API with a health endpoint, a placeholder frontend, the compose stack, CI and the documentation site exist. No domain code runs yet. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -27,18 +27,37 @@ Status: pre-alpha. The repository holds documentation and the project plan. No s
 
 | Layer | Technology | Notes |
 | --- | --- | --- |
-| Database | PostgreSQL 17 + PostGIS + TimescaleDB (`timescale/timescaledb-ha`) | Hypertables for positions, measurements, source events, gateway receptions. Decision gate in phase 4 |
-| Event bus and cache | Redis 7, Redis Streams with consumer groups | One broker; `EventBus` interface in `shared/bus.py` (planned) |
+| Database | PostgreSQL 17 + PostGIS + TimescaleDB (`timescale/timescaledb-ha:pg17.10-ts2.29.2`) | Hypertables for positions, measurements, source events, gateway receptions. Decision gate in phase 4 |
+| Event bus and cache | Redis 7.4, Redis Streams with consumer groups | One broker; `EventBus` interface in `shared/bus.py` (planned, phase 2) |
 | Object storage | MinIO | Raw log files, uploads, exports. Not for telemetry |
-| Backend | Python 3.12, FastAPI, SQLAlchemy 2 async, Alembic, Pydantic 2, FastAPI-Users | `uv` workspace, one lockfile, exact pins |
-| Frontend | React 19, Vite, TypeScript strict, Tailwind, shadcn/ui, TanStack Query, Zustand, React Hook Form + Zod | MapLibre GL JS for maps, Apache ECharts for charts |
-| Tests | pytest, Vitest, Playwright | API tests run against a real database container |
-| Docs | MkDocs Material, ADRs in `docs/adr/` | `mkdocs build --strict` in CI |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2 async, Alembic, Pydantic 2, FastAPI-Users | `uv` workspace, one `uv.lock`, exact `==` pins in every `pyproject.toml` |
+| Frontend | React 19, Vite, TypeScript strict, Tailwind 4, shadcn/ui (Radix), TanStack Query, Zustand, React Hook Form + Zod, React Router 7 | MapLibre GL JS for maps, Apache ECharts for charts. Rules in `services/frontend/FRONTEND_CONVENTIONS.md` |
+| Tests | pytest, Vitest, Playwright (phase 3) | API tests run against real Postgres, Redis and MinIO |
+| Docs | MkDocs 1.x with Material, ADRs in `docs/adr/` | `mkdocs build --strict` in CI. MkDocs 2 removes plugins and is pinned out |
 | Deployment | Docker Compose, Ansible, Nginx, Let's Encrypt | From phase 7 |
 
-## Repository structure (planned)
+## Repository structure
 
-The target tree is in `PROJECT_PLAN.md` under "Target repository structure". The rules behind it:
+What exists today. The full target tree is in `PROJECT_PLAN.md` under "Target repository structure".
+
+```
+smartparks-protect/
+├── services/
+│   ├── api/                 # FastAPI service, python package `protect_api`, Dockerfile
+│   └── frontend/            # React + Vite + TypeScript, nginx Dockerfile, FRONTEND_CONVENTIONS.md
+├── shared/shared/           # package `shared`: config, database, logger, version
+├── tests/                   # tests/shared, tests/api, tests/fixtures/payloads
+├── docs/                    # MkDocs site, docs/adr/ holds the ADRs
+├── docker/chirpstack/       # ChirpStack, gateway bridge and Mosquitto config for the compose profile
+├── scripts/dev.sh           # daily commands
+├── .githooks/commit-msg     # strips assistant trailers (D28), installed with scripts/dev.sh hooks
+├── .github/workflows/ci.yml
+├── docker-compose.yml
+├── pyproject.toml           # uv workspace root, ruff, mypy, pytest config
+└── uv.lock
+```
+
+The rules behind it:
 
 - `services/<name>/` is one container each. Services import from `shared` and never from each other.
 - `shared/shared/` is the only place for models, schemas, the bus, the trace helpers, device drivers and connectivity adapters.
@@ -82,27 +101,51 @@ The target tree is in `PROJECT_PLAN.md` under "Target repository structure". The
 - Metric keys are lowercase snake_case with the canonical unit in the registry (`battery_voltage` in V, `temperature` in °C).
 - Icon keys are dotted (`wildlife.wolf`, `device.lora_gateway`).
 
-## Local development (planned, filled in during phase 0)
+## Local development
+
+Requirements: Docker with Compose v2, [uv](https://docs.astral.sh/uv/), Node 24. On WSL2, enable the Docker Desktop WSL integration for the distro.
 
 ```bash
 cp .env.example .env
-docker compose up -d                      # infrastructure, api, frontend
-docker compose --profile chirpstack up -d # adds a local ChirpStack for LoRaWAN testing
+scripts/dev.sh hooks                      # git config core.hooksPath .githooks
+scripts/dev.sh up                         # docker compose up -d --build: postgres, redis, minio, api, frontend
+docker compose --profile chirpstack up -d # adds a local ChirpStack (web UI on :8080, MQTT on :1883, REST on :8090)
+uv sync --all-groups                      # python environment for tests, linters and docs
+cd services/frontend && npm ci            # frontend dependencies
 ```
 
-Backend and frontend commands, the simulator and the benchmark scripts are documented here once they exist.
+Daily commands through `scripts/dev.sh`: `up`, `down`, `logs [service]`, `test`, `lint`, `format`, `docs`, `hooks`. `migrate` and `sweep` arrive in phases 1 and 3.
+
+Ports (all bound to localhost except the frontend): API 8000, frontend 3000, Postgres 5432, Redis 6379, MinIO 9000 and console 9001. `/api/docs` is the OpenAPI UI, `/api/health` reports database, Redis and MinIO, `/api/version` reports the version and commit.
+
+The frontend dev server (`npm run dev` in `services/frontend`) runs on :5173 and proxies `/api` and `/ws` to `VITE_PROXY_TARGET` from the root `.env`. The frontend reads the root `.env`, there is no second env file.
+
+### Python workspace
+
+One `uv` workspace: `shared/` and `services/*` (the frontend is excluded). Every `pyproject.toml` pins exact versions; `uv.lock` is committed and CI installs with `--frozen`. Add a dependency with `uv add --package smartparks-protect-shared <name>`, then pin it to the resolved version.
+
+`shared/shared/` today: `config.py` (pydantic-settings, `get_settings()` cached, raises on missing values), `database.py` (one async engine per process, `get_session` dependency, `session_scope` for workers), `logger.py` (JSON or text, `request_id` and `trace_id` context variables, `get_logger(name).info("msg", key=value)`), `version.py` (reads `VERSION`, falls back to `v0.0.0-dev`).
+
+`services/api/protect_api/`: `main.py` builds the app, `middleware.py` sets the request id (inbound `X-Request-ID` is kept), `health.py` runs the three dependency checks concurrently with a 3 second timeout each and answers 503 when one fails.
+
+### Frontend
+
+`npm run build` is `tsc -b && vite build`: a type error fails the build and the Docker image. `npm run lint` is ESLint, `npm run test` is Vitest with Testing Library. shadcn/ui components are added with `npx shadcn@latest add <name>` and land in `src/components/ui/`, which ESLint ignores. Brand colours and semantic tokens are CSS variables in `src/index.css`; the logo SVGs in `src/assets/brand/` use `currentColor`.
 
 ## Database migrations (planned)
 
 Migrations live in `services/api/alembic/versions/`. Hypertable creation, compression and retention policies are explicit migration steps, not autogenerated. Migrations must apply and revert from an empty database in CI.
 
-## Testing (planned)
+## Testing
 
 ```bash
-uv run pytest tests/ -q          # all python tests
-uv run pytest tests/shared -q    # one package
+uv run pytest -q                            # all python tests, needs the compose stack for `integration` tests
+uv run pytest -q -m "not integration"       # unit tests only
+uv run pytest tests/shared -q               # one package
 cd services/frontend && npm run test && npm run build
 ```
+
+`tests/conftest.py` sets default environment values that match `.env.example`, so tests run against the local compose stack without extra setup. CI runs one job per package (`tests/shared`, `tests/api`) against Postgres/Timescale and Redis service containers and a MinIO container.
 
 - Drivers, adapters and rules are tested with recorded fixtures under `tests/fixtures/payloads/`. Add the source of every fixture in a `README.md` next to it.
 - API tests use a real Postgres/Timescale container. No mocked SQL.
@@ -111,8 +154,8 @@ cd services/frontend && npm run test && npm run build
 
 ## Releases
 
-`VERSION` is written and committed before each tag. `CHANGELOG.md` has an Unreleased section that becomes the release notes. Servers run tags, never `main`, except a dev server.
+`VERSION` is written and committed before each tag (it does not exist before v0.1.0; the code reports `v0.0.0-dev`). `CHANGELOG.md` has an Unreleased section that becomes the release notes. Servers run tags, never `main`, except a dev server.
 
 ## Logging
 
-All services write structured JSON to stdout with `service`, `trace_id` and `request_id` fields where available. `docker compose logs -f <service>` follows a service.
+All services write one JSON object per line to stdout (`LOG_FORMAT=json`, the container default) with `service`, `trace_id` and `request_id` where set; `LOG_FORMAT=text` gives readable lines for development. `docker compose logs -f <service>` follows a service. Uvicorn's own access log is not yet routed through the structured logger.
