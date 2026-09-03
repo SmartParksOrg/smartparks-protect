@@ -20,7 +20,7 @@ from shared.config import get_settings
 from shared.connectivity.base import AdapterCapabilities, DataSourceContext, InboundMessage
 from shared.enums import ProcessingStatus, TraceClass
 from shared.logger import get_logger
-from shared.models import DataSource, ExternalIdentity, SourceEvent
+from shared.models import DataSource, ExternalIdentity, GatewayReception, SourceEvent
 from shared.secrets import decrypt_json
 from shared.storage import put_object, sha256
 from shared.timeutil import utc_now
@@ -71,6 +71,10 @@ async def resolve_identity(
         session.add(identity)
     identity.last_seen_at = now
     identity.event_count = (identity.event_count or 0) + 1
+    if message.identity_attributes:
+        merged = {**identity.attributes, **message.identity_attributes}
+        if merged != identity.attributes:
+            identity.attributes = merged
     await session.flush()
     return identity
 
@@ -125,6 +129,23 @@ async def store_inbound(
         event.payload_object_key = key
     session.add(event)
     await session.flush()
+
+    for reception in message.gateway_receptions:
+        session.add(
+            GatewayReception(
+                time=message.network_received_at or now,
+                data_source_id=source.id,
+                device_id=device_id,
+                source_event_id=event.id,
+                source_event_ingested_at=now,
+                gateway_id=reception.gateway_id,
+                rssi=reception.rssi,
+                snr=reception.snr,
+                frequency_hz=reception.frequency_hz,
+                channel=reception.channel,
+                attributes=reception.attributes,
+            )
+        )
 
     tracer.trace.root_object_id = str(event.id)
     async with tracer.step(

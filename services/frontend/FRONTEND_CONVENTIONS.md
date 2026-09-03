@@ -25,13 +25,19 @@ State colours on the map communicate status, not object type; the icon communica
 
 `src/assets/brand/` holds `logo-stacked.svg` (emblem above wordmark), `logo-wide.svg` (emblem left of wordmark) and `logo-mark.svg` (emblem only). All use `fill="currentColor"`. Import them as React components (`import Logo from "@/assets/brand/logo-mark.svg?react"`) so `className="text-primary"` colours them; an `<img>` cannot inherit the colour. Use the mark for the sidebar and favicon, the wide logo in headers, the stacked logo on the login page.
 
+## Map
+
+- One `useMap` hook per map. The MapLibre worker is bundled by Vite (`?worker&url`) and registered with `setWorkerUrl`; do not import MapLibre elsewhere.
+- Symbol layers use `text-font: ["Noto Sans Regular"]`, the glyphs OpenFreeMap serves. The MapLibre default font is not available there.
+- Marker images come from `components/icons/markers.ts`; never hand-build marker images in a page.
+
 ## Z-index ladder
 
 Do not invent z-index values. Pick the layer; ties are broken by DOM order.
 
 | Layer | z-index | Elements |
 | --- | --- | --- |
-| Map | 0 | Every map container gets an explicit `z-0` so its internal layers cannot paint over the app |
+| Map | 0 | Every map container gets an explicit `z-0` so its internal layers cannot paint over the app. MapLibre's stylesheet sets `position: relative` on its container, so a container that must fill its parent uses `absolute!` (Tailwind important) or an explicit height |
 | In-page sticky | 10 to 30 | Sticky table headers, filter bars, mobile top bar at 30 |
 | Backdrop | 40 | Sidebar drawer backdrop |
 | App overlays | 50 | Sidebar drawer, dialogs, sheets, dropdowns, popovers, select menus |

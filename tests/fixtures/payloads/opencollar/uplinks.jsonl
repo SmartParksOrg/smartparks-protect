@@ -1,0 +1,7 @@
+{"f_port": 2, "data_hex": "f21e0100001000e6a40d1f97100e03a0cb000003082f00048c61686500000000", "expected": {"latitude": 52.0987878, "longitude": 5.1253399, "altitude": 52.128, "ttf": 16, "fixType": 3, "SIV": 8, "h_acc_est": 47, "pDOP": 4, "fix_time": 1701339532}}
+{"f_port": 4, "data_hex": "f40e0400a00095007f7f721444550000", "expected": {"bat": 4100, "temp": 16.86, "acc_z": -10.59, "ver_fw": "4.4", "ver_hw": "1.4", "type": 5}}
+{"f_port": 13, "data_hex": "930ef9636865aba50d1f8e090e031500", "expected": {"fix_timestamp": 1701340153, "latitude": 52.0988075, "longitude": 5.1251598, "h_acc_est": 21}}
+{"f_port": 14, "data_hex": "94050010000000", "expected": {"percentage": 0, "n_msg": 16}}
+{"f_port": 12, "data_hex": "9206000000000000", "expected": {"success": 0, "N": 0, "voltage": 0, "energy": 0}}
+{"f_port": 29, "data_hex": "0D930E3C636865FCA10D1F7D160E030C00436368650D930EF9636865ABA50D1F8E090E031500006468650D930EBA64686536A30D1F0D140E031300C26468650D930E7865686561A50D1FE0140E031600816568650D930E37666865C3A40D1FF5120E0311003F6668650D930EF466686599A30D1F81120E031100FC6668650D930EB1676865DFA30D1FCC120E030E00B76768650D930E6D686865DFA40D1F9B110E031000746868650D930E2A69686576A60D1FA20F0E030E00316968650D930EE6696865CEA40D1F8B100E031000ED696865", "expected": {"records": 10, "first_fix_timestamp": 1701339964, "first_store_timestamp": 1701339971, "last_fix_timestamp": 1701341670}}
+{"f_port": 5, "data_hex": "f50100", "expected": {"not_canonical": true}}

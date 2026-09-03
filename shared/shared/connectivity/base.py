@@ -33,6 +33,18 @@ class AdapterCapabilities(BaseModel):
 
 
 @dataclass(slots=True)
+class GatewayReceptionData:
+    """One gateway that received an uplink (architecture 20)."""
+
+    gateway_id: str
+    rssi: float | None = None
+    snr: float | None = None
+    frequency_hz: int | None = None
+    channel: int | None = None
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class InboundMessage:
     """One delivery from an external platform, before any device decoding."""
 
@@ -47,6 +59,11 @@ class InboundMessage:
     ble_synced_at: datetime | None = None
     file_uploaded_at: datetime | None = None
     identity_type: str = "dev_eui"
+    identity_attributes: dict[str, Any] = field(
+        default_factory=dict,
+        metadata={"doc": "Merged into the external identity: tenant, application, names for links"},
+    )
+    gateway_receptions: list[GatewayReceptionData] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)

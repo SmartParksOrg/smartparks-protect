@@ -29,14 +29,28 @@ Self-hosted operational data platform for [Smart Parks](https://www.smartparks.o
 - [`CONVENTIONS.md`](CONVENTIONS.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md): how we work.
 - `docs/`: the documentation site (`scripts/dev.sh docs` builds it).
 
-## Running the foundation
+## Quick start
+
+Requirements: Docker with Compose v2. For development also [uv](https://docs.astral.sh/uv/) and Node 24.
 
 ```bash
-cp .env.example .env
-docker compose up -d
+git clone https://github.com/SmartParksOrg/smartparks-protect.git
+cd smartparks-protect
+cp .env.example .env                                  # set the secrets before any server use
+docker compose --profile chirpstack up -d             # database, redis, minio, api, workers, frontend, local ChirpStack
+scripts/dev.sh bootstrap-admin you@example.org        # prints the registration link for the first server admin
 ```
 
-API documentation at <http://localhost:8000/api/docs>, health at <http://localhost:8000/api/health>, placeholder frontend at <http://localhost:3000>. A full quick start with a simulated collar arrives with v0.1.0.
+Open the link, create your account, sign in at <http://localhost:3000>. Then, under Server admin, create a project, an entity type and a device type with the OpenCollar driver, or let the bootstrap do the ChirpStack part:
+
+```bash
+scripts/dev.sh chirpstack-bootstrap --protect-email you@example.org --protect-password '...'
+scripts/dev.sh simulate --application-id <id printed by the bootstrap> --count 20 --rate 2
+```
+
+The simulator publishes uplinks the way ChirpStack does. Create the device `SP05-sim` with the external identity `70B3D57ED0001234` on the ChirpStack data source (or accept it from Needs attention), assign it to your project and an entity, and watch it move on the live map. Traffic, traces and health are under Network and Server admin.
+
+Endpoints: API docs <http://localhost:8000/api/docs>, health <http://localhost:8000/api/health>, ChirpStack <http://localhost:8080> (admin / admin), MinIO console <http://localhost:9001>.
 
 ## Relationship to AddaxAI Connect
 

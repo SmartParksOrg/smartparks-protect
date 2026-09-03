@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from protect_api.auth.routes import router as auth_router
+from protect_api.realtime import router as realtime_router
 from protect_api.routers.admin import router as admin_router
 from protect_api.routers.attention import router as attention_router
 from protect_api.routers.catalog import router as catalog_router
@@ -11,6 +12,8 @@ from protect_api.routers.data_sources import router as data_sources_router
 from protect_api.routers.devices import router as devices_router
 from protect_api.routers.entities import router as entities_router
 from protect_api.routers.ingest import router as ingest_router
+from protect_api.routers.map import router as map_router
+from protect_api.routers.network import router as network_router
 from protect_api.routers.projects import router as projects_router
 
 v1_router = APIRouter()
@@ -25,5 +28,8 @@ for router in (
     ingest_router,
     attention_router,
     data_router,
+    network_router,
+    map_router,
+    realtime_router,
 ):
     v1_router.include_router(router)

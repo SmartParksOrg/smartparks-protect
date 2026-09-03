@@ -52,8 +52,11 @@ async def ingest_http(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Body is not valid JSON"
         ) from None
     context = data_source_context(source)
+    headers = dict(request.headers)
+    if "event" in request.query_params:  # ChirpStack HTTP integration style
+        headers["x-event"] = request.query_params["event"]
     try:
-        messages = adapter.parse_webhook(context, body, dict(request.headers))
+        messages = adapter.parse_webhook(context, body, headers)
     except ApplicationError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
     stored = [await store_inbound(session, source, message) for message in messages]

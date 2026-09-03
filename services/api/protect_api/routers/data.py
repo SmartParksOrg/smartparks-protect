@@ -83,6 +83,8 @@ class SourceEventRead(BaseModel):
     trace_id: uuid.UUID | None
     error_code: str | None
     deliveries: list[DeliveryRead]
+    links: list[dict[str, str]] = []
+    data_source_name: str | None = None
 
 
 class StepRead(BaseModel):
@@ -207,15 +209,22 @@ async def get_source_event(
             .order_by(SourceDelivery.id)
         )
     ).all()
-    data = (
-        SourceEventRead.model_validate(event, from_attributes=True)
-        if False
-        else SourceEventRead(
-            **{c: getattr(event, c) for c in SourceEventRead.model_fields if c != "deliveries"},
-            deliveries=[DeliveryRead.model_validate(d, from_attributes=True) for d in deliveries],
-        )
+    from shared.domain.links import resolve_links
+    from shared.models import DataSource, ExternalIdentity
+
+    source = await session.get(DataSource, event.data_source_id)
+    identity = (
+        await session.get(ExternalIdentity, event.external_identity_id)
+        if event.external_identity_id
+        else None
     )
-    return data
+    skip = {"deliveries", "links", "data_source_name"}
+    return SourceEventRead(
+        **{c: getattr(event, c) for c in SourceEventRead.model_fields if c not in skip},
+        deliveries=[DeliveryRead.model_validate(d, from_attributes=True) for d in deliveries],
+        links=resolve_links(source, identity) if source else [],
+        data_source_name=source.name if source else None,
+    )
 
 
 async def _error_dict(session: AsyncSession, error_id: int | None) -> dict[str, Any] | None:

@@ -79,7 +79,12 @@ class DecodedRecords:
 
 @dataclass(frozen=True, slots=True)
 class SourceEventData:
-    """What a driver may see of a source event."""
+    """What a driver may see of a source event.
+
+    `payload` is the provider message as stored. For LoRaWAN uplinks the decoder also extracts
+    the application frame: `frame` (the decoded bytes) and `f_port`. Drivers of LoRaWAN devices
+    work on those two and never on provider fields.
+    """
 
     id: int
     event_type: str
@@ -89,6 +94,11 @@ class SourceEventData:
     ingested_at: datetime
     device_attributes: dict[str, Any]
     device_type_settings: dict[str, Any]
+    frame: bytes | None = None
+    f_port: int | None = None
+
+
+DEFAULT_DECODABLE_EVENT_TYPES: frozenset[str] = frozenset({"uplink"})
 
 
 class DeviceDriver(Protocol):
@@ -96,8 +106,35 @@ class DeviceDriver(Protocol):
     label: ClassVar[str]
     capabilities: ClassVar[frozenset[str]]
     timestamp_semantics: ClassVar[dict[str, TimestampSemantics]]
+    decodable_event_types: ClassVar[frozenset[str]]
 
     def decode(self, event: SourceEventData) -> DecodedRecords: ...
+
+
+def lorawan_frame(
+    payload: dict[str, Any], provider_metadata: dict[str, Any]
+) -> tuple[bytes | None, int | None]:
+    """The application payload of a LoRaWAN uplink as stored by the adapter: base64 `data` and
+    `fPort` in the payload (ChirpStack shape) or `frame_hex` and `f_port` in provider metadata
+    (other adapters normalize to this)."""
+    import base64
+
+    f_port = provider_metadata.get("f_port")
+    if f_port is None:
+        f_port = payload.get("fPort")
+    if "frame_hex" in provider_metadata:
+        return bytes.fromhex(str(provider_metadata["frame_hex"])), int(
+            f_port
+        ) if f_port is not None else None
+    data = payload.get("data")
+    if isinstance(data, str):
+        try:
+            return base64.b64decode(data, validate=True), int(
+                f_port
+            ) if f_port is not None else None
+        except (ValueError, TypeError):
+            return None, int(f_port) if f_port is not None else None
+    return None, int(f_port) if f_port is not None else None
 
 
 def canonical_key(

@@ -81,6 +81,34 @@ jobs:
       - run: npm run build
       - run: npm run test
 
+  openapi:
+    name: openapi schema is current
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+asyncpg://protect:protect-dev-password@localhost:5432/smartparks_protect
+      REDIS_URL: redis://localhost:6379/0
+      MINIO_ENDPOINT: localhost:9000
+      MINIO_ROOT_USER: protect
+      MINIO_ROOT_PASSWORD: protect-dev-minio
+      JWT_SECRET: ci-secret-that-is-at-least-32-bytes-long
+      CREDENTIALS_KEY: ci-credentials-key-long-enough
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/frontend/package-lock.json
+      - run: uv sync --frozen --all-groups
+      - run: cd services/frontend && npm ci
+      - run: scripts/dev.sh openapi
+      - name: Committed schema must match the API
+        run: git diff --exit-code -- services/frontend/openapi.json services/frontend/src/api/schema.d.ts
+
   docs:
     runs-on: ubuntu-latest
     steps:

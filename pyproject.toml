@@ -29,6 +29,7 @@ dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "httpx==0.28.1",
+    "httpx-ws==0.9.0",
 ]
 docs = [
     "mkdocs<2",
@@ -50,6 +51,9 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "f
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "E501"]
 "services/api/alembic/versions/**" = ["E501"]
+"shared/shared/metrics/seeds.py" = ["E501"]
+"shared/shared/device_drivers/opencollar/__init__.py" = ["E501"]
+"scripts/**" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

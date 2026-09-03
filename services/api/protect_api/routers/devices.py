@@ -32,6 +32,7 @@ from protect_api.schemas.domain import (
     ProjectAssignmentRead,
 )
 from shared.database import get_session
+from shared.domain.links import resolve_links
 from shared.enums import DeviceStatus, Role
 from shared.models import (
     DataSource,
@@ -196,11 +197,25 @@ async def get_device(
             select(ExternalIdentity).where(ExternalIdentity.device_id == device.id)
         )
     ).all()
+    sources = {
+        s.id: s
+        for s in (
+            await session.scalars(
+                select(DataSource).where(DataSource.id.in_({i.data_source_id for i in identities}))
+            )
+        ).all()
+    }
+    links = [
+        link
+        for identity in identities
+        for link in resolve_links(sources[identity.data_source_id], identity)
+    ]
     return DeviceWithAssignments(
         **DeviceRead.model_validate(device).model_dump(),
         project_assignments=[project_assignment_read(a) for a in project_assignments],
         entity_assignments=[assignment_read(a) for a in entity_assignments],
         external_identities=[ExternalIdentityRead.model_validate(i) for i in identities],
+        links=links,
     )
 
 

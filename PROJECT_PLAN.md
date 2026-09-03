@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 3, ChirpStack, OpenCollar and the first frontend |
-| Latest release | none (first target v0.1.0 at the end of phase 3) |
+| Active phase | Phase 4, analyze, export and the scale benchmark |
+| Latest release | v0.1.0 (2026-09-03) |
 | Last session | 2026-09-03 |
-| Next item | Phase 3: ChirpStack adapter |
+| Next item | Phase 4: quick start on a clean checkout, then the aggregation API |
 | Blockers | none |
 
 ## What we are building
@@ -76,12 +76,16 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D32 | Raw payload placement | JSONB in `source_events` up to 64 KB, larger payloads in MinIO with a reference and SHA-256 on the row | Provenance joins stay in SQL for every normal uplink; raw log files do not bloat the hypertable. Decided by Tim on 2026-09-03. |
 | D33 | Stream trimming | Approximate `MAXLEN` per topic, 100,000 entries by default, 10,000 for dead-letter streams | Bounded memory; the database is the source of truth. Decided by Tim on 2026-09-03. |
 | D34 | Webhook authentication | Per-source bearer token, shown once at creation, stored hashed | Works with every IoT platform that can set a header. HMAC signatures can be added per adapter later. Decided by Tim on 2026-09-03. |
+| D35 | OpenCollar sources | Driver and fixtures built from the public Smart Parks repositories; recorded live uplinks extend the golden tests when Tim provides them | Work can start without waiting for exports. Decided by Tim on 2026-09-03. |
+| D36 | Icons | Lucide (ISC) for technical and UI icons, own monochrome silhouettes for wildlife and infrastructure under the project licence; EarthRanger mappings stay as registry keys | Clean licence today, assets can be swapped later without touching data. Decided by Tim on 2026-09-03. |
+| D37 | Base map | OpenFreeMap vector tiles, no key; satellite imagery later behind an optional key as a user choice | Free, native to MapLibre, no tile server to run. Decided by Tim on 2026-09-03. |
+| D38 | External deep links | `data_sources.link_templates` JSONB keyed `OPEN_DEVICE`, `OPEN_APPLICATION`, `OPEN_GATEWAY`; URL templates filled from ExternalIdentity attributes; adapters ship defaults, admins override per data source | Built as proposed in architecture 32 during phase 3; no reason found to deviate. Recorded by Claude on 2026-09-03. |
 
 ### Open decisions from architecture section 32
 
 These are not decided yet. A proposed default is given so work can start; each is confirmed or changed when its phase begins.
 
-- [ ] **External deep links.** Proposed: `data_sources.link_templates` JSONB with keys like `OPEN_DEVICE`, `OPEN_GATEWAY`, `OPEN_APPLICATION`, each a URL template with placeholders from ExternalIdentity attributes. Adapters ship defaults; admins can override. Decide in phase 3.
+- [x] **External deep links.** Decided on 2026-09-03: built as proposed, see D38.
 - [ ] **Control action schema versioning.** Proposed: action definitions are Python dataclasses in the driver with a `schema_version`; parameters are Pydantic models exported as JSON schema for the UI and rules. Decide in phase 6.
 - [ ] **Integration delivery idempotency.** Proposed: `integration_deliveries` row per (integration, object type, object id, object version) with a unique key; backfill creates rows in batches. Decide in phase 8.
 - [x] **Raw payload placement for very large events.** Decided on 2026-09-03: 64 KB threshold, see D32.
@@ -329,35 +333,35 @@ Each phase has a goal, a reason for its place in the sequence, deliverables with
 
 Backend:
 
-- [ ] ChirpStack adapter: MQTT event connector for uplink, join, ack, txack, log and status events mapped to the normalized LoRaWAN event types (8.1); gateway receptions with RSSI and SNR per uplink; management connector via the ChirpStack gRPC or REST API (list applications, devices, gateways); capabilities declared per data source; deep link templates for device, application and gateway. Command connector is completed in phase 6.
-- [ ] ChirpStack in docker compose (profile `chirpstack`) with a documented bootstrap (tenant, application, device profile, simulated gateway). `scripts/simulate_opencollar.py` publishes recorded fixtures as uplinks through the ChirpStack MQTT integration, at a configurable rate.
-- [ ] OpenCollar driver: port mappings, decoder per message type ported from the public Smart Parks decoders, firmware and decoder version metadata, capabilities (gnss, accelerometer, battery, activity, remote settings, drop-off), timestamp semantics per record type including embedded log timestamps, canonical keys, golden tests over `tests/fixtures/payloads/opencollar/`. Driver documentation is the reference example for extension docs (28.12).
-- [ ] Metric registry seeds from architecture 10.2 plus the OpenCollar metrics.
-- [ ] Current-state API for the live map: bounded by project and viewport, served as vector tiles (`ST_AsMVT`) above a threshold and as GeoJSON below it. Track API with automatic simplification by period (13.4), maximum points per response, progressive drill-down.
-- [ ] WebSocket endpoint bridged from the event bus: per-project channel, sends compact current-state updates, target p95 under 2 seconds from commit (13.7).
-- [ ] LoRaWAN traffic API: paginated normalized events with raw payload, decoded result, gateway receptions and trace link.
-- [ ] Trace API: search by device, entity, EUI, trace id, data source, time range, status and error code; trace detail with ordered steps.
-- [ ] System Health API (basic): worker heartbeats, stream lag per consumer group, events per minute, dead-letter counts, data source connectivity.
+- [x] ChirpStack adapter (2026-09-03, management connector lists applications, devices and gateways; command connector in phase 6): MQTT event connector for uplink, join, ack, txack, log and status events mapped to the normalized LoRaWAN event types (8.1); gateway receptions with RSSI and SNR per uplink; management connector via the ChirpStack gRPC or REST API (list applications, devices, gateways); capabilities declared per data source; deep link templates for device, application and gateway. Command connector is completed in phase 6.
+- [x] ChirpStack in docker compose (2026-09-03, `scripts/chirpstack_bootstrap.py` mints the API key and creates everything; the simulator publishes integration events, not radio frames) (profile `chirpstack`) with a documented bootstrap (tenant, application, device profile, simulated gateway). `scripts/simulate_opencollar.py` publishes recorded fixtures as uplinks through the ChirpStack MQTT integration, at a configurable rate.
+- [x] OpenCollar driver (2026-09-03, from the public firmware 7.3.0 and decoder; ports 2, 4, 12, 13, 14, 16, 18, 19, 20, 29, 31, 3 and 30 decoded, scan and satellite ports accepted without canonical rows; recorded live uplinks still wanted): port mappings, decoder per message type ported from the public Smart Parks decoders, firmware and decoder version metadata, capabilities (gnss, accelerometer, battery, activity, remote settings, drop-off), timestamp semantics per record type including embedded log timestamps, canonical keys, golden tests over `tests/fixtures/payloads/opencollar/`. Driver documentation is the reference example for extension docs (28.12).
+- [x] Metric registry seeds from architecture 10.2 plus the OpenCollar metrics (migration 0003, 2026-09-03).
+- [x] Current-state API (2026-09-03) for the live map: bounded by project and viewport, served as vector tiles (`ST_AsMVT`) above a threshold and as GeoJSON below it. Track API with automatic simplification by period (13.4), maximum points per response, progressive drill-down.
+- [x] WebSocket endpoint (2026-09-03) bridged from the event bus: per-project channel, sends compact current-state updates, target p95 under 2 seconds from commit (13.7).
+- [x] LoRaWAN traffic API (2026-09-03): paginated normalized events with raw payload, decoded result, gateway receptions and trace link.
+- [x] Trace API (2026-09-03): search by device, entity, EUI, trace id, data source, time range, status and error code; trace detail with ordered steps.
+- [x] System Health API (basic, 2026-09-03): worker heartbeats, stream lag per consumer group, events per minute, dead-letter counts, data source connectivity.
 
 Frontend:
 
-- [ ] App shell: login, invitation acceptance, password reset, project switcher, sidebar navigation with the sections from architecture 28 (Monitor, Analyze, Network, Rules, Integrate, Control, Admin), responsive layout, Smart Parks logo and colours. Route guards per role. Empty states for screens that later phases fill.
-- [ ] Icon registry: `src/assets/icons/` by category, `icon-registry.json` with key, category, label, asset, source, licence, aliases, fallback and EarthRanger mapping. Marker renderer with shape families for entity, infrastructure and event, colour for state, badge overlay. Starter set covering the concepts in 24.10. Licence review recorded per asset.
-- [ ] Admin screens: projects, users and invitations, data sources (with a capability inspector showing what the adapter and this account support, and a connection test), device types, devices (assignments, handover dialog, external identities, bulk import), entity types (icon and attribute schema), entities, features (draw geofences on the map), metrics.
-- [ ] Live map: MapLibre, current-state layer with icon registry symbols and clustering, selection panel with entity, assigned device, connectivity state, last seen, quick link to device and trace, track toggle with period selection, features layer.
-- [ ] Devices and Entities list screens with status, last seen, project and assignment.
-- [ ] Network: LoRaWAN traffic viewer (8.3) with expandable raw, decoded, gateway reception and trace details.
-- [ ] Trace Explorer (basic) and Needs Attention screen with the remediation actions from phase 2.
-- [ ] System Health (basic).
-- [ ] Provenance panel on a position and a source event: DataSource, external identity, all deliveries, Open in ChirpStack link.
-- [ ] Playwright smoke: login and open every page at 390, 768 and 1440 px; screenshot sweep script.
+- [x] App shell (2026-09-03): login, invitation acceptance, password reset, project switcher, sidebar navigation with the sections from architecture 28 (Monitor, Analyze, Network, Rules, Integrate, Control, Admin), responsive layout, Smart Parks logo and colours. Route guards per role. Empty states for screens that later phases fill.
+- [x] Icon registry (2026-09-03, starter set of 20 own silhouettes under MIT, EarthRanger keys as mappings): `src/assets/icons/` by category, `icon-registry.json` with key, category, label, asset, source, licence, aliases, fallback and EarthRanger mapping. Marker renderer with shape families for entity, infrastructure and event, colour for state, badge overlay. Starter set covering the concepts in 24.10. Licence review recorded per asset.
+- [x] Admin screens (2026-09-03): projects, users and invitations, data sources (with a capability inspector showing what the adapter and this account support, and a connection test), device types, devices (assignments, handover dialog, external identities, bulk import), entity types (icon and attribute schema), entities, features (draw geofences on the map), metrics.
+- [x] Live map (2026-09-03): MapLibre, current-state layer with icon registry symbols and clustering, selection panel with entity, assigned device, connectivity state, last seen, quick link to device and trace, track toggle with period selection, features layer.
+- [x] Devices and Entities list screens (2026-09-03) with status, last seen, project and assignment.
+- [x] Network (2026-09-03): LoRaWAN traffic viewer (8.3) with expandable raw, decoded, gateway reception and trace details.
+- [x] Trace Explorer (basic) and Needs Attention screen (2026-09-03) with the remediation actions from phase 2.
+- [x] System Health (basic, 2026-09-03).
+- [x] Provenance panel (2026-09-03) on a position and a source event: DataSource, external identity, all deliveries, Open in ChirpStack link.
+- [x] Playwright sweep (2026-09-03, `npm run sweep`, routes derived from the router; a `@playwright/test` smoke with assertions follows when CI gets a browser): login and open every page at 390, 768 and 1440 px; screenshot sweep script.
 
 Release:
 
-- [ ] `README.md` quick start: clone, `.env`, `docker compose --profile chirpstack up`, bootstrap, run the simulator, open the map.
-- [ ] `VERSION` v0.1.0, `CHANGELOG.md`, tag.
+- [x] `README.md` quick start (2026-09-03): clone, `.env`, `docker compose --profile chirpstack up`, bootstrap, run the simulator, open the map.
+- [x] `VERSION` v0.1.0, `CHANGELOG.md` (2026-09-03); the tag is created after the commit.
 
-**Exit criteria.** Run the quick start on a clean checkout and see a simulated collar move on the map, its uplinks in the traffic viewer, its trace in the explorer and a working Open in ChirpStack link.
+**Exit criteria.** Run the quick start on a clean checkout and see a simulated collar move on the map, its uplinks in the traffic viewer, its trace in the explorer and a working Open in ChirpStack link. Met on 2026-09-03 on the development stack (bootstrap, simulator, map, traffic, traces, ChirpStack links from the identity attributes). A clean-checkout run is the first thing to do in the next session.
 
 ---
 
@@ -695,3 +699,19 @@ Listed by the phase where they are first needed.
 - Data sources with an unregistered adapter key are rejected (422); the phase 1 tests were changed to the generic adapters.
 - 68 tests pass. Not committed. Tim reviews and commits.
 - Next: phase 3 in order, starting with the ChirpStack adapter.
+
+### 2026-09-03, phase 3 (Claude)
+
+- Tim decided D35 (OpenCollar from the public repositories), D36 (Lucide plus own silhouettes), D37 (OpenFreeMap), backend first then frontend; the frontend followed in the same session while the protocol research ran.
+- CI fix from phase 2: MinIO buckets are created on demand.
+- ChirpStack adapter (events, gateway receptions, identity attributes for deep links, REST management, HTTP integration), compose profile fixed (the gateway bridge needs a literal broker host), bootstrap script that mints a ChirpStack API key from the database and secret, simulator publishing integration events. Verified live: bootstrap, ingest connects, simulated uplinks become positions with receptions.
+- Drivers get the LoRaWAN frame and port; network-level status and join events need no driver. Metric seeds in migration 0003.
+- APIs: current state as GeoJSON and vector tiles, tracks with uniform decimation, WebSocket fan-out per API process, traffic, trace search, system health, deep links from templates and identity attributes.
+- OpenCollar Edge driver from a research pass over twenty public repositories (the research document is in `docs/devices/`), golden tests over the wiki examples, ports 2, 4, 12, 13, 14, 16, 18, 19, 20, 29, 31, 3, 30. A port 16 resend and a port 29 flash log record map to the same canonical key as the original fix. Recorded live uplinks are still wanted (input list).
+- Frontend: typed client, generated OpenAPI types with a CI freshness check, Zustand stores, router with guards, app shell, icon registry with twenty starter silhouettes, live map with clustering and marker families, entities, devices, device detail with provenance and links, traffic viewer, trace explorer, members, features with drawing, project settings, Needs Attention, health, projects, users, devices with handover, data sources with webhook tokens, catalogues, audit. Screenshot sweep derives routes from the router; all 3 viewports times 31 routes clean after the nginx WebSocket fix.
+- Live map fixes found with the sweep and a screenshot script: MapLibre 6 ships its worker as a module, so Vite bundles it (`?worker&url`, `setWorkerUrl`) and nginx serves `.mjs` as JavaScript; MapLibre's own CSS sets `position: relative` on the container, so the map page uses `absolute!`; symbol layers use Noto Sans, the only glyphs OpenFreeMap serves. `/api` in nginx now passes WebSocket upgrades.
+- Tim installed Chromium's system libraries (`libnspr4 libnss3 libasound2t64`), so `npm run sweep` and `scripts/dev.sh sweep` run natively; the Playwright image stays documented as a fallback with `--user` so it leaves no root-owned files.
+- Known gaps for later phases: uvicorn access logs are unstructured; the sweep has no assertions yet (`@playwright/test` smoke when CI gets a browser); satellite base map behind a key; ChirpStack command connector in phase 6.
+- D38 recorded: external deep links built as proposed in architecture 32.
+- 100 python tests, 2 frontend tests, lint and types clean, docs strict, sweep 31 routes times 3 viewports clean. Committed and tagged v0.1.0 on Tim's instruction.
+- Next session: run the quick start on a clean checkout (phase 3 exit criterion on a fresh machine), then phase 4 starting with the aggregation API. Inputs still wanted: recorded live OpenCollar uplinks, confirmation of the composed wide logo.

@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from protect_decoder.main import build_worker
 from protect_decoder.pipeline import process_source_event, publish_outcome
 from shared.bus import RedisStreamsBus, Topic
-from shared.enums import ErrorCode, ProcessingStatus, TraceStatus
+from shared.enums import AcquisitionChannel, ErrorCode, ProcessingStatus, TraceStatus
 from shared.ingest import commit_and_publish, store_inbound
 from shared.models import (
     DeviceCurrentState,
@@ -288,3 +288,68 @@ async def test_large_payload_goes_to_minio(db, bus, world, monkeypatch):
         select(func.count()).select_from(Measurement).where(Measurement.source_event_id == event.id)
     )
     assert measurement_count == 0
+
+
+async def test_chirpstack_uplink_and_status_events(db, bus, world):
+    """A ChirpStack uplink carries the frame in base64; a status event needs no driver."""
+    import base64
+    import json
+
+    from shared.connectivity.base import GatewayReceptionData
+    from shared.enums import IngestionMethod
+    from shared.models import ConnectivityState
+
+    frame = json.dumps({"time": "2026-05-01T10:00:00+00:00", "lat": -24.5, "lon": 31.0}).encode()
+    uplink = inbound(
+        world.external_id,
+        {"data": base64.b64encode(frame).decode(), "fPort": 1, "fCnt": 3},
+        acquisition_channel=AcquisitionChannel.LORAWAN,
+        ingestion_method=IngestionMethod.MQTT,
+        provider_metadata={"f_port": 1, "best_rssi": -70.0, "best_snr": 6.0, "gateway_count": 1},
+        network_received_at=datetime(2026, 5, 1, 10, 0, 2, tzinfo=UTC),
+        gateway_receptions=[GatewayReceptionData(gateway_id="gw1", rssi=-70.0, snr=6.0)],
+    )
+    stored = await store_inbound(db, world.source, uplink)
+    await commit_and_publish(db, bus, [stored])
+    outcome = await process_source_event(
+        db, stored.source_event.id, stored.source_event.ingested_at
+    )
+    await db.commit()
+    assert outcome.created["positions"] == 1
+    connectivity = await db.get(ConnectivityState, (world.device.id, world.source.id))
+    assert connectivity.last_rssi == -70.0 and connectivity.last_uplink_at == datetime(
+        2026, 5, 1, 10, 0, 2, tzinfo=UTC
+    )
+
+    status = inbound(
+        world.external_id,
+        {"batteryLevel": 88.3, "margin": 10},
+        acquisition_channel=AcquisitionChannel.LORAWAN,
+        ingestion_method=IngestionMethod.MQTT,
+        network_received_at=datetime(2026, 5, 1, 10, 5, tzinfo=UTC),
+    )
+    status.event_type = "status"
+    stored = await store_inbound(db, world.source, status)
+    await commit_and_publish(db, bus, [stored])
+    outcome = await process_source_event(
+        db, stored.source_event.id, stored.source_event.ingested_at
+    )
+    await db.commit()
+    assert outcome.created["measurements"] == 2 and outcome.created["positions"] == 0
+    join = inbound(
+        world.external_id,
+        {"devAddr": "00189440"},
+        acquisition_channel=AcquisitionChannel.LORAWAN,
+        ingestion_method=IngestionMethod.MQTT,
+        network_received_at=datetime(2026, 5, 1, 9, tzinfo=UTC),
+    )
+    join.event_type = "join"
+    stored = await store_inbound(db, world.source, join)
+    await commit_and_publish(db, bus, [stored])
+    outcome = await process_source_event(
+        db, stored.source_event.id, stored.source_event.ingested_at
+    )
+    await db.commit()
+    await db.refresh(connectivity)
+    assert connectivity.last_join_at == datetime(2026, 5, 1, 9, tzinfo=UTC)
+    assert outcome.status == ProcessingStatus.PROCESSED

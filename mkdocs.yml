@@ -63,9 +63,12 @@ nav:
   - Devices:
       - devices/index.md
       - Driver interface: devices/driver-interface.md
+      - OpenCollar Edge: devices/opencollar.md
+      - OpenCollar protocol research: devices/opencollar-protocol-research.md
   - Integrations:
       - integrations/index.md
       - Adapter interface: integrations/adapter-interface.md
+      - ChirpStack: integrations/chirpstack/index.md
   - Analytics: analytics/index.md
   - Rules: rules/index.md
   - Administration:

@@ -1,6 +1,8 @@
 """FastAPI application for Smart Parks Protect."""
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +10,7 @@ from pydantic import BaseModel
 
 from protect_api.health import router as health_router
 from protect_api.middleware import RequestIdMiddleware
+from protect_api.realtime import broadcaster
 from protect_api.routers import v1_router
 from shared.config import get_settings
 from shared.logger import configure_logging, get_logger
@@ -25,12 +28,18 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging("api", level=settings.log_level, log_format=settings.log_format)
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        await broadcaster.stop()
+
     app = FastAPI(
         title="Smart Parks Protect",
         version=__version__,
         docs_url="/api/docs",
         redoc_url=None,
         openapi_url="/api/openapi.json",
+        lifespan=lifespan,
     )
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(

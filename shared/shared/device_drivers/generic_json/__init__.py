@@ -7,10 +7,12 @@ with `type`, `title`, optional `severity` and `context`). Without `time` the net
 time is canonical (NETWORK_TIME semantics).
 """
 
+import json
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from shared.device_drivers.base import (
+    DEFAULT_DECODABLE_EVENT_TYPES,
     DecodedEvent,
     DecodedMeasurement,
     DecodedPosition,
@@ -70,8 +72,20 @@ class GenericJsonDriver:
         "event": TimestampSemantics.DEVICE_TIME,
     }
 
+    decodable_event_types: ClassVar[frozenset[str]] = DEFAULT_DECODABLE_EVENT_TYPES
+
     def decode(self, event: SourceEventData) -> DecodedRecords:
-        payload = event.payload
+        payload: Any = event.payload
+        if event.frame is not None:
+            try:
+                payload = json.loads(event.frame.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ApplicationError(
+                    code=ErrorCode.PAYLOAD_DECODE_FAILED,
+                    message=f"frame is not JSON: {exc}",
+                    component="driver.generic_json",
+                    user_actionable=True,
+                ) from exc
         if not isinstance(payload, dict):
             raise ApplicationError(
                 code=ErrorCode.PAYLOAD_DECODE_FAILED,

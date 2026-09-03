@@ -12,6 +12,6 @@
       type="generic"
 
       [integration.mqtt.auth.generic]
-        servers=["tcp://$MQTT_BROKER_HOST:1883"]
+        servers=["tcp://chirpstack-mosquitto:1883"]  # the bridge does not expand environment variables
         username=""
         password=""

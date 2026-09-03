@@ -225,10 +225,19 @@ class HandoverRequest(BaseModel):
         return require_aware(value)
 
 
+class ExternalLink(BaseModel):
+    key: str
+    label: str
+    url: str
+    data_source_id: uuid.UUID
+    data_source_name: str
+
+
 class DeviceWithAssignments(DeviceRead):
     project_assignments: list[ProjectAssignmentRead]
     entity_assignments: list[EntityAssignmentRead]
     external_identities: list["ExternalIdentityRead"]
+    links: list[ExternalLink] = Field(default_factory=list)
 
 
 class DataSourceCreate(BaseModel):

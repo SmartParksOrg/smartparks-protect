@@ -1,0 +1,122 @@
+import { useQuery } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
+
+import { api } from "@/api/client";
+import { queryKeys } from "@/api/queryKeys";
+import type { SourceEvent, Trace } from "@/api/types";
+import { JsonView } from "@/components/common/JsonView";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatTime } from "@/lib/format";
+
+/** Trace steps with status, timing and the structured error (architecture 26.3). */
+export function TraceSteps({ traceId }: { traceId: string }) {
+  const trace = useQuery({ queryKey: queryKeys.trace(traceId), queryFn: () => api.get<Trace>(`/api/v1/traces/${traceId}`) });
+  if (trace.isPending) return <div className="text-sm text-muted-foreground">Loading trace…</div>;
+  if (trace.isError) return <div className="text-sm text-destructive">{trace.error.message}</div>;
+  const t = trace.data;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <StatusBadge value={t.status} />
+        <Badge variant="outline">{t.trace_class}</Badge>
+        <span className="text-muted-foreground">{t.root_object_type} {t.root_object_id}</span>
+        <span className="text-muted-foreground">{formatTime(t.started_at)}</span>
+        {t.compact && <Badge variant="secondary">compact</Badge>}
+      </div>
+      <ol className="space-y-1">
+        {t.steps.map((step) => (
+          <li key={step.sequence} className="rounded-md border px-3 py-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge value={step.status} />
+              <span className="font-medium">{step.component}</span>
+              <span>{step.operation}</span>
+              {step.duration_ms != null && <span className="ml-auto text-xs text-muted-foreground">{step.duration_ms} ms</span>}
+            </div>
+            {(step.input_ref || step.output_ref) && <div className="mt-1 text-xs text-muted-foreground">{step.input_ref && <span>in {step.input_ref} </span>}{step.output_ref && <span>out {step.output_ref}</span>}</div>}
+            {step.error && (
+              <div className="mt-2 rounded bg-destructive/10 p-2 text-xs">
+                <div className="font-medium text-destructive">{step.error.error_code as string}: {step.error.message as string}</div>
+                <div className="text-muted-foreground">{step.error.retryable ? "retryable" : "not retryable"}{step.error.user_actionable ? ", an administrator can fix this" : ""}</div>
+              </div>
+            )}
+            {Object.keys(step.metadata ?? {}).length > 0 && <JsonView value={step.metadata} className="mt-2 max-h-40" />}
+          </li>
+        ))}
+      </ol>
+      {t.error && !t.steps.some((s) => s.error) && <div className="rounded bg-destructive/10 p-2 text-xs text-destructive">{t.error.error_code as string}: {t.error.message as string}</div>}
+    </div>
+  );
+}
+
+/** Where a record came from: data source, identity, every delivery, raw payload, trace, deep links. */
+export function SourceEventPanel({ id, ingestedAt }: { id: number; ingestedAt: string }) {
+  const event = useQuery({ queryKey: queryKeys.sourceEvent(id, ingestedAt), queryFn: () => api.get<SourceEvent>(`/api/v1/source-events/${id}`, { query: { ingested_at: ingestedAt } }) });
+  if (event.isPending) return <div className="text-sm text-muted-foreground">Loading source event…</div>;
+  if (event.isError) return <div className="text-sm text-destructive">{event.error.message}</div>;
+  const e = event.data;
+  return (
+    <Tabs defaultValue="provenance">
+      <TabsList>
+        <TabsTrigger value="provenance">Provenance</TabsTrigger>
+        <TabsTrigger value="payload">Raw payload</TabsTrigger>
+        {e.trace_id && <TabsTrigger value="trace">Trace</TabsTrigger>}
+      </TabsList>
+      <TabsContent value="provenance" className="space-y-3">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          <dt className="text-muted-foreground">Data source</dt><dd>{e.data_source_name ?? e.data_source_id}</dd>
+          <dt className="text-muted-foreground">External id</dt><dd className="font-mono">{e.external_id ?? "none"}</dd>
+          <dt className="text-muted-foreground">Event type</dt><dd>{e.event_type}</dd>
+          <dt className="text-muted-foreground">Channel</dt><dd>{e.acquisition_channel} over {e.ingestion_method}</dd>
+          <dt className="text-muted-foreground">Network received</dt><dd>{formatTime(e.network_received_at) || "unknown"}</dd>
+          <dt className="text-muted-foreground">Ingested</dt><dd>{formatTime(e.ingested_at)}</dd>
+          <dt className="text-muted-foreground">Status</dt><dd><StatusBadge value={e.processing_status} /> {e.error_code}</dd>
+        </dl>
+        {e.links.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {e.links.map((link) => (
+              <Button key={link.key} asChild variant="outline" size="sm"><a href={link.url} target="_blank" rel="noreferrer"><ExternalLink className="size-4" /> {link.label}</a></Button>
+            ))}
+          </div>
+        )}
+        <div>
+          <div className="mb-1 text-sm font-medium">Deliveries linked to canonical rows</div>
+          {e.deliveries.length === 0 ? <div className="text-sm text-muted-foreground">No canonical rows from this event.</div> : (
+            <ul className="text-sm">
+              {e.deliveries.map((d) => <li key={`${d.canonical_type}${d.canonical_id}`}>{d.canonical_type} {d.canonical_id} at {formatTime(d.canonical_time)} {d.first ? "(created by this delivery)" : "(repeat delivery)"}</li>)}
+            </ul>
+          )}
+        </div>
+      </TabsContent>
+      <TabsContent value="payload">
+        {e.payload ? <JsonView value={e.payload} /> : <div className="text-sm text-muted-foreground">Payload stored out of line ({e.payload_size} bytes) as {e.payload_object_key}.</div>}
+      </TabsContent>
+      {e.trace_id && <TabsContent value="trace"><TraceSteps traceId={e.trace_id} /></TabsContent>}
+    </Tabs>
+  );
+}
+
+export function SourceEventDialog({ id, ingestedAt, onClose }: { id: number | null; ingestedAt: string | null; onClose: () => void }) {
+  return (
+    <Dialog open={id != null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader><DialogTitle>Source event {id}</DialogTitle><DialogDescription>Raw delivery and how it was processed</DialogDescription></DialogHeader>
+        {id != null && ingestedAt && <SourceEventPanel id={id} ingestedAt={ingestedAt} />}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function TraceDialog({ traceId, onClose }: { traceId: string | null; onClose: () => void }) {
+  return (
+    <Dialog open={traceId != null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader><DialogTitle>Processing trace</DialogTitle><DialogDescription className="font-mono text-xs">{traceId}</DialogDescription></DialogHeader>
+        {traceId && <TraceSteps traceId={traceId} />}
+      </DialogContent>
+    </Dialog>
+  );
+}

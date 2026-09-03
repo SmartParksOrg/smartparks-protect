@@ -1,11 +1,13 @@
 """Explicit adapter registry (decision D10): in-repo modules, no dynamic loading."""
 
+from shared.connectivity.adapters.chirpstack import ChirpStackAdapter
 from shared.connectivity.adapters.generic_http import GenericHttpAdapter
 from shared.connectivity.adapters.generic_mqtt import GenericMqttAdapter
 from shared.connectivity.base import Adapter
 
 ADAPTERS: dict[str, Adapter] = {
-    adapter.key: adapter for adapter in (GenericHttpAdapter(), GenericMqttAdapter())
+    adapter.key: adapter
+    for adapter in (GenericHttpAdapter(), GenericMqttAdapter(), ChirpStackAdapter())
 }
 
 

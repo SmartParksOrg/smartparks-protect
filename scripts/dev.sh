@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Daily development commands for Smart Parks Protect. Run from anywhere in the repository.
-#   scripts/dev.sh up | down | logs [service] | migrate | revision <msg> | bootstrap-admin <email> | test | lint | format | docs | sweep | hooks
+#   scripts/dev.sh up | down | logs [service] | migrate | revision <msg> | bootstrap-admin <email> | chirpstack-bootstrap [args] | simulate [args] | openapi | test | lint | format | docs | sweep | hooks
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,6 +38,12 @@ case "$cmd" in
     revision)
         uv run alembic -c services/api/alembic.ini revision --autogenerate -m "$*"
         ;;
+    chirpstack-bootstrap)
+        uv run scripts/chirpstack_bootstrap.py --mint-key "$@"
+        ;;
+    simulate)
+        uv run scripts/simulate_opencollar.py "$@"
+        ;;
     bootstrap-admin)
         docker compose run --rm --no-deps api /app/.venv/bin/python -m protect_api.bootstrap "$@"
         ;;
@@ -55,12 +61,15 @@ case "$cmd" in
         uv run ruff format .
         uv run ruff check --fix .
         ;;
+    openapi)
+        uv run python -c "import json, pathlib; from protect_api.main import app; pathlib.Path('services/frontend/openapi.json').write_text(json.dumps(app.openapi(), indent=1))"
+        (cd services/frontend && npx openapi-typescript openapi.json -o src/api/schema.d.ts >/dev/null && echo "src/api/schema.d.ts generated")
+        ;;
     docs)
         uv run --only-group docs mkdocs build --strict "$@"
         ;;
     sweep)
-        echo "The screenshot sweep arrives with the app shell in phase 3." >&2
-        exit 1
+        (cd services/frontend && npm run sweep)
         ;;
     hooks)
         git config core.hooksPath .githooks

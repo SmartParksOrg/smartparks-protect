@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import ClassVar
 
 from shared.device_drivers.base import (
+    DEFAULT_DECODABLE_EVENT_TYPES,
     DecodedMeasurement,
     DecodedPosition,
     DecodedRecords,
@@ -25,9 +26,12 @@ class ExampleDeviceDriver:
         "gnss": TimestampSemantics.DEVICE_TIME,
         "measurement": TimestampSemantics.DEVICE_TIME,
     }
+    decodable_event_types: ClassVar[frozenset[str]] = DEFAULT_DECODABLE_EVENT_TYPES
 
     def decode(self, event: SourceEventData) -> DecodedRecords:
-        payload = event.payload
+        payload = (
+            event.payload
+        )  # for a LoRaWAN device, work on event.frame and event.f_port instead
         try:
             time = datetime.fromtimestamp(int(payload["ts"]), tz=UTC)
             latitude, longitude = float(payload["lat"]), float(payload["lon"])

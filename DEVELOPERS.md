@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: pre-alpha. Phases 0 to 2 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, the connectivity and driver contracts with generic HTTP, MQTT and JSON implementations, the ingest and decoder services and the Needs Attention API. A JSON payload posted to a generic HTTP source becomes a position with a trace. No frontend beyond the login placeholder yet (phase 3). Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: v0.1.0, the first vertical slice. Phases 0 to 3 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -111,7 +111,20 @@ The rules behind it:
 
 ### Adapters and drivers
 
-Contracts in `shared/connectivity/base.py` and `shared/device_drivers/base.py`, registries in `registry.py` next to them (D10, ADR 0011). Adapters produce `InboundMessage` and never decode payloads; drivers produce `DecodedRecords` and never read provider fields. Skeletons to copy are in `examples/`. Documentation: `docs/integrations/adapter-interface.md`, `docs/devices/driver-interface.md`.
+Contracts in `shared/connectivity/base.py` and `shared/device_drivers/base.py`, registries in `registry.py` next to them (D10, ADR 0011). Adapters produce `InboundMessage` (with gateway receptions and identity attributes for links) and never decode payloads; drivers produce `DecodedRecords` and never read provider fields. For LoRaWAN uplinks the decoder extracts the application frame (`frame` bytes and `f_port`) from the stored event and drivers work on that; network-level events (`join`, `status`, `downlink_ack`, `downlink_transmitted`, `log`) need no driver: `status` yields `battery_level` and `link_margin` measurements, the rest update connectivity state. A driver declares `decodable_event_types` (default `uplink`). Skeletons to copy are in `examples/`. Documentation: `docs/integrations/adapter-interface.md`, `docs/devices/driver-interface.md`, `docs/integrations/chirpstack/`.
+
+### ChirpStack locally
+
+`docker compose --profile chirpstack up -d` starts ChirpStack 4.19, its gateway bridge, Mosquitto, Postgres and Redis and the REST API. `scripts/dev.sh chirpstack-bootstrap --protect-email ... --protect-password ...` mints an API key (a row in ChirpStack's `api_key` table plus a JWT signed with `CHIRPSTACK_API_SECRET`), creates tenant, application, device profile, simulated gateway and device, and registers the data source in Protect. `scripts/dev.sh simulate --application-id <id>` publishes uplinks as ChirpStack integration events on the broker. The gateway bridge config has the broker host written literally because the bridge does not expand environment variables.
+
+### Live map, traffic, traces, health
+
+- `GET /projects/{id}/map/current` returns entity current state as GeoJSON within a viewport and limit and says whether the client should switch to tiles (`use_tiles` above 2,000 entities); `GET /projects/{id}/map/tiles/{z}/{x}/{y}.mvt` serves the same as Mapbox vector tiles from `ST_AsMVT` (layer `entities`).
+- `GET /projects/{id}/tracks?entity_id|device_id&from&to&max_points` returns a LineString with one time per vertex, decimated with a uniform step so at most `max_points` come back; `total_points` and `step` tell the client how much was skipped.
+- `GET /projects/{id}/traffic` lists source events of the project's devices with port, frame counter, spreading factor, best RSSI and SNR, gateway receptions and processing status; `include_payload=true` adds the raw payload.
+- `GET /projects/{id}/traces` searches traces by device, DevEUI, data source, status, error code and time; `GET /traces/{id}` has the steps.
+- `GET /system/health` (server admin) reports workers with heartbeat, lag and dead letters, events per minute, failures, unknown identities and per data source counts.
+- `WS /api/v1/ws/projects/{id}?token=...` streams `position.created`, `device.state_changed`, `event.created` and `alert.created` for the project. One reader per API process tails the streams with `XREAD` and fans out; there is no consumer group, so every API instance sees every message (`protect_api/realtime.py`).
 
 ### Errors
 
@@ -155,7 +168,19 @@ One `uv` workspace: `shared/` and `services/*` (the frontend is excluded). Every
 
 ### Frontend
 
-`npm run build` is `tsc -b && vite build`: a type error fails the build and the Docker image. `npm run lint` is ESLint, `npm run test` is Vitest with Testing Library. shadcn/ui components are added with `npx shadcn@latest add <name>` and land in `src/components/ui/`, which ESLint ignores. Brand colours and semantic tokens are CSS variables in `src/index.css`; the logo SVGs in `src/assets/brand/` use `currentColor`.
+`npm run build` is `tsc -b && vite build`: a type error fails the build and the Docker image. `npm run lint` is ESLint, `npm run test` is Vitest with Testing Library, `npm run sweep` is the screenshot sweep (see below). shadcn/ui components are added with `npx shadcn@latest add <name>` and land in `src/components/ui/`, which ESLint ignores. Brand colours and semantic tokens are CSS variables in `src/index.css`; the logo SVGs in `src/assets/brand/` use `currentColor` and are imported as React components. Rules are in `services/frontend/FRONTEND_CONVENTIONS.md`.
+
+How the app is put together:
+
+- `src/api/client.ts`: the one fetch wrapper. Attaches the bearer token, turns errors into `ApiError`, calls `useAuthStore.expire()` on a 401 so the router shows the login page with a return path. No `window.location` anywhere.
+- `src/api/schema.d.ts` is generated from the API's OpenAPI document with `scripts/dev.sh openapi` (also `npm run generate:api` after the JSON is dumped); `src/api/types.ts` aliases the schemas the pages use. CI fails when the committed schema is stale.
+- `src/api/queryKeys.ts` is the only place query keys are defined; `useMutationToast` invalidates by these keys and toasts the outcome.
+- Stores: `useAuthStore` (token persisted in localStorage, user, status), `useProjectStore` (last opened project). Filters and selection live in the URL.
+- Routing in `src/App.tsx`: `/projects/:projectId/...` behind `RequireAuth`, `/admin/...` behind `RequireServerAdmin`; pages are lazy loaded. Sidebar sections in `src/components/layout/navigation.ts`, items without a route show the phase they arrive in.
+- Icons: `src/assets/icons/icon-registry.json` maps stable keys (`wildlife.rhino`) to SVGs with fallback chains and licence data (`src/components/icons/registry.ts`); `Icon` renders inline, `markers.ts` renders marker images for MapLibre with the family shape (round entity, square infrastructure, diamond event) and a state colour.
+- Map: `useMap` creates one MapLibre map with OpenFreeMap styles (D37) and sends the bearer token on requests to our own origin; `layers.ts` owns the entity, track and feature sources. Live updates come from `useProjectStream` over the WebSocket and patch the current-state query cache.
+
+Screenshot sweep: `npm run sweep` (Playwright, routes derived from `src/App.tsx`) logs in with `SWEEP_EMAIL` and `SWEEP_PASSWORD`, opens every route at 390, 768 and 1440 px, flags console errors and horizontal overflow and writes `ui-sweep-output/`. Chromium needs a few system libraries (`libnspr4 libnss3 libasound2t64` on Ubuntu 24.04); without them run the sweep in the Playwright image from `services/frontend`: `docker run --rm --network host --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work -e SWEEP_EMAIL=... -e SWEEP_PASSWORD=... mcr.microsoft.com/playwright:v1.58.0-noble node scripts/ui-sweep.mjs`. The `--user` flag keeps the output owned by you.
 
 ## Database migrations
 

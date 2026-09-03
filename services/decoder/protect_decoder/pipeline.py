@@ -28,10 +28,18 @@ from shared.device_drivers.base import (
     SourceEventData,
     canonical_key,
     fingerprint,
+    lorawan_frame,
 )
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import Attribution, resolve_attribution
-from shared.enums import ConnectivityStatus, ErrorCode, ProcessingStatus, TraceStatus, ValueType
+from shared.enums import (
+    AcquisitionChannel,
+    ConnectivityStatus,
+    ErrorCode,
+    ProcessingStatus,
+    TraceStatus,
+    ValueType,
+)
 from shared.logger import get_logger
 from shared.models import (
     ConnectivityState,
@@ -71,6 +79,36 @@ class Outcome:
 def event_age(record_time: datetime, ingested_at: datetime) -> float:
     """Seconds between the canonical time of a record and its arrival (architecture 25.8)."""
     return (ingested_at - record_time).total_seconds()
+
+
+def network_event_records(event: SourceEvent, payload: dict[str, Any]) -> DecodedRecords:
+    """Records from network-level events that need no device driver (architecture 8.1): a
+    LoRaWAN status event carries battery level and link margin; joins and downlink
+    acknowledgements only touch connectivity state, handled in `_update_current_state`."""
+    records = DecodedRecords(decoder_version="network")
+    time = event.network_received_at or event.ingested_at
+    if event.event_type == "status":
+        level = payload.get("batteryLevel")
+        if isinstance(level, int | float) and not payload.get("batteryLevelUnavailable"):
+            records.measurements.append(
+                DecodedMeasurement(
+                    time=time,
+                    metric_key="battery_level",
+                    value=float(level),
+                    record_type="network_status",
+                )
+            )
+        margin = payload.get("margin")
+        if isinstance(margin, int | float):
+            records.measurements.append(
+                DecodedMeasurement(
+                    time=time,
+                    metric_key="link_margin",
+                    value=float(margin),
+                    record_type="network_status",
+                )
+            )
+    return records
 
 
 async def load_source_event(
@@ -168,18 +206,28 @@ async def process_source_event(
             step.output_ref = f"driver:{driver.key}"
 
         async with tracer.step("decoder", "payload decoded") as step:
-            records = driver.decode(
-                SourceEventData(
-                    id=event.id,
-                    event_type=event.event_type,
-                    payload=await payload_of(event),
-                    provider_metadata=event.provider_metadata,
-                    network_received_at=event.network_received_at,
-                    ingested_at=event.ingested_at,
-                    device_attributes=device.attributes,
-                    device_type_settings=device_type.default_settings,
+            payload = await payload_of(event)
+            frame, f_port = (None, None)
+            if event.acquisition_channel == AcquisitionChannel.LORAWAN:
+                frame, f_port = lorawan_frame(payload, event.provider_metadata)
+            if event.event_type in driver.decodable_event_types:
+                records = driver.decode(
+                    SourceEventData(
+                        id=event.id,
+                        event_type=event.event_type,
+                        payload=payload,
+                        provider_metadata=event.provider_metadata,
+                        network_received_at=event.network_received_at,
+                        ingested_at=event.ingested_at,
+                        device_attributes=device.attributes,
+                        device_type_settings=device_type.default_settings,
+                        frame=frame,
+                        f_port=f_port,
+                    )
                 )
-            )
+            else:
+                records = network_event_records(event, payload)
+                step.metadata["network_event"] = event.event_type
             step.metadata.update(
                 positions=len(records.positions),
                 measurements=len(records.measurements),
@@ -557,7 +605,18 @@ async def _update_current_state(
         connectivity = ConnectivityState(device_id=device.id, data_source_id=event.data_source_id)
         session.add(connectivity)
     connectivity.status = ConnectivityStatus.ONLINE
-    connectivity.last_uplink_at = event.network_received_at or event.ingested_at
+    received = event.network_received_at or event.ingested_at
+    if event.event_type == "join":
+        connectivity.last_join_at = received
+    elif event.event_type in ("downlink_ack", "downlink_transmitted"):
+        connectivity.last_downlink_at = received
+    else:
+        connectivity.last_uplink_at = received
+    meta = event.provider_metadata or {}
+    if meta.get("best_rssi") is not None:
+        connectivity.last_rssi = float(meta["best_rssi"])
+    if meta.get("best_snr") is not None:
+        connectivity.last_snr = float(meta["best_snr"])
     connectivity.updated_at = now
 
     if latest_position is not None:
