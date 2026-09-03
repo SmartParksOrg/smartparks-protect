@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "Smart Parks Protect",
-  "version": "v0.1.0"
+  "version": "committed"
  },
  "paths": {
   "/api/health": {

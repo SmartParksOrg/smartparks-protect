@@ -62,7 +62,8 @@ case "$cmd" in
         uv run ruff check --fix .
         ;;
     openapi)
-        uv run python -c "import json, pathlib; from protect_api.main import app; pathlib.Path('services/frontend/openapi.json').write_text(json.dumps(app.openapi(), indent=1))"
+        # The committed schema is for type generation and drift detection; its version is pinned so a release bump does not change it.
+        uv run python -c "import json, pathlib; from protect_api.main import app; spec = app.openapi(); spec['info']['version'] = 'committed'; pathlib.Path('services/frontend/openapi.json').write_text(json.dumps(spec, indent=1))"
         (cd services/frontend && npx openapi-typescript openapi.json -o src/api/schema.d.ts >/dev/null && echo "src/api/schema.d.ts generated")
         ;;
     docs)
