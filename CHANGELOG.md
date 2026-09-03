@@ -4,6 +4,16 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+## v0.1.1, 2026-09-03
+
+The v0.1.0 tag does not build the frontend on a clean checkout; use this tag instead.
+
+### Fixed
+
+- The `data/` ignore rule hid `services/frontend/src/components/data/DataTable.tsx` from git, so the tagged frontend did not compile. The rule now matches only the root data directory.
+- MinIO buckets are created on first use, so the decoder works against a MinIO without the compose bucket setup (tests and CI).
+- CI prints failed test names as workflow annotations.
+
 ## v0.1.0, 2026-09-03
 
 First vertical slice: a simulated OpenCollar sends uplinks through a local ChirpStack, the OpenCollar driver decodes them, the entity appears on the live map, the traffic viewer shows raw and decoded data, the trace explorer shows the steps.

@@ -17,7 +17,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 4, analyze, export and the scale benchmark |
-| Latest release | v0.1.0 (2026-09-03); the tagged commit misses `DataTable.tsx`, fix is on main, see the phase 3 log |
+| Latest release | v0.1.1 (2026-09-03); v0.1.0 does not build on a clean checkout |
 | Last session | 2026-09-03 |
 | Next item | Phase 4: quick start on a clean checkout, then the aggregation API |
 | Blockers | none |
@@ -713,7 +713,7 @@ Listed by the phase where they are first needed.
 - Tim installed Chromium's system libraries (`libnspr4 libnss3 libasound2t64`), so `npm run sweep` and `scripts/dev.sh sweep` run natively; the Playwright image stays documented as a fallback with `--user` so it leaves no root-owned files.
 - Known gaps for later phases: uvicorn access logs are unstructured; the sweep has no assertions yet (`@playwright/test` smoke when CI gets a browser); satellite base map behind a key; ChirpStack command connector in phase 6.
 - D38 recorded: external deep links built as proposed in architecture 32.
-- CI on the release commit failed twice: `.gitignore` had `data/`, which hid `src/components/data/DataTable.tsx` from git, so the frontend build failed on a clean checkout (rule is now `/data/`); the decoder test job failed because the CI MinIO has no `uploads` bucket (the on-demand creation noted in phase 2 had never been written); pytest steps now print failures as workflow annotations because the logs are not readable without a token (no `gh` on this machine). Fixed on main after the tag; CI is green on main at `49d8098` (seven jobs). Open for Tim: move the `v0.1.0` tag to the fixed commit, or tag `v0.1.1` (recommended, the tag was already public).
+- CI on the release commit failed twice: `.gitignore` had `data/`, which hid `src/components/data/DataTable.tsx` from git, so the frontend build failed on a clean checkout (rule is now `/data/`); the decoder test job failed because the CI MinIO has no `uploads` bucket (the on-demand creation noted in phase 2 had never been written); pytest steps now print failures as workflow annotations because the logs are not readable without a token (no `gh` on this machine). Fixed on main after the tag; CI is green on main at `49d8098` (seven jobs). Tim chose to tag `v0.1.1` on the fixed main rather than move the public `v0.1.0` tag.
 - 100 python tests, 2 frontend tests, lint and types clean, docs strict, sweep 31 routes times 3 viewports clean. Committed and tagged v0.1.0 on Tim's instruction.
 - Next session: run the quick start on a clean checkout (phase 3 exit criterion on a fresh machine), then phase 4 starting with the aggregation API.
 - Decisions to ask Tim when phase 4 starts: where the export worker runs (proposed: `services/export` in the shared Python image, own compose service); XLSX writer (proposed: openpyxl write-only mode); resolution selection rule for aggregates (proposed: pick the coarsest `time_bucket` that keeps a series at or under 5,000 points); saved views storage (proposed: `saved_views` table per project, JSONB filter). Everything phase 4 needs is in place: TimescaleDB hypertables, MinIO, ECharts installed, the Redis bus and worker base class. Inputs still wanted: recorded live OpenCollar uplinks, confirmation of the composed wide logo.
