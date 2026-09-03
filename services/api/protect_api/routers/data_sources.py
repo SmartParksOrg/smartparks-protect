@@ -2,6 +2,7 @@
 phase 1; credentials are written, never read back."""
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -19,6 +20,9 @@ from protect_api.schemas.domain import (
     ExternalIdentityRead,
     ExternalIdentityUpdate,
 )
+from shared.config import get_settings
+from shared.connectivity.registry import ADAPTERS
+from shared.connectivity.transports.http import hash_token, new_webhook_token
 from shared.database import get_session
 from shared.models import (
     DataSource,
@@ -43,8 +47,26 @@ async def _read(session: AsyncSession, source: DataSource) -> DataSourceRead:
     )
     data = DataSourceRead.model_validate(source)
     data.has_credentials = source.credentials_encrypted is not None
+    data.has_webhook_token = source.webhook_token_hash is not None
+    if source.webhook_token_hash is not None:
+        data.webhook_url = f"{get_settings().public_url}/api/v1/ingest/http/{source.id}"
     data.project_ids = list(scopes)
     return data
+
+
+def _adapter_defaults(body: DataSourceCreate) -> dict[str, Any]:
+    adapter = ADAPTERS.get(body.adapter_key)
+    if adapter is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Unknown adapter {body.adapter_key!r}; known: {sorted(ADAPTERS)}",
+        )
+    values = body.model_dump(exclude={"credentials", "project_ids"})
+    if not body.capabilities:
+        values["capabilities"] = adapter.default_capabilities.model_dump()
+    if not body.link_templates:
+        values["link_templates"] = dict(adapter.default_link_templates)
+    return values
 
 
 async def _set_scopes(
@@ -80,9 +102,13 @@ async def create_data_source(
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
 ) -> DataSourceRead:
+    """HTTP push sources get a bearer token that is returned once, in this response only."""
+    values = _adapter_defaults(body)
+    token = new_webhook_token() if body.adapter_key == "generic_http" else None
     source = DataSource(
         credentials_encrypted=encrypt_json(body.credentials) if body.credentials else None,
-        **body.model_dump(exclude={"credentials", "project_ids"}),
+        webhook_token_hash=hash_token(token) if token else None,
+        **values,
     )
     session.add(source)
     await flush_or_409(session, "Data source")
@@ -96,7 +122,32 @@ async def create_data_source(
         details={"name": source.name, "adapter_key": source.adapter_key},
     )
     await session.commit()
-    return await _read(session, source)
+    data = await _read(session, source)
+    data.webhook_token = token
+    return data
+
+
+@router.post("/{data_source_id}/webhook-token", response_model=DataSourceRead)
+async def rotate_webhook_token(
+    data_source_id: uuid.UUID,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> DataSourceRead:
+    """Issue a new bearer token for an HTTP push source. The old one stops working at once."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    token = new_webhook_token()
+    source.webhook_token_hash = hash_token(token)
+    await record_audit(
+        session,
+        user=user,
+        action="data_source.webhook_token_rotated",
+        object_type="data_source",
+        object_id=str(source.id),
+    )
+    await session.commit()
+    data = await _read(session, source)
+    data.webhook_token = token
+    return data
 
 
 @router.get("/{data_source_id}", response_model=DataSourceRead)

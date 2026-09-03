@@ -24,7 +24,11 @@ async def _setup(client, db):
     source = (
         await client.post(
             "/api/v1/data-sources",
-            json={"name": unique_name("KPN"), "adapter_key": "kpn_thingpark"},
+            json={
+                "name": unique_name("KPN"),
+                "adapter_key": "generic_mqtt",
+                "config": {"host": "broker.example.org"},
+            },
             headers=h,
         )
     ).json()
@@ -106,7 +110,7 @@ async def test_data_source_credentials_are_write_only(client, db):
         "/api/v1/data-sources",
         json={
             "name": unique_name("LORIOT"),
-            "adapter_key": "loriot",
+            "adapter_key": "generic_http",
             "credentials": {"token": "abc"},
         },
         headers=admin.headers,

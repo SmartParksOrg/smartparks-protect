@@ -94,13 +94,16 @@ def configure_logging(service: str, level: str = "INFO", log_format: str = "json
 
 
 class StructuredLogger(logging.LoggerAdapter[logging.Logger]):
-    """Lets callers pass extra fields as keyword arguments."""
+    """Lets callers pass extra fields as keyword arguments. A field that collides with a
+    LogRecord attribute (`created`, `name`, `message`, ...) gets a trailing underscore instead of
+    making the logging call itself raise."""
 
     def process(self, msg: Any, kwargs: Any) -> tuple[Any, Any]:
         extra = dict(self.extra or {})
         for key in list(kwargs):
             if key not in ("exc_info", "stack_info", "stacklevel", "extra"):
-                extra[key] = kwargs.pop(key)
+                value = kwargs.pop(key)
+                extra[f"{key}_" if key in _STANDARD_ATTRS else key] = value
         kwargs["extra"] = extra
         return msg, kwargs
 

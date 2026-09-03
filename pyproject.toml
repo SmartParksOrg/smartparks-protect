@@ -15,11 +15,15 @@ exclude = ["services/frontend"]
 [tool.uv.sources]
 smartparks-protect-shared = { workspace = true }
 smartparks-protect-api = { workspace = true }
+smartparks-protect-ingest = { workspace = true }
+smartparks-protect-decoder = { workspace = true }
 
 [dependency-groups]
 dev = [
     "smartparks-protect-shared",
     "smartparks-protect-api",
+    "smartparks-protect-ingest",
+    "smartparks-protect-decoder",
     "ruff==0.16.5",
     "mypy==2.3.1",
     "pytest==9.1.1",
@@ -34,7 +38,7 @@ docs = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["shared", "services/api", "tests"]
+src = ["shared", "services/api", "services/ingest", "services/decoder", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF", "ANN"]
@@ -50,8 +54,8 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "f
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = ["shared", "services/api"]
-packages = ["shared", "protect_api"]
+mypy_path = ["shared", "services/api", "services/ingest", "services/decoder"]
+packages = ["shared", "protect_api", "protect_ingest", "protect_decoder"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]

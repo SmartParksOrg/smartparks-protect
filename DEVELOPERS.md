@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: pre-alpha. Phases 0 and 1 are done: workspace, compose stack, CI, docs, the canonical schema with migrations, authentication by invitation, RBAC, the trace contract, assignment resolution and the admin API. Nothing ingests data yet (phase 2). Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: pre-alpha. Phases 0 to 2 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, the connectivity and driver contracts with generic HTTP, MQTT and JSON implementations, the ingest and decoder services and the Needs Attention API. A JSON payload posted to a generic HTTP source becomes a position with a trace. No frontend beyond the login placeholder yet (phase 3). Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -28,7 +28,7 @@ Status: pre-alpha. Phases 0 and 1 are done: workspace, compose stack, CI, docs, 
 | Layer | Technology | Notes |
 | --- | --- | --- |
 | Database | PostgreSQL 17 + PostGIS + TimescaleDB (`timescale/timescaledb-ha:pg17.10-ts2.29.2`) | Hypertables for positions, measurements, source events, gateway receptions. Decision gate in phase 4 |
-| Event bus and cache | Redis 7.4, Redis Streams with consumer groups | One broker; `EventBus` interface in `shared/bus.py` (planned, phase 2) |
+| Event bus and cache | Redis 7.4, Redis Streams with consumer groups | One broker; `RedisStreamsBus` in `shared/bus.py`, `Worker` base in `shared/worker.py` |
 | Object storage | MinIO | Raw log files, uploads, exports. Not for telemetry |
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2 async, Alembic, Pydantic 2, FastAPI-Users | `uv` workspace, one `uv.lock`, exact `==` pins in every `pyproject.toml` |
 | Frontend | React 19, Vite, TypeScript strict, Tailwind 4, shadcn/ui (Radix), TanStack Query, Zustand, React Hook Form + Zod, React Router 7 | MapLibre GL JS for maps, Apache ECharts for charts. Rules in `services/frontend/FRONTEND_CONVENTIONS.md` |
@@ -43,13 +43,19 @@ What exists today. The full target tree is in `PROJECT_PLAN.md` under "Target re
 ```
 smartparks-protect/
 ├── services/
-│   ├── api/                 # FastAPI service `protect_api`: auth/, routers/, schemas/, deps.py, alembic/
+│   ├── api/                 # FastAPI service `protect_api`: auth/, routers/, schemas/, deps.py, alembic/, bootstrap.py
+│   ├── ingest/              # `protect_ingest`: runs adapter event connectors (MQTT, polling, websocket)
+│   ├── decoder/             # `protect_decoder`: source events to canonical rows
 │   └── frontend/            # React + Vite + TypeScript, nginx Dockerfile, FRONTEND_CONVENTIONS.md
 ├── shared/shared/           # package `shared`: config, database, logger, version, enums, permissions,
-│                            # models/ (by area), domain/assignments.py, trace.py, timeutil.py, secrets.py
+│                            # models/, domain/assignments.py, trace.py, timeutil.py, secrets.py, bus.py,
+│                            # worker.py, ingest.py, storage.py, connectivity/ (base, transports, adapters),
+│                            # device_drivers/ (base, registry, generic_json)
 ├── tests/                   # tests/shared, tests/api, tests/fixtures/payloads
 ├── docs/                    # MkDocs site, docs/adr/ holds the ADRs
+├── docker/python.Dockerfile # one image for every Python service; compose sets the command per service
 ├── docker/chirpstack/       # ChirpStack, gateway bridge and Mosquitto config for the compose profile
+├── examples/                # adapter, driver and payload skeletons to copy from
 ├── scripts/dev.sh           # daily commands
 ├── .githooks/commit-msg     # strips assistant trailers (D28), installed with scripts/dev.sh hooks
 ├── .github/workflows/ci.yml
@@ -60,7 +66,7 @@ smartparks-protect/
 
 The rules behind it:
 
-- `services/<name>/` is one container each. Services import from `shared` and never from each other.
+- `services/<name>/` is one Python package each (`protect_<name>`), all built into one image (`docker/python.Dockerfile`) and started with a different command per compose service. Services import from `shared` and never from each other.
 - `shared/shared/` is the only place for models, schemas, the bus, the trace helpers, device drivers and connectivity adapters.
 - Provider-specific code lives only in `shared/connectivity/adapters/<provider>/`. Device-specific code lives only in `shared/device_drivers/<family>/`. A test enforces this from phase 7.
 - `tests/<package>/` mirrors the packages; CI runs one job per directory. `tests/fixtures/payloads/` holds recorded real payloads with a note where each came from.
@@ -84,11 +90,28 @@ The rules behind it:
 - SourceEvents keep provenance times separately: `network_received_at`, `satellite_delivered_at`, `ble_synced_at`, `file_uploaded_at`, `ingested_at`.
 - Display timezone is a user or project setting applied in the frontend and in exports on request. UTC is the export default.
 
-### Event bus (planned)
+### Event bus
 
-- Topics are `<object>.<verb>` in past tense: `source_event.received`, `position.created`, `device.state_changed`, `event.created`, `alert.created`, `command.updated`, `delivery.updated`.
-- Each worker is one consumer group. Messages are acked after the database transaction commits. Failed messages retry with backoff and land in `<topic>.dead` after the configured attempts.
-- Every worker stamps a heartbeat key; 15 minutes without a stamp is stale. The health endpoint and the liveness alert read the same rule.
+`shared/bus.py`, Redis Streams (ADR 0004). Topics are `<object>.<verb>` in past tense, listed on `Topic`: `source_event.received`, `position.created`, `measurement.created`, `device.state_changed`, `event.created`, `alert.created`, `command.updated`, `delivery.updated`, `needs_attention.created`.
+
+- Publish after the database commit, never before (`shared.ingest.commit_and_publish`, `protect_decoder.pipeline.publish_outcome`), so a consumer never reads a row that is not committed.
+- Each worker is one consumer group (`Worker(name)` in `shared/worker.py`; `worker.subscribe(topic, handler)`). A handler acknowledges by returning. A handler that raises leaves the message pending; it is re-delivered after `BUS_RETRY_BASE_SECONDS` doubling per attempt, and dead-lettered to `<topic>.dead` after `BUS_MAX_ATTEMPTS`. An `ApplicationError` with `retryable=False` is dead-lettered at once. Pending messages of a crashed consumer are reclaimed by any consumer of the group.
+- Messages carry `schema_version`; a newer version than the consumer knows is dead-lettered with `SCHEMA_VERSION_UNSUPPORTED`.
+- Streams are trimmed to about `BUS_MAXLEN` entries (D33). Dead-letter streams are listed, retried and resolved through `/api/v1/attention/dead-letters`.
+- Every worker stamps `heartbeat:<worker>` each loop; `HEARTBEAT_STALE_MINUTES` (15) without a stamp is stale. `/api/v1/attention/summary` reads it.
+- Tests use Redis database 1, flushed per session; the development stack uses database 0.
+
+### Ingestion
+
+`shared/ingest.py` is the one inbound path: resolve the external identity (create it unknown if new), store the source event (payload inline up to `PAYLOAD_INLINE_MAX_BYTES`, else in the MinIO uploads bucket with key, size and SHA-256 on the row, D32), start a compact trace, and after the commit publish `source_event.received`, or `needs_attention.created` for an unknown or ignored identity. Two callers: `POST /api/v1/ingest/http/{data_source_id}` (bearer token per source, D34; token returned once at creation or by `POST /data-sources/{id}/webhook-token`) and the ingest service, which runs the event connectors of enabled data sources and re-reads the sources every minute.
+
+### Decoding
+
+`services/decoder/protect_decoder/pipeline.py`: driver from the device type, decode, canonical key per record, repeat deliveries link to the existing row in `source_deliveries`, attribution at the record's time, canonical rows and current state in one transaction, domain events after commit. Unknown metric keys are registered automatically in the metric registry with category `uncategorized`. See `docs/architecture/processing-pipeline.md`.
+
+### Adapters and drivers
+
+Contracts in `shared/connectivity/base.py` and `shared/device_drivers/base.py`, registries in `registry.py` next to them (D10, ADR 0011). Adapters produce `InboundMessage` and never decode payloads; drivers produce `DecodedRecords` and never read provider fields. Skeletons to copy are in `examples/`. Documentation: `docs/integrations/adapter-interface.md`, `docs/devices/driver-interface.md`.
 
 ### Errors
 
@@ -109,13 +132,14 @@ Requirements: Docker with Compose v2, [uv](https://docs.astral.sh/uv/), Node 24.
 ```bash
 cp .env.example .env
 scripts/dev.sh hooks                      # git config core.hooksPath .githooks
-scripts/dev.sh up                         # docker compose up -d --build: postgres, redis, minio, api, frontend
+scripts/dev.sh up                         # docker compose up -d --build: postgres, redis, minio, migrate, api, ingest, decoder, frontend
+scripts/dev.sh bootstrap-admin you@example.org   # invitation link for the first server admin (once)
 docker compose --profile chirpstack up -d # adds a local ChirpStack (web UI on :8080, MQTT on :1883, REST on :8090)
 uv sync --all-groups                      # python environment for tests, linters and docs
 cd services/frontend && npm ci            # frontend dependencies
 ```
 
-Daily commands through `scripts/dev.sh`: `up`, `down`, `logs [service]`, `test`, `lint`, `format`, `docs`, `hooks`. `migrate` and `sweep` arrive in phases 1 and 3.
+Daily commands through `scripts/dev.sh`: `up`, `down`, `logs [service]`, `migrate`, `revision`, `bootstrap-admin`, `test`, `lint`, `format`, `docs`, `hooks`. `sweep` arrives in phase 3.
 
 Ports (all bound to localhost except the frontend): API 8000, frontend 3000, Postgres 5432, Redis 6379, MinIO 9000 and console 9001. `/api/docs` is the OpenAPI UI, `/api/health` reports database, Redis and MinIO, `/api/version` reports the version and commit.
 

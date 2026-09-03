@@ -32,6 +32,7 @@ from shared.models.timeseries import (
     GatewayReception,
     Measurement,
     Position,
+    SourceDelivery,
     SourceEvent,
 )
 from shared.models.trace import ApplicationError, ProcessingStep, ProcessingTrace
@@ -69,6 +70,7 @@ __all__ = [
     "ProjectMembership",
     "Rule",
     "RuleVersion",
+    "SourceDelivery",
     "SourceEvent",
     "User",
 ]

@@ -39,3 +39,9 @@ def test_json_record_omits_unset_ids():
     payload = _record_through(ContextFilter("worker"), JsonFormatter())
     assert "request_id" not in payload
     assert "trace_id" not in payload
+
+
+def test_reserved_field_names_are_renamed_not_fatal():
+    payload = _record_through(ContextFilter("decoder"), JsonFormatter(), created=3, name="x")
+    assert payload["created_"] == 3 and payload["name_"] == "x"
+    assert payload["logger"] == "test.logger"

@@ -66,7 +66,7 @@ async def test_full_onboarding_and_handover(client, db):
             "/api/v1/data-sources",
             json={
                 "name": unique_name("ChirpStack"),
-                "adapter_key": "chirpstack",
+                "adapter_key": "generic_http",
                 "credentials": {"api_token": "secret"},
                 "project_ids": [project_a["id"]],
             },

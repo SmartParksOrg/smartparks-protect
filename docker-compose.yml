@@ -81,42 +81,16 @@ services:
 
   migrate:
     container_name: protect-migrate
-    build:
+    build: &python-build
       context: .
-      dockerfile: services/api/Dockerfile
+      dockerfile: docker/python.Dockerfile
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     command: ["/app/.venv/bin/alembic", "-c", "services/api/alembic.ini", "upgrade", "head"]
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      CREDENTIALS_KEY: ${CREDENTIALS_KEY}
-      LOG_FORMAT: ${LOG_FORMAT:-json}
-
-  api:
-    container_name: protect-api
-    build:
-      context: .
-      dockerfile: services/api/Dockerfile
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    restart: unless-stopped
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
+    environment: &python-env
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
@@ -128,10 +102,32 @@ services:
       MINIO_BUCKET_EXPORTS: ${MINIO_BUCKET_EXPORTS:-exports}
       MINIO_BUCKET_LOG_FILES: ${MINIO_BUCKET_LOG_FILES:-device-log-files}
       JWT_SECRET: ${JWT_SECRET}
+      CREDENTIALS_KEY: ${CREDENTIALS_KEY}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      BUS_MAXLEN: ${BUS_MAXLEN:-100000}
+      BUS_DEAD_MAXLEN: ${BUS_DEAD_MAXLEN:-10000}
+      BUS_MAX_ATTEMPTS: ${BUS_MAX_ATTEMPTS:-5}
+      BUS_RETRY_BASE_SECONDS: ${BUS_RETRY_BASE_SECONDS:-5}
+      HEARTBEAT_STALE_MINUTES: ${HEARTBEAT_STALE_MINUTES:-15}
+      PAYLOAD_INLINE_MAX_BYTES: ${PAYLOAD_INLINE_MAX_BYTES:-65536}
+
+  api:
+    container_name: protect-api
+    build: *python-build
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      <<: *python-env
       JWT_LIFETIME_SECONDS: ${JWT_LIFETIME_SECONDS:-3600}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
-      CREDENTIALS_KEY: ${CREDENTIALS_KEY}
       INVITATION_LIFETIME_HOURS: ${INVITATION_LIFETIME_HOURS:-168}
       MAIL_SERVER: ${MAIL_SERVER:-}
       MAIL_PORT: ${MAIL_PORT:-587}
@@ -139,8 +135,6 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
       DEV_NOTIFY_EMAILS: ${DEV_NOTIFY_EMAILS:-}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      LOG_FORMAT: ${LOG_FORMAT:-json}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     healthcheck:
@@ -148,6 +142,34 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+
+  ingest:
+    container_name: protect-ingest
+    build: *python-build
+    restart: unless-stopped
+    command: ["/app/.venv/bin/python", "-m", "protect_ingest.main"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment: *python-env
+
+  decoder:
+    container_name: protect-decoder
+    build: *python-build
+    restart: unless-stopped
+    command: ["/app/.venv/bin/python", "-m", "protect_decoder.main"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment: *python-env
 
   frontend:
     container_name: protect-frontend

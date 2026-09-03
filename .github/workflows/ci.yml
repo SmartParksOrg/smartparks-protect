@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [shared, api]
+        package: [shared, api, decoder]
     services:
       postgres:
         image: timescale/timescaledb-ha:pg17.10-ts2.29.2
@@ -99,4 +99,4 @@ jobs:
       - run: cp .env.example .env
       - run: docker compose config --quiet
       - run: docker compose --profile chirpstack config --quiet
-      - run: docker build -f services/api/Dockerfile .
+      - run: docker build -f docker/python.Dockerfile .

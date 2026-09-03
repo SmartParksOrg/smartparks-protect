@@ -54,12 +54,18 @@ nav:
   - Concepts:
       - concepts/index.md
       - Domain model: concepts/domain-model.md
+      - Timestamps and deduplication: concepts/timestamps-and-deduplication.md
   - Architecture:
       - architecture/index.md
       - Data model: architecture/data-model.md
+      - Processing pipeline: architecture/processing-pipeline.md
       - AddaxAI Connect reuse audit: architecture/addaxai-connect-reuse-audit.md
-  - Devices: devices/index.md
-  - Integrations: integrations/index.md
+  - Devices:
+      - devices/index.md
+      - Driver interface: devices/driver-interface.md
+  - Integrations:
+      - integrations/index.md
+      - Adapter interface: integrations/adapter-interface.md
   - Analytics: analytics/index.md
   - Rules: rules/index.md
   - Administration:
@@ -81,3 +87,4 @@ nav:
       - adr/0008-device-timestamp-deduplication.md
       - adr/0009-processing-trace-model.md
       - adr/0010-assignment-attribution.md
+      - adr/0011-connectivity-adapter-boundary.md

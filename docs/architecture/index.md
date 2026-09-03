@@ -15,7 +15,7 @@ Connectivity adapters understand external platforms and nothing about devices. D
 Pages in this section are written as the related phases land:
 
 - [Data model](data-model.md)
-- Processing pipeline (phase 2)
+- [Processing pipeline](processing-pipeline.md)
 - Scalability and bounded queries (phase 4)
 - [AddaxAI Connect reuse audit](addaxai-connect-reuse-audit.md) (phase 0)
 

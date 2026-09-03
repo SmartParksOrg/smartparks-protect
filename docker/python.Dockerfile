@@ -1,7 +1,6 @@
-# Smart Parks Protect API. Build context is the repository root:
-#   docker build -f services/api/Dockerfile .
-# Layer order matters: dependency metadata first, then the source, so a code change does not
-# reinstall dependencies.
+# One image for every Python service (api, migrate, ingest, decoder, ...). Build context is the
+# repository root; compose picks the command per service. Layer order: dependency metadata first,
+# then sources, so a code change does not reinstall dependencies.
 FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.9 /uv /uvx /bin/
@@ -16,15 +15,19 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY shared/pyproject.toml shared/pyproject.toml
 COPY services/api/pyproject.toml services/api/pyproject.toml
+COPY services/ingest/pyproject.toml services/ingest/pyproject.toml
+COPY services/decoder/pyproject.toml services/decoder/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-workspace --package smartparks-protect-api
+    uv sync --frozen --no-dev --no-install-workspace --all-packages
 
 COPY shared shared
 COPY services/api services/api
+COPY services/ingest services/ingest
+COPY services/decoder services/decoder
 # VERSION exists from the first release on; the glob keeps the build working without it.
 COPY VERSIO[N] ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --package smartparks-protect-api
+    uv sync --frozen --no-dev --all-packages
 
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=${GIT_COMMIT}

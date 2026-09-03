@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Daily development commands for Smart Parks Protect. Run from anywhere in the repository.
-#   scripts/dev.sh up | down | logs [service] | migrate | revision <msg> | test | lint | format | docs | sweep | hooks
+#   scripts/dev.sh up | down | logs [service] | migrate | revision <msg> | bootstrap-admin <email> | test | lint | format | docs | sweep | hooks
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -37,6 +37,9 @@ case "$cmd" in
         ;;
     revision)
         uv run alembic -c services/api/alembic.ini revision --autogenerate -m "$*"
+        ;;
+    bootstrap-admin)
+        docker compose run --rm --no-deps api /app/.venv/bin/python -m protect_api.bootstrap "$@"
         ;;
     test)
         uv run pytest -q "$@"

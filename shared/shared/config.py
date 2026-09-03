@@ -47,6 +47,19 @@ class Settings(BaseSettings):
         default="", description="Comma separated addresses that may be emailed in development"
     )
 
+    bus_maxlen: int = Field(default=100_000, description="Approximate entries kept per topic")
+    bus_dead_maxlen: int = Field(default=10_000, description="Entries kept per dead-letter stream")
+    bus_max_attempts: int = Field(
+        default=5, description="Deliveries before a message is dead-lettered"
+    )
+    bus_retry_base_seconds: float = Field(
+        default=5.0, description="First retry delay, doubles per attempt"
+    )
+    heartbeat_stale_minutes: int = 15
+    payload_inline_max_bytes: int = Field(
+        default=65_536, description="Bigger raw payloads go to MinIO"
+    )
+
     log_level: str = "INFO"
     log_format: Literal["json", "text"] = "json"
 

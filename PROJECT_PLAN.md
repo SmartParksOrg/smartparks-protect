@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 2, connectivity abstraction and ingestion pipeline |
+| Active phase | Phase 3, ChirpStack, OpenCollar and the first frontend |
 | Latest release | none (first target v0.1.0 at the end of phase 3) |
 | Last session | 2026-09-03 |
-| Next item | Phase 2: `shared/bus.py` Redis Streams EventBus |
+| Next item | Phase 3: ChirpStack adapter |
 | Blockers | none |
 
 ## What we are building
@@ -73,6 +73,9 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D29 | API versioning | `/api/v1` prefix from phase 1; `/api/health` and `/api/version` stay unversioned | ADR 0006. Monitoring paths never change. Decided by Tim on 2026-09-03. |
 | D30 | Migrations | One-shot compose service `protect-migrate` runs `alembic upgrade head`; the API waits for it | `docker compose up` always gives a current schema, servers run the same service from the update script, no race between API replicas. Decided by Tim on 2026-09-03. |
 | D31 | Primary keys | UUID for domain objects, bigint identity for time-series rows | Domain ids are not guessable and safe in URLs and exports; hypertable rows keep small indexes. Hypertable primary keys include the time column as TimescaleDB requires. Decided by Tim on 2026-09-03. |
+| D32 | Raw payload placement | JSONB in `source_events` up to 64 KB, larger payloads in MinIO with a reference and SHA-256 on the row | Provenance joins stay in SQL for every normal uplink; raw log files do not bloat the hypertable. Decided by Tim on 2026-09-03. |
+| D33 | Stream trimming | Approximate `MAXLEN` per topic, 100,000 entries by default, 10,000 for dead-letter streams | Bounded memory; the database is the source of truth. Decided by Tim on 2026-09-03. |
+| D34 | Webhook authentication | Per-source bearer token, shown once at creation, stored hashed | Works with every IoT platform that can set a header. HMAC signatures can be added per adapter later. Decided by Tim on 2026-09-03. |
 
 ### Open decisions from architecture section 32
 
@@ -81,7 +84,7 @@ These are not decided yet. A proposed default is given so work can start; each i
 - [ ] **External deep links.** Proposed: `data_sources.link_templates` JSONB with keys like `OPEN_DEVICE`, `OPEN_GATEWAY`, `OPEN_APPLICATION`, each a URL template with placeholders from ExternalIdentity attributes. Adapters ship defaults; admins can override. Decide in phase 3.
 - [ ] **Control action schema versioning.** Proposed: action definitions are Python dataclasses in the driver with a `schema_version`; parameters are Pydantic models exported as JSON schema for the UI and rules. Decide in phase 6.
 - [ ] **Integration delivery idempotency.** Proposed: `integration_deliveries` row per (integration, object type, object id, object version) with a unique key; backfill creates rows in batches. Decide in phase 8.
-- [ ] **Raw payload placement for very large events.** Proposed: payloads above a size threshold (raw log file uploads) go to MinIO with a reference; normal uplinks stay in JSONB. Decide in phase 2.
+- [x] **Raw payload placement for very large events.** Decided on 2026-09-03: 64 KB threshold, see D32.
 - [x] **Commit trailers.** Decided on 2026-09-03: strip them, see D28.
 
 ## Definition of done
@@ -300,19 +303,19 @@ Each phase has a goal, a reason for its place in the sequence, deliverables with
 
 **Deliverables.**
 
-- [ ] `shared/bus.py`: Redis Streams EventBus. Publish, subscribe with consumer group, ack, retry with backoff, per-consumer dead-letter stream, pending message recovery on restart, heartbeat key per worker (15 minute staleness rule). Topics: `source_event.received`, `position.created`, `measurement.created`, `device.state_changed`, `event.created`, `alert.created`, `command.updated`, `delivery.updated`, `needs_attention.created`. Tests against a real Redis.
-- [ ] `shared/connectivity/base.py`: `EventConnector`, `CommandConnector`, `ManagementConnector` protocols; `AdapterCapabilities` model (architecture 8.2); adapter registry. `transports/`: MQTT client (aiomqtt), HTTP webhook receiver helpers, polling base class, websocket base class.
-- [ ] `shared/device_drivers/base.py`: `DeviceDriver` protocol with capabilities, `decode(source_event) -> DecodedRecords` (positions, measurements, states, events, log records), timestamp semantics declaration per record type, canonical key function, `encode(action, params) -> ProtocolPayload` (used in phase 6). Driver registry. `generic_json` driver for tests and simple custom devices.
-- [ ] `services/ingest`: runs adapter event connectors for every enabled data source, stores SourceEvent with provider metadata (network received time, ingestion method, acquisition channel), resolves ExternalIdentity, publishes `source_event.received`. Webhook inbound endpoints live in the API and publish the same way. SourceEvents carry a `processing_status` (received, processed, duplicate, failed, unassigned) so Needs Attention and health counts are cheap queries.
-- [ ] `services/decoder`: consumes `source_event.received`, selects the driver from the device type, decodes, resolves the canonical device timestamp, computes the canonical key (device EUI + device timestamp + record type + optional fingerprint, architecture 25.3), deduplicates against existing canonical rows and links additional deliveries, resolves project and entity at the canonical time, writes canonical rows and updates current state in one transaction, publishes domain events, writes trace steps, maps failures to ApplicationErrors.
-- [ ] Unknown device workflow: SourceEvents for unresolved identities are retained and appear in Needs Attention with data source, external id, first and last seen, count and inferred type. Actions: create device, link to existing device, assign project, ignore, reprocess (architecture 28.6).
-- [ ] Late data policy: canonical rows carry `ingested_at` next to `time`; a helper computes event age for phase 5 freshness checks (25.8).
-- [ ] Needs Attention and dead-letter API: list, retry, reprocess, reassign, ignore, resolve, each audited.
-- [ ] Generic MQTT and generic HTTP data source types configurable from the admin API.
-- [ ] Tests: pipeline with the generic driver; the same record delivered twice creates one position with two source deliveries; late record attributed to the historical project; unknown device retained and reprocessed after linking; decode failure lands in dead-letter with `PAYLOAD_DECODE_FAILED`.
-- [ ] Docs: `docs/architecture/processing-pipeline.md`, `docs/devices/driver-interface.md`, `docs/integrations/adapter-interface.md`, `docs/concepts/timestamps-and-deduplication.md`. ADR: connectivity adapter boundary. `examples/device-drivers/` and `examples/adapters/` skeletons.
+- [x] `shared/bus.py`: Redis Streams EventBus. Publish, subscribe with consumer group, ack, retry with backoff, per-consumer dead-letter stream, pending message recovery on restart, heartbeat key per worker (15 minute staleness rule). Topics: `source_event.received`, `position.created`, `measurement.created`, `device.state_changed`, `event.created`, `alert.created`, `command.updated`, `delivery.updated`, `needs_attention.created`. Tests against a real Redis.
+- [x] `shared/connectivity/base.py`: `EventConnector`, `CommandConnector`, `ManagementConnector` protocols; `AdapterCapabilities` model (architecture 8.2); adapter registry. `transports/`: MQTT client (aiomqtt), HTTP webhook receiver helpers, polling base class, websocket base class.
+- [x] `shared/device_drivers/base.py`: `DeviceDriver` protocol with capabilities, `decode(source_event) -> DecodedRecords` (positions, measurements, states, events, log records), timestamp semantics declaration per record type, canonical key function, `encode(action, params) -> ProtocolPayload` (used in phase 6). Driver registry. `generic_json` driver for tests and simple custom devices.
+- [x] `services/ingest`: runs adapter event connectors for every enabled data source, stores SourceEvent with provider metadata (network received time, ingestion method, acquisition channel), resolves ExternalIdentity, publishes `source_event.received`. Webhook inbound endpoints live in the API and publish the same way. SourceEvents carry a `processing_status` (received, processed, duplicate, failed, unassigned) so Needs Attention and health counts are cheap queries.
+- [x] `services/decoder`: consumes `source_event.received`, selects the driver from the device type, decodes, resolves the canonical device timestamp, computes the canonical key (device EUI + device timestamp + record type + optional fingerprint, architecture 25.3), deduplicates against existing canonical rows and links additional deliveries, resolves project and entity at the canonical time, writes canonical rows and updates current state in one transaction, publishes domain events, writes trace steps, maps failures to ApplicationErrors.
+- [x] Unknown device workflow: SourceEvents for unresolved identities are retained and appear in Needs Attention with data source, external id, first and last seen, count and inferred type. Actions: create device, link to existing device, assign project, ignore, reprocess (architecture 28.6).
+- [x] Late data policy: canonical rows carry `ingested_at` next to `time`; a helper computes event age for phase 5 freshness checks (25.8).
+- [x] Needs Attention and dead-letter API: list, retry, reprocess, reassign, ignore, resolve, each audited.
+- [x] Generic MQTT and generic HTTP data source types configurable from the admin API.
+- [x] Tests: pipeline with the generic driver; the same record delivered twice creates one position with two source deliveries; late record attributed to the historical project; unknown device retained and reprocessed after linking; decode failure lands in dead-letter with `PAYLOAD_DECODE_FAILED`.
+- [x] Docs: `docs/architecture/processing-pipeline.md`, `docs/devices/driver-interface.md`, `docs/integrations/adapter-interface.md`, `docs/concepts/timestamps-and-deduplication.md`. ADR: connectivity adapter boundary. `examples/device-drivers/` and `examples/adapters/` skeletons.
 
-**Exit criteria.** A JSON payload posted to the generic HTTP source produces a position visible through the API with a complete trace. Posting it again links a second delivery and creates no second position. An unknown device id appears in Needs Attention and its data is processed after linking.
+**Exit criteria.** A JSON payload posted to the generic HTTP source produces a position visible through the API with a complete trace. Posting it again links a second delivery and creates no second position. An unknown device id appears in Needs Attention and its data is processed after linking. Met on 2026-09-03: `tests/api/test_ingest_and_attention.py` and a run against the compose stack with the ingest and decoder containers.
 
 ---
 
@@ -678,3 +681,17 @@ Listed by the phase where they are first needed.
 - Not done on purpose: BRIN indexes wait for the phase 4 benchmark; uvicorn access logs are still not routed through the structured logger; the frontend is untouched (phase 3).
 - Not committed. Tim reviews and commits.
 - Next: phase 2 in order, starting with `shared/bus.py`.
+
+### 2026-09-03, phase 2 (Claude)
+
+- Tim decided D32 (payloads above 64 KB to MinIO), D33 (approximate MAXLEN trimming), D34 (per-source bearer token for webhooks), whole phase in one session.
+- Built `shared/bus.py` (Redis Streams, consumer groups, backoff re-delivery, dead letters, pending reclaim, heartbeats, schema version check, trimming) and `shared/worker.py`; eight bus tests against the real Redis. Tests now use Redis database 1, flushed per session.
+- Built the connectivity contract (`Adapter`, `EventConnector`, `CommandConnector`, `ManagementConnector`, `InboundMessage`, `AdapterCapabilities`), transports (MQTT with reconnect, polling, websocket, HTTP token helpers), generic HTTP and generic MQTT adapters, the driver contract with decoded record types and canonical keys, the generic JSON driver, both registries.
+- Built `shared/ingest.py` (identity resolution, out-of-line payloads, compact trace, publish after commit), the API webhook endpoint with per-source tokens (returned once, rotatable), the ingest service (connector runner re-reading data sources every minute), the decoder service (driver selection, decode, dedup with `source_deliveries`, attribution at canonical time, current state, domain events), migration 0002, `Tracer.resume`.
+- Needs Attention API: summary with worker heartbeats and dead-letter counts, unknown identities, create device or link, ignore, reprocess, failed source events, dead letters retry and resolve. Read endpoints for positions per project (bounded by time window and limit), source event detail with deliveries, trace detail with steps.
+- One Docker image for every Python service (`docker/python.Dockerfile`), compose services `ingest` and `decoder`, CI matrix extended with `decoder`. `protect_api.bootstrap` creates the invitation for the first server admin (`scripts/dev.sh bootstrap-admin`).
+- Docs: processing pipeline, timestamps and deduplication, driver interface, adapter interface, ADR 0011; skeletons in `examples/`.
+- Adapter default time field is `received_at`, not `time`, so the platform's receive time and the device's own time never collide.
+- Data sources with an unregistered adapter key are rejected (422); the phase 1 tests were changed to the generic adapters.
+- 68 tests pass. Not committed. Tim reviews and commits.
+- Next: phase 3 in order, starting with the ChirpStack adapter.

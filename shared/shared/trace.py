@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.enums import ErrorCode, ErrorSeverity, TraceClass, TraceStatus
@@ -100,6 +101,28 @@ class Tracer:
         self.session.add(self.trace)
         await self.session.flush()
         return self.trace
+
+    @classmethod
+    async def resume(cls, session: AsyncSession, trace_id: uuid.UUID) -> "Tracer":
+        """Continue a trace another service started (ingest starts, decoder continues)."""
+        trace = await session.get(ProcessingTrace, trace_id)
+        if trace is None:
+            raise ValueError(f"trace {trace_id} not found")
+        tracer = cls.__new__(cls)
+        tracer.session = session
+        tracer.compact = trace.compact
+        tracer.trace = trace
+        tracer._failed = trace.status in (TraceStatus.FAILED, TraceStatus.DEAD_LETTER)
+        if trace.compact:
+            tracer._sequence = len(trace.compact_steps or [])
+        else:
+            last = await session.scalar(
+                select(func.max(ProcessingStep.sequence)).where(ProcessingStep.trace_id == trace.id)
+            )
+            tracer._sequence = int(last or 0)
+        trace.status = TraceStatus.PROCESSING
+        trace.completed_at = None
+        return tracer
 
     @asynccontextmanager
     async def step(

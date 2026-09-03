@@ -1,3 +1,4 @@
 # Integrations
 
-This section is filled in as the related phase of `PROJECT_PLAN.md` lands. Documentation is written in the same commit as the feature it describes.
+- [Adapter interface](adapter-interface.md): how an external platform is connected.
+- Generic HTTP and generic MQTT sources exist now; ChirpStack arrives in phase 3, KPN and LORIOT in phase 7, outbound connectors in phase 8.

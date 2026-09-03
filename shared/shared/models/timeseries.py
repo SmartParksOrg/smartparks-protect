@@ -75,7 +75,14 @@ class SourceEvent(Base):
     processing_status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="received"
     )
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, comment="Inline up to PAYLOAD_INLINE_MAX_BYTES, else null with an object reference"
+    )
+    payload_object_key: Mapped[str | None] = mapped_column(
+        String(512), comment="MinIO key in the uploads bucket for payloads stored out of line"
+    )
+    payload_size: Mapped[int | None] = mapped_column(Integer)
+    payload_sha256: Mapped[str | None] = mapped_column(String(64))
     provider_metadata: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
@@ -86,6 +93,42 @@ class SourceEvent(Base):
     trace_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     error_code: Mapped[str | None] = mapped_column(String(64))
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class SourceDelivery(Base):
+    """Links a canonical row to every source event that delivered it (architecture 25.2). The
+    first delivery creates the row; later ones only add a link."""
+
+    __tablename__ = "source_deliveries"
+    __table_args__ = (
+        Index(
+            "uq_source_deliveries_canonical_event",
+            "canonical_type",
+            "canonical_id",
+            "source_event_id",
+            unique=True,
+        ),
+        Index("ix_source_deliveries_source_event", "source_event_id"),
+        enum_check("acquisition_channel", AcquisitionChannel, "ck_source_deliveries_channel"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    canonical_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, comment="position, measurement, state, event"
+    )
+    canonical_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    canonical_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_event_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_event_ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    acquisition_channel: Mapped[str] = mapped_column(String(16), nullable=False)
+    first: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, comment="Created the canonical row"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
 
 
 class Position(Base):

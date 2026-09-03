@@ -1,0 +1,13 @@
+{
+  "device_id": "70B3D57ED0001234",
+  "type": "uplink",
+  "received_at": "2026-03-20T10:00:05+00:00",
+  "time": "2026-03-20T10:00:00+00:00",
+  "lat": -24.9,
+  "lon": 31.5,
+  "altitude": 300,
+  "speed": 1.2,
+  "measurements": {"battery_voltage": 3.9, "temperature": 27.5},
+  "state": {"firmware": "6.12"},
+  "events": [{"type": "drop_off", "title": "Drop-off triggered", "severity": "warning"}]
+}

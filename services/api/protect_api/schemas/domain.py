@@ -261,6 +261,11 @@ class DataSourceRead(ORMModel):
     enabled: bool
     config: dict[str, Any]
     has_credentials: bool = False
+    has_webhook_token: bool = False
+    webhook_token: str | None = Field(
+        default=None, description="Only in the response that created it"
+    )
+    webhook_url: str | None = None
     capabilities: dict[str, Any]
     link_templates: dict[str, Any]
     retention_days: int | None

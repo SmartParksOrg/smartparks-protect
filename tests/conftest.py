@@ -31,6 +31,10 @@ _BASE_URL = os.environ["DATABASE_URL"]
 _BASE_NAME = _BASE_URL.rsplit("/", 1)[1]
 TEST_DB_NAME = f"{_BASE_NAME}_test"
 os.environ["DATABASE_URL"] = _BASE_URL.rsplit("/", 1)[0] + "/" + TEST_DB_NAME
+# Tests get Redis database 1, flushed at the start of every session, so streams and heartbeats of
+# the development stack (database 0) and of earlier runs never leak into a test.
+_REDIS_BASE = os.environ["REDIS_URL"]
+os.environ["REDIS_URL"] = _REDIS_BASE.rsplit("/", 1)[0] + "/1"
 
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
@@ -47,6 +51,15 @@ ALEMBIC_INI = REPO_ROOT / "services" / "api" / "alembic.ini"
 def _admin_engine() -> sa.Engine:
     url = _BASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg://")
     return sa.create_engine(url, isolation_level="AUTOCOMMIT")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def clean_redis() -> None:
+    import redis
+
+    client = redis.Redis.from_url(os.environ["REDIS_URL"])
+    client.flushdb()
+    client.close()
 
 
 @pytest.fixture(scope="session")
