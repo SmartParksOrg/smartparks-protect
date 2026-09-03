@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 0, repository foundation |
+| Active phase | Phase 1, core domain, database and access control |
 | Latest release | none (first target v0.1.0 at the end of phase 3) |
 | Last session | 2026-09-03 |
-| Next item | Phase 0: push to GitHub and confirm CI is green, then phase 1: Alembic and migration 0001 |
-| Blockers | CI is written but only runs after the first push |
+| Next item | Phase 1: Alembic and migration 0001 |
+| Blockers | none |
 
 ## What we are building
 
@@ -254,10 +254,10 @@ Each phase has a goal, a reason for its place in the sequence, deliverables with
 - [x] `docker-compose.yml` (2026-09-03): `protect-postgres` (`timescale/timescaledb-ha`, PostgreSQL 17), `protect-redis` (Redis 7), `protect-minio` and `protect-minio-init`, `protect-api`, `protect-frontend`. Profile `chirpstack` with ChirpStack, its MQTT broker and Postgres, ready for phase 3. `.env.example` with every variable documented. Named volumes, healthchecks, `restart: unless-stopped`.
 - [x] `services/api` skeleton (2026-09-03): FastAPI app, `/api/health` returning database, Redis and MinIO status, request id middleware, OpenAPI at `/api/docs`, Dockerfile.
 - [x] `services/frontend` skeleton (2026-09-03): Vite, React 19, TypeScript strict, Tailwind, shadcn/ui initialised, Smart Parks colours as CSS variables, MapLibre GL, ECharts, TanStack Query, React Router, Zustand, RHF + Zod installed. Login placeholder page. `npm run build` runs `tsc --noEmit && vite build`. Nginx Dockerfile. `FRONTEND_CONVENTIONS.md` written for this repo (colour system, z-index ladder, responsive rules, viewport targets 390/768/1440).
-- [ ] CI (`.github/workflows/ci.yml`) (written 2026-09-03, ticked when the first push is green): ruff, mypy, pytest per package against Postgres/Timescale and Redis service containers, `pip check` equivalent via `uv sync --frozen`, frontend `npm ci && npm run build && npm run test`, `mkdocs build --strict`. Fail-fast off.
+- [x] CI (`.github/workflows/ci.yml`) (2026-09-03, green on the first push): ruff, mypy, pytest per package against Postgres/Timescale and Redis service containers, `pip check` equivalent via `uv sync --frozen`, frontend `npm ci && npm run build && npm run test`, `mkdocs build --strict`. Fail-fast off.
 - [x] `scripts/dev.sh` (2026-09-03, `make` is not installed on the dev machine and a shell script needs nothing else) with the daily commands: up, down, logs, migrate, test, lint, sweep.
 
-**Exit criteria.** `docker compose up` starts the infrastructure, the empty API answers `/api/health` with all three dependencies OK, the frontend serves the placeholder, CI is green, docs build. Verified locally on 2026-09-03 except CI, which runs on the first push.
+**Exit criteria.** `docker compose up` starts the infrastructure, the empty API answers `/api/health` with all three dependencies OK, the frontend serves the placeholder, CI is green, docs build. All verified on 2026-09-03; CI green on the first push (run 33751856553).
 
 ---
 
@@ -661,5 +661,5 @@ Listed by the phase where they are first needed.
 - Built: uv workspace with exact pins (FastAPI 0.141.1, SQLAlchemy 2.0.52, Pydantic 2.13.5, redis-py 8.1.0, ruff 0.16.5, mypy 2.3.1, pytest 9.1.1), `shared` (config, database, logger, version), `protect_api` (health with three concurrent dependency checks, request id middleware, `/api/version`), tests (unit and integration), compose stack (TimescaleDB pg17.10, Redis 7.4, MinIO pinned, ChirpStack 4.19.1 profile with gateway bridge, Mosquitto and REST API), frontend (Vite 8, React 19, TypeScript 6, Tailwind 4, shadcn/ui on Radix, React Router 8, TanStack Query 5, Zustand 5, RHF 7, Zod 4, MapLibre 6, ECharts 6, Vitest 4, ESLint 10), nginx image with immutable assets, no-cache index, gzip and security headers, MkDocs site with six ADRs, CI workflow with a Python matrix, frontend, docs and compose jobs, Dependabot security-only.
 - Verified locally: ruff, mypy strict, 9 python tests (3 integration against the running stack), frontend lint, type check, build and 2 tests, `docker compose up` with `/api/health` reporting database, Redis and MinIO OK, frontend on :3000 serving the placeholder and proxying `/api/version`, `mkdocs build --strict`.
 - Decisions taken without a table entry: MkDocs stays on 1.x (`mkdocs<2`; MkDocs 2 removes the plugin system), API path versioning `/api/v1` from phase 1 (ADR 0006), frontend reads the root `.env` so there is one env file, shadcn `components.json` written by hand because the new CLI preset prompt cannot run non-interactively, uvicorn access logs not yet routed through the structured logger.
-- Not committed. Tim reviews and commits.
-- Next: push and watch CI, then phase 1 in order starting with Alembic and migration 0001.
+- Committed as 9c60e34 and pushed to SmartParksOrg/smartparks-protect. CI green on the first run: python (shared), python (api), frontend, docs, compose. Phase 0 exit criteria met.
+- Next: phase 1 in order, starting with Alembic and migration 0001.
