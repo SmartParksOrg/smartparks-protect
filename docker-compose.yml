@@ -79,6 +79,28 @@ services:
       mc mb --ignore-existing local/$$MINIO_BUCKET_UPLOADS local/$$MINIO_BUCKET_EXPORTS local/$$MINIO_BUCKET_LOG_FILES &&
       echo buckets ready"
 
+  migrate:
+    container_name: protect-migrate
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    command: ["/app/.venv/bin/alembic", "-c", "services/api/alembic.ini", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIALS_KEY: ${CREDENTIALS_KEY}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+
   api:
     container_name: protect-api
     build:
@@ -88,8 +110,8 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       minio:
@@ -108,6 +130,15 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_LIFETIME_SECONDS: ${JWT_LIFETIME_SECONDS:-3600}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      CREDENTIALS_KEY: ${CREDENTIALS_KEY}
+      INVITATION_LIFETIME_HOURS: ${INVITATION_LIFETIME_HOURS:-168}
+      MAIL_SERVER: ${MAIL_SERVER:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      DEV_NOTIFY_EMAILS: ${DEV_NOTIFY_EMAILS:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-json}
     ports:

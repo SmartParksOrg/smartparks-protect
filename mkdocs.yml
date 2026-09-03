@@ -51,15 +51,20 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting started: getting-started/index.md
-  - Concepts: concepts/index.md
+  - Concepts:
+      - concepts/index.md
+      - Domain model: concepts/domain-model.md
   - Architecture:
       - architecture/index.md
+      - Data model: architecture/data-model.md
       - AddaxAI Connect reuse audit: architecture/addaxai-connect-reuse-audit.md
   - Devices: devices/index.md
   - Integrations: integrations/index.md
   - Analytics: analytics/index.md
   - Rules: rules/index.md
-  - Administration: administration/index.md
+  - Administration:
+      - administration/index.md
+      - Permissions: administration/permissions.md
   - Operations: operations/index.md
   - Troubleshooting: troubleshooting/index.md
   - API: api/index.md
@@ -72,3 +77,7 @@ nav:
       - adr/0004-redis-streams-event-bus.md
       - adr/0005-backend-and-frontend-stack.md
       - adr/0006-schema-versioning.md
+      - adr/0007-canonical-domain-model.md
+      - adr/0008-device-timestamp-deduplication.md
+      - adr/0009-processing-trace-model.md
+      - adr/0010-assignment-attribution.md

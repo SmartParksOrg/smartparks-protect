@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from protect_api.health import router as health_router
 from protect_api.middleware import RequestIdMiddleware
+from protect_api.routers import v1_router
 from shared.config import get_settings
 from shared.logger import configure_logging, get_logger
 from shared.version import __version__
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(health_router)
+    app.include_router(v1_router, prefix="/api/v1")
 
     @app.get("/api/version", response_model=VersionResponse, tags=["health"])
     async def version() -> VersionResponse:

@@ -1,3 +1,4 @@
 # Administration
 
-This section is filled in as the related phase of `PROJECT_PLAN.md` lands. Documentation is written in the same commit as the feature it describes.
+- [Permissions](permissions.md): roles, permission keys, device visibility, registration by invitation, audit.
+- Projects, users, devices, data sources and notifications: filled in with the admin screens in phase 3.

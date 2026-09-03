@@ -1,0 +1,5 @@
+You have been invited to Smart Parks Protect{% if project_name %} for the project {{ project_name }}{% endif %}{% if invited_by %} by {{ invited_by }}{% endif %}.
+
+Create your account here: {{ link }}
+
+The link is valid for a limited time. If you did not expect this invitation, ignore this message.

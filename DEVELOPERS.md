@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: pre-alpha. Phase 0 is done: the workspace, an empty API with a health endpoint, a placeholder frontend, the compose stack, CI and the documentation site exist. No domain code runs yet. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: pre-alpha. Phases 0 and 1 are done: workspace, compose stack, CI, docs, the canonical schema with migrations, authentication by invitation, RBAC, the trace contract, assignment resolution and the admin API. Nothing ingests data yet (phase 2). Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -43,9 +43,10 @@ What exists today. The full target tree is in `PROJECT_PLAN.md` under "Target re
 ```
 smartparks-protect/
 ├── services/
-│   ├── api/                 # FastAPI service, python package `protect_api`, Dockerfile
+│   ├── api/                 # FastAPI service `protect_api`: auth/, routers/, schemas/, deps.py, alembic/
 │   └── frontend/            # React + Vite + TypeScript, nginx Dockerfile, FRONTEND_CONVENTIONS.md
-├── shared/shared/           # package `shared`: config, database, logger, version
+├── shared/shared/           # package `shared`: config, database, logger, version, enums, permissions,
+│                            # models/ (by area), domain/assignments.py, trace.py, timeutil.py, secrets.py
 ├── tests/                   # tests/shared, tests/api, tests/fixtures/payloads
 ├── docs/                    # MkDocs site, docs/adr/ holds the ADRs
 ├── docker/chirpstack/       # ChirpStack, gateway bridge and Mosquitto config for the compose profile
@@ -67,11 +68,11 @@ The rules behind it:
 ## Core concepts for developers
 
 - **Device versus Entity.** A Device is hardware and exists at server level without a project column. An Entity is the real-world object (animal, vehicle, gate). They are linked by `device_entity_assignments` with a validity range. Project membership of a device is `device_project_assignments`, also time-bounded. Both use `tstzrange` with an exclusion constraint so ranges never overlap.
-- **Attribution uses canonical time.** A record belongs to the project and entity that were assigned at the record's device-origin time, not at ingest time. `shared/domain/assignments.py` (planned) is the one place that resolves this.
+- **Attribution uses canonical time.** A record belongs to the project and entity that were assigned at the record's device-origin time, not at ingest time. `shared/domain/assignments.py` is the one place that resolves this (`resolve_attribution(session, device_id, at)`).
 - **DataSource and ExternalIdentity.** A DataSource is an external platform account (a ChirpStack instance, a KPN account). ExternalIdentity maps `(data_source, external_id)` such as a DevEUI to a Device. Incoming data is resolved through this pair. Unknown identities are retained and shown in Needs Attention, never guessed.
 - **Four data levels.** Raw SourceEvent (immutable), decoded (driver output), normalized canonical rows (positions, measurements, states, events), aggregated (server-side buckets). Maps, charts, rules and exports use canonical rows.
 - **Canonical key and deduplication.** For OpenCollar: device EUI + device-origin timestamp + record type, plus a payload fingerprint where needed. Several deliveries (LoRaWAN, WebBLE, log file, Iridium) link to one canonical row. Never use network, satellite, sync, upload or ingest time in the key.
-- **ProcessingTrace.** Every flow (inbound message, command, import, delivery, export) has a trace id and ordered steps with status and a structured ApplicationError on failure. Successful routine telemetry writes compact traces.
+- **ProcessingTrace.** Every flow (inbound message, command, import, delivery, export) has a trace id and ordered steps with status and a structured ApplicationError on failure. Successful routine telemetry writes compact traces. `shared/trace.py` has the `Tracer`; a step is `async with tracer.step(component, operation)`; raise `ApplicationError(code, message, component, ...)` for expected failures, anything else is recorded as `INTERNAL_ERROR` and re-raised.
 - **Bounded queries.** Every user-facing list, map, chart and export endpoint has an explicit bound. An endpoint that could return the whole history is a defect.
 
 ## Conventions specific to this repo
@@ -132,9 +133,25 @@ One `uv` workspace: `shared/` and `services/*` (the frontend is excluded). Every
 
 `npm run build` is `tsc -b && vite build`: a type error fails the build and the Docker image. `npm run lint` is ESLint, `npm run test` is Vitest with Testing Library. shadcn/ui components are added with `npx shadcn@latest add <name>` and land in `src/components/ui/`, which ESLint ignores. Brand colours and semantic tokens are CSS variables in `src/index.css`; the logo SVGs in `src/assets/brand/` use `currentColor`.
 
-## Database migrations (planned)
+## Database migrations
 
-Migrations live in `services/api/alembic/versions/`. Hypertable creation, compression and retention policies are explicit migration steps, not autogenerated. Migrations must apply and revert from an empty database in CI.
+Migrations live in `services/api/alembic/versions/`, named `<rev>_<slug>.py` with a four digit revision. They run synchronously through psycopg (`alembic/env.py` rewrites the async URL). `scripts/dev.sh migrate` applies them locally; in docker compose the one-shot `protect-migrate` container runs `alembic upgrade head` before the API starts (decision D30). `scripts/dev.sh revision "message"` autogenerates a draft from the models; hypertable creation, compression and retention policies are written by hand as explicit steps (see migration 0001). The test suite migrates the test database up at the start and down at the end, so every run is an up-and-down test. `alembic check` must report no drift; the Alembic environment ignores the time index TimescaleDB adds to every hypertable.
+
+Hypertables cannot be referenced by foreign keys, so canonical rows carry `source_event_id` and `source_event_ingested_at` as plain columns.
+
+## Authentication and access control
+
+FastAPI-Users with JWT bearer tokens under `/api/v1/auth`. Registration is by invitation only (`POST /api/v1/auth/register` with the invitation token); the token proves the email, so accounts are verified on creation and the invitation's role becomes a membership. The JWT strategy adds `iat` and rejects tokens issued before `users.password_changed_at`, so a password change logs out other sessions. Password reset uses the FastAPI-Users flow; mail goes through `protect_api/mailer.py`, which logs instead of sending when SMTP is not configured or the recipient is not in `DEV_NOTIFY_EMAILS` on a non-production server.
+
+Dependencies in `protect_api/deps.py`: `require_server_admin`, `get_project_context` (reads `{project_id}` from the path, 404 for unknown projects, 403 without membership), `require_project_role(role)` and `require_permission(key)`. Permission keys and their mapping from roles live in `shared/permissions.py`. Every mutating endpoint calls `record_audit` in the same transaction.
+
+## API conventions
+
+- Everything under `/api/v1` (D29). `/api/health` and `/api/version` stay unversioned.
+- Every list endpoint takes `limit` (max 500) and `cursor` through `protect_api/pagination.py` and returns `{items, next_cursor}`. A test fails when a list endpoint lacks `limit`.
+- Geometry goes in and out as GeoJSON (`geometry` field); the helpers in `protect_api/crud.py` convert with shapely.
+- Constraint violations become 409 with the constraint name in the message (`flush_or_409`).
+- Credentials of data sources are encrypted with Fernet (`shared/secrets.py`, key from `CREDENTIALS_KEY`) and never returned.
 
 ## Testing
 
@@ -146,6 +163,8 @@ cd services/frontend && npm run test && npm run build
 ```
 
 `tests/conftest.py` sets default environment values that match `.env.example`, so tests run against the local compose stack without extra setup. CI runs one job per package (`tests/shared`, `tests/api`) against Postgres/Timescale and Redis service containers and a MinIO container.
+
+All tests share one event loop (`asyncio_default_test_loop_scope = session`) because asyncpg connections cannot move between loops. `tests/api/conftest.py` has helpers for actors per role (`actor`, `project_actor`), committed fixture rows and invitations. `tests/api/test_phase1_scenario.py` runs the phase 1 exit criteria end to end.
 
 - Drivers, adapters and rules are tested with recorded fixtures under `tests/fixtures/payloads/`. Add the source of every fixture in a `README.md` next to it.
 - API tests use a real Postgres/Timescale container. No mocked SQL.

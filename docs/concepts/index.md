@@ -1,3 +1,4 @@
 # Concepts
 
-This section is filled in as the related phase of `PROJECT_PLAN.md` lands. Documentation is written in the same commit as the feature it describes.
+- [Domain model](domain-model.md): device versus entity, assignments, attribution at canonical time, data sources and external identities, the four data levels, traces, roles.
+- Timestamps and deduplication: phase 2.

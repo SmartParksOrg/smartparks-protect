@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Daily development commands for Smart Parks Protect. Run from anywhere in the repository.
-#   scripts/dev.sh up | down | logs [service] | migrate | test | lint | docs | sweep | hooks
+#   scripts/dev.sh up | down | logs [service] | migrate | revision <msg> | test | lint | format | docs | sweep | hooks
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,8 +33,10 @@ case "$cmd" in
         docker compose logs -f "$@"
         ;;
     migrate)
-        echo "No migrations yet. Alembic arrives in phase 1." >&2
-        exit 1
+        uv run alembic -c services/api/alembic.ini upgrade head "$@"
+        ;;
+    revision)
+        uv run alembic -c services/api/alembic.ini revision --autogenerate -m "$*"
         ;;
     test)
         uv run pytest -q "$@"

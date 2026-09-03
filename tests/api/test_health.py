@@ -22,7 +22,7 @@ async def test_inbound_request_id_is_kept():
 
 
 @pytest.mark.integration
-async def test_health_reports_all_dependencies_ok():
+async def test_health_reports_all_dependencies_ok(migrated_database):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/health")
     body = response.json()

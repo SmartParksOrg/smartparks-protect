@@ -1,0 +1,74 @@
+"""ORM models. Import this package so every table is registered on `Base.metadata`."""
+
+from shared.models.access import (
+    AuditLog,
+    Invitation,
+    Organization,
+    Project,
+    ProjectMembership,
+    User,
+)
+from shared.models.base import Base
+from shared.models.domain import (
+    DataSource,
+    DataSourceProjectScope,
+    Device,
+    DeviceEntityAssignment,
+    DeviceProjectAssignment,
+    DeviceType,
+    Entity,
+    EntityType,
+    ExternalIdentity,
+    Feature,
+    Metric,
+)
+from shared.models.events import Alert, Event, Rule, RuleVersion
+from shared.models.timeseries import (
+    HYPERTABLES,
+    ConnectivityState,
+    DeviceCurrentState,
+    DeviceStateHistory,
+    EntityCurrentState,
+    GatewayReception,
+    Measurement,
+    Position,
+    SourceEvent,
+)
+from shared.models.trace import ApplicationError, ProcessingStep, ProcessingTrace
+
+__all__ = [
+    "HYPERTABLES",
+    "Alert",
+    "ApplicationError",
+    "AuditLog",
+    "Base",
+    "ConnectivityState",
+    "DataSource",
+    "DataSourceProjectScope",
+    "Device",
+    "DeviceCurrentState",
+    "DeviceEntityAssignment",
+    "DeviceProjectAssignment",
+    "DeviceStateHistory",
+    "DeviceType",
+    "Entity",
+    "EntityCurrentState",
+    "EntityType",
+    "Event",
+    "ExternalIdentity",
+    "Feature",
+    "GatewayReception",
+    "Invitation",
+    "Measurement",
+    "Metric",
+    "Organization",
+    "Position",
+    "ProcessingStep",
+    "ProcessingTrace",
+    "Project",
+    "ProjectMembership",
+    "Rule",
+    "RuleVersion",
+    "SourceEvent",
+    "User",
+]

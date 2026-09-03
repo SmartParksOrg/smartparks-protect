@@ -39,7 +39,7 @@ jobs:
       MINIO_ENDPOINT: localhost:9000
       MINIO_ROOT_USER: protect
       MINIO_ROOT_PASSWORD: protect-dev-minio
-      JWT_SECRET: ci-secret-that-is-long-enough
+      JWT_SECRET: ci-secret-that-is-at-least-32-bytes-long
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

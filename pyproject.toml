@@ -40,8 +40,12 @@ src = ["shared", "services/api", "tests"]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF", "ANN"]
 ignore = ["ANN401"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "fastapi.Path", "fastapi.File", "fastapi.UploadFile", "protect_api.deps.require_permission", "protect_api.deps.require_project_role"]
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ANN"]
+"tests/**" = ["ANN", "E501"]
+"services/api/alembic/versions/**" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -50,10 +54,15 @@ mypy_path = ["shared", "services/api"]
 packages = ["shared", "protect_api"]
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+module = ["shapely.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "strict"
-asyncio_default_fixture_loop_scope = "function"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 markers = [
     "integration: needs running Postgres, Redis and MinIO (see .env.example)",
 ]

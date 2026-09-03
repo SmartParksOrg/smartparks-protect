@@ -12,3 +12,7 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 | [0004](0004-redis-streams-event-bus.md) | Redis Streams as the event bus | accepted |
 | [0005](0005-backend-and-frontend-stack.md) | Backend and frontend stack | accepted |
 | [0006](0006-schema-versioning.md) | Schema versioning for bus messages, webhooks and API responses | accepted |
+| [0007](0007-canonical-domain-model.md) | Canonical domain model | accepted |
+| [0008](0008-device-timestamp-deduplication.md) | Device timestamp deduplication | accepted |
+| [0009](0009-processing-trace-model.md) | Processing trace model | accepted |
+| [0010](0010-assignment-attribution.md) | Assignment attribution stored on canonical rows | accepted |

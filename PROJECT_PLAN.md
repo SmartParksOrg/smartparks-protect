@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 1, core domain, database and access control |
+| Active phase | Phase 2, connectivity abstraction and ingestion pipeline |
 | Latest release | none (first target v0.1.0 at the end of phase 3) |
 | Last session | 2026-09-03 |
-| Next item | Phase 1: Alembic and migration 0001 |
+| Next item | Phase 2: `shared/bus.py` Redis Streams EventBus |
 | Blockers | none |
 
 ## What we are building
@@ -70,6 +70,9 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D26 | Database reconfirmed | TimescaleDB from migration 1 stays (D3) | The Codex plan proposed plain PostGIS with a later evaluation. Retrofitting hypertables on 250 million row tables is the expensive path; the gate in phase 4 keeps the exit open. |
 | D27 | Assignment attribution | Canonical rows persist `project_id` and `entity_id` resolved at processing time and keep `device_id`; assignment tables stay the source for audit and recomputation | Both plans proposed this. Fast historical queries without range joins; timestamp curation in phase 12 reruns the resolution. |
 | D28 | Commit trailers | Strip `Co-Authored-By` lines with the same commit-msg hook as AddaxAI Connect | Both repos behave the same and git history shows human authors only. Decided by Tim on 2026-09-03. |
+| D29 | API versioning | `/api/v1` prefix from phase 1; `/api/health` and `/api/version` stay unversioned | ADR 0006. Monitoring paths never change. Decided by Tim on 2026-09-03. |
+| D30 | Migrations | One-shot compose service `protect-migrate` runs `alembic upgrade head`; the API waits for it | `docker compose up` always gives a current schema, servers run the same service from the update script, no race between API replicas. Decided by Tim on 2026-09-03. |
+| D31 | Primary keys | UUID for domain objects, bigint identity for time-series rows | Domain ids are not guessable and safe in URLs and exports; hypertable rows keep small indexes. Hypertable primary keys include the time column as TimescaleDB requires. Decided by Tim on 2026-09-03. |
 
 ### Open decisions from architecture section 32
 
@@ -269,23 +272,23 @@ Each phase has a goal, a reason for its place in the sequence, deliverables with
 
 **Deliverables.**
 
-- [ ] Alembic configured for async SQLAlchemy. Migration 0001 creates extensions `postgis` and `timescaledb`.
-- [ ] Access control tables: `users`, `organizations` (reserved, D21), `projects`, `project_memberships` (role per project), `invitations`, `audit_log`. Server admin flag on users. Fine-grained permission keys defined in code and mapped from roles: `devices:control`, `devices:control_high_impact`, `rules:write`, `integrations:write`, `data:curate`, `data:curate_bulk`, `data:approve`, `data:revert`, `traces:read`.
-- [ ] Domain tables: `entity_types` (icon key, JSON schema for attributes, group), `entities` (project, type, name, status, optional geometry, JSONB attributes), `features` (sites, zones, geofences, routes with PostGIS geometry), `device_types` (driver key, capabilities), `devices` (server-level, no project column), `device_project_assignments` and `device_entity_assignments` with `tstzrange` validity and a GiST exclusion constraint against overlaps, `data_sources` (adapter key, capabilities JSONB, encrypted credentials, project scoping, link templates), `external_identities` (unique per data source and external id), `metrics` (registry: key, unit, value type, category).
-- [ ] Time-series tables as hypertables: `source_events`, `positions` (PostGIS point, device, resolved entity and project, canonical key unique), `measurements` (D7), `gateway_receptions`, `device_state_history`. Latest-state tables: `device_current_state`, `entity_current_state`, `connectivity_state`. Compression and retention policies as parameterised migration steps.
-- [ ] Event tables: `events`, `alerts` (separate from events, architecture 16), placeholders for `rules` and `rule_versions` used in phase 5.
-- [ ] Trace tables: `processing_traces`, `processing_steps`, `application_errors` with the error code enum from architecture 26.5. `shared/trace.py` helper: start trace, add step, fail step with error, finish. Compact mode for successful routine telemetry (26.9).
-- [ ] `shared/domain/assignments.py`: resolve device to project and entity at a given canonical time. Tests include the architecture 28.9 example (raw log from 20 August with a fix from 15 July belongs to the old project).
-- [ ] Indexes from measured needs only: time plus device, time plus entity, GiST on geometry, BRIN on time for the largest hypertables. Documented in `docs/architecture/data-model.md`.
-- [ ] Authentication: FastAPI-Users with JWT, registration by invitation only, email verification, password reset, SMTP sender. Same flow as AddaxAI Connect, written fresh.
-- [ ] RBAC dependencies: `require_server_admin`, `require_project_role(project_id, role)`, `require_permission(key)`. Access to canonical rows follows historical project attribution (architecture 28.12).
-- [ ] Admin API: projects, users, memberships and invitations, entity types, entities, features, device types, devices, data sources (credentials write-only, never returned), external identities, metrics. Device handover workflow endpoint (28.10) that closes and opens assignments with validation.
-- [ ] Bulk device import from CSV (28.7 fields).
-- [ ] Bounded query dependency: every list endpoint takes limit and cursor; a shared test asserts no list endpoint lacks a bound.
-- [ ] Tests: migrations up and down from empty database, CRUD with RBAC per role, assignment resolution, overlap rejection, handover.
-- [ ] Docs: `docs/concepts/domain-model.md` (Device versus Entity, assignments, DataSource and ExternalIdentity, four data levels), `docs/architecture/data-model.md`, `docs/administration/permissions.md`. ADRs: canonical domain model, device timestamp deduplication, processing trace model, assignment attribution (open decision above).
+- [x] Alembic configured for async SQLAlchemy. Migration 0001 creates extensions `postgis` and `timescaledb`.
+- [x] Access control tables: `users`, `organizations` (reserved, D21), `projects`, `project_memberships` (role per project), `invitations`, `audit_log`. Server admin flag on users. Fine-grained permission keys defined in code and mapped from roles: `devices:control`, `devices:control_high_impact`, `rules:write`, `integrations:write`, `data:curate`, `data:curate_bulk`, `data:approve`, `data:revert`, `traces:read`.
+- [x] Domain tables: `entity_types` (icon key, JSON schema for attributes, group), `entities` (project, type, name, status, optional geometry, JSONB attributes), `features` (sites, zones, geofences, routes with PostGIS geometry), `device_types` (driver key, capabilities), `devices` (server-level, no project column), `device_project_assignments` and `device_entity_assignments` with `tstzrange` validity and a GiST exclusion constraint against overlaps, `data_sources` (adapter key, capabilities JSONB, encrypted credentials, project scoping, link templates), `external_identities` (unique per data source and external id), `metrics` (registry: key, unit, value type, category).
+- [x] Time-series tables as hypertables: `source_events`, `positions` (PostGIS point, device, resolved entity and project, canonical key unique), `measurements` (D7), `gateway_receptions`, `device_state_history`. Latest-state tables: `device_current_state`, `entity_current_state`, `connectivity_state`. Compression and retention policies as parameterised migration steps.
+- [x] Event tables: `events`, `alerts` (separate from events, architecture 16), placeholders for `rules` and `rule_versions` used in phase 5.
+- [x] Trace tables: `processing_traces`, `processing_steps`, `application_errors` with the error code enum from architecture 26.5. `shared/trace.py` helper: start trace, add step, fail step with error, finish. Compact mode for successful routine telemetry (26.9).
+- [x] `shared/domain/assignments.py`: resolve device to project and entity at a given canonical time. Tests include the architecture 28.9 example (raw log from 20 August with a fix from 15 July belongs to the old project).
+- [x] Indexes from measured needs only: time plus device, time plus entity, GiST on geometry. Documented in `docs/architecture/data-model.md`. (BRIN on time deferred to the phase 4 benchmark, 2026-09-03.)
+- [x] Authentication: FastAPI-Users with JWT, registration by invitation only, email verification, password reset, SMTP sender. Same flow as AddaxAI Connect, written fresh. (Verification is by the invitation token; there is no separate verify-email flow because nobody can register without an invitation, 2026-09-03.)
+- [x] RBAC dependencies: `require_server_admin`, `require_project_role(project_id, role)`, `require_permission(key)`. Access to canonical rows follows historical project attribution (architecture 28.12).
+- [x] Admin API: projects, users, memberships and invitations, entity types, entities, features, device types, devices, data sources (credentials write-only, never returned), external identities, metrics. Device handover workflow endpoint (28.10) that closes and opens assignments with validation.
+- [x] Bulk device import from CSV (28.7 fields).
+- [x] Bounded query dependency: every list endpoint takes limit and cursor; a shared test asserts no list endpoint lacks a bound.
+- [x] Tests: migrations up and down from empty database, CRUD with RBAC per role, assignment resolution, overlap rejection, handover.
+- [x] Docs: `docs/concepts/domain-model.md` (Device versus Entity, assignments, DataSource and ExternalIdentity, four data levels), `docs/architecture/data-model.md`, `docs/administration/permissions.md`. ADRs: canonical domain model, device timestamp deduplication, processing trace model, assignment attribution (open decision above).
 
-**Exit criteria.** From an empty database, migrations apply, a server admin invites a project admin, who creates a project, a data source, a device with an external identity, assigns it to the project and to an entity with effective dates, hands it over to a second project, and every step is tested and audited.
+**Exit criteria.** From an empty database, migrations apply, a server admin invites a project admin, who creates a project, a data source, a device with an external identity, assigns it to the project and to an entity with effective dates, hands it over to a second project, and every step is tested and audited. Met on 2026-09-03: `tests/api/test_phase1_scenario.py` runs exactly this (the server admin creates the project and the data source, which are server-level objects; the project admin does the rest).
 
 ---
 
@@ -663,3 +666,15 @@ Listed by the phase where they are first needed.
 - Decisions taken without a table entry: MkDocs stays on 1.x (`mkdocs<2`; MkDocs 2 removes the plugin system), API path versioning `/api/v1` from phase 1 (ADR 0006), frontend reads the root `.env` so there is one env file, shadcn `components.json` written by hand because the new CLI preset prompt cannot run non-interactively, uvicorn access logs not yet routed through the structured logger.
 - Committed as 9c60e34 and pushed to SmartParksOrg/smartparks-protect. CI green on the first run: python (shared), python (api), frontend, docs, compose. Phase 0 exit criteria met.
 - Next: phase 1 in order, starting with Alembic and migration 0001.
+
+### 2026-09-03, phase 1 (Claude)
+
+- Tim decided D29 (`/api/v1` now), D30 (one-shot `protect-migrate` compose service), D31 (UUID for domain objects, bigint for time series), whole phase in one session.
+- Built the schema: 32 tables in migration 0001 (autogenerated draft, then hand edited for extensions, five hypertables, columnstore compression after 7 days, 730 day retention on source events). `btree_gist` is needed for the UUID exclusion constraints. Enumerations are text plus check constraint from `shared/enums.py`. The Alembic environment ignores TimescaleDB's own time indexes so `alembic check` reports no drift.
+- Built `shared/trace.py` (Tracer, ApplicationError, compact mode), `shared/domain/assignments.py`, `shared/timeutil.py` (naive datetimes raise), `shared/permissions.py`, `shared/secrets.py` (Fernet for data source credentials).
+- Built the API: FastAPI-Users auth with invitation-only registration and the `iat` versus `password_changed_at` strategy, mailer with the development guard, RBAC dependencies returning a `ProjectContext`, audit writer, bounded pagination with a guard test, and routers for projects, members, invitations, admin, entity types, entities, features, entity assignments, device types, devices, project assignments, handover, identities, CSV import, data sources, metrics. 46 paths.
+- Tests: 41, of which 38 run against the migrated test database (created, upgraded, downgraded and dropped per run). Role matrix, phase 1 scenario, handover with historical access, import all-or-nothing, credentials write-only, cursor pagination, trace and attribution tests.
+- Docs: domain model, data model, permissions, ADRs 0007 to 0010. `DEVELOPERS.md` describes migrations, auth, API conventions.
+- Not done on purpose: BRIN indexes wait for the phase 4 benchmark; uvicorn access logs are still not routed through the structured logger; the frontend is untouched (phase 3).
+- Not committed. Tim reviews and commits.
+- Next: phase 2 in order, starting with `shared/bus.py`.
