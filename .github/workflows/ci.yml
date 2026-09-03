@@ -62,7 +62,12 @@ jobs:
             sleep 1
           done
       - name: Pytest
-        run: uv run pytest tests/${{ matrix.package }} -q
+        run: |
+          set -o pipefail
+          uv run pytest tests/${{ matrix.package }} -q -rfE --tb=short 2>&1 | tee pytest.log
+      - name: Failures as annotations
+        if: failure()
+        run: grep -E "^(FAILED|ERROR) " pytest.log | head -10 | while read -r line; do echo "::error::$line"; done
 
   frontend:
     runs-on: ubuntu-latest

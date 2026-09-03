@@ -27,7 +27,7 @@ secrets.yaml
 
 # Docker and local data
 docker-compose.override.yml
-data/
+/data/
 
 # Ansible: the repo ships the shape of a deployment, not anyone's servers
 ansible/inventory.yml
