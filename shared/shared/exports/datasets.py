@@ -23,9 +23,17 @@ from shared.analytics import (
     choose_resolution,
     whole_range,
 )
-from shared.enums import ExportDataset, ExportFormat
+from shared.curation.effective import (
+    effective_geom,
+    effective_time,
+    effective_value_num,
+    in_window,
+    visible,
+)
+from shared.enums import CorrectionStatus, ExportDataset, ExportFormat
 from shared.exports import ExportParameters
 from shared.models import (
+    DataCorrection,
     Device,
     DeviceProjectAssignment,
     Entity,
@@ -34,6 +42,19 @@ from shared.models import (
     Position,
     SourceEvent,
 )
+
+CURATION_COLUMNS = [
+    "is_curated",
+    "curated_fields",
+    "curation_reason",
+    "original_time",
+    "effective_time",
+    "original_value",
+    "effective_value",
+    "curated_by",
+    "curated_at",
+    "curation_job_id",
+]
 
 YIELD_PER = 2_000
 
@@ -90,6 +111,9 @@ def columns(params: ExportParameters, lookups: Lookups) -> list[str]:
             "trace_id",
             "attributes",
         ]
+        cols += ["valid"]
+        if params.curation_metadata:
+            cols += CURATION_COLUMNS
         if params.format is ExportFormat.GPX:
             cols += ["track_key", "track_name"]
         return cols
@@ -100,7 +124,9 @@ def columns(params: ExportParameters, lookups: Lookups) -> list[str]:
         cols += ["device_name"] if names else []
         cols += ["metric_key"]
         cols += ["metric_label", "unit"] if names else []
-        cols += ["value", "data_source_id", "source_event_id", "trace_id"]
+        cols += ["value", "data_source_id", "source_event_id", "trace_id", "valid"]
+        if params.curation_metadata:
+            cols += CURATION_COLUMNS
         return cols
     if params.dataset is ExportDataset.SOURCE_EVENTS:
         cols = ["ingested_at", "network_received_at", "device_id"]
@@ -142,11 +168,13 @@ def _wide_series(params: ExportParameters, lookups: Lookups) -> list[str]:
 
 
 def _base_conditions(model: Any, project_id: uuid.UUID, params: ExportParameters) -> list[Any]:
-    conditions = [
-        model.project_id == project_id,
-        model.time >= params.time_from,
-        model.time < params.time_to,
-    ]
+    """The effective view selects by effective time and hides invalid rows; the original view
+    selects by original time and shows every row with its `valid` flag (decision D83)."""
+    conditions = [model.project_id == project_id]
+    if params.view == "original":
+        conditions += [model.time >= params.time_from, model.time < params.time_to]
+    else:
+        conditions += [in_window(model, params.time_from, params.time_to), visible(model)]
     if params.entity_ids:
         conditions.append(model.entity_id.in_(params.entity_ids))
     if params.device_ids:
@@ -222,12 +250,15 @@ async def _positions(
     session: AsyncSession, project_id: uuid.UUID, params: ExportParameters, lookups: Lookups
 ) -> AsyncIterator[dict[str, Any]]:
     # Plain columns, not ORM objects: a streamed export must not grow the session's identity map.
+    original = params.view == "original"
+    time_column = Position.time if original else effective_time(Position)
+    geom_column = Position.geom if original else effective_geom()
     statement = select(
-        Position.time,
+        time_column.label("time"),
         Position.entity_id,
         Position.device_id,
-        func.ST_Y(Position.geom).label("lat"),
-        func.ST_X(Position.geom).label("lon"),
+        func.ST_Y(geom_column).label("lat"),
+        func.ST_X(geom_column).label("lon"),
         Position.altitude_m,
         Position.speed_mps,
         Position.heading_deg,
@@ -238,18 +269,26 @@ async def _positions(
         Position.source_event_id,
         Position.trace_id,
         Position.attributes,
+        Position.valid,
+        Position.curated_fields,
+        Position.id,
+        Position.time.label("original_time"),
+        effective_time(Position).label("effective_time"),
     ).where(*_base_conditions(Position, project_id, params))
     if params.format is ExportFormat.GPX:
         # one track per entity (device when unassigned), points in order
-        statement = statement.order_by(Position.entity_id, Position.device_id, Position.time)
+        statement = statement.order_by(Position.entity_id, Position.device_id, time_column)
     else:
-        statement = statement.order_by(Position.time, Position.id)
+        statement = statement.order_by(time_column, Position.id)
     result = await session.stream(statement.execution_options(yield_per=YIELD_PER))
+    curation = _CurationLookup(session, "position") if params.curation_metadata else None
     async for row in result:
         track_id = row.entity_id or row.device_id
         yield {
             "time": _iso(row.time, params),
             "time_utc": _utc(row.time),
+            "valid": row.valid,
+            **(await curation.columns(row, params) if curation else {}),
             "entity_id": row.entity_id,
             "entity_name": lookups.entities.get(row.entity_id) if row.entity_id else None,
             "device_id": row.device_id,
@@ -275,6 +314,55 @@ async def _positions(
         }
 
 
+class _CurationLookup:
+    """The curation metadata columns of architecture 28.13, from the latest active correction
+    of the row (one query per curated row; uncurated rows cost nothing)."""
+
+    def __init__(self, session: AsyncSession, target_type: str) -> None:
+        self.session = session
+        self.target_type = target_type
+
+    async def columns(self, row: Any, params: ExportParameters) -> dict[str, Any]:
+        fields = list(row.curated_fields or [])
+        base: dict[str, Any] = {
+            "is_curated": bool(fields),
+            "curated_fields": ",".join(fields) if fields else None,
+            "curation_reason": None,
+            "original_time": _iso(row.original_time, params),
+            "effective_time": _iso(row.effective_time, params),
+            "original_value": getattr(row, "original_value_num", None),
+            "effective_value": getattr(row, "effective_value_num", None),
+            "curated_by": None,
+            "curated_at": None,
+            "curation_job_id": None,
+        }
+        if not fields:
+            return base
+        correction = await self.session.scalar(
+            select(DataCorrection)
+            .where(
+                DataCorrection.target_type == self.target_type,
+                DataCorrection.target_id == row.id,
+                DataCorrection.target_time == row.original_time,
+                DataCorrection.status == CorrectionStatus.ACTIVE,
+            )
+            .order_by(DataCorrection.applied_at.desc())
+            .limit(1)
+        )
+        if correction is not None:
+            base.update(
+                curation_reason=correction.reason_code,
+                curated_by=str(correction.created_by_user_id)
+                if correction.created_by_user_id
+                else None,
+                curated_at=_iso(correction.applied_at, params),
+                curation_job_id=str(correction.curation_job_id)
+                if correction.curation_job_id
+                else None,
+            )
+        return base
+
+
 def _value(num: float | None, boolean: bool | None, text: str | None, json_value: Any) -> Any:
     if num is not None:
         return num
@@ -291,29 +379,42 @@ async def _measurements(
     conditions = _base_conditions(Measurement, project_id, params)
     if params.metric_keys:
         conditions.append(Measurement.metric_key.in_(params.metric_keys))
+    original = params.view == "original"
+    time_column = Measurement.time if original else effective_time(Measurement)
+    value_column = Measurement.value_num if original else effective_value_num()
     statement = (
         select(
-            Measurement.time,
+            time_column.label("time"),
             Measurement.entity_id,
             Measurement.device_id,
             Measurement.metric_key,
-            Measurement.value_num,
+            value_column.label("value_num"),
             Measurement.value_bool,
             Measurement.value_text,
             Measurement.value_json,
             Measurement.data_source_id,
             Measurement.source_event_id,
             Measurement.trace_id,
+            Measurement.valid,
+            Measurement.curated_fields,
+            Measurement.id,
+            Measurement.time.label("original_time"),
+            effective_time(Measurement).label("effective_time"),
+            Measurement.value_num.label("original_value_num"),
+            effective_value_num().label("effective_value_num"),
         )
         .where(*conditions)
-        .order_by(Measurement.time, Measurement.id)
+        .order_by(time_column, Measurement.id)
     )
     result = await session.stream(statement.execution_options(yield_per=YIELD_PER))
+    curation = _CurationLookup(session, "measurement") if params.curation_metadata else None
     async for m in result:
         metric = lookups.metrics.get(m.metric_key)
         yield {
             "time": _iso(m.time, params),
             "time_utc": _utc(m.time),
+            "valid": m.valid,
+            **(await curation.columns(m, params) if curation else {}),
             "entity_id": m.entity_id,
             "entity_name": lookups.entities.get(m.entity_id) if m.entity_id else None,
             "device_id": m.device_id,

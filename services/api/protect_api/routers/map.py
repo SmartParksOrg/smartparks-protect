@@ -19,6 +19,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.deps import ProjectContext, require_permission
+from shared.curation.effective import effective_geom, effective_time, in_window, visible
 from shared.database import get_session
 from shared.models import Entity, EntityCurrentState, EntityType, Position
 from shared.permissions import Permission
@@ -204,8 +205,8 @@ async def track(
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
     conditions = [
         Position.project_id == context.project.id,
-        Position.time >= time_from,
-        Position.time < time_to,
+        in_window(Position, time_from, time_to),
+        visible(Position),
     ]
     conditions.append(
         Position.entity_id == entity_id
@@ -219,10 +220,10 @@ async def track(
     numbered = (
         select(
             Position.id,
-            Position.time,
-            func.ST_X(Position.geom).label("lon"),
-            func.ST_Y(Position.geom).label("lat"),
-            func.row_number().over(order_by=Position.time).label("rn"),
+            effective_time(Position).label("time"),
+            func.ST_X(effective_geom()).label("lon"),
+            func.ST_Y(effective_geom()).label("lat"),
+            func.row_number().over(order_by=effective_time(Position)).label("rn"),
         )
         .where(*conditions)
         .subquery()

@@ -9,6 +9,7 @@ import type { DeviceDetail, DeviceType, Page as PageType, Position } from "@/api
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DeviceControl } from "@/components/control/DeviceControl";
+import { CuratedBadge, CurateDialog, RecordHistoryDialog } from "@/components/curation/CurationDialogs";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
 import { RecordDeliveriesDialog, SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { WebBleCard } from "@/components/devices/WebBleCard";
@@ -17,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
 import { useAuthStore } from "@/stores/auth";
 
@@ -26,6 +28,8 @@ export function DevicePage() {
   const role = useProjectRole(projectId);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(null);
   const [record, setRecord] = useState<number | null>(null);
+  const [curating, setCurating] = useState<CurationTarget | null>(null);
+  const [history, setHistory] = useState<CurationTarget | null>(null);
   const device = useQuery({ queryKey: queryKeys.device(deviceId), queryFn: () => api.get<DeviceDetail>(`/api/v1/devices/${deviceId}`) });
   const types = useQuery({ queryKey: queryKeys.deviceTypes, queryFn: () => api.get<PageType<DeviceType>>("/api/v1/device-types", { query: { limit: 500 } }) });
   const positions = useQuery({
@@ -105,7 +109,9 @@ export function DevicePage() {
                       <span>{formatTime(p.time)}</span>
                       <span className="font-mono text-xs">{(p.geometry?.coordinates as number[])?.[1]?.toFixed(5)}, {(p.geometry?.coordinates as number[])?.[0]?.toFixed(5)}</span>
                       {p.accuracy_m != null && <span className="text-muted-foreground">±{p.accuracy_m} m</span>}
+                      <CuratedBadge curatedFields={p.curated_fields ?? []} valid={p.valid ?? true} onClick={() => setHistory({ target_type: "position", target_id: p.id, target_time: p.original_time })} />
                       <span className="ml-auto flex gap-3">
+                        {projectId && (canAdmin(role) || user?.is_superuser) && <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setCurating({ target_type: "position", target_id: p.id, target_time: p.original_time })}>curate</Button>}
                         <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setRecord(p.id)}>deliveries</Button>
                         {p.source_event_id != null && (
                           <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setEvent({ id: p.source_event_id!, ingestedAt: p.ingested_at })}>provenance</Button>
@@ -121,6 +127,8 @@ export function DevicePage() {
       </Page>
       <SourceEventDialog id={event?.id ?? null} ingestedAt={event?.ingestedAt ?? null} onClose={() => setEvent(null)} />
       <RecordDeliveriesDialog canonicalType="position" canonicalId={record} onClose={() => setRecord(null)} onOpenEvent={(id, ingestedAt) => { setRecord(null); setEvent({ id, ingestedAt }); }} />
+      {projectId && <CurateDialog projectId={projectId} target={curating} onClose={() => { setCurating(null); void positions.refetch(); }} />}
+      {projectId && <RecordHistoryDialog projectId={projectId} target={history} onClose={() => setHistory(null)} />}
     </>
   );
 }

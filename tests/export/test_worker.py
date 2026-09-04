@@ -43,7 +43,10 @@ async def test_worker_runs_a_queued_job(db, monkeypatch):
     job_id = job.id
 
     worker = build_worker()
-    assert [topic for topic, _ in worker._subscriptions] == [Topic.EXPORT_REQUESTED]
+    assert [topic for topic, _ in worker._subscriptions] == [
+        Topic.EXPORT_REQUESTED,
+        Topic.CURATION_JOB_REQUESTED,
+    ]
     handler = worker._subscriptions[0][1]
     await handler(
         Message(

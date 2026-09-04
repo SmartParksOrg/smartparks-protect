@@ -5575,7 +5575,7 @@
      "data"
     ],
     "summary": "List Positions",
-    "description": "Positions attributed to the project, newest first, within a time window (default the last\n24 hours) and a row limit.",
+    "description": "Positions attributed to the project, newest first, within a time window (default the last\n24 hours) and a row limit. Times and coordinates are the effective ones (architecture 28).",
     "operationId": "list_positions_api_v1_projects__project_id__positions_get",
     "security": [
      {
@@ -5672,6 +5672,18 @@
        "default": 500,
        "title": "Limit"
       }
+     },
+     {
+      "name": "include_invalid",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Also rows marked invalid by curation",
+       "default": false,
+       "title": "Include Invalid"
+      },
+      "description": "Also rows marked invalid by curation"
      }
     ],
     "responses": {
@@ -6709,7 +6721,7 @@
      "analytics"
     ],
     "summary": "Rows",
-    "description": "Normalized measurement rows behind a bucket: the drill-down from an aggregate. Each row\ncarries its source event and trace, so the next step down is the source event detail.",
+    "description": "Normalized measurement rows behind a bucket: the drill-down from an aggregate. Each row\ncarries its source event and trace, so the next step down is the source event detail.\nValues and times are the effective ones; curated rows say so (architecture 28.12).",
     "operationId": "rows_api_v1_projects__project_id__analytics_rows_get",
     "security": [
      {
@@ -6820,6 +6832,18 @@
        ],
        "title": "To"
       }
+     },
+     {
+      "name": "include_invalid",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Also rows marked invalid by curation",
+       "default": false,
+       "title": "Include Invalid"
+      },
+      "description": "Also rows marked invalid by curation"
      },
      {
       "name": "limit",
@@ -7492,6 +7516,34 @@
        "title": "Include Names"
       },
       "description": "Entity, device and metric names as columns"
+     },
+     {
+      "name": "view",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "effective",
+        "original"
+       ],
+       "type": "string",
+       "description": "Effective (curated) values, the default, or the original canonical values (positions and measurements; architecture 28.13, decision D83)",
+       "default": "effective",
+       "title": "View"
+      },
+      "description": "Effective (curated) values, the default, or the original canonical values (positions and measurements; architecture 28.13, decision D83)"
+     },
+     {
+      "name": "curation_metadata",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Add is_curated, curated_fields, curation_reason, original and effective time and value, curated_by, curated_at and curation_job_id columns",
+       "default": false,
+       "title": "Curation Metadata"
+      },
+      "description": "Add is_curated, curated_fields, curation_reason, original and effective time and value, curated_by, curated_at and curation_job_id columns"
      },
      {
       "name": "bucket",
@@ -11415,6 +11467,971 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/curation/summary": {
+   "get": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Summary",
+    "operationId": "summary_api_v1_projects__project_id__curation_summary_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CurationSummary"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/corrections": {
+   "get": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "List Corrections",
+    "operationId": "list_corrections_api_v1_projects__project_id__curation_corrections_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "target_type",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Target Type"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "job_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_CorrectionRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Create Correction",
+    "description": "Correct one field of one record. Applied at once, or left pending when the project\nrequires approval (decision D81).",
+    "operationId": "create_correction_api_v1_projects__project_id__curation_corrections_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CorrectionCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CorrectionRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/history": {
+   "get": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Record History",
+    "description": "The effective and original values of one record with every correction, for the marker\non curated fields (architecture 28.12).",
+    "operationId": "record_history_api_v1_projects__project_id__curation_history_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "target_type",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^(position|measurement)$",
+       "title": "Target Type"
+      }
+     },
+     {
+      "name": "target_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "title": "Target Id"
+      }
+     },
+     {
+      "name": "target_time",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date-time",
+       "title": "Target Time"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RecordHistory"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/corrections/{correction_id}": {
+   "get": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Get Correction",
+    "operationId": "get_correction_api_v1_projects__project_id__curation_corrections__correction_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "correction_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Correction Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CorrectionRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/corrections/{correction_id}/approve": {
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Approve Correction",
+    "description": "The second person of the two-step workflow (architecture 28.11): applies the pending\ncorrection. The proposer cannot approve their own.",
+    "operationId": "approve_correction_api_v1_projects__project_id__curation_corrections__correction_id__approve_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "correction_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Correction Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CorrectionRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/corrections/{correction_id}/revert": {
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Revert One",
+    "operationId": "revert_one_api_v1_projects__project_id__curation_corrections__correction_id__revert_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "correction_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Correction Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CorrectionRevert"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CorrectionRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/jobs": {
+   "get": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "List Jobs",
+    "operationId": "list_jobs_api_v1_projects__project_id__curation_jobs_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_JobRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Create Job",
+    "description": "Define a bulk correction and preview it (architecture 28.5): the count, samples before\nand after, and the impact on attribution, deliveries and rules. Nothing is applied.",
+    "operationId": "create_job_api_v1_projects__project_id__curation_jobs_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/JobCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/jobs/{job_id}": {
+   "get": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Get Job",
+    "operationId": "get_job_api_v1_projects__project_id__curation_jobs__job_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/jobs/{job_id}/preview": {
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Preview Job",
+    "operationId": "preview_job_api_v1_projects__project_id__curation_jobs__job_id__preview_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/jobs/{job_id}/apply": {
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Apply Job",
+    "description": "Apply a previewed job in the batch worker, or leave it pending for approval when the\nproject requires it (decision D81).",
+    "operationId": "apply_job_api_v1_projects__project_id__curation_jobs__job_id__apply_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/jobs/{job_id}/approve": {
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Approve Job",
+    "operationId": "approve_job_api_v1_projects__project_id__curation_jobs__job_id__approve_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/curation/jobs/{job_id}/revert": {
+   "post": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "Revert Job",
+    "operationId": "revert_job_api_v1_projects__project_id__curation_jobs__job_id__revert_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CorrectionRevert"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/log-files": {
    "post": {
     "tags": [
@@ -12048,6 +13065,24 @@
       }
      },
      {
+      "name": "stale",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only deliveries a curation made stale",
+       "title": "Stale"
+      },
+      "description": "Only deliveries a curation made stale"
+     },
+     {
       "name": "limit",
       "in": "query",
       "required": false,
@@ -12167,6 +13202,65 @@
     ],
     "summary": "Retry Delivery",
     "operationId": "retry_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__retry_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "delivery_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Delivery Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationDeliveryRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/deliveries/{delivery_id}/resend": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Resend Delivery",
+    "description": "Send the corrected object again (architecture 28.10, decision D82): a new delivery with\nthe object's current curation version; the stale flag on the old one is cleared.",
+    "operationId": "resend_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__resend_post",
     "security": [
      {
       "OAuth2PasswordBearer": []
@@ -15169,6 +16263,343 @@
     "title": "ConsentInfo",
     "description": "What the consent page shows. `client_host` is the host of a client id metadata document,\nthe name the user must judge by (the document is self-asserted)."
    },
+   "CorrectionCreate": {
+    "properties": {
+     "target_type": {
+      "type": "string",
+      "pattern": "^(position|measurement)$",
+      "title": "Target Type"
+     },
+     "target_id": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Target Id"
+     },
+     "target_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Target Time",
+      "description": "The record's original time, its key"
+     },
+     "field": {
+      "type": "string",
+      "pattern": "^(time|coordinates|value|valid)$",
+      "title": "Field"
+     },
+     "corrected_value": {
+      "title": "Corrected Value"
+     },
+     "reason_code": {
+      "type": "string",
+      "maxLength": 48,
+      "minLength": 1,
+      "title": "Reason Code"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     }
+    },
+    "type": "object",
+    "required": [
+     "target_type",
+     "target_id",
+     "target_time",
+     "field",
+     "corrected_value",
+     "reason_code"
+    ],
+    "title": "CorrectionCreate"
+   },
+   "CorrectionRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "target_type": {
+      "type": "string",
+      "title": "Target Type"
+     },
+     "target_id": {
+      "type": "integer",
+      "title": "Target Id"
+     },
+     "target_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Target Time"
+     },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "metric_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Metric Key"
+     },
+     "field": {
+      "type": "string",
+      "title": "Field"
+     },
+     "original_value": {
+      "title": "Original Value"
+     },
+     "corrected_value": {
+      "title": "Corrected Value"
+     },
+     "reason_code": {
+      "type": "string",
+      "title": "Reason Code"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "impact": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Impact"
+     },
+     "curation_job_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Curation Job Id"
+     },
+     "supersedes_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Supersedes Id"
+     },
+     "created_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By User Id"
+     },
+     "approved_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Approved By User Id"
+     },
+     "approved_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Approved At"
+     },
+     "applied_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Applied At"
+     },
+     "reverted_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reverted By User Id"
+     },
+     "reverted_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reverted At"
+     },
+     "revert_comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revert Comment"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "target_type",
+     "target_id",
+     "target_time",
+     "device_id",
+     "entity_id",
+     "metric_key",
+     "field",
+     "original_value",
+     "corrected_value",
+     "reason_code",
+     "comment",
+     "status",
+     "impact",
+     "curation_job_id",
+     "supersedes_id",
+     "created_by_user_id",
+     "approved_by_user_id",
+     "approved_at",
+     "applied_at",
+     "reverted_by_user_id",
+     "reverted_at",
+     "revert_comment",
+     "trace_id",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "CorrectionRead"
+   },
+   "CorrectionRevert": {
+    "properties": {
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     }
+    },
+    "type": "object",
+    "title": "CorrectionRevert"
+   },
    "CreateDeviceForIdentity": {
     "properties": {
      "name": {
@@ -15218,6 +16649,74 @@
      "device_type_id"
     ],
     "title": "CreateDeviceForIdentity"
+   },
+   "CurationSummary": {
+    "properties": {
+     "requires_approval": {
+      "type": "boolean",
+      "title": "Requires Approval"
+     },
+     "pending_corrections": {
+      "type": "integer",
+      "title": "Pending Corrections"
+     },
+     "active_corrections": {
+      "type": "integer",
+      "title": "Active Corrections"
+     },
+     "reverted_corrections": {
+      "type": "integer",
+      "title": "Reverted Corrections"
+     },
+     "jobs": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Jobs"
+     },
+     "stale_deliveries": {
+      "type": "integer",
+      "title": "Stale Deliveries"
+     },
+     "reasons": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Reasons"
+     },
+     "curatable": {
+      "additionalProperties": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "type": "object",
+      "title": "Curatable"
+     },
+     "transformations": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Transformations"
+     }
+    },
+    "type": "object",
+    "required": [
+     "requires_approval",
+     "pending_corrections",
+     "active_corrections",
+     "reverted_corrections",
+     "jobs",
+     "stale_deliveries",
+     "reasons",
+     "curatable",
+     "transformations"
+    ],
+    "title": "CurationSummary"
    },
    "CurrentStateResponse": {
     "properties": {
@@ -17862,6 +19361,22 @@
       "description": "Entity, device and metric names as columns",
       "default": true
      },
+     "view": {
+      "type": "string",
+      "enum": [
+       "effective",
+       "original"
+      ],
+      "title": "View",
+      "description": "Effective (curated) values, the default, or the original canonical values (positions and measurements; architecture 28.13, decision D83)",
+      "default": "effective"
+     },
+     "curation_metadata": {
+      "type": "boolean",
+      "title": "Curation Metadata",
+      "description": "Add is_curated, curated_fields, curation_reason, original and effective time and value, curated_by, curated_at and curation_job_id columns",
+      "default": false
+     },
      "bucket": {
       "anyOf": [
        {
@@ -19151,6 +20666,29 @@
       "format": "date-time",
       "title": "Created At"
      },
+     "stale_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stale At"
+     },
+     "stale_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stale Reason"
+     },
      "request": {
       "anyOf": [
        {
@@ -19351,6 +20889,29 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "stale_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stale At"
+     },
+     "stale_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stale Reason"
      }
     },
     "type": "object",
@@ -20132,6 +21693,336 @@
     ],
     "title": "InvitationRead"
    },
+   "JobCreate": {
+    "properties": {
+     "target_type": {
+      "type": "string",
+      "pattern": "^(position|measurement)$",
+      "title": "Target Type"
+     },
+     "device_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Device Ids"
+     },
+     "entity_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Entity Ids"
+     },
+     "metric_keys": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 100,
+      "title": "Metric Keys"
+     },
+     "time_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time From"
+     },
+     "time_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time To"
+     },
+     "transformation": {
+      "$ref": "#/components/schemas/TransformationIn"
+     },
+     "reason_code": {
+      "type": "string",
+      "maxLength": 48,
+      "minLength": 1,
+      "title": "Reason Code"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     },
+     "replay_rules": {
+      "type": "boolean",
+      "title": "Replay Rules",
+      "description": "Run the rule replay over the corrected window as a report",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "target_type",
+     "time_from",
+     "time_to",
+     "transformation",
+     "reason_code"
+    ],
+    "title": "JobCreate"
+   },
+   "JobRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "target_type": {
+      "type": "string",
+      "title": "Target Type"
+     },
+     "device_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Device Ids"
+     },
+     "entity_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Entity Ids"
+     },
+     "metric_keys": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Metric Keys"
+     },
+     "time_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time From"
+     },
+     "time_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time To"
+     },
+     "transformation": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Transformation"
+     },
+     "reason_code": {
+      "type": "string",
+      "title": "Reason Code"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     },
+     "replay_rules": {
+      "type": "boolean",
+      "title": "Replay Rules"
+     },
+     "preview": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Preview"
+     },
+     "impact": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Impact"
+     },
+     "affected_count": {
+      "type": "integer",
+      "title": "Affected Count"
+     },
+     "applied_count": {
+      "type": "integer",
+      "title": "Applied Count"
+     },
+     "reverted_count": {
+      "type": "integer",
+      "title": "Reverted Count"
+     },
+     "created_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By User Id"
+     },
+     "approved_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Approved By User Id"
+     },
+     "approved_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Approved At"
+     },
+     "applied_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Applied By User Id"
+     },
+     "applied_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Applied At"
+     },
+     "reverted_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reverted By User Id"
+     },
+     "reverted_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reverted At"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "status",
+     "target_type",
+     "device_ids",
+     "entity_ids",
+     "metric_keys",
+     "time_from",
+     "time_to",
+     "transformation",
+     "reason_code",
+     "comment",
+     "replay_rules",
+     "preview",
+     "impact",
+     "affected_count",
+     "applied_count",
+     "reverted_count",
+     "created_by_user_id",
+     "approved_by_user_id",
+     "approved_at",
+     "applied_by_user_id",
+     "applied_at",
+     "reverted_by_user_id",
+     "reverted_at",
+     "error_message",
+     "trace_id",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "JobRead"
+   },
    "Layout": {
     "type": "string",
     "enum": [
@@ -20170,6 +22061,41 @@
       "type": "string",
       "format": "date-time",
       "title": "Time"
+     },
+     "original_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Original Time",
+      "description": "The record's key; equals time unless curated"
+     },
+     "original_value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Original Value",
+      "description": "Set when the value is curated"
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid",
+      "default": true
+     },
+     "curated_fields": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Curated Fields"
+     },
+     "curation_version": {
+      "type": "integer",
+      "title": "Curation Version",
+      "default": 1
      },
      "metric_key": {
       "type": "string",
@@ -20265,6 +22191,7 @@
     "required": [
      "id",
      "time",
+     "original_time",
      "metric_key",
      "value",
      "device_id",
@@ -20904,6 +22831,33 @@
     ],
     "title": "PageResponse[CommandRead]"
    },
+   "PageResponse_CorrectionRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/CorrectionRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[CorrectionRead]"
+   },
    "PageResponse_DataSourceRead_": {
     "properties": {
      "items": {
@@ -21282,6 +23236,33 @@
     ],
     "title": "PageResponse[InvitationRead]"
    },
+   "PageResponse_JobRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/JobRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[JobRead]"
+   },
    "PageResponse_MeasurementRow_": {
     "properties": {
      "items": {
@@ -21534,7 +23515,14 @@
      "time": {
       "type": "string",
       "format": "date-time",
-      "title": "Time"
+      "title": "Time",
+      "description": "The effective time (architecture 28.1)"
+     },
+     "original_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Original Time",
+      "description": "The record's key; equals time unless curated"
      },
      "ingested_at": {
       "type": "string",
@@ -21680,12 +23668,43 @@
        }
       ],
       "title": "Trace Id"
+     },
+     "original_geometry": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Original Geometry",
+      "description": "Set when the coordinates are curated"
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid",
+      "default": true
+     },
+     "curated_fields": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Curated Fields"
+     },
+     "curation_version": {
+      "type": "integer",
+      "title": "Curation Version",
+      "default": 1
      }
     },
     "type": "object",
     "required": [
      "id",
      "time",
+     "original_time",
      "ingested_at",
      "device_id",
      "project_id",
@@ -22257,6 +24276,69 @@
      "channel"
     ],
     "title": "ReceptionRead"
+   },
+   "RecordHistory": {
+    "properties": {
+     "target_type": {
+      "type": "string",
+      "title": "Target Type"
+     },
+     "target_id": {
+      "type": "integer",
+      "title": "Target Id"
+     },
+     "target_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Target Time"
+     },
+     "effective": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Effective"
+     },
+     "original": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Original"
+     },
+     "curated_fields": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Curated Fields"
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid"
+     },
+     "curation_version": {
+      "type": "integer",
+      "title": "Curation Version"
+     },
+     "corrections": {
+      "items": {
+       "$ref": "#/components/schemas/CorrectionRead"
+      },
+      "type": "array",
+      "title": "Corrections"
+     }
+    },
+    "type": "object",
+    "required": [
+     "target_type",
+     "target_id",
+     "target_time",
+     "effective",
+     "original",
+     "curated_fields",
+     "valid",
+     "curation_version",
+     "corrections"
+    ],
+    "title": "RecordHistory",
+    "description": "A record's effective and original values with every correction on it."
    },
    "RegisterRequest": {
     "properties": {
@@ -24289,6 +26371,40 @@
      "receptions"
     ],
     "title": "TrafficRow"
+   },
+   "TransformationIn": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "pattern": "^(time_offset|set_valid|value_offset|value_scale)$",
+      "title": "Kind"
+     },
+     "seconds": {
+      "type": "integer",
+      "title": "Seconds",
+      "default": 0
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid",
+      "default": false
+     },
+     "delta": {
+      "type": "number",
+      "title": "Delta",
+      "default": 0.0
+     },
+     "factor": {
+      "type": "number",
+      "title": "Factor",
+      "default": 1.0
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "title": "TransformationIn"
    },
    "UnknownIdentity": {
     "properties": {

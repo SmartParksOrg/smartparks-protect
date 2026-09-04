@@ -7,9 +7,18 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import Float, Integer, cast, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.curation.effective import (
+    before as effective_before,
+)
+from shared.curation.effective import (
+    effective_geom,
+    effective_number,
+    effective_time,
+    visible,
+)
 from shared.models import (
     DeviceCurrentState,
     EntityCurrentState,
@@ -37,18 +46,15 @@ class SqlDataAccess:
         self._features: dict[str, tuple[datetime, list[FeatureGeometry]]] = {}
 
     async def latest_value(self, subject: Subject, metric: str, before: datetime) -> float | None:
-        value = func.coalesce(
-            Measurement.value_num, cast(cast(Measurement.value_bool, Integer), Float)
-        )
         row = await self.session.execute(
-            select(value)
+            select(effective_number())
             .where(
                 _subject_filter(Measurement, subject),
                 Measurement.metric_key == metric,
-                Measurement.time <= before,
-                Measurement.time > before - LOOKBACK,
+                effective_before(Measurement, before, before - LOOKBACK),
+                visible(Measurement),
             )
-            .order_by(Measurement.time.desc())
+            .order_by(effective_time(Measurement).desc())
             .limit(1)
         )
         result = row.scalar_one_or_none()
@@ -59,13 +65,13 @@ class SqlDataAccess:
     ) -> tuple[tuple[float, float], datetime] | None:
         row = (
             await self.session.execute(
-                select(Position.geom, Position.time)
+                select(effective_geom(), effective_time(Position))
                 .where(
                     _subject_filter(Position, subject),
-                    Position.time <= before,
-                    Position.time > before - LOOKBACK,
+                    effective_before(Position, before, before - LOOKBACK),
+                    visible(Position),
                 )
-                .order_by(Position.time.desc())
+                .order_by(effective_time(Position).desc())
                 .limit(1)
             )
         ).first()
@@ -77,9 +83,7 @@ class SqlDataAccess:
     async def window(
         self, subject: Subject, metric: str, aggregate: str, seconds: int, at: datetime
     ) -> float | None:
-        value = func.coalesce(
-            Measurement.value_num, cast(cast(Measurement.value_bool, Integer), Float)
-        )
+        value = effective_number()
         agg = {
             "avg": func.avg(value),
             "min": func.min(value),
@@ -91,8 +95,8 @@ class SqlDataAccess:
             select(agg).where(
                 _subject_filter(Measurement, subject),
                 Measurement.metric_key == metric,
-                Measurement.time > at - timedelta(seconds=seconds),
-                Measurement.time <= at,
+                effective_before(Measurement, at, at - timedelta(seconds=seconds)),
+                visible(Measurement),
             )
         )
         if result is None:
@@ -133,15 +137,17 @@ class SqlDataAccess:
             return device.last_seen_at if device is not None else None
         since = at - timedelta(days=90)
         latest_position = await self.session.scalar(
-            select(func.max(Position.time)).where(
-                _subject_filter(Position, subject), Position.time <= at, Position.time > since
+            select(func.max(effective_time(Position))).where(
+                _subject_filter(Position, subject),
+                effective_before(Position, at, since),
+                visible(Position),
             )
         )
         latest_measurement = await self.session.scalar(
-            select(func.max(Measurement.time)).where(
+            select(func.max(effective_time(Measurement))).where(
                 _subject_filter(Measurement, subject),
-                Measurement.time <= at,
-                Measurement.time > since,
+                effective_before(Measurement, at, since),
+                visible(Measurement),
             )
         )
         candidates = [t for t in (latest_position, latest_measurement) if t is not None]

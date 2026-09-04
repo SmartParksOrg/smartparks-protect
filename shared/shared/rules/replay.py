@@ -9,9 +9,16 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import Float, Integer, cast, func, select, union_all
+from sqlalchemy import select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.curation.effective import (
+    effective_geom,
+    effective_number,
+    effective_time,
+    in_window,
+    visible,
+)
 from shared.models import Device, Entity, EntityCurrentState, Measurement, Position
 from shared.rules.data import SqlDataAccess
 from shared.rules.evaluator import Sample, Subject, SubjectState, evaluate, format_title
@@ -156,20 +163,20 @@ async def replay(
     if doc.trigger.kind is TriggerKind.POSITION:
         statement = (
             select(
-                Position.time,
+                effective_time(Position),
                 Position.entity_id,
                 Position.device_id,
-                Position.geom,
+                effective_geom(),
                 Position.speed_mps,
                 Position.altitude_m,
                 Position.source_event_id,
             )
             .where(
                 Position.project_id == project_id,
-                Position.time >= time_from,
-                Position.time < time_to,
+                in_window(Position, time_from, time_to),
+                visible(Position),
             )
-            .order_by(Position.time)
+            .order_by(effective_time(Position))
             .limit(MAX_SAMPLES + 1)
         )
         rows = (await session.execute(statement)).all()
@@ -193,24 +200,21 @@ async def replay(
         return result
 
     if doc.trigger.kind is TriggerKind.MEASUREMENT:
-        value = func.coalesce(
-            Measurement.value_num, cast(cast(Measurement.value_bool, Integer), Float)
-        )
         statement = (
             select(
-                Measurement.time,
+                effective_time(Measurement),
                 Measurement.entity_id,
                 Measurement.device_id,
                 Measurement.metric_key,
-                value,
+                effective_number(),
                 Measurement.source_event_id,
             )
             .where(
                 Measurement.project_id == project_id,
-                Measurement.time >= time_from,
-                Measurement.time < time_to,
+                in_window(Measurement, time_from, time_to),
+                visible(Measurement),
             )
-            .order_by(Measurement.time)
+            .order_by(effective_time(Measurement))
             .limit(MAX_SAMPLES + 1)
         )
         if doc.trigger.metric_key:

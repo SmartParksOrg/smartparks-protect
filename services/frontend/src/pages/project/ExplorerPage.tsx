@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { CuratedBadge, CurateDialog, RecordHistoryDialog } from "@/components/curation/CurationDialogs";
 import { SourceEventDialog, TraceDialog } from "@/components/devices/ProvenancePanel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { type CurationTarget } from "@/lib/curation";
 import { type Aggregate, AGGREGATES, browserTimezone, BUCKETS, bucketLabel, CHART_TYPES, type ChartType, formatInZone, type LongRow, RANGE_PRESETS, type RangePreset, rangeFor, seriesLabel, TIMEZONES, toLongRows } from "@/lib/analytics";
 import { type ExportPreset } from "@/lib/exports";
 import { useAuthStore } from "@/stores/auth";
@@ -203,7 +205,7 @@ export function ExplorerPage() {
           </>
         )}
       </Page>
-      <DrillDownDialog projectId={projectId} row={drill} bucketSeconds={series.data?.bucket_seconds ?? 0} timezone={state.timezone} onClose={() => setDrill(null)} />
+      <DrillDownDialog projectId={projectId} row={drill} bucketSeconds={series.data?.bucket_seconds ?? 0} timezone={state.timezone} onClose={() => setDrill(null)} canCurate={canAdmin(role)} />
       <ExportDialog projectId={projectId} open={exportOpen} onOpenChange={setExportOpen} preset={exportPreset} />
       <SaveViewDialog open={saveOpen} onOpenChange={setSaveOpen} onSave={(name) => saveView.mutate(name)} pending={saveView.isPending} />
     </>
@@ -216,9 +218,11 @@ function formatNumber(value: number | null | undefined): string {
 }
 
 /** The normalized rows behind one bucket, each linking to its source event. */
-function DrillDownDialog({ projectId, row, bucketSeconds, timezone, onClose }: { projectId: string; row: LongRow | null; bucketSeconds: number; timezone: string; onClose: () => void }) {
+function DrillDownDialog({ projectId, row, bucketSeconds, timezone, onClose, canCurate }: { projectId: string; row: LongRow | null; bucketSeconds: number; timezone: string; onClose: () => void; canCurate: boolean }) {
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(null);
   const [trace, setTrace] = useState<string | null>(null);
+  const [curating, setCurating] = useState<CurationTarget | null>(null);
+  const [history, setHistory] = useState<CurationTarget | null>(null);
   const from = row?.time;
   const to = row ? new Date(new Date(row.time).getTime() + Math.max(bucketSeconds, 1) * 1000).toISOString() : undefined;
   const rows = useQuery({
@@ -228,10 +232,11 @@ function DrillDownDialog({ projectId, row, bucketSeconds, timezone, onClose }: {
   });
   const columns: ColumnDef<MeasurementRow, unknown>[] = [
     { header: "Time", accessorKey: "time", cell: ({ getValue }) => formatInZone(getValue<string>(), timezone, { timeStyle: "medium" }) },
-    { header: "Value", accessorKey: "value", cell: ({ getValue }) => { const v = getValue<unknown>(); return typeof v === "number" ? formatNumber(v) : JSON.stringify(v); } },
+    { header: "Value", accessorKey: "value", cell: ({ getValue, row: r }) => { const v = getValue<unknown>(); return <span className="inline-flex items-center gap-1">{typeof v === "number" ? formatNumber(v) : JSON.stringify(v)}<CuratedBadge curatedFields={r.original.curated_fields ?? []} valid={r.original.valid ?? true} onClick={() => setHistory({ target_type: "measurement", target_id: r.original.id, target_time: r.original.original_time })} /></span>; } },
     { header: "Device", accessorKey: "device_id", cell: ({ getValue }) => getValue<string>().slice(0, 8) },
     { header: "Source event", accessorKey: "source_event_id", cell: ({ row: r }) => (r.original.source_event_id ? <Button variant="link" size="sm" className="h-auto p-0" onClick={(e) => { e.stopPropagation(); setEvent({ id: r.original.source_event_id!, ingestedAt: r.original.source_event_ingested_at! }); }}>open</Button> : "") },
     { header: "Trace", accessorKey: "trace_id", cell: ({ row: r }) => (r.original.trace_id ? <Button variant="link" size="sm" className="h-auto p-0" onClick={(e) => { e.stopPropagation(); setTrace(r.original.trace_id!); }}>view</Button> : "") },
+    ...(canCurate ? [{ id: "curate", header: "", cell: ({ row: r }: { row: { original: MeasurementRow } }) => <Button variant="link" size="sm" className="h-auto p-0" onClick={(e) => { e.stopPropagation(); setCurating({ target_type: "measurement", target_id: r.original.id, target_time: r.original.original_time }); }}>curate</Button> } as ColumnDef<MeasurementRow, unknown>] : []),
   ];
   return (
     <>
@@ -246,6 +251,8 @@ function DrillDownDialog({ projectId, row, bucketSeconds, timezone, onClose }: {
       </Dialog>
       <SourceEventDialog id={event?.id ?? null} ingestedAt={event?.ingestedAt ?? null} onClose={() => setEvent(null)} />
       <TraceDialog traceId={trace} onClose={() => setTrace(null)} />
+      <CurateDialog projectId={projectId} target={curating} onClose={() => { setCurating(null); void rows.refetch(); }} />
+      <RecordHistoryDialog projectId={projectId} target={history} onClose={() => setHistory(null)} />
     </>
   );
 }

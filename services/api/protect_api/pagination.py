@@ -42,11 +42,15 @@ async def paginate(
     key: InstrumentedAttribute[Any],
     statement: Select[Any],
     page: Page,
+    *,
+    descending: bool = False,
 ) -> tuple[list[Any], str | None]:
-    """Apply the cursor and limit to a statement returning rows of the model that owns `key`."""
+    """Apply the cursor and limit to a statement returning rows of the model that owns `key`;
+    `descending` walks newest first."""
     if page.cursor is not None:
-        statement = statement.where(key > _parse_cursor(key, page.cursor))
-    statement = statement.order_by(key).limit(page.limit + 1)
+        cursor = _parse_cursor(key, page.cursor)
+        statement = statement.where(key < cursor if descending else key > cursor)
+    statement = statement.order_by(key.desc() if descending else key).limit(page.limit + 1)
     rows = list((await session.execute(statement)).scalars().all())
     next_cursor = str(getattr(rows[page.limit - 1], key.key)) if len(rows) > page.limit else None
     return rows[: page.limit], next_cursor

@@ -73,6 +73,56 @@ class ProcessingStatus(StrEnum):
     IGNORED = "ignored"
 
 
+class CorrectionStatus(StrEnum):
+    """Lifecycle of a data correction (architecture 28.2, 28.6)."""
+
+    PENDING = "pending"
+    ACTIVE = "active"
+    REVERTED = "reverted"
+    SUPERSEDED = "superseded"
+
+
+class CurationJobStatus(StrEnum):
+    """Lifecycle of a bulk curation job (architecture 28.5)."""
+
+    PREVIEWED = "previewed"
+    PENDING = "pending"
+    APPLYING = "applying"
+    APPLIED = "applied"
+    REVERTING = "reverting"
+    REVERTED = "reverted"
+    FAILED = "failed"
+
+
+class CurationTarget(StrEnum):
+    POSITION = "position"
+    MEASUREMENT = "measurement"
+
+
+class CurationField(StrEnum):
+    """The curatable fields (architecture 28.3): nothing else is editable."""
+
+    TIME = "time"
+    COORDINATES = "coordinates"
+    VALUE = "value"
+    VALID = "valid"
+
+
+class CurationReason(StrEnum):
+    """Structured data quality reasons (architecture 28.7)."""
+
+    DEVICE_FIRMWARE_BUG = "DEVICE_FIRMWARE_BUG"
+    DEVICE_CLOCK_ERROR = "DEVICE_CLOCK_ERROR"
+    TIMEZONE_ERROR = "TIMEZONE_ERROR"
+    GPS_OUTLIER = "GPS_OUTLIER"
+    CALIBRATION_ERROR = "CALIBRATION_ERROR"
+    WRONG_ENTITY_ASSIGNMENT = "WRONG_ENTITY_ASSIGNMENT"
+    WRONG_PROJECT_ASSIGNMENT = "WRONG_PROJECT_ASSIGNMENT"
+    CLASSIFICATION_CORRECTION = "CLASSIFICATION_CORRECTION"
+    MANUAL_QC = "MANUAL_QC"
+    OTHER = "OTHER"
+
+
 class LogFileStatus(StrEnum):
     """Parse status of a device log file (architecture 25.6)."""
 

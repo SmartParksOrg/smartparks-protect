@@ -140,6 +140,11 @@ class Position(Base):
         Index("ix_positions_device_time", "device_id", "time"),
         Index("ix_positions_entity_time", "entity_id", "time"),
         Index("ix_positions_project_time", "project_id", "time"),
+        Index(
+            "ix_positions_curated_time",
+            "curated_time",
+            postgresql_where=text("curated_time IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
@@ -175,6 +180,21 @@ class Position(Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     trace_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # Curation overlay (architecture 28, decision D80): null means the original applies.
+    curated_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="Effective time when curated; null means `time`"
+    )
+    curated_geom: Mapped[Any | None] = mapped_column(
+        Geometry(geometry_type="POINT", srid=4326, spatial_index=False),
+        comment="Effective point when curated; null means `geom`",
+    )
+    valid: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    curated_fields: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb"), default=list
+    )
+    curation_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1"), comment="Bumped on every correction"
+    )
 
 
 class Measurement(Base):
@@ -186,6 +206,11 @@ class Measurement(Base):
         Index("ix_measurements_device_metric_time", "device_id", "metric_key", "time"),
         Index("ix_measurements_entity_metric_time", "entity_id", "metric_key", "time"),
         Index("ix_measurements_project_metric_time", "project_id", "metric_key", "time"),
+        Index(
+            "ix_measurements_curated_time",
+            "curated_time",
+            postgresql_where=text("curated_time IS NOT NULL"),
+        ),
         CheckConstraint(
             "num_nonnulls(value_num, value_bool, value_text, value_json) = 1",
             name="ck_measurements_one_value",
@@ -220,6 +245,20 @@ class Measurement(Base):
     value_text: Mapped[str | None] = mapped_column(String(1024))
     value_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     trace_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # Curation overlay (architecture 28, decision D80): null means the original applies.
+    curated_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="Effective time when curated; null means `time`"
+    )
+    curated_value_num: Mapped[float | None] = mapped_column(
+        Float, comment="Effective numeric value when curated; null means `value_num`"
+    )
+    valid: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    curated_fields: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb"), default=list
+    )
+    curation_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1"), comment="Bumped on every correction"
+    )
 
 
 class GatewayReception(Base):

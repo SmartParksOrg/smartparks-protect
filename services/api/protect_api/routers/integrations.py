@@ -27,10 +27,12 @@ from protect_api.schemas.integrations import (
 )
 from shared.bus import RedisStreamsBus, Topic
 from shared.database import get_session
-from shared.enums import BackfillStatus, DeliveryStatus
+from shared.enums import BackfillStatus, DeliveryOrigin, DeliveryStatus
 from shared.integrations.base import PermanentFailure, Skipped, TransientFailure
 from shared.integrations.deliveries import (
+    curated_ref,
     delivery_counts,
+    enqueue,
     integration_context,
     requeue,
 )
@@ -143,11 +145,14 @@ async def list_deliveries(
     integration_id: uuid.UUID | None = Query(None),
     delivery_status: DeliveryStatus | None = Query(None, alias="status"),
     object_type: str | None = Query(None),
+    stale: bool | None = Query(None, description="Only deliveries a curation made stale"),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[IntegrationDeliveryRead]:
     statement = select(IntegrationDelivery).where(
         IntegrationDelivery.project_id == context.project.id
     )
+    if stale:
+        statement = statement.where(IntegrationDelivery.stale_at.is_not(None))
     if integration_id is not None:
         statement = statement.where(IntegrationDelivery.integration_id == integration_id)
     if delivery_status is not None:
@@ -201,6 +206,59 @@ async def retry_delivery(
     requeue(delivery)
     await session.commit()
     return IntegrationDeliveryRead.model_validate(delivery)
+
+
+@router.post("/deliveries/{delivery_id}/resend", response_model=IntegrationDeliveryRead)
+async def resend_delivery(
+    delivery_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.INTEGRATIONS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> IntegrationDeliveryRead:
+    """Send the corrected object again (architecture 28.10, decision D82): a new delivery with
+    the object's current curation version; the stale flag on the old one is cleared."""
+    delivery = await get_or_404(session, IntegrationDelivery, delivery_id, "Delivery")
+    if delivery.project_id != context.project.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Delivery not found")
+    integration = await session.get(Integration, delivery.integration_id)
+    if integration is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The integration no longer exists")
+    ref = await curated_ref(session, delivery)
+    if ref is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The object no longer exists")
+    if ref.object_version <= delivery.object_version:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This version of the object was delivered already"
+        )
+    if ref.project_id != integration.project_id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "The corrected record now belongs to another project; this integration cannot "
+            "resend it",
+        )
+    queued = await enqueue(
+        session, [integration], [ref], origin=DeliveryOrigin.RETRY, honour_age=False
+    )
+    delivery.stale_at = None
+    delivery.stale_reason = None
+    await record_audit(
+        session,
+        user=context.user,
+        action="integration_delivery.resent",
+        object_type="integration_delivery",
+        object_id=str(delivery.id),
+        project_id=context.project.id,
+        details={"object_version": ref.object_version, "queued": queued},
+    )
+    await session.commit()
+    new = await session.scalar(
+        select(IntegrationDelivery).where(
+            IntegrationDelivery.integration_id == integration.id,
+            IntegrationDelivery.object_type == ref.object_type,
+            IntegrationDelivery.object_id == ref.object_id,
+            IntegrationDelivery.object_version == ref.object_version,
+        )
+    )
+    return IntegrationDeliveryRead.model_validate(new or delivery)
 
 
 @router.get("/{integration_id}", response_model=IntegrationDetail)

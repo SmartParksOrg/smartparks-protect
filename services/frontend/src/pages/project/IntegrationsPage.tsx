@@ -17,6 +17,7 @@ import { JsonView } from "@/components/common/JsonView";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -139,6 +140,7 @@ export function IntegrationsPage() {
     onSuccess: () => setBackfilling(null),
   });
   const retry = useMutationToast({ mutationFn: (d: IntegrationDelivery) => api.post<IntegrationDelivery>(`${base}/deliveries/${d.id}/retry`), invalidate: [queryKeys.integrationDeliveries(projectId, { status: deliveryStatus, integration: deliveryIntegration })], success: "Queued again", onSuccess: () => setDeliveryDetail(null) });
+  const resend = useMutationToast({ mutationFn: (d: IntegrationDelivery) => api.post<IntegrationDelivery>(`${base}/deliveries/${d.id}/resend`), invalidate: [queryKeys.integrationDeliveries(projectId, { status: deliveryStatus, integration: deliveryIntegration })], success: "Corrected object queued for delivery", onSuccess: () => setDeliveryDetail(null) });
   const connectorLabel = (key: string) => CONNECTORS.find((c) => c.key === key)?.label ?? key;
   const integrationName = (id: string) => integrations.data?.items.find((i) => i.id === id)?.name ?? "";
   const entityName = (id: string | null | undefined) => entities.data?.items.find((e) => e.id === id)?.name ?? "";
@@ -162,7 +164,7 @@ export function IntegrationsPage() {
     { header: "Object", id: "object", cell: ({ row }) => <span className="text-xs">{row.original.object_type} {row.original.object_type === "event" ? row.original.object_id.slice(0, 8) : row.original.object_id}<span className="text-muted-foreground"> at {formatTime(row.original.object_time)}</span></span> },
     { header: "Entity", accessorKey: "entity_id", cell: ({ getValue }) => entityName(getValue<string | null>()) },
     { header: "Origin", accessorKey: "origin" },
-    { header: "Status", accessorKey: "status", cell: ({ row }) => <span className="inline-flex items-center gap-2"><StatusBadge value={row.original.status} /><span className="text-xs text-muted-foreground">{row.original.attempts} attempt{row.original.attempts === 1 ? "" : "s"}</span></span> },
+    { header: "Status", accessorKey: "status", cell: ({ row }) => <span className="inline-flex items-center gap-2"><StatusBadge value={row.original.status} />{row.original.stale_at && <Badge variant="outline" title={row.original.stale_reason ?? undefined}>stale</Badge>}<span className="text-xs text-muted-foreground">{row.original.attempts} attempt{row.original.attempts === 1 ? "" : "s"}</span></span> },
     { header: "Detail", id: "detail", cell: ({ row }) => <span className="text-xs">{row.original.external_id ? `ref ${row.original.external_id}` : row.original.error_message ?? (row.original.next_attempt_at ? `next ${formatTime(row.original.next_attempt_at)}` : "")}</span> },
   ];
 
@@ -288,11 +290,12 @@ export function IntegrationsPage() {
             <div className="space-y-3 text-sm">
               <div className="flex flex-wrap items-center gap-2"><StatusBadge value={deliveryDetail.status} />{deliveryDetail.delivered_at && <span className="text-xs text-muted-foreground">delivered {formatTime(deliveryDetail.delivered_at)}</span>}{deliveryDetail.external_id && <span className="text-xs">target ref {deliveryDetail.external_id}</span>}{deliveryDetail.trace_id && <a className="text-xs underline" href={`/projects/${projectId}/network/traces?trace=${deliveryDetail.trace_id}`}>trace</a>}</div>
               {deliveryDetail.error_message && <Callout kind={deliveryDetail.status === "failed" ? "error" : "warning"}>{deliveryDetail.error_message}</Callout>}
+              {deliveryDetail.stale_at && <Callout kind="warning">The object was corrected after this delivery ({deliveryDetail.stale_reason}, {formatTime(deliveryDetail.stale_at)}). Resend delivers the corrected version as a new delivery.</Callout>}
               <div><div className="mb-1 text-xs font-medium uppercase text-muted-foreground">Request</div><JsonView value={delivery.data?.request ?? null} /></div>
               <div><div className="mb-1 text-xs font-medium uppercase text-muted-foreground">Response</div><JsonView value={delivery.data?.response ?? {}} /></div>
             </div>
           )}
-          <DialogFooter><Button variant="outline" onClick={() => setDeliveryDetail(null)}>Close</Button>{deliveryDetail && deliveryDetail.status !== "sent" && <Button onClick={() => retry.mutate(deliveryDetail)} disabled={retry.isPending}><RotateCcw className="size-4" /> Retry now</Button>}</DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDeliveryDetail(null)}>Close</Button>{deliveryDetail && deliveryDetail.status !== "sent" && <Button onClick={() => retry.mutate(deliveryDetail)} disabled={retry.isPending}><RotateCcw className="size-4" /> Retry now</Button>}{deliveryDetail?.stale_at && <Button onClick={() => resend.mutate(deliveryDetail)} disabled={resend.isPending}><RotateCcw className="size-4" /> Resend corrected</Button>}</DialogFooter>
         </DialogContent>
       </Dialog>
 

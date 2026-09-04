@@ -94,6 +94,8 @@ class IntegrationDeliveryRead(ORMModel):
     error_message: str | None
     trace_id: uuid.UUID | None
     created_at: datetime
+    stale_at: datetime | None = None
+    stale_reason: str | None = None
 
 
 class IntegrationDeliveryDetail(IntegrationDeliveryRead):

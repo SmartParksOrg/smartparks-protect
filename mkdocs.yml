@@ -90,6 +90,7 @@ nav:
       - analytics/index.md
       - Data Explorer: analytics/data-explorer.md
       - Export: analytics/export.md
+      - Data curation: analytics/curation.md
   - Rules:
       - rules/index.md
       - Automations and notifications: rules/automations.md
@@ -126,3 +127,4 @@ nav:
       - adr/0015-mcp-security-boundary.md
       - adr/0016-backup-and-observability.md
       - adr/0017-multi-path-acquisition.md
+      - adr/0018-immutable-source-layered-interpretation.md

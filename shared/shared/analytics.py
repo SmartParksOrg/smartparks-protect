@@ -12,9 +12,10 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import Float, Integer, Interval, Select, cast, func, literal, select
+from sqlalchemy import Interval, Select, func, literal, select
 from sqlalchemy.sql import ColumnElement
 
+from shared.curation.effective import effective_number, effective_time, in_window, visible
 from shared.models import Measurement
 
 
@@ -113,8 +114,8 @@ def aggregate_columns(
         Aggregate.MEDIAN: func.percentile_cont(0.5).within_group(value),
         Aggregate.SUM: func.sum(value),
         Aggregate.COUNT: func.count(value),
-        Aggregate.FIRST: func.first(value, Measurement.time),
-        Aggregate.LAST: func.last(value, Measurement.time),
+        Aggregate.FIRST: func.first(value, effective_time(Measurement)),
+        Aggregate.LAST: func.last(value, effective_time(Measurement)),
     }
     return [by_name[a].label(a.value) for a in aggregates]
 
@@ -134,20 +135,20 @@ def aggregate_statement(
 ) -> Select[Any]:
     """Rows of (bucket, metric_key, series_key, <one column per aggregate>) ordered by metric,
     series and bucket. Booleans count as 0 and 1, so `mean` is the fraction true."""
-    value = func.coalesce(Measurement.value_num, cast(cast(Measurement.value_bool, Integer), Float))
+    value = effective_number()
     group_column = Measurement.entity_id if group_by is GroupBy.ENTITY else Measurement.device_id
     time_column = (
         literal(time_from).label("bucket")
         if resolution.key == "all"
-        else func.time_bucket(literal(resolution.width, type_=Interval), Measurement.time).label(
-            "bucket"
-        )
+        else func.time_bucket(
+            literal(resolution.width, type_=Interval), effective_time(Measurement)
+        ).label("bucket")
     )
     conditions = [
         Measurement.project_id == project_id,
         Measurement.metric_key.in_(metrics),
-        Measurement.time >= time_from,
-        Measurement.time < time_to,
+        in_window(Measurement, time_from, time_to),
+        visible(Measurement),
     ]
     if entity_ids:
         conditions.append(Measurement.entity_id.in_(entity_ids))

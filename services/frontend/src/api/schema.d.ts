@@ -1247,7 +1247,7 @@ export interface paths {
         /**
          * List Positions
          * @description Positions attributed to the project, newest first, within a time window (default the last
-         *     24 hours) and a row limit.
+         *     24 hours) and a row limit. Times and coordinates are the effective ones (architecture 28).
          */
         get: operations["list_positions_api_v1_projects__project_id__positions_get"];
         put?: never;
@@ -1467,6 +1467,7 @@ export interface paths {
          * Rows
          * @description Normalized measurement rows behind a bucket: the drill-down from an aggregate. Each row
          *     carries its source event and trace, so the next step down is the source event detail.
+         *     Values and times are the effective ones; curated rows say so (architecture 28.12).
          */
         get: operations["rows_api_v1_projects__project_id__analytics_rows_get"];
         put?: never;
@@ -2469,6 +2470,232 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/curation/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Summary */
+        get: operations["summary_api_v1_projects__project_id__curation_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Corrections */
+        get: operations["list_corrections_api_v1_projects__project_id__curation_corrections_get"];
+        put?: never;
+        /**
+         * Create Correction
+         * @description Correct one field of one record. Applied at once, or left pending when the project
+         *     requires approval (decision D81).
+         */
+        post: operations["create_correction_api_v1_projects__project_id__curation_corrections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Record History
+         * @description The effective and original values of one record with every correction, for the marker
+         *     on curated fields (architecture 28.12).
+         */
+        get: operations["record_history_api_v1_projects__project_id__curation_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/corrections/{correction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Correction */
+        get: operations["get_correction_api_v1_projects__project_id__curation_corrections__correction_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/corrections/{correction_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Correction
+         * @description The second person of the two-step workflow (architecture 28.11): applies the pending
+         *     correction. The proposer cannot approve their own.
+         */
+        post: operations["approve_correction_api_v1_projects__project_id__curation_corrections__correction_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/corrections/{correction_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revert One */
+        post: operations["revert_one_api_v1_projects__project_id__curation_corrections__correction_id__revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Jobs */
+        get: operations["list_jobs_api_v1_projects__project_id__curation_jobs_get"];
+        put?: never;
+        /**
+         * Create Job
+         * @description Define a bulk correction and preview it (architecture 28.5): the count, samples before
+         *     and after, and the impact on attribution, deliveries and rules. Nothing is applied.
+         */
+        post: operations["create_job_api_v1_projects__project_id__curation_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job */
+        get: operations["get_job_api_v1_projects__project_id__curation_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/jobs/{job_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Job */
+        post: operations["preview_job_api_v1_projects__project_id__curation_jobs__job_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/jobs/{job_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Job
+         * @description Apply a previewed job in the batch worker, or leave it pending for approval when the
+         *     project requires it (decision D81).
+         */
+        post: operations["apply_job_api_v1_projects__project_id__curation_jobs__job_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/jobs/{job_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Job */
+        post: operations["approve_job_api_v1_projects__project_id__curation_jobs__job_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/curation/jobs/{job_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revert Job */
+        post: operations["revert_job_api_v1_projects__project_id__curation_jobs__job_id__revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/log-files": {
         parameters: {
             query?: never;
@@ -2672,6 +2899,27 @@ export interface paths {
         put?: never;
         /** Retry Delivery */
         post: operations["retry_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/deliveries/{delivery_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Delivery
+         * @description Send the corrected object again (architecture 28.10, decision D82): a new delivery with
+         *     the object's current curation version; the stale flag on the old one is cleared.
+         */
+        post: operations["resend_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__resend_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3622,6 +3870,103 @@ export interface components {
              */
             expires_at: string;
         };
+        /** CorrectionCreate */
+        CorrectionCreate: {
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: number;
+            /**
+             * Target Time
+             * Format: date-time
+             * @description The record's original time, its key
+             */
+            target_time: string;
+            /** Field */
+            field: string;
+            /** Corrected Value */
+            corrected_value: unknown;
+            /** Reason Code */
+            reason_code: string;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** CorrectionRead */
+        CorrectionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: number;
+            /**
+             * Target Time
+             * Format: date-time
+             */
+            target_time: string;
+            /** Device Id */
+            device_id: string | null;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Metric Key */
+            metric_key: string | null;
+            /** Field */
+            field: string;
+            /** Original Value */
+            original_value: unknown;
+            /** Corrected Value */
+            corrected_value: unknown;
+            /** Reason Code */
+            reason_code: string;
+            /** Comment */
+            comment: string | null;
+            /** Status */
+            status: string;
+            /** Impact */
+            impact: {
+                [key: string]: unknown;
+            };
+            /** Curation Job Id */
+            curation_job_id: string | null;
+            /** Supersedes Id */
+            supersedes_id: string | null;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /** Approved By User Id */
+            approved_by_user_id: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Applied At */
+            applied_at: string | null;
+            /** Reverted By User Id */
+            reverted_by_user_id: string | null;
+            /** Reverted At */
+            reverted_at: string | null;
+            /** Revert Comment */
+            revert_comment: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CorrectionRevert */
+        CorrectionRevert: {
+            /** Comment */
+            comment?: string | null;
+        };
         /** CreateDeviceForIdentity */
         CreateDeviceForIdentity: {
             /** Name */
@@ -3640,6 +3985,31 @@ export interface components {
              * @default true
              */
             reprocess: boolean;
+        };
+        /** CurationSummary */
+        CurationSummary: {
+            /** Requires Approval */
+            requires_approval: boolean;
+            /** Pending Corrections */
+            pending_corrections: number;
+            /** Active Corrections */
+            active_corrections: number;
+            /** Reverted Corrections */
+            reverted_corrections: number;
+            /** Jobs */
+            jobs: {
+                [key: string]: number;
+            };
+            /** Stale Deliveries */
+            stale_deliveries: number;
+            /** Reasons */
+            reasons: string[];
+            /** Curatable */
+            curatable: {
+                [key: string]: string[];
+            };
+            /** Transformations */
+            transformations: string[];
         };
         /** CurrentStateResponse */
         CurrentStateResponse: {
@@ -4599,6 +4969,19 @@ export interface components {
              */
             include_names: boolean;
             /**
+             * View
+             * @description Effective (curated) values, the default, or the original canonical values (positions and measurements; architecture 28.13, decision D83)
+             * @default effective
+             * @enum {string}
+             */
+            view: "effective" | "original";
+            /**
+             * Curation Metadata
+             * @description Add is_curated, curated_fields, curation_reason, original and effective time and value, curated_by, curated_at and curation_job_id columns
+             * @default false
+             */
+            curation_metadata: boolean;
+            /**
              * Bucket
              * @description Ladder key, `all`, or empty for automatic
              */
@@ -5058,6 +5441,10 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Stale At */
+            stale_at?: string | null;
+            /** Stale Reason */
+            stale_reason?: string | null;
             /** Request */
             request: {
                 [key: string]: unknown;
@@ -5124,6 +5511,10 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Stale At */
+            stale_at?: string | null;
+            /** Stale Reason */
+            stale_reason?: string | null;
         };
         /** IntegrationDetail */
         IntegrationDetail: {
@@ -5388,6 +5779,123 @@ export interface components {
              */
             mail_sent: boolean;
         };
+        /** JobCreate */
+        JobCreate: {
+            /** Target Type */
+            target_type: string;
+            /** Device Ids */
+            device_ids?: string[];
+            /** Entity Ids */
+            entity_ids?: string[];
+            /** Metric Keys */
+            metric_keys?: string[];
+            /**
+             * Time From
+             * Format: date-time
+             */
+            time_from: string;
+            /**
+             * Time To
+             * Format: date-time
+             */
+            time_to: string;
+            transformation: components["schemas"]["TransformationIn"];
+            /** Reason Code */
+            reason_code: string;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Replay Rules
+             * @description Run the rule replay over the corrected window as a report
+             * @default false
+             */
+            replay_rules: boolean;
+        };
+        /** JobRead */
+        JobRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Status */
+            status: string;
+            /** Target Type */
+            target_type: string;
+            /** Device Ids */
+            device_ids: string[];
+            /** Entity Ids */
+            entity_ids: string[];
+            /** Metric Keys */
+            metric_keys: string[];
+            /**
+             * Time From
+             * Format: date-time
+             */
+            time_from: string;
+            /**
+             * Time To
+             * Format: date-time
+             */
+            time_to: string;
+            /** Transformation */
+            transformation: {
+                [key: string]: unknown;
+            };
+            /** Reason Code */
+            reason_code: string;
+            /** Comment */
+            comment: string | null;
+            /** Replay Rules */
+            replay_rules: boolean;
+            /** Preview */
+            preview: {
+                [key: string]: unknown;
+            };
+            /** Impact */
+            impact: {
+                [key: string]: unknown;
+            };
+            /** Affected Count */
+            affected_count: number;
+            /** Applied Count */
+            applied_count: number;
+            /** Reverted Count */
+            reverted_count: number;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /** Approved By User Id */
+            approved_by_user_id: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Applied By User Id */
+            applied_by_user_id: string | null;
+            /** Applied At */
+            applied_at: string | null;
+            /** Reverted By User Id */
+            reverted_by_user_id: string | null;
+            /** Reverted At */
+            reverted_at: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /**
          * Layout
          * @enum {string}
@@ -5415,6 +5923,29 @@ export interface components {
              * Format: date-time
              */
             time: string;
+            /**
+             * Original Time
+             * Format: date-time
+             * @description The record's key; equals time unless curated
+             */
+            original_time: string;
+            /**
+             * Original Value
+             * @description Set when the value is curated
+             */
+            original_value?: number | null;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+            /** Curated Fields */
+            curated_fields?: string[];
+            /**
+             * Curation Version
+             * @default 1
+             */
+            curation_version: number;
             /** Metric Key */
             metric_key: string;
             /** Value */
@@ -5646,6 +6177,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PageResponse[CorrectionRead] */
+        PageResponse_CorrectionRead_: {
+            /** Items */
+            items: components["schemas"]["CorrectionRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** PageResponse[DataSourceRead] */
         PageResponse_DataSourceRead_: {
             /** Items */
@@ -5744,6 +6282,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PageResponse[JobRead] */
+        PageResponse_JobRead_: {
+            /** Items */
+            items: components["schemas"]["JobRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** PageResponse[MeasurementRow] */
         PageResponse_MeasurementRow_: {
             /** Items */
@@ -5814,8 +6359,15 @@ export interface components {
             /**
              * Time
              * Format: date-time
+             * @description The effective time (architecture 28.1)
              */
             time: string;
+            /**
+             * Original Time
+             * Format: date-time
+             * @description The record's key; equals time unless curated
+             */
+            original_time: string;
             /**
              * Ingested At
              * Format: date-time
@@ -5856,6 +6408,25 @@ export interface components {
             };
             /** Trace Id */
             trace_id: string | null;
+            /**
+             * Original Geometry
+             * @description Set when the coordinates are curated
+             */
+            original_geometry?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+            /** Curated Fields */
+            curated_fields?: string[];
+            /**
+             * Curation Version
+             * @default 1
+             */
+            curation_version: number;
         };
         /**
          * ProcessingStatus
@@ -6049,6 +6620,37 @@ export interface components {
             frequency_hz: number | null;
             /** Channel */
             channel: number | null;
+        };
+        /**
+         * RecordHistory
+         * @description A record's effective and original values with every correction on it.
+         */
+        RecordHistory: {
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: number;
+            /**
+             * Target Time
+             * Format: date-time
+             */
+            target_time: string;
+            /** Effective */
+            effective: {
+                [key: string]: unknown;
+            };
+            /** Original */
+            original: {
+                [key: string]: unknown;
+            };
+            /** Curated Fields */
+            curated_fields: string[];
+            /** Valid */
+            valid: boolean;
+            /** Curation Version */
+            curation_version: number;
+            /** Corrections */
+            corrections: components["schemas"]["CorrectionRead"][];
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -6746,6 +7348,31 @@ export interface components {
             } | null;
             /** Receptions */
             receptions: components["schemas"]["ReceptionRead"][];
+        };
+        /** TransformationIn */
+        TransformationIn: {
+            /** Kind */
+            kind: string;
+            /**
+             * Seconds
+             * @default 0
+             */
+            seconds: number;
+            /**
+             * Valid
+             * @default false
+             */
+            valid: boolean;
+            /**
+             * Delta
+             * @default 0
+             */
+            delta: number;
+            /**
+             * Factor
+             * @default 1
+             */
+            factor: number;
         };
         /** UnknownIdentity */
         UnknownIdentity: {
@@ -10229,6 +10856,8 @@ export interface operations {
                 from?: string | null;
                 to?: string | null;
                 limit?: number;
+                /** @description Also rows marked invalid by curation */
+                include_invalid?: boolean;
             };
             header?: never;
             path: {
@@ -10609,6 +11238,8 @@ export interface operations {
                 data_source_id?: string | null;
                 from?: string | null;
                 to?: string | null;
+                /** @description Also rows marked invalid by curation */
+                include_invalid?: boolean;
                 limit?: number;
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
@@ -10896,6 +11527,10 @@ export interface operations {
                 timezone?: string;
                 /** @description Entity, device and metric names as columns */
                 include_names?: boolean;
+                /** @description Effective (curated) values, the default, or the original canonical values (positions and measurements; architecture 28.13, decision D83) */
+                view?: "effective" | "original";
+                /** @description Add is_curated, curated_fields, curation_reason, original and effective time and value, curated_by, curated_at and curation_job_id columns */
+                curation_metadata?: boolean;
                 /** @description Ladder key, `all`, or empty for automatic */
                 bucket?: string | null;
                 aggregates?: components["schemas"]["Aggregate"][];
@@ -12954,6 +13589,481 @@ export interface operations {
             };
         };
     };
+    summary_api_v1_projects__project_id__curation_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurationSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_corrections_api_v1_projects__project_id__curation_corrections_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                target_type?: string | null;
+                device_id?: string | null;
+                job_id?: string | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_CorrectionRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_correction_api_v1_projects__project_id__curation_corrections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_history_api_v1_projects__project_id__curation_history_get: {
+        parameters: {
+            query: {
+                target_type: string;
+                target_id: number;
+                target_time: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_correction_api_v1_projects__project_id__curation_corrections__correction_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                correction_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_correction_api_v1_projects__project_id__curation_corrections__correction_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                correction_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_one_api_v1_projects__project_id__curation_corrections__correction_id__revert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                correction_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionRevert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_jobs_api_v1_projects__project_id__curation_jobs_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_JobRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_job_api_v1_projects__project_id__curation_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_v1_projects__project_id__curation_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_job_api_v1_projects__project_id__curation_jobs__job_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_job_api_v1_projects__project_id__curation_jobs__job_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_job_api_v1_projects__project_id__curation_jobs__job_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_job_api_v1_projects__project_id__curation_jobs__job_id__revert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionRevert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_log_files_api_v1_devices__device_id__log_files_get: {
         parameters: {
             query?: {
@@ -13290,6 +14400,8 @@ export interface operations {
                 integration_id?: string | null;
                 status?: components["schemas"]["DeliveryStatus"] | null;
                 object_type?: string | null;
+                /** @description Only deliveries a curation made stale */
+                stale?: boolean | null;
                 limit?: number;
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
@@ -13355,6 +14467,38 @@ export interface operations {
         };
     };
     retry_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                delivery_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationDeliveryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__resend_post: {
         parameters: {
             query?: never;
             header?: never;

@@ -15,6 +15,7 @@ import {
   ListTree,
   Map as MapIcon,
   PawPrint,
+  PenLine,
   Plug,
   Radio,
   Ruler,
@@ -59,6 +60,7 @@ export const projectSections: NavSection[] = [
     items: [
       { label: "Data explorer", icon: ChartLine, to: "analyze/explorer" },
       { label: "Exports", icon: FileClock, to: "analyze/exports" },
+      { label: "Curation", icon: PenLine, to: "analyze/curation" },
     ],
   },
   {

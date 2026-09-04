@@ -1,9 +1,11 @@
-"""Export service: consumes `export.requested`, runs the job, stores the result in MinIO."""
+"""Export service: consumes `export.requested`, runs the job, stores the result in MinIO. It is
+also the batch worker for curation jobs (`curation.job_requested`, architecture 28.5)."""
 
 import asyncio
 import uuid
 
 from shared.bus import Message, Topic
+from shared.curation.jobs import run_job
 from shared.database import session_scope
 from shared.exports.runner import run_export
 from shared.logger import get_logger
@@ -26,7 +28,11 @@ def build_worker() -> Worker:
             await run_export(session, job)
         log.info("export finished", job_id=str(job_id))
 
+    async def on_curation(message: Message) -> None:
+        await run_job(worker.bus, message.payload)
+
     worker.subscribe(Topic.EXPORT_REQUESTED, handle)
+    worker.subscribe(Topic.CURATION_JOB_REQUESTED, on_curation)
     return worker
 
 

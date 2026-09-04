@@ -29,6 +29,7 @@ from shared.analytics import (
     choose_resolution,
     whole_range,
 )
+from shared.curation.effective import effective_time, in_window, visible
 from shared.database import get_session
 from shared.enums import ValueType
 from shared.models import Entity, Measurement, Metric, SavedView
@@ -71,6 +72,11 @@ class SeriesResponse(BaseModel):
 class MeasurementRow(BaseModel):
     id: int
     time: datetime
+    original_time: datetime = Field(description="The record's key; equals time unless curated")
+    original_value: float | None = Field(default=None, description="Set when the value is curated")
+    valid: bool = True
+    curated_fields: list[str] = Field(default_factory=list)
+    curation_version: int = 1
     metric_key: str
     value: float | bool | str | dict[str, Any] | None
     device_id: uuid.UUID
@@ -274,19 +280,22 @@ async def rows(
     data_source_id: uuid.UUID | None = None,
     time_from: datetime | None = Query(None, alias="from"),
     time_to: datetime | None = Query(None, alias="to"),
+    include_invalid: bool = Query(False, description="Also rows marked invalid by curation"),
     page: Page = Depends(page),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[MeasurementRow]:
     """Normalized measurement rows behind a bucket: the drill-down from an aggregate. Each row
-    carries its source event and trace, so the next step down is the source event detail."""
+    carries its source event and trace, so the next step down is the source event detail.
+    Values and times are the effective ones; curated rows say so (architecture 28.12)."""
     frm, to = _window(time_from, time_to, DEFAULT_RANGE)
     statement = select(Measurement).where(
         Measurement.project_id == context.project.id,
         Measurement.metric_key == metric,
-        Measurement.time >= frm,
-        Measurement.time < to,
+        in_window(Measurement, frm, to),
     )
+    if not include_invalid:
+        statement = statement.where(visible(Measurement))
     if entity_id is not None:
         statement = statement.where(Measurement.entity_id == entity_id)
     if device_id is not None:
@@ -299,7 +308,9 @@ async def rows(
 
 def _row(m: Measurement) -> MeasurementRow:
     value: float | bool | str | dict[str, Any] | None
-    if m.value_num is not None:
+    if m.curated_value_num is not None:
+        value = m.curated_value_num
+    elif m.value_num is not None:
         value = m.value_num
     elif m.value_bool is not None:
         value = m.value_bool
@@ -309,7 +320,12 @@ def _row(m: Measurement) -> MeasurementRow:
         value = m.value_json
     return MeasurementRow(
         id=m.id,
-        time=m.time,
+        time=m.curated_time or m.time,
+        original_time=m.time,
+        original_value=m.value_num if m.curated_value_num is not None else None,
+        valid=m.valid,
+        curated_fields=list(m.curated_fields or []),
+        curation_version=m.curation_version,
         metric_key=m.metric_key,
         value=value,
         device_id=m.device_id,
@@ -335,13 +351,13 @@ async def metrics_with_data(
         select(
             Measurement.metric_key,
             func.count().label("count"),
-            func.min(Measurement.time).label("first_time"),
-            func.max(Measurement.time).label("last_time"),
+            func.min(effective_time(Measurement)).label("first_time"),
+            func.max(effective_time(Measurement)).label("last_time"),
         )
         .where(
             Measurement.project_id == context.project.id,
-            Measurement.time >= frm,
-            Measurement.time < to,
+            in_window(Measurement, frm, to),
+            visible(Measurement),
         )
         .group_by(Measurement.metric_key)
         .subquery()

@@ -136,6 +136,11 @@ class IntegrationDelivery(UuidPrimaryKeyMixin, Base):
     )
     last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    stale_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="Set when a curation changed the object after it was sent (architecture 28.10)",
+    )
+    stale_reason: Mapped[str | None] = mapped_column(String(128))
     external_id: Mapped[str | None] = mapped_column(
         String(256), comment="The target's id for the sent object, when it returns one"
     )

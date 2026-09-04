@@ -6,13 +6,14 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.users import current_active_user
 from protect_api.crud import geom_to_geojson
 from protect_api.deps import ProjectContext, accessible_project_ids, require_permission
+from shared.curation.effective import effective_time, in_window, visible
 from shared.database import get_session
 from shared.models import ApplicationError as ApplicationErrorRow
 from shared.models import (
@@ -33,7 +34,8 @@ MAX_POSITIONS = 1000
 
 class PositionRead(BaseModel):
     id: int
-    time: datetime
+    time: datetime = Field(description="The effective time (architecture 28.1)")
+    original_time: datetime = Field(description="The record's key; equals time unless curated")
     ingested_at: datetime
     device_id: uuid.UUID
     project_id: uuid.UUID | None
@@ -49,6 +51,12 @@ class PositionRead(BaseModel):
     satellites: int | None
     attributes: dict[str, Any]
     trace_id: uuid.UUID | None
+    original_geometry: dict[str, Any] | None = Field(
+        default=None, description="Set when the coordinates are curated"
+    )
+    valid: bool = True
+    curated_fields: list[str] = Field(default_factory=list)
+    curation_version: int = 1
 
 
 class DeliveryRead(BaseModel):
@@ -139,9 +147,11 @@ class TraceRead(BaseModel):
 
 
 def position_read(position: Position) -> PositionRead:
+    curated_geom = position.curated_geom
     return PositionRead(
         id=position.id,
-        time=position.time,
+        time=position.curated_time or position.time,
+        original_time=position.time,
         ingested_at=position.ingested_at,
         device_id=position.device_id,
         project_id=position.project_id,
@@ -149,7 +159,11 @@ def position_read(position: Position) -> PositionRead:
         data_source_id=position.data_source_id,
         source_event_id=position.source_event_id,
         record_type=position.record_type,
-        geometry=geom_to_geojson(position.geom),
+        geometry=geom_to_geojson(curated_geom if curated_geom is not None else position.geom),
+        original_geometry=geom_to_geojson(position.geom) if curated_geom is not None else None,
+        valid=position.valid,
+        curated_fields=list(position.curated_fields or []),
+        curation_version=position.curation_version,
         altitude_m=position.altitude_m,
         speed_mps=position.speed_mps,
         heading_deg=position.heading_deg,
@@ -167,23 +181,24 @@ async def list_positions(
     time_from: datetime | None = Query(None, alias="from"),
     time_to: datetime | None = Query(None, alias="to"),
     limit: int = Query(500, ge=1, le=MAX_POSITIONS),
+    include_invalid: bool = Query(False, description="Also rows marked invalid by curation"),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> list[PositionRead]:
     """Positions attributed to the project, newest first, within a time window (default the last
-    24 hours) and a row limit."""
+    24 hours) and a row limit. Times and coordinates are the effective ones (architecture 28)."""
     time_to = require_aware(time_to) if time_to else utc_now()
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
     statement = select(Position).where(
-        Position.project_id == context.project.id,
-        Position.time >= time_from,
-        Position.time < time_to,
+        Position.project_id == context.project.id, in_window(Position, time_from, time_to)
     )
+    if not include_invalid:
+        statement = statement.where(visible(Position))
     if device_id is not None:
         statement = statement.where(Position.device_id == device_id)
     if entity_id is not None:
         statement = statement.where(Position.entity_id == entity_id)
-    rows = await session.scalars(statement.order_by(Position.time.desc()).limit(limit))
+    rows = await session.scalars(statement.order_by(effective_time(Position).desc()).limit(limit))
     return [position_read(r) for r in rows]
 
 

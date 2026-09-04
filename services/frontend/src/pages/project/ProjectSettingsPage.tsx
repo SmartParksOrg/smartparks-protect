@@ -14,23 +14,24 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatTime } from "@/lib/format";
 
-const schema = z.object({ name: z.string().min(1).max(200), description: z.string().optional(), timezone: z.string().min(1) });
+const schema = z.object({ name: z.string().min(1).max(200), description: z.string().optional(), timezone: z.string().min(1), curation_requires_approval: z.boolean() });
 type Values = z.infer<typeof schema>;
 
 export function ProjectSettingsPage() {
   const { projectId = "" } = useParams();
   const project = useQuery({ queryKey: queryKeys.project(projectId), queryFn: () => api.get<Project>(`/api/v1/projects/${projectId}`) });
   const audit = useQuery({ queryKey: queryKeys.audit(projectId), queryFn: () => api.get<AuditEntry[]>(`/api/v1/projects/${projectId}/audit`, { query: { limit: 50 } }) });
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", description: "", timezone: "UTC" } });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", description: "", timezone: "UTC", curation_requires_approval: false } });
   useEffect(() => {
-    if (project.data) form.reset({ name: project.data.name, description: project.data.description ?? "", timezone: project.data.timezone });
+    if (project.data) form.reset({ name: project.data.name, description: project.data.description ?? "", timezone: project.data.timezone, curation_requires_approval: Boolean((project.data.settings as Record<string, unknown>)?.curation_requires_approval) });
   }, [project.data, form]);
   const save = useMutationToast({
-    mutationFn: (values: Values) => api.patch<Project>(`/api/v1/projects/${projectId}`, { body: { ...values, description: values.description || null } }),
+    mutationFn: (values: Values) => api.patch<Project>(`/api/v1/projects/${projectId}`, { body: { name: values.name, timezone: values.timezone, description: values.description || null, settings: { ...(project.data?.settings ?? {}), curation_requires_approval: values.curation_requires_approval } } }),
     invalidate: [queryKeys.project(projectId), queryKeys.projects],
     success: "Project saved",
     onError: (error) => form.setError("root", { message: error.message }),
@@ -46,6 +47,7 @@ export function ProjectSettingsPage() {
               <Field label="Name" htmlFor="name" error={form.formState.errors.name?.message}><Input id="name" {...form.register("name")} /></Field>
               <Field label="Description" htmlFor="description"><Textarea id="description" rows={3} {...form.register("description")} /></Field>
               <Field label="Timezone" htmlFor="timezone" hint="IANA name, used for display and exports" error={form.formState.errors.timezone?.message}><Input id="timezone" {...form.register("timezone")} /></Field>
+              <div className="flex items-start gap-2"><Switch id="curation-approval" checked={form.watch("curation_requires_approval")} onCheckedChange={(v) => form.setValue("curation_requires_approval", v)} /><label htmlFor="curation-approval" className="text-sm">Corrections need approval<span className="block text-xs text-muted-foreground">Data corrections and bulk jobs stay pending until a second person with the approve permission accepts them.</span></label></div>
               {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
               <Button type="submit" disabled={save.isPending}>Save</Button>
             </form>

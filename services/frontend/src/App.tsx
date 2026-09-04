@@ -17,6 +17,7 @@ const TrafficPage = lazy(() => import("@/pages/project/TrafficPage").then((m) =>
 const TracesPage = lazy(() => import("@/pages/project/TracesPage").then((m) => ({ default: m.TracesPage })));
 const ExplorerPage = lazy(() => import("@/pages/project/ExplorerPage").then((m) => ({ default: m.ExplorerPage })));
 const ExportsPage = lazy(() => import("@/pages/project/ExportsPage").then((m) => ({ default: m.ExportsPage })));
+const CurationPage = lazy(() => import("@/pages/project/CurationPage").then((m) => ({ default: m.CurationPage })));
 const MembersPage = lazy(() => import("@/pages/project/MembersPage").then((m) => ({ default: m.MembersPage })));
 const FeaturesPage = lazy(() => import("@/pages/project/FeaturesPage").then((m) => ({ default: m.FeaturesPage })));
 const ProjectSettingsPage = lazy(() => import("@/pages/project/ProjectSettingsPage").then((m) => ({ default: m.ProjectSettingsPage })));
@@ -77,6 +78,7 @@ export default function App() {
               <Route path="admin/notifications" element={<NotificationsPage />} />
               <Route path="analyze/explorer" element={<ExplorerPage />} />
               <Route path="analyze/exports" element={<ExportsPage />} />
+              <Route path="analyze/curation" element={<CurationPage />} />
               <Route path="network/traffic" element={<TrafficPage />} />
               <Route path="network/gateways" element={<GatewaysPage />} />
               <Route path="integrate/integrations" element={<IntegrationsPage />} />

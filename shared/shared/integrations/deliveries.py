@@ -216,9 +216,14 @@ async def load_item(session: AsyncSession, delivery: IntegrationDelivery) -> Del
             position.entity_id,
             position.data_source_id,
         )
-        item.location = _point(position.geom)
+        item.time = position.curated_time or position.time
+        item.location = _point(
+            position.curated_geom if position.curated_geom is not None else position.geom
+        )
         item.data = {
             "record_type": position.record_type,
+            "curated_fields": list(position.curated_fields or []),
+            "curation_version": position.curation_version,
             "altitude_m": position.altitude_m,
             "speed_mps": position.speed_mps,
             "heading_deg": position.heading_deg,
@@ -254,7 +259,12 @@ async def load_item(session: AsyncSession, delivery: IntegrationDelivery) -> Del
             measurement.entity_id,
             measurement.data_source_id,
         )
-        value: Any = measurement.value_num
+        item.time = measurement.curated_time or measurement.time
+        value: Any = (
+            measurement.curated_value_num
+            if measurement.curated_value_num is not None
+            else measurement.value_num
+        )
         if value is None:
             value = measurement.value_bool
         if value is None:
@@ -455,6 +465,38 @@ def _position_ref(row: Position) -> ObjectRef:
         entity_id=row.entity_id,
         device_id=row.device_id,
     )
+
+
+async def curated_ref(session: AsyncSession, delivery: IntegrationDelivery) -> ObjectRef | None:
+    """The delivered object as it is now: effective time and the current curation version, so a
+    resend after a correction is a new idempotency key (architecture 28.10, decision D82)."""
+    if delivery.object_type == IntegrationObjectType.POSITION:
+        position = await session.scalar(
+            select(Position).where(
+                Position.id == int(delivery.object_id), Position.time == delivery.object_time
+            )
+        )
+        if position is None:
+            return None
+        ref = _position_ref(position)
+        ref.time = position.curated_time or position.time
+        ref.object_version = int(position.curation_version or 1)
+        return ref
+    if delivery.object_type == IntegrationObjectType.MEASUREMENT:
+        measurement = await session.scalar(
+            select(Measurement).where(
+                Measurement.id == int(delivery.object_id),
+                Measurement.time == delivery.object_time,
+            )
+        )
+        if measurement is None:
+            return None
+        ref = measurement_ref(measurement)
+        ref.time = measurement.curated_time or measurement.time
+        ref.object_version = int(measurement.curation_version or 1)
+        return ref
+    event = await session.get(Event, uuid.UUID(delivery.object_id))
+    return event_ref(event) if event is not None else None
 
 
 def event_ref(row: Event) -> ObjectRef:

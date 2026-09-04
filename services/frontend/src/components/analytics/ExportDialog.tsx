@@ -54,6 +54,8 @@ function ExportForm({ projectId, preset, onDone }: { projectId: string; preset?:
   const [layout, setLayout] = useState<"long" | "wide">(preset?.layout ?? "long");
   const [timezone, setTimezone] = useState(preset?.timezone ?? browserTimezone());
   const [includeNames, setIncludeNames] = useState(true);
+  const [view, setView] = useState<"effective" | "original">("effective");
+  const [curationMeta, setCurationMeta] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
@@ -82,6 +84,7 @@ function ExportForm({ projectId, preset, onDone }: { projectId: string; preset?:
       metric_keys: dataset === "positions" || dataset === "source_events" ? [] : metricKeys,
       timezone,
       include_names: includeNames,
+      ...(dataset === "positions" || dataset === "measurements" ? { view, curation_metadata: curationMeta } : {}),
       ...(dataset === "aggregates" ? { bucket: bucket === "auto" ? null : bucket, aggregates, layout } : {}),
     };
   }
@@ -182,6 +185,17 @@ function ExportForm({ projectId, preset, onDone }: { projectId: string; preset?:
         </div>
       </div>
       {error && <Callout kind="error">{error}</Callout>}
+      {(dataset === "positions" || dataset === "measurements") && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Values" htmlFor="export-view" hint="Effective is what maps and charts show; original is the value as decoded (architecture 28.13)">
+            <Select value={view} onValueChange={(v) => setView(v as "effective" | "original")}>
+              <SelectTrigger id="export-view"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="effective">effective (curated)</SelectItem><SelectItem value="original">original canonical</SelectItem></SelectContent>
+            </Select>
+          </Field>
+          <div className="flex items-center gap-2 pt-6"><Switch id="curation-meta" checked={curationMeta} onCheckedChange={setCurationMeta} /><label htmlFor="curation-meta" className="text-sm">Curation metadata columns</label></div>
+        </div>
+      )}
       <DialogFooter className="gap-2 sm:justify-between">
         <Button variant="outline" onClick={() => void downloadNow()} disabled={downloading}><Download className="size-4" /> {downloading ? "Preparing…" : "Download now"}</Button>
         <Button onClick={() => { const p = parameters(); if (p) queue.mutate(p); }} disabled={queue.isPending}><ListPlus className="size-4" /> Queue as job</Button>

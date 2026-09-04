@@ -6,6 +6,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -39,6 +40,16 @@ class ExportParameters(BaseModel):
     timezone: str = Field(default="UTC", description="IANA name; times are written in this zone")
     include_names: bool = Field(
         default=True, description="Entity, device and metric names as columns"
+    )
+    view: Literal["effective", "original"] = Field(
+        default="effective",
+        description="Effective (curated) values, the default, or the original canonical values "
+        "(positions and measurements; architecture 28.13, decision D83)",
+    )
+    curation_metadata: bool = Field(
+        default=False,
+        description="Add is_curated, curated_fields, curation_reason, original and effective "
+        "time and value, curated_by, curated_at and curation_job_id columns",
     )
     # aggregates only
     bucket: str | None = Field(

@@ -48,6 +48,8 @@ class Topic:
     EXPORT_REQUESTED = "export.requested"
     INTEGRATION_BACKFILL_REQUESTED = "integration.backfill_requested"
     LOG_FILE_UPLOADED = "log_file.uploaded"
+    CURATION_JOB_REQUESTED = "curation.job_requested"
+    CURATION_APPLIED = "curation.applied"
 
 
 SCHEMA_VERSION = 1

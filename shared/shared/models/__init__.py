@@ -12,6 +12,7 @@ from shared.models.analytics import ExportJob, SavedView
 from shared.models.backup import BackupRun
 from shared.models.base import Base
 from shared.models.control import Command, CommandExecution
+from shared.models.curation import CurationJob, DataCorrection
 from shared.models.domain import (
     DataSource,
     DataSourceProjectScope,
@@ -65,6 +66,8 @@ __all__ = [
     "Command",
     "CommandExecution",
     "ConnectivityState",
+    "CurationJob",
+    "DataCorrection",
     "DataSource",
     "DataSourceCursor",
     "DataSourceProjectScope",

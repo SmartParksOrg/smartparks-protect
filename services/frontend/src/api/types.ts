@@ -74,6 +74,10 @@ export type DriverCatalog = Schemas["DriverCatalog"];
 export type RouteOption = Schemas["RouteOptionRead"];
 export type BrowserResult = Schemas["BrowserResult"];
 export type DeliveryDetail = Schemas["DeliveryDetail"];
+export type Correction = Schemas["CorrectionRead"];
+export type CurationJob = Schemas["JobRead"];
+export type CurationSummary = Schemas["CurationSummary"];
+export type RecordHistory = Schemas["RecordHistory"];
 
 export interface Page<T> {
   items: T[];
