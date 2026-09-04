@@ -4,6 +4,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+## v0.3.0, 2026-09-04
+
 Rules, events, alerts, automations and notifications (phase 5).
 
 ### Added
