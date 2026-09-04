@@ -18,12 +18,14 @@ import {
   Radio,
   Ruler,
   ScrollText,
+  Send,
   Settings2,
   Shield,
   SlidersHorizontal,
   TriangleAlert,
   Users,
   Waypoints,
+  Workflow,
 } from "lucide-react";
 
 export interface NavItem {
@@ -48,7 +50,7 @@ export const projectSections: NavSection[] = [
       { label: "Live map", icon: MapIcon, to: "map" },
       { label: "Entities", icon: PawPrint, to: "entities" },
       { label: "Devices", icon: Cpu, to: "devices" },
-      { label: "Alerts", icon: Bell, phase: 5 },
+      { label: "Alerts", icon: Bell, to: "alerts" },
     ],
   },
   {
@@ -69,8 +71,9 @@ export const projectSections: NavSection[] = [
   {
     label: "Rules",
     items: [
-      { label: "Rules", icon: GitBranch, phase: 5 },
-      { label: "Events", icon: Activity, phase: 5 },
+      { label: "Rules", icon: GitBranch, to: "rules" },
+      { label: "Events", icon: Activity, to: "rules/events" },
+      { label: "Automations", icon: Workflow, to: "rules/automations", adminOnly: true },
     ],
   },
   {
@@ -86,6 +89,7 @@ export const projectSections: NavSection[] = [
     items: [
       { label: "Members", icon: Users, to: "admin/members", adminOnly: true },
       { label: "Features", icon: Layers, to: "admin/features", adminOnly: true },
+      { label: "Notifications", icon: Send, to: "admin/notifications", adminOnly: true },
       { label: "Settings", icon: Settings2, to: "admin/settings", adminOnly: true },
     ],
   },
@@ -97,6 +101,9 @@ export const serverSections: NavSection[] = [
     items: [
       { label: "Needs attention", icon: TriangleAlert, to: "/admin/attention", serverAdminOnly: true },
       { label: "System health", icon: Shield, to: "/admin/health", serverAdminOnly: true },
+      { label: "System alerts", icon: Bell, to: "/admin/alerts", serverAdminOnly: true },
+      { label: "Automations", icon: Workflow, to: "/admin/automations", serverAdminOnly: true },
+      { label: "Notifications", icon: Send, to: "/admin/notifications", serverAdminOnly: true },
       { label: "Projects", icon: Boxes, to: "/admin/projects", serverAdminOnly: true },
       { label: "Users", icon: Users, to: "/admin/users", serverAdminOnly: true },
       { label: "Devices", icon: Cpu, to: "/admin/devices", serverAdminOnly: true },

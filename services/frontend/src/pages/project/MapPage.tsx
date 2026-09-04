@@ -2,20 +2,21 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Layers, X } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { CurrentState, Feature, Page as PageType, Track } from "@/api/types";
 import { Icon } from "@/components/icons/Icon";
 import { type BasemapKey, BASEMAPS, loadBasemap, saveBasemap } from "@/components/map/basemap";
-import { type EntityFeatureProperties, ensureEntityLayers, ensureFeatureLayers, ensureTrackLayers, setEntities, setFeatures, setTrack, SOURCES } from "@/components/map/layers";
+import { type EntityFeatureProperties, ensureEntityLayers, ensureEventLayers, ensureFeatureLayers, ensureTrackLayers, setEntities, setEvents, setFeatures, setTrack, SOURCES } from "@/components/map/layers";
 import { useMap } from "@/components/map/useMap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { formatAgo, formatTime } from "@/lib/format";
+import { EventDetailDialog } from "@/pages/project/EventsPage";
 import { useProjectStore } from "@/stores/project";
 
 interface CurrentFeature {
@@ -41,12 +42,15 @@ export function MapPage() {
   const container = useRef<HTMLDivElement | null>(null);
   const { mapRef, ready } = useMap(container, basemap, [31.5, -24.9], 6);
   const client = useQueryClient();
+  const navigate = useNavigate();
+  const selectedEvent = params.get("event");
   const setLast = useProjectStore((s) => s.setLastProjectId);
   useEffect(() => setLast(projectId), [projectId, setLast]);
 
   const current = useQuery({ queryKey: queryKeys.currentState(projectId), queryFn: () => api.get<CurrentState>(`/api/v1/projects/${projectId}/map/current`), refetchInterval: 60_000 });
   const currentFeatures = current.data?.features as unknown as CurrentFeature[] | undefined;
   const features = useQuery({ queryKey: queryKeys.features(projectId), queryFn: () => api.get<PageType<Feature>>(`/api/v1/projects/${projectId}/features`, { query: { limit: 500 } }) });
+  const events = useQuery({ queryKey: queryKeys.mapEvents(projectId, 24), queryFn: () => api.get<GeoJSON.FeatureCollection>(`/api/v1/projects/${projectId}/map/events`, { query: { hours: 24, limit: 500 } }), refetchInterval: 120_000 });
   const trackQuery = useMemo(() => ({ entity_id: selectedId, hours: trackHours, max_points: 5000 }), [selectedId, trackHours]);
   const track = useQuery({
     queryKey: queryKeys.track(projectId, trackQuery),
@@ -83,6 +87,10 @@ export function MapPage() {
       });
       if (message.entity_id === selectedId) void client.invalidateQueries({ queryKey: queryKeys.track(projectId, trackQuery) });
     }
+    if (message.topic === "event.created" || message.topic === "alert.created") {
+      void client.invalidateQueries({ queryKey: queryKeys.mapEvents(projectId, 24) });
+      void client.invalidateQueries({ queryKey: queryKeys.currentState(projectId) });
+    }
   });
 
   // layers
@@ -95,7 +103,14 @@ export function MapPage() {
     });
     ensureFeatureLayers(map);
     ensureTrackLayers(map);
-  }, [mapRef, ready, select]);
+    ensureEventLayers(map, (props) => setParams((p) => { p.set("event", props.event_id); return p; }, { replace: true }));
+  }, [mapRef, ready, select, setParams]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !events.data) return;
+    void setEvents(map, events.data.features);
+  }, [mapRef, ready, events.data]);
 
   const fitted = useRef(false);
   useEffect(() => {
@@ -134,6 +149,7 @@ export function MapPage() {
           <SelectContent>{Object.entries(BASEMAPS).map(([key, b]) => <SelectItem key={key} value={key}>{b.label}</SelectItem>)}</SelectContent>
         </Select>
         {current.data && <Badge variant="secondary" className="bg-card">{current.data.total} entities{current.data.use_tiles ? ", tiles" : ""}</Badge>}
+        {events.data && events.data.features.length > 0 && <Badge variant="secondary" className="bg-card cursor-pointer" onClick={() => void navigate(`/projects/${projectId}/rules/events`)}>{events.data.features.length} events, 24 h</Badge>}
       </div>
       {selected && (
         <aside className="absolute bottom-3 left-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80">
@@ -149,7 +165,7 @@ export function MapPage() {
             <dt className="text-muted-foreground">Last seen</dt><dd title={formatTime(selected.last_seen_at)}>{formatAgo(selected.last_seen_at)}</dd>
             <dt className="text-muted-foreground">Position</dt><dd>{formatTime(selected.position_time)}</dd>
             <dt className="text-muted-foreground">Device</dt><dd>{selected.device_id ? <Link className="underline" to={`/projects/${projectId}/devices/${selected.device_id}`}>open device</Link> : "none"}</dd>
-            <dt className="text-muted-foreground">Alerts</dt><dd>{selected.active_alert_count}</dd>
+            <dt className="text-muted-foreground">Alerts</dt><dd>{selected.active_alert_count > 0 ? <Link className="underline" to={`/projects/${projectId}/alerts`}>{selected.active_alert_count} open</Link> : "none"}</dd>
           </dl>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Select value={String(trackHours)} onValueChange={(v) => setParams((p) => { if (v === "0") p.delete("track"); else p.set("track", v); return p; }, { replace: true })}>
@@ -160,6 +176,7 @@ export function MapPage() {
           </div>
         </aside>
       )}
+      <EventDetailDialog scope={projectId} eventId={selectedEvent} onClose={() => setParams((p) => { p.delete("event"); return p; }, { replace: true })} />
     </div>
   );
 }

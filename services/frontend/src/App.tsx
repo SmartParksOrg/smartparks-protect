@@ -6,7 +6,6 @@ import { RequireAuth, RequireServerAdmin } from "@/components/layout/RequireAuth
 import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/auth/PasswordPages";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
-import { ComingSoonPage } from "@/pages/ComingSoonPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 
@@ -31,6 +30,14 @@ const DeviceTypesPage = lazy(() => import("@/pages/admin/CatalogPages").then((m)
 const EntityTypesPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.EntityTypesPage })));
 const MetricsPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.MetricsPage })));
 const AuditPage = lazy(() => import("@/pages/admin/AuditPage").then((m) => ({ default: m.AuditPage })));
+const RulesPage = lazy(() => import("@/pages/project/RulesPage").then((m) => ({ default: m.RulesPage })));
+const EventsPage = lazy(() => import("@/pages/project/EventsPage").then((m) => ({ default: m.EventsPage })));
+const AlertsPage = lazy(() => import("@/pages/project/AlertsPage").then((m) => ({ default: m.AlertsPage })));
+const AutomationsPage = lazy(() => import("@/pages/project/AutomationsPage").then((m) => ({ default: m.AutomationsPage })));
+const NotificationsPage = lazy(() => import("@/pages/project/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
+const AdminAlertsPage = lazy(() => import("@/pages/project/AlertsPage").then((m) => ({ default: m.AdminAlertsPage })));
+const AdminAutomationsPage = lazy(() => import("@/pages/project/AutomationsPage").then((m) => ({ default: m.AdminAutomationsPage })));
+const AdminNotificationsPage = lazy(() => import("@/pages/project/NotificationsPage").then((m) => ({ default: m.AdminNotificationsPage })));
 
 function Loading() {
   return <div className="p-6 text-muted-foreground">Loading…</div>;
@@ -54,7 +61,11 @@ export default function App() {
               <Route path="entities" element={<EntitiesPage />} />
               <Route path="devices" element={<DevicesPage />} />
               <Route path="devices/:deviceId" element={<DevicePage />} />
-              <Route path="alerts" element={<ComingSoonPage title="Alerts" phase={5} />} />
+              <Route path="alerts" element={<AlertsPage />} />
+              <Route path="rules" element={<RulesPage />} />
+              <Route path="rules/events" element={<EventsPage />} />
+              <Route path="rules/automations" element={<AutomationsPage />} />
+              <Route path="admin/notifications" element={<NotificationsPage />} />
               <Route path="analyze/explorer" element={<ExplorerPage />} />
               <Route path="analyze/exports" element={<ExportsPage />} />
               <Route path="network/traffic" element={<TrafficPage />} />
@@ -67,6 +78,9 @@ export default function App() {
               <Route index element={<Navigate to="attention" replace />} />
               <Route path="attention" element={<AttentionPage />} />
               <Route path="health" element={<HealthPage />} />
+              <Route path="alerts" element={<AdminAlertsPage />} />
+              <Route path="automations" element={<AdminAutomationsPage />} />
+              <Route path="notifications" element={<AdminNotificationsPage />} />
               <Route path="projects" element={<AdminProjectsPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="devices" element={<AdminDevicesPage />} />

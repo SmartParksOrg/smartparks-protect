@@ -4,6 +4,25 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+Rules, events, alerts, automations and notifications (phase 5).
+
+### Added
+
+- Rules as versioned JSON documents (`shared/rules/schema.py`, ADR 0012): position, measurement, state and schedule triggers; threshold, geofence (enter, exit, inside, outside), no-data and window aggregate conditions with `all`, `any` and `not`; FOR duration; cooldown reminders; event template with severity and alert flag. Reserved condition types (`near`, `dwell`, `crossed`, `baseline`, `correlation`, `event_chain`) can be saved but not enabled. Six templates: geofence exit, geofence enter, speed limit inside an area, no data, battery low, possible immobility.
+- Rules service (`protect-rules`): a stateful evaluator on `position.created`, `measurement.created` and `device.state_changed`, a scheduler for schedule rules, per-subject state in `rule_state`, each rule in its own transaction with failures on `rules.last_error` and a failed trace, a compact trace per fired rule. System checks every five minutes open and auto-resolve system alerts for stale workers, dead letters and consumer lag.
+- Replay: test a saved version or a draft document over the project's history without side effects, bounded to 50,000 rows, 500 events and 5,000 schedule steps.
+- Events and alerts: project and server-level lists newest first with a time cursor, event detail with deliveries, alert acknowledge and resolve with a note (viewers may act, `alerts:write`), the entity's open alert count, recent events on the live map with the event marker family and a detail dialog.
+- Automation service (`protect-automation`): automations bind event types, severity, alert-only, entity and rule filters to actions; notify (email, Telegram) and signed webhook actions; one idempotent action delivery per action and event with attempts, response and trace; transient failures retried by the bus, stale events skipped by the automation's freshness bound; failed deliveries can be retried from the UI.
+- Notifications: channel-neutral `shared/notifications` (render, email with the development guard, Telegram Bot API, dispatch); notification targets per project and at server level; Telegram chats linked with a `/start <code>` handled by the automation service's bot poller (decision D43); test messages; capabilities endpoint.
+- Frontend: Rules (list, enable, editor with template picker, condition builder, JSON fallback, versions and test tab), Events, Alerts inbox, Automations with deliveries, Notification targets with the Telegram link dialog; server-admin pages for system alerts, automations and targets; events on the map.
+- Migration 0005: `rule_state`, `automations`, `notification_targets`, `action_deliveries`; `events.project_id` and `alerts.project_id` nullable for system events; `rules.last_fired_at` and `rules.last_error`.
+- Settings: `TELEGRAM_BOT_TOKEN`, `RULES_RELOAD_SECONDS`, `SYSTEM_CHECK_INTERVAL_SECONDS`; mail settings move to every Python service.
+
+### Changed
+
+- The API mailer sends through `shared.notifications.email`; the development guard lives there now.
+- Project viewers hold `alerts:write`.
+
 ## v0.2.0, 2026-09-03
 
 Analyze: the Data Explorer and exports as backend capabilities with their screens, the synthetic scale benchmark, and TimescaleDB confirmed at the decision gate.

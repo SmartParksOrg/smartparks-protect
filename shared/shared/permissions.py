@@ -20,6 +20,8 @@ class Permission(StrEnum):
     DEVICES_CONTROL_HIGH_IMPACT = "devices:control_high_impact"
     DATA_SOURCES_WRITE = "data_sources:write"
     RULES_WRITE = "rules:write"
+    ALERTS_WRITE = "alerts:write"
+    AUTOMATIONS_WRITE = "automations:write"
     INTEGRATIONS_WRITE = "integrations:write"
     DATA_CURATE = "data:curate"
     DATA_CURATE_BULK = "data:curate_bulk"
@@ -31,7 +33,12 @@ class Permission(StrEnum):
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.PROJECT_VIEWER: frozenset(
-        {Permission.PROJECT_READ, Permission.TRACES_READ, Permission.EXPORTS_CREATE}
+        {
+            Permission.PROJECT_READ,
+            Permission.TRACES_READ,
+            Permission.EXPORTS_CREATE,
+            Permission.ALERTS_WRITE,
+        }
     ),
     Role.PROJECT_ADMIN: frozenset(Permission),
 }

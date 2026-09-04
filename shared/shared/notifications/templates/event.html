@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <body style="font-family: system-ui, sans-serif; color: #1f2a24; max-width: 600px; margin: 0 auto; padding: 16px;">
+    <p style="margin: 0 0 8px; font-size: 12px; letter-spacing: 0.08em; color: {% if m.severity == 'critical' %}#A13D2D{% elif m.severity == 'warning' %}#8a6d1f{% else %}#52735E{% endif %};">{{ mark }}</p>
+    <h1 style="font-size: 20px; margin: 0 0 16px;">{{ m.title }}</h1>
+    <table style="border-collapse: collapse; font-size: 14px;">
+      {% if m.project_name %}<tr><td style="padding: 2px 12px 2px 0; color: #6b7570;">Project</td><td>{{ m.project_name }}</td></tr>{% endif %}
+      {% if m.entity_name %}<tr><td style="padding: 2px 12px 2px 0; color: #6b7570;">Entity</td><td>{{ m.entity_name }}</td></tr>{% endif %}
+      {% if m.device_name %}<tr><td style="padding: 2px 12px 2px 0; color: #6b7570;">Device</td><td>{{ m.device_name }}</td></tr>{% endif %}
+      <tr><td style="padding: 2px 12px 2px 0; color: #6b7570;">Type</td><td>{{ m.event_type }}</td></tr>
+      <tr><td style="padding: 2px 12px 2px 0; color: #6b7570;">Time</td><td>{{ m.time }}</td></tr>
+    </table>
+    {% if m.description %}<p style="font-size: 14px;">{{ m.description }}</p>{% endif %}
+    {% if m.alert %}<p style="font-size: 14px;">This event is an open alert and needs acknowledgement.</p>{% endif %}
+    <p style="margin-top: 20px;"><a href="{{ link }}" style="background: #52735E; color: #fff; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-size: 14px;">Open in Smart Parks Protect</a></p>
+    <p style="font-size: 12px; color: #6b7570;">Sent by Smart Parks Protect at {{ public_url }}</p>
+  </body>
+</html>

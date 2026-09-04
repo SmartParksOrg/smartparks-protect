@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 5, rules, events, alerts, automations and notifications |
-| Latest release | v0.2.0 (2026-09-03) |
-| Last session | 2026-09-03 |
-| Next item | Phase 5: rule schema (D9), after the decisions at its start; first performance item: decoder statements per event |
+| Active phase | Phase 6, device control through ChirpStack |
+| Latest release | v0.2.0 (2026-09-03); v0.3.0 candidate built on 2026-09-04, Tim reviews and tags |
+| Last session | 2026-09-04 |
+| Next item | Tim reviews and tags v0.3.0; then phase 6: control action definitions and the command lifecycle, after the decisions at its start |
 | Blockers | none |
 
 ## What we are building
@@ -84,6 +84,12 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D40 | XLSX writer | openpyxl in write-only mode; the Excel row limit is enforced by splitting into sheets, never silently truncated | Pure Python, MIT, streams rows. Decided by Tim on 2026-09-03. |
 | D41 | Aggregate resolution | Fixed ladder 1 s, 10 s, 1 min, 5 min, 15 min, 1 h, 6 h, 1 d, 7 d; pick the smallest bucket with at most 5,000 buckets over the range; user override allowed | Deterministic, cache friendly, matches continuous aggregates later. Decided by Tim on 2026-09-03. |
 | D42 | Saved views | `saved_views` table per project with the filter and layout as JSONB and a schema version | Simple, versioned, no new service. Recorded by Claude on 2026-09-03. |
+| D43 | Telegram targets | One bot per installation (`TELEGRAM_BOT_TOKEN`); chats link to a target by sending `/start <code>` to the bot, the automation service polls the bot | Same pattern as AddaxAI Connect, one bot to create, no tokens per project. Decided by Tim on 2026-09-04. |
+| D44 | Phase 5 services | Two services: `protect-rules` (evaluation, scheduler, system checks) and `protect-automation` (actions, email and Telegram delivery in-process, bot poller) | A slow SMTP server never stalls evaluation; two containers, not four. Decided by Tim on 2026-09-04. |
+| D45 | Rule constructs in phase 5 | Threshold, spatial enter/exit/inside/outside, speed as a derived metric, FOR, no-data, window aggregates; `near`, `dwell`, `crossed`, `baseline`, `correlation` and `event_chain` reserved in the schema until phase 13 | Covers the four template rules and the immobility example; reserved types can be written now but not enabled. Decided by Tim on 2026-09-04. |
+| D46 | Alert lifecycle permission | `alerts:write` (acknowledge, resolve) is held by project viewers as well as admins | Rangers are viewers and acknowledging is their daily workflow; read-only stays read-only for everything else. Recorded by Claude on 2026-09-04, easy to revert in `shared/permissions.py`. |
+| D47 | System alerts | System findings (stale worker, dead letters, consumer lag) are events with `project_id` null and an alert that resolves itself when the finding clears; server-level automations and targets (project null) deliver them | One event and alert path for everything, no second notification mechanism; server admins see them under System alerts. Recorded by Claude on 2026-09-04. |
+| D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
 
@@ -400,17 +406,17 @@ Release:
 
 **Deliverables.**
 
-- [ ] Rule schema (D9): trigger (position, measurement, state, event, schedule), condition tree (threshold, spatial ENTER/EXIT/INSIDE/OUTSIDE/NEAR/DWELL, movement, temporal FOR and COUNT, aggregation over windows, baseline, correlation, event chaining), event template (type, severity, context values), actions. Pydantic validation, JSON schema for the UI. `rules` and `rule_versions` tables; every event references the rule version.
-- [ ] `services/rules`: consumes domain events, keeps per-rule and per-entity state (windows, dwell timers) in Postgres, evaluates geofences with PostGIS, emits events, respects late data freshness policy (25.8), traces every evaluation compactly.
-- [ ] Rule testing: run a rule version over a historical time range by replaying canonical data, show the events it would have produced, without side effects.
-- [ ] Initial rules shipped as templates: geofence enter and exit, speed limit inside an area, inactivity or no data for a duration, battery threshold.
-- [ ] Events and alerts: event list and detail, alert lifecycle (open, acknowledged, resolved) with actor and time, alert inbox per project, event and alert markers on the map using the event marker family.
-- [ ] `services/automation`: automations bind event types and filters to actions; action framework with delivery tracking (status, attempts, delivered time, error, trace). Action types: notification, webhook (basic), integration forward (completed in phase 8), device command (completed in phase 6).
-- [ ] Notifications: notification targets at project and organization level, email over SMTP with templates and links back to the object, Telegram bot targets with chat registration, severity-aware formatting, delivery workers with retry and dead-letter.
-- [ ] System alerts use the same path: worker down, stream lag, dead-letter growth, data source unreachable.
-- [ ] Rules UI: list, form builder, version history, test run with results, enable and disable. Automations UI. Notification targets UI. Events and Alerts screens.
-- [ ] Tests: each construct with fixtures, replay test, freshness test, delivery retry test.
-- [ ] Docs: `docs/rules/` (concepts, constructs, examples from 15.3 and 15.4, testing), `docs/administration/notifications.md`. ADR: rule representation.
+- [x] Rule schema (D9): trigger (position, measurement, state, event, schedule), condition tree (threshold, spatial ENTER/EXIT/INSIDE/OUTSIDE/NEAR/DWELL, movement, temporal FOR and COUNT, aggregation over windows, baseline, correlation, event chaining), event template (type, severity, context values), actions. Pydantic validation, JSON schema for the UI. `rules` and `rule_versions` tables; every event references the rule version. (2026-09-04; NEAR, DWELL, CROSSED, baseline, correlation and event chaining are reserved types per D45, COUNT is the window `count` aggregate)
+- [x] `services/rules`: consumes domain events, keeps per-rule and per-entity state (windows, dwell timers) in Postgres, evaluates geofences with PostGIS, emits events, respects late data freshness policy (25.8), traces every evaluation compactly. (2026-09-04; geofences are evaluated with shapely on cached feature geometries, a compact trace is written per fired rule and per failure, silent evaluations write nothing; event age travels on the event for the automation freshness bound)
+- [x] Rule testing: run a rule version over a historical time range by replaying canonical data, show the events it would have produced, without side effects. (2026-09-04)
+- [x] Initial rules shipped as templates: geofence enter and exit, speed limit inside an area, inactivity or no data for a duration, battery threshold. (2026-09-04; plus possible immobility)
+- [x] Events and alerts: event list and detail, alert lifecycle (open, acknowledged, resolved) with actor and time, alert inbox per project, event and alert markers on the map using the event marker family. (2026-09-04)
+- [x] `services/automation`: automations bind event types and filters to actions; action framework with delivery tracking (status, attempts, delivered time, error, trace). Action types: notification, webhook (basic), integration forward (completed in phase 8), device command (completed in phase 6). (2026-09-04; integration and command are rejected until their phases)
+- [x] Notifications: notification targets at project and organization level, email over SMTP with templates and links back to the object, Telegram bot targets with chat registration, severity-aware formatting, delivery workers with retry and dead-letter. (2026-09-04; organization level is server level, project null, per D21)
+- [x] System alerts use the same path: worker down, stream lag, dead-letter growth, data source unreachable. (2026-09-04; data source unreachable has no signal yet: connectors log and restart, the ingest heartbeat covers the worker; a per-source health check comes with the production adapters in phase 7)
+- [x] Rules UI: list, form builder, version history, test run with results, enable and disable. Automations UI. Notification targets UI. Events and Alerts screens. (2026-09-04)
+- [x] Tests: each construct with fixtures, replay test, freshness test, delivery retry test. (2026-09-04)
+- [x] Docs: `docs/rules/` (concepts, constructs, examples from 15.3 and 15.4, testing), `docs/administration/notifications.md`. ADR: rule representation. (2026-09-04, ADR 0012)
 
 **Exit criteria.** The four template rules fire on simulated data, produce events and alerts, and deliver email and Telegram notifications with tracked status. A rule replay over the past week matches live results.
 
@@ -734,3 +740,15 @@ Listed by the phase where they are first needed.
 - Lessons: `docker compose up --build` fails silently in a chained shell command when the compose file is invalid, and the old containers keep running; after every rebuild the code inside the container is now checked before a benchmark is trusted.
 - Not done in this phase: table virtualization, column selection and grouping in the Data explorer (the shared table sorts only); noted on the deliverable. The Playwright sweep still has no assertions.
 - 117 python tests, 5 frontend tests, lint and types clean, docs strict, OpenAPI schema regenerated. Committed and tagged v0.2.0 on Tim's instruction.
+
+### 2026-09-04, phase 5 (Claude)
+
+- Tim decided D43 (one Telegram bot per installation, chats linked with a code), D44 (two services: rules and automation), D45 (constructs for this phase, the rest reserved), whole phase in one session backend first. Claude recorded D46 (viewers hold `alerts:write`), D47 (system alerts are events without a project), D48 (edge-triggered firing with cooldown reminders).
+- Built `shared/rules` (schema with six templates, evaluator, SQL data access in live and historical mode, event creation, replay), `shared/notifications` (render, email with the guard moved out of the API mailer, Telegram, dispatch), migration 0005, `protect-rules` (engine with rule cache and per-rule transactions, scheduler, system checks) and `protect-automation` (idempotent deliveries, signed webhooks, retry through the bus, Telegram poller). API: rules with versions, templates, schema and replay; events and alerts for projects and the server; automations, notification targets, deliveries and test sends for both scopes; recent events on the map.
+- Frontend: Rules with the editor (template picker, condition builder, JSON fallback, versions, replay tab), Events with detail and deliveries, Alerts inbox, Automations with deliveries and retry, Notifications with the Telegram link dialog; the same pages serve the server scope under Server admin; events on the live map with the event marker family; the map's alert count links to the inbox. Placeholders for Alerts, Rules and Events are gone.
+- Lessons: a `DeliveryRead` schema name collided with the attention router's and the generated TypeScript type got a module prefix, so the class is `ActionDeliveryRead`; a test that reads a worker's commit from its own session sees it fine (read committed), the stale row was a missing status filter that a silent string replace had skipped after ruff reformatted the line. Patch scripts now assert their matches.
+- First start on the development stack: a new consumer group reads a stream from its beginning, so the rules service saw the 9,884 benchmark messages per topic as lag and opened two system alerts, which resolved themselves as it caught up; a backlog is evaluated against no enabled rules cheaply because the handlers now return before loading rows when no rule has that trigger. On a production server the same happens once when a new worker joins; the automation freshness bound stops any stale notification.
+- Not done on purpose: NEAR, DWELL, CROSSED, baseline, correlation and event chaining (phase 13, reserved in the schema); a data source health signal for system alerts (phase 7); rule state for the `any` branch keeps geofence memory for every branch evaluated, which is intended. Late samples older than the last firing are evaluated normally; the automation freshness bound is the guard against stale notifications.
+- Verification: 157 python tests, 5 frontend tests, ruff, mypy strict, eslint and tsc clean, docs strict, OpenAPI regenerated, compose stack rebuilt with the two new services running, screenshot sweep clean on 34 routes at three viewports against the rebuilt stack. The sweep account `sweep@example.org` (server admin, local development stack only) was created directly in the development database because the environment has no sweep credentials; delete it or set `SWEEP_EMAIL` and `SWEEP_PASSWORD` in `.env` for the next sweep.
+- Not committed. Tim reviews and commits, then tags v0.3.0.
+- Decisions to ask Tim when phase 6 starts: how action definitions are versioned (open decision, proposed dataclasses with a `schema_version` and Pydantic parameter models), whether the ChirpStack command connector uses the REST API or gRPC (proposed REST, already used by the management connector), whether commands wait for a device response before CONFIRMED_BY_DEVICE (proposed: the driver interprets the next matching uplink), and where the OpenCollar encoders get their port and payload table (the protocol research document has RESET and REQUEST_STATUS).

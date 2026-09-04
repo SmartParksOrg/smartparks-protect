@@ -17,3 +17,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 | [0009](0009-processing-trace-model.md) | Processing trace model | accepted |
 | [0010](0010-assignment-attribution.md) | Assignment attribution stored on canonical rows | accepted |
 | [0011](0011-connectivity-adapter-boundary.md) | Connectivity adapter boundary | accepted |
+- [0012 rule representation](0012-rule-representation.md)

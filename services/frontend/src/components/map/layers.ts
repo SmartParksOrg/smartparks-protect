@@ -2,7 +2,7 @@ import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 
 import { ensureMarkerImage, type MarkerState } from "@/components/icons/markers";
 
-export const SOURCES = { entities: "entities", track: "track", features: "features" } as const;
+export const SOURCES = { entities: "entities", track: "track", features: "features", events: "events" } as const;
 
 /** Glyphs the OpenFreeMap styles serve; the MapLibre default (Open Sans) is not among them. */
 const FONT = ["Noto Sans Regular"];
@@ -103,4 +103,43 @@ export function ensureFeatureLayers(map: MapLibreMap): void {
 export function setFeatures(map: MapLibreMap, features: GeoJSON.Feature[]): void {
   const source = map.getSource(SOURCES.features) as GeoJSONSource | undefined;
   source?.setData({ type: "FeatureCollection", features });
+}
+
+export interface EventFeatureProperties {
+  event_id: string;
+  event_type: string;
+  severity: string;
+  title: string;
+  time: string;
+  entity_id: string | null;
+  alert_id: string | null;
+  alert_status: string | null;
+  icon_key: string;
+}
+
+/** Recent events use the event marker family (diamond), so a wolf detection never looks like a
+ * tracked wolf (architecture 24.5). Placed under the entity layers so entities stay on top. */
+export function ensureEventLayers(map: MapLibreMap, onClick: (props: EventFeatureProperties) => void): void {
+  if (map.getSource(SOURCES.events)) return;
+  map.addSource(SOURCES.events, { type: "geojson", data: { type: "FeatureCollection", features: [] }, promoteId: "event_id" });
+  map.addLayer({ id: "event-markers", type: "symbol", source: SOURCES.events, layout: { "icon-image": ["get", "marker"], "icon-size": 0.7, "icon-allow-overlap": true }, paint: { "icon-opacity": 0.95 } }, "entity-clusters");
+  map.on("click", "event-markers", (e) => {
+    const feature = e.features?.[0];
+    if (feature) onClick(feature.properties as unknown as EventFeatureProperties);
+  });
+  map.on("mouseenter", "event-markers", () => (map.getCanvas().style.cursor = "pointer"));
+  map.on("mouseleave", "event-markers", () => (map.getCanvas().style.cursor = ""));
+}
+
+export async function setEvents(map: MapLibreMap, features: GeoJSON.Feature[]): Promise<void> {
+  const source = map.getSource(SOURCES.events) as GeoJSONSource | undefined;
+  if (!source) return;
+  const withMarkers: GeoJSON.Feature[] = [];
+  for (const feature of features) {
+    const props = feature.properties as unknown as EventFeatureProperties;
+    const state: MarkerState = props.alert_status === "open" ? "critical" : props.severity === "warning" ? "warning" : "normal";
+    const marker = await ensureMarkerImage(map, props.icon_key, state);
+    withMarkers.push({ ...feature, properties: { ...feature.properties, marker } });
+  }
+  source.setData({ type: "FeatureCollection", features: withMarkers });
 }

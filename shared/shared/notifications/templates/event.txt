@@ -1,0 +1,12 @@
+{{ mark }}: {{ m.title }}
+{% if m.project_name %}Project: {{ m.project_name }}
+{% endif %}{% if m.entity_name %}Entity: {{ m.entity_name }}
+{% endif %}{% if m.device_name %}Device: {{ m.device_name }}
+{% endif %}Type: {{ m.event_type }}
+Time: {{ m.time }}
+{% if m.description %}
+{{ m.description }}
+{% endif %}{% if m.alert %}
+This event is an open alert and needs acknowledgement.
+{% endif %}
+Open in Smart Parks Protect: {{ link }}

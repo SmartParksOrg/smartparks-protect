@@ -1,4 +1,5 @@
 # Administration
 
 - [Permissions](permissions.md): roles, permission keys, device visibility, registration by invitation, audit.
-- Projects, users, devices, data sources and notifications: filled in with the admin screens in phase 3.
+- [Notifications](notifications.md): mail and Telegram configuration, rules and automation settings.
+- Projects, users, devices and data sources: the admin screens under Server admin, described in the concepts and integrations sections.

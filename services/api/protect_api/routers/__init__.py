@@ -7,16 +7,21 @@ from protect_api.realtime import router as realtime_router
 from protect_api.routers.admin import router as admin_router
 from protect_api.routers.analytics import router as analytics_router
 from protect_api.routers.attention import router as attention_router
+from protect_api.routers.automations import admin_router as admin_automations_router
+from protect_api.routers.automations import router as automations_router
 from protect_api.routers.catalog import router as catalog_router
 from protect_api.routers.data import router as data_router
 from protect_api.routers.data_sources import router as data_sources_router
 from protect_api.routers.devices import router as devices_router
 from protect_api.routers.entities import router as entities_router
+from protect_api.routers.events import admin_router as admin_events_router
+from protect_api.routers.events import router as events_router
 from protect_api.routers.exports import router as exports_router
 from protect_api.routers.ingest import router as ingest_router
 from protect_api.routers.map import router as map_router
 from protect_api.routers.network import router as network_router
 from protect_api.routers.projects import router as projects_router
+from protect_api.routers.rules import router as rules_router
 
 v1_router = APIRouter()
 for router in (
@@ -34,6 +39,11 @@ for router in (
     map_router,
     analytics_router,
     exports_router,
+    rules_router,
+    events_router,
+    admin_events_router,
+    automations_router,
+    admin_automations_router,
     realtime_router,
 ):
     v1_router.include_router(router)

@@ -74,10 +74,13 @@ nav:
       - analytics/index.md
       - Data Explorer: analytics/data-explorer.md
       - Export: analytics/export.md
-  - Rules: rules/index.md
+  - Rules:
+      - rules/index.md
+      - Automations and notifications: rules/automations.md
   - Administration:
       - administration/index.md
       - Permissions: administration/permissions.md
+      - Notifications: administration/notifications.md
   - Operations:
       - operations/index.md
       - Benchmarks: operations/benchmarks.md
@@ -97,3 +100,4 @@ nav:
       - adr/0009-processing-trace-model.md
       - adr/0010-assignment-attribution.md
       - adr/0011-connectivity-adapter-boundary.md
+      - adr/0012-rule-representation.md

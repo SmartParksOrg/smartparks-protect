@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: v0.1.1 released, phase 4 in progress (analyze, export, benchmark). Phases 0 to 3 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: v0.2.0 released, phase 5 built (rules, events, alerts, automations, notifications). Phases 0 to 4 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -47,11 +47,14 @@ smartparks-protect/
 │   ├── ingest/              # `protect_ingest`: runs adapter event connectors (MQTT, polling, websocket)
 │   ├── decoder/             # `protect_decoder`: source events to canonical rows
 │   ├── export/              # `protect_export`: export jobs to MinIO
+│   ├── rules/               # `protect_rules`: rule evaluation, scheduler, system checks
+│   ├── automation/          # `protect_automation`: actions, notification delivery, Telegram poller
 │   └── frontend/            # React + Vite + TypeScript, nginx Dockerfile, FRONTEND_CONVENTIONS.md
 ├── shared/shared/           # package `shared`: config, database, logger, version, enums, permissions,
 │                            # models/, domain/assignments.py, trace.py, timeutil.py, secrets.py, bus.py,
 │                            # worker.py, ingest.py, storage.py, connectivity/ (base, transports, adapters),
-│                            # device_drivers/ (base, registry, generic_json)
+│                            # device_drivers/ (base, registry, generic_json, opencollar), analytics.py, exports/,
+│                            # rules/ (schema, templates, evaluator, data, events, replay), notifications/
 ├── tests/                   # tests/shared, tests/api, tests/fixtures/payloads
 ├── docs/                    # MkDocs site, docs/adr/ holds the ADRs
 ├── docker/python.Dockerfile # one image for every Python service; compose sets the command per service
@@ -99,7 +102,7 @@ The rules behind it:
 - Each worker is one consumer group (`Worker(name)` in `shared/worker.py`; `worker.subscribe(topic, handler)`). A handler acknowledges by returning. A handler that raises leaves the message pending; it is re-delivered after `BUS_RETRY_BASE_SECONDS` doubling per attempt, and dead-lettered to `<topic>.dead` after `BUS_MAX_ATTEMPTS`. An `ApplicationError` with `retryable=False` is dead-lettered at once. Pending messages of a crashed consumer are reclaimed by any consumer of the group.
 - Messages carry `schema_version`; a newer version than the consumer knows is dead-lettered with `SCHEMA_VERSION_UNSUPPORTED`.
 - Streams are trimmed to about `BUS_MAXLEN` entries (D33). Dead-letter streams are listed, retried and resolved through `/api/v1/attention/dead-letters`.
-- Every worker stamps `heartbeat:<worker>` each loop; `HEARTBEAT_STALE_MINUTES` (15) without a stamp is stale. `/api/v1/attention/summary` reads it.
+- Every worker stamps `heartbeat:<worker>` each loop; `HEARTBEAT_STALE_MINUTES` (15) without a stamp is stale. `/api/v1/attention/summary` reads it, and the rules service turns a stale worker into a system alert.
 - Tests use Redis database 1, flushed per session; the development stack uses database 0.
 
 ### Ingestion
@@ -183,6 +186,22 @@ How the app is put together:
 
 Screenshot sweep: `npm run sweep` (Playwright, routes derived from `src/App.tsx`) logs in with `SWEEP_EMAIL` and `SWEEP_PASSWORD`, opens every route at 390, 768 and 1440 px, flags console errors and horizontal overflow and writes `ui-sweep-output/`. Chromium needs a few system libraries (`libnspr4 libnss3 libasound2t64` on Ubuntu 24.04); without them run the sweep in the Playwright image from `services/frontend`: `docker run --rm --network host --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work -e SWEEP_EMAIL=... -e SWEEP_PASSWORD=... mcr.microsoft.com/playwright:v1.58.0-noble node scripts/ui-sweep.mjs`. The `--user` flag keeps the output owned by you.
 
+## Rules, events, alerts
+
+`shared/rules/schema.py` is the rule document (decision D9, ADR 0012): Pydantic models, `RuleDocument.reserved_types()` says what the evaluator cannot run, `json_schema()` feeds the frontend builder. `shared/rules/evaluator.py` is the stateful evaluator: `evaluate(doc, subject, sample, state, data)` returns a `Verdict`; it is pure apart from the `DataAccess` protocol, implemented for SQL in `shared/rules/data.py` (live mode reads the current-state tables, historical mode derives everything from rows before the sample time). Firing is edge-triggered with an optional cooldown reminder; `SubjectState` (active, holding since, last fired, inside geofences) is stored per rule and subject in `rule_state`. `shared/rules/events.py` creates events and alerts the same way for rules, system checks and later the API (`create_event`, `close_alert`, `event_messages`); `shared/rules/replay.py` replays canonical rows through the evaluator with in-memory state, bounded.
+
+`services/rules/protect_rules/engine.py`: `RuleCache` re-reads enabled rules every `RULES_RELOAD_SECONDS`; `handle_position`, `handle_measurements` and `handle_state` build a `Sample` and run every rule in scope, each in its own transaction (`run_rules`), so one broken rule lands on `rules.last_error` plus a failed trace and the others continue. A rule that fires writes a compact trace (rule matched, conditions evaluated, event created) and publishes `event.created` and `alert.created` after the commit; silent evaluations write nothing. `Scheduler.tick()` runs schedule rules over the entities of the project (at most 5,000) every `every_seconds`. `system_checks.py` opens one system alert per stale worker, dead-letter stream and lagging consumer group and resolves it when the finding clears; system events have `project_id` null and are visible to server admins only.
+
+Events and alerts API: `routers/events.py` (project lists newest first with the time of the last item as cursor, detail with deliveries, `map/events` GeoJSON for the last hours, acknowledge and resolve under `alerts:write`, which viewers hold) and the `/admin` variants for system events. Rules API: `routers/rules.py` (templates, schema, versions as immutable rows, `PUT /document` makes a new version, `POST /{id}/test` and `POST /test-document` replay).
+
+## Automations and notifications
+
+`services/automation/protect_automation/actions.py`: `handle_event` loads the matching automations of the event's scope, and for every action gets or creates the `ActionDelivery` row keyed on (event, automation, action index), so a re-delivered bus message runs only the actions that have not succeeded. Stale events (older than `max_event_age_seconds`) are recorded as skipped. `Skipped`, `PermanentFailure` and `TransientFailure` from `shared/notifications/dispatch.py` decide the delivery status; a transient failure makes the handler raise a retryable `ApplicationError` after the commit, so the bus re-delivers with backoff. Webhooks are signed with `X-Protect-Signature: sha256=<hmac>` when the action has a secret. `telegram_poller.py` long-polls the bot (offset in Redis `telegram:update_offset`) and links `/start <code>` messages to targets.
+
+`shared/notifications/`: `render.py` (Jinja templates for event and test messages, the link back), `email.py` (SMTP with the development guard: non-production servers mail only `DEV_NOTIFY_EMAILS`, everything else is logged and the delivery is skipped), `telegram.py` (Bot API over httpx), `dispatch.py` (`deliver_to_target`, shared by the automation service and the API test send). The API mailer for invitations and password resets uses the same sender.
+
+Targets, automations and deliveries API: `routers/automations.py`, one implementation for the project scope and the `/admin` scope (project null). `automations:write` is project admin only.
+
 ## Analytics and exports
 
 `shared/analytics.py` holds the aggregation statement the API and the export worker share: the bucket ladder and the automatic resolution (decision D41), the bound of 5,000 points per series and 20 series per request, and `aggregate_statement` built on `time_bucket`, `first` and `last`. The router is `protect_api/routers/analytics.py` (series, drill-down rows, metrics with data, saved views).
@@ -222,7 +241,7 @@ uv run pytest tests/shared -q               # one package
 cd services/frontend && npm run test && npm run build
 ```
 
-`tests/conftest.py` sets default environment values that match `.env.example`, so tests run against the local compose stack without extra setup. CI runs one job per package (`tests/shared`, `tests/api`) against Postgres/Timescale and Redis service containers and a MinIO container.
+`tests/conftest.py` sets default environment values that match `.env.example`, so tests run against the local compose stack without extra setup. CI runs one job per package (`tests/shared`, `tests/api`, `tests/decoder`, `tests/export`, `tests/rules`, `tests/automation`) against Postgres/Timescale and Redis service containers and a MinIO container. A test that reads rows a worker committed in another session must end its own transaction first (`await db.rollback()`): the test session's snapshot predates the commit otherwise.
 
 All tests share one event loop (`asyncio_default_test_loop_scope = session`) because asyncpg connections cannot move between loops. `tests/api/conftest.py` has helpers for actors per role (`actor`, `project_actor`), committed fixture rows and invitations. `tests/api/test_phase1_scenario.py` runs the phase 1 exit criteria end to end.
 

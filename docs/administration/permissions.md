@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Server admin | `users.is_superuser` | Everything in every project, plus server administration: accounts, invitations for server admins, catalogues (entity types, device types, metrics), devices, data sources |
 | Project admin | membership row | Every permission inside the project: entities, features, members, invitations, assignments of devices to entities, rules, integrations, control, curation |
-| Project viewer | membership row | Read the project, read traces, create exports |
+| Project viewer | membership row | Read the project, read traces, create exports, acknowledge and resolve alerts |
 
 A user can hold different roles in different projects. Server admins need no membership.
 
@@ -19,6 +19,7 @@ Endpoints declare the key they need. The role decides whether the caller has it.
 | `project:read` | yes | yes |
 | `traces:read` | yes | yes |
 | `exports:create` | yes | yes |
+| `alerts:write` | yes | yes |
 | `project:write` | | yes |
 | `members:write` | | yes |
 | `entities:write` | | yes |
@@ -27,6 +28,7 @@ Endpoints declare the key they need. The role decides whether the caller has it.
 | `devices:control_high_impact` | | yes |
 | `data_sources:write` | | yes |
 | `rules:write` | | yes |
+| `automations:write` | | yes |
 | `integrations:write` | | yes |
 | `data:curate`, `data:curate_bulk`, `data:approve`, `data:revert` | | yes |
 

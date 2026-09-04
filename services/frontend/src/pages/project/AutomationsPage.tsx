@@ -1,0 +1,193 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
+import { useParams, useSearchParams } from "react-router";
+import { z } from "zod";
+
+import { api } from "@/api/client";
+import { queryKeys } from "@/api/queryKeys";
+import type { Automation, Delivery, NotificationTarget, Page as PageType } from "@/api/types";
+import { Callout } from "@/components/common/Callout";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { Field } from "@/components/common/FormField";
+import { Page, PageHeader } from "@/components/common/PageHeader";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable } from "@/components/data/DataTable";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMutationToast } from "@/hooks/useMutationToast";
+import { formatTime } from "@/lib/format";
+import { type Scope, scopeBase, SEVERITIES } from "@/lib/rules";
+
+const actionSchema = z.object({ type: z.enum(["notify", "webhook"]), target_id: z.string(), url: z.string(), secret: z.string() }).refine((a) => a.type !== "notify" || a.target_id, { path: ["target_id"], message: "Choose a target" }).refine((a) => a.type !== "webhook" || /^https?:\/\//.test(a.url), { path: ["url"], message: "An http(s) URL is needed" });
+const schema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string(),
+  enabled: z.boolean(),
+  event_types: z.string(),
+  min_severity: z.enum(["info", "warning", "critical"]),
+  require_alert: z.boolean(),
+  max_event_age_hours: z.number().min(0.1).max(720),
+  actions: z.array(actionSchema).min(1, "Add at least one action"),
+});
+type Values = z.infer<typeof schema>;
+
+function toValues(a: Automation | null): Values {
+  return a
+    ? { name: a.name, description: a.description ?? "", enabled: a.enabled, event_types: a.event_types.join(", "), min_severity: a.min_severity as Values["min_severity"], require_alert: a.require_alert, max_event_age_hours: a.max_event_age_seconds / 3600, actions: a.actions.map((x) => ({ type: (x.type as "notify" | "webhook") ?? "notify", target_id: String(x.target_id ?? ""), url: String(x.url ?? ""), secret: String(x.secret ?? "") })) }
+    : { name: "", description: "", enabled: true, event_types: "", min_severity: "warning", require_alert: false, max_event_age_hours: 6, actions: [{ type: "notify", target_id: "", url: "", secret: "" }] };
+}
+
+function toBody(v: Values) {
+  return {
+    name: v.name,
+    description: v.description || null,
+    enabled: v.enabled,
+    event_types: v.event_types.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
+    min_severity: v.min_severity,
+    require_alert: v.require_alert,
+    max_event_age_seconds: Math.round(v.max_event_age_hours * 3600),
+    actions: v.actions.map((a) => (a.type === "notify" ? { type: "notify", target_id: a.target_id } : { type: "webhook", url: a.url, ...(a.secret ? { secret: a.secret } : {}) })),
+  };
+}
+
+/** Automations bind events to actions (architecture 16); deliveries show what each action did. */
+export function AutomationsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
+  const { projectId = "" } = useParams();
+  const scope = scopeProp ?? projectId;
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "deliveries" ? "deliveries" : "automations";
+  const base = scopeBase(scope);
+  const automations = useQuery({ queryKey: queryKeys.automations(scope), queryFn: () => api.get<PageType<Automation>>(`${base}/automations`, { query: { limit: 500 } }) });
+  const targets = useQuery({ queryKey: queryKeys.notificationTargets(scope), queryFn: () => api.get<PageType<NotificationTarget>>(`${base}/notification-targets`, { query: { limit: 500 } }) });
+  const deliveryStatus = params.get("status") ?? "";
+  const deliveries = useQuery({ queryKey: queryKeys.deliveries(scope, { status: deliveryStatus }), queryFn: () => api.get<PageType<Delivery>>(`${base}/deliveries`, { query: { limit: 200, status: deliveryStatus || undefined } }), enabled: tab === "deliveries", refetchInterval: tab === "deliveries" ? 15_000 : false });
+  const [editing, setEditing] = useState<Automation | null>(null);
+  const [open, setOpen] = useState(false);
+  const [removing, setRemoving] = useState<Automation | null>(null);
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: toValues(null) });
+  const actions = useFieldArray({ control: form.control, name: "actions" });
+  useEffect(() => { if (open) form.reset(toValues(editing)); }, [open, editing, form]);
+  const invalidate = [queryKeys.automations(scope)];
+  const save = useMutationToast({
+    mutationFn: (v: Values) => (editing ? api.patch<Automation>(`${base}/automations/${editing.id}`, { body: toBody(v) }) : api.post<Automation>(`${base}/automations`, { body: toBody(v) })),
+    invalidate,
+    success: editing ? "Automation saved" : "Automation created",
+    onSuccess: () => setOpen(false),
+    onError: (e) => form.setError("root", { message: e.message }),
+  });
+  const toggle = useMutationToast({ mutationFn: ({ a, enabled }: { a: Automation; enabled: boolean }) => api.patch<Automation>(`${base}/automations/${a.id}`, { body: { enabled } }), invalidate, success: (a) => (a.enabled ? "Automation enabled" : "Automation disabled") });
+  const remove = useMutationToast({ mutationFn: (a: Automation) => api.delete<void>(`${base}/automations/${a.id}`), invalidate, success: "Automation deleted", onSuccess: () => setRemoving(null) });
+  const retry = useMutationToast({ mutationFn: (d: Delivery) => api.post<Delivery>(`${base}/deliveries/${d.id}/retry`), invalidate: [queryKeys.deliveries(scope, { status: deliveryStatus })], success: "Queued again" });
+  const targetName = (id: string | null | undefined) => targets.data?.items.find((t) => t.id === id)?.name ?? "target";
+  const automationName = (id: string | null) => automations.data?.items.find((a) => a.id === id)?.name ?? "";
+
+  const columns: ColumnDef<Automation, unknown>[] = [
+    { header: "Enabled", accessorKey: "enabled", cell: ({ row }) => <span onClick={(e) => e.stopPropagation()}><Switch checked={row.original.enabled} aria-label={`Enable ${row.original.name}`} onCheckedChange={(v) => toggle.mutate({ a: row.original, enabled: v })} /></span> },
+    { header: "Name", accessorKey: "name" },
+    { header: "Events", id: "events", cell: ({ row }) => <span className="text-xs">{row.original.event_types.length ? row.original.event_types.join(", ") : "any type"}, {row.original.min_severity} and up{row.original.require_alert ? ", alerts only" : ""}</span> },
+    { header: "Actions", id: "actions", cell: ({ row }) => <span className="text-xs">{row.original.actions.map((a, i) => <span key={i} className="mr-2">{a.type === "notify" ? `notify ${targetName(String(a.target_id))}` : `webhook ${String(a.url ?? "")}`}</span>)}</span> },
+    { header: "Max age", accessorKey: "max_event_age_seconds", cell: ({ getValue }) => `${getValue<number>() / 3600} h` },
+    { id: "remove", header: "", cell: ({ row }) => <span onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" aria-label="Delete automation" onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button></span> },
+  ];
+  const deliveryColumns: ColumnDef<Delivery, unknown>[] = [
+    { header: "Created", accessorKey: "created_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
+    { header: "Automation", accessorKey: "automation_id", cell: ({ getValue }) => automationName(getValue<string | null>()) },
+    { header: "Action", accessorKey: "action_type", cell: ({ row }) => row.original.action_type === "notify" ? `notify ${targetName(row.original.target_id)}` : row.original.action_type },
+    { header: "Status", accessorKey: "status", cell: ({ row }) => <span className="inline-flex items-center gap-2"><StatusBadge value={row.original.status} /><span className="text-xs text-muted-foreground">{row.original.attempts} attempt{row.original.attempts === 1 ? "" : "s"}</span></span> },
+    { header: "Detail", accessorKey: "error_message", cell: ({ getValue }) => <span className="text-xs">{getValue<string | null>() ?? ""}</span> },
+    { id: "retry", header: "", cell: ({ row }) => row.original.status === "failed" && <Button variant="ghost" size="sm" onClick={() => retry.mutate(row.original)}><RotateCcw className="size-4" /> Retry</Button> },
+  ];
+
+  return (
+    <>
+      <PageHeader title="Automations" description={scope === "server" ? "What happens with system alerts: notify server-level targets or call a webhook" : "What happens when an event occurs: notify a target or call a webhook, with a freshness bound so old data never pages anyone"} actions={<Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> New automation</Button>} />
+      <Page>
+        <div className="flex flex-wrap items-center gap-3">
+          <Tabs value={tab} onValueChange={(v) => setParams((p) => { p.set("tab", v); return p; }, { replace: true })}><TabsList><TabsTrigger value="automations">Automations</TabsTrigger><TabsTrigger value="deliveries">Deliveries</TabsTrigger></TabsList></Tabs>
+          {tab === "deliveries" && (
+            <Select value={deliveryStatus || "all"} onValueChange={(v) => setParams((p) => { if (v === "all") p.delete("status"); else p.set("status", v); return p; }, { replace: true })}>
+              <SelectTrigger className="w-36" aria-label="Delivery status"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Any status</SelectItem>{["queued", "sent", "failed", "skipped"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
+        </div>
+        {(automations.error ?? deliveries.error) && <Callout kind="error">{(automations.error ?? deliveries.error)?.message}</Callout>}
+        {tab === "automations" ? (
+          <DataTable columns={columns} data={automations.data?.items} isLoading={automations.isPending} emptyMessage="No automations yet. Create a notification target first, then bind events to it here." onRowClick={(a) => { setEditing(a); setOpen(true); }} />
+        ) : (
+          <DataTable columns={deliveryColumns} data={deliveries.data?.items} isLoading={deliveries.isPending} emptyMessage="No deliveries yet." footer={deliveries.data && `${deliveries.data.items.length} deliveries`} />
+        )}
+      </Page>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader><DialogTitle>{editing ? "Edit automation" : "New automation"}</DialogTitle><DialogDescription>Events older than the freshness bound are skipped, so a log upload of last month never sends today's alerts.</DialogDescription></DialogHeader>
+          <form className="space-y-3" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
+            <Field label="Name" htmlFor="au-name" error={form.formState.errors.name?.message}><Input id="au-name" {...form.register("name")} /></Field>
+            <Field label="Description" htmlFor="au-description"><Input id="au-description" {...form.register("description")} /></Field>
+            <Field label="Event types" htmlFor="au-types" hint="Comma separated; empty means every type"><Input id="au-types" placeholder="GEOFENCE_EXIT, BATTERY_LOW" {...form.register("event_types")} /></Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Minimum severity" htmlFor="au-severity">
+                <Select value={form.watch("min_severity")} onValueChange={(v) => form.setValue("min_severity", v as Values["min_severity"])}>
+                  <SelectTrigger id="au-severity"><SelectValue /></SelectTrigger>
+                  <SelectContent>{SEVERITIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+              <Field label="Skip events older than (hours)" htmlFor="au-age" error={form.formState.errors.max_event_age_hours?.message}><Input id="au-age" type="number" step="any" {...form.register("max_event_age_hours", { valueAsNumber: true })} /></Field>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <span className="flex items-center gap-2"><Switch id="au-alert" checked={form.watch("require_alert")} onCheckedChange={(v) => form.setValue("require_alert", v)} /><label htmlFor="au-alert" className="text-sm">Only events with an alert</label></span>
+              <span className="flex items-center gap-2"><Switch id="au-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="au-enabled" className="text-sm">Enabled</label></span>
+            </div>
+            <div className="space-y-2 rounded-md border p-3">
+              <div className="flex items-center justify-between"><span className="text-sm font-medium">Actions</span><Button type="button" size="sm" variant="outline" onClick={() => actions.append({ type: "notify", target_id: "", url: "", secret: "" })}><Plus className="size-4" /> Add action</Button></div>
+              {typeof form.formState.errors.actions?.message === "string" && <p className="text-sm text-destructive">{form.formState.errors.actions.message}</p>}
+              {actions.fields.map((field, index) => {
+                const type = form.watch(`actions.${index}.type`);
+                const errs = form.formState.errors.actions?.[index];
+                return (
+                  <div key={field.id} className="flex flex-wrap items-start gap-2 rounded bg-muted/40 p-2">
+                    <Select value={type} onValueChange={(v) => form.setValue(`actions.${index}.type`, v as "notify" | "webhook")}>
+                      <SelectTrigger className="h-8 w-28" aria-label="Action type"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="notify">Notify</SelectItem><SelectItem value="webhook">Webhook</SelectItem></SelectContent>
+                    </Select>
+                    {type === "notify" ? (
+                      <div className="min-w-48 flex-1">
+                        <Select value={form.watch(`actions.${index}.target_id`) || "none"} onValueChange={(v) => form.setValue(`actions.${index}.target_id`, v === "none" ? "" : v)}>
+                          <SelectTrigger className="h-8" aria-label="Target"><SelectValue placeholder="Choose a target" /></SelectTrigger>
+                          <SelectContent><SelectItem value="none" disabled>Choose a target</SelectItem>{targets.data?.items.map((t) => <SelectItem key={t.id} value={t.id}>{t.name} ({t.channel})</SelectItem>)}</SelectContent>
+                        </Select>
+                        {errs?.target_id && <p className="text-xs text-destructive">{errs.target_id.message}</p>}
+                      </div>
+                    ) : (
+                      <div className="flex min-w-48 flex-1 flex-col gap-1">
+                        <Input className="h-8" placeholder="https://…" aria-label="Webhook URL" {...form.register(`actions.${index}.url`)} />
+                        <Input className="h-8" placeholder="Signing secret (optional)" aria-label="Webhook secret" {...form.register(`actions.${index}.secret`)} />
+                        {errs?.url && <p className="text-xs text-destructive">{errs.url.message}</p>}
+                      </div>
+                    )}
+                    <Button type="button" size="icon" variant="ghost" className="size-8" aria-label="Remove action" onClick={() => actions.remove(index)}><Trash2 className="size-4" /></Button>
+                  </div>
+                );
+              })}
+            </div>
+            {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={save.isPending}>Save</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={`Delete automation ${removing?.name ?? ""}?`} description="Past deliveries stay in the log." confirmLabel="Delete" pending={remove.isPending} onConfirm={() => removing && remove.mutate(removing)} />
+    </>
+  );
+}
+
+export function AdminAutomationsPage() {
+  return <AutomationsPage scope="server" />;
+}

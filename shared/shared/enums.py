@@ -179,3 +179,25 @@ class ExportStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+
+
+class NotificationChannel(StrEnum):
+    EMAIL = "email"
+    TELEGRAM = "telegram"
+
+
+class ActionType(StrEnum):
+    """What an automation does with an event (architecture 16). Integration and command are
+    reserved for phases 8 and 6; the automation service rejects them until then."""
+
+    NOTIFY = "notify"
+    WEBHOOK = "webhook"
+    INTEGRATION = "integration"
+    COMMAND = "command"
+
+
+class DeliveryStatus(StrEnum):
+    QUEUED = "queued"
+    SENT = "sent"
+    FAILED = "failed"
+    SKIPPED = "skipped"

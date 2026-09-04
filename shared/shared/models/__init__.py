@@ -23,7 +23,16 @@ from shared.models.domain import (
     Feature,
     Metric,
 )
-from shared.models.events import Alert, Event, Rule, RuleVersion
+from shared.models.events import (
+    ActionDelivery,
+    Alert,
+    Automation,
+    Event,
+    NotificationTarget,
+    Rule,
+    RuleState,
+    RuleVersion,
+)
 from shared.models.timeseries import (
     HYPERTABLES,
     ConnectivityState,
@@ -40,9 +49,11 @@ from shared.models.trace import ApplicationError, ProcessingStep, ProcessingTrac
 
 __all__ = [
     "HYPERTABLES",
+    "ActionDelivery",
     "Alert",
     "ApplicationError",
     "AuditLog",
+    "Automation",
     "Base",
     "ConnectivityState",
     "DataSource",
@@ -64,6 +75,7 @@ __all__ = [
     "Invitation",
     "Measurement",
     "Metric",
+    "NotificationTarget",
     "Organization",
     "Position",
     "ProcessingStep",
@@ -71,6 +83,7 @@ __all__ = [
     "Project",
     "ProjectMembership",
     "Rule",
+    "RuleState",
     "RuleVersion",
     "SavedView",
     "SourceDelivery",

@@ -39,6 +39,17 @@ export type MetricWithData = Schemas["MetricWithData"];
 export type SavedView = Schemas["SavedViewRead"];
 export type ExportJob = Schemas["ExportJobRead"];
 export type ExportParameters = Schemas["ExportParameters"];
+export type Rule = Schemas["RuleRead"];
+export type RuleVersion = Schemas["RuleVersionRead"];
+export type RuleTemplate = Schemas["RuleTemplateRead"];
+export type ReplayResult = Schemas["ReplayResultRead"];
+export type EventItem = Schemas["EventRead"];
+export type EventDetail = Schemas["EventDetail"];
+export type Alert = Schemas["AlertRead"];
+export type Delivery = Schemas["ActionDeliveryRead"];
+export type Automation = Schemas["AutomationRead"];
+export type NotificationTarget = Schemas["NotificationTargetRead"];
+export type NotificationCapabilities = Schemas["NotificationCapabilities"];
 
 export interface Page<T> {
   items: T[];

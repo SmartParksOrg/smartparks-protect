@@ -1,19 +1,14 @@
-"""Outgoing mail for invitations and password resets.
+"""Outgoing mail for invitations and password resets: the auth templates on top of the shared
+sender in `shared.notifications.email`, which holds the development guard."""
 
-In development (ENVIRONMENT=development) mail goes only to addresses in DEV_NOTIFY_EMAILS; every
-other message is logged instead of sent, so a development server holding real users never mails
-them (pattern from AddaxAI Connect). Without SMTP settings every message is logged.
-"""
-
-from email.message import EmailMessage
 from functools import lru_cache
 from pathlib import Path
 
-import aiosmtplib
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from shared.config import Settings, get_settings
 from shared.logger import get_logger
+from shared.notifications.email import send_email
 
 log = get_logger("api.mailer")
 
@@ -27,43 +22,13 @@ class Mailer:
             loader=FileSystemLoader(TEMPLATES), autoescape=select_autoescape(["html"])
         )
 
-    def _allowed(self, to: str) -> tuple[bool, str]:
-        if not self.settings.mail_configured:
-            return False, "mail is not configured"
-        if self.settings.environment != "production":
-            if to.strip().lower() in self.settings.dev_notify_email_list:
-                return True, ""
-            return False, "not a production server and recipient not in DEV_NOTIFY_EMAILS"
-        return True, ""
-
     async def send(self, to: str, subject: str, template: str, **context: object) -> bool:
-        """Render and send. Returns True when sent, False when logged instead."""
+        """Render and send through the shared sender (development guard included). Returns
+        True when sent, False when logged instead."""
         context = {"public_url": self.settings.public_url, **context}
         text = self.env.get_template(f"{template}.txt").render(**context)
         html = self.env.get_template(f"{template}.html").render(**context)
-        allowed, reason = self._allowed(to)
-        if not allowed:
-            log.warning("mail logged, not sent", to=to, subject=subject, reason=reason, body=text)
-            return False
-        message = EmailMessage()
-        message["From"] = self.settings.mail_from
-        message["To"] = to
-        message["Subject"] = subject
-        message.set_content(text)
-        message.add_alternative(html, subtype="html")
-        assert self.settings.mail_server is not None
-        port = self.settings.mail_port
-        await aiosmtplib.send(
-            message,
-            hostname=self.settings.mail_server,
-            port=port,
-            username=self.settings.mail_username,
-            password=self.settings.mail_password,
-            use_tls=port == 465,
-            start_tls=port != 465,
-        )
-        log.info("mail sent", to=to, subject=subject)
-        return True
+        return await send_email(to, subject, text, html)
 
     async def send_invitation(
         self, to: str, token: str, *, project_name: str | None, invited_by: str | None

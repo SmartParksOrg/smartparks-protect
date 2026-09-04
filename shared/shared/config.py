@@ -46,6 +46,21 @@ class Settings(BaseSettings):
     dev_notify_emails: str = Field(
         default="", description="Comma separated addresses that may be emailed in development"
     )
+    telegram_bot_token: str | None = Field(
+        default=None, description="One bot per installation; chats link to targets with a code"
+    )
+    webhook_timeout_seconds: float = 10.0
+
+    rules_reload_seconds: int = Field(
+        default=10, ge=1, description="How often the rules service re-reads enabled rules"
+    )
+    system_check_interval_seconds: int = Field(
+        default=300, ge=30, description="Interval of the worker, lag and dead-letter checks"
+    )
+    automation_max_event_age_seconds: int = Field(
+        default=21_600,
+        description="Default freshness bound of a new automation (architecture 25.8)",
+    )
 
     bus_maxlen: int = Field(default=100_000, description="Approximate entries kept per topic")
     bus_dead_maxlen: int = Field(default=10_000, description="Entries kept per dead-letter stream")
@@ -69,6 +84,10 @@ class Settings(BaseSettings):
     @property
     def dev_notify_email_list(self) -> set[str]:
         return {item.strip().lower() for item in self.dev_notify_emails.split(",") if item.strip()}
+
+    @property
+    def telegram_configured(self) -> bool:
+        return bool(self.telegram_bot_token)
 
     @property
     def mail_configured(self) -> bool:

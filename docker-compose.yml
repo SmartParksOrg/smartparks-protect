@@ -113,6 +113,15 @@ services:
       BUS_CONCURRENCY: ${BUS_CONCURRENCY:-8}
       HEARTBEAT_STALE_MINUTES: ${HEARTBEAT_STALE_MINUTES:-15}
       PAYLOAD_INLINE_MAX_BYTES: ${PAYLOAD_INLINE_MAX_BYTES:-65536}
+      MAIL_SERVER: ${MAIL_SERVER:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      DEV_NOTIFY_EMAILS: ${DEV_NOTIFY_EMAILS:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      RULES_RELOAD_SECONDS: ${RULES_RELOAD_SECONDS:-10}
+      SYSTEM_CHECK_INTERVAL_SECONDS: ${SYSTEM_CHECK_INTERVAL_SECONDS:-300}
 
   api:
     container_name: protect-api
@@ -130,12 +139,6 @@ services:
       JWT_LIFETIME_SECONDS: ${JWT_LIFETIME_SECONDS:-3600}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       INVITATION_LIFETIME_HOURS: ${INVITATION_LIFETIME_HOURS:-168}
-      MAIL_SERVER: ${MAIL_SERVER:-}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      MAIL_FROM: ${MAIL_FROM:-}
-      DEV_NOTIFY_EMAILS: ${DEV_NOTIFY_EMAILS:-}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     healthcheck:
@@ -183,6 +186,30 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+    environment: *python-env
+
+  rules:
+    container_name: protect-rules
+    build: *python-build
+    restart: unless-stopped
+    command: ["/app/.venv/bin/python", "-m", "protect_rules.main"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment: *python-env
+
+  automation:
+    container_name: protect-automation
+    build: *python-build
+    restart: unless-stopped
+    command: ["/app/.venv/bin/python", "-m", "protect_automation.main"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
         condition: service_healthy
     environment: *python-env
 

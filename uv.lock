@@ -6,9 +6,11 @@ requires-python = "==3.12.*"
 members = [
     "smartparks-protect",
     "smartparks-protect-api",
+    "smartparks-protect-automation",
     "smartparks-protect-decoder",
     "smartparks-protect-export",
     "smartparks-protect-ingest",
+    "smartparks-protect-rules",
     "smartparks-protect-shared",
 ]
 
@@ -1217,9 +1219,11 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "ruff" },
     { name = "smartparks-protect-api" },
+    { name = "smartparks-protect-automation" },
     { name = "smartparks-protect-decoder" },
     { name = "smartparks-protect-export" },
     { name = "smartparks-protect-ingest" },
+    { name = "smartparks-protect-rules" },
     { name = "smartparks-protect-shared" },
     { name = "types-openpyxl" },
 ]
@@ -1239,9 +1243,11 @@ dev = [
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "ruff", specifier = "==0.16.5" },
     { name = "smartparks-protect-api", editable = "services/api" },
+    { name = "smartparks-protect-automation", editable = "services/automation" },
     { name = "smartparks-protect-decoder", editable = "services/decoder" },
     { name = "smartparks-protect-export", editable = "services/export" },
     { name = "smartparks-protect-ingest", editable = "services/ingest" },
+    { name = "smartparks-protect-rules", editable = "services/rules" },
     { name = "smartparks-protect-shared", editable = "shared" },
     { name = "types-openpyxl", specifier = "==3.1.5.20260827" },
 ]
@@ -1282,6 +1288,17 @@ requires-dist = [
 ]
 
 [[package]]
+name = "smartparks-protect-automation"
+version = "0.0.0"
+source = { editable = "services/automation" }
+dependencies = [
+    { name = "smartparks-protect-shared" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "smartparks-protect-shared", editable = "shared" }]
+
+[[package]]
 name = "smartparks-protect-decoder"
 version = "0.0.0"
 source = { editable = "services/decoder" }
@@ -1315,37 +1332,56 @@ dependencies = [
 requires-dist = [{ name = "smartparks-protect-shared", editable = "shared" }]
 
 [[package]]
+name = "smartparks-protect-rules"
+version = "0.0.0"
+source = { editable = "services/rules" }
+dependencies = [
+    { name = "smartparks-protect-shared" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "smartparks-protect-shared", editable = "shared" }]
+
+[[package]]
 name = "smartparks-protect-shared"
 version = "0.0.0"
 source = { editable = "shared" }
 dependencies = [
     { name = "aiomqtt" },
+    { name = "aiosmtplib" },
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "cryptography" },
     { name = "geoalchemy2" },
+    { name = "httpx" },
+    { name = "jinja2" },
     { name = "minio" },
     { name = "openpyxl" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "redis" },
+    { name = "shapely" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aiomqtt", specifier = "==2.5.1" },
+    { name = "aiosmtplib", specifier = "==5.1.2" },
     { name = "alembic", specifier = "==1.19.1" },
     { name = "asyncpg", specifier = "==0.31.0" },
     { name = "cryptography", specifier = "==50.0.1" },
     { name = "geoalchemy2", specifier = "==0.20.0" },
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "jinja2", specifier = "==3.1.6" },
     { name = "minio", specifier = "==7.2.20" },
     { name = "openpyxl", specifier = "==3.1.5" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.5" },
     { name = "pydantic", specifier = "==2.13.5" },
     { name = "pydantic-settings", specifier = "==2.15.0" },
     { name = "redis", specifier = "==8.1.0" },
+    { name = "shapely", specifier = "==2.1.2" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.52" },
 ]
 

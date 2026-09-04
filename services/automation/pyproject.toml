@@ -1,0 +1,16 @@
+[project]
+name = "smartparks-protect-automation"
+version = "0.0.0"
+description = "Smart Parks Protect automation service: runs actions and delivers notifications."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "smartparks-protect-shared",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "protect_automation"
+module-root = ""
