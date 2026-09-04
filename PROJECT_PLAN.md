@@ -19,8 +19,8 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 7, production LoRaWAN networks and the dev server (built from documentation; live verification waits for accounts and a VM) |
 | Latest release | v0.4.0 (2026-09-04); phase 7 in progress |
 | Last session | 2026-09-04 |
-| Next item | Phase 7 live items when Tim provides KPN, LORIOT and Netmore access plus a dev VM and domain; meanwhile phase 8 items that need no network |
-| Blockers | Phase 7 live verification: no KPN, LORIOT or Netmore account, no dev VM, no domain yet |
+| Next item | Phase 8 items that need no network (integration framework with durable deliveries, EarthRanger via Gundi needs a key, Traccar proof of concept, gateway registry); phase 7 live items whenever Tim provides KPN, LORIOT, Netmore or akenza access plus a dev VM and a domain |
+| Blockers | Phase 7 live verification: no KPN, LORIOT, Netmore or akenza account in use yet, no dev VM, no domain; the deep link paths for Netmore and akenza are guesses until seen live |
 
 ## What we are building
 
