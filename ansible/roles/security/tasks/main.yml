@@ -93,7 +93,8 @@
   assert:
     that:
       - "'passwordauthentication no' in sshd_effective.stdout"
-      - "'permitrootlogin prohibit-password' in sshd_effective.stdout"
+      # sshd -T prints the older spelling of prohibit-password
+      - "'permitrootlogin without-password' in sshd_effective.stdout or 'permitrootlogin prohibit-password' in sshd_effective.stdout"
     fail_msg: "sshd still allows password login; another config file overrides the drop-in"
     quiet: true
 

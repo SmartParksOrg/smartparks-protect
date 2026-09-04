@@ -335,7 +335,9 @@ services:
       - api
       - mcp
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      # Localhost only: nginx on the server is the public face, and a port Docker publishes on
+      # every interface bypasses the host firewall.
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
 
   # ChirpStack profile: a local LoRaWAN network server for end-to-end testing (phase 3).
   chirpstack-postgres:

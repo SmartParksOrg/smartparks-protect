@@ -1,4 +1,9 @@
 ---
+# Notified handlers (nginx reload after the TLS site) run before the check, so a finding
+# never leaves the server half configured.
+- name: Apply pending handlers
+  meta: flush_handlers
+
 - name: Install the security check
   template:
     src: security-check.sh.j2
