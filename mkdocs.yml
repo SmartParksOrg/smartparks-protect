@@ -53,6 +53,7 @@ nav:
   - Getting started:
       - getting-started/index.md
       - Deployment: getting-started/deployment.md
+      - Demonstration: getting-started/demonstration.md
   - Concepts:
       - concepts/index.md
       - Domain model: concepts/domain-model.md
@@ -77,6 +78,11 @@ nav:
       - LORIOT: integrations/loriot/index.md
       - Netmore: integrations/netmore/index.md
       - akenza.io: integrations/akenza/index.md
+      - Traccar: integrations/traccar/index.md
+      - AddaxAI Connect: integrations/addaxai-connect/index.md
+      - Gateways and connectivity: integrations/gateways.md
+      - Outbound integrations: integrations/outbound.md
+      - EarthRanger via Gundi: integrations/earthranger-gundi/index.md
   - Analytics:
       - analytics/index.md
       - Data Explorer: analytics/data-explorer.md
@@ -110,3 +116,4 @@ nav:
       - adr/0011-connectivity-adapter-boundary.md
       - adr/0012-rule-representation.md
       - adr/0013-control-action-schema.md
+      - adr/0014-integration-deliveries.md

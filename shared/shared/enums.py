@@ -218,3 +218,27 @@ class DeliveryStatus(StrEnum):
     SENT = "sent"
     FAILED = "failed"
     SKIPPED = "skipped"
+
+
+class IntegrationObjectType(StrEnum):
+    """What an outbound integration forwards (architecture 18)."""
+
+    POSITION = "position"
+    EVENT = "event"
+    MEASUREMENT = "measurement"
+
+
+class DeliveryOrigin(StrEnum):
+    """How an integration delivery row came to exist."""
+
+    LIVE = "live"
+    BACKFILL = "backfill"
+    RETRY = "retry"
+    TEST = "test"
+
+
+class BackfillStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"

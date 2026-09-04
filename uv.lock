@@ -10,6 +10,7 @@ members = [
     "smartparks-protect-decoder",
     "smartparks-protect-export",
     "smartparks-protect-ingest",
+    "smartparks-protect-integration",
     "smartparks-protect-rules",
     "smartparks-protect-shared",
 ]
@@ -1223,6 +1224,7 @@ dev = [
     { name = "smartparks-protect-decoder" },
     { name = "smartparks-protect-export" },
     { name = "smartparks-protect-ingest" },
+    { name = "smartparks-protect-integration" },
     { name = "smartparks-protect-rules" },
     { name = "smartparks-protect-shared" },
     { name = "types-openpyxl" },
@@ -1247,6 +1249,7 @@ dev = [
     { name = "smartparks-protect-decoder", editable = "services/decoder" },
     { name = "smartparks-protect-export", editable = "services/export" },
     { name = "smartparks-protect-ingest", editable = "services/ingest" },
+    { name = "smartparks-protect-integration", editable = "services/integration" },
     { name = "smartparks-protect-rules", editable = "services/rules" },
     { name = "smartparks-protect-shared", editable = "shared" },
     { name = "types-openpyxl", specifier = "==3.1.5.20260827" },
@@ -1324,6 +1327,17 @@ requires-dist = [{ name = "smartparks-protect-shared", editable = "shared" }]
 name = "smartparks-protect-ingest"
 version = "0.0.0"
 source = { editable = "services/ingest" }
+dependencies = [
+    { name = "smartparks-protect-shared" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "smartparks-protect-shared", editable = "shared" }]
+
+[[package]]
+name = "smartparks-protect-integration"
+version = "0.0.0"
+source = { editable = "services/integration" }
 dependencies = [
     { name = "smartparks-protect-shared" },
 ]

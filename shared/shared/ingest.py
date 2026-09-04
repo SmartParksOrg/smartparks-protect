@@ -12,21 +12,63 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from geoalchemy2.shape import from_shape
+from shapely.geometry import Point
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
-from shared.connectivity.base import AdapterCapabilities, DataSourceContext, InboundMessage
-from shared.enums import ProcessingStatus, TraceClass
+from shared.connectivity.base import (
+    AdapterCapabilities,
+    DataSourceContext,
+    GatewayReceptionData,
+    GatewayUpdate,
+    InboundMessage,
+)
+from shared.database import session_scope
+from shared.enums import ConnectivityStatus, ProcessingStatus, TraceClass
 from shared.logger import get_logger
-from shared.models import DataSource, ExternalIdentity, GatewayReception, SourceEvent
+from shared.models import (
+    DataSource,
+    DataSourceCursor,
+    ExternalIdentity,
+    Gateway,
+    GatewayReception,
+    SourceEvent,
+)
 from shared.secrets import decrypt_json
 from shared.storage import put_object, sha256
 from shared.timeutil import utc_now
 from shared.trace import Tracer
 
 log = get_logger("ingest")
+
+
+class DatabaseCursorStore:
+    """Polling cursor of one data source in `data_source_cursors`, its own short transaction so
+    a connector can save between pages without touching the ingest session."""
+
+    def __init__(self, data_source_id: uuid.UUID) -> None:
+        self.data_source_id = data_source_id
+
+    async def load(self) -> dict[str, Any]:
+        async with session_scope() as session:
+            row = await session.get(DataSourceCursor, self.data_source_id)
+            return dict(row.state) if row is not None else {}
+
+    async def save(self, state: dict[str, Any]) -> None:
+        async with session_scope() as session:
+            await session.execute(
+                insert(DataSourceCursor)
+                .values(data_source_id=self.data_source_id, state=state, updated_at=utc_now())
+                .on_conflict_do_update(
+                    index_elements=[DataSourceCursor.data_source_id],
+                    set_={"state": state, "updated_at": utc_now()},
+                )
+            )
+            await session.commit()
 
 
 def data_source_context(source: DataSource) -> DataSourceContext:
@@ -38,13 +80,100 @@ def data_source_context(source: DataSource) -> DataSourceContext:
         config=dict(source.config),
         credentials=credentials,
         capabilities=AdapterCapabilities.model_validate(source.capabilities),
+        cursors=DatabaseCursorStore(source.id),
     )
+
+
+def _status(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).lower()
+    if text in ("online", "offline"):
+        return text
+    return ConnectivityStatus.UNKNOWN
+
+
+async def upsert_gateways(
+    session: AsyncSession,
+    data_source_id: uuid.UUID,
+    receptions: list[GatewayReceptionData],
+    now: datetime,
+) -> None:
+    """Every gateway that received something exists in the registry (architecture 20, D66).
+    A reception's `location` attribute (ChirpStack shape) fills the position once."""
+    for reception in receptions:
+        if not reception.gateway_id:
+            continue
+        location = reception.attributes.get("location") if reception.attributes else None
+        update = GatewayUpdate(gateway_id=reception.gateway_id, seen_at=now)
+        if isinstance(location, dict):
+            update.latitude = location.get("latitude")
+            update.longitude = location.get("longitude")
+            update.altitude_m = location.get("altitude")
+        await apply_gateway_update(session, data_source_id, update, now, from_reception=True)
+
+
+async def apply_gateway_update(
+    session: AsyncSession,
+    data_source_id: uuid.UUID,
+    update: GatewayUpdate,
+    now: datetime,
+    *,
+    from_reception: bool = False,
+) -> Gateway:
+    gateway_id = update.gateway_id.lower()
+    gateway = await session.scalar(
+        select(Gateway).where(
+            Gateway.data_source_id == data_source_id, Gateway.external_id == gateway_id
+        )
+    )
+    seen = update.seen_at or now
+    if gateway is None:
+        gateway = Gateway(
+            data_source_id=data_source_id,
+            external_id=gateway_id,
+            first_seen_at=seen,
+            status=ConnectivityStatus.UNKNOWN,
+        )
+        session.add(gateway)
+    if gateway.last_seen_at is None or seen > gateway.last_seen_at:
+        gateway.last_seen_at = seen
+    if from_reception:
+        gateway.status = ConnectivityStatus.ONLINE
+    elif update.status is not None:
+        gateway.status = _status(update.status) or ConnectivityStatus.UNKNOWN
+    if (update.name and not gateway.name) or (update.name and not from_reception):
+        gateway.name = update.name
+    if update.latitude is not None and update.longitude is not None:
+        latitude: float | None
+        longitude: float | None
+        try:
+            latitude, longitude = float(update.latitude), float(update.longitude)
+        except (TypeError, ValueError):
+            latitude = longitude = None
+        if (
+            latitude is not None
+            and longitude is not None
+            and -90 <= latitude <= 90
+            and -180 <= longitude <= 180
+            and (latitude, longitude) != (0.0, 0.0)
+        ):
+            gateway.geom = from_shape(Point(longitude, latitude), srid=4326)
+            if update.altitude_m is not None:
+                gateway.altitude_m = float(update.altitude_m)
+    if update.stats:
+        gateway.stats = {**gateway.stats, **update.stats}
+        gateway.last_stats_at = seen
+    if update.attributes:
+        gateway.attributes = {**gateway.attributes, **update.attributes}
+    await session.flush()
+    return gateway
 
 
 @dataclass(slots=True)
 class StoredEvent:
     source_event: SourceEvent
-    topic: str
+    topic: str | None
     payload: dict[str, Any]
     trace_id: uuid.UUID
     identity: ExternalIdentity | None
@@ -110,7 +239,15 @@ async def store_inbound(
         ingestion_method=message.ingestion_method,
         processing_status=ProcessingStatus.IGNORED
         if ignored
-        else (ProcessingStatus.RECEIVED if device_id else ProcessingStatus.UNASSIGNED),
+        else (
+            ProcessingStatus.RECEIVED
+            if device_id
+            else (
+                ProcessingStatus.PROCESSED
+                if message.gateway is not None
+                else ProcessingStatus.UNASSIGNED
+            )
+        ),
         provider_metadata=message.provider_metadata,
         network_received_at=message.network_received_at,
         satellite_delivered_at=message.satellite_delivered_at,
@@ -147,6 +284,9 @@ async def store_inbound(
             )
         )
 
+    if message.gateway_receptions:
+        await upsert_gateways(session, source.id, message.gateway_receptions, now)
+
     tracer.trace.root_object_id = str(event.id)
     async with tracer.step(
         "ingest",
@@ -155,6 +295,16 @@ async def store_inbound(
         metadata={"inline": event.payload is not None, "bytes": len(raw)},
     ):
         pass
+    if message.gateway is not None:
+        async with tracer.step(
+            "ingest", "gateway updated", input_ref=f"gateway:{message.gateway.gateway_id}"
+        ) as step:
+            gateway = await apply_gateway_update(session, source.id, message.gateway, now)
+            step.output_ref = f"gateway:{gateway.id}"
+        await tracer.finish()
+        return StoredEvent(
+            source_event=event, topic=None, payload={}, trace_id=tracer.trace_id, identity=None
+        )
     async with tracer.step(
         "ingest", "identity resolved", input_ref=f"external_id:{message.external_id}"
     ) as step:
@@ -204,7 +354,8 @@ async def commit_and_publish(
 ) -> None:
     await session.commit()
     for item in stored:
-        await bus.publish(item.topic, item.payload, trace_id=str(item.trace_id))
+        if item.topic is not None:
+            await bus.publish(item.topic, item.payload, trace_id=str(item.trace_id))
 
 
 async def republish_source_event(bus: RedisStreamsBus, event: SourceEvent) -> str:

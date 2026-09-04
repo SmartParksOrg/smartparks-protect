@@ -4,8 +4,10 @@ phase 1; credentials are written, never read back."""
 import uuid
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
@@ -20,12 +22,15 @@ from protect_api.schemas.domain import (
     ExternalIdentityRead,
     ExternalIdentityUpdate,
 )
+from protect_api.schemas.integrations import CursorReset, GatewaySyncResult
 from shared.config import get_settings
 from shared.connectivity.registry import ADAPTERS, describe_adapter
 from shared.connectivity.transports.http import hash_token, new_webhook_token
 from shared.database import get_session
+from shared.ingest import apply_gateway_update, data_source_context
 from shared.models import (
     DataSource,
+    DataSourceCursor,
     DataSourceProjectScope,
     Device,
     ExternalIdentity,
@@ -33,6 +38,8 @@ from shared.models import (
     User,
 )
 from shared.secrets import encrypt_json
+from shared.timeutil import utc_now
+from shared.trace import ApplicationError
 
 router = APIRouter(
     prefix="/data-sources", tags=["data sources"], dependencies=[Depends(require_server_admin)]
@@ -155,6 +162,97 @@ async def rotate_webhook_token(
     data = await _read(session, source)
     data.webhook_token = token
     return data
+
+
+@router.get("/{data_source_id}/cursor", response_model=dict[str, Any])
+async def get_cursor(
+    data_source_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    """Where a polling connector is."""
+    await get_or_404(session, DataSource, data_source_id, "Data source")
+    row = await session.get(DataSourceCursor, data_source_id)
+    return dict(row.state) if row is not None else {}
+
+
+@router.post("/{data_source_id}/cursor", response_model=dict[str, Any])
+async def reset_cursor(
+    data_source_id: uuid.UUID,
+    body: CursorReset,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Rescan from an instant (or from the adapter's default window when empty). The
+    connector picks the new cursor up at its next poll; records it already stored are
+    deduplicated by their canonical keys."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    adapter = ADAPTERS.get(source.adapter_key)
+    if adapter is None or not getattr(adapter, "polling", False):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "this data source's adapter does not poll"
+        )
+    state: dict[str, Any] = {
+        "since": body.since.isoformat() if body.since else None,
+        "reset_at": utc_now().isoformat(),
+        "reset_by": user.email,
+    }
+    await session.execute(
+        insert(DataSourceCursor)
+        .values(data_source_id=source.id, state=state, updated_at=utc_now())
+        .on_conflict_do_update(
+            index_elements=[DataSourceCursor.data_source_id],
+            set_={"state": state, "updated_at": utc_now()},
+        )
+    )
+    await record_audit(
+        session,
+        user=user,
+        action="data_source.cursor_reset",
+        object_type="data_source",
+        object_id=str(source.id),
+        details=state,
+    )
+    await session.commit()
+    return state
+
+
+@router.post("/{data_source_id}/sync-gateways", response_model=GatewaySyncResult)
+async def sync_gateways(
+    data_source_id: uuid.UUID,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> GatewaySyncResult:
+    """Read the platform's gateway list into the registry: names, locations, states."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    adapter = ADAPTERS.get(source.adapter_key)
+    factory = getattr(adapter, "management_connector", None)
+    connector = factory(data_source_context(source)) if factory else None
+    lister = getattr(connector, "list_gateway_updates", None)
+    if lister is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "this data source's adapter does not list gateways",
+        )
+    try:
+        updates = await lister()
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"platform unreachable: {error}"
+        ) from error
+    now = utc_now()
+    for update in updates:
+        await apply_gateway_update(session, source.id, update, now)
+    await record_audit(
+        session,
+        user=user,
+        action="data_source.gateways_synced",
+        object_type="data_source",
+        object_id=str(source.id),
+        details={"synced": len(updates)},
+    )
+    await session.commit()
+    return GatewaySyncResult(synced=len(updates))
 
 
 @router.get("/{data_source_id}", response_model=DataSourceRead)

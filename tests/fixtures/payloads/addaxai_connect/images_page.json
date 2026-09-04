@@ -1,0 +1,92 @@
+{
+  "items": [
+    {
+      "uuid": "6b2b7f2e-1c1d-4e0a-9d7d-0a1b2c3d4e5f",
+      "filename": "IMG_0421.JPG",
+      "camera_id": 17,
+      "camera_name": "Camera 17",
+      "site_name": "Waterhole north",
+      "captured_at": "2026-09-04T05:12:30+00:00",
+      "status": "classified",
+      "detection_count": 1,
+      "top_species": "wolf",
+      "max_confidence": 0.94,
+      "thumbnail_url": "/api/images/6b2b7f2e-1c1d-4e0a-9d7d-0a1b2c3d4e5f/thumbnail",
+      "detections": [
+        {
+          "id": 9001,
+          "category": "animal",
+          "bbox": {"x": 0.12, "y": 0.3, "width": 0.4, "height": 0.35},
+          "confidence": 0.97,
+          "classifications": [{"id": 1, "species": "wolf", "confidence": 0.94}]
+        }
+      ],
+      "image_width": 4000,
+      "image_height": 3000,
+      "is_verified": false,
+      "is_liked": false,
+      "needs_review": false,
+      "observed_species": []
+    },
+    {
+      "uuid": "7c3c8a3f-2d2e-4f1b-8e8e-1b2c3d4e5f60",
+      "filename": "IMG_0420.JPG",
+      "camera_id": 17,
+      "camera_name": "Camera 17",
+      "site_name": "Waterhole north",
+      "captured_at": "2026-09-04T04:58:02+00:00",
+      "status": "classified",
+      "detection_count": 1,
+      "top_species": "person",
+      "max_confidence": 0.81,
+      "thumbnail_url": null,
+      "detections": [
+        {
+          "id": 9000,
+          "category": "person",
+          "bbox": {"x": 0.5, "y": 0.2, "width": 0.2, "height": 0.6},
+          "confidence": 0.81,
+          "classifications": []
+        }
+      ],
+      "image_width": 4000,
+      "image_height": 3000,
+      "is_verified": false,
+      "is_liked": false,
+      "needs_review": true,
+      "observed_species": []
+    },
+    {
+      "uuid": "8d4d9b40-3e3f-4a2c-9f9f-2c3d4e5f6071",
+      "filename": "IMG_0419.JPG",
+      "camera_id": 18,
+      "camera_name": "Camera 18",
+      "site_name": null,
+      "captured_at": "2026-09-04T03:20:45+00:00",
+      "status": "classified",
+      "detection_count": 1,
+      "top_species": "red_fox",
+      "max_confidence": 0.31,
+      "thumbnail_url": null,
+      "detections": [
+        {
+          "id": 8999,
+          "category": "animal",
+          "bbox": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2},
+          "confidence": 0.88,
+          "classifications": [{"id": 2, "species": "red_fox", "confidence": 0.31}]
+        }
+      ],
+      "image_width": 4000,
+      "image_height": 3000,
+      "is_verified": false,
+      "is_liked": false,
+      "needs_review": false,
+      "observed_species": []
+    }
+  ],
+  "total": 3,
+  "page": 1,
+  "limit": 100,
+  "pages": 1
+}

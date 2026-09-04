@@ -213,6 +213,18 @@ services:
         condition: service_healthy
     environment: *python-env
 
+  integration:
+    container_name: protect-integration
+    build: *python-build
+    restart: unless-stopped
+    command: ["/app/.venv/bin/python", "-m", "protect_integration.main"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment: *python-env
+
   frontend:
     container_name: protect-frontend
     build:

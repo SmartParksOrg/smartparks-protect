@@ -36,6 +36,8 @@ const AlertsPage = lazy(() => import("@/pages/project/AlertsPage").then((m) => (
 const AutomationsPage = lazy(() => import("@/pages/project/AutomationsPage").then((m) => ({ default: m.AutomationsPage })));
 const NotificationsPage = lazy(() => import("@/pages/project/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 const CommandsPage = lazy(() => import("@/pages/project/CommandsPage").then((m) => ({ default: m.CommandsPage })));
+const IntegrationsPage = lazy(() => import("@/pages/project/IntegrationsPage").then((m) => ({ default: m.IntegrationsPage })));
+const GatewaysPage = lazy(() => import("@/pages/project/GatewaysPage").then((m) => ({ default: m.GatewaysPage })));
 const AdminAlertsPage = lazy(() => import("@/pages/project/AlertsPage").then((m) => ({ default: m.AdminAlertsPage })));
 const AdminAutomationsPage = lazy(() => import("@/pages/project/AutomationsPage").then((m) => ({ default: m.AdminAutomationsPage })));
 const AdminNotificationsPage = lazy(() => import("@/pages/project/NotificationsPage").then((m) => ({ default: m.AdminNotificationsPage })));
@@ -71,6 +73,8 @@ export default function App() {
               <Route path="analyze/explorer" element={<ExplorerPage />} />
               <Route path="analyze/exports" element={<ExportsPage />} />
               <Route path="network/traffic" element={<TrafficPage />} />
+              <Route path="network/gateways" element={<GatewaysPage />} />
+              <Route path="integrate/integrations" element={<IntegrationsPage />} />
               <Route path="network/traces" element={<TracesPage />} />
               <Route path="admin/members" element={<MembersPage />} />
               <Route path="admin/features" element={<FeaturesPage />} />

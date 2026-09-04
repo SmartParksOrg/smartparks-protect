@@ -1,0 +1,32 @@
+[
+  {
+    "id": 17,
+    "name": "Ranger truck 2",
+    "uniqueId": "356938035643809",
+    "status": "online",
+    "disabled": false,
+    "lastUpdate": "2026-09-04T09:15:03Z",
+    "positionId": 9001,
+    "groupId": null,
+    "phone": null,
+    "model": "FMB920",
+    "contact": null,
+    "category": "truck",
+    "attributes": {}
+  },
+  {
+    "id": 18,
+    "name": "Quad bike",
+    "uniqueId": "356938035643810",
+    "status": "offline",
+    "disabled": false,
+    "lastUpdate": "2026-09-03T18:40:11Z",
+    "positionId": 8877,
+    "groupId": null,
+    "phone": null,
+    "model": null,
+    "contact": null,
+    "category": "motorcycle",
+    "attributes": {}
+  }
+]

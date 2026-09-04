@@ -3,14 +3,22 @@
 Payload fields (all optional): `time` (ISO 8601 with offset, or unix seconds), `latitude` or
 `lat`, `longitude` or `lon`, `altitude`, `speed` (m/s), `heading`, `accuracy`, `satellites`,
 `measurements` (object of metric key to value), `state` (object), `events` (list of objects
-with `type`, `title`, optional `severity` and `context`). Without `time` the network receive
-time is canonical (NETWORK_TIME semantics).
+with `type`, `title`, optional `severity`, `description`, `context`, `lat` and `lon`). Without
+`time` the network receive time is canonical (NETWORK_TIME semantics). Application platforms
+whose data arrives decoded (a tracking server, a camera platform) deliver this shape and keep
+the original record under `raw`, which the driver ignores.
+
+The driver declares one control action, `PLATFORM_COMMAND`: a platform-level command (`type`
+plus attributes) encoded as JSON for an adapter whose platform relays commands to its devices.
 """
 
 import json
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
+from pydantic import BaseModel, ConfigDict, Field
+
+from shared.control.actions import ConfirmationPolicy, ControlAction, EncodedCommand
 from shared.device_drivers.base import (
     DEFAULT_DECODABLE_EVENT_TYPES,
     DecodedEvent,
@@ -72,7 +80,9 @@ class GenericJsonDriver:
         "event": TimestampSemantics.DEVICE_TIME,
     }
 
-    decodable_event_types: ClassVar[frozenset[str]] = DEFAULT_DECODABLE_EVENT_TYPES
+    decodable_event_types: ClassVar[frozenset[str]] = DEFAULT_DECODABLE_EVENT_TYPES | frozenset(
+        {"position", "event", "state", "detection"}
+    )
 
     def decode(self, event: SourceEventData) -> DecodedRecords:
         payload: Any = event.payload
@@ -137,13 +147,54 @@ class GenericJsonDriver:
         for item in payload.get("events") or []:
             if not isinstance(item, dict) or "type" not in item:
                 continue
+            event_time = time
+            if item.get("time") not in (None, ""):
+                event_time, _ = _time(item, event)
             records.events.append(
                 DecodedEvent(
-                    time=time,
+                    time=event_time,
                     event_type=str(item["type"]),
                     title=str(item.get("title") or item["type"]),
                     severity=Severity(item.get("severity", "info")),
+                    description=str(item["description"]) if item.get("description") else None,
                     context=dict(item.get("context") or {}),
+                    latitude=_number(item, "latitude", "lat"),
+                    longitude=_number(item, "longitude", "lon", "lng"),
                 )
             )
         return records
+
+    control_actions: ClassVar[dict[str, Any]] = {}
+
+
+class PlatformCommandParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = Field(min_length=1, max_length=64, description="Command type of the platform")
+    attributes: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters the platform expects for that type"
+    )
+
+
+def _encode_platform_command(params: BaseModel) -> EncodedCommand:
+    return EncodedCommand(
+        payload=json.dumps(params.model_dump(), separators=(",", ":")).encode(),
+        f_port=0,
+        metadata={"encoding": "json"},
+    )
+
+
+GenericJsonDriver.control_actions = {
+    "PLATFORM_COMMAND": ControlAction(
+        key="PLATFORM_COMMAND",
+        label="Platform command",
+        description=(
+            "Send a command the platform relays to the device: its type and attributes as "
+            "JSON. The adapter of the route maps it to the platform's command API."
+        ),
+        parameters=PlatformCommandParameters,
+        encode=_encode_platform_command,
+        confirmation=ConfirmationPolicy.CONFIRM,
+        required_capability="downlink",
+    )
+}

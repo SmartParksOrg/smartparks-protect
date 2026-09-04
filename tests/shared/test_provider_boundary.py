@@ -10,7 +10,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PROVIDERS = re.compile(
-    r"(chirpstack|loriot|kpn|thingpark|actility|netmore|akenza|traccar|cloudloop)", re.I
+    r"\b(chirpstack|loriot|kpn|thingpark|actility|netmore|akenza|traccar|cloudloop|addaxai"
+    r"|gundi|earthranger)\b",
+    re.I,
 )
 
 # Places that may name providers: the adapters, their registry, provider docs and fixtures,
@@ -19,6 +21,8 @@ PROVIDERS = re.compile(
 ALLOWED_BACKEND = (
     "shared/shared/connectivity/adapters/",
     "shared/shared/connectivity/registry.py",
+    "shared/shared/integrations/connectors/",
+    "shared/shared/integrations/registry.py",
     "shared/shared/enums.py",
     "shared/shared/device_drivers/opencollar/",
     "scripts/chirpstack_bootstrap.py",
@@ -33,6 +37,7 @@ BACKEND_ROOTS = (
     "services/export",
     "services/rules",
     "services/automation",
+    "services/integration",
     "scripts",
 )
 

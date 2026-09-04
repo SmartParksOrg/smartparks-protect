@@ -3803,6 +3803,165 @@
     }
    }
   },
+  "/api/v1/data-sources/{data_source_id}/cursor": {
+   "get": {
+    "tags": [
+     "data sources"
+    ],
+    "summary": "Get Cursor",
+    "description": "Where a polling connector is.",
+    "operationId": "get_cursor_api_v1_data_sources__data_source_id__cursor_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "data_source_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Data Source Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Cursor Api V1 Data Sources  Data Source Id  Cursor Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "data sources"
+    ],
+    "summary": "Reset Cursor",
+    "description": "Rescan from an instant (or from the adapter's default window when empty). The\nconnector picks the new cursor up at its next poll; records it already stored are\ndeduplicated by their canonical keys.",
+    "operationId": "reset_cursor_api_v1_data_sources__data_source_id__cursor_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "data_source_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Data Source Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CursorReset"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Reset Cursor Api V1 Data Sources  Data Source Id  Cursor Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/data-sources/{data_source_id}/sync-gateways": {
+   "post": {
+    "tags": [
+     "data sources"
+    ],
+    "summary": "Sync Gateways",
+    "description": "Read the platform's gateway list into the registry: names, locations, states.",
+    "operationId": "sync_gateways_api_v1_data_sources__data_source_id__sync_gateways_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "data_source_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Data Source Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GatewaySyncResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/data-sources/{data_source_id}": {
    "get": {
     "tags": [
@@ -10777,6 +10936,1112 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/integrations/connectors": {
+   "get": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "List Connectors",
+    "operationId": "list_connectors_api_v1_projects__project_id__integrations_connectors_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response List Connectors Api V1 Projects  Project Id  Integrations Connectors Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations": {
+   "get": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "List Integrations",
+    "operationId": "list_integrations_api_v1_projects__project_id__integrations_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_IntegrationRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Create Integration",
+    "operationId": "create_integration_api_v1_projects__project_id__integrations_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IntegrationCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/deliveries": {
+   "get": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "List Deliveries",
+    "operationId": "list_deliveries_api_v1_projects__project_id__integrations_deliveries_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "integration_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/DeliveryStatus"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "object_type",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Object Type"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_IntegrationDeliveryRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/deliveries/{delivery_id}": {
+   "get": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Get Delivery",
+    "operationId": "get_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "delivery_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Delivery Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationDeliveryDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/deliveries/{delivery_id}/retry": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Retry Delivery",
+    "operationId": "retry_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__retry_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "delivery_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Delivery Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationDeliveryRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}": {
+   "get": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Get Integration",
+    "operationId": "get_integration_api_v1_projects__project_id__integrations__integration_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Update Integration",
+    "operationId": "update_integration_api_v1_projects__project_id__integrations__integration_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IntegrationUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Delete Integration",
+    "operationId": "delete_integration_api_v1_projects__project_id__integrations__integration_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}/test": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Test Integration",
+    "operationId": "test_integration_api_v1_projects__project_id__integrations__integration_id__test_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IntegrationTestRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationTestResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/integrations/{integration_id}/backfill": {
+   "post": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "Request Backfill",
+    "operationId": "request_backfill_api_v1_projects__project_id__integrations__integration_id__backfill_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "integration_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Integration Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BackfillRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/gateways": {
+   "get": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "Project Gateways",
+    "description": "Gateways that received the project's devices in the window, busiest first.",
+    "operationId": "project_gateways_api_v1_projects__project_id__gateways_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 720,
+       "minimum": 1,
+       "default": 24,
+       "title": "Hours"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 200,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/GatewayRead"
+         },
+         "title": "Response Project Gateways Api V1 Projects  Project Id  Gateways Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/gateways/{gateway_id}": {
+   "get": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "Project Gateway",
+    "operationId": "project_gateway_api_v1_projects__project_id__gateways__gateway_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "gateway_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Gateway Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 720,
+       "minimum": 1,
+       "default": 24,
+       "title": "Hours"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GatewayDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/connectivity": {
+   "get": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "Project Connectivity",
+    "description": "Gateway diversity per device: how many gateways heard it, which one most often and\nhow large that gateway's share is, mean signal, last reception.",
+    "operationId": "project_connectivity_api_v1_projects__project_id__connectivity_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 720,
+       "minimum": 1,
+       "default": 24,
+       "title": "Hours"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 200,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/DeviceConnectivity"
+         },
+         "title": "Response Project Connectivity Api V1 Projects  Project Id  Connectivity Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/gateways": {
+   "get": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "All Gateways",
+    "operationId": "all_gateways_api_v1_admin_gateways_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "data_source_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Data Source Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_GatewayRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/gateways/{gateway_id}": {
+   "patch": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "Update Gateway",
+    "operationId": "update_gateway_api_v1_admin_gateways__gateway_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "gateway_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Gateway Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GatewayUpdateRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GatewayRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/version": {
    "get": {
     "tags": [
@@ -11815,6 +13080,26 @@
     "type": "object",
     "title": "AutomationUpdate"
    },
+   "BackfillRequest": {
+    "properties": {
+     "time_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time From"
+     },
+     "time_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time To"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time_from",
+     "time_to"
+    ],
+    "title": "BackfillRequest"
+   },
    "BearerResponse": {
     "properties": {
      "access_token": {
@@ -12453,6 +13738,25 @@
     ],
     "title": "CurrentStateResponse"
    },
+   "CursorReset": {
+    "properties": {
+     "since": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Since",
+      "description": "Rescan from this instant; empty resets to the default window"
+     }
+    },
+    "type": "object",
+    "title": "CursorReset"
+   },
    "DataSourceCreate": {
     "properties": {
      "name": {
@@ -12869,6 +14173,16 @@
     ],
     "title": "DeliveryRead"
    },
+   "DeliveryStatus": {
+    "type": "string",
+    "enum": [
+     "queued",
+     "sent",
+     "failed",
+     "skipped"
+    ],
+    "title": "DeliveryStatus"
+   },
    "DependencyStatus": {
     "properties": {
      "status": {
@@ -12901,6 +14215,129 @@
      "latency_ms"
     ],
     "title": "DependencyStatus"
+   },
+   "DeviceConnectivity": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions"
+     },
+     "uplinks": {
+      "type": "integer",
+      "title": "Uplinks"
+     },
+     "gateway_count": {
+      "type": "integer",
+      "title": "Gateway Count"
+     },
+     "best_gateway_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Best Gateway Id"
+     },
+     "best_gateway_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Best Gateway Name"
+     },
+     "best_gateway_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Best Gateway Share",
+      "description": "Share of uplinks the best gateway received"
+     },
+     "mean_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Rssi"
+     },
+     "mean_snr": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Snr"
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     },
+     "gateways": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Gateways"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_name",
+     "receptions",
+     "uplinks",
+     "gateway_count",
+     "best_gateway_id",
+     "best_gateway_name",
+     "mean_rssi",
+     "mean_snr",
+     "last_reception_at"
+    ],
+    "title": "DeviceConnectivity"
    },
    "DeviceCreate": {
     "properties": {
@@ -14942,6 +16379,403 @@
     "type": "object",
     "title": "FeatureUpdate"
    },
+   "GatewayDetail": {
+    "properties": {
+     "gateway": {
+      "$ref": "#/components/schemas/GatewayRead"
+     },
+     "devices": {
+      "items": {
+       "$ref": "#/components/schemas/GatewayDeviceStat"
+      },
+      "type": "array",
+      "title": "Devices"
+     }
+    },
+    "type": "object",
+    "required": [
+     "gateway",
+     "devices"
+    ],
+    "title": "GatewayDetail"
+   },
+   "GatewayDeviceStat": {
+    "properties": {
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions"
+     },
+     "mean_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Rssi"
+     },
+     "mean_snr": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Snr"
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_name",
+     "receptions",
+     "mean_rssi",
+     "mean_snr",
+     "last_reception_at"
+    ],
+    "title": "GatewayDeviceStat"
+   },
+   "GatewayRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "data_source_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Data Source Id"
+     },
+     "data_source_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Source Name"
+     },
+     "external_id": {
+      "type": "string",
+      "title": "External Id"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "name_override": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name Override"
+     },
+     "display_name": {
+      "type": "string",
+      "title": "Display Name",
+      "default": ""
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "geometry": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Geometry"
+     },
+     "altitude_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Altitude M"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "first_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "First Seen At"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At"
+     },
+     "last_stats_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Stats At"
+     },
+     "stats": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Stats"
+     },
+     "attributes": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Attributes"
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions",
+      "default": 0
+     },
+     "devices": {
+      "type": "integer",
+      "title": "Devices",
+      "default": 0
+     },
+     "mean_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Rssi"
+     },
+     "mean_snr": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Snr"
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     },
+     "links": {
+      "items": {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Links"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "data_source_id",
+     "external_id",
+     "name",
+     "name_override",
+     "description",
+     "altitude_m",
+     "status",
+     "first_seen_at",
+     "last_seen_at",
+     "last_stats_at",
+     "stats",
+     "attributes",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "GatewayRead"
+   },
+   "GatewaySyncResult": {
+    "properties": {
+     "synced": {
+      "type": "integer",
+      "title": "Synced"
+     }
+    },
+    "type": "object",
+    "required": [
+     "synced"
+    ],
+    "title": "GatewaySyncResult"
+   },
+   "GatewayUpdateRequest": {
+    "properties": {
+     "name_override": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name Override"
+     },
+     "latitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 90.0,
+        "minimum": -90.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latitude"
+     },
+     "longitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 180.0,
+        "minimum": -180.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Longitude"
+     },
+     "altitude_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Altitude M"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "title": "GatewayUpdateRequest"
+   },
    "GeoJSONGeometry": {
     "properties": {
      "type": {
@@ -15141,6 +16975,1087 @@
      "trace_ids"
     ],
     "title": "IngestResponse"
+   },
+   "IntegrationCreate": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "connector_key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,62}$",
+      "title": "Connector Key"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "default": true
+     },
+     "config": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Config"
+     },
+     "credentials": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credentials",
+      "description": "Write only"
+     },
+     "object_types": {
+      "items": {
+       "$ref": "#/components/schemas/IntegrationObjectType"
+      },
+      "type": "array",
+      "title": "Object Types"
+     },
+     "entity_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "title": "Entity Ids"
+     },
+     "device_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "title": "Device Ids"
+     },
+     "event_types": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Event Types"
+     },
+     "metric_keys": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Metric Keys"
+     },
+     "min_severity": {
+      "$ref": "#/components/schemas/Severity",
+      "default": "info"
+     },
+     "max_object_age_seconds": {
+      "type": "integer",
+      "maximum": 31536000.0,
+      "minimum": 60.0,
+      "title": "Max Object Age Seconds",
+      "default": 86400
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "connector_key"
+    ],
+    "title": "IntegrationCreate"
+   },
+   "IntegrationDeliveryDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "integration_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Integration Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "object_type": {
+      "type": "string",
+      "title": "Object Type"
+     },
+     "object_id": {
+      "type": "string",
+      "title": "Object Id"
+     },
+     "object_version": {
+      "type": "integer",
+      "title": "Object Version"
+     },
+     "object_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Object Time"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "origin": {
+      "type": "string",
+      "title": "Origin"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "attempts": {
+      "type": "integer",
+      "title": "Attempts"
+     },
+     "next_attempt_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Attempt At"
+     },
+     "last_attempt_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Attempt At"
+     },
+     "delivered_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delivered At"
+     },
+     "external_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Id"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "request": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request"
+     },
+     "response": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Response"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "integration_id",
+     "project_id",
+     "object_type",
+     "object_id",
+     "object_version",
+     "object_time",
+     "entity_id",
+     "device_id",
+     "origin",
+     "status",
+     "attempts",
+     "next_attempt_at",
+     "last_attempt_at",
+     "delivered_at",
+     "external_id",
+     "error_code",
+     "error_message",
+     "trace_id",
+     "created_at",
+     "request",
+     "response"
+    ],
+    "title": "IntegrationDeliveryDetail"
+   },
+   "IntegrationDeliveryRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "integration_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Integration Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "object_type": {
+      "type": "string",
+      "title": "Object Type"
+     },
+     "object_id": {
+      "type": "string",
+      "title": "Object Id"
+     },
+     "object_version": {
+      "type": "integer",
+      "title": "Object Version"
+     },
+     "object_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Object Time"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "origin": {
+      "type": "string",
+      "title": "Origin"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "attempts": {
+      "type": "integer",
+      "title": "Attempts"
+     },
+     "next_attempt_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Attempt At"
+     },
+     "last_attempt_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Attempt At"
+     },
+     "delivered_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delivered At"
+     },
+     "external_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Id"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "integration_id",
+     "project_id",
+     "object_type",
+     "object_id",
+     "object_version",
+     "object_time",
+     "entity_id",
+     "device_id",
+     "origin",
+     "status",
+     "attempts",
+     "next_attempt_at",
+     "last_attempt_at",
+     "delivered_at",
+     "external_id",
+     "error_code",
+     "error_message",
+     "trace_id",
+     "created_at"
+    ],
+    "title": "IntegrationDeliveryRead"
+   },
+   "IntegrationDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "connector_key": {
+      "type": "string",
+      "title": "Connector Key"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "config": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Config"
+     },
+     "has_credentials": {
+      "type": "boolean",
+      "title": "Has Credentials",
+      "default": false
+     },
+     "object_types": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Object Types"
+     },
+     "entity_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Entity Ids"
+     },
+     "device_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Device Ids"
+     },
+     "event_types": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Event Types"
+     },
+     "metric_keys": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Metric Keys"
+     },
+     "min_severity": {
+      "type": "string",
+      "title": "Min Severity"
+     },
+     "max_object_age_seconds": {
+      "type": "integer",
+      "title": "Max Object Age Seconds"
+     },
+     "last_delivery_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Delivery At"
+     },
+     "last_error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Error"
+     },
+     "last_error_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Error At"
+     },
+     "backfill": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Backfill"
+     },
+     "created_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By User Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     },
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Counts",
+      "description": "Deliveries per status"
+     },
+     "counts_24h": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Counts 24H"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "name",
+     "description",
+     "connector_key",
+     "enabled",
+     "config",
+     "object_types",
+     "entity_ids",
+     "device_ids",
+     "event_types",
+     "metric_keys",
+     "min_severity",
+     "max_object_age_seconds",
+     "last_delivery_at",
+     "last_error",
+     "last_error_at",
+     "backfill",
+     "created_by_user_id",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "IntegrationDetail"
+   },
+   "IntegrationObjectType": {
+    "type": "string",
+    "enum": [
+     "position",
+     "event",
+     "measurement"
+    ],
+    "title": "IntegrationObjectType",
+    "description": "What an outbound integration forwards (architecture 18)."
+   },
+   "IntegrationRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "connector_key": {
+      "type": "string",
+      "title": "Connector Key"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "config": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Config"
+     },
+     "has_credentials": {
+      "type": "boolean",
+      "title": "Has Credentials",
+      "default": false
+     },
+     "object_types": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Object Types"
+     },
+     "entity_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Entity Ids"
+     },
+     "device_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Device Ids"
+     },
+     "event_types": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Event Types"
+     },
+     "metric_keys": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Metric Keys"
+     },
+     "min_severity": {
+      "type": "string",
+      "title": "Min Severity"
+     },
+     "max_object_age_seconds": {
+      "type": "integer",
+      "title": "Max Object Age Seconds"
+     },
+     "last_delivery_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Delivery At"
+     },
+     "last_error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Error"
+     },
+     "last_error_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Error At"
+     },
+     "backfill": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Backfill"
+     },
+     "created_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By User Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "name",
+     "description",
+     "connector_key",
+     "enabled",
+     "config",
+     "object_types",
+     "entity_ids",
+     "device_ids",
+     "event_types",
+     "metric_keys",
+     "min_severity",
+     "max_object_age_seconds",
+     "last_delivery_at",
+     "last_error",
+     "last_error_at",
+     "backfill",
+     "created_by_user_id",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "IntegrationRead"
+   },
+   "IntegrationTestRequest": {
+    "properties": {
+     "latitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 90.0,
+        "minimum": -90.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latitude"
+     },
+     "longitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 180.0,
+        "minimum": -180.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Longitude"
+     }
+    },
+    "type": "object",
+    "title": "IntegrationTestRequest"
+   },
+   "IntegrationTestResult": {
+    "properties": {
+     "ok": {
+      "type": "boolean",
+      "title": "Ok"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     },
+     "response": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Response"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ok",
+     "detail"
+    ],
+    "title": "IntegrationTestResult"
+   },
+   "IntegrationUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "enabled": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Enabled"
+     },
+     "config": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Config"
+     },
+     "credentials": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credentials",
+      "description": "Write only"
+     },
+     "object_types": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/IntegrationObjectType"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Object Types"
+     },
+     "entity_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Ids"
+     },
+     "device_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Ids"
+     },
+     "event_types": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Types"
+     },
+     "metric_keys": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Metric Keys"
+     },
+     "min_severity": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Severity"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "max_object_age_seconds": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 31536000.0,
+        "minimum": 60.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Object Age Seconds"
+     }
+    },
+    "type": "object",
+    "title": "IntegrationUpdate"
    },
    "InvitationCreate": {
     "properties": {
@@ -16342,6 +19257,87 @@
      "items"
     ],
     "title": "PageResponse[FeatureRead]"
+   },
+   "PageResponse_GatewayRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/GatewayRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[GatewayRead]"
+   },
+   "PageResponse_IntegrationDeliveryRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/IntegrationDeliveryRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[IntegrationDeliveryRead]"
+   },
+   "PageResponse_IntegrationRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/IntegrationRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[IntegrationRead]"
    },
    "PageResponse_InvitationRead_": {
     "properties": {

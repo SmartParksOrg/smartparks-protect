@@ -62,6 +62,9 @@ class DecodedEvent:
     severity: Severity = Severity.INFO
     context: dict[str, Any] = field(default_factory=dict)
     record_type: str = "event"
+    latitude: float | None = None
+    longitude: float | None = None
+    description: str | None = None
 
 
 @dataclass(slots=True)

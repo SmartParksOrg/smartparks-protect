@@ -18,7 +18,10 @@ from protect_api.routers.entities import router as entities_router
 from protect_api.routers.events import admin_router as admin_events_router
 from protect_api.routers.events import router as events_router
 from protect_api.routers.exports import router as exports_router
+from protect_api.routers.gateways import admin_router as admin_gateways_router
+from protect_api.routers.gateways import router as gateways_router
 from protect_api.routers.ingest import router as ingest_router
+from protect_api.routers.integrations import router as integrations_router
 from protect_api.routers.map import router as map_router
 from protect_api.routers.network import router as network_router
 from protect_api.routers.projects import router as projects_router
@@ -46,6 +49,9 @@ for router in (
     automations_router,
     admin_automations_router,
     control_router,
+    integrations_router,
+    gateways_router,
+    admin_gateways_router,
     realtime_router,
 ):
     v1_router.include_router(router)

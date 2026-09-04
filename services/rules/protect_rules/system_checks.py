@@ -19,7 +19,7 @@ from shared.timeutil import utc_now
 
 log = get_logger("rules.system")
 
-WORKERS = ("ingest", "decoder", "export", "rules", "automation")
+WORKERS = ("ingest", "decoder", "export", "rules", "automation", "integration")
 TOPICS = (
     Topic.SOURCE_EVENT_RECEIVED,
     Topic.POSITION_CREATED,
@@ -29,11 +29,11 @@ TOPICS = (
     Topic.EXPORT_REQUESTED,
 )
 CONSUMERS = {
-    Topic.SOURCE_EVENT_RECEIVED: "decoder",
-    Topic.POSITION_CREATED: "rules",
-    Topic.MEASUREMENT_CREATED: "rules",
-    Topic.EVENT_CREATED: "automation",
-    Topic.EXPORT_REQUESTED: "export",
+    Topic.SOURCE_EVENT_RECEIVED: ("decoder",),
+    Topic.POSITION_CREATED: ("rules", "integration"),
+    Topic.MEASUREMENT_CREATED: ("rules", "integration"),
+    Topic.EVENT_CREATED: ("automation", "integration"),
+    Topic.EXPORT_REQUESTED: ("export",),
 }
 LAG_THRESHOLD = 1_000
 DEAD_LETTER_THRESHOLD = 1
@@ -84,19 +84,21 @@ async def collect(bus: RedisStreamsBus) -> tuple[list[Finding], set[tuple[str, s
                     {"topic": topic, "count": count},
                 )
             )
-    for topic, group in CONSUMERS.items():
-        known.add((EVENT_STREAM_LAG, topic))
-        lag = await bus.lag(topic, group)
-        if lag >= LAG_THRESHOLD:
-            findings.append(
-                Finding(
-                    EVENT_STREAM_LAG,
-                    topic,
-                    Severity.WARNING,
-                    f"{group} is {lag} messages behind on {topic}",
-                    {"topic": topic, "group": group, "lag": lag},
+    for topic, groups in CONSUMERS.items():
+        for group in groups:
+            subject = f"{topic}:{group}"
+            known.add((EVENT_STREAM_LAG, subject))
+            lag = await bus.lag(topic, group)
+            if lag >= LAG_THRESHOLD:
+                findings.append(
+                    Finding(
+                        EVENT_STREAM_LAG,
+                        subject,
+                        Severity.WARNING,
+                        f"{group} is {lag} messages behind on {topic}",
+                        {"topic": topic, "group": group, "lag": lag},
+                    )
                 )
-            )
     return findings, known
 
 

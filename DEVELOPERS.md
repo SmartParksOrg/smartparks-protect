@@ -49,6 +49,7 @@ smartparks-protect/
 │   ├── export/              # `protect_export`: export jobs to MinIO
 │   ├── rules/               # `protect_rules`: rule evaluation, scheduler, system checks
 │   ├── automation/          # `protect_automation`: actions, notification delivery, Telegram poller
+│   ├── integration/         # `protect_integration`: outbound deliveries, retry loop, backfill
 │   └── frontend/            # React + Vite + TypeScript, nginx Dockerfile, FRONTEND_CONVENTIONS.md
 ├── shared/shared/           # package `shared`: config, database, logger, version, enums, permissions,
 │                            # models/, domain/assignments.py, trace.py, timeutil.py, secrets.py, bus.py,
@@ -211,6 +212,24 @@ Targets, automations and deliveries API: `routers/automations.py`, one implement
 The ChirpStack connector (`ChirpStackCommands`) posts to `/api/devices/{dev_eui}/queue` and returns the queue item id as `provider_ref` with statuses `accepted_by_network` and `queued`; `queue` and `flush` read and clear the platform queue. Adapters without a `command_connector` method cannot send commands, which the actions endpoint reports as the reason.
 
 API in `routers/control.py`: permissions are judged in the device's current project (`_control_permissions`), confirmation policies other than `none` need `confirmed: true`, everything is audited. The automation action `command` calls `request_command` with the automation as actor and publishes `command.updated` after the commit.
+
+## Integrations
+
+`shared/integrations/base.py` is the outbound connector contract: `render(integration, item)` (pure) and `deliver(integration, item, payload)`, plus `test`. `DeliveryItem` is the canonical object with the names around it; `load_item` in `shared/integrations/deliveries.py` builds it from a delivery row (position, event or measurement, entity and type, device, project, data source, the event's link, and for an event without a point the entity's latest position as a fallback). Connectors live in `shared/integrations/connectors/` (`gundi` for EarthRanger, `webhook`, `mqtt`) and are registered in `shared/integrations/registry.py`; `describe_connector` feeds the frontend so it names no provider. `TransientFailure`, `PermanentFailure` and `Skipped` come from `shared/notifications/dispatch.py`.
+
+`deliveries.py` is the mechanism (ADR 0014): `matches` applies the integration's filters to an `ObjectRef`; `enqueue` inserts queued rows with `ON CONFLICT DO NOTHING` on (integration, object type, object id, object version), records stale events as skipped and drops stale positions; `attempt` runs one try, sets the next attempt from `backoff_seconds` (30 s doubling to 6 h, `MAX_ATTEMPTS` 30) or the final status, keeps a compact trace per delivery and the integration's `last_delivery_at` and `last_error`; `backfill` walks a date range per object type in batches and commits progress on `integration.backfill`; `requeue` is the manual retry.
+
+`services/integration/protect_integration/worker.py`: `handle_message` turns `position.created` (payload only), `event.created` and `measurement.created` (rows loaded) into refs and enqueues them for the project's enabled integrations (`IntegrationCache`, re-read every 30 s), then the bus message is acknowledged. `delivery_loop` calls `deliver_due` every two seconds: due rows in order, one integration's share of a cycle ends at its first transient failure, disabled integrations get their rows skipped. `handle_backfill` runs the backfill for `integration.backfill_requested`. The API (`routers/integrations.py`) only writes rows, publishes the backfill request and runs test sends inline.
+
+## Gateways
+
+`shared/models/network.py`: `Gateway` (server level, unique on data source and provider id) and `DataSourceCursor`. `shared/ingest.py` keeps the registry: `upsert_gateways` for every reception (online, last seen, a location from the reception's `location` attribute) and `apply_gateway_update` for `GatewayUpdate` messages (`InboundMessage.gateway`, `external_id` None): stored as a source event without a device, `processing_status` processed, no bus message. The ChirpStack adapter parses `gateway/+/event/stats` and `gateway/+/state/conn` and its management connector's `list_gateway_updates` backs `POST /data-sources/{id}/sync-gateways`. `routers/gateways.py` aggregates `gateway_receptions` per project window: gateways busiest first, gateway detail with the devices heard, and `connectivity` per device (gateways heard, best gateway and its share of uplinks, mean signal).
+
+## Application platforms
+
+Platforms whose data arrives decoded (Traccar positions, AddaxAI Connect detections) deliver the generic JSON shape (`time`, `lat`, `lon`, `speed` in m/s, `measurements`, `state`, `events` with optional `lat`, `lon`, `description`) with the original record under `raw`, and their devices use the Generic JSON driver, whose `decodable_event_types` include `position`, `event`, `state` and `detection`. That keeps adapters ignorant of devices and drivers ignorant of networks. The driver also declares `PLATFORM_COMMAND` (`type` plus `attributes` encoded as JSON), which a command connector such as Traccar's maps to the platform's command API.
+
+Polling connectors keep their position in `data_source_cursors` through `DataSourceContext.cursors` (`DatabaseCursorStore` in production, `MemoryCursorStore` in tests). `POST /data-sources/{id}/cursor` writes `{"since": ...}`, which the connector honours at its next poll and then replaces with its own state. The AddaxAI Connect connector pages `GET /api/images` newest first from `captured_after`, rescans an overlap window daily, and logs in again on 401 (the JWT lives an hour).
 
 ## Deployment
 

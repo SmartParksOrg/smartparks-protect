@@ -39,8 +39,9 @@ def fake_submit(responses: list[dict]):
 async def test_actions_availability_and_reasons(client, db):
     admin, _project, _entity, source, device, _ = await _setup(client, db)
     h = admin.headers
-    # generic_json has no actions
-    assert (await client.get(f"/api/v1/devices/{device['id']}/actions", headers=h)).json() == []
+    # generic_json declares only the platform command
+    generic = (await client.get(f"/api/v1/devices/{device['id']}/actions", headers=h)).json()
+    assert [a["key"] for a in generic] == ["PLATFORM_COMMAND"]
     device_type, _ = await _opencollar(client, db, device)
     assert (
         await client.patch(

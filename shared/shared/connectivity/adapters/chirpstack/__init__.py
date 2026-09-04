@@ -24,6 +24,7 @@ from shared.connectivity.base import (
     Emit,
     EventConnector,
     GatewayReceptionData,
+    GatewayUpdate,
     InboundMessage,
 )
 from shared.connectivity.transports.mqtt import MqttSettings, subscribe_forever
@@ -140,6 +141,118 @@ def parse_event(source: DataSourceContext, topic: str, payload: bytes) -> Inboun
     )
 
 
+GATEWAY_STATES = {"ONLINE": "online", "OFFLINE": "offline", "NEVER_SEEN": "unknown"}
+
+
+def _gateway_location(data: dict[str, Any]) -> tuple[Any, Any, Any]:
+    location = data.get("location") or {}
+    if not isinstance(location, dict):
+        return None, None, None
+    return location.get("latitude"), location.get("longitude"), location.get("altitude")
+
+
+def parse_gateway_event(source: DataSourceContext, topic: str, payload: bytes) -> InboundMessage:
+    """`gateway/{id}/event/stats` (counters and location every stats interval) and
+    `gateway/{id}/state/conn` (ONLINE or OFFLINE) to a gateway update (architecture 20)."""
+    try:
+        data = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ApplicationError(
+            code=ErrorCode.PAYLOAD_DECODE_FAILED,
+            message=f"ChirpStack gateway event is not JSON: {exc}",
+            component="adapter.chirpstack",
+            context={"topic": topic},
+        ) from exc
+    if not isinstance(data, dict):
+        raise ApplicationError(
+            code=ErrorCode.PAYLOAD_DECODE_FAILED,
+            message="ChirpStack gateway event must be a JSON object",
+            component="adapter.chirpstack",
+            context={"topic": topic},
+        )
+    parts = topic.split("/")
+    kind = parts[-1] if len(parts) >= 2 else "stats"
+    gateway_id = str(data.get("gatewayId") or (parts[-3] if len(parts) >= 3 else "")).lower()
+    if not gateway_id:
+        raise ApplicationError(
+            code=ErrorCode.PAYLOAD_DECODE_FAILED,
+            message="ChirpStack gateway event without gatewayId",
+            component="adapter.chirpstack",
+            context={"topic": topic},
+        )
+    latitude, longitude, altitude = _gateway_location(data)
+    update = GatewayUpdate(
+        gateway_id=gateway_id,
+        latitude=latitude,
+        longitude=longitude,
+        altitude_m=altitude,
+        seen_at=parse_chirpstack_time(data.get("time")),
+    )
+    if kind == "conn":
+        update.status = GATEWAY_STATES.get(str(data.get("state") or "").upper(), "unknown")
+    else:
+        update.stats = {
+            k: v
+            for k, v in {
+                "rx_packets": data.get("rxPacketsReceived"),
+                "rx_packets_ok": data.get("rxPacketsReceivedOk"),
+                "tx_packets": data.get("txPacketsReceived"),
+                "tx_packets_emitted": data.get("txPacketsEmitted"),
+            }.items()
+            if v is not None
+        }
+        update.attributes = {
+            k: v
+            for k, v in {
+                "metadata": data.get("metadata"),
+                "tx_packets_per_status": data.get("txPacketsPerStatus"),
+            }.items()
+            if v
+        }
+    return InboundMessage(
+        external_id=None,
+        event_type=f"gateway_{kind}",
+        payload=data,
+        acquisition_channel=AcquisitionChannel.LORAWAN,
+        ingestion_method=IngestionMethod.MQTT,
+        provider_metadata={"chirpstack_event": f"gateway_{kind}", "topic": topic},
+        network_received_at=update.seen_at,
+        gateway=update,
+    )
+
+
+def gateway_updates_from_listing(items: list[dict[str, Any]]) -> list[GatewayUpdate]:
+    """`GET /api/gateways` items (gatewayId, name, description, location, state, lastSeenAt)
+    to registry updates, for the sync action."""
+    updates = []
+    for item in items:
+        gateway_id = str(item.get("gatewayId") or "").lower()
+        if not gateway_id:
+            continue
+        latitude, longitude, altitude = _gateway_location(item)
+        updates.append(
+            GatewayUpdate(
+                gateway_id=gateway_id,
+                name=item.get("name") or None,
+                status=GATEWAY_STATES.get(str(item.get("state") or "").upper(), "unknown"),
+                latitude=latitude,
+                longitude=longitude,
+                altitude_m=altitude,
+                attributes={
+                    k: v
+                    for k, v in {
+                        "description": item.get("description"),
+                        "tenant_id": item.get("tenantId"),
+                        "properties": item.get("properties"),
+                    }.items()
+                    if v
+                },
+                seen_at=parse_chirpstack_time(item.get("lastSeenAt")),
+            )
+        )
+    return updates
+
+
 class ChirpStackConnector:
     def __init__(self, source: DataSourceContext) -> None:
         self.source = source
@@ -155,15 +268,19 @@ class ChirpStackConnector:
             client_id=f"protect-ingest-{self.source.id.hex[:8]}",
         )
         prefix = str(config.get("topic_prefix", "")).strip("/")
-        topic = (
-            f"{prefix}/application/+/device/+/event/+"
-            if prefix
-            else "application/+/device/+/event/+"
-        )
+        head = f"{prefix}/" if prefix else ""
+        topics = [
+            f"{head}application/+/device/+/event/+",
+            f"{head}gateway/+/event/stats",
+            f"{head}gateway/+/state/conn",
+        ]
 
         async def callback(received_topic: str, payload: bytes) -> None:
             try:
-                message = parse_event(self.source, received_topic, payload)
+                if "/gateway/" in f"/{received_topic}":
+                    message = parse_gateway_event(self.source, received_topic, payload)
+                else:
+                    message = parse_event(self.source, received_topic, payload)
             except ApplicationError as error:
                 log.warning(
                     "chirpstack event dropped",
@@ -174,7 +291,7 @@ class ChirpStackConnector:
                 return
             await emit(message)
 
-        await subscribe_forever(settings, [topic], callback)
+        await subscribe_forever(settings, topics, callback)
 
 
 class ChirpStackManagement:
@@ -232,6 +349,9 @@ class ChirpStackManagement:
 
     async def list_gateways(self) -> list[dict[str, Any]]:
         return await self._list("/api/gateways", "result", {"tenantId": self.tenant_id})
+
+    async def list_gateway_updates(self) -> list[GatewayUpdate]:
+        return gateway_updates_from_listing(await self.list_gateways())
 
     async def test_connection(self) -> dict[str, Any]:
         applications = await self.list_applications()
@@ -360,6 +480,9 @@ class ChirpStackAdapter:
 
     def command_connector(self, source: DataSourceContext) -> ChirpStackCommands:
         return ChirpStackCommands(source)
+
+    def management_connector(self, source: DataSourceContext) -> ChirpStackManagement:
+        return ChirpStackManagement(source)
 
     def parse_webhook(
         self, source: DataSourceContext, body: Any, headers: dict[str, str]

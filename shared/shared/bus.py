@@ -44,6 +44,7 @@ class Topic:
     DELIVERY_UPDATED = "delivery.updated"
     NEEDS_ATTENTION_CREATED = "needs_attention.created"
     EXPORT_REQUESTED = "export.requested"
+    INTEGRATION_BACKFILL_REQUESTED = "integration.backfill_requested"
 
 
 SCHEMA_VERSION = 1

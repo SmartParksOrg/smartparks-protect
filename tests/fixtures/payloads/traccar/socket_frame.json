@@ -1,0 +1,61 @@
+{
+  "devices": [
+    {
+      "id": 17,
+      "name": "Ranger truck 2",
+      "uniqueId": "356938035643809",
+      "status": "online",
+      "disabled": false,
+      "lastUpdate": "2026-09-04T09:15:03Z",
+      "positionId": 9001,
+      "groupId": null,
+      "phone": null,
+      "model": "FMB920",
+      "contact": null,
+      "category": "truck",
+      "attributes": {}
+    }
+  ],
+  "positions": [
+    {
+      "id": 9001,
+      "deviceId": 17,
+      "protocol": "teltonika",
+      "deviceTime": "2026-09-04T09:15:00Z",
+      "fixTime": "2026-09-04T09:15:00Z",
+      "serverTime": "2026-09-04T09:15:03Z",
+      "valid": true,
+      "latitude": -24.9012,
+      "longitude": 31.5123,
+      "altitude": 312.0,
+      "speed": 21.6,
+      "course": 87.5,
+      "address": null,
+      "accuracy": 4.0,
+      "network": {},
+      "geofenceIds": [3],
+      "attributes": {
+        "sat": 11,
+        "ignition": true,
+        "motion": true,
+        "batteryLevel": 87,
+        "battery": 4.02,
+        "power": 13.9,
+        "odometer": 152340,
+        "totalDistance": 4523110.5
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": 501,
+      "type": "geofenceExit",
+      "eventTime": "2026-09-04T09:15:00Z",
+      "deviceId": 17,
+      "positionId": 9001,
+      "geofenceId": 3,
+      "maintenanceId": 0,
+      "attributes": {}
+    }
+  ]
+}

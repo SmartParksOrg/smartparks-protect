@@ -45,6 +45,43 @@ class GatewayReceptionData:
 
 
 @dataclass(slots=True)
+class GatewayUpdate:
+    """What a platform says about one gateway (architecture 20): status, statistics, location.
+    Carried by a message with `external_id` None; the ingest layer updates the registry and
+    keeps the raw message as a source event without a device."""
+
+    gateway_id: str
+    status: str | None = None
+    name: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    altitude_m: float | None = None
+    stats: dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    seen_at: datetime | None = None
+
+
+@runtime_checkable
+class CursorStore(Protocol):
+    """Where a polling connector keeps its position between polls and restarts."""
+
+    async def load(self) -> dict[str, Any]: ...
+
+    async def save(self, state: dict[str, Any]) -> None: ...
+
+
+class MemoryCursorStore:
+    def __init__(self, state: dict[str, Any] | None = None) -> None:
+        self.state: dict[str, Any] = dict(state or {})
+
+    async def load(self) -> dict[str, Any]:
+        return dict(self.state)
+
+    async def save(self, state: dict[str, Any]) -> None:
+        self.state = dict(state)
+
+
+@dataclass(slots=True)
 class InboundMessage:
     """One delivery from an external platform, before any device decoding."""
 
@@ -64,6 +101,7 @@ class InboundMessage:
         metadata={"doc": "Merged into the external identity: tenant, application, names for links"},
     )
     gateway_receptions: list[GatewayReceptionData] = field(default_factory=list)
+    gateway: GatewayUpdate | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +114,7 @@ class DataSourceContext:
     config: dict[str, Any]
     credentials: dict[str, Any]
     capabilities: AdapterCapabilities
+    cursors: CursorStore | None = None
 
 
 Emit = Callable[[InboundMessage], Awaitable[None]]

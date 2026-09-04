@@ -534,6 +534,12 @@ async def _write_events(
             event_type=record.event_type,
             severity=record.severity,
             title=record.title,
+            description=record.description,
+            geom=(
+                from_shape(Point(record.longitude, record.latitude), srid=4326)
+                if record.latitude is not None and record.longitude is not None
+                else None
+            ),
             context={**record.context, "dedup": dedup},
             source_event_id=event.id,
             source_event_ingested_at=event.ingested_at,

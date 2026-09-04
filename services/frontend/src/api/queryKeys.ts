@@ -54,4 +54,13 @@ export const queryKeys = {
   command: (id: string) => ["commands", id] as const,
   projectCommands: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "commands", params] as const,
   downlinkQueue: (deviceId: string) => ["devices", deviceId, "downlink-queue"] as const,
+  integrationConnectors: (projectId: string) => ["projects", projectId, "integrations", "connectors"] as const,
+  integrations: (projectId: string) => ["projects", projectId, "integrations"] as const,
+  integration: (projectId: string, id: string) => ["projects", projectId, "integrations", id] as const,
+  integrationDeliveries: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "integration-deliveries", params] as const,
+  integrationDelivery: (projectId: string, id: string) => ["projects", projectId, "integration-deliveries", id] as const,
+  gateways: (projectId: string, hours: number) => ["projects", projectId, "gateways", hours] as const,
+  gateway: (projectId: string, id: string, hours: number) => ["projects", projectId, "gateways", id, hours] as const,
+  connectivity: (projectId: string, hours: number) => ["projects", projectId, "connectivity", hours] as const,
+  dataSourceCursor: (id: string) => ["data-sources", id, "cursor"] as const,
 };

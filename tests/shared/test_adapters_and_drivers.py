@@ -36,6 +36,8 @@ def test_registries():
         "loriot",
         "netmore",
         "akenza",
+        "traccar",
+        "addaxai_connect",
     }
     assert set(DRIVERS) == {"generic_json", "opencollar"}
     assert (

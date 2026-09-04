@@ -55,6 +55,14 @@ export type CommandItem = Schemas["CommandRead"];
 export type CommandDetail = Schemas["CommandDetail"];
 export type CommandExecution = Schemas["CommandExecutionRead"];
 export type QueueState = Schemas["QueueState"];
+export type Integration = Schemas["IntegrationRead"];
+export type IntegrationDetail = Schemas["IntegrationDetail"];
+export type IntegrationDelivery = Schemas["IntegrationDeliveryRead"];
+export type IntegrationDeliveryDetail = Schemas["IntegrationDeliveryDetail"];
+export type IntegrationTestResult = Schemas["IntegrationTestResult"];
+export type Gateway = Schemas["GatewayRead"];
+export type GatewayDetail = Schemas["GatewayDetail"];
+export type DeviceConnectivity = Schemas["DeviceConnectivity"];
 
 export interface Page<T> {
   items: T[];

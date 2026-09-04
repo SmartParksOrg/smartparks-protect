@@ -34,6 +34,8 @@ from shared.models.events import (
     RuleState,
     RuleVersion,
 )
+from shared.models.integrations import Integration, IntegrationDelivery
+from shared.models.network import DataSourceCursor, Gateway
 from shared.models.timeseries import (
     HYPERTABLES,
     ConnectivityState,
@@ -60,6 +62,7 @@ __all__ = [
     "CommandExecution",
     "ConnectivityState",
     "DataSource",
+    "DataSourceCursor",
     "DataSourceProjectScope",
     "Device",
     "DeviceCurrentState",
@@ -74,7 +77,10 @@ __all__ = [
     "ExportJob",
     "ExternalIdentity",
     "Feature",
+    "Gateway",
     "GatewayReception",
+    "Integration",
+    "IntegrationDelivery",
     "Invitation",
     "Measurement",
     "Metric",

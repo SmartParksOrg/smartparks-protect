@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 7, production LoRaWAN networks and the dev server (built from documentation; live verification waits for accounts and a VM) |
-| Latest release | v0.4.0 (2026-09-04); phase 7 in progress |
+| Active phase | Phase 8, integrations, Traccar, gateways and the first demonstrator (built from documentation and the local stack; the live demonstration waits for accounts) |
+| Latest release | v0.4.0 (2026-09-04); phases 7 and 8 unreleased, v0.6.0 planned once CI is green (D67) |
 | Last session | 2026-09-04 |
-| Next item | Phase 8 items that need no network (integration framework with durable deliveries, EarthRanger via Gundi needs a key, Traccar proof of concept, gateway registry); phase 7 live items whenever Tim provides KPN, LORIOT, Netmore or akenza access plus a dev VM and a domain |
-| Blockers | Phase 7 live verification: no KPN, LORIOT, Netmore or akenza account in use yet, no dev VM, no domain; the deep link paths for Netmore and akenza are guesses until seen live |
+| Next item | Tag v0.6.0 after CI; then phase 9 (MCP read-only proof of concept) unless Tim provides accounts first: phase 7 live items (KPN, LORIOT, Netmore, akenza, a dev VM and a domain) and phase 8 live items (Gundi connection and EarthRanger site, an AddaxAI Connect viewer account, a Traccar instance) close the section 33 demonstration and v1.0.0 |
+| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, no dev VM, no domain; deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live |
 
 ## What we are building
 
@@ -100,6 +100,14 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D57 | Netmore | A third production LoRaWAN network, added on Tim's request on 2026-09-04: events in Netmore's export format over HTTP push (static `Authorization` header) or the Netmore MQTT broker; downlinks through the Netmore Connect REST API with an API key | Built from the published documentation and the Connect OpenAPI document; the decoded export formats are refused because they carry no raw frame. Live verification pending. |
 | D58 | Netmore platforms | One adapter with a `platform` setting: `lorawan_portal` (portal.blink.services; login token, sensor downlink queue, clear) or `connect` (API key); events share the export format | Tim's account is on the LoRaWAN Portal; both are offered without duplicating the parser. Decided by Tim on 2026-09-04. |
 | D59 | akenza.io | Webhook output connector for events (the whole sample; the device type must keep `payloadHex`), REST `POST /v3/devices/{id}/downlink` with `{"raw": true, "loraDownlink": {...}}` and `x-api-key`; the akenza device id is the external identity, the DevEUI an attribute | akenza addresses devices by its own id, so downlinks need it. Built from docs.akenza.io and the published API collection. Decided by Tim on 2026-09-04. |
+| D60 | Integration delivery idempotency | One `integration_deliveries` row per (integration, object type, object id, object version) with a unique index; positions and measurements are version 1, events carry a version curation can bump; backfill inserts in batches and skips existing keys | An object is never sent twice to the same integration, replays and backfills included. Decided by Tim on 2026-09-04 (open decision from architecture 32 closed). |
+| D61 | Integration retries | Table-driven: deliveries carry `next_attempt_at` and `attempts`; the integration service polls due rows and retries with exponential backoff from 30 s to 6 h, up to 30 attempts, then marks failed with manual retry; the bus acknowledges at once | A target outage of hours never fills the stream or blocks other consumers (architecture 18). Decided by Tim on 2026-09-04. |
+| D62 | Gundi identities | Observations use the Smart Parks entity id as Gundi `source`, the entity name as `source_name`, the subject type mapped per integration from the entity type; the device and data source travel in `additional`; event types live in the `smartparks_protect_` namespace | The EarthRanger track stays continuous across collar swaps. Decided by Tim on 2026-09-04. |
+| D63 | AddaxAI Connect authentication | The data source stores the email and password of a dedicated AddaxAI Connect viewer account; the connector logs in, caches the JWT and logs in again on 401 or before expiry | AddaxAI Connect has only user login today; an API key mode is added when it grows one. Decided by Tim on 2026-09-04. |
+| D64 | AddaxAI Connect cursor | Poll the image list newest first with a captured-at cursor; a rescan over an overlap window (default 7 days) runs daily and a manual "rescan from date" covers older bulk imports; idempotency on the image uuid | Bulk SD-card imports arrive with old capture times and the list has no ingest-time filter. Decided by Tim on 2026-09-04. |
+| D65 | Traccar | Session login (`POST /api/session`), the `/api/socket` websocket for positions, events and device status with reconnect, `GET /api/positions` on every connect, `GET /api/devices` for management, `POST /api/commands/send` as the command proof of concept, deep links to the Traccar web UI | Real time with Traccar's own event stream; polling would lose geofence and alarm events. Built from the Traccar OpenAPI document. Decided by Tim on 2026-09-04. |
+| D66 | Gateway registry | Server-level `gateways` table unique on (data source, provider gateway id) with name, location, state, last seen, statistics and provider diagnostics in attributes; rows come from receptions, gateway events and a sync against the platform; a project sees the gateways that received its devices | Matches "devices are server-level physical objects"; public-network gateways belong to nobody. Decided by Tim on 2026-09-04. |
+| D67 | Phase 8 release | Everything buildable from documentation and the local stack ships as v0.6.0 once CI is green; v1.0.0 waits for the section 33 demonstration with real accounts | The demonstration needs a second LoRaWAN network, an EarthRanger site, an AddaxAI Connect account and a Traccar instance. Decided by Tim on 2026-09-04. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -108,7 +116,7 @@ These are not decided yet. A proposed default is given so work can start; each i
 
 - [x] **External deep links.** Decided on 2026-09-03: built as proposed, see D38.
 - [x] **Control action schema versioning.** Decided on 2026-09-04: built as proposed, see D49 and ADR 0013.
-- [ ] **Integration delivery idempotency.** Proposed: `integration_deliveries` row per (integration, object type, object id, object version) with a unique key; backfill creates rows in batches. Decide in phase 8.
+- [x] **Integration delivery idempotency.** Decided on 2026-09-04: built as proposed, see D60 and ADR 0014.
 - [x] **Raw payload placement for very large events.** Decided on 2026-09-03: 64 KB threshold, see D32.
 - [x] **Commit trailers.** Decided on 2026-09-03: strip them, see D28.
 
@@ -487,16 +495,16 @@ Release:
 
 **Deliverables.**
 
-- [ ] Integration framework in `services/integration`: `integrations` (per project, connector key, credentials, filters for entities, devices, event types, measurements, historical data) and `integration_deliveries` (object, version, status, attempts, request and response, external id, trace) tables; worker with retry and backoff, idempotency keys, backfill over a date range in batches, project enable and disable, isolation so an outage never blocks ingestion (18).
-- [ ] EarthRanger connector via Gundi (D15): positions as observations, events with type slugs in a `smartparks_protect_` namespace, entity mapping to subjects, per-project Gundi key, test event, health status. Direct EarthRanger API connector recorded as a later option.
-- [ ] Webhook outbound connector with signed payloads. MQTT outbound connector.
-- [ ] AddaxAI Connect inbound connector (D16): polling event connector with a cursor per data source, authentication with an AddaxAI Connect API token, per-project filters (detection types, species, confidence threshold, AddaxAI projects), mapping to `SPECIES_DETECTION` events with taxonomy, confidence, camera and site context, position, source detection id as ExternalIdentity, Open in AddaxAI Connect link, idempotency on detection id, raw payload retained.
-- [ ] Traccar adapter: websocket or polling event connector for positions, device list management, command connector proof of concept, deep links. One Traccar-fed entity on the map.
-- [ ] Gateways: `gateways` registry with location and state, ChirpStack gateway state and statistics, gateway diversity and best-gateway analysis over receptions, Network section screens for gateways and connectivity health. Provider diagnostics kept as attributes (20).
-- [ ] ExternalLink coverage: every data source type ships link templates; provenance panel works for every adapter.
-- [ ] Integrate section UI: integrations per project, delivery log with payload and response inspection, retry, backfill dialog. AddaxAI Connect source configuration screen.
-- [ ] Demonstrator script (architecture 33) written as `docs/getting-started/demonstration.md` and executed: two LoRaWAN backends, same entities on the map, raw and normalized traffic, battery and RSSI analysed and exported, geofence or speed rule creating an event, event forwarded to EarthRanger, one Traccar entity, one AddaxAI Connect wolf detection entering as an event with a source link and forwarded by a rule, an alert acknowledged, a device reassigned to another entity with historical positions staying with the old entity, and one command sent through the abstract control path.
-- [ ] `VERSION` v1.0.0, changelog, tag.
+- [x] Integration framework in `services/integration`: `integrations` (per project, connector key, credentials, filters for entities, devices, event types, measurements, historical data) and `integration_deliveries` (object, version, status, attempts, request and response, external id, trace) tables; worker with retry and backoff, idempotency keys, backfill over a date range in batches, project enable and disable, isolation so an outage never blocks ingestion (18).
+- [x] EarthRanger connector via Gundi (D15): positions as observations, events with type slugs in a `smartparks_protect_` namespace, entity mapping to subjects, per-project Gundi key, test event, health status. Direct EarthRanger API connector recorded as a later option.
+- [x] Webhook outbound connector with signed payloads. MQTT outbound connector.
+- [x] AddaxAI Connect inbound connector (D16): polling event connector with a cursor per data source, authentication with an AddaxAI Connect API token, per-project filters (detection types, species, confidence threshold, AddaxAI projects), mapping to `SPECIES_DETECTION` events with taxonomy, confidence, camera and site context, position, source detection id as ExternalIdentity, Open in AddaxAI Connect link, idempotency on detection id, raw payload retained.
+- [x] Traccar adapter (built from the OpenAPI document; the entity on the map waits for a Traccar instance): websocket or polling event connector for positions, device list management, command connector proof of concept, deep links. One Traccar-fed entity on the map.
+- [x] Gateways: `gateways` registry with location and state, ChirpStack gateway state and statistics, gateway diversity and best-gateway analysis over receptions, Network section screens for gateways and connectivity health. Provider diagnostics kept as attributes (20).
+- [x] ExternalLink coverage: every data source type ships link templates; provenance panel works for every adapter.
+- [x] Integrate section UI: integrations per project, delivery log with payload and response inspection, retry, backfill dialog. AddaxAI Connect source configuration screen.
+- [ ] Demonstrator script (architecture 33) written as `docs/getting-started/demonstration.md` (done) and executed (local steps pass; the live steps wait for accounts): two LoRaWAN backends, same entities on the map, raw and normalized traffic, battery and RSSI analysed and exported, geofence or speed rule creating an event, event forwarded to EarthRanger, one Traccar entity, one AddaxAI Connect wolf detection entering as an event with a source link and forwarded by a rule, an alert acknowledged, a device reassigned to another entity with historical positions staying with the old entity, and one command sent through the abstract control path.
+- [ ] `VERSION` v0.6.0 for the code (D67), changelog, tag; v1.0.0 after the demonstration.
 
 **Exit criteria.** The demonstration passes end to end and its result is recorded in the session log with screenshots in `docs/assets/`.
 
@@ -664,7 +672,7 @@ Listed by the phase where they are first needed.
 - [ ] Phase 3: recorded OpenCollar uplinks (ChirpStack, KPN or LORIOT exports) and links to the public Smart Parks decoder and protocol repositories.
 - [ ] Phase 3: confirmation which EarthRanger icons may be reused and under which licence.
 - [ ] Phase 7: KPN/ThingPark, LORIOT, Netmore (portal.blink.services, LoRaWAN Portal) and akenza test accounts, a dev VM (Ubuntu 24.04) and a domain. Device deep link paths for Netmore and akenza are guesses until seen live.
-- [ ] Phase 8: Gundi connection and EarthRanger test site, an AddaxAI Connect dev server API token, a Traccar test instance or account.
+- [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work.
 - [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access.
 
@@ -795,3 +803,13 @@ Listed by the phase where they are first needed.
 - Tim asked for akenza.io. From docs.akenza.io (the webhook connector posts the whole sample; the LoRaWAN uplink event carries `data.port`, `data.payloadHex`, `uplinkMetrics` and `device`) and the published API collection (`POST /v3/devices/{id}/downlink` with `{"raw": true, "loraDownlink": {"port", "payloadHex", "confirmed"}}`, `x-api-key`, `GET /v3/devices/by-device-id`). Tim decided D59: webhook events, REST downlinks, the akenza device id as the external identity with the DevEUI as an attribute. Built the adapter with a new identity type `akenza_device_id`, the runbook, fixtures from the documentation's sample.
 - Decoded akenza samples and decoded Netmore export formats are refused with an explanation, because neither carries the raw frame the driver needs.
 - Verification: 226 python tests (both Netmore downlink connectors against mocked transports, the akenza sample and downlink, the provider guard), ruff, mypy strict, docs strict, compose stack rebuilt, `GET /data-sources/adapters` answers live with seven adapters. Committed as e3379f0 and pushed on Tim's instruction; v0.5.0 waits for the live items.
+
+### 2026-09-04, phase 8 (Claude)
+
+- Asked the phase 8 decisions (D60 to D67, all recommendations accepted): object-keyed idempotent deliveries, table-driven retries, the entity as Gundi source, a dedicated AddaxAI Connect account, a captured-at cursor with rescans, Traccar over its websocket, a server-level gateway registry, v0.6.0 for the code and v1.0.0 after the live demonstration.
+- Built `shared/integrations` (contract, Gundi, webhook and MQTT connectors, the delivery mechanism with backoff, backfill and traces), migration 0008, the `protect-integration` service, the integrations and gateways API, the Traccar and AddaxAI Connect adapters with fixtures from their documentation, gateway updates from receptions and ChirpStack gateway events with a sync action, polling cursors, the Integrate and Gateways screens, rescan and gateway sync on the data sources page, runbooks, ADR 0014 and the demonstration script.
+- Found that the provider boundary guard had a literal backspace where `\b` was meant and matched nothing since phase 7; fixed, and the guard now also covers AddaxAI, Gundi and EarthRanger names. It flagged one description in the new UI, which was reworded.
+- Verification: ruff, mypy strict, 316 Python tests against the local stack (new suites for integration, Traccar, AddaxAI Connect, gateways, API), eslint, tsc, vite build, vitest, mkdocs strict, the stack rebuilt with migration 0008 and the integration worker running, screenshot sweep, and a live webhook delivery on the dev stack (see below).
+- Live check on the dev stack: a webhook integration on Demo park pointing at a local receiver; three simulated OpenCollar uplinks became three sent deliveries (signed body, `X-Protect-Delivery`, target response recorded), the local gateway appeared in the registry with 22 receptions and a ChirpStack deep link, the connectivity view showed the collar heard by one gateway, and Sync gateways read the gateway from the ChirpStack API. The integration was removed again afterwards.
+- Open: the live steps of the demonstration and the deep links of four platforms wait for accounts.
+

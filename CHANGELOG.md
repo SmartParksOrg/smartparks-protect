@@ -4,10 +4,20 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
-Production LoRaWAN networks and the dev server (phase 7), built from documentation; live verification pending.
+Production LoRaWAN networks and the dev server (phase 7), and integrations, Traccar, AddaxAI Connect and gateways (phase 8), built from documentation; live verification pending.
 
 ### Added
 
+- Integration framework (ADR 0014): integrations per project with connector, encrypted credentials, filters (object types, entities, devices, event types, minimum severity, metric keys, freshness bound); one idempotent `integration_deliveries` row per (integration, object type, object id, object version) with the retry schedule on the row (30 s doubling to 6 h, 30 attempts), request, response, external id and trace; the `protect-integration` service (live path, delivery loop that isolates an unreachable target, backfill in batches with progress); API for integrations, connectors, the delivery log with inspection, retry, test sends and backfill; the Integrate section in the frontend.
+- Outbound connectors: EarthRanger via Gundi (positions as observations with the entity as source, events in the `smartparks_protect_` namespace, subject and event type mapping, test event), signed webhook with `X-Protect-Delivery`, MQTT with a topic template.
+- Traccar adapter: session login, the `/api/socket` websocket with the latest positions on every connect, positions, events and device status as generic JSON with the Traccar record under `raw`, Traccar's forwarding accepted on the webhook, `POST /api/commands/send` as the command proof of concept, device listing. Runbook.
+- AddaxAI Connect inbound connector: a dedicated viewer account, `GET /api/images` polled newest first with a captured-at cursor, a daily rescan over an overlap window and a manual rescan from a date, detections filtered on category, species and confidence as `SPECIES_DETECTION` events with the camera's location and a link back. Runbook.
+- Gateway registry: server-level `gateways` from receptions, ChirpStack gateway stats and connection state, and a sync against the platform's gateway list; project gateways with reception statistics, gateway detail with the devices heard, device connectivity with gateway diversity and best-gateway share; administrator overrides. Network, Gateways screen. Runbook.
+- Generic JSON driver: events carry an optional point and description; `position`, `event`, `state` and `detection` source events decode; the `PLATFORM_COMMAND` control action.
+- Polling cursors per data source (`data_source_cursors`) with `GET` and `POST /data-sources/{id}/cursor`.
+- System health lists every worker; the lag check covers every consumer group of a topic.
+- Migration 0008: `integrations`, `integration_deliveries`, `gateways`, `data_source_cursors`.
+- Demonstration script (`docs/getting-started/demonstration.md`) with the local steps passing and the live steps recorded as pending.
 - KPN LoRa (ThingPark) adapter: HTTP push of `DevEUI_uplink`, `DevEUI_downlink_Sent`, `DevEUI_location` and `DevEUI_notification` with LRR receptions; downlinks through the ThingPark downlink API in token or bearer mode. Runbook.
 - LORIOT adapter: websocket application output with reconnect (`rx`, `gw`, `txd` frames), the HTTP output as a webhook, downlinks as `tx` frames over the same output. Runbook.
 - Netmore adapter: the export format over HTTP push or the Netmore MQTT broker, downlink responses; a `platform` setting selects downlinks, queue and clear through the LoRaWAN Portal API (login token) or downlinks and clear through Netmore Connect (API key). Runbook.
@@ -15,6 +25,10 @@ Production LoRaWAN networks and the dev server (phase 7), built from documentati
 - `GET /data-sources/adapters`: every adapter with push flag, command support, channel, config schema and example, credential fields and setup hint; the data source form is built from it and the frontend names no provider. Webhook tokens are minted for every adapter that declares `push`.
 - Provider boundary guard test over the backend and the frontend. Migration 0007 rewrites a column comment that named a provider.
 - Ansible playbook and roles (security with sshd drift check, docker, nginx, ssl, dev-tools with release tag resolution, app-deploy, security-check), example inventory and variables, `scripts/verify-server.sh`, `scripts/security-status.sh`. Deployment and update guides.
+
+### Fixed
+
+- The provider boundary guard compiled its pattern with a literal backspace instead of a word boundary and matched nothing; it now checks the backend and the frontend for real.
 
 ## v0.4.0, 2026-09-04
 

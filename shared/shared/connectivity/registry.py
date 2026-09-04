@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from shared.connectivity.adapters.addaxai_connect import AddaxAiConnectAdapter
 from shared.connectivity.adapters.akenza import AkenzaAdapter
 from shared.connectivity.adapters.chirpstack import ChirpStackAdapter
 from shared.connectivity.adapters.generic_http import GenericHttpAdapter
@@ -9,6 +10,7 @@ from shared.connectivity.adapters.generic_mqtt import GenericMqttAdapter
 from shared.connectivity.adapters.kpn_thingpark import KpnThingParkAdapter
 from shared.connectivity.adapters.loriot import LoriotAdapter
 from shared.connectivity.adapters.netmore import NetmoreAdapter
+from shared.connectivity.adapters.traccar import TraccarAdapter
 from shared.connectivity.base import Adapter
 
 ADAPTERS: dict[str, Adapter] = {
@@ -21,6 +23,8 @@ ADAPTERS: dict[str, Adapter] = {
         LoriotAdapter(),
         NetmoreAdapter(),
         AkenzaAdapter(),
+        TraccarAdapter(),
+        AddaxAiConnectAdapter(),
     )
 }
 
@@ -32,6 +36,8 @@ def describe_adapter(adapter: Adapter) -> dict[str, Any]:
         "label": adapter.label,
         "push": bool(getattr(adapter, "push", False)),
         "can_send_commands": hasattr(adapter, "command_connector"),
+        "can_manage": hasattr(adapter, "management_connector"),
+        "polling": bool(getattr(adapter, "polling", False)),
         "acquisition_channel": str(getattr(adapter, "acquisition_channel", None) or "other"),
         "default_capabilities": adapter.default_capabilities.model_dump(),
         "default_link_templates": dict(adapter.default_link_templates),

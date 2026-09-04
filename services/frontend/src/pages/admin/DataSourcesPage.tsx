@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Copy, KeyRound, Plus } from "lucide-react";
+import { Copy, KeyRound, Plus, RefreshCw, Waypoints } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -34,6 +34,8 @@ interface AdapterInfo {
   config_example: Record<string, unknown>;
   credentials_schema: Record<string, string>;
   setup_hint: string;
+  polling: boolean;
+  can_manage: boolean;
 }
 
 const credentialsTemplate = (a: AdapterInfo) => Object.fromEntries(Object.keys(a.credentials_schema).map((k) => [k, ""]));
@@ -82,6 +84,10 @@ export function DataSourcesPage() {
     onSuccess: (source) => { setOpen(false); if (source.webhook_token) setToken({ token: source.webhook_token, url: source.webhook_url ?? null }); },
     onError: (error) => form.setError("root", { message: error.message }),
   });
+  const [rescanning, setRescanning] = useState<DataSource | null>(null);
+  const [since, setSince] = useState("");
+  const rescan = useMutationToast({ mutationFn: (s: DataSource) => api.post<Record<string, unknown>>(`/api/v1/data-sources/${s.id}/cursor`, { body: { since: since ? new Date(since).toISOString() : null } }), invalidate: [queryKeys.dataSources], success: "Cursor reset; the connector rescans at its next poll", onSuccess: () => setRescanning(null) });
+  const syncGateways = useMutationToast({ mutationFn: (s: DataSource) => api.post<{ synced: number }>(`/api/v1/data-sources/${s.id}/sync-gateways`), invalidate: [queryKeys.dataSources], success: (r) => `${r.synced} gateways synced` });
   const rotate = useMutationToast({ mutationFn: (id: string) => api.post<DataSource>(`/api/v1/data-sources/${id}/webhook-token`), invalidate: [queryKeys.dataSources], onSuccess: (source) => source.webhook_token && setToken({ token: source.webhook_token, url: source.webhook_url ?? null }) });
   const columns: ColumnDef<DataSource, unknown>[] = [
     { header: "Name", accessorKey: "name" },
@@ -91,7 +97,11 @@ export function DataSourcesPage() {
     { header: "Capabilities", id: "caps", cell: ({ row }) => <Capabilities source={row.original} /> },
     { header: "Projects", accessorFn: (s) => (s.project_ids ?? []).length || "all" },
     { header: "Updated", accessorKey: "updated_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { id: "token", header: "", cell: ({ row }) => (row.original.has_webhook_token ? <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); rotate.mutate(row.original.id); }}><KeyRound className="size-4" /> New token</Button> : null) },
+    { id: "token", header: "", cell: ({ row }) => { const a = ADAPTERS.find((x) => x.key === row.original.adapter_key); const caps = row.original.capabilities as Record<string, boolean>; return <span className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+      {row.original.has_webhook_token && <Button variant="ghost" size="sm" onClick={() => rotate.mutate(row.original.id)}><KeyRound className="size-4" /> New token</Button>}
+      {a?.polling && <Button variant="ghost" size="sm" onClick={() => { setSince(""); setRescanning(row.original); }}><RefreshCw className="size-4" /> Rescan</Button>}
+      {a?.can_manage && caps.gateway_management && <Button variant="ghost" size="sm" disabled={syncGateways.isPending} onClick={() => syncGateways.mutate(row.original)}><Waypoints className="size-4" /> Sync gateways</Button>}
+    </span>; } },
   ];
   return (
     <>
@@ -120,6 +130,13 @@ export function DataSourcesPage() {
             {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
             <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={save.isPending}>Save</Button></DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={rescanning != null} onOpenChange={(o) => !o && setRescanning(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Rescan {rescanning?.name}</DialogTitle><DialogDescription>The connector reads everything again from this instant at its next poll. Records it stored before are recognised by their canonical keys, so nothing is duplicated. Leave empty for the adapter's default window.</DialogDescription></DialogHeader>
+          <Field label="Rescan from" htmlFor="ds-since"><Input id="ds-since" type="datetime-local" value={since} onChange={(e) => setSince(e.target.value)} /></Field>
+          <DialogFooter><Button variant="outline" onClick={() => setRescanning(null)}>Cancel</Button><Button disabled={rescan.isPending} onClick={() => rescanning && rescan.mutate(rescanning)}>Reset cursor</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       <Dialog open={token != null} onOpenChange={(o) => !o && setToken(null)}>

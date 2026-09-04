@@ -749,6 +749,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data-sources/{data_source_id}/cursor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cursor
+         * @description Where a polling connector is.
+         */
+        get: operations["get_cursor_api_v1_data_sources__data_source_id__cursor_get"];
+        put?: never;
+        /**
+         * Reset Cursor
+         * @description Rescan from an instant (or from the adapter's default window when empty). The
+         *     connector picks the new cursor up at its next poll; records it already stored are
+         *     deduplicated by their canonical keys.
+         */
+        post: operations["reset_cursor_api_v1_data_sources__data_source_id__cursor_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-sources/{data_source_id}/sync-gateways": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Gateways
+         * @description Read the platform's gateway list into the registry: names, locations, states.
+         */
+        post: operations["sync_gateways_api_v1_data_sources__data_source_id__sync_gateways_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/data-sources/{data_source_id}": {
         parameters: {
             query?: never;
@@ -2247,6 +2293,237 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/integrations/connectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Connectors */
+        get: operations["list_connectors_api_v1_projects__project_id__integrations_connectors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Integrations */
+        get: operations["list_integrations_api_v1_projects__project_id__integrations_get"];
+        put?: never;
+        /** Create Integration */
+        post: operations["create_integration_api_v1_projects__project_id__integrations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Deliveries */
+        get: operations["list_deliveries_api_v1_projects__project_id__integrations_deliveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/deliveries/{delivery_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Delivery */
+        get: operations["get_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/deliveries/{delivery_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Delivery */
+        post: operations["retry_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Integration */
+        get: operations["get_integration_api_v1_projects__project_id__integrations__integration_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Integration */
+        delete: operations["delete_integration_api_v1_projects__project_id__integrations__integration_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Integration */
+        patch: operations["update_integration_api_v1_projects__project_id__integrations__integration_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Integration */
+        post: operations["test_integration_api_v1_projects__project_id__integrations__integration_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/integrations/{integration_id}/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request Backfill */
+        post: operations["request_backfill_api_v1_projects__project_id__integrations__integration_id__backfill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/gateways": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Gateways
+         * @description Gateways that received the project's devices in the window, busiest first.
+         */
+        get: operations["project_gateways_api_v1_projects__project_id__gateways_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/gateways/{gateway_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Project Gateway */
+        get: operations["project_gateway_api_v1_projects__project_id__gateways__gateway_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/connectivity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Connectivity
+         * @description Gateway diversity per device: how many gateways heard it, which one most often and
+         *     how large that gateway's share is, mean signal, last reception.
+         */
+        get: operations["project_connectivity_api_v1_projects__project_id__connectivity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gateways": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All Gateways */
+        get: operations["all_gateways_api_v1_admin_gateways_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gateways/{gateway_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Gateway */
+        patch: operations["update_gateway_api_v1_admin_gateways__gateway_id__patch"];
+        trace?: never;
+    };
     "/api/version": {
         parameters: {
             query?: never;
@@ -2590,6 +2867,19 @@ export interface components {
             /** Max Event Age Seconds */
             max_event_age_seconds?: number | null;
         };
+        /** BackfillRequest */
+        BackfillRequest: {
+            /**
+             * Time From
+             * Format: date-time
+             */
+            time_from: string;
+            /**
+             * Time To
+             * Format: date-time
+             */
+            time_to: string;
+        };
         /** BearerResponse */
         BearerResponse: {
             /** Access Token */
@@ -2816,6 +3106,14 @@ export interface components {
             /** Use Tiles */
             use_tiles: boolean;
         };
+        /** CursorReset */
+        CursorReset: {
+            /**
+             * Since
+             * @description Rescan from this instant; empty resets to the default window
+             */
+            since?: string | null;
+        };
         /** DataSourceCreate */
         DataSourceCreate: {
             /** Name */
@@ -2982,6 +3280,11 @@ export interface components {
             /** First */
             first: boolean;
         };
+        /**
+         * DeliveryStatus
+         * @enum {string}
+         */
+        DeliveryStatus: "queued" | "sent" | "failed" | "skipped";
         /** DependencyStatus */
         DependencyStatus: {
             /**
@@ -2993,6 +3296,41 @@ export interface components {
             latency_ms: number;
             /** Error */
             error?: string | null;
+        };
+        /** DeviceConnectivity */
+        DeviceConnectivity: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string | null;
+            /** Receptions */
+            receptions: number;
+            /** Uplinks */
+            uplinks: number;
+            /** Gateway Count */
+            gateway_count: number;
+            /** Best Gateway Id */
+            best_gateway_id: string | null;
+            /** Best Gateway Name */
+            best_gateway_name: string | null;
+            /**
+             * Best Gateway Share
+             * @description Share of uplinks the best gateway received
+             */
+            best_gateway_share?: number | null;
+            /** Mean Rssi */
+            mean_rssi: number | null;
+            /** Mean Snr */
+            mean_snr: number | null;
+            /** Last Reception At */
+            last_reception_at: string | null;
+            /** Gateways */
+            gateways?: {
+                [key: string]: unknown;
+            }[];
         };
         /** DeviceCreate */
         DeviceCreate: {
@@ -3730,6 +4068,125 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** GatewayDetail */
+        GatewayDetail: {
+            gateway: components["schemas"]["GatewayRead"];
+            /** Devices */
+            devices: components["schemas"]["GatewayDeviceStat"][];
+        };
+        /** GatewayDeviceStat */
+        GatewayDeviceStat: {
+            /** Device Id */
+            device_id: string | null;
+            /** Device Name */
+            device_name: string | null;
+            /** Receptions */
+            receptions: number;
+            /** Mean Rssi */
+            mean_rssi: number | null;
+            /** Mean Snr */
+            mean_snr: number | null;
+            /** Last Reception At */
+            last_reception_at: string | null;
+        };
+        /** GatewayRead */
+        GatewayRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Data Source Id
+             * Format: uuid
+             */
+            data_source_id: string;
+            /** Data Source Name */
+            data_source_name?: string | null;
+            /** External Id */
+            external_id: string;
+            /** Name */
+            name: string | null;
+            /** Name Override */
+            name_override: string | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /** Description */
+            description: string | null;
+            /** Geometry */
+            geometry?: {
+                [key: string]: unknown;
+            } | null;
+            /** Altitude M */
+            altitude_m: number | null;
+            /** Status */
+            status: string;
+            /** First Seen At */
+            first_seen_at: string | null;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Last Stats At */
+            last_stats_at: string | null;
+            /** Stats */
+            stats: {
+                [key: string]: unknown;
+            };
+            /** Attributes */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /**
+             * Receptions
+             * @default 0
+             */
+            receptions: number;
+            /**
+             * Devices
+             * @default 0
+             */
+            devices: number;
+            /** Mean Rssi */
+            mean_rssi?: number | null;
+            /** Mean Snr */
+            mean_snr?: number | null;
+            /** Last Reception At */
+            last_reception_at?: string | null;
+            /** Links */
+            links?: {
+                [key: string]: string;
+            }[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** GatewaySyncResult */
+        GatewaySyncResult: {
+            /** Synced */
+            synced: number;
+        };
+        /** GatewayUpdateRequest */
+        GatewayUpdateRequest: {
+            /** Name Override */
+            name_override?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Altitude M */
+            altitude_m?: number | null;
+            /** Description */
+            description?: string | null;
+        };
         /** GeoJSONGeometry */
         GeoJSONGeometry: {
             /** Type */
@@ -3807,6 +4264,372 @@ export interface components {
             source_event_ids: number[];
             /** Trace Ids */
             trace_ids: string[];
+        };
+        /** IntegrationCreate */
+        IntegrationCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Connector Key */
+            connector_key: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Credentials
+             * @description Write only
+             */
+            credentials?: {
+                [key: string]: unknown;
+            } | null;
+            /** Object Types */
+            object_types?: components["schemas"]["IntegrationObjectType"][];
+            /** Entity Ids */
+            entity_ids?: string[];
+            /** Device Ids */
+            device_ids?: string[];
+            /** Event Types */
+            event_types?: string[];
+            /** Metric Keys */
+            metric_keys?: string[];
+            /** @default info */
+            min_severity: components["schemas"]["Severity"];
+            /**
+             * Max Object Age Seconds
+             * @default 86400
+             */
+            max_object_age_seconds: number;
+        };
+        /** IntegrationDeliveryDetail */
+        IntegrationDeliveryDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Integration Id
+             * Format: uuid
+             */
+            integration_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Object Type */
+            object_type: string;
+            /** Object Id */
+            object_id: string;
+            /** Object Version */
+            object_version: number;
+            /**
+             * Object Time
+             * Format: date-time
+             */
+            object_time: string;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Device Id */
+            device_id: string | null;
+            /** Origin */
+            origin: string;
+            /** Status */
+            status: string;
+            /** Attempts */
+            attempts: number;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /** Last Attempt At */
+            last_attempt_at: string | null;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** External Id */
+            external_id: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Request */
+            request: {
+                [key: string]: unknown;
+            } | null;
+            /** Response */
+            response: {
+                [key: string]: unknown;
+            };
+        };
+        /** IntegrationDeliveryRead */
+        IntegrationDeliveryRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Integration Id
+             * Format: uuid
+             */
+            integration_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Object Type */
+            object_type: string;
+            /** Object Id */
+            object_id: string;
+            /** Object Version */
+            object_version: number;
+            /**
+             * Object Time
+             * Format: date-time
+             */
+            object_time: string;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Device Id */
+            device_id: string | null;
+            /** Origin */
+            origin: string;
+            /** Status */
+            status: string;
+            /** Attempts */
+            attempts: number;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /** Last Attempt At */
+            last_attempt_at: string | null;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** External Id */
+            external_id: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** IntegrationDetail */
+        IntegrationDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Connector Key */
+            connector_key: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Has Credentials
+             * @default false
+             */
+            has_credentials: boolean;
+            /** Object Types */
+            object_types: string[];
+            /** Entity Ids */
+            entity_ids: string[];
+            /** Device Ids */
+            device_ids: string[];
+            /** Event Types */
+            event_types: string[];
+            /** Metric Keys */
+            metric_keys: string[];
+            /** Min Severity */
+            min_severity: string;
+            /** Max Object Age Seconds */
+            max_object_age_seconds: number;
+            /** Last Delivery At */
+            last_delivery_at: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Last Error At */
+            last_error_at: string | null;
+            /** Backfill */
+            backfill: {
+                [key: string]: unknown;
+            };
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Counts
+             * @description Deliveries per status
+             */
+            counts?: {
+                [key: string]: number;
+            };
+            /** Counts 24H */
+            counts_24h?: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * IntegrationObjectType
+         * @description What an outbound integration forwards (architecture 18).
+         * @enum {string}
+         */
+        IntegrationObjectType: "position" | "event" | "measurement";
+        /** IntegrationRead */
+        IntegrationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Connector Key */
+            connector_key: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Has Credentials
+             * @default false
+             */
+            has_credentials: boolean;
+            /** Object Types */
+            object_types: string[];
+            /** Entity Ids */
+            entity_ids: string[];
+            /** Device Ids */
+            device_ids: string[];
+            /** Event Types */
+            event_types: string[];
+            /** Metric Keys */
+            metric_keys: string[];
+            /** Min Severity */
+            min_severity: string;
+            /** Max Object Age Seconds */
+            max_object_age_seconds: number;
+            /** Last Delivery At */
+            last_delivery_at: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Last Error At */
+            last_error_at: string | null;
+            /** Backfill */
+            backfill: {
+                [key: string]: unknown;
+            };
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** IntegrationTestRequest */
+        IntegrationTestRequest: {
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+        };
+        /** IntegrationTestResult */
+        IntegrationTestResult: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+            /** Response */
+            response?: {
+                [key: string]: unknown;
+            };
+        };
+        /** IntegrationUpdate */
+        IntegrationUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Credentials
+             * @description Write only
+             */
+            credentials?: {
+                [key: string]: unknown;
+            } | null;
+            /** Object Types */
+            object_types?: components["schemas"]["IntegrationObjectType"][] | null;
+            /** Entity Ids */
+            entity_ids?: string[] | null;
+            /** Device Ids */
+            device_ids?: string[] | null;
+            /** Event Types */
+            event_types?: string[] | null;
+            /** Metric Keys */
+            metric_keys?: string[] | null;
+            min_severity?: components["schemas"]["Severity"] | null;
+            /** Max Object Age Seconds */
+            max_object_age_seconds?: number | null;
         };
         /** InvitationCreate */
         InvitationCreate: {
@@ -4196,6 +5019,27 @@ export interface components {
         PageResponse_FeatureRead_: {
             /** Items */
             items: components["schemas"]["FeatureRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** PageResponse[GatewayRead] */
+        PageResponse_GatewayRead_: {
+            /** Items */
+            items: components["schemas"]["GatewayRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** PageResponse[IntegrationDeliveryRead] */
+        PageResponse_IntegrationDeliveryRead_: {
+            /** Items */
+            items: components["schemas"]["IntegrationDeliveryRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** PageResponse[IntegrationRead] */
+        PageResponse_IntegrationRead_: {
+            /** Items */
+            items: components["schemas"]["IntegrationRead"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -7617,6 +8461,107 @@ export interface operations {
             };
         };
     };
+    get_cursor_api_v1_data_sources__data_source_id__cursor_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_cursor_api_v1_data_sources__data_source_id__cursor_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CursorReset"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_gateways_api_v1_data_sources__data_source_id__sync_gateways_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewaySyncResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_data_source_api_v1_data_sources__data_source_id__get: {
         parameters: {
             query?: never;
@@ -10980,6 +11925,552 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_connectors_api_v1_projects__project_id__integrations_connectors_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_integrations_api_v1_projects__project_id__integrations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_IntegrationRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_integration_api_v1_projects__project_id__integrations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_deliveries_api_v1_projects__project_id__integrations_deliveries_get: {
+        parameters: {
+            query?: {
+                integration_id?: string | null;
+                status?: components["schemas"]["DeliveryStatus"] | null;
+                object_type?: string | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_IntegrationDeliveryRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                delivery_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationDeliveryDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_delivery_api_v1_projects__project_id__integrations_deliveries__delivery_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                delivery_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationDeliveryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_integration_api_v1_projects__project_id__integrations__integration_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_integration_api_v1_projects__project_id__integrations__integration_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_integration_api_v1_projects__project_id__integrations__integration_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_integration_api_v1_projects__project_id__integrations__integration_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationTestResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_backfill_api_v1_projects__project_id__integrations__integration_id__backfill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BackfillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_gateways_api_v1_projects__project_id__gateways_get: {
+        parameters: {
+            query?: {
+                hours?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_gateway_api_v1_projects__project_id__gateways__gateway_id__get: {
+        parameters: {
+            query?: {
+                hours?: number;
+            };
+            header?: never;
+            path: {
+                gateway_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_connectivity_api_v1_projects__project_id__connectivity_get: {
+        parameters: {
+            query?: {
+                hours?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceConnectivity"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    all_gateways_api_v1_admin_gateways_get: {
+        parameters: {
+            query?: {
+                data_source_id?: string | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_GatewayRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_gateway_api_v1_admin_gateways__gateway_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gateway_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatewayUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayRead"];
+                };
             };
             /** @description Validation Error */
             422: {

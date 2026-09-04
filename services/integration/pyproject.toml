@@ -1,0 +1,16 @@
+[project]
+name = "smartparks-protect-integration"
+version = "0.0.0"
+description = "Smart Parks Protect integration service: durable outbound deliveries to EarthRanger, webhooks and MQTT."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "smartparks-protect-shared",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "protect_integration"
+module-root = ""

@@ -187,7 +187,14 @@ async def test_traffic_traces_and_health(client, db, bus):
     health = await client.get("/api/v1/system/health", headers=admin.headers)
     assert health.status_code == 200
     body = health.json()
-    assert {w["name"] for w in body["workers"]} == {"ingest", "decoder"}
+    assert {w["name"] for w in body["workers"]} == {
+        "ingest",
+        "decoder",
+        "export",
+        "rules",
+        "automation",
+        "integration",
+    }
     assert any(s["id"] == source["id"] and s["events_last_hour"] == 2 for s in body["data_sources"])
 
 

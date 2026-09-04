@@ -20,6 +20,7 @@ smartparks-protect-decoder = { workspace = true }
 smartparks-protect-export = { workspace = true }
 smartparks-protect-rules = { workspace = true }
 smartparks-protect-automation = { workspace = true }
+smartparks-protect-integration = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -30,6 +31,7 @@ dev = [
     "smartparks-protect-export",
     "smartparks-protect-rules",
     "smartparks-protect-automation",
+    "smartparks-protect-integration",
     "ruff==0.16.5",
     "mypy==2.3.1",
     "pytest==9.1.1",
@@ -46,7 +48,7 @@ docs = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "tests"]
+src = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "services/integration", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF", "ANN"]

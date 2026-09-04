@@ -64,7 +64,7 @@ export const projectSections: NavSection[] = [
     label: "Network",
     items: [
       { label: "Traffic", icon: Radio, to: "network/traffic" },
-      { label: "Gateways", icon: Waypoints, phase: 8 },
+      { label: "Gateways", icon: Waypoints, to: "network/gateways" },
       { label: "Trace explorer", icon: ListTree, to: "network/traces" },
     ],
   },
@@ -78,7 +78,7 @@ export const projectSections: NavSection[] = [
   },
   {
     label: "Integrate",
-    items: [{ label: "Integrations", icon: Plug, phase: 8 }],
+    items: [{ label: "Integrations", icon: Plug, to: "integrate/integrations", adminOnly: true }],
   },
   {
     label: "Control",
