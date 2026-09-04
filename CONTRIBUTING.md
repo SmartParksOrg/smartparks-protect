@@ -6,7 +6,7 @@ Thanks for helping build Smart Parks Protect. This page explains how work is org
 
 1. Read `CONVENTIONS.md`. Crash early, type hints everywhere, no em dashes, natural capitalisation, no quick fixes.
 2. Read the active phase in `PROJECT_PLAN.md`. Work follows the plan; if you want something that is not in it, open an issue first.
-3. Install the git hook once per clone. It strips assistant co-author lines from commit messages:
+3. Install the git hooks once per clone. They strip assistant co-author lines from commit messages and refuse a commit that contains a credential, a filled-in `.env` or an Ansible inventory:
 
 ```bash
 git config core.hooksPath .githooks

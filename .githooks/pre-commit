@@ -1,0 +1,29 @@
+#!/bin/sh
+# Refuses a commit that would put a credential in the repository: cloud API tokens, object
+# storage keys, private keys, or a filled-in .env or Ansible inventory. Installed with
+# `scripts/dev.sh hooks` (git config core.hooksPath .githooks). Deployment credentials live
+# outside the repository tree (~/.config/smartparks-protect on the operator's machine).
+set -u
+status=0
+
+# Files that must never be committed, whatever they contain.
+forbidden='^(\.env|\.env\..*[^e]|ansible/inventory\.yml|ansible/host_vars/[^/]+\.yml|ansible/group_vars/all/main\.yml|.*\.pem|.*\.key|.*id_ed25519|.*id_rsa)$'
+for path in $(git diff --cached --name-only --diff-filter=ACMR); do
+    case "$path" in *.example) continue ;; esac
+    if printf '%s\n' "$path" | grep -Eq "$forbidden"; then
+        echo "pre-commit: refusing to commit $path (credentials or filled-in configuration)" >&2
+        status=1
+    fi
+done
+
+# Content patterns: DigitalOcean tokens and Spaces keys, AWS keys, private keys, Slack and
+# GitHub tokens, JWT-looking blobs in code, and the token variable itself.
+patterns='dop_v1_[0-9a-f]{20,}|DO[0-9A-Z]{18,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[0-9A-Za-z]{30,}|xox[baprs]-[0-9A-Za-z-]{10,}|DIGITALOCEAN_ACCESS_TOKEN=[^ ]+|SPACES_SECRET[A-Z_]*=[^ ]{8,}|BACKUP_S3_KEY_SECRET=[^ ]{8,}|CIPHER_PASS=[^ ]{8,}'
+hits=$(git diff --cached -U0 --diff-filter=ACMR -- . ':!.githooks/pre-commit' | grep -E '^\+' | grep -Ev '^\+\+\+' | grep -En "$patterns" | grep -Ev 'example|CHANGE_ME|placeholder|<[a-z_ ]+>' || true)
+if [ -n "$hits" ]; then
+    echo "pre-commit: refusing to commit lines that look like credentials:" >&2
+    printf '%s\n' "$hits" | cut -c1-120 >&2
+    status=1
+fi
+
+exit $status
