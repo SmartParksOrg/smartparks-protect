@@ -9,13 +9,21 @@
     mode: "0600"
   tags: [env-refresh, sync-config]
 
+- name: Deployed commit
+  command: git rev-parse --short HEAD
+  args:
+    chdir: "{{ app_directory }}"
+  register: deployed_commit
+  changed_when: false
+  tags: [env-refresh]
+
 - name: Build images
   command: docker compose build
   args:
     chdir: "{{ app_directory }}"
   become_user: "{{ app_user }}"
   environment:
-    GIT_COMMIT: "{{ lookup('pipe', 'echo unknown') }}"
+    GIT_COMMIT: "{{ deployed_commit.stdout }}"
   tags: [env-refresh]
 
 - name: Start the stack (the migrate service runs first)

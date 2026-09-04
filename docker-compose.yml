@@ -11,6 +11,10 @@ services:
     container_name: protect-postgres
     image: timescale/timescaledb-ha:pg17.10-ts2.29.2
     restart: unless-stopped
+    # An init process as PID 1. Without it PostgreSQL is PID 1 and pgBackRest's detached
+    # asynchronous archive process gets reparented to the postmaster, which treats that unknown
+    # child's exit as a crashed backend and restarts the whole cluster (seen on the dev server).
+    init: true
     # WAL archiving is always on; the wrapper drops segments until BACKUP_ENABLED is true, then
     # pushes them to the pgBackRest repository (architecture 28.4). archive_timeout forces a
     # segment every 15 minutes on a quiet server so the recovery point stays under an hour.
