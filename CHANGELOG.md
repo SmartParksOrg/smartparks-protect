@@ -4,6 +4,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+## v0.6.0, 2026-09-04
+
 Production LoRaWAN networks and the dev server (phase 7), integrations, Traccar, AddaxAI Connect and gateways (phase 8), and the MCP server for AI clients (phase 9), built from documentation and the local stack; live verification pending.
 
 ### Added

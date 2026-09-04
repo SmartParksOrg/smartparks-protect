@@ -17,9 +17,9 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 9, MCP read-only proof of concept (built and tested locally; the Claude and ChatGPT verification waits for the dev server) |
-| Latest release | v0.4.0 (2026-09-04); phases 7, 8 and 9 unreleased, v0.6.0 planned once CI is green (D67) |
+| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9, built from documentation and the local stack (D67); v1.0.0 waits for the live demonstration |
 | Last session | 2026-09-04 |
-| Next item | Tag v0.6.0 after CI; then the dev server (VM and domain) closes the phase 9 exit criterion and the phase 7 and 8 live items in one batch; phase 10 (observability, backup, disaster recovery) is the next buildable phase without accounts |
+| Next item | The dev server (VM and domain) closes the phase 9 exit criterion and the phase 7 and 8 live items in one batch; phase 10 (observability, backup, disaster recovery) is the next buildable phase without accounts |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, no dev VM, no domain (also needed for Claude and ChatGPT to reach the MCP server); deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live |
 
 ## What we are building
@@ -826,3 +826,7 @@ Listed by the phase where they are first needed.
 - Verification: ruff, mypy strict, eslint, tsc, vitest, vite build, OpenAPI regenerated; the Python suites (`tests/api/test_oauth.py`: metadata, registration rules, the full PKCE flow, scoped and audited access, code reuse, refresh rotation, revocation, consent denial, resource and redirect validation, a client id metadata document; `tests/mcp`: discovery, 401 and 403 challenges, tools over streamable HTTP against the real API, resources, prompts, audit rows, no data without membership) pass (15 tests), the full Python suite passes (279 tests), the screenshot sweep is clean on 37 routes at three viewports including the consent and Connected AI clients pages, and on the rebuilt local stack the whole flow ran through nginx: metadata, dynamic registration, authorize, consent, PKCE token exchange, then every tool over `/mcp` against Demo park (Rhino 14, its collar, traces, metrics, aggregates, position, search and fetch, a prompt), a write with the token refused with `insufficient_scope`, the connection listed and revoked.
 - Found while testing: a URL object built outside the SDK's metadata models gains a trailing slash on a path-less issuer, which would break RFC 8414 issuer comparison in clients; the models now receive strings. Entity and device types are named by `label`, not `name`.
 - Not done: the exit criterion (Claude and ChatGPT against the dev server) waits for the VM and the domain. `ruff format` also reformatted five test files of phase 8 that had drifted. Not committed; Tim reviews and commits.
+
+### 2026-09-04, release v0.6.0 (Claude)
+
+- CI green on the phase 9 commit (6186e2f); the phase 8 commit had failed CI on `ruff format`, fixed by the same commit. Tagged v0.6.0 per D67 on Tim's "continue". Phase 10 starts next.
