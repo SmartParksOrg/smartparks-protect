@@ -9,7 +9,9 @@ import type { DeviceDetail, DeviceType, Page as PageType, Position } from "@/api
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DeviceControl } from "@/components/control/DeviceControl";
-import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
+import { LogFilesCard } from "@/components/devices/LogFilesCard";
+import { RecordDeliveriesDialog, SourceEventDialog } from "@/components/devices/ProvenancePanel";
+import { WebBleCard } from "@/components/devices/WebBleCard";
 import { Icon } from "@/components/icons/Icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,7 @@ export function DevicePage() {
   const user = useAuthStore((s) => s.user);
   const role = useProjectRole(projectId);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(null);
+  const [record, setRecord] = useState<number | null>(null);
   const device = useQuery({ queryKey: queryKeys.device(deviceId), queryFn: () => api.get<DeviceDetail>(`/api/v1/devices/${deviceId}`) });
   const types = useQuery({ queryKey: queryKeys.deviceTypes, queryFn: () => api.get<PageType<DeviceType>>("/api/v1/device-types", { query: { limit: 500 } }) });
   const positions = useQuery({
@@ -89,6 +92,8 @@ export function DevicePage() {
             </CardContent>
           </Card>
           <div className="lg:col-span-2"><DeviceControl deviceId={d.id} projectId={projectId} canFlush={canAdmin(role) || Boolean(user?.is_superuser)} /></div>
+          <WebBleCard deviceId={d.id} deviceName={d.name} driverKey={type?.driver_key} canWrite={canAdmin(role) || Boolean(user?.is_superuser)} />
+          <LogFilesCard deviceId={d.id} canWrite={canAdmin(role) || Boolean(user?.is_superuser)} />
           {projectId && (
             <Card className="lg:col-span-2">
               <CardHeader><CardTitle>Recent positions</CardTitle></CardHeader>
@@ -100,9 +105,12 @@ export function DevicePage() {
                       <span>{formatTime(p.time)}</span>
                       <span className="font-mono text-xs">{(p.geometry?.coordinates as number[])?.[1]?.toFixed(5)}, {(p.geometry?.coordinates as number[])?.[0]?.toFixed(5)}</span>
                       {p.accuracy_m != null && <span className="text-muted-foreground">±{p.accuracy_m} m</span>}
-                      {p.source_event_id != null && (
-                        <Button variant="link" size="sm" className="ml-auto h-auto p-0" onClick={() => setEvent({ id: p.source_event_id!, ingestedAt: p.ingested_at })}>provenance</Button>
-                      )}
+                      <span className="ml-auto flex gap-3">
+                        <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setRecord(p.id)}>deliveries</Button>
+                        {p.source_event_id != null && (
+                          <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setEvent({ id: p.source_event_id!, ingestedAt: p.ingested_at })}>provenance</Button>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -112,6 +120,7 @@ export function DevicePage() {
         </div>
       </Page>
       <SourceEventDialog id={event?.id ?? null} ingestedAt={event?.ingestedAt ?? null} onClose={() => setEvent(null)} />
+      <RecordDeliveriesDialog canonicalType="position" canonicalId={record} onClose={() => setRecord(null)} onOpenEvent={(id, ingestedAt) => { setRecord(null); setEvent({ id, ingestedAt }); }} />
     </>
   );
 }

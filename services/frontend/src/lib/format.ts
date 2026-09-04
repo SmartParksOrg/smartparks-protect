@@ -17,3 +17,10 @@ export function formatAgo(value: string | null | undefined): string {
 export function shortId(value: string | null | undefined, length = 8): string {
   return value ? value.slice(0, length) : "";
 }
+
+const CHANNEL_LABELS: Record<string, string> = { lorawan: "LoRaWAN", webble: "WebBLE", log_file: "log file", iridium: "Iridium", cellular: "cellular", api: "API", other: "other" };
+
+/** Acquisition channel names as people read them (architecture 25.1). */
+export function channelLabel(channel: string): string {
+  return CHANNEL_LABELS[channel] ?? channel;
+}

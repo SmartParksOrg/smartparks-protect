@@ -102,6 +102,13 @@ class InboundMessage:
     )
     gateway_receptions: list[GatewayReceptionData] = field(default_factory=list)
     gateway: GatewayUpdate | None = None
+    device_id: uuid.UUID | None = field(
+        default=None,
+        metadata={
+            "doc": "The device the caller already knows, for browser syncs and file uploads "
+            "(architecture 25.4 and 25.6); identities still record the delivery"
+        },
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -99,6 +99,7 @@ class SourceEventData:
     device_type_settings: dict[str, Any]
     frame: bytes | None = None
     f_port: int | None = None
+    acquisition_channel: str | None = None
 
 
 DEFAULT_DECODABLE_EVENT_TYPES: frozenset[str] = frozenset({"uplink"})
@@ -140,6 +141,28 @@ def lorawan_frame(
         except (ValueError, TypeError):
             return None, int(f_port) if f_port is not None else None
     return None, int(f_port) if f_port is not None else None
+
+
+def raw_frame(payload: dict[str, Any], provider_metadata: dict[str, Any]) -> bytes | None:
+    """The raw bytes of a delivery that has no LoRaWAN port: a BLE notification, a raw log file
+    line or a satellite message. Adapters store them as `data_hex` (or `frame_hex` in the
+    provider metadata) or as base64 `data`."""
+    import base64
+
+    for container, key in ((payload, "data_hex"), (provider_metadata, "frame_hex")):
+        value = container.get(key)
+        if isinstance(value, str) and value:
+            try:
+                return bytes.fromhex(value)
+            except ValueError:
+                return None
+    data = payload.get("data")
+    if isinstance(data, str) and data:
+        try:
+            return base64.b64decode(data, validate=True)
+        except (ValueError, TypeError):
+            return None
+    return None
 
 
 def canonical_key(

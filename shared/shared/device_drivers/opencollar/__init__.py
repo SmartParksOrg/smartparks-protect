@@ -14,8 +14,11 @@ and flash status messages carry no clock of their own: on the air their time is 
 receive time; inside a flash log it is the store timestamp of the record.
 """
 
+import json
 import struct
 from datetime import UTC, datetime
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, ClassVar
 
 from shared.control.actions import ControlAction
@@ -30,10 +33,19 @@ from shared.device_drivers.base import (
     TimestampSemantics,
 )
 from shared.device_drivers.opencollar.control import CONTROL_ACTIONS
-from shared.enums import ErrorCode, Severity
+from shared.enums import AcquisitionChannel, ErrorCode, Severity
 from shared.trace import ApplicationError
 
 DECODER_VERSION = "fw7.3.0"
+CATALOG_PATH = Path(__file__).with_name("catalog.json")
+
+
+@lru_cache
+def _catalog() -> dict[str, Any]:
+    data: dict[str, Any] = json.loads(CATALOG_PATH.read_text())
+    return data
+
+
 COMPONENT = "driver.opencollar"
 MIN_VALID_UNIX = 1_000_000_000  # 2001; the firmware's init_time default is 2020
 
@@ -166,15 +178,45 @@ class OpenCollarDriver:
     control_actions: ClassVar[dict[str, ControlAction]] = CONTROL_ACTIONS
 
     def decode(self, event: SourceEventData) -> DecodedRecords:
-        if event.frame is None or event.f_port is None:
-            raise _fail("uplink carries no LoRaWAN frame or port", event_type=event.event_type)
+        """One delivery on any acquisition channel (architecture 25.1):
+
+        * LoRaWAN: the application payload on its FPort.
+        * WebBLE and raw log files: a notification frame `[port][msg_id][len][data]`; on port
+          29 the rest of the frame is the stored record stream.
+        * Iridium: the RockBLOCK send buffer, a record stream in the flash storage format
+          (`[port][msg_id][len][data][store timestamp]` repeated, wiki satellite page).
+        """
         records = DecodedRecords(decoder_version=DECODER_VERSION)
         received = event.network_received_at or event.ingested_at
+        channel = event.acquisition_channel or AcquisitionChannel.LORAWAN
+        if event.frame is None:
+            raise _fail("delivery carries no frame", event_type=event.event_type, channel=channel)
+        if channel in (AcquisitionChannel.WEBBLE, AcquisitionChannel.LOG_FILE):
+            if len(event.frame) < 2:
+                raise _fail("frame shorter than a port byte and a message", channel=channel)
+            port, message = event.frame[0], event.frame[1:]
+            if port == PORT_FLASH_LOG:
+                self._decode_flash_log(message, records)
+            else:
+                self._decode_message(port, message, received, records, via=str(channel))
+            return records
+        if channel == AcquisitionChannel.IRIDIUM:
+            self._decode_flash_log(event.frame, records)
+            return records
+        if event.f_port is None:
+            raise _fail("uplink carries no LoRaWAN port", event_type=event.event_type)
         if event.f_port == PORT_FLASH_LOG:
             self._decode_flash_log(event.frame, records)
         else:
             self._decode_message(event.f_port, event.frame, received, records, via="lorawan")
         return records
+
+    @staticmethod
+    def catalog() -> dict[str, Any]:
+        """Settings, commands and values of the protocol (research sections 4.2 to 4.4), for
+        the WebBLE settings editor and the documentation. Generated from the research document
+        into `catalog.json`; regenerate when a firmware release changes the tables."""
+        return dict(_catalog())
 
     # Framing
 

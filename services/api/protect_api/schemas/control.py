@@ -30,6 +30,33 @@ class CommandCreate(BaseModel):
     confirmed: bool = Field(
         default=False, description="The user confirmed an action whose policy asks for it"
     )
+    route_data_source_id: uuid.UUID | None = Field(
+        default=None,
+        description="Deliver through this data source (decision D79); default the most "
+        "recently seen route that needs no connected client",
+    )
+
+
+class RouteOptionRead(BaseModel):
+    data_source_id: uuid.UUID
+    name: str
+    adapter_key: str
+    channel: str
+    external_id: str
+    identity_type: str
+    last_seen_at: datetime | None
+    available: bool
+    reason: str | None
+    requires_client: bool
+    default: bool
+
+
+class BrowserResult(BaseModel):
+    """What the browser reports after executing a WebBLE command."""
+
+    status: str = Field(pattern="^(transmitted|failed)$")
+    detail: dict[str, Any] = Field(default_factory=dict)
+    error_message: str | None = Field(default=None, max_length=500)
 
 
 class CommandRead(ORMModel):

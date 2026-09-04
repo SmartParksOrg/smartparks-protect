@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { ActionAvailability, CommandDetail, CommandItem, QueueState } from "@/api/types";
+import type { ActionAvailability, CommandDetail, CommandItem, QueueState, RouteOption } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
@@ -17,9 +17,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { useWebBle } from "@/hooks/useWebBle";
 import { formatAgo, formatTime } from "@/lib/format";
+import { fromHex, hex } from "@/lib/opencollar-ble";
+
+const ROUTE_LABELS: Record<string, string> = { lorawan: "LoRaWAN", webble: "this browser (WebBLE)", iridium: "Iridium satellite", cellular: "cellular", api: "API", other: "other" };
 
 type SchemaProperty = { type?: string; title?: string; description?: string; minimum?: number; maximum?: number; default?: unknown };
 
@@ -91,27 +96,57 @@ export function DeviceControl({ deviceId, projectId, canFlush }: { deviceId: str
   const actions = useQuery({ queryKey: queryKeys.deviceActions(deviceId), queryFn: () => api.get<ActionAvailability[]>(`/api/v1/devices/${deviceId}/actions`) });
   const commands = useQuery({ queryKey: queryKeys.deviceCommands(deviceId), queryFn: () => api.get<CommandItem[]>(`/api/v1/devices/${deviceId}/commands`, { query: { limit: 20 } }), refetchInterval: 15_000 });
   const queue = useQuery({ queryKey: queryKeys.downlinkQueue(deviceId), queryFn: () => api.get<QueueState>(`/api/v1/devices/${deviceId}/downlink-queue`), refetchInterval: 30_000 });
+  const routes = useQuery({ queryKey: queryKeys.deviceRoutes(deviceId), queryFn: () => api.get<RouteOption[]>(`/api/v1/devices/${deviceId}/routes`) });
+  const ble = useWebBle(deviceId);
   const [chosen, setChosen] = useState<ActionAvailability | null>(null);
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [confirmed, setConfirmed] = useState(false);
+  const [route, setRoute] = useState<string>("");
   const [selected, setSelected] = useState<string | null>(null);
   const [flushing, setFlushing] = useState(false);
+  // Routes the dialog offers (decision D79): every usable route; the browser route only while
+  // this browser is connected to the device.
+  const routeOptions = (routes.data ?? []).filter((r) => r.available && (!r.requires_client || (r.adapter_key === "webble" && ble.connection)));
   function openAction(a: ActionAvailability) {
     const defaults: Record<string, unknown> = {};
     for (const [k, p] of Object.entries((a.parameters_schema.properties ?? {}) as Record<string, SchemaProperty>)) if (p.default !== undefined) defaults[k] = p.default;
     setValues(defaults);
     setConfirmed(false);
+    const preferred = ble.connection ? routeOptions.find((r) => r.adapter_key === "webble") : undefined;
+    setRoute((preferred ?? routeOptions.find((r) => r.default) ?? routeOptions[0])?.data_source_id ?? "");
     setChosen(a);
   }
+  /** A WebBLE command is written by this browser; the device's answer reaches the backend as a synced frame. */
+  async function executeInBrowser(c: CommandItem) {
+    const session = ble.session;
+    if (!session || c.payload_hex == null || c.f_port == null) {
+      await api.post(`/api/v1/commands/${c.id}/browser-result`, { body: { status: "failed", error_message: "the browser is not connected to the device" } }).catch(() => undefined);
+      return;
+    }
+    try {
+      const frame = new Uint8Array([c.f_port, ...fromHex(c.payload_hex)]);
+      const answer = await session.writeEncoded(frame);
+      await api.post(`/api/v1/commands/${c.id}/browser-result`, { body: { status: "transmitted", detail: { frame_hex: hex(frame), confirmation_hex: answer ? hex(answer.raw) : null, executed: answer ? answer.data[1] === 1 : null } } });
+      await ble.sync("command", session);
+    } catch (error) {
+      await api.post(`/api/v1/commands/${c.id}/browser-result`, { body: { status: "failed", error_message: error instanceof Error ? error.message : String(error) } }).catch(() => undefined);
+    }
+    await client.invalidateQueries({ queryKey: queryKeys.deviceCommands(deviceId) });
+  }
   const send = useMutationToast({
-    mutationFn: (a: ActionAvailability) => api.post<CommandItem>(`/api/v1/devices/${deviceId}/commands`, { body: { action_key: a.key, parameters: values, confirmed } }),
+    mutationFn: (a: ActionAvailability) => api.post<CommandItem>(`/api/v1/devices/${deviceId}/commands`, { body: { action_key: a.key, parameters: values, confirmed, route_data_source_id: route || null } }),
     invalidate: [queryKeys.deviceCommands(deviceId), queryKeys.downlinkQueue(deviceId)],
-    onSuccess: (c) => { setChosen(null); if (c.status === "failed") toast.error(`Command failed: ${c.error_message ?? c.error_code}`); else toast.success(`${c.action_key} ${c.status.replaceAll("_", " ")}`); setSelected(c.id); },
+    onSuccess: (c) => {
+      setChosen(null);
+      if (c.status === "failed") toast.error(`Command failed: ${c.error_message ?? c.error_code}`);
+      else toast.success(`${c.action_key} ${c.status.replaceAll("_", " ")}${c.route ? ` over ${ROUTE_LABELS[c.route] ?? c.route}` : ""}`);
+      setSelected(c.id);
+      if (c.route === "webble" && c.status !== "failed") void executeInBrowser(c);
+    },
   });
   const flush = useMutationToast({ mutationFn: () => api.delete<void>(`/api/v1/devices/${deviceId}/downlink-queue`), invalidate: [queryKeys.downlinkQueue(deviceId)], success: "Downlink queue flushed", onSuccess: () => setFlushing(false) });
   const available = actions.data ?? [];
   const needsConfirmation = chosen ? chosen.confirmation !== "none" : false;
-  void client;
 
   return (
     <>
@@ -158,6 +193,16 @@ export function DeviceControl({ deviceId, projectId, canFlush }: { deviceId: str
           {chosen && (
             <div className="space-y-3">
               <ParameterFields schema={chosen.parameters_schema} values={values} onChange={setValues} />
+              {routeOptions.length > 0 && (
+                <Field label="Route" htmlFor="command-route" hint={routeOptions.length === 1 ? "The only route that can reach the device now" : "How the command reaches the device; the most recently seen route is preselected"}>
+                  <Select value={route} onValueChange={setRoute}>
+                    <SelectTrigger id="command-route"><SelectValue placeholder="Choose a route" /></SelectTrigger>
+                    <SelectContent>
+                      {routeOptions.map((r) => <SelectItem key={r.data_source_id} value={r.data_source_id}>{ROUTE_LABELS[r.channel] ?? r.channel}: {r.name}{r.last_seen_at ? ` (seen ${formatAgo(r.last_seen_at)})` : ""}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               {needsConfirmation && (
                 <div className="flex items-start gap-2 rounded-md border border-brand-sand bg-brand-sand/20 p-2 text-sm">
                   <Switch id="confirm-command" checked={confirmed} onCheckedChange={setConfirmed} />

@@ -96,6 +96,25 @@ class Availability:
     reason: str | None
 
 
+@dataclass(slots=True)
+class RouteOption:
+    """One way a command could reach the device (architecture 25.5, decision D79): a data
+    source holding an identity of the device. `requires_client` marks the browser route, which
+    is only usable while the device is connected in the caller's browser."""
+
+    data_source_id: uuid.UUID
+    name: str
+    adapter_key: str
+    channel: str
+    external_id: str
+    identity_type: str
+    last_seen_at: Any
+    available: bool
+    reason: str | None
+    requires_client: bool
+    default: bool = False
+
+
 def command_connector_for(context: DataSourceContext) -> CommandConnector | None:
     adapter = ADAPTERS.get(context.adapter_key)
     factory = getattr(adapter, "command_connector", None)
@@ -111,12 +130,9 @@ async def driver_for(session: AsyncSession, device: Device) -> tuple[str, Any]:
     return device_type.driver_key, DRIVERS.get(device_type.driver_key)
 
 
-async def select_route(
-    session: AsyncSession, device: Device, capability: str = "downlink"
-) -> tuple[Route | None, str | None]:
-    """The enabled data source that can deliver to this device: it holds an identity of the
-    device, its adapter has a command connector, and its capabilities include the one the
-    action needs. The identity seen most recently wins."""
+async def _identity_rows(
+    session: AsyncSession, device: Device
+) -> list[tuple[ExternalIdentity, DataSource]]:
     rows = (
         await session.execute(
             select(ExternalIdentity, DataSource)
@@ -129,33 +145,99 @@ async def select_route(
             .order_by(ExternalIdentity.last_seen_at.desc().nulls_last())
         )
     ).all()
+    return [(identity, source) for identity, source in rows]
+
+
+def _route_of(
+    identity: ExternalIdentity, source: DataSource, capability: str
+) -> tuple[Route | None, str | None]:
+    context = data_source_context(source)
+    if not getattr(context.capabilities, capability, False):
+        return None, f"{source.name} has no {capability} capability"
+    connector = command_connector_for(context)
+    if connector is None:
+        return None, f"{source.name} ({source.adapter_key}) cannot send commands"
+    return (
+        Route(
+            source=source,
+            context=context,
+            identity=identity,
+            connector=connector,
+            channel=getattr(
+                ADAPTERS.get(source.adapter_key), "acquisition_channel", AcquisitionChannel.OTHER
+            ),
+        ),
+        None,
+    )
+
+
+def _requires_client(source: DataSource) -> bool:
+    return bool(getattr(ADAPTERS.get(source.adapter_key), "requires_client", False))
+
+
+async def select_route(
+    session: AsyncSession,
+    device: Device,
+    capability: str = "downlink",
+    *,
+    preferred_source_id: uuid.UUID | None = None,
+) -> tuple[Route | None, str | None]:
+    """The enabled data source that can deliver to this device: it holds an identity of the
+    device, its adapter has a command connector, and its capabilities include the one the
+    action needs. With a preference only that source is considered (decision D79); otherwise
+    the identity seen most recently wins and routes that need a connected client (the
+    browser) are skipped."""
+    rows = await _identity_rows(session, device)
+    if preferred_source_id is not None:
+        rows = [(i, s) for i, s in rows if s.id == preferred_source_id]
+        if not rows:
+            return None, "the device has no identity on the chosen data source"
+    else:
+        rows = [(i, s) for i, s in rows if not _requires_client(s)]
     if not rows:
         return None, "the device has no identity on an enabled data source"
     reasons: list[str] = []
     for identity, source in rows:
-        context = data_source_context(source)
-        if not getattr(context.capabilities, capability, False):
-            reasons.append(f"{source.name} has no {capability} capability")
-            continue
-        connector = command_connector_for(context)
-        if connector is None:
-            reasons.append(f"{source.name} ({source.adapter_key}) cannot send commands")
-            continue
-        return (
-            Route(
-                source=source,
-                context=context,
-                identity=identity,
-                connector=connector,
-                channel=getattr(
+        route, reason = _route_of(identity, source, capability)
+        if route is not None:
+            return route, None
+        reasons.append(reason or "unusable route")
+    return None, "; ".join(reasons)
+
+
+async def candidate_routes(
+    session: AsyncSession, device: Device, capability: str = "downlink"
+) -> list[RouteOption]:
+    """Every route the control dialog can offer, most recently seen first; the first usable
+    route that needs no client is the default."""
+    options: list[RouteOption] = []
+    default_set = False
+    for identity, source in await _identity_rows(session, device):
+        route, reason = _route_of(identity, source, capability)
+        requires_client = _requires_client(source)
+        option = RouteOption(
+            data_source_id=source.id,
+            name=source.name,
+            adapter_key=source.adapter_key,
+            channel=str(
+                getattr(
                     ADAPTERS.get(source.adapter_key),
                     "acquisition_channel",
                     AcquisitionChannel.OTHER,
-                ),
+                )
             ),
-            None,
+            external_id=identity.external_id,
+            identity_type=identity.identity_type,
+            last_seen_at=identity.last_seen_at,
+            available=route is not None,
+            reason=reason,
+            requires_client=requires_client,
         )
-    return None, "; ".join(reasons)
+        if route is not None and not requires_client and not default_set:
+            option.default = True
+            default_set = True
+        options.append(option)
+    return options
 
 
 async def available_actions(session: AsyncSession, device: Device) -> list[Availability]:
@@ -225,10 +307,11 @@ async def request_command(
     action_key: str,
     parameters: dict[str, Any],
     actor: Actor,
+    route_source_id: uuid.UUID | None = None,
 ) -> Command:
     """Create, encode, route and submit. The caller checks permissions and confirmation and
     commits afterwards. A command that cannot be delivered is stored as failed with the reason,
-    so the audit trail holds the attempt."""
+    so the audit trail holds the attempt. `route_source_id` pins the route (decision D79)."""
     driver_key, driver = await driver_for(session, device)
     action = actions_of(driver).get(action_key)
     if action is None:
@@ -302,7 +385,12 @@ async def request_command(
             )
 
         async with tracer.step("control", "route selected") as step:
-            route, reason = await select_route(session, device, action.required_capability)
+            route, reason = await select_route(
+                session,
+                device,
+                action.required_capability,
+                preferred_source_id=route_source_id,
+            )
             if route is None:
                 raise ApplicationError(
                     code=ErrorCode.COMMAND_REJECTED,
@@ -331,6 +419,8 @@ async def request_command(
                         "f_port": encoded.f_port,
                         "confirmed": encoded.confirmed,
                         "reference": str(command.id),
+                        "identity_type": route.identity.identity_type,
+                        "identity_attributes": dict(route.identity.attributes or {}),
                     },
                 )
             except ApplicationError:

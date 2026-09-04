@@ -57,6 +57,10 @@ async def _read(session: AsyncSession, source: DataSource) -> DataSourceRead:
     data.has_webhook_token = source.webhook_token_hash is not None
     if source.webhook_token_hash is not None:
         data.webhook_url = f"{get_settings().public_url}/api/v1/ingest/http/{source.id}"
+        data.webhook_token_in_query = bool(
+            getattr(ADAPTERS.get(source.adapter_key), "webhook_token_in_query", False)
+        )
+    data.builtin = bool(getattr(ADAPTERS.get(source.adapter_key), "builtin", False))
     data.project_ids = list(scopes)
     return data
 
@@ -138,6 +142,8 @@ async def create_data_source(
     await session.commit()
     data = await _read(session, source)
     data.webhook_token = token
+    if token and data.webhook_token_in_query and data.webhook_url:
+        data.webhook_url = f"{data.webhook_url}?token={token}"
     return data
 
 
@@ -161,6 +167,8 @@ async def rotate_webhook_token(
     await session.commit()
     data = await _read(session, source)
     data.webhook_token = token
+    if data.webhook_token_in_query and data.webhook_url:
+        data.webhook_url = f"{data.webhook_url}?token={token}"
     return data
 
 
@@ -299,6 +307,10 @@ async def delete_data_source(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    if getattr(ADAPTERS.get(source.adapter_key), "builtin", False):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Built-in channel sources cannot be deleted; disable instead"
+        )
     await session.delete(source)
     await flush_or_409(session, "Data source")
     await record_audit(

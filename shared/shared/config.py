@@ -117,6 +117,12 @@ class Settings(BaseSettings):
     payload_inline_max_bytes: int = Field(
         default=65_536, description="Bigger raw payloads go to MinIO"
     )
+    log_file_max_bytes: int = Field(
+        default=64 * 1024 * 1024, description="Largest raw device log file accepted for upload"
+    )
+    log_file_batch_size: int = Field(
+        default=200, ge=1, description="Frames of a log file decoded per transaction"
+    )
 
     log_level: str = "INFO"
     log_format: Literal["json", "text"] = "json"

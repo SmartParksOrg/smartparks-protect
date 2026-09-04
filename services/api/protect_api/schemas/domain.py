@@ -275,6 +275,10 @@ class DataSourceRead(ORMModel):
         default=None, description="Only in the response that created it"
     )
     webhook_url: str | None = None
+    webhook_token_in_query: bool = Field(
+        default=False, description="The platform posts with the token in the URL (D78)"
+    )
+    builtin: bool = Field(default=False, description="A channel source that cannot be deleted")
     capabilities: dict[str, Any]
     link_templates: dict[str, Any]
     retention_days: int | None

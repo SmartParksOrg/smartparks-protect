@@ -1,6 +1,7 @@
 """Golden tests over the wiki examples. Expected values are the public decoder's output."""
 
 import json
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -221,3 +222,73 @@ def test_simulator_frames_decode_to_positions_and_status():
     assert all(abs(p.latitude + 24.9) < 0.02 and abs(p.longitude - 31.5) < 0.02 for p in positions)
     assert positions[0].time < positions[-1].time and positions[-1].speed_mps is not None
     assert {"battery_voltage", "device_temperature"} <= status_metrics
+
+
+# Multi-path deliveries (architecture 25, phase 11): the same frames over WebBLE, from a raw
+# log file and over Iridium.
+
+
+def channel_event(channel: str, hex_data: str) -> SourceEventData:
+    return SourceEventData(
+        id=2,
+        event_type="uplink",
+        payload={"data_hex": hex_data},
+        provider_metadata={},
+        network_received_at=None,
+        ingested_at=RECEIVED,
+        device_attributes={},
+        device_type_settings={},
+        frame=bytes.fromhex(hex_data),
+        f_port=None,
+        acquisition_channel=channel,
+    )
+
+
+def test_ble_status_frame_carries_the_port_in_front():
+    row = load()[4]
+    records = driver.decode(channel_event("webble", "04" + row["data_hex"]))
+    assert {m.metric_key for m in records.measurements} >= {"battery_voltage", "device_temperature"}
+    assert records.states[0].state["via"] == "webble"
+
+
+def test_log_file_line_and_satellite_buffer_decode_like_a_flash_log():
+    row = load()[29]
+    over_lorawan = driver.decode(event(29, row["data_hex"]))
+    from_file = driver.decode(channel_event("log_file", "1d" + row["data_hex"]))
+    over_iridium = driver.decode(channel_event("iridium", row["data_hex"]))
+    times = [p.time for p in over_lorawan.positions]
+    assert len(times) == 10  # the wiki example holds ten stored short positions
+    assert [p.time for p in from_file.positions] == times
+    assert [p.time for p in over_iridium.positions] == times
+    assert {p.attributes["via"] for p in from_file.positions} == {"flash_log"}
+    device_id = uuid.uuid4()
+    assert {canonical_key(device_id, p.time, "gnss") for p in from_file.positions} == {
+        canonical_key(device_id, p.time, "gnss") for p in over_lorawan.positions
+    }
+
+
+def test_short_channel_frames_are_decode_failures():
+    with pytest.raises(ApplicationError) as excinfo:
+        driver.decode(channel_event("webble", "04"))
+    assert excinfo.value.code == ErrorCode.PAYLOAD_DECODE_FAILED
+    with pytest.raises(ApplicationError):
+        driver.decode(channel_event("iridium", "0d93"))
+
+
+def test_catalog_lists_the_protocol_tables():
+    catalog = OpenCollarDriver.catalog()
+    settings = {s["name"]: s for s in catalog["settings"]}
+    assert settings["ublox_send_interval"] == {
+        "id": 2,
+        "name": "ublox_send_interval",
+        "length": 4,
+        "type": "uint32",
+        "default": 0,
+        "min": 0,
+        "max": 172800,
+    }
+    assert len(settings) == 123
+    commands = {c["name"]: c for c in catalog["commands"]}
+    assert commands["cmd_flash_get_all"]["id"] == 0xBB
+    assert commands["cmd_flash_get_from_head"]["argument_length"] == 12
+    assert catalog["firmware"] == "7.3.0"

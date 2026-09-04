@@ -28,6 +28,7 @@ Schema as of migration 0001. Every time column is `TIMESTAMPTZ` in UTC. Domain o
 | `data_source_project_scopes` | Optional project scoping and auto-assign flag |
 | `external_identities` | `(data source, external id)` to device, null device while unknown |
 | `metrics` | Registry of metric keys with unit, value type and category |
+| `device_log_files` | Raw log files and browser syncs as managed assets: file in the log files bucket, SHA-256 unique per device, status, frame and record counts, period, firmware, the file's trace (architecture 25.6) |
 
 ## Time series (hypertables)
 

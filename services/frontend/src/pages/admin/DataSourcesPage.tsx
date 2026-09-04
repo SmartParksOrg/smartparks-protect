@@ -36,6 +36,8 @@ interface AdapterInfo {
   setup_hint: string;
   polling: boolean;
   can_manage: boolean;
+  builtin: boolean;
+  webhook_token_in_query: boolean;
 }
 
 const credentialsTemplate = (a: AdapterInfo) => Object.fromEntries(Object.keys(a.credentials_schema).map((k) => [k, ""]));
@@ -61,6 +63,8 @@ export function DataSourcesPage() {
   const sources = useQuery({ queryKey: queryKeys.dataSources, queryFn: () => api.get<PageType<DataSource>>("/api/v1/data-sources", { query: { limit: 500 } }) });
   const adapters = useQuery({ queryKey: queryKeys.adapters, queryFn: () => api.get<AdapterInfo[]>("/api/v1/data-sources/adapters") });
   const ADAPTERS = adapters.data ?? [];
+  // Built-in channel sources (WebBLE, log files) exist once per installation; nobody creates them.
+  const CREATABLE = ADAPTERS.filter((a) => !a.builtin);
   const projects = useQuery({ queryKey: queryKeys.projects, queryFn: () => api.get<PageType<ProjectWithRole>>("/api/v1/projects", { query: { limit: 500 } }) });
   const [editing, setEditing] = useState<DataSource | null>(null);
   const [open, setOpen] = useState(false);
@@ -70,7 +74,7 @@ export function DataSourcesPage() {
   useEffect(() => {
     if (!open) return;
     if (editing) form.reset({ name: editing.name, adapter_key: editing.adapter_key, enabled: editing.enabled, config: JSON.stringify(editing.config, null, 2), credentials: "", project_ids: editing.project_ids ?? [] });
-    else { const a = ADAPTERS[0]; form.reset({ name: "", adapter_key: a?.key ?? "", enabled: true, config: JSON.stringify(a?.config_example ?? {}, null, 2), credentials: JSON.stringify(a ? credentialsTemplate(a) : {}, null, 2), project_ids: [] }); }
+    else { const a = CREATABLE[0]; form.reset({ name: "", adapter_key: a?.key ?? "", enabled: true, config: JSON.stringify(a?.config_example ?? {}, null, 2), credentials: JSON.stringify(a ? credentialsTemplate(a) : {}, null, 2), project_ids: [] }); }
   }, [open, editing, form, ADAPTERS]);
   const save = useMutationToast({
     mutationFn: (values: Values) => {
@@ -115,10 +119,10 @@ export function DataSourcesPage() {
             <Field label="Adapter" htmlFor="ds-adapter">
               <Select value={adapterKey} disabled={Boolean(editing)} onValueChange={(v) => { form.setValue("adapter_key", v); const a = ADAPTERS.find((x) => x.key === v); if (a && !editing) { form.setValue("config", JSON.stringify(a.config_example, null, 2)); form.setValue("credentials", JSON.stringify(credentialsTemplate(a), null, 2)); } }}>
                 <SelectTrigger id="ds-adapter"><SelectValue /></SelectTrigger>
-                <SelectContent>{ADAPTERS.map((a) => <SelectItem key={a.key} value={a.key}>{a.label}</SelectItem>)}</SelectContent>
+                <SelectContent>{(editing ? ADAPTERS : CREATABLE).map((a) => <SelectItem key={a.key} value={a.key}>{a.label}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
-            {(() => { const a = ADAPTERS.find((x) => x.key === adapterKey); return a?.setup_hint ? <Callout kind="info">{a.setup_hint}{a.push ? " The webhook URL and its bearer token are shown after saving." : ""}</Callout> : null; })()}
+            {(() => { const a = ADAPTERS.find((x) => x.key === adapterKey); return a?.setup_hint ? <Callout kind="info">{a.setup_hint}{a.push ? (a.webhook_token_in_query ? " The webhook URL with its token is shown after saving; the platform posts to that URL as is." : " The webhook URL and its bearer token are shown after saving.") : ""}</Callout> : null; })()}
             <div className="flex items-center gap-2"><Switch id="ds-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="ds-enabled" className="text-sm">Enabled</label></div>
             <Field label="Configuration (JSON)" htmlFor="ds-config" error={form.formState.errors.config?.message}><Textarea id="ds-config" rows={6} className="font-mono text-xs" {...form.register("config")} /></Field>
             <Field label="Credentials (JSON)" htmlFor="ds-credentials" hint={editing ? "Leave empty to keep the stored credentials" : undefined} error={form.formState.errors.credentials?.message}><Textarea id="ds-credentials" rows={3} className="font-mono text-xs" {...form.register("credentials")} /></Field>

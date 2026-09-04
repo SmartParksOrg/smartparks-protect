@@ -5760,6 +5760,69 @@
     }
    }
   },
+  "/api/v1/deliveries": {
+   "get": {
+    "tags": [
+     "data"
+    ],
+    "summary": "List Deliveries",
+    "description": "Every delivery of one canonical record, oldest first: the delivery that created it and\nevery repeat over another path (architecture 25.7).",
+    "operationId": "list_deliveries_api_v1_deliveries_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "canonical_type",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^(position|measurement|state|event)$",
+       "title": "Canonical Type"
+      }
+     },
+     {
+      "name": "canonical_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "title": "Canonical Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/DeliveryDetail"
+         },
+         "title": "Response List Deliveries Api V1 Deliveries Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/traces/{trace_id}": {
    "get": {
     "tags": [
@@ -10821,6 +10884,108 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/routes": {
+   "get": {
+    "tags": [
+     "control"
+    ],
+    "summary": "List Routes",
+    "description": "Every way a command could reach the device, most recently seen first (decision D79).\nThe browser route appears once the device was connected over WebBLE in this application.",
+    "operationId": "list_routes_api_v1_devices__device_id__routes_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/RouteOptionRead"
+         },
+         "title": "Response List Routes Api V1 Devices  Device Id  Routes Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/routes/webble": {
+   "post": {
+    "tags": [
+     "control"
+    ],
+    "summary": "Connect Webble Route",
+    "description": "The browser reports that the device is connected over Web Bluetooth: the device gets\nits identity on the built-in WebBLE source, which makes the route selectable.",
+    "operationId": "connect_webble_route_api_v1_devices__device_id__routes_webble_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RouteOptionRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/commands": {
    "post": {
     "tags": [
@@ -10925,6 +11090,65 @@
           "$ref": "#/components/schemas/CommandRead"
          },
          "title": "Response List Device Commands Api V1 Devices  Device Id  Commands Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/commands/{command_id}/browser-result": {
+   "post": {
+    "tags": [
+     "control"
+    ],
+    "summary": "Browser Result",
+    "description": "The browser executed (or could not execute) a WebBLE command (decision D79). The\ndevice's own answer arrives through the synced frames and the action's interpreter.",
+    "operationId": "browser_result_api_v1_commands__command_id__browser_result_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "command_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Command Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BrowserResult"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CommandRead"
         }
        }
       }
@@ -11177,6 +11401,379 @@
     "responses": {
      "204": {
       "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/log-files": {
+   "post": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "Upload Log File",
+    "description": "Upload a raw log file retrieved from the device (one base64 or hex frame per line, the\nformat the public BLE app exports). The same file for the same device is refused with 409\nand the existing row.",
+    "operationId": "upload_log_file_api_v1_devices__device_id__log_files_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_log_file_api_v1_devices__device_id__log_files_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceLogFileRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "List Log Files",
+    "operationId": "list_log_files_api_v1_devices__device_id__log_files_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/DeviceLogFileRead"
+         },
+         "title": "Response List Log Files Api V1 Devices  Device Id  Log Files Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/log-files/ble-sync": {
+   "post": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "Ble Sync",
+    "description": "Frames the browser read over Web Bluetooth become a log file of channel `webble` and\nare decoded like an upload; the sync time is kept as provenance (architecture 25.3).",
+    "operationId": "ble_sync_api_v1_devices__device_id__log_files_ble_sync_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BleSyncRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceLogFileRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/driver-catalog": {
+   "get": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "Driver Catalog",
+    "description": "The driver's protocol catalogue (settings, commands, values) for the WebBLE settings\neditor; empty for drivers without one.",
+    "operationId": "driver_catalog_api_v1_devices__device_id__driver_catalog_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DriverCatalog"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/log-files/{log_file_id}": {
+   "get": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "Get Log File",
+    "operationId": "get_log_file_api_v1_log_files__log_file_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "log_file_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Log File Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceLogFileRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/log-files/{log_file_id}/download": {
+   "get": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "Download Log File",
+    "description": "The original file, byte for byte.",
+    "operationId": "download_log_file_api_v1_log_files__log_file_id__download_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "log_file_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Log File Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/log-files/{log_file_id}/redecode": {
+   "post": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "Redecode Log File",
+    "description": "Decode the stored frames again, for example after a decoder update. Records known\nalready are recognised by their canonical keys, so nothing is duplicated.",
+    "operationId": "redecode_log_file_api_v1_log_files__log_file_id__redecode_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "log_file_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Log File Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceLogFileRead"
+        }
+       }
+      }
      },
      "422": {
       "description": "Validation Error",
@@ -13733,6 +14330,51 @@
     ],
     "title": "BearerResponse"
    },
+   "BleSyncRequest": {
+    "properties": {
+     "frames": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 50000,
+      "minItems": 1,
+      "title": "Frames"
+     },
+     "ble_synced_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ble Synced At",
+      "description": "When the browser read the frames; default now"
+     },
+     "label": {
+      "type": "string",
+      "maxLength": 120,
+      "title": "Label",
+      "description": "Shown as the file name, for example the reason",
+      "default": ""
+     },
+     "attributes": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Attributes",
+      "description": "Session context: device name, browser, firmware"
+     }
+    },
+    "type": "object",
+    "required": [
+     "frames"
+    ],
+    "title": "BleSyncRequest",
+    "description": "Frames the browser read from the device over Web Bluetooth, hex encoded, each starting\nwith the port byte. Stored as a log file of channel `webble`."
+   },
    "Body_auth_jwt_login_api_v1_auth_login_post": {
     "properties": {
      "grant_type": {
@@ -13838,6 +14480,52 @@
     ],
     "title": "Body_reset_reset_password_api_v1_auth_reset_password_post"
    },
+   "Body_upload_log_file_api_v1_devices__device_id__log_files_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_log_file_api_v1_devices__device_id__log_files_post"
+   },
+   "BrowserResult": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "pattern": "^(transmitted|failed)$",
+      "title": "Status"
+     },
+     "detail": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Detail"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status"
+    ],
+    "title": "BrowserResult",
+    "description": "What the browser reports after executing a WebBLE command."
+   },
    "ChangePasswordRequest": {
     "properties": {
      "current_password": {
@@ -13876,6 +14564,19 @@
       "title": "Confirmed",
       "description": "The user confirmed an action whose policy asks for it",
       "default": false
+     },
+     "route_data_source_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Route Data Source Id",
+      "description": "Deliver through this data source (decision D79); default the most recently seen route that needs no connected client"
      }
     },
     "type": "object",
@@ -14705,6 +15406,18 @@
       ],
       "title": "Webhook Url"
      },
+     "webhook_token_in_query": {
+      "type": "boolean",
+      "title": "Webhook Token In Query",
+      "description": "The platform posts with the token in the URL (D78)",
+      "default": false
+     },
+     "builtin": {
+      "type": "boolean",
+      "title": "Builtin",
+      "description": "A channel source that cannot be deleted",
+      "default": false
+     },
      "capabilities": {
       "additionalProperties": true,
       "type": "object",
@@ -14944,6 +15657,134 @@
      "payload"
     ],
     "title": "DeadLetter"
+   },
+   "DeliveryDetail": {
+    "properties": {
+     "source_event_id": {
+      "type": "integer",
+      "title": "Source Event Id"
+     },
+     "source_event_ingested_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Source Event Ingested At"
+     },
+     "acquisition_channel": {
+      "type": "string",
+      "title": "Acquisition Channel"
+     },
+     "ingestion_method": {
+      "type": "string",
+      "title": "Ingestion Method"
+     },
+     "data_source_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Data Source Id"
+     },
+     "data_source_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Source Name"
+     },
+     "event_type": {
+      "type": "string",
+      "title": "Event Type"
+     },
+     "processing_status": {
+      "type": "string",
+      "title": "Processing Status"
+     },
+     "first": {
+      "type": "boolean",
+      "title": "First"
+     },
+     "network_received_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Network Received At"
+     },
+     "satellite_delivered_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Satellite Delivered At"
+     },
+     "ble_synced_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ble Synced At"
+     },
+     "file_uploaded_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "File Uploaded At"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "source_event_id",
+     "source_event_ingested_at",
+     "acquisition_channel",
+     "ingestion_method",
+     "data_source_id",
+     "data_source_name",
+     "event_type",
+     "processing_status",
+     "first",
+     "network_received_at",
+     "satellite_delivered_at",
+     "ble_synced_at",
+     "file_uploaded_at",
+     "trace_id"
+    ],
+    "title": "DeliveryDetail",
+    "description": "One delivery of a canonical record with the source event that carried it (architecture\n25.2 and 25.7): which channel, which platform, when it arrived."
    },
    "DeliveryRead": {
     "properties": {
@@ -15219,6 +16060,245 @@
      "name"
     ],
     "title": "DeviceCreate"
+   },
+   "DeviceLogFileRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "data_source_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Data Source Id"
+     },
+     "acquisition_channel": {
+      "type": "string",
+      "title": "Acquisition Channel"
+     },
+     "original_filename": {
+      "type": "string",
+      "title": "Original Filename"
+     },
+     "sha256": {
+      "type": "string",
+      "title": "Sha256"
+     },
+     "size_bytes": {
+      "type": "integer",
+      "title": "Size Bytes"
+     },
+     "uploaded_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Uploaded By User Id"
+     },
+     "uploaded_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Uploaded At"
+     },
+     "ble_synced_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ble Synced At"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     },
+     "frames_total": {
+      "type": "integer",
+      "title": "Frames Total"
+     },
+     "frames_failed": {
+      "type": "integer",
+      "title": "Frames Failed"
+     },
+     "records_found": {
+      "type": "integer",
+      "title": "Records Found"
+     },
+     "records_new": {
+      "type": "integer",
+      "title": "Records New"
+     },
+     "records_duplicate": {
+      "type": "integer",
+      "title": "Records Duplicate"
+     },
+     "period_start": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Period Start"
+     },
+     "period_end": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Period End"
+     },
+     "firmware_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Firmware Version"
+     },
+     "decoder_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decoder Version"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     },
+     "processed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Processed At"
+     },
+     "attributes": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Attributes"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_id",
+     "project_id",
+     "data_source_id",
+     "acquisition_channel",
+     "original_filename",
+     "sha256",
+     "size_bytes",
+     "uploaded_by_user_id",
+     "uploaded_at",
+     "ble_synced_at",
+     "status",
+     "error_code",
+     "error_message",
+     "frames_total",
+     "frames_failed",
+     "records_found",
+     "records_new",
+     "records_duplicate",
+     "period_start",
+     "period_end",
+     "firmware_version",
+     "decoder_version",
+     "trace_id",
+     "processed_at",
+     "attributes",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "DeviceLogFileRead"
    },
    "DeviceRead": {
     "properties": {
@@ -15711,6 +16791,25 @@
      "external_identities"
     ],
     "title": "DeviceWithAssignments"
+   },
+   "DriverCatalog": {
+    "properties": {
+     "driver_key": {
+      "type": "string",
+      "title": "Driver Key"
+     },
+     "catalog": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Catalog"
+     }
+    },
+    "type": "object",
+    "required": [
+     "driver_key",
+     "catalog"
+    ],
+    "title": "DriverCatalog"
    },
    "EntityAssignmentCreate": {
     "properties": {
@@ -21356,6 +22455,85 @@
     ],
     "title": "Role",
     "description": "Project roles. Server admin is `User.is_superuser`, not a membership row."
+   },
+   "RouteOptionRead": {
+    "properties": {
+     "data_source_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Data Source Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "adapter_key": {
+      "type": "string",
+      "title": "Adapter Key"
+     },
+     "channel": {
+      "type": "string",
+      "title": "Channel"
+     },
+     "external_id": {
+      "type": "string",
+      "title": "External Id"
+     },
+     "identity_type": {
+      "type": "string",
+      "title": "Identity Type"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At"
+     },
+     "available": {
+      "type": "boolean",
+      "title": "Available"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "requires_client": {
+      "type": "boolean",
+      "title": "Requires Client"
+     },
+     "default": {
+      "type": "boolean",
+      "title": "Default"
+     }
+    },
+    "type": "object",
+    "required": [
+     "data_source_id",
+     "name",
+     "adapter_key",
+     "channel",
+     "external_id",
+     "identity_type",
+     "last_seen_at",
+     "available",
+     "reason",
+     "requires_client",
+     "default"
+    ],
+    "title": "RouteOptionRead"
    },
    "RuleCreate": {
     "properties": {

@@ -24,6 +24,7 @@ from protect_api.routers.gateways import admin_router as admin_gateways_router
 from protect_api.routers.gateways import router as gateways_router
 from protect_api.routers.ingest import router as ingest_router
 from protect_api.routers.integrations import router as integrations_router
+from protect_api.routers.log_files import router as log_files_router
 from protect_api.routers.map import router as map_router
 from protect_api.routers.network import router as network_router
 from protect_api.routers.projects import router as projects_router
@@ -52,6 +53,7 @@ for router in (
     automations_router,
     admin_automations_router,
     control_router,
+    log_files_router,
     integrations_router,
     gateways_router,
     admin_gateways_router,

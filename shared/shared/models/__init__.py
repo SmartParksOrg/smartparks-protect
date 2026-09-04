@@ -36,6 +36,7 @@ from shared.models.events import (
     RuleVersion,
 )
 from shared.models.integrations import Integration, IntegrationDelivery
+from shared.models.log_files import DeviceLogFile
 from shared.models.network import DataSourceCursor, Gateway
 from shared.models.oauth import OAuthAuthorizationCode, OAuthClient, OAuthRefreshToken
 from shared.models.timeseries import (
@@ -70,6 +71,7 @@ __all__ = [
     "Device",
     "DeviceCurrentState",
     "DeviceEntityAssignment",
+    "DeviceLogFile",
     "DeviceProjectAssignment",
     "DeviceStateHistory",
     "DeviceType",

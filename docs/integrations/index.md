@@ -8,7 +8,8 @@
 - [akenza.io](akenza/index.md): webhook samples, downlinks through the akenza REST API.
 - [Traccar](traccar/index.md): the non-LoRaWAN tracking source over its websocket, with the command proof of concept.
 - [AddaxAI Connect](addaxai-connect/index.md): camera trap detections as `SPECIES_DETECTION` events, polled with a cursor.
+- [Cloudloop (Iridium)](cloudloop/index.md): RockBLOCK satellite messages over a webhook, commands as SBD messages.
 - [Gateways and connectivity](gateways.md): the gateway registry and the coverage analysis per device.
 - [Outbound integrations](outbound.md): durable deliveries with retries, backfill and a delivery log; webhook and MQTT targets.
 - [EarthRanger via Gundi](earthranger-gundi/index.md): positions as observations and events as EarthRanger events.
-- Generic HTTP and generic MQTT sources exist as well.
+- Generic HTTP and generic MQTT sources exist as well, and two built-in sources carry what a browser reads over Web Bluetooth and what a person uploads as a raw log file (see [devices](../devices/index.md)).

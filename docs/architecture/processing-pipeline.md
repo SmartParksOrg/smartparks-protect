@@ -13,11 +13,11 @@ platform  ->  adapter (ingest service or API webhook)  ->  source_events + trace
 
 ## Ingest
 
-`shared/ingest.py` is used by both entry points. The API endpoint `POST /api/v1/ingest/http/{data_source_id}` accepts pushes with the source's bearer token (decision D34) and hands the body to the adapter's `parse_webhook`. The ingest service runs the event connector of every enabled data source whose adapter has one (MQTT today) and re-reads the data sources every minute.
+`shared/ingest.py` is used by every entry point. The API endpoint `POST /api/v1/ingest/http/{data_source_id}` accepts pushes with the source's bearer token (decision D34; adapters whose platform cannot set a header, Cloudloop, take it as `?token=` and may restrict caller addresses) and hands the body to the adapter's `parse_webhook`. The ingest service runs the event connector of every enabled data source whose adapter has one and re-reads the data sources every minute. The file processing worker in the decoder service stores the frames of a raw log file or a browser sync the same way, on the built-in data source of the channel, with the device known up front (architecture 25, ADR 0017).
 
 For every `InboundMessage`:
 
-1. The external identity `(data source, external id)` is looked up or created with `device_id` null. First and last seen and the event count are updated.
+1. The external identity `(data source, external id)` is looked up or created with `device_id` null (or the device the caller named, for frames from a browser or a file). First and last seen and the event count are updated.
 2. The source event is stored. Payloads up to 64 KB are JSONB; bigger ones go to MinIO and the row keeps the object key, size and SHA-256 (decision D32).
 3. A compact processing trace is started with the steps "source event stored" and "identity resolved".
 4. After the commit, `source_event.received` is published, or `needs_attention.created` when the identity is unknown or ignored. The source event status is `received`, `unassigned` or `ignored`.
@@ -27,7 +27,7 @@ For every `InboundMessage`:
 `services/decoder/protect_decoder/pipeline.py`, one consumer group on `source_event.received`.
 
 1. Driver selected from the device type. No driver, no device: `ApplicationError`, not retried.
-2. Decoded by the driver into positions, measurements, states and events, each with its canonical time (ADR 0008).
+2. Decoded by the driver into positions, measurements, states and events, each with its canonical time (ADR 0008). LoRaWAN uplinks reach the driver as the application frame on its port; frames from Web Bluetooth, raw log files and Iridium as the raw bytes with the channel, which the driver reads accordingly.
 3. For every record the canonical key is computed. An existing row with the same key means a repeat delivery: a `source_deliveries` link is added and nothing else. Otherwise the project and entity are resolved at the record's time and the row is written with them.
 4. Current state is updated in the same transaction: `device_current_state`, `connectivity_state`, and `entity_current_state` when the record is attributed to an entity.
 5. The source event becomes `processed`, `duplicate` (only links added) or `failed` with an error code. The trace is finished. After the commit the domain events are published.

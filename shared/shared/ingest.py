@@ -198,11 +198,13 @@ async def resolve_identity(
             first_seen_at=now,
         )
         session.add(identity)
+    if identity.device_id is None and message.device_id is not None:
+        identity.device_id = message.device_id  # the caller knows the device (browser, upload)
     identity.last_seen_at = now
     identity.event_count = (identity.event_count or 0) + 1
     if message.identity_attributes:
-        merged = {**identity.attributes, **message.identity_attributes}
-        if merged != identity.attributes:
+        merged = {**(identity.attributes or {}), **message.identity_attributes}
+        if merged != (identity.attributes or {}):
             identity.attributes = merged
     await session.flush()
     return identity
@@ -213,7 +215,7 @@ async def store_inbound(
 ) -> StoredEvent:
     now = utc_now()
     identity = await resolve_identity(session, source, message, now)
-    device_id = identity.device_id if identity is not None else None
+    device_id = (identity.device_id if identity is not None else None) or message.device_id
     ignored = identity.ignored if identity is not None else False
 
     tracer = Tracer(
@@ -347,6 +349,57 @@ async def store_inbound(
         trace_id=tracer.trace_id,
         identity=identity,
     )
+
+
+async def builtin_source(session: AsyncSession, adapter_key: str) -> DataSource:
+    """The built-in data source of a channel (`webble`, `log_file`), created by migration 0011
+    and recreated here if an installation lost it."""
+    from shared.connectivity.adapters import log_file, webble
+
+    known = {webble.WebBleAdapter.key: webble, log_file.LogFileAdapter.key: log_file}
+    module = known[adapter_key]
+    source = await session.get(DataSource, module.SOURCE_ID)
+    if source is None:
+        source = await session.scalar(
+            select(DataSource).where(DataSource.adapter_key == adapter_key)
+        )
+    if source is None:
+        source = DataSource(
+            id=module.SOURCE_ID,
+            name=module.SOURCE_NAME,
+            adapter_key=adapter_key,
+            enabled=True,
+            capabilities={"uplink": True, "downlink": adapter_key == webble.WebBleAdapter.key},
+        )
+        session.add(source)
+        await session.flush()
+    return source
+
+
+async def ensure_channel_identity(
+    session: AsyncSession, source: DataSource, device_id: uuid.UUID
+) -> ExternalIdentity:
+    """The device's identity on a built-in channel source: its own id, so a browser sync or a
+    file upload is a delivery like any other and the route selection sees the channel."""
+    identity = await session.scalar(
+        select(ExternalIdentity).where(
+            ExternalIdentity.data_source_id == source.id,
+            ExternalIdentity.external_id == str(device_id),
+        )
+    )
+    if identity is None:
+        identity = ExternalIdentity(
+            data_source_id=source.id,
+            device_id=device_id,
+            external_id=str(device_id),
+            identity_type="device_id",
+            first_seen_at=utc_now(),
+        )
+        session.add(identity)
+        await session.flush()
+    elif identity.device_id is None:
+        identity.device_id = device_id
+    return identity
 
 
 async def commit_and_publish(

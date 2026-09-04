@@ -1,0 +1,1533 @@
+{
+ "firmware": "7.3.0",
+ "source": "docs/devices/opencollar-protocol-research.md sections 4.2 to 4.4 (settings.json at firmware commit 73fa4de)",
+ "settings": [
+  {
+   "id": 0,
+   "name": "tracker_type",
+   "length": 1,
+   "type": "uint8",
+   "default": 0,
+   "min": 0,
+   "max": 15
+  },
+  {
+   "id": 1,
+   "name": "lr_gps_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 2,
+   "name": "ublox_send_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 172800
+  },
+  {
+   "id": 3,
+   "name": "status_send_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 3600,
+   "min": 1,
+   "max": 86400
+  },
+  {
+   "id": 4,
+   "name": "satellite_send_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 86400,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 5,
+   "name": "gps_init_lon",
+   "length": 4,
+   "type": "int32",
+   "default": 156447700,
+   "min": -1800000000,
+   "max": 1800000000
+  },
+  {
+   "id": 6,
+   "name": "gps_init_lat",
+   "length": 4,
+   "type": "int32",
+   "default": 465556280,
+   "min": -900000000,
+   "max": 900000000
+  },
+  {
+   "id": 7,
+   "name": "init_time",
+   "length": 4,
+   "type": "uint32",
+   "default": 1606314575,
+   "min": 1606314575,
+   "max": 4294967295
+  },
+  {
+   "id": 8,
+   "name": "ble_adv",
+   "length": 1,
+   "type": "bool",
+   "default": true,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 9,
+   "name": "gnss_assisted_scan",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 10,
+   "name": "gps_resend_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 11,
+   "name": "data_log",
+   "length": 1,
+   "type": "bool",
+   "default": true,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 12,
+   "name": "lr_send_flag",
+   "length": 4,
+   "type": "uint32",
+   "default": 4162715375,
+   "min": 0,
+   "max": 4294967295
+  },
+  {
+   "id": 13,
+   "name": "flash_store_flag",
+   "length": 4,
+   "type": "uint32",
+   "default": 876143,
+   "min": 0,
+   "max": 4294967295
+  },
+  {
+   "id": 14,
+   "name": "lr_adr",
+   "length": 1,
+   "type": "uint8",
+   "default": 3,
+   "min": 0,
+   "max": 15
+  },
+  {
+   "id": 15,
+   "name": "lr_region",
+   "length": 1,
+   "type": "uint8",
+   "default": 1,
+   "min": 1,
+   "max": 13
+  },
+  {
+   "id": 16,
+   "name": "app_key",
+   "length": 16,
+   "type": "byte_array",
+   "default": "8bcd49421167dd03bad3aeea98efe409",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 17,
+   "name": "device_eui",
+   "length": 8,
+   "type": "byte_array",
+   "default": "0000000000000000",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 18,
+   "name": "app_eui",
+   "length": 8,
+   "type": "byte_array",
+   "default": "0000000000000000",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 19,
+   "name": "horizontal_accuracy",
+   "length": 4,
+   "type": "uint32",
+   "default": 50,
+   "min": 1,
+   "max": 1000
+  },
+  {
+   "id": 20,
+   "name": "cold_fix_retry",
+   "length": 1,
+   "type": "uint8",
+   "default": 200,
+   "min": 1,
+   "max": 255
+  },
+  {
+   "id": 21,
+   "name": "hot_fix_retry",
+   "length": 1,
+   "type": "uint8",
+   "default": 4,
+   "min": 1,
+   "max": 255
+  },
+  {
+   "id": 22,
+   "name": "cold_fix_timeout",
+   "length": 2,
+   "type": "uint16",
+   "default": 200,
+   "min": 1,
+   "max": 600
+  },
+  {
+   "id": 23,
+   "name": "hot_fix_timeout",
+   "length": 2,
+   "type": "uint16",
+   "default": 65,
+   "min": 1,
+   "max": 600
+  },
+  {
+   "id": 24,
+   "name": "ble_advertisement_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 500,
+   "min": 100,
+   "max": 10000
+  },
+  {
+   "id": 25,
+   "name": "wifi_scan_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 26,
+   "name": "wifi_scan_aggregated_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 27,
+   "name": "ble_scan_duration",
+   "length": 4,
+   "type": "uint32",
+   "default": 600,
+   "min": 50,
+   "max": 10000
+  },
+  {
+   "id": 28,
+   "name": "ble_scan_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 29,
+   "name": "ble_scan_aggregated_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 30,
+   "name": "ble_scan_filter",
+   "length": 1,
+   "type": "uint8",
+   "default": 1,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "id": 31,
+   "name": "ble_auto_disconnect",
+   "length": 4,
+   "type": "uint32",
+   "default": 600,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 32,
+   "name": "s_band_send_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 604800
+  },
+  {
+   "id": 33,
+   "name": "device_name",
+   "length": 8,
+   "type": "string",
+   "default": "",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 34,
+   "name": "lr_join_flag",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 4294967295
+  },
+  {
+   "id": 35,
+   "name": "lr_confirm_flag",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 4294967295
+  },
+  {
+   "id": 36,
+   "name": "lr_max_confirm_fail",
+   "length": 2,
+   "type": "uint16",
+   "default": 0,
+   "min": 0,
+   "max": 1000
+  },
+  {
+   "id": 37,
+   "name": "gps_backoff_factor",
+   "length": 1,
+   "type": "uint8",
+   "default": 10,
+   "min": 10,
+   "max": 100
+  },
+  {
+   "id": 38,
+   "name": "ublox_send_interval_2",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 39,
+   "name": "ublox_interval1_start",
+   "length": 1,
+   "type": "uint8",
+   "default": 11,
+   "min": 0,
+   "max": 23
+  },
+  {
+   "id": 40,
+   "name": "ublox_min_fix_time",
+   "length": 1,
+   "type": "uint8",
+   "default": 5,
+   "min": 0,
+   "max": 30
+  },
+  {
+   "id": 41,
+   "name": "ublox_multiple_intervals",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 42,
+   "name": "device_pin",
+   "length": 4,
+   "type": "byte_array",
+   "default": "00000000",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 43,
+   "name": "ublox_active_tracking",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 44,
+   "name": "led_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": true,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 45,
+   "name": "motion_ths",
+   "length": 1,
+   "type": "uint8",
+   "default": 6,
+   "min": 0,
+   "max": 63
+  },
+  {
+   "id": 46,
+   "name": "enable_motion_trig_gps",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 47,
+   "name": "gps_triggered_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 60,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 48,
+   "name": "gps_skipped_triggered_interval",
+   "length": 1,
+   "type": "uint8",
+   "default": 5,
+   "min": 0,
+   "max": 255
+  },
+  {
+   "id": 49,
+   "name": "lr_messaging_retry_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 60,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 50,
+   "name": "lr_messaging_retry_count",
+   "length": 1,
+   "type": "uint8",
+   "default": 1,
+   "min": 1,
+   "max": 5
+  },
+  {
+   "id": 51,
+   "name": "ublox_leave_on",
+   "length": 1,
+   "type": "uint8",
+   "default": 15,
+   "min": 0,
+   "max": 60
+  },
+  {
+   "id": 52,
+   "name": "memfault_send_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 53,
+   "name": "rejoin_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 3600,
+   "min": 600,
+   "max": 86400
+  },
+  {
+   "id": 54,
+   "name": "check_error_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 86400,
+   "min": 0,
+   "max": 2678400
+  },
+  {
+   "id": 55,
+   "name": "gnss_constellation_to_use",
+   "length": 1,
+   "type": "uint8",
+   "default": 3,
+   "min": 1,
+   "max": 3
+  },
+  {
+   "id": 56,
+   "name": "ublox_min_satellites_timer",
+   "length": 1,
+   "type": "uint8",
+   "default": 30,
+   "min": 5,
+   "max": 255
+  },
+  {
+   "id": 57,
+   "name": "sat_send_flag",
+   "length": 4,
+   "type": "uint32",
+   "default": 16522,
+   "min": 0,
+   "max": 4294967295
+  },
+  {
+   "id": 58,
+   "name": "satellite_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 59,
+   "name": "satellite_retry",
+   "length": 1,
+   "type": "uint8",
+   "default": 10,
+   "min": 1,
+   "max": 15
+  },
+  {
+   "id": 63,
+   "name": "fence_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 64,
+   "name": "fence_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 60,
+   "min": 0,
+   "max": 604800
+  },
+  {
+   "id": 65,
+   "name": "fence_sampling_length",
+   "length": 2,
+   "type": "uint16",
+   "default": 10,
+   "min": 1,
+   "max": 60
+  },
+  {
+   "id": 66,
+   "name": "fence_mv_scaling_factor",
+   "length": 4,
+   "type": "uint32",
+   "default": 100000,
+   "min": 100,
+   "max": 1000000
+  },
+  {
+   "id": 67,
+   "name": "flash_status_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 604800
+  },
+  {
+   "id": 68,
+   "name": "lp0_app_key",
+   "length": 16,
+   "type": "byte_array",
+   "default": "ec7f380e7adfb2e5c9bbde5ac21694a8",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 69,
+   "name": "lp0_network_key",
+   "length": 16,
+   "type": "byte_array",
+   "default": "db7e2726cff58c133a07b5a1b400e1d0",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 70,
+   "name": "lp0_dev_addr",
+   "length": 4,
+   "type": "byte_array",
+   "default": "260bf6ef",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 71,
+   "name": "ble_scan_report_zero_connections_found",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 72,
+   "name": "wifi_scan_report_zero_connections_found",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 73,
+   "name": "cmdq_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 74,
+   "name": "cmdq_scan_duration",
+   "length": 4,
+   "type": "uint32",
+   "default": 10000,
+   "min": 1,
+   "max": 10000
+  },
+  {
+   "id": 75,
+   "name": "cmdq_search_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 300,
+   "min": 1,
+   "max": 10000
+  },
+  {
+   "id": 76,
+   "name": "cmdq_on_no_detection_wait_duration",
+   "length": 4,
+   "type": "uint32",
+   "default": 1800,
+   "min": 1,
+   "max": 10000
+  },
+  {
+   "id": 77,
+   "name": "cmdq_searched_mac_address",
+   "length": 6,
+   "type": "byte_array",
+   "default": "d81068acdae4",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 78,
+   "name": "cmdq_reporting_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 300,
+   "min": 1,
+   "max": 10000
+  },
+  {
+   "id": 79,
+   "name": "s_band_rf_frequency_hz",
+   "length": 4,
+   "type": "uint32",
+   "default": 2008450000,
+   "min": 1980000000,
+   "max": 2100000000
+  },
+  {
+   "id": 80,
+   "name": "cmdq_report_zero_messages_to_be_sent",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 82,
+   "name": "ublox_interval2_start",
+   "length": 1,
+   "type": "uint8",
+   "default": 19,
+   "min": 0,
+   "max": 23
+  },
+  {
+   "id": 87,
+   "name": "lr_adr_profile",
+   "length": 1,
+   "type": "uint8",
+   "default": 3,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "id": 95,
+   "name": "ublox_min_satellites",
+   "length": 1,
+   "type": "uint8",
+   "default": 3,
+   "min": 0,
+   "max": 255
+  },
+  {
+   "id": 96,
+   "name": "external_switch_detection_gpio_pin_power_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 97,
+   "name": "vhf_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 98,
+   "name": "vhf_interval1",
+   "length": 4,
+   "type": "uint32",
+   "default": 2,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 99,
+   "name": "vhf_interval2",
+   "length": 4,
+   "type": "uint32",
+   "default": 2,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 100,
+   "name": "vhf_interval1_start",
+   "length": 1,
+   "type": "uint8",
+   "default": 7,
+   "min": 0,
+   "max": 23
+  },
+  {
+   "id": 101,
+   "name": "vhf_interval2_start",
+   "length": 1,
+   "type": "uint8",
+   "default": 19,
+   "min": 0,
+   "max": 23
+  },
+  {
+   "id": 102,
+   "name": "vhf_multiple_intervals",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 103,
+   "name": "vhf_num_of_packets_per_burst",
+   "length": 1,
+   "type": "uint8",
+   "default": 1,
+   "min": 1,
+   "max": 255
+  },
+  {
+   "id": 104,
+   "name": "vhf_time_between_packets_ms",
+   "length": 2,
+   "type": "uint16",
+   "default": 250,
+   "min": 1,
+   "max": 10000
+  },
+  {
+   "id": 105,
+   "name": "vhf_external_path",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 106,
+   "name": "vhf_tx_frequency_khz",
+   "length": 4,
+   "type": "uint32",
+   "default": 150000,
+   "min": 150000,
+   "max": 300000
+  },
+  {
+   "id": 107,
+   "name": "vhf_single_pulse_duration_ms",
+   "length": 2,
+   "type": "uint16",
+   "default": 18,
+   "min": 5,
+   "max": 10000
+  },
+  {
+   "id": 108,
+   "name": "s_band_send_mode",
+   "length": 1,
+   "type": "uint8",
+   "default": 1,
+   "min": 0,
+   "max": 2
+  },
+  {
+   "id": 109,
+   "name": "fence_led_blink",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 110,
+   "name": "gps_motion_triggered_min_num_of_triggers_per_interval",
+   "length": 1,
+   "type": "uint8",
+   "default": 0,
+   "min": 0,
+   "max": 255
+  },
+  {
+   "id": 114,
+   "name": "ble_scan_manufacturer_id",
+   "length": 2,
+   "type": "uint16",
+   "default": 2657,
+   "min": 0,
+   "max": 65535
+  },
+  {
+   "id": 115,
+   "name": "accel_movement_data_fifo_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 116,
+   "name": "accel_odr_hz",
+   "length": 2,
+   "type": "uint16",
+   "default": 12,
+   "min": 0,
+   "max": 1600
+  },
+  {
+   "id": 117,
+   "name": "accel_g_scale",
+   "length": 1,
+   "type": "uint8",
+   "default": 2,
+   "min": 2,
+   "max": 16
+  },
+  {
+   "id": 118,
+   "name": "satellite_send_interval2",
+   "length": 4,
+   "type": "uint32",
+   "default": 86400,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 119,
+   "name": "satellite_send_interval2_start",
+   "length": 1,
+   "type": "uint8",
+   "default": 19,
+   "min": 0,
+   "max": 23
+  },
+  {
+   "id": 120,
+   "name": "satellite_multiple_intervals",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 121,
+   "name": "satellite_interval1_start",
+   "length": 1,
+   "type": "uint8",
+   "default": 7,
+   "min": 0,
+   "max": 23
+  },
+  {
+   "id": 122,
+   "name": "outdoor_detection_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 123,
+   "name": "outdoor_detection_tau",
+   "length": 1,
+   "type": "uint8",
+   "default": 11,
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": 124,
+   "name": "outdoor_detection_parameters",
+   "length": 12,
+   "type": "byte_array",
+   "default": "cbec6b122a13790f201c0000",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 125,
+   "name": "ublox_cold_fix_hour_interval",
+   "length": 2,
+   "type": "uint16",
+   "default": 0,
+   "min": 0,
+   "max": 4320
+  },
+  {
+   "id": 126,
+   "name": "external_switch_detection_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 127,
+   "name": "external_switch_detection_trigger_type",
+   "length": 1,
+   "type": "uint8",
+   "default": 0,
+   "min": 0,
+   "max": 1
+  },
+  {
+   "id": 128,
+   "name": "external_switch_detection_trigger_debounce_ms",
+   "length": 2,
+   "type": "uint16",
+   "default": 50,
+   "min": 0,
+   "max": 2000
+  },
+  {
+   "id": 129,
+   "name": "external_switch_detection_reporting_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 3600,
+   "min": 0,
+   "max": 86400
+  },
+  {
+   "id": 130,
+   "name": "external_switch_send_inactivity_report",
+   "length": 1,
+   "type": "bool",
+   "default": true,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 131,
+   "name": "external_switch_minimal_report_duration_ms",
+   "length": 2,
+   "type": "uint16",
+   "default": 250,
+   "min": 0,
+   "max": 65000
+  },
+  {
+   "id": 132,
+   "name": "external_switch_input_pull",
+   "length": 1,
+   "type": "uint8",
+   "default": 1,
+   "min": 0,
+   "max": 2
+  },
+  {
+   "id": 133,
+   "name": "external_switch_counter_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 134,
+   "name": "air_quality_enabled",
+   "length": 1,
+   "type": "bool",
+   "default": false,
+   "min": false,
+   "max": true
+  },
+  {
+   "id": 135,
+   "name": "air_quality_interval",
+   "length": 4,
+   "type": "uint32",
+   "default": 300,
+   "min": 10,
+   "max": 86400
+  },
+  {
+   "id": 136,
+   "name": "lp0_send_flag",
+   "length": 4,
+   "type": "uint32",
+   "default": 0,
+   "min": 0,
+   "max": 4294967295
+  },
+  {
+   "id": 137,
+   "name": "lp0_tx_frequency_hz",
+   "length": 4,
+   "type": "uint32",
+   "default": 869150000,
+   "min": 0,
+   "max": 2100000000
+  },
+  {
+   "id": 138,
+   "name": "lp0_rx_frequency_hz",
+   "length": 4,
+   "type": "uint32",
+   "default": 869150000,
+   "min": 0,
+   "max": 2100000000
+  },
+  {
+   "id": 139,
+   "name": "lp0_communication_params",
+   "length": 4,
+   "type": "byte_array",
+   "default": "07050101",
+   "min": null,
+   "max": null
+  },
+  {
+   "id": 140,
+   "name": "lp0_node_params",
+   "length": 5,
+   "type": "byte_array",
+   "default": "00000a013c",
+   "min": null,
+   "max": null
+  }
+ ],
+ "commands": [
+  {
+   "id": 160,
+   "name": "cmd_join",
+   "argument_length": 0,
+   "description": "Rejoin the LoRaWAN network. Response: status uplink on FPort 4 after join"
+  },
+  {
+   "id": 161,
+   "name": "cmd_reset",
+   "argument_length": 0,
+   "description": "Reboot the device (sys_reboot). No response"
+  },
+  {
+   "id": 162,
+   "name": "cmd_send_all_val",
+   "argument_length": 0,
+   "description": "Response: all values as TLV on FPort 30"
+  },
+  {
+   "id": 163,
+   "name": "cmd_send_single_val",
+   "argument_length": 1,
+   "description": "arg: value id (0xD0..0xEF). Response: `id len value` on FPort 30"
+  },
+  {
+   "id": 164,
+   "name": "cmd_send_status",
+   "argument_length": 0,
+   "description": "Response: status message on FPort 4 to the requesting channel"
+  },
+  {
+   "id": 165,
+   "name": "cmd_send_position",
+   "argument_length": 0,
+   "description": "Response: msg_last_position 0xFE on FPort 31"
+  },
+  {
+   "id": 166,
+   "name": "cmd_reset_gps",
+   "argument_length": 0,
+   "description": "Power cycle the u-blox module. Response: cmd confirm on FPort 31"
+  },
+  {
+   "id": 167,
+   "name": "cmd_send_all_settings",
+   "argument_length": 0,
+   "description": "Response: settings TLV on FPort 3 (first chunk over LoRaWAN)"
+  },
+  {
+   "id": 168,
+   "name": "cmd_send_single_setting",
+   "argument_length": 1,
+   "description": "arg: setting id. Response: `id len value` on FPort 3"
+  },
+  {
+   "id": 169,
+   "name": "cmd_reset_initial_position",
+   "argument_length": 1,
+   "description": "arg: 1 byte. Reset stored reference position to gps_init_lon/lat"
+  },
+  {
+   "id": 170,
+   "name": "cmd_reset_initial_time",
+   "argument_length": 0,
+   "description": "Reset device clock from init_time setting"
+  },
+  {
+   "id": 171,
+   "name": "cmd_clear_nvs",
+   "argument_length": 0,
+   "description": "Erase all stored settings (factory reset of NVS)"
+  },
+  {
+   "id": 172,
+   "name": "cmd_reset_to_def_settings",
+   "argument_length": 0,
+   "description": "Restore settings.json defaults"
+  },
+  {
+   "id": 173,
+   "name": "cmd_send_status_lr",
+   "argument_length": 0,
+   "description": "Force a status uplink over LoRaWAN regardless of origin"
+  },
+  {
+   "id": 174,
+   "name": "cmd_send_lr_fix",
+   "argument_length": 0,
+   "description": "Perform LR11xx GNSS scan now. Response: FPort 1 (and 5)"
+  },
+  {
+   "id": 175,
+   "name": "cmd_set_location_and_time",
+   "argument_length": 12,
+   "description": "arg: lon i32 (deg*1e7), lat i32, unix time u32, 12 bytes LE. Seeds assisted GNSS and the clock"
+  },
+  {
+   "id": 177,
+   "name": "cmd_get_wifi_scan",
+   "argument_length": 0,
+   "description": "Perform Wi-Fi scan now. Response: FPort 10 (and 6)"
+  },
+  {
+   "id": 178,
+   "name": "cmd_get_ble_scan",
+   "argument_length": 0,
+   "description": "Perform BLE scan now. Response: FPort 11"
+  },
+  {
+   "id": 179,
+   "name": "cmd_get_flash_status",
+   "argument_length": 0,
+   "description": "Response: FPort 14"
+  },
+  {
+   "id": 180,
+   "name": "cmd_get_lr_satellite_data",
+   "argument_length": 0,
+   "description": "Response: FPort 5"
+  },
+  {
+   "id": 181,
+   "name": "cmd_get_ublox_satellite_data",
+   "argument_length": 0,
+   "description": "Response: FPort 9"
+  },
+  {
+   "id": 182,
+   "name": "cmd_almanac_update",
+   "argument_length": 250,
+   "description": "arg: up to 250 bytes, stacked 20 byte almanac chunks (byte 0 of each chunk is the SV id, 128 = header; update executes when header received)"
+  },
+  {
+   "id": 183,
+   "name": "cmd_get_mac",
+   "argument_length": 0,
+   "description": "Response: msg_mac_id 0xFD on FPort 31"
+  },
+  {
+   "id": 184,
+   "name": "cmd_get_ublox_fix",
+   "argument_length": 0,
+   "description": "Perform u-blox fix now. Response: FPort 2 (fixed for LoRaWAN in 6.4.0)"
+  },
+  {
+   "id": 185,
+   "name": "cmd_reset_lr",
+   "argument_length": 0,
+   "description": "Reset the LR11xx modem"
+  },
+  {
+   "id": 186,
+   "name": "cmd_flash_clear",
+   "argument_length": 0,
+   "description": "Erase flash log. Response: cmd confirm FPort 31"
+  },
+  {
+   "id": 187,
+   "name": "cmd_flash_get_all",
+   "argument_length": 1,
+   "description": "arg: port (0 = all). Response: FPort 29 records, then cmd confirm"
+  },
+  {
+   "id": 188,
+   "name": "cmd_flash_get_from_head",
+   "argument_length": 12,
+   "description": "arg: port u32, start u32, count u32 (12 bytes LE). Response: FPort 29 records, then cmd confirm"
+  },
+  {
+   "id": 189,
+   "name": "cmd_s_band_send",
+   "argument_length": 0,
+   "description": "Send status and short position over S-band (RangerEdge 1.7+ only)"
+  },
+  {
+   "id": 190,
+   "name": "cmd_set_operation_mode_com_th",
+   "argument_length": 1,
+   "description": "arg: mode byte for the communication thread (debug)"
+  },
+  {
+   "id": 191,
+   "name": "cmd_disable_flash_th",
+   "argument_length": 0,
+   "description": "Disable the flash thread"
+  },
+  {
+   "id": 192,
+   "name": "cmd_disable_bt_th",
+   "argument_length": 0,
+   "description": "Disable Bluetooth"
+  },
+  {
+   "id": 193,
+   "name": "cmd_set_operation_mode_main_th",
+   "argument_length": 1,
+   "description": "arg: mode byte for the main thread (debug)"
+  },
+  {
+   "id": 194,
+   "name": "cmd_check_pin",
+   "argument_length": 16,
+   "description": "arg: 16 bytes (PIN or AppKey) to unlock a PIN protected device (BLE use)"
+  },
+  {
+   "id": 195,
+   "name": "cmd_set_hibernation_mode",
+   "argument_length": 0,
+   "description": "Enter hibernation (everything off until magnet). Wiki: `C3 00`, base64 `wwA=`"
+  },
+  {
+   "id": 196,
+   "name": "cmd_send_lr_message",
+   "argument_length": 46,
+   "description": "arg: up to 46 ASCII bytes, queued as FPort 28 uplink (msg 0x90)"
+  },
+  {
+   "id": 197,
+   "name": "cmd_read_all_lr_messages",
+   "argument_length": 0,
+   "description": "Deliver stored incoming messages (BLE use)"
+  },
+  {
+   "id": 198,
+   "name": "cmd_send_sat_buffer",
+   "argument_length": 0,
+   "description": "Flush the RockBLOCK send buffer now (adds a status message if empty)"
+  },
+  {
+   "id": 199,
+   "name": "cmd_lp0_command",
+   "argument_length": 1,
+   "description": "arg: 1 byte LP0 command (experimental)"
+  },
+  {
+   "id": 200,
+   "name": "cmd_fence_measure",
+   "argument_length": 1,
+   "description": "arg: 1 byte. Perform fence measurement now. Response: FPort 12"
+  },
+  {
+   "id": 201,
+   "name": "cmd_aggregated_bt_scan",
+   "argument_length": 0,
+   "description": "Compose and send BLE aggregated message now. Response: FPort 7"
+  },
+  {
+   "id": 202,
+   "name": "cmd_single_bt_scan",
+   "argument_length": 0,
+   "description": "Perform BLE scan now. Response: FPort 11"
+  },
+  {
+   "id": 203,
+   "name": "cmd_bt_disconnect",
+   "argument_length": 0,
+   "description": "Drop the current BLE connection"
+  },
+  {
+   "id": 204,
+   "name": "cmd_send_bt_cmdq_results",
+   "argument_length": 0,
+   "description": "Send latest CMDQ results. Response: FPort 15"
+  },
+  {
+   "id": 205,
+   "name": "cmd_decouple_collar",
+   "argument_length": 0,
+   "description": "CollarEdge drop-off: powers the P3 connector for 5 s. Wiki: `CD 00`"
+  },
+  {
+   "id": 206,
+   "name": "cmd_send_timestamp",
+   "argument_length": 0,
+   "description": "Response: msg_timestamp 0x97 on FPort 18"
+  }
+ ],
+ "values": [
+  {
+   "id": 208,
+   "name": "reset_reason",
+   "length": 4,
+   "type": "uint32",
+   "description": "NRF_POWER RESETREAS register"
+  },
+  {
+   "id": 209,
+   "name": "gps_lon",
+   "length": 4,
+   "type": "int32",
+   "description": "last fix longitude deg*1e7"
+  },
+  {
+   "id": 210,
+   "name": "gps_lat",
+   "length": 4,
+   "type": "int32",
+   "description": "last fix latitude deg*1e7"
+  },
+  {
+   "id": 211,
+   "name": "gps_alt",
+   "length": 4,
+   "type": "int32",
+   "description": "last fix altitude mm"
+  },
+  {
+   "id": 212,
+   "name": "lis2_acc_x",
+   "length": 4,
+   "type": "float",
+   "description": "m/s^2"
+  },
+  {
+   "id": 213,
+   "name": "lis2_acc_y",
+   "length": 4,
+   "type": "float",
+   "description": "m/s^2"
+  },
+  {
+   "id": 214,
+   "name": "lis2_acc_z",
+   "length": 4,
+   "type": "float",
+   "description": "m/s^2"
+  },
+  {
+   "id": 215,
+   "name": "batt_mV",
+   "length": 4,
+   "type": "int32",
+   "description": "battery mV"
+  },
+  {
+   "id": 216,
+   "name": "ublox_time",
+   "length": 4,
+   "type": "uint32",
+   "description": "last u-blox time (unix)"
+  },
+  {
+   "id": 217,
+   "name": "lr_satellites",
+   "length": 1,
+   "type": "uint8",
+   "description": "satellites in last LR scan"
+  },
+  {
+   "id": 218,
+   "name": "mcu_temp",
+   "length": 4,
+   "type": "float",
+   "description": "degrees C"
+  },
+  {
+   "id": 219,
+   "name": "charge_mV",
+   "length": 4,
+   "type": "int32",
+   "description": "charging input mV"
+  },
+  {
+   "id": 220,
+   "name": "gps_h_acc_est",
+   "length": 2,
+   "type": "uint16",
+   "description": "m"
+  },
+  {
+   "id": 232,
+   "name": "flash_nr_msg",
+   "length": 4,
+   "type": "uint32",
+   "description": "records in flash"
+  },
+  {
+   "id": 233,
+   "name": "last_position_time",
+   "length": 4,
+   "type": "uint32",
+   "description": "unix time of last valid fix"
+  },
+  {
+   "id": 234,
+   "name": "last_accel_int_time",
+   "length": 4,
+   "type": "uint32",
+   "description": "unix time of last accelerometer interrupt"
+  },
+  {
+   "id": 235,
+   "name": "n_mes",
+   "length": 1,
+   "type": "uint8",
+   "description": "unread incoming LR messages"
+  },
+  {
+   "id": 236,
+   "name": "almanac_age",
+   "length": 2,
+   "type": "uint16",
+   "description": "days since GPS epoch 2019-04-07 (wiki)"
+  },
+  {
+   "id": 237,
+   "name": "factory_device_name",
+   "length": 8,
+   "type": "string",
+   "description": "8 ASCII bytes"
+  },
+  {
+   "id": 239,
+   "name": "satellite_resend_try",
+   "length": 1,
+   "type": "uint8",
+   "description": "current RockBLOCK retry"
+  }
+ ]
+}

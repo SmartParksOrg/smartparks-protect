@@ -73,6 +73,15 @@ class ProcessingStatus(StrEnum):
     IGNORED = "ignored"
 
 
+class LogFileStatus(StrEnum):
+    """Parse status of a device log file (architecture 25.6)."""
+
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+
 class AcquisitionChannel(StrEnum):
     """Route from the device to the upstream system (architecture 25.1)."""
 

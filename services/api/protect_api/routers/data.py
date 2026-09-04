@@ -61,6 +61,26 @@ class DeliveryRead(BaseModel):
     first: bool
 
 
+class DeliveryDetail(BaseModel):
+    """One delivery of a canonical record with the source event that carried it (architecture
+    25.2 and 25.7): which channel, which platform, when it arrived."""
+
+    source_event_id: int
+    source_event_ingested_at: datetime
+    acquisition_channel: str
+    ingestion_method: str
+    data_source_id: uuid.UUID
+    data_source_name: str | None
+    event_type: str
+    processing_status: str
+    first: bool
+    network_received_at: datetime | None
+    satellite_delivered_at: datetime | None
+    ble_synced_at: datetime | None
+    file_uploaded_at: datetime | None
+    trace_id: uuid.UUID | None
+
+
 class SourceEventRead(BaseModel):
     id: int
     ingested_at: datetime
@@ -225,6 +245,67 @@ async def get_source_event(
         links=resolve_links(source, identity) if source else [],
         data_source_name=source.name if source else None,
     )
+
+
+@router.get("/deliveries", response_model=list[DeliveryDetail])
+async def list_deliveries(
+    canonical_type: str = Query(pattern="^(position|measurement|state|event)$"),
+    canonical_id: int = Query(ge=1),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[DeliveryDetail]:
+    """Every delivery of one canonical record, oldest first: the delivery that created it and
+    every repeat over another path (architecture 25.7)."""
+    from shared.models import DataSource
+
+    rows = (
+        await session.execute(
+            select(SourceDelivery, SourceEvent)
+            .join(
+                SourceEvent,
+                (SourceEvent.id == SourceDelivery.source_event_id)
+                & (SourceEvent.ingested_at == SourceDelivery.source_event_ingested_at),
+            )
+            .where(
+                SourceDelivery.canonical_type == canonical_type,
+                SourceDelivery.canonical_id == canonical_id,
+            )
+            .order_by(SourceDelivery.id)
+        )
+    ).all()
+    if not rows:
+        return []
+    if not await _device_visible(session, user, rows[0][1].device_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Record not found")
+    sources = {
+        s.id: s.name
+        for s in (
+            await session.scalars(
+                select(DataSource).where(
+                    DataSource.id.in_({event.data_source_id for _, event in rows})
+                )
+            )
+        ).all()
+    }
+    return [
+        DeliveryDetail(
+            source_event_id=event.id,
+            source_event_ingested_at=event.ingested_at,
+            acquisition_channel=event.acquisition_channel,
+            ingestion_method=event.ingestion_method,
+            data_source_id=event.data_source_id,
+            data_source_name=sources.get(event.data_source_id),
+            event_type=event.event_type,
+            processing_status=event.processing_status,
+            first=delivery.first,
+            network_received_at=event.network_received_at,
+            satellite_delivered_at=event.satellite_delivered_at,
+            ble_synced_at=event.ble_synced_at,
+            file_uploaded_at=event.file_uploaded_at,
+            trace_id=event.trace_id,
+        )
+        for delivery, event in rows
+    ]
 
 
 async def _error_dict(session: AsyncSession, error_id: int | None) -> dict[str, Any] | None:

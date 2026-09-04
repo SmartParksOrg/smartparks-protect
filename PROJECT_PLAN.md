@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 10 complete on the dev server; phase 11 (WebBLE, raw log files, Cloudloop) is next |
-| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phase 10 and the deployment fixes unreleased |
+| Active phase | Phase 11 built on the local stack (WebBLE, raw log files, Cloudloop/Iridium); live checks with a collar and a Cloudloop account pending |
+| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 and 11 and the deployment fixes unreleased |
 | Last session | 2026-09-04 |
-| Next item | Phase 11 (WebBLE, raw log files, Cloudloop); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the phase 7 and 8 live items follow the accounts |
-| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet; deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
+| Next item | Commit phase 11 on Tim's word, then phase 12 (data curation and corrections); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the phase 7, 8 and 11 live items follow the accounts and a collar with BLE |
+| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
 
@@ -116,6 +116,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D73 | Object backups | `mc mirror` of every MinIO bucket to the backup bucket, incremental, never deleting on the remote, plus a daily check of referenced objects | Works with any S3-compatible provider; MinIO replication would need MinIO on both ends. Decided by Tim on 2026-09-04. |
 | D74 | Backup jobs and status | Host cron from Ansible runs `scripts/backup.sh` and `scripts/restore-verify.sh`; every run is a `backup_runs` row; the Backup and recovery page and `SYSTEM_BACKUP` alerts derive from the rows and `pg_stat_archiver`; the restore test restores into a second compose project on the same host | No container with the Docker socket; a job that never ran is as visible as one that failed. Decided by Tim on 2026-09-04. |
 | D75 | Technical telemetry | OpenTelemetry in every service, exporting over OTLP/HTTP only when an endpoint is configured; the `observability` compose profile runs Grafana with a collector; spans carry the processing trace id | One standard, off by default, joins with the application traces. Decided by Tim on 2026-09-04. |
+| D76 | WebBLE implementation | Our own implementation of the OpenCollar BLE protocol in the frontend (Nordic UART service, frames `[port][msg_id][len][data]`, flash logs paged with `cmd_flash_get_from_head`): connect, status, settings read and write, commands, flash log count, download, erase and sync. The public GPL-3.0 app is a behavioural reference only; no code is copied into this MIT repository | Same product, one licence; the protocol is documented in the research document. Decided by Tim on 2026-09-04. |
+| D77 | Raw log files and BLE syncs | Every line of a raw log file and every BLE notification frame is one SourceEvent (channel `log_file` or `webble`) under a built-in data source per channel, grouped by a `device_log_files` row; the file lives in the `device-log-files` bucket; the port 29 record parser decodes the frames; re-decode reprocesses the frames; a BLE sync is stored as a log file of channel `webble` so both share status, counts, download and re-decode | Provenance per frame with the same pipeline as LoRaWAN, and one worker for both paths. Decided by Tim on 2026-09-04. |
+| D78 | Cloudloop | Lingo JSON webhook at the source's URL with the token as a query parameter (Cloudloop sends no authentication header) and an optional allow-list of its two source addresses; the IMEI is the device identity with the Cloudloop thing id as an attribute; `Data/GetThings` for management sync, `Data/DoSendSbdMessage` for commands (satellite frame `[port][msg_id][len][data]`), `Platform/Ping` as the connection test; the pull endpoints only for a manual catch-up | Push is Cloudloop's recommended path and has retries for twelve hours; pull would add latency and calls. Decided by Tim on 2026-09-04. |
+| D79 | Command routes | The control dialog lists every route (each enabled source holding an identity of the device with a command connector, plus WebBLE while the device is connected in this browser) with the most recently seen route preselected; WebBLE is never chosen automatically; a WebBLE command is created on the backend, written by the browser and its confirmation arrives through the synced frames, so lifecycle, audit and trace are the same as over a network | Architecture 25.5 keeps the action with the driver and the route separate. Decided by Tim on 2026-09-04. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -572,16 +576,16 @@ Release:
 
 **Deliverables.**
 
-- [ ] `device_log_files` as managed assets (25.6): upload, SHA-256 duplicate detection, association with a device, parse status, record counts (found, new, duplicate, malformed), firmware and decoder version, re-decode, download original. Storage in MinIO.
-- [ ] Log file parser in the OpenCollar driver with the same canonical keys, run by a file processing worker with traces.
-- [ ] WebBLE in the frontend based on the public Smart Parks OpenCollar WebBLE application: connect, read settings and status, control actions, retrieve stored logs, sync to the backend as deliveries with `ble_synced_at`.
-- [ ] Device Control route selection extended with WebBLE and satellite routes (25.5).
-- [ ] Cloudloop adapter: inbound Iridium messages as SourceEvents with satellite delivery time separate from device time, outbound MT/SBD command connector, Thing management sync to ExternalIdentity, deep links, runbook (28.7 example).
-- [ ] Provenance panel shows all deliveries per canonical record with acquisition channel filter.
-- [ ] Late data: rules evaluate offloaded history for completeness, automations skip stale alerts by policy.
-- [ ] Docs: `docs/devices/opencollar-webble.md`, `docs/devices/raw-log-files.md`, `docs/integrations/cloudloop/`.
+- [x] `device_log_files` as managed assets (25.6): upload, SHA-256 duplicate detection, association with a device, parse status, record counts (found, new, duplicate, malformed), firmware and decoder version, re-decode, download original. Storage in MinIO. (2026-09-04, D77, migration 0011, `shared/logfiles.py`, `routers/log_files.py`, the Log files card)
+- [x] Log file parser in the OpenCollar driver with the same canonical keys, run by a file processing worker with traces. (2026-09-04, `protect_decoder/logfiles.py`: one source event per frame on the built-in channel source, the driver reads frames by channel; the file has its own trace, every frame a compact one)
+- [x] WebBLE in the frontend based on the public Smart Parks OpenCollar WebBLE application: connect, read settings and status, control actions, retrieve stored logs, sync to the backend as deliveries with `ble_synced_at`. (2026-09-04, D76: our own protocol implementation `lib/opencollar-ble.ts` tested against a scripted transport, the card "Nearby over Bluetooth", settings editor from the driver's catalogue; control actions over the WebBLE route through Control; a real collar still to be tried)
+- [x] Device Control route selection extended with WebBLE and satellite routes (25.5). (2026-09-04, D79: `candidate_routes`, `route_data_source_id`, the route choice in the dialog, the browser executes and reports)
+- [x] Cloudloop adapter: inbound Iridium messages as SourceEvents with satellite delivery time separate from device time, outbound MT/SBD command connector, Thing management sync to ExternalIdentity, deep links, runbook (28.7 example). (2026-09-04, D78, `adapters/cloudloop`, webhook token in the URL with an address allow-list; the runbook is `docs/integrations/cloudloop/index.md`)
+- [x] Provenance panel shows all deliveries per canonical record with acquisition channel filter. (2026-09-04, `GET /deliveries`, the deliveries dialog on the device page and in the source event dialog)
+- [x] Late data: rules evaluate offloaded history for completeness, automations skip stale alerts by policy. (2026-09-04: records from files are attributed at their own time and evaluated; automations had `max_event_age_seconds` since phase 5; covered by the exit criterion test)
+- [x] Docs: `docs/devices/opencollar-webble.md`, `docs/devices/raw-log-files.md`, `docs/integrations/cloudloop/`. (2026-09-04, plus ADR 0017)
 
-**Exit criteria.** One GNSS record delivered by simulator over ChirpStack, uploaded in a log file and synced over WebBLE results in one position with three deliveries.
+**Exit criteria.** One GNSS record delivered by simulator over ChirpStack, uploaded in a log file and synced over WebBLE results in one position with three deliveries. (Met in `tests/decoder/test_logfiles.py` with the wiki's port 13 fix over LoRaWAN, the port 29 flash example as a file and the same record as a browser sync: one position, deliveries `lorawan`, `log_file`, `webble`. The same through the API in `tests/api/test_log_files_api.py`. The browser half against a physical collar is pending.)
 
 ---
 
@@ -683,7 +687,7 @@ Listed by the phase where they are first needed.
 - [x] Phase 10: an S3-compatible bucket for backups and a throwaway VM for the timed clean-server recovery. (2026-09-04, DigitalOcean Spaces and droplets through the API token)
 - [ ] Phase 9: a ChatGPT account with Developer mode (Pro or Business) to connect https://dev-protect.smartparks.org/mcp; Claude was verified on 2026-09-04.
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
-- [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work.
+- [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work. (Built from documentation on 2026-09-04; the card and the adapter wait for a collar and an account.)
 - [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access.
 
 ## Session log
@@ -852,3 +856,12 @@ Listed by the phase where they are first needed.
 - The clean-server recovery drill found a data-loss risk: the drill server archived its promoted timelines into the production stanza and a later restore followed "latest", missing rows that were on the real timeline. Fixed: restores use `--target-timeline=current`, `scripts/restore.sh --test` turns archiving off on a drill server, the stray timelines were purged from the archive. The drill then took 435 s from droplet creation to a verified restored server with every archived row present (target four hours); the drill droplet was destroyed.
 - Open: Tim registers with the invitation link on the dev server and connects Claude and ChatGPT. The object restore's warning on empty buckets was a wrong emptiness test, fixed.
 - Later the same day: Tim registered on the dev server and connected Claude; the three questions of the exit criterion were answered correctly against a seeded Demo park (Rhino 14, collar SP05-demo, 48 hourly uplinks then silence). ChatGPT could not be tested: Developer mode is not offered on Tim's Plus plan. An operations admin account (protect-ops@smartparks.org, credentials in the private config directory) seeds and checks the dev server.
+
+### 2026-09-04, phase 11 (Claude)
+
+- Decisions D76 to D79 asked and taken: our own WebBLE protocol implementation (the public app is GPL-3.0, this repository MIT), one source event per frame on built-in channel sources with a browser sync stored as a log file, Cloudloop over its Lingo webhook with the token in the URL, and a route choice in the control dialog with the browser as a route that is never chosen automatically.
+- Backend: `device_log_files` and the built-in sources "Browser (WebBLE)" and "Log file upload" (migration 0011, fixed ids); `shared/logfiles.py` and the file processing worker in the decoder service (batches, counts, period, firmware, re-decode); `InboundMessage.device_id` for deliveries whose device the caller knows; the OpenCollar driver reads frames by acquisition channel and ships its protocol catalogue (`catalog.json`, 123 settings, 46 commands, 20 values, generated from the research document); the Cloudloop adapter (Lingo and Core shapes, `Data/DoSendSbdMessage`, `Data/GetThings`, `Platform/Ping`); route options, pinned routes and client-only routes in the command path; new endpoints for log files, syncs, routes, browser results, deliveries per record and the driver catalogue; webhooks with `?token=` and `allowed_source_ips`.
+- Frontend: `lib/opencollar-ble.ts` (Nordic UART, frames, settings encoding, status decoding, log streaming) over an injected transport with nine tests, the WebBLE store and hook, the cards "Nearby over Bluetooth" and "Log files", the route choice and browser execution in Control, deliveries with a channel filter, built-in sources kept out of the create dialog.
+- Verified: 303 Python tests (the exit criterion as a decoder test and through the API, malformed frames, re-decode, the Cloudloop webhook with token and allow-list, the WebBLE command path with the device's confirmation through a synced frame), lint, mypy, frontend lint, typecheck and 14 tests, strict docs build; the whole path also exercised through the rebuilt local stack (upload, decode, re-decode, browser sync, WebBLE route, command written by the browser and confirmed by a synced status frame) and the screenshot sweep.
+- Open: a physical OpenCollar for the Bluetooth half and a Cloudloop account with an enrolled RockBLOCK; Cloudloop's deep link path is a guess; the frames of a BLE session are synced when an operation ends, not live.
+

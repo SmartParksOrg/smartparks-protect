@@ -38,6 +38,9 @@ def test_registries():
         "akenza",
         "traccar",
         "addaxai_connect",
+        "cloudloop",
+        "webble",
+        "log_file",
     }
     assert set(DRIVERS) == {"generic_json", "opencollar"}
     assert (

@@ -1,9 +1,11 @@
 """Decoder service: consumes `source_event.received`, writes canonical rows, publishes domain
-events after the commit."""
+events after the commit. Also the file processing worker of architecture 25.6: it turns an
+uploaded log file or a browser sync into frames and decodes them through the same pipeline."""
 
 import asyncio
 from datetime import datetime
 
+from protect_decoder.logfiles import handle_log_file
 from protect_decoder.pipeline import process_source_event, publish_outcome
 from shared.bus import Message, Topic
 from shared.database import session_scope
@@ -41,7 +43,11 @@ def build_worker() -> Worker:
             duplicates=outcome.duplicates,
         )
 
+    async def on_log_file(message: Message) -> None:
+        await handle_log_file(worker.bus, message.payload)
+
     worker.subscribe(Topic.SOURCE_EVENT_RECEIVED, handle)
+    worker.subscribe(Topic.LOG_FILE_UPLOADED, on_log_file)
     return worker
 
 

@@ -16,7 +16,11 @@ A device offers the actions its driver declares (`control_actions` on the driver
 
 ## Route
 
-A command travels through the enabled data source that holds an identity of the device, whose adapter has a command connector, and whose capabilities include what the action needs (`downlink`). When several qualify, the identity seen most recently wins. The command records the data source, the external id and the channel (`lorawan`).
+A command travels through the enabled data source that holds an identity of the device, whose adapter has a command connector, and whose capabilities include what the action needs (`downlink`). When several qualify, the identity seen most recently wins, and the control dialog lets the person pick another one (decision D79): `GET /devices/{id}/routes` lists every route with why one is unusable, `route_data_source_id` on the command pins it. The command records the data source, the external id and the channel (`lorawan`, `iridium`, `webble`, `cellular`).
+
+Routes that need a connected client are never chosen automatically. The WebBLE route exists while the collar is connected in the person's browser (`POST /devices/{id}/routes/webble` registers it): the backend creates and encodes the command as usual, the browser writes `[port][payload]` over Bluetooth and reports `transmitted` or `failed` (`POST /commands/{id}/browser-result`), and the collar's answer reaches the backend as a synced frame, which confirms the command through the action's interpreter. See [OpenCollar over Web Bluetooth](opencollar-webble.md).
+
+Iridium (Cloudloop): the frame `[port][msg_id][len][data]` becomes a mobile-terminated SBD message for the collar's thing; it reaches `queued` and is delivered at the collar's next satellite session. See [Cloudloop](../integrations/cloudloop/index.md).
 
 ChirpStack (decision D50): the command becomes a device queue item through the REST API. The `txack` event reports it transmitted by a gateway, the `ack` event acknowledged by the device for confirmed downlinks, and a `log` error fails it. The device's queue can be read and flushed from the device page (flushing is high impact).
 

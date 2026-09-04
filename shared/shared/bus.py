@@ -47,6 +47,7 @@ class Topic:
     NEEDS_ATTENTION_CREATED = "needs_attention.created"
     EXPORT_REQUESTED = "export.requested"
     INTEGRATION_BACKFILL_REQUESTED = "integration.backfill_requested"
+    LOG_FILE_UPLOADED = "log_file.uploaded"
 
 
 SCHEMA_VERSION = 1

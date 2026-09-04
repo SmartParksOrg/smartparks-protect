@@ -30,6 +30,7 @@ from shared.device_drivers.base import (
     canonical_key,
     fingerprint,
     lorawan_frame,
+    raw_frame,
 )
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import Attribution, resolve_attribution
@@ -63,6 +64,10 @@ from shared.trace import ApplicationError, Tracer
 log = get_logger("decoder")
 
 AttributionAt = Callable[[datetime], Awaitable[Attribution]]
+# Channels whose deliveries are raw frames without a LoRaWAN port (architecture 25.1).
+FRAME_CHANNELS = frozenset(
+    {AcquisitionChannel.WEBBLE, AcquisitionChannel.LOG_FILE, AcquisitionChannel.IRIDIUM}
+)
 
 
 @dataclass(slots=True)
@@ -75,6 +80,10 @@ class Outcome:
     duplicates: int = 0
     messages: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     trace_id: uuid.UUID | None = None
+    earliest: datetime | None = None
+    latest: datetime | None = None
+    firmware_version: str | None = None
+    decoder_version: str | None = None
 
 
 def event_age(record_time: datetime, ingested_at: datetime) -> float:
@@ -211,6 +220,8 @@ async def process_source_event(
             frame, f_port = (None, None)
             if event.acquisition_channel == AcquisitionChannel.LORAWAN:
                 frame, f_port = lorawan_frame(payload, event.provider_metadata)
+            elif event.acquisition_channel in FRAME_CHANNELS:
+                frame = raw_frame(payload, event.provider_metadata)
             if event.event_type in driver.decodable_event_types:
                 records = driver.decode(
                     SourceEventData(
@@ -224,6 +235,7 @@ async def process_source_event(
                         device_type_settings=device_type.default_settings,
                         frame=frame,
                         f_port=f_port,
+                        acquisition_channel=event.acquisition_channel,
                     )
                 )
             else:
@@ -237,6 +249,7 @@ async def process_source_event(
                 events=len(records.events),
                 decoder_version=records.decoder_version,
             )
+            _summarize(outcome, records)
             if records.empty:
                 step.skip("payload holds no records")
 
@@ -276,6 +289,22 @@ async def process_source_event(
         await tracer.finish()
     event.error_code = None
     return outcome
+
+
+def _summarize(outcome: Outcome, records: DecodedRecords) -> None:
+    """Period and versions of the decoded records, for the log file counters."""
+    times = [
+        r.time
+        for group in (records.positions, records.measurements, records.states, records.events)
+        for r in group
+    ]
+    if times:
+        outcome.earliest, outcome.latest = min(times), max(times)
+    outcome.decoder_version = records.decoder_version
+    for state in records.states:
+        version = state.state.get("firmware_version") if isinstance(state.state, dict) else None
+        if version:
+            outcome.firmware_version = str(version)
 
 
 async def _link_delivery(

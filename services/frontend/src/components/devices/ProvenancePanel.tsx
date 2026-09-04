@@ -3,14 +3,53 @@ import { ExternalLink } from "lucide-react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { SourceEvent, Trace } from "@/api/types";
+import type { DeliveryDetail, SourceEvent, Trace } from "@/api/types";
 import { JsonView } from "@/components/common/JsonView";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatTime } from "@/lib/format";
+import { channelLabel, formatTime } from "@/lib/format";
+import { useState } from "react";
+
+/** Every delivery of one canonical record, with a filter on the acquisition channel
+ * (architecture 25.7): the same fix over LoRaWAN, from a log file and over WebBLE is one row
+ * with three deliveries. */
+export function RecordDeliveries({ canonicalType, canonicalId, onOpenEvent }: { canonicalType: string; canonicalId: number; onOpenEvent?: (id: number, ingestedAt: string) => void }) {
+  const [channel, setChannel] = useState<string>("all");
+  const deliveries = useQuery({ queryKey: queryKeys.recordDeliveries(canonicalType, canonicalId), queryFn: () => api.get<DeliveryDetail[]>("/api/v1/deliveries", { query: { canonical_type: canonicalType, canonical_id: canonicalId } }) });
+  if (deliveries.isPending) return <div className="text-sm text-muted-foreground">Loading deliveries…</div>;
+  if (deliveries.isError) return <div className="text-sm text-destructive">{deliveries.error.message}</div>;
+  const channels = [...new Set(deliveries.data.map((d) => d.acquisition_channel))];
+  const rows = channel === "all" ? deliveries.data : deliveries.data.filter((d) => d.acquisition_channel === channel);
+  return (
+    <div className="space-y-2 text-sm">
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="text-muted-foreground">{deliveries.data.length} {deliveries.data.length === 1 ? "delivery" : "deliveries"} of {canonicalType} {canonicalId}</span>
+        {channels.length > 1 && (
+          <span className="ml-auto flex gap-1">
+            <Button size="sm" variant={channel === "all" ? "default" : "outline"} className="h-6 px-2 text-xs" onClick={() => setChannel("all")}>all</Button>
+            {channels.map((c) => <Button key={c} size="sm" variant={channel === c ? "default" : "outline"} className="h-6 px-2 text-xs" onClick={() => setChannel(c)}>{channelLabel(c)}</Button>)}
+          </span>
+        )}
+      </div>
+      <ul className="divide-y">
+        {rows.map((d) => (
+          <li key={`${d.source_event_id}-${d.source_event_ingested_at}`} className="flex flex-wrap items-center gap-2 py-1">
+            <Badge variant="outline">{channelLabel(d.acquisition_channel)}</Badge>
+            <span>{d.data_source_name ?? d.data_source_id}</span>
+            <span className="text-xs text-muted-foreground">
+              {d.network_received_at ? `network ${formatTime(d.network_received_at)}` : d.satellite_delivered_at ? `satellite ${formatTime(d.satellite_delivered_at)}` : d.ble_synced_at ? `synced ${formatTime(d.ble_synced_at)}` : d.file_uploaded_at ? `uploaded ${formatTime(d.file_uploaded_at)}` : `ingested ${formatTime(d.source_event_ingested_at)}`}
+            </span>
+            {d.first ? <Badge variant="secondary">created the record</Badge> : <span className="text-xs text-muted-foreground">repeat delivery</span>}
+            {onOpenEvent && <Button variant="link" size="sm" className="ml-auto h-auto p-0" onClick={() => onOpenEvent(d.source_event_id, d.source_event_ingested_at)}>source event {d.source_event_id}</Button>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** Trace steps with status, timing and the structured error (architecture 26.3). */
 export function TraceSteps({ traceId }: { traceId: string }) {
@@ -102,8 +141,11 @@ export function SourceEventPanel({ id, ingestedAt }: { id: number; ingestedAt: s
           <dt className="text-muted-foreground">Data source</dt><dd>{e.data_source_name ?? e.data_source_id}</dd>
           <dt className="text-muted-foreground">External id</dt><dd className="font-mono">{e.external_id ?? "none"}</dd>
           <dt className="text-muted-foreground">Event type</dt><dd>{e.event_type}</dd>
-          <dt className="text-muted-foreground">Channel</dt><dd>{e.acquisition_channel} over {e.ingestion_method}</dd>
+          <dt className="text-muted-foreground">Channel</dt><dd>{channelLabel(e.acquisition_channel)} over {e.ingestion_method.replace("_", " ")}</dd>
           <dt className="text-muted-foreground">Network received</dt><dd>{formatTime(e.network_received_at) || "unknown"}</dd>
+          {e.satellite_delivered_at && <><dt className="text-muted-foreground">Satellite session</dt><dd>{formatTime(e.satellite_delivered_at)}</dd></>}
+          {e.ble_synced_at && <><dt className="text-muted-foreground">Read over BLE</dt><dd>{formatTime(e.ble_synced_at)}</dd></>}
+          {e.file_uploaded_at && <><dt className="text-muted-foreground">File uploaded</dt><dd>{formatTime(e.file_uploaded_at)}</dd></>}
           <dt className="text-muted-foreground">Ingested</dt><dd>{formatTime(e.ingested_at)}</dd>
           <dt className="text-muted-foreground">Status</dt><dd><StatusBadge value={e.processing_status} /> {e.error_code}</dd>
         </dl>
@@ -122,12 +164,26 @@ export function SourceEventPanel({ id, ingestedAt }: { id: number; ingestedAt: s
             </ul>
           )}
         </div>
+        {e.deliveries.filter((d) => d.canonical_type === "position").slice(0, 3).map((d) => (
+          <div key={`all-${d.canonical_id}`} className="rounded-md border p-2"><RecordDeliveries canonicalType="position" canonicalId={d.canonical_id} /></div>
+        ))}
       </TabsContent>
       <TabsContent value="payload">
         {e.payload ? <JsonView value={e.payload} /> : <div className="text-sm text-muted-foreground">Payload stored out of line ({e.payload_size} bytes) as {e.payload_object_key}.</div>}
       </TabsContent>
       {e.trace_id && <TabsContent value="trace"><TraceSteps traceId={e.trace_id} /></TabsContent>}
     </Tabs>
+  );
+}
+
+export function RecordDeliveriesDialog({ canonicalType, canonicalId, onClose, onOpenEvent }: { canonicalType: string; canonicalId: number | null; onClose: () => void; onOpenEvent?: (id: number, ingestedAt: string) => void }) {
+  return (
+    <Dialog open={canonicalId != null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader><DialogTitle>Deliveries</DialogTitle><DialogDescription>Every path this record arrived over (architecture 25.7)</DialogDescription></DialogHeader>
+        {canonicalId != null && <RecordDeliveries canonicalType={canonicalType} canonicalId={canonicalId} onOpenEvent={onOpenEvent} />}
+      </DialogContent>
+    </Dialog>
   );
 }
 

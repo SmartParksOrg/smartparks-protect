@@ -70,6 +70,8 @@ nav:
       - OpenCollar Edge: devices/opencollar.md
       - OpenCollar protocol research: devices/opencollar-protocol-research.md
       - Device control: devices/device-control.md
+      - OpenCollar over Web Bluetooth: devices/opencollar-webble.md
+      - Raw log files: devices/raw-log-files.md
   - Integrations:
       - integrations/index.md
       - Adapter interface: integrations/adapter-interface.md
@@ -80,6 +82,7 @@ nav:
       - akenza.io: integrations/akenza/index.md
       - Traccar: integrations/traccar/index.md
       - AddaxAI Connect: integrations/addaxai-connect/index.md
+      - Cloudloop (Iridium): integrations/cloudloop/index.md
       - Gateways and connectivity: integrations/gateways.md
       - Outbound integrations: integrations/outbound.md
       - EarthRanger via Gundi: integrations/earthranger-gundi/index.md
@@ -122,3 +125,4 @@ nav:
       - adr/0014-integration-deliveries.md
       - adr/0015-mcp-security-boundary.md
       - adr/0016-backup-and-observability.md
+      - adr/0017-multi-path-acquisition.md

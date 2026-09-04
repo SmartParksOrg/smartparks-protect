@@ -1279,6 +1279,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Deliveries
+         * @description Every delivery of one canonical record, oldest first: the delivery that created it and
+         *     every repeat over another path (architecture 25.7).
+         */
+        get: operations["list_deliveries_api_v1_deliveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/traces/{trace_id}": {
         parameters: {
             query?: never;
@@ -2301,6 +2322,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Routes
+         * @description Every way a command could reach the device, most recently seen first (decision D79).
+         *     The browser route appears once the device was connected over WebBLE in this application.
+         */
+        get: operations["list_routes_api_v1_devices__device_id__routes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/routes/webble": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connect Webble Route
+         * @description The browser reports that the device is connected over Web Bluetooth: the device gets
+         *     its identity on the built-in WebBLE source, which makes the route selectable.
+         */
+        post: operations["connect_webble_route_api_v1_devices__device_id__routes_webble_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/commands": {
         parameters: {
             query?: never;
@@ -2317,6 +2380,27 @@ export interface paths {
          *     refused is returned as failed with the reason, and stays in the history.
          */
         post: operations["create_command_api_v1_devices__device_id__commands_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/commands/{command_id}/browser-result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Browser Result
+         * @description The browser executed (or could not execute) a WebBLE command (decision D79). The
+         *     device's own answer arrives through the synced frames and the action's interpreter.
+         */
+        post: operations["browser_result_api_v1_commands__command_id__browser_result_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2380,6 +2464,129 @@ export interface paths {
          *     the device and expire.
          */
         delete: operations["flush_downlink_queue_api_v1_devices__device_id__downlink_queue_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/log-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Log Files */
+        get: operations["list_log_files_api_v1_devices__device_id__log_files_get"];
+        put?: never;
+        /**
+         * Upload Log File
+         * @description Upload a raw log file retrieved from the device (one base64 or hex frame per line, the
+         *     format the public BLE app exports). The same file for the same device is refused with 409
+         *     and the existing row.
+         */
+        post: operations["upload_log_file_api_v1_devices__device_id__log_files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/log-files/ble-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ble Sync
+         * @description Frames the browser read over Web Bluetooth become a log file of channel `webble` and
+         *     are decoded like an upload; the sync time is kept as provenance (architecture 25.3).
+         */
+        post: operations["ble_sync_api_v1_devices__device_id__log_files_ble_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/driver-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Driver Catalog
+         * @description The driver's protocol catalogue (settings, commands, values) for the WebBLE settings
+         *     editor; empty for drivers without one.
+         */
+        get: operations["driver_catalog_api_v1_devices__device_id__driver_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/log-files/{log_file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Log File */
+        get: operations["get_log_file_api_v1_log_files__log_file_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/log-files/{log_file_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Log File
+         * @description The original file, byte for byte.
+         */
+        get: operations["download_log_file_api_v1_log_files__log_file_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/log-files/{log_file_id}/redecode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redecode Log File
+         * @description Decode the stored frames again, for example after a decoder update. Records known
+         *     already are recognised by their canonical keys, so nothing is duplicated.
+         */
+        post: operations["redecode_log_file_api_v1_log_files__log_file_id__redecode_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3113,6 +3320,33 @@ export interface components {
             /** Token Type */
             token_type: string;
         };
+        /**
+         * BleSyncRequest
+         * @description Frames the browser read from the device over Web Bluetooth, hex encoded, each starting
+         *     with the port byte. Stored as a log file of channel `webble`.
+         */
+        BleSyncRequest: {
+            /** Frames */
+            frames: string[];
+            /**
+             * Ble Synced At
+             * @description When the browser read the frames; default now
+             */
+            ble_synced_at?: string | null;
+            /**
+             * Label
+             * @description Shown as the file name, for example the reason
+             * @default
+             */
+            label: string;
+            /**
+             * Attributes
+             * @description Session context: device name, browser, firmware
+             */
+            attributes?: {
+                [key: string]: unknown;
+            };
+        };
         /** Body_auth_jwt_login_api_v1_auth_login_post */
         Body_auth_jwt_login_api_v1_auth_login_post: {
             /** Grant Type */
@@ -3157,6 +3391,25 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** Body_upload_log_file_api_v1_devices__device_id__log_files_post */
+        Body_upload_log_file_api_v1_devices__device_id__log_files_post: {
+            /** File */
+            file: string;
+        };
+        /**
+         * BrowserResult
+         * @description What the browser reports after executing a WebBLE command.
+         */
+        BrowserResult: {
+            /** Status */
+            status: string;
+            /** Detail */
+            detail?: {
+                [key: string]: unknown;
+            };
+            /** Error Message */
+            error_message?: string | null;
+        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -3178,6 +3431,11 @@ export interface components {
              * @default false
              */
             confirmed: boolean;
+            /**
+             * Route Data Source Id
+             * @description Deliver through this data source (decision D79); default the most recently seen route that needs no connected client
+             */
+            route_data_source_id?: string | null;
         };
         /** CommandDetail */
         CommandDetail: {
@@ -3478,6 +3736,18 @@ export interface components {
             webhook_token?: string | null;
             /** Webhook Url */
             webhook_url?: string | null;
+            /**
+             * Webhook Token In Query
+             * @description The platform posts with the token in the URL (D78)
+             * @default false
+             */
+            webhook_token_in_query: boolean;
+            /**
+             * Builtin
+             * @description A channel source that cannot be deleted
+             * @default false
+             */
+            builtin: boolean;
             /** Capabilities */
             capabilities: {
                 [key: string]: unknown;
@@ -3551,6 +3821,47 @@ export interface components {
             payload: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * DeliveryDetail
+         * @description One delivery of a canonical record with the source event that carried it (architecture
+         *     25.2 and 25.7): which channel, which platform, when it arrived.
+         */
+        DeliveryDetail: {
+            /** Source Event Id */
+            source_event_id: number;
+            /**
+             * Source Event Ingested At
+             * Format: date-time
+             */
+            source_event_ingested_at: string;
+            /** Acquisition Channel */
+            acquisition_channel: string;
+            /** Ingestion Method */
+            ingestion_method: string;
+            /**
+             * Data Source Id
+             * Format: uuid
+             */
+            data_source_id: string;
+            /** Data Source Name */
+            data_source_name: string | null;
+            /** Event Type */
+            event_type: string;
+            /** Processing Status */
+            processing_status: string;
+            /** First */
+            first: boolean;
+            /** Network Received At */
+            network_received_at: string | null;
+            /** Satellite Delivered At */
+            satellite_delivered_at: string | null;
+            /** Ble Synced At */
+            ble_synced_at: string | null;
+            /** File Uploaded At */
+            file_uploaded_at: string | null;
+            /** Trace Id */
+            trace_id: string | null;
         };
         /** DeliveryRead */
         DeliveryRead: {
@@ -3648,6 +3959,85 @@ export interface components {
             };
             /** Notes */
             notes?: string | null;
+        };
+        /** DeviceLogFileRead */
+        DeviceLogFileRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Project Id */
+            project_id: string | null;
+            /**
+             * Data Source Id
+             * Format: uuid
+             */
+            data_source_id: string;
+            /** Acquisition Channel */
+            acquisition_channel: string;
+            /** Original Filename */
+            original_filename: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Uploaded By User Id */
+            uploaded_by_user_id: string | null;
+            /**
+             * Uploaded At
+             * Format: date-time
+             */
+            uploaded_at: string;
+            /** Ble Synced At */
+            ble_synced_at: string | null;
+            /** Status */
+            status: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Frames Total */
+            frames_total: number;
+            /** Frames Failed */
+            frames_failed: number;
+            /** Records Found */
+            records_found: number;
+            /** Records New */
+            records_new: number;
+            /** Records Duplicate */
+            records_duplicate: number;
+            /** Period Start */
+            period_start: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Firmware Version */
+            firmware_version: string | null;
+            /** Decoder Version */
+            decoder_version: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /** Processed At */
+            processed_at: string | null;
+            /** Attributes */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** DeviceRead */
         DeviceRead: {
@@ -3827,6 +4217,15 @@ export interface components {
             external_identities: components["schemas"]["ExternalIdentityRead"][];
             /** Links */
             links?: components["schemas"]["ExternalLink"][];
+        };
+        /** DriverCatalog */
+        DriverCatalog: {
+            /** Driver Key */
+            driver_key: string;
+            /** Catalog */
+            catalog: {
+                [key: string]: unknown;
+            };
         };
         /** EntityAssignmentCreate */
         EntityAssignmentCreate: {
@@ -5734,6 +6133,34 @@ export interface components {
          * @enum {string}
          */
         Role: "project-viewer" | "project-admin";
+        /** RouteOptionRead */
+        RouteOptionRead: {
+            /**
+             * Data Source Id
+             * Format: uuid
+             */
+            data_source_id: string;
+            /** Name */
+            name: string;
+            /** Adapter Key */
+            adapter_key: string;
+            /** Channel */
+            channel: string;
+            /** External Id */
+            external_id: string;
+            /** Identity Type */
+            identity_type: string;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Requires Client */
+            requires_client: boolean;
+            /** Default */
+            default: boolean;
+        };
         /** RuleCreate */
         RuleCreate: {
             /** Name */
@@ -9864,6 +10291,38 @@ export interface operations {
             };
         };
     };
+    list_deliveries_api_v1_deliveries_get: {
+        parameters: {
+            query: {
+                canonical_type: string;
+                canonical_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryDetail"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_trace_api_v1_traces__trace_id__get: {
         parameters: {
             query?: never;
@@ -12202,6 +12661,68 @@ export interface operations {
             };
         };
     };
+    list_routes_api_v1_devices__device_id__routes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteOptionRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_webble_route_api_v1_devices__device_id__routes_webble_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteOptionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_device_commands_api_v1_devices__device_id__commands_get: {
         parameters: {
             query?: {
@@ -12252,6 +12773,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    browser_result_api_v1_commands__command_id__browser_result_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                command_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserResult"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12386,6 +12942,233 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_log_files_api_v1_devices__device_id__log_files_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLogFileRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_log_file_api_v1_devices__device_id__log_files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_log_file_api_v1_devices__device_id__log_files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLogFileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ble_sync_api_v1_devices__device_id__log_files_ble_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BleSyncRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLogFileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    driver_catalog_api_v1_devices__device_id__driver_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverCatalog"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_log_file_api_v1_log_files__log_file_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                log_file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLogFileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_log_file_api_v1_log_files__log_file_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                log_file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redecode_log_file_api_v1_log_files__log_file_id__redecode_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                log_file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLogFileRead"];
+                };
             };
             /** @description Validation Error */
             422: {

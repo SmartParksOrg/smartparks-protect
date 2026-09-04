@@ -19,18 +19,23 @@ from protect_api.pagination import Page, PageResponse, page
 from protect_api.routers.devices import _visible_device
 from protect_api.schemas.control import (
     ActionAvailability,
+    BrowserResult,
     CommandCreate,
     CommandDetail,
     CommandExecutionRead,
     CommandRead,
     QueueItem,
     QueueState,
+    RouteOptionRead,
 )
 from shared.bus import RedisStreamsBus
 from shared.control.actions import ConfirmationPolicy, actions_of
 from shared.control.commands import (
+    FINAL,
     Actor,
+    _record,
     available_actions,
+    candidate_routes,
     command_message,
     driver_for,
     request_command,
@@ -38,7 +43,8 @@ from shared.control.commands import (
 )
 from shared.database import get_session
 from shared.domain.assignments import resolve_attribution
-from shared.enums import Role
+from shared.enums import CommandStatus, ErrorCode, Role
+from shared.ingest import builtin_source, ensure_channel_identity
 from shared.models import Command, CommandExecution, Device, ProjectMembership, User
 from shared.permissions import Permission, permissions_for
 from shared.timeutil import utc_now
@@ -91,6 +97,45 @@ async def list_actions(
     return result
 
 
+@router.get("/devices/{device_id}/routes", response_model=list[RouteOptionRead])
+async def list_routes(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[RouteOptionRead]:
+    """Every way a command could reach the device, most recently seen first (decision D79).
+    The browser route appears once the device was connected over WebBLE in this application."""
+    device = await _visible_device(session, user, device_id)
+    return [
+        RouteOptionRead(**{k: getattr(option, k) for k in RouteOptionRead.model_fields})
+        for option in await candidate_routes(session, device)
+    ]
+
+
+@router.post("/devices/{device_id}/routes/webble", response_model=RouteOptionRead)
+async def connect_webble_route(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> RouteOptionRead:
+    """The browser reports that the device is connected over Web Bluetooth: the device gets
+    its identity on the built-in WebBLE source, which makes the route selectable."""
+    device = await _visible_device(session, user, device_id)
+    _, permissions = await _control_permissions(session, user, device)
+    if Permission.DEVICES_CONTROL not in permissions:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, f"Permission {Permission.DEVICES_CONTROL} required"
+        )
+    source = await builtin_source(session, "webble")
+    identity = await ensure_channel_identity(session, source, device.id)
+    identity.last_seen_at = utc_now()
+    await session.commit()
+    for option in await candidate_routes(session, device):
+        if option.data_source_id == source.id:
+            return RouteOptionRead(**{k: getattr(option, k) for k in RouteOptionRead.model_fields})
+    raise HTTPException(status.HTTP_409_CONFLICT, "The WebBLE source is disabled")
+
+
 @router.post(
     "/devices/{device_id}/commands", response_model=CommandRead, status_code=status.HTTP_201_CREATED
 )
@@ -124,6 +169,7 @@ async def create_command(
             action_key=action.key,
             parameters=body.parameters,
             actor=Actor(kind="user", user_id=user.id),
+            route_source_id=body.route_data_source_id,
         )
     except ApplicationError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
@@ -134,11 +180,76 @@ async def create_command(
         object_type="command",
         object_id=str(command.id),
         project_id=command.project_id,
-        details={"action_key": action.key, "device_id": str(device.id), "status": command.status},
+        details={
+            "action_key": action.key,
+            "device_id": str(device.id),
+            "status": command.status,
+            "route": command.route,
+            "data_source_id": str(command.data_source_id) if command.data_source_id else None,
+        },
     )
     await session.commit()
     topic, payload = command_message(command)
     await bus.publish(topic, payload)
+    return command
+
+
+@router.post("/commands/{command_id}/browser-result", response_model=CommandRead)
+async def browser_result(
+    command_id: uuid.UUID,
+    body: BrowserResult,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> Command:
+    """The browser executed (or could not execute) a WebBLE command (decision D79). The
+    device's own answer arrives through the synced frames and the action's interpreter."""
+    command = await get_or_404(session, Command, command_id, "Command")
+    device = await _visible_device(session, user, command.device_id)
+    _, permissions = await _control_permissions(session, user, device)
+    if Permission.DEVICES_CONTROL not in permissions:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, f"Permission {Permission.DEVICES_CONTROL} required"
+        )
+    if command.route != "webble":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Only WebBLE commands are executed by a browser"
+        )
+    if command.status in FINAL:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"The command is already {command.status}")
+    now = utc_now()
+    if body.status == "transmitted":
+        command.transmitted_at = command.transmitted_at or now
+        moved = await _record(
+            session,
+            command,
+            CommandStatus.TRANSMITTED,
+            "browser",
+            {**body.detail, "user_id": str(user.id)},
+        )
+    else:
+        command.error_code = ErrorCode.COMMAND_REJECTED
+        command.error_message = body.error_message or "the browser could not write the command"
+        moved = await _record(
+            session,
+            command,
+            CommandStatus.FAILED,
+            "browser",
+            {**body.detail, "user_id": str(user.id)},
+        )
+    await record_audit(
+        session,
+        user=user,
+        action="command.browser_result",
+        object_type="command",
+        object_id=str(command.id),
+        project_id=command.project_id,
+        details={"status": body.status, "device_id": str(device.id)},
+    )
+    await session.commit()
+    if moved:
+        topic, payload = command_message(command)
+        await bus.publish(topic, payload)
     return command
 
 

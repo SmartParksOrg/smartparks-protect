@@ -6,6 +6,10 @@ The first comprehensive device driver (`shared/device_drivers/opencollar/`). It 
 
 Every uplink is `[msg_id][len][data]` on an FPort that selects the message type; integers are little-endian. FPort 29 has no header: it is a concatenation of stored records `[port][msg_id][len][data][store timestamp u32]`. FPorts 3 and 30 are `id, len, value` lists.
 
+The same messages arrive over other paths (architecture 25, phase 11) and the driver reads them by the delivery's acquisition channel: over Web Bluetooth and in raw log files a frame carries the port in front, `[port][msg_id][len][data]`, and on port 29 the rest of the frame is the stored record stream; over Iridium the payload is the satellite buffer, a stored record stream in the flash storage format. A record's own timestamp stays canonical whichever path delivered it, which is what makes the same fix over LoRaWAN, from a file and over Bluetooth one position with three deliveries. See [OpenCollar over Web Bluetooth](opencollar-webble.md), [raw log files](raw-log-files.md) and [Cloudloop](../integrations/cloudloop/index.md).
+
+The protocol catalogue (settings, commands and readable values of firmware 7.3.0, research sections 4.2 to 4.4) ships with the driver as `catalog.json`, generated from the research document, and feeds the Web Bluetooth settings editor through `GET /devices/{id}/driver-catalog`.
+
 ## What the driver produces
 
 | FPort | Message | Canonical records | Canonical time |
