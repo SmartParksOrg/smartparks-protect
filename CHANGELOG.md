@@ -4,6 +4,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+## v0.4.0, 2026-09-04
+
 Device control through ChirpStack (phase 6).
 
 ### Added
