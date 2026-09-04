@@ -1,0 +1,29 @@
+---
+# Copy to <host>.yml matching the name in inventory.yml, then vault-encrypt it:
+#   ansible-vault encrypt ansible/host_vars/<host>.yml
+domain_name: "protect.example.org"
+# production or development. Development delivers mail only to dev_notify_emails.
+app_environment: production
+log_level: INFO
+# git_version: main            # dev servers only
+# dev_notify_emails: "you@example.org"
+
+# Secrets. `openssl rand -base64 32` for each. Losing credentials_key means re-entering every
+# data source credential.
+postgres_password: "CHANGE_ME"
+redis_password: "CHANGE_ME"
+minio_root_user: "protect"
+minio_root_password: "CHANGE_ME"
+jwt_secret: "CHANGE_ME_AT_LEAST_32_CHARACTERS_LONG"
+credentials_key: "CHANGE_ME"
+chirpstack_api_secret: "CHANGE_ME"   # only with the chirpstack profile
+
+# Optional
+# app_user_password: "CHANGE_ME"     # leave out to keep the existing one
+# compose_profiles: ""               # "chirpstack" runs a local network server on this host
+# mail_server: smtp.example.org
+# mail_port: 587
+# mail_username: ""
+# mail_password: ""
+# mail_from: "protect@example.org"
+# telegram_bot_token: ""

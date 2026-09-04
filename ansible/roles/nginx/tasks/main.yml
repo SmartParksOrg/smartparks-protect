@@ -1,0 +1,44 @@
+---
+- name: Install nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Remove the default site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Does a certificate exist
+  stat:
+    path: "/etc/letsencrypt/live/{{ domain_name | default('') }}/fullchain.pem"
+  register: ssl_cert
+  when: enable_ssl | default(false) and domain_name is defined
+
+- name: Site configuration
+  template:
+    src: protect.conf.j2
+    dest: /etc/nginx/sites-available/protect.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Enable the site
+  file:
+    src: /etc/nginx/sites-available/protect.conf
+    dest: /etc/nginx/sites-enabled/protect.conf
+    state: link
+  notify: reload nginx
+
+- name: Validate nginx configuration
+  command: nginx -t
+  changed_when: false
+
+- name: nginx runs
+  systemd:
+    name: nginx
+    state: started
+    enabled: true

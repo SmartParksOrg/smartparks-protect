@@ -1,0 +1,59 @@
+---
+# Let's Encrypt without an interactive pause: DNS must point here before the run.
+- name: Install certbot
+  apt:
+    name: [certbot, python3-certbot-nginx]
+    state: present
+  when: enable_ssl | default(false)
+
+- name: Certificate present
+  stat:
+    path: "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem"
+  register: ssl_cert
+  when: enable_ssl | default(false) and domain_name is defined
+
+- name: DNS points at this server
+  command: getent ahostsv4 {{ domain_name }}
+  register: dns_lookup
+  changed_when: false
+  failed_when: false
+  when: enable_ssl | default(false) and domain_name is defined and not ssl_cert.stat.exists
+
+- name: Refuse to request a certificate for a domain that does not resolve here
+  assert:
+    that: ansible_host in dns_lookup.stdout or ansible_default_ipv4.address in dns_lookup.stdout
+    fail_msg: >-
+      {{ domain_name }} resolves to '{{ dns_lookup.stdout | default('nothing') }}', not to this
+      server. Add the A record, wait for propagation, run again.
+    quiet: true
+  when: enable_ssl | default(false) and domain_name is defined and not ssl_cert.stat.exists
+
+- name: Obtain the certificate
+  command: >
+    certbot certonly --nginx --non-interactive --agree-tos
+    --email {{ letsencrypt_email }} --domain {{ domain_name }}
+    {% if letsencrypt_staging | default(false) %}--staging{% endif %}
+  when: enable_ssl | default(false) and domain_name is defined and not ssl_cert.stat.exists
+
+- name: Certificate present after certbot
+  stat:
+    path: "/etc/letsencrypt/live/{{ domain_name | default('none') }}/fullchain.pem"
+  register: ssl_cert
+  when: enable_ssl | default(false) and domain_name is defined
+
+- name: Site configuration with TLS
+  template:
+    src: ../../nginx/templates/protect.conf.j2
+    dest: /etc/nginx/sites-available/protect.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: enable_ssl | default(false) and domain_name is defined and ssl_cert.stat.exists
+  notify: reload nginx
+
+- name: Renewal timer
+  systemd:
+    name: certbot.timer
+    state: started
+    enabled: true
+  when: enable_ssl | default(false)

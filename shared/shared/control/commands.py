@@ -60,7 +60,6 @@ PENDING_FOR_DEVICE = frozenset(
         CommandStatus.ACKNOWLEDGED,
     }
 )
-ROUTE_CHANNELS = {"chirpstack": AcquisitionChannel.LORAWAN}
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,7 +147,11 @@ async def select_route(
                 context=context,
                 identity=identity,
                 connector=connector,
-                channel=ROUTE_CHANNELS.get(source.adapter_key, AcquisitionChannel.OTHER),
+                channel=getattr(
+                    ADAPTERS.get(source.adapter_key),
+                    "acquisition_channel",
+                    AcquisitionChannel.OTHER,
+                ),
             ),
             None,
         )

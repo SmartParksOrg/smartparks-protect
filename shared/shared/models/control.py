@@ -113,7 +113,7 @@ class CommandExecution(Base):
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     source: Mapped[str] = mapped_column(
-        String(64), nullable=False, comment="api, automation, adapter:chirpstack, device, expiry"
+        String(64), nullable=False, comment="api, automation, adapter:<key>, device, expiry"
     )
     detail: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")

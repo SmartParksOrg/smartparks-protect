@@ -1,0 +1,16 @@
+[
+  {
+    "devEui": "70b3d57ed0001234",
+    "sensorType": "other",
+    "timestamp": "2026-09-04T07:53:07.886337Z",
+    "payload": "1234",
+    "spreadingFactor": "7",
+    "rssi": "-73",
+    "snr": "10",
+    "gatewayIdentifier": "506",
+    "fPort": "1",
+    "latitude": 59.776931,
+    "longitude": 14.903832,
+    "tags": {"building": ["A"]}
+  }
+]

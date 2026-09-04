@@ -28,14 +28,22 @@ def context(adapter_key: str, config: dict | None = None) -> DataSourceContext:
 
 
 def test_registries():
-    assert set(ADAPTERS) == {"generic_http", "generic_mqtt", "chirpstack"}
+    assert set(ADAPTERS) == {
+        "generic_http",
+        "generic_mqtt",
+        "chirpstack",
+        "kpn_thingpark",
+        "loriot",
+        "netmore",
+        "akenza",
+    }
     assert set(DRIVERS) == {"generic_json", "opencollar"}
     assert (
         get_adapter("generic_http").key == "generic_http"
         and get_driver("generic_json").key == "generic_json"
     )
     with pytest.raises(KeyError):
-        get_adapter("loriot")
+        get_adapter("nope")
 
 
 def test_generic_http_single_and_batch():

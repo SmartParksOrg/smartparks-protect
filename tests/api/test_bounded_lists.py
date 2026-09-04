@@ -14,7 +14,9 @@ def test_every_list_endpoint_has_a_limit():
         methods = getattr(route, "methods", set()) or set()
         if "GET" not in methods or not path.startswith("/api/v1"):
             continue
-        if path.endswith(("}", "/me", "/invitation", "/schema", "/templates", "/capabilities")):
+        if path.endswith(
+            ("}", "/me", "/invitation", "/schema", "/templates", "/capabilities", "/adapters")
+        ):
             continue  # single objects and fixed small sets
         if "limit" not in _query_params(route):
             unbounded.append(path)

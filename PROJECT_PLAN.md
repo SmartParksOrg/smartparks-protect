@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 7, production LoRaWAN networks and the dev server |
-| Latest release | v0.3.0 (2026-09-04); v0.4.0 candidate built on 2026-09-04 |
+| Active phase | Phase 7, production LoRaWAN networks and the dev server (built from documentation; live verification waits for accounts and a VM) |
+| Latest release | v0.4.0 (2026-09-04); phase 7 in progress |
 | Last session | 2026-09-04 |
-| Next item | Tag v0.4.0 after review; then phase 7: KPN/ThingPark adapter, after the decisions at its start (accounts and a dev VM are inputs) |
-| Blockers | none |
+| Next item | Phase 7 live items when Tim provides KPN, LORIOT and Netmore access plus a dev VM and domain; meanwhile phase 8 items that need no network |
+| Blockers | Phase 7 live verification: no KPN, LORIOT or Netmore account, no dev VM, no domain yet |
 
 ## What we are building
 
@@ -93,6 +93,13 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D50 | ChirpStack downlinks | The REST API device queue, the same client and token as the management connector | No new dependency; `txack` and `ack` carry the queue item id back. Decided by Tim on 2026-09-04. |
 | D51 | Device confirmation | An action may declare an interpreter that recognises the device's answer in later decoded records; without one the lifecycle ends at the last stage the network reports | Nothing is fabricated (architecture 17.4); OpenCollar confirms status and position requests and resets. Decided by Tim on 2026-09-04. |
 | D52 | Command routing and audit | The route is the most recently seen identity on an enabled data source whose adapter can send and whose capabilities fit; a refused submission is stored as a failed command; commands have an audit-class trace and expire after the action's expiry | The attempt stays in the history for audit; a device with two networks uses the one that heard it last. Recorded by Claude on 2026-09-04. |
+| D53 | KPN/ThingPark integration | ThingPark HTTP application server push to the source's webhook with the bearer token; downlinks through the ThingPark downlink API in `token` (AS id, time, SHA-256 token) or `bearer` mode | No broker to run, works with the public KPN network. Built from the ThingPark documentation; the live run confirms the downlink security scheme. Decided by Tim on 2026-09-04. |
+| D54 | LORIOT integration | The application's websocket output for events; downlinks as `tx` frames over a short-lived connection to the same output; the HTTP output accepted as well | One credential, bidirectional, reconnects like the MQTT transport. Built from the LORIOT documentation. Decided by Tim on 2026-09-04. |
+| D55 | Phase 7 without accounts | Adapters, guard test, Ansible, scripts and runbooks are built from public documentation with invented fixtures; the items that need live networks or a server stay open until Tim provides access | Work proceeds; recorded payloads replace the fixtures and the live run closes the items. Decided by Tim on 2026-09-04. |
+| D56 | Adapter metadata from the API | `GET /data-sources/adapters` describes every adapter (push, commands, channel, config schema and example, credential fields, setup hint); the frontend builds the data source form from it and names no provider; a guard test enforces the boundary in backend and frontend | Architecture principle 2 made mechanical. Recorded by Claude on 2026-09-04. |
+| D57 | Netmore | A third production LoRaWAN network, added on Tim's request on 2026-09-04: events in Netmore's export format over HTTP push (static `Authorization` header) or the Netmore MQTT broker; downlinks through the Netmore Connect REST API with an API key | Built from the published documentation and the Connect OpenAPI document; the decoded export formats are refused because they carry no raw frame. Live verification pending. |
+| D58 | Netmore platforms | One adapter with a `platform` setting: `lorawan_portal` (portal.blink.services; login token, sensor downlink queue, clear) or `connect` (API key); events share the export format | Tim's account is on the LoRaWAN Portal; both are offered without duplicating the parser. Decided by Tim on 2026-09-04. |
+| D59 | akenza.io | Webhook output connector for events (the whole sample; the device type must keep `payloadHex`), REST `POST /v3/devices/{id}/downlink` with `{"raw": true, "loraDownlink": {...}}` and `x-api-key`; the akenza device id is the external identity, the DevEUI an attribute | akenza addresses devices by its own id, so downlinks need it. Built from docs.akenza.io and the published API collection. Decided by Tim on 2026-09-04. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -162,7 +169,7 @@ Every section of the architecture document maps to at least one phase. Use this 
 | --- | --- |
 | 1-4 Summary, principles, relationship, high-level architecture | 0 (ADRs), all |
 | 5-6 Domain model and core entities | 1 |
-| 7 Connectivity layer | 2, 3, 7, 8 |
+| 7 Connectivity layer (ChirpStack, KPN, LORIOT, Netmore, TTS, Actility, Traccar, Cloudloop, AddaxAI) | 2, 3, 7, 8, 11, 13 |
 | 8 LoRaWAN specialization, capabilities, traffic viewer | 3, 7 |
 | 9 Device drivers and OpenCollar | 2, 3 |
 | 10 Data model for analytics, metric registry, storage | 1, 4 |
@@ -457,16 +464,18 @@ Release:
 
 **Deliverables.**
 
-- [ ] KPN/ThingPark adapter: HTTP push event connector (uplink, downlink status where exposed), REST management where the account allows, downlink command connector, capabilities per data source, timestamps mapping, deep links, runbook with setup, authentication, uplink and downlink flow, timestamps and troubleshooting (28.7).
-- [ ] LORIOT adapter: websocket or HTTP push event connector, downlink command connector, management where available, capabilities, deep links, runbook.
-- [ ] Guard test: a test asserts that no file outside `shared/connectivity/adapters/` imports or names a provider, and the frontend has no provider string outside the adapter display metadata.
-- [ ] OpenCollar RESET or REQUEST_STATUS executed through KPN or LORIOT, proving the same action over two networks (30.1).
-- [ ] Ansible: roles for docker, nginx with TLS, security hardening (ufw, unattended upgrades, fail2ban on SSH, SSH keys only, sshd drift check), app deploy from a git tag, env and secrets handling with vault, `inventory.yml.example` and host vars examples. Dev server can run `main`.
-- [ ] `scripts/verify-server.sh` and `scripts/security-status.sh` equivalents.
-- [ ] Dev server deployed, real collars from KPN and LORIOT visible on the map.
-- [ ] Docs: `docs/getting-started/deployment.md`, `docs/operations/update-guide.md`, `docs/integrations/kpn-thingpark/`, `docs/integrations/loriot/`.
+- [x] KPN/ThingPark adapter: HTTP push event connector (uplink, downlink status where exposed), REST management where the account allows, downlink command connector, capabilities per data source, timestamps mapping, deep links, runbook with setup, authentication, uplink and downlink flow, timestamps and troubleshooting (28.7). (2026-09-04, from the ThingPark documentation with invented fixtures; no management connector, the public account exposes none; live confirmation pending)
+- [x] LORIOT adapter: websocket or HTTP push event connector, downlink command connector, management where available, capabilities, deep links, runbook. (2026-09-04, from the LORIOT documentation with invented fixtures; live confirmation pending)
+- [x] Netmore adapter: event connector, downlink command connector, capabilities, deep links, runbook. Added on 2026-09-04 (D57). (2026-09-04, from docs.connect.netmoregroup.com, the Blink Portal API document and the Connect OpenAPI document; HTTP push and MQTT events; downlinks, queue and clear on the LoRaWAN Portal and downlinks and clear on Connect per D58; the device deep link path is a guess to adjust on the live run; live confirmation pending)
+- [x] akenza.io adapter: webhook samples, akenza device id as identity, REST downlinks, runbook. Added on 2026-09-04 (D59) from docs.akenza.io and the published API collection; live confirmation pending.
+- [x] Guard test: a test asserts that no file outside `shared/connectivity/adapters/` imports or names a provider, and the frontend has no provider string outside the adapter display metadata. (2026-09-04; the frontend now has no provider string at all, it reads `GET /data-sources/adapters`)
+- [ ] OpenCollar RESET or REQUEST_STATUS executed through KPN or LORIOT, proving the same action over two networks (30.1). (connectors and their tests exist; the live run waits for an account)
+- [x] Ansible: roles for docker, nginx with TLS, security hardening (ufw, unattended upgrades, fail2ban on SSH, SSH keys only, sshd drift check), app deploy from a git tag, env and secrets handling with vault, `inventory.yml.example` and host vars examples. Dev server can run `main`. (2026-09-04; YAML validated, not yet run against a server)
+- [x] `scripts/verify-server.sh` and `scripts/security-status.sh` equivalents. (2026-09-04; parsed, not yet run on a server)
+- [ ] Dev server deployed, real collars from KPN, LORIOT, Netmore and akenza visible on the map. (waits for the VM, the domain and the accounts)
+- [x] Docs: `docs/getting-started/deployment.md`, `docs/operations/update-guide.md`, `docs/integrations/kpn-thingpark/`, `docs/integrations/loriot/`. (2026-09-04; a Netmore runbook follows with its adapter)
 
-**Exit criteria.** Live OpenCollar data from two different LoRaWAN backends shows on one map, a control action works over the second network, the dev server is reproducible from the playbook.
+**Exit criteria.** Live OpenCollar data from two different LoRaWAN backends shows on one map, a control action works over the second network, the dev server is reproducible from the playbook. Netmore joins as a third backend (D57).
 
 ---
 
@@ -654,7 +663,7 @@ Listed by the phase where they are first needed.
 - [x] Phase 0: Smart Parks logo received on 2026-09-03 as Illustrator, PDF and PNG in `LOGO_Smartparks_Typo/` (gitignored). SVGs derived from the PDF in `services/frontend/src/assets/brand/`. The wide variant is composed from the delivered emblem and wordmark; confirm with Smart Parks before public use. Colours #52735E and #90AE9B confirmed.
 - [ ] Phase 3: recorded OpenCollar uplinks (ChirpStack, KPN or LORIOT exports) and links to the public Smart Parks decoder and protocol repositories.
 - [ ] Phase 3: confirmation which EarthRanger icons may be reused and under which licence.
-- [ ] Phase 7: KPN/ThingPark and LORIOT test accounts, a dev VM (Ubuntu 24.04) and a domain.
+- [ ] Phase 7: KPN/ThingPark, LORIOT, Netmore (portal.blink.services, LoRaWAN Portal) and akenza test accounts, a dev VM (Ubuntu 24.04) and a domain. Device deep link paths for Netmore and akenza are guesses until seen live.
 - [ ] Phase 8: Gundi connection and EarthRanger test site, an AddaxAI Connect dev server API token, a Traccar test instance or account.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work.
 - [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access.
@@ -767,4 +776,22 @@ Listed by the phase where they are first needed.
 - Verification: 185 python tests, 5 frontend tests, ruff, mypy strict, eslint and tsc clean, docs strict, OpenAPI regenerated, compose stack rebuilt, screenshot sweep clean on 35 routes at three viewports. Live exit criterion on the local ChirpStack: `REQUEST_STATUS` and `RESET` issued through the API for the demo collar were queued with payloads `a400` and `a100` on port 32, both visible in the ChirpStack device queue, the timeline shows created, encoded, submitted, accepted by network and queued, the queue was flushed afterwards. The simulator does not transmit downlinks, so transmitted and confirmed stages were verified with the fixture tests, not live.
 - The demo collar in this development database still had the pre-v0.2.0 generic JSON type; it now has an OpenCollar Edge type (created through the API), which is what the current bootstrap creates on a fresh stack.
 - Committed as f540569 and pushed on Tim's instruction. The v0.4.0 tag is pending Tim's review.
-- Decisions to ask Tim when phase 7 starts: KPN/ThingPark integration style (proposed: HTTP push from ThingPark to the webhook endpoint with the per-source bearer token, downlinks through the ThingPark REST API), LORIOT integration style (proposed: the LORIOT websocket application output with the downlink API), which accounts and devices exist for live tests, and whether the dev VM is provisioned by Ansible from this repository from the first run (proposed: yes, DigitalOcean Ubuntu 24.04).
+- Decisions asked at the start of phase 7, see the next entry. Earlier list: KPN/ThingPark integration style (proposed: HTTP push from ThingPark to the webhook endpoint with the per-source bearer token, downlinks through the ThingPark REST API), LORIOT integration style (proposed: the LORIOT websocket application output with the downlink API), which accounts and devices exist for live tests, and whether the dev VM is provisioned by Ansible from this repository from the first run (proposed: yes, DigitalOcean Ubuntu 24.04).
+
+### 2026-09-04, release v0.4.0 and phase 7 (Claude)
+
+- CI green on the phase 6 commits; tagged v0.4.0 on Tim's instruction (288320d).
+- Tim decided D53 (KPN through ThingPark HTTP push and the downlink API), D54 (LORIOT through the websocket output with downlinks on the same connection), D55 (build from public documentation now, verify live later), and asked for Netmore as a third production network (D57). Claude recorded D56 (adapter metadata from the API, no provider names in the frontend).
+- Built the KPN/ThingPark adapter (uplink, downlink sent, location and notification documents; LRR receptions; the downlink connector in token and bearer mode), the LORIOT adapter (websocket connector with reconnect on the transport base, `rx`, `gw`, `txd` frames, the HTTP output variant, downlinks as `tx` frames), adapter metadata in the registry and `GET /data-sources/adapters`, push tokens for every adapter that declares `push`, the acquisition channel on the adapter instead of a provider table in the control module, the provider boundary guard test (backend and frontend), the Ansible playbook with security, docker, nginx, ssl, dev-tools, app-deploy and security-check roles plus the example inventory and vars, `scripts/verify-server.sh` and `scripts/security-status.sh`, the runbooks for KPN and LORIOT, the deployment and update guides. The data source form reads adapters from the API.
+- Fixtures for KPN and LORIOT are invented from the documentation and say so in their README; recorded payloads replace them at the live run.
+- Netmore, on Tim's pointer to the online documentation: built from docs.connect.netmoregroup.com (export format with its four variants, HTTP push with static headers, the MQTT broker and topics, downlink over MQTT with its responses) and the Netmore Connect OpenAPI document (`POST /devices/LoRaWAN/{devEui}/LoRaWAN/downlink` with `payloadHex`, `fPort`, `confirmed`, `validity` and the `api-key` header, `clearDownlink`). Netmore has two platforms (the older LoRaWAN Portal and Netmore Connect); the export format is shared, downlinks use the Connect API. The decoded export formats are refused with an explanation because they carry no raw frame.
+- Not done, waiting for inputs: the live run of a command over KPN, LORIOT or Netmore, the dev server (no VM, no domain), real collars on the map. The Ansible playbook is YAML-validated but has not been run against a server.
+- Verification: 214 python tests (adapter parsing for KPN, LORIOT and Netmore, downlink connectors against mocked transports, the provider guard, the adapter metadata endpoint), 5 frontend tests, ruff, mypy strict, eslint and tsc clean, docs strict, Ansible YAML loaded and the shell scripts parsed, OpenAPI regenerated, compose stack rebuilt, `GET /data-sources/adapters` answered live with six adapters (seven after akenza), screenshot sweep clean on 35 routes at three viewports. Migration 0007 changes a column comment that named a provider; 0006 is untouched because v0.4.0 ships it.
+- Not committed. Tim reviews and commits; v0.5.0 waits for the live items, so no tag yet.
+
+### 2026-09-04, Netmore platforms and akenza (Claude)
+
+- Tim's Netmore account is on portal.blink.services, the LoRaWAN Portal. Its API document (api.blink.services/rest/swagger.json) has a login endpoint returning a bearer token, `POST /net/sensors/{devEui}/downlink` with `fPort`, `payloadHex`, `confirmed`, `validity` and `requestId`, a queue list with `deliveryStatus`, and a clear call. Tim decided D58: one adapter, a `platform` setting, both downlink paths. Built the portal connector (token cached, renewed on 401, `requestId` set to the command id so an MQTT `downlink-response` can move the command), kept the Connect connector, and the queue reads through the portal.
+- Tim asked for akenza.io. From docs.akenza.io (the webhook connector posts the whole sample; the LoRaWAN uplink event carries `data.port`, `data.payloadHex`, `uplinkMetrics` and `device`) and the published API collection (`POST /v3/devices/{id}/downlink` with `{"raw": true, "loraDownlink": {"port", "payloadHex", "confirmed"}}`, `x-api-key`, `GET /v3/devices/by-device-id`). Tim decided D59: webhook events, REST downlinks, the akenza device id as the external identity with the DevEUI as an attribute. Built the adapter with a new identity type `akenza_device_id`, the runbook, fixtures from the documentation's sample.
+- Decoded akenza samples and decoded Netmore export formats are refused with an explanation, because neither carries the raw frame the driver needs.
+- Verification: 226 python tests (both Netmore downlink connectors against mocked transports, the akenza sample and downlink, the provider guard), ruff, mypy strict, docs strict, compose stack rebuilt, `GET /data-sources/adapters` answers live with seven adapters. Not committed; Tim reviews and commits.

@@ -1,0 +1,30 @@
+[
+  {
+    "devEui": "70b3d57ed0001234",
+    "sensorType": "other",
+    "messageType": "payload",
+    "timestamp": "2026-09-04T08:00:08.599602Z",
+    "payload": "f21c000000000000000000000000000000000000000000000000000000000000",
+    "fCntUp": 15800,
+    "toa": null,
+    "freq": 868300000,
+    "batteryLevel": "255",
+    "ack": false,
+    "spreadingFactor": "7",
+    "dr": 5,
+    "rssi": "-73",
+    "snr": "9.8",
+    "gatewayIdentifier": "506",
+    "fPort": "2",
+    "latitude": 59.776931,
+    "longitude": 14.903832,
+    "tags": {
+      "building": ["A"],
+      "type": ["MOTION", "TEMP"]
+    },
+    "gateways": [
+      {"rssi": "-73", "snr": "9.8", "gatewayIdentifier": "506", "gwEui": "7276FF0039040879", "mac": "7076FF02123C", "antenna": 0},
+      {"rssi": "-47", "snr": "9.5", "gatewayIdentifier": "1789", "gwEui": "647FDAFFFE016C40", "mac": "647FDA016C40", "antenna": 0}
+    ]
+  }
+]

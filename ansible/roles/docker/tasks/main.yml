@@ -1,0 +1,48 @@
+---
+- name: Install prerequisites
+  apt:
+    name: [apt-transport-https, ca-certificates, curl, gnupg, lsb-release]
+    state: present
+    update_cache: true
+
+- name: Keyring directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Docker GPG key
+  shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  args:
+    creates: /etc/apt/keyrings/docker.gpg
+
+- name: Docker repository
+  shell: >
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg]
+    https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    > /etc/apt/sources.list.d/docker.list
+  args:
+    creates: /etc/apt/sources.list.d/docker.list
+
+- name: Install Docker Engine and the compose plugin
+  apt:
+    name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+    state: present
+    update_cache: true
+
+- name: Docker runs
+  systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Application user may use docker
+  user:
+    name: "{{ app_user }}"
+    groups: docker
+    append: true
+
+- name: Docker compose version
+  command: docker compose version
+  register: compose_version
+  changed_when: false

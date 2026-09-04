@@ -11,7 +11,7 @@ ChirpStack v4 is the reference LoRaWAN network server of Smart Parks Protect: it
 - Lists applications, devices and gateways through the ChirpStack REST API (management connector, phase 3) and tests the connection.
 - Accepts the same events over the ChirpStack HTTP integration at `POST /api/v1/ingest/http/{data_source_id}?event=up` with the source's bearer token.
 
-Downlinks (command connector) arrive in phase 6.
+Downlinks go through the REST API device queue, see [device control](../../devices/device-control.md).
 
 ## Data source configuration
 

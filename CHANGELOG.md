@@ -4,6 +4,18 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+Production LoRaWAN networks and the dev server (phase 7), built from documentation; live verification pending.
+
+### Added
+
+- KPN LoRa (ThingPark) adapter: HTTP push of `DevEUI_uplink`, `DevEUI_downlink_Sent`, `DevEUI_location` and `DevEUI_notification` with LRR receptions; downlinks through the ThingPark downlink API in token or bearer mode. Runbook.
+- LORIOT adapter: websocket application output with reconnect (`rx`, `gw`, `txd` frames), the HTTP output as a webhook, downlinks as `tx` frames over the same output. Runbook.
+- Netmore adapter: the export format over HTTP push or the Netmore MQTT broker, downlink responses; a `platform` setting selects downlinks, queue and clear through the LoRaWAN Portal API (login token) or downlinks and clear through Netmore Connect (API key). Runbook.
+- akenza.io adapter: webhook samples with the raw frame, the akenza device id as identity, downlinks through the akenza REST API. Runbook.
+- `GET /data-sources/adapters`: every adapter with push flag, command support, channel, config schema and example, credential fields and setup hint; the data source form is built from it and the frontend names no provider. Webhook tokens are minted for every adapter that declares `push`.
+- Provider boundary guard test over the backend and the frontend. Migration 0007 rewrites a column comment that named a provider.
+- Ansible playbook and roles (security with sshd drift check, docker, nginx, ssl, dev-tools with release tag resolution, app-deploy, security-check), example inventory and variables, `scripts/verify-server.sh`, `scripts/security-status.sh`. Deployment and update guides.
+
 ## v0.4.0, 2026-09-04
 
 Device control through ChirpStack (phase 6).

@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: v0.3.0 released, phase 6 built (device control through ChirpStack). Phases 0 to 5 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: v0.4.0 released, phase 7 in progress (KPN and LORIOT adapters and the Ansible deployment built from documentation, live verification pending). Phases 0 to 6 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -56,6 +56,7 @@ smartparks-protect/
 │                            # device_drivers/ (base, registry, generic_json, opencollar), analytics.py, exports/,
 │                            # rules/ (schema, templates, evaluator, data, events, replay), notifications/,
 │                            # control/ (actions, commands)
+├── ansible/                 # playbook, roles, *.example inventory and vars (phase 7)
 ├── tests/                   # tests/shared, tests/api, tests/fixtures/payloads
 ├── docs/                    # MkDocs site, docs/adr/ holds the ADRs
 ├── docker/python.Dockerfile # one image for every Python service; compose sets the command per service
@@ -116,7 +117,7 @@ The rules behind it:
 
 ### Adapters and drivers
 
-Contracts in `shared/connectivity/base.py` and `shared/device_drivers/base.py`, registries in `registry.py` next to them (D10, ADR 0011). Adapters produce `InboundMessage` (with gateway receptions and identity attributes for links) and never decode payloads; drivers produce `DecodedRecords` and never read provider fields. For LoRaWAN uplinks the decoder extracts the application frame (`frame` bytes and `f_port`) from the stored event and drivers work on that; network-level events (`join`, `status`, `downlink_ack`, `downlink_transmitted`, `log`) need no driver: `status` yields `battery_level` and `link_margin` measurements, the rest update connectivity state. A driver declares `decodable_event_types` (default `uplink`). Skeletons to copy are in `examples/`. Documentation: `docs/integrations/adapter-interface.md`, `docs/devices/driver-interface.md`, `docs/integrations/chirpstack/`.
+Contracts in `shared/connectivity/base.py` and `shared/device_drivers/base.py`, registries in `registry.py` next to them (D10, ADR 0011). An adapter may declare `push` (a webhook token is minted for its sources), `acquisition_channel`, `command_connector`, `config_example`, `credentials_schema` and `setup_hint`; `describe_adapter` turns that into the `GET /data-sources/adapters` answer the frontend builds its form from. `tests/shared/test_provider_boundary.py` fails when a provider is named outside `shared/connectivity/adapters/` or anywhere in the frontend. Adapters today: generic HTTP, generic MQTT, ChirpStack (MQTT events, REST management and queue), KPN/ThingPark (HTTP push, downlink API), LORIOT (websocket output, `tx` downlinks), Netmore (export format over HTTP push or MQTT; downlinks through the LoRaWAN Portal or Connect API per the `platform` setting), akenza.io (webhook samples, akenza device id as identity, REST downlinks). Adapters produce `InboundMessage` (with gateway receptions and identity attributes for links) and never decode payloads; drivers produce `DecodedRecords` and never read provider fields. For LoRaWAN uplinks the decoder extracts the application frame (`frame` bytes and `f_port`) from the stored event and drivers work on that; network-level events (`join`, `status`, `downlink_ack`, `downlink_transmitted`, `log`) need no driver: `status` yields `battery_level` and `link_margin` measurements, the rest update connectivity state. A driver declares `decodable_event_types` (default `uplink`). Skeletons to copy are in `examples/`. Documentation: `docs/integrations/adapter-interface.md`, `docs/devices/driver-interface.md`, `docs/integrations/chirpstack/`.
 
 ### ChirpStack locally
 
@@ -210,6 +211,10 @@ Targets, automations and deliveries API: `routers/automations.py`, one implement
 The ChirpStack connector (`ChirpStackCommands`) posts to `/api/devices/{dev_eui}/queue` and returns the queue item id as `provider_ref` with statuses `accepted_by_network` and `queued`; `queue` and `flush` read and clear the platform queue. Adapters without a `command_connector` method cannot send commands, which the actions endpoint reports as the reason.
 
 API in `routers/control.py`: permissions are judged in the device's current project (`_control_permissions`), confirmation policies other than `none` need `confirmed: true`, everything is audited. The automation action `command` calls `request_command` with the automation as actor and publishes `command.updated` after the commit.
+
+## Deployment
+
+`ansible/playbook.yml` with the roles security, docker, nginx, ssl, dev-tools, app-deploy and security-check, mirrored from AddaxAI Connect without FTPS and GPU: firewall with SSH, HTTP and HTTPS only; sshd hardening in a `01-` drop-in read back with `sshd -T`; security updates with a reboot at 04:30 only when required; fail2ban on sshd; nginx in front of the frontend container and the API with rate limits, websocket upgrade for `/api/v1/ws/` and a generous limit on `/api/v1/ingest/`; certbot without an interactive pause (the playbook refuses when the domain does not resolve to the host); checkout of the newest `vX.Y.Z` tag unless `git_version` is set; `.env` written from host vars; `docker compose up` with the migrate service; a daily cron for `scripts/security-status.sh`. `scripts/verify-server.sh` is the read-only gate after an update: containers versus `docker compose config --services`, Alembic head, health and version, worker heartbeats from Redis, error lines in the logs. Only the `*.example` files are committed; a private repository holds the filled-in inventory and the vault-encrypted host vars.
 
 ## Analytics and exports
 

@@ -1,0 +1,17 @@
+{
+  "DevEUI_downlink_Sent": {
+    "Time": "2026-09-04T10:12:05.900+02:00",
+    "DevEUI": "70B3D57ED0001234",
+    "FPort": "32",
+    "FCntDn": "13",
+    "Lrcid": "00000201",
+    "SpFact": "9",
+    "SubBand": "G1",
+    "Channel": "LC3",
+    "Lrrid": "FF010A2B",
+    "DeliveryStatus": "1",
+    "CorrelationID": "5f3e4d2c-0000-1111-2222-333344445555",
+    "CustomerID": "100000123",
+    "TransmissionSlot": "1"
+  }
+}

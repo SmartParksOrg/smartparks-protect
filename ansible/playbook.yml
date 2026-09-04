@@ -1,0 +1,47 @@
+---
+# Smart Parks Protect: one playbook for a clean Ubuntu 24.04 server and for updates.
+- name: Deploy Smart Parks Protect
+  hosts: all
+  become: true
+
+  pre_tasks:
+    - name: Refuse to deploy to more than one server unless asked
+      assert:
+        that: ansible_play_hosts | length == 1
+        fail_msg: >-
+          This run targets {{ ansible_play_hosts | length }} servers
+          ({{ ansible_play_hosts | join(', ') }}). Add --limit <host>, or -e confirm_multi=true.
+        quiet: true
+      when: not (confirm_multi | default(false) | bool)
+      run_once: true
+
+    - name: Show what is about to happen
+      debug:
+        msg: >-
+          {{ inventory_hostname }} ({{ ansible_host }}), user {{ app_user }},
+          directory {{ app_directory }}, environment {{ app_environment | default('production') }},
+          domain {{ domain_name | default('none') }}, ssl {{ enable_ssl | default(false) }}
+
+  roles:
+    - role: security
+      tags: [security, base]
+    - role: docker
+      tags: [docker, base]
+    - role: nginx
+      tags: [nginx, web]
+    - role: ssl
+      tags: [ssl, web]
+    - role: dev-tools
+      tags: [dev-tools, deploy]
+    - role: app-deploy
+      tags: [app-deploy, deploy]
+    - role: security-check
+      tags: [security-check, verify]
+
+  post_tasks:
+    - name: Done
+      debug:
+        msg: >-
+          Web: {{ 'https://' + domain_name if (enable_ssl | default(false) and domain_name is defined) else 'http://' + ansible_host }}.
+          Next: scripts/dev.sh bootstrap-admin on the server (see the deployment guide),
+          then bash scripts/verify-server.sh.

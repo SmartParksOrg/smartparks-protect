@@ -1,0 +1,21 @@
+---
+# Copy to inventory.yml and fill in your servers. inventory.yml is gitignored.
+#
+#   ansible-playbook -i ansible/inventory.yml ansible/playbook.yml --limit myserver
+#
+# Per-server settings and secrets go in host_vars/<name>.yml (vault-encrypted), shared
+# settings in group_vars/all/main.yml.
+all:
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+    ansible_python_interpreter: /usr/bin/python3
+  children:
+    prod:
+      hosts:
+        myserver:
+          ansible_host: 192.0.2.10
+    dev:
+      hosts:
+        devserver:
+          ansible_host: 192.0.2.20

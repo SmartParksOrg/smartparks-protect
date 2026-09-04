@@ -687,6 +687,27 @@ export interface paths {
         patch: operations["update_metric_api_v1_metrics__key__patch"];
         trace?: never;
     };
+    "/api/v1/data-sources/adapters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Adapters
+         * @description Every registered adapter with its configuration shape, so the frontend and API clients
+         *     build data sources without knowing any provider by name.
+         */
+        get: operations["list_adapters_api_v1_data_sources_adapters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/data-sources": {
         parameters: {
             query?: never;
@@ -7473,6 +7494,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_adapters_api_v1_data_sources_adapters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
         };

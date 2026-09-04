@@ -1,0 +1,44 @@
+---
+# docker-compose.yml comes from git; only .env is written here.
+- name: Write .env
+  template:
+    src: env.j2
+    dest: "{{ app_directory }}/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: "0600"
+  tags: [env-refresh, sync-config]
+
+- name: Build images
+  command: docker compose build
+  args:
+    chdir: "{{ app_directory }}"
+  become_user: "{{ app_user }}"
+  environment:
+    GIT_COMMIT: "{{ lookup('pipe', 'echo unknown') }}"
+  tags: [env-refresh]
+
+- name: Start the stack (the migrate service runs first)
+  command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ app_directory }}"
+  become_user: "{{ app_user }}"
+  tags: [env-refresh, sync-config]
+
+- name: Wait for the API
+  uri:
+    url: http://127.0.0.1:8000/api/health
+    status_code: 200
+  register: health
+  until: health.status == 200
+  retries: 30
+  delay: 5
+  tags: [env-refresh, sync-config]
+
+- name: Daily security status at 02:30
+  cron:
+    name: "smartparks-protect security status"
+    minute: "30"
+    hour: "2"
+    user: root
+    job: "cd {{ app_directory }} && bash scripts/security-status.sh > /dev/null 2>&1"

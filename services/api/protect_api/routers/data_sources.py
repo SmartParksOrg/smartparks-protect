@@ -21,7 +21,7 @@ from protect_api.schemas.domain import (
     ExternalIdentityUpdate,
 )
 from shared.config import get_settings
-from shared.connectivity.registry import ADAPTERS
+from shared.connectivity.registry import ADAPTERS, describe_adapter
 from shared.connectivity.transports.http import hash_token, new_webhook_token
 from shared.database import get_session
 from shared.models import (
@@ -88,6 +88,13 @@ async def _set_scopes(
             session.add(DataSourceProjectScope(data_source_id=source.id, project_id=project_id))
 
 
+@router.get("/adapters", response_model=list[dict[str, Any]])
+async def list_adapters() -> list[dict[str, Any]]:
+    """Every registered adapter with its configuration shape, so the frontend and API clients
+    build data sources without knowing any provider by name."""
+    return [describe_adapter(adapter) for adapter in ADAPTERS.values()]
+
+
 @router.get("", response_model=PageResponse[DataSourceRead])
 async def list_data_sources(
     page: Page = Depends(page), session: AsyncSession = Depends(get_session)
@@ -104,7 +111,7 @@ async def create_data_source(
 ) -> DataSourceRead:
     """HTTP push sources get a bearer token that is returned once, in this response only."""
     values = _adapter_defaults(body)
-    token = new_webhook_token() if body.adapter_key == "generic_http" else None
+    token = new_webhook_token() if getattr(ADAPTERS[body.adapter_key], "push", False) else None
     source = DataSource(
         credentials_encrypted=encrypt_json(body.credentials) if body.credentials else None,
         webhook_token_hash=hash_token(token) if token else None,

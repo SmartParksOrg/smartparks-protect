@@ -50,7 +50,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting started: getting-started/index.md
+  - Getting started:
+      - getting-started/index.md
+      - Deployment: getting-started/deployment.md
   - Concepts:
       - concepts/index.md
       - Domain model: concepts/domain-model.md
@@ -71,6 +73,10 @@ nav:
       - integrations/index.md
       - Adapter interface: integrations/adapter-interface.md
       - ChirpStack: integrations/chirpstack/index.md
+      - KPN LoRa (ThingPark): integrations/kpn-thingpark/index.md
+      - LORIOT: integrations/loriot/index.md
+      - Netmore: integrations/netmore/index.md
+      - akenza.io: integrations/akenza/index.md
   - Analytics:
       - analytics/index.md
       - Data Explorer: analytics/data-explorer.md
@@ -84,6 +90,7 @@ nav:
       - Notifications: administration/notifications.md
   - Operations:
       - operations/index.md
+      - Update guide: operations/update-guide.md
       - Benchmarks: operations/benchmarks.md
   - Troubleshooting: troubleshooting/index.md
   - API: api/index.md

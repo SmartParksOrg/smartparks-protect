@@ -1,0 +1,37 @@
+{
+  "DevEUI_uplink": {
+    "Time": "2026-09-04T10:12:03.421+02:00",
+    "DevEUI": "70B3D57ED0001234",
+    "FPort": "2",
+    "FCntUp": "1834",
+    "FCntDn": "12",
+    "ADRbit": "1",
+    "MType": "2",
+    "ACKbit": "0",
+    "mic_hex": "a1b2c3d4",
+    "Lrcid": "00000201",
+    "LrrRSSI": "-97.000000",
+    "LrrSNR": "8.250000",
+    "SpFact": "9",
+    "SubBand": "G1",
+    "Channel": "LC3",
+    "DevLrrCnt": "2",
+    "Lrrid": "FF010A2B",
+    "Late": "0",
+    "LrrLAT": "52.090737",
+    "LrrLON": "5.121420",
+    "Lrrs": {
+      "Lrr": [
+        {"Lrrid": "FF010A2B", "Chain": "0", "LrrRSSI": "-97.000000", "LrrSNR": "8.250000", "LrrESP": "-97.598892"},
+        {"Lrrid": "FF010C71", "Chain": "0", "LrrRSSI": "-112.000000", "LrrSNR": "-2.500000", "LrrESP": "-116.394741"}
+      ]
+    },
+    "CustomerID": "100000123",
+    "CustomerData": {"alr": {"pro": "SMPK/OC", "ver": "1"}},
+    "ModelCfg": "0",
+    "DevAddr": "0BB03C1E",
+    "TxPower": "14.000000",
+    "NbTrans": "1",
+    "payload_hex": "f21c000000000000000000000000000000000000000000000000000000000000"
+  }
+}

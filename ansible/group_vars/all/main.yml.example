@@ -1,0 +1,17 @@
+---
+# Copy to main.yml. Settings every server agrees on; host_vars wins when both define a value.
+app_user: protect
+app_directory: /opt/smartparks-protect
+git_repo: https://github.com/SmartParksOrg/smartparks-protect.git
+# Unset: a new server gets the newest release tag. A dev server sets `main` in its host_vars.
+# git_version: v0.4.0
+
+enable_firewall: true
+allowed_ssh_port: 22
+fail_on_security_issues: true
+
+enable_ssl: true
+letsencrypt_staging: false
+letsencrypt_email: "you@example.org"
+
+install_tools: true

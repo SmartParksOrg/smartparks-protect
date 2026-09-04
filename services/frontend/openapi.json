@@ -3609,6 +3609,38 @@
     }
    }
   },
+  "/api/v1/data-sources/adapters": {
+   "get": {
+    "tags": [
+     "data sources"
+    ],
+    "summary": "List Adapters",
+    "description": "Every registered adapter with its configuration shape, so the frontend and API clients\nbuild data sources without knowing any provider by name.",
+    "operationId": "list_adapters_api_v1_data_sources_adapters_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response List Adapters Api V1 Data Sources Adapters Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/data-sources": {
    "get": {
     "tags": [

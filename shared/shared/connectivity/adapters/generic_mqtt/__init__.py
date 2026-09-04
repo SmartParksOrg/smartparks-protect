@@ -100,6 +100,16 @@ class GenericMqttConnector:
 class GenericMqttAdapter:
     key: ClassVar[str] = "generic_mqtt"
     label: ClassVar[str] = "Generic MQTT broker"
+    push: ClassVar[bool] = False
+    acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.API
+    config_example: ClassVar[dict[str, Any]] = {
+        "host": "broker.example.org",
+        "port": 1883,
+        "topics": ["devices/#"],
+        "topic_template": "devices/{external_id}/+",
+    }
+    credentials_schema: ClassVar[dict[str, str]] = {"username": "", "password": ""}
+    setup_hint: ClassVar[str] = "The ingest service subscribes to the topics within a minute."
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(uplink=True)
     default_link_templates: ClassVar[dict[str, str]] = {}
     config_schema: ClassVar[dict[str, Any]] = {

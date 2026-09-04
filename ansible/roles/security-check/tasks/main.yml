@@ -1,0 +1,23 @@
+---
+- name: Install the security check
+  template:
+    src: security-check.sh.j2
+    dest: /usr/local/bin/security-check.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Run it
+  command: /usr/local/bin/security-check.sh
+  register: security_check
+  failed_when: false
+  changed_when: false
+
+- name: Results
+  debug:
+    msg: "{{ security_check.stdout_lines }}"
+
+- name: Stop on a critical finding
+  fail:
+    msg: "Critical security findings above; fix them and run again."
+  when: security_check.rc != 0 and (fail_on_security_issues | default(true))

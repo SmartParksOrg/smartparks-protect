@@ -1,5 +1,6 @@
 # Operations
 
-Running the platform: deployment and update guides arrive with phase 7. What exists now:
-
-- [Benchmarks](benchmarks.md): the latest run of the benchmark scripts against the synthetic dataset, with the performance budgets from the architecture.
+- [Deployment](../getting-started/deployment.md): the Ansible playbook for a clean Ubuntu server.
+- [Update guide](update-guide.md): moving a server to a new release, rollback.
+- [Benchmarks](benchmarks.md): the latest run of the benchmark scripts against the synthetic dataset.
+- Backups and recovery arrive with phase 10.

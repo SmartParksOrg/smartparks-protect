@@ -1,0 +1,33 @@
+{
+  "data": {
+    "port": 2,
+    "customAttributes": null,
+    "payloadHex": "f21c000000000000000000000000000000000000000000000000000000000000"
+  },
+  "uplinkMetrics": {
+    "id": "8888888888888888",
+    "uplinkId": "88888888-8888-8888-8888-888888888888",
+    "deviceId": "0000000000000fff",
+    "uplinkSize": 364,
+    "timestamp": "2026-09-04T12:43:46.083Z",
+    "port": 2,
+    "frameCountUp": 4325,
+    "frameCountDown": 115,
+    "rssi": -114,
+    "snr": -6,
+    "sf": 7,
+    "txPower": 16,
+    "numberOfGateways": 1,
+    "esp": -120.97,
+    "sqi": 3
+  },
+  "topic": "default",
+  "device": {
+    "customFields": {"SiteId": "AK_OFFICE"},
+    "name": "Rhino 14 collar",
+    "description": "OpenCollar Edge",
+    "id": "0000000000000fff",
+    "deviceId": "70B3D57ED0001234"
+  },
+  "timestamp": "2026-09-04T12:43:46.083Z"
+}

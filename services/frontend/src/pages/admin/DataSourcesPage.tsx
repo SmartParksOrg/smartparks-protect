@@ -23,11 +23,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatTime } from "@/lib/format";
 
-const ADAPTERS = [
-  { key: "chirpstack", label: "ChirpStack", config: { mqtt_host: "chirpstack-mosquitto", mqtt_port: 1883, api_url: "http://chirpstack-rest-api:8090", web_url: "http://localhost:8080", tenant_id: "" }, credentials: { api_token: "" } },
-  { key: "generic_http", label: "Generic HTTP webhook", config: { external_id_field: "device_id", event_type_field: "type", time_field: "received_at" }, credentials: {} },
-  { key: "generic_mqtt", label: "Generic MQTT broker", config: { host: "", port: 1883, topics: ["devices/#"], topic_template: "devices/{external_id}/+" }, credentials: { username: "", password: "" } },
-];
+interface AdapterInfo {
+  key: string;
+  label: string;
+  push: boolean;
+  can_send_commands: boolean;
+  acquisition_channel: string;
+  default_capabilities: Record<string, boolean>;
+  config_schema: Record<string, unknown>;
+  config_example: Record<string, unknown>;
+  credentials_schema: Record<string, string>;
+  setup_hint: string;
+}
+
+const credentialsTemplate = (a: AdapterInfo) => Object.fromEntries(Object.keys(a.credentials_schema).map((k) => [k, ""]));
 
 const schema = z.object({
   name: z.string().min(1).max(200),
@@ -48,17 +57,19 @@ function Capabilities({ source }: { source: DataSource }) {
 
 export function DataSourcesPage() {
   const sources = useQuery({ queryKey: queryKeys.dataSources, queryFn: () => api.get<PageType<DataSource>>("/api/v1/data-sources", { query: { limit: 500 } }) });
+  const adapters = useQuery({ queryKey: queryKeys.adapters, queryFn: () => api.get<AdapterInfo[]>("/api/v1/data-sources/adapters") });
+  const ADAPTERS = adapters.data ?? [];
   const projects = useQuery({ queryKey: queryKeys.projects, queryFn: () => api.get<PageType<ProjectWithRole>>("/api/v1/projects", { query: { limit: 500 } }) });
   const [editing, setEditing] = useState<DataSource | null>(null);
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<{ token: string; url: string | null } | null>(null);
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", adapter_key: "chirpstack", enabled: true, config: JSON.stringify(ADAPTERS[0].config, null, 2), credentials: JSON.stringify(ADAPTERS[0].credentials, null, 2), project_ids: [] } });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", adapter_key: "", enabled: true, config: "{}", credentials: "{}", project_ids: [] } });
   const adapterKey = form.watch("adapter_key");
   useEffect(() => {
     if (!open) return;
     if (editing) form.reset({ name: editing.name, adapter_key: editing.adapter_key, enabled: editing.enabled, config: JSON.stringify(editing.config, null, 2), credentials: "", project_ids: editing.project_ids ?? [] });
-    else { const a = ADAPTERS[0]; form.reset({ name: "", adapter_key: a.key, enabled: true, config: JSON.stringify(a.config, null, 2), credentials: JSON.stringify(a.credentials, null, 2), project_ids: [] }); }
-  }, [open, editing, form]);
+    else { const a = ADAPTERS[0]; form.reset({ name: "", adapter_key: a?.key ?? "", enabled: true, config: JSON.stringify(a?.config_example ?? {}, null, 2), credentials: JSON.stringify(a ? credentialsTemplate(a) : {}, null, 2), project_ids: [] }); }
+  }, [open, editing, form, ADAPTERS]);
   const save = useMutationToast({
     mutationFn: (values: Values) => {
       const body: Record<string, unknown> = { name: values.name, enabled: values.enabled, config: JSON.parse(values.config), project_ids: values.project_ids };
@@ -74,13 +85,13 @@ export function DataSourcesPage() {
   const rotate = useMutationToast({ mutationFn: (id: string) => api.post<DataSource>(`/api/v1/data-sources/${id}/webhook-token`), invalidate: [queryKeys.dataSources], onSuccess: (source) => source.webhook_token && setToken({ token: source.webhook_token, url: source.webhook_url ?? null }) });
   const columns: ColumnDef<DataSource, unknown>[] = [
     { header: "Name", accessorKey: "name" },
-    { header: "Adapter", accessorKey: "adapter_key" },
+    { header: "Adapter", accessorKey: "adapter_key", cell: ({ getValue }) => ADAPTERS.find((a) => a.key === getValue<string>())?.label ?? getValue<string>() },
     { header: "Enabled", accessorKey: "enabled", cell: ({ getValue }) => (getValue<boolean>() ? "yes" : "no") },
     { header: "Credentials", accessorKey: "has_credentials", cell: ({ getValue }) => (getValue<boolean>() ? "stored" : "none") },
     { header: "Capabilities", id: "caps", cell: ({ row }) => <Capabilities source={row.original} /> },
     { header: "Projects", accessorFn: (s) => (s.project_ids ?? []).length || "all" },
     { header: "Updated", accessorKey: "updated_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { id: "token", header: "", cell: ({ row }) => (row.original.adapter_key === "generic_http" ? <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); rotate.mutate(row.original.id); }}><KeyRound className="size-4" /> New token</Button> : null) },
+    { id: "token", header: "", cell: ({ row }) => (row.original.has_webhook_token ? <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); rotate.mutate(row.original.id); }}><KeyRound className="size-4" /> New token</Button> : null) },
   ];
   return (
     <>
@@ -92,11 +103,12 @@ export function DataSourcesPage() {
           <form className="space-y-3" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
             <Field label="Name" htmlFor="ds-name" error={form.formState.errors.name?.message}><Input id="ds-name" {...form.register("name")} /></Field>
             <Field label="Adapter" htmlFor="ds-adapter">
-              <Select value={adapterKey} disabled={Boolean(editing)} onValueChange={(v) => { form.setValue("adapter_key", v); const a = ADAPTERS.find((x) => x.key === v); if (a && !editing) { form.setValue("config", JSON.stringify(a.config, null, 2)); form.setValue("credentials", JSON.stringify(a.credentials, null, 2)); } }}>
+              <Select value={adapterKey} disabled={Boolean(editing)} onValueChange={(v) => { form.setValue("adapter_key", v); const a = ADAPTERS.find((x) => x.key === v); if (a && !editing) { form.setValue("config", JSON.stringify(a.config_example, null, 2)); form.setValue("credentials", JSON.stringify(credentialsTemplate(a), null, 2)); } }}>
                 <SelectTrigger id="ds-adapter"><SelectValue /></SelectTrigger>
                 <SelectContent>{ADAPTERS.map((a) => <SelectItem key={a.key} value={a.key}>{a.label}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
+            {(() => { const a = ADAPTERS.find((x) => x.key === adapterKey); return a?.setup_hint ? <Callout kind="info">{a.setup_hint}{a.push ? " The webhook URL and its bearer token are shown after saving." : ""}</Callout> : null; })()}
             <div className="flex items-center gap-2"><Switch id="ds-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="ds-enabled" className="text-sm">Enabled</label></div>
             <Field label="Configuration (JSON)" htmlFor="ds-config" error={form.formState.errors.config?.message}><Textarea id="ds-config" rows={6} className="font-mono text-xs" {...form.register("config")} /></Field>
             <Field label="Credentials (JSON)" htmlFor="ds-credentials" hint={editing ? "Leave empty to keep the stored credentials" : undefined} error={form.formState.errors.credentials?.message}><Textarea id="ds-credentials" rows={3} className="font-mono text-xs" {...form.register("credentials")} /></Field>

@@ -53,8 +53,19 @@ def parse_time(value: Any, adapter: str = "generic_http") -> datetime | None:
 class GenericHttpAdapter:
     key: ClassVar[str] = "generic_http"
     label: ClassVar[str] = "Generic HTTP webhook"
+    push: ClassVar[bool] = True
+    acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.API
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(uplink=True)
     default_link_templates: ClassVar[dict[str, str]] = {}
+    config_example: ClassVar[dict[str, Any]] = {
+        "external_id_field": "device_id",
+        "event_type_field": "type",
+        "time_field": "received_at",
+    }
+    credentials_schema: ClassVar[dict[str, str]] = {}
+    setup_hint: ClassVar[str] = (
+        "POST JSON to the webhook URL of this data source with the bearer token."
+    )
     config_schema: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
