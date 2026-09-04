@@ -21,6 +21,7 @@ class Permission(StrEnum):
     DATA_SOURCES_WRITE = "data_sources:write"
     RULES_WRITE = "rules:write"
     ALERTS_WRITE = "alerts:write"
+    EVENTS_WRITE = "events:write"
     AUTOMATIONS_WRITE = "automations:write"
     INTEGRATIONS_WRITE = "integrations:write"
     DATA_CURATE = "data:curate"
@@ -38,6 +39,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.TRACES_READ,
             Permission.EXPORTS_CREATE,
             Permission.ALERTS_WRITE,
+            Permission.EVENTS_WRITE,
         }
     ),
     Role.PROJECT_ADMIN: frozenset(Permission),

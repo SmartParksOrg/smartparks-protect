@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   Bell,
+  Bot,
   Boxes,
   ChartLine,
   Cpu,
@@ -11,6 +12,7 @@ import {
   DatabaseBackup,
   FileClock,
   GitBranch,
+  LayoutDashboard,
   Layers,
   ListTree,
   Map as MapIcon,
@@ -60,6 +62,7 @@ export const projectSections: NavSection[] = [
     items: [
       { label: "Data explorer", icon: ChartLine, to: "analyze/explorer" },
       { label: "Exports", icon: FileClock, to: "analyze/exports" },
+      { label: "Dashboards", icon: LayoutDashboard, to: "analyze/dashboards" },
       { label: "Curation", icon: PenLine, to: "analyze/curation" },
     ],
   },
@@ -116,6 +119,7 @@ export const serverSections: NavSection[] = [
       { label: "Entity types", icon: PawPrint, to: "/admin/entity-types", serverAdminOnly: true },
       { label: "Metrics", icon: Ruler, to: "/admin/metrics", serverAdminOnly: true },
       { label: "Audit log", icon: ScrollText, to: "/admin/audit", serverAdminOnly: true },
+      { label: "AI clients policy", icon: Bot, to: "/admin/ai-policy", serverAdminOnly: true },
     ],
   },
 ];

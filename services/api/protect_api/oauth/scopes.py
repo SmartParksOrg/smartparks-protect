@@ -1,5 +1,5 @@
 """Which API paths an access token of an AI client may reach, per scope (AI action policy,
-architecture 27.6 and 27.7). Phase 9: reads only; every other request is refused."""
+architecture 27.6 and 27.7): reads per scope, writes through the AI action endpoint only."""
 
 import re
 
@@ -26,8 +26,24 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
+# Writes an AI client may make, through the AI action endpoint or the frameworks people use
+# (architecture 27.4); the action policy applies on top (architecture 27.6).
+_WRITE_RULES: list[tuple[str, re.Pattern[str], str]] = [
+    ("POST", re.compile(r"^/api/v1/mcp/actions$"), ""),
+    ("POST", re.compile(r"^/api/v1/mcp/actions/[^/]+/confirm$"), ""),
+    ("GET", re.compile(r"^/api/v1/mcp/(policy|actions/[^/]+)$"), ""),
+    ("GET", re.compile(r"^/api/v1/devices/[^/]+/actions$"), Scope.DEVICES_READ),
+]
+
+
 def authorize_request(method: str, path: str, granted: list[str]) -> tuple[bool, str | None]:
-    """(allowed, missing scope). A write is never allowed; an unknown path is never allowed."""
+    """(allowed, missing scope). Reads per scope; writes only through the AI action endpoint,
+    which checks the write scope of the action; an unknown path is never allowed."""
+    for write_method, pattern, scope in _WRITE_RULES:
+        if method == write_method and pattern.match(path):
+            if scope == "" or scope in granted:
+                return True, None
+            return False, scope
     if method != "GET":
         return False, None
     for pattern, scope in _RULES:

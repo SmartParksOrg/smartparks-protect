@@ -31,8 +31,8 @@ from shared.enums import OAuthClientKind
 from shared.logger import get_logger
 from shared.models import OAuthAuthorizationCode, OAuthClient, OAuthRefreshToken, User
 from shared.oauth import (
+    ALL_SCOPES,
     OFFLINE_ACCESS,
-    READ_SCOPES,
     decode_access_token,
     issuer_url,
     mcp_resource_url,
@@ -42,7 +42,7 @@ from shared.secrets import decrypt_json, encrypt_json
 
 log = get_logger("api.oauth")
 
-SUPPORTED_SCOPES: tuple[str, ...] = (*READ_SCOPES, OFFLINE_ACCESS)
+SUPPORTED_SCOPES: tuple[str, ...] = (*ALL_SCOPES, OFFLINE_ACCESS)
 METADATA_DOCUMENT_MAX_BYTES = 65_536
 METADATA_DOCUMENT_CACHE = timedelta(hours=1)
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "[::1]", "::1")
@@ -239,7 +239,9 @@ class ProtectAuthorizationServerProvider:
             raise AuthorizeError(
                 "invalid_target", f"This server issues tokens for {mcp_resource_url()} only"
             )
-        scopes = params.scopes or list(READ_SCOPES)
+        # A client that asks for nothing gets everything it may hold; the person consents to
+        # the list and the AI action policy gates every write (architecture 27.6).
+        scopes = params.scopes or list(ALL_SCOPES)
         unknown = [s for s in scopes if s not in SUPPORTED_SCOPES]
         if unknown:
             raise AuthorizeError("invalid_scope", f"Unknown scopes: {', '.join(unknown)}")

@@ -468,7 +468,11 @@ async def apply_provider_signal(
 ) -> list[tuple[str, dict[str, Any]]]:
     """Network events about a queued item move the command: transmitted, acknowledged, or
     failed with the platform's description. Unknown references are ignored."""
-    ref = payload.get("queueItemId") or (payload.get("context") or {}).get("queue_item_id")
+    ref = (
+        payload.get("queueItemId")
+        or (payload.get("context") or {}).get("queue_item_id")
+        or (event.provider_metadata or {}).get("queue_ref")
+    )
     if not ref or event.data_source_id is None:
         return []
     command = await session.scalar(
@@ -491,7 +495,10 @@ async def apply_provider_signal(
             {"gateway_id": payload.get("gatewayId"), "f_cnt_down": payload.get("fCntDown")},
         )
     elif event.event_type == "downlink_ack":
-        if payload.get("acknowledged", True):
+        acknowledged = payload.get("acknowledged")
+        if acknowledged is None:
+            acknowledged = (event.provider_metadata or {}).get("acknowledged", True)
+        if acknowledged:
             command.acknowledged_at = command.acknowledged_at or when
             moved = await _record(
                 session,
@@ -506,10 +513,15 @@ async def apply_provider_signal(
             moved = await _record(
                 session, command, CommandStatus.FAILED, source, {"acknowledged": False}
             )
-    elif event.event_type == "log" and str(payload.get("level", "")).upper() in ("ERROR", "FATAL"):
+    elif event.event_type == "log" and str(
+        payload.get("level") or (event.provider_metadata or {}).get("level") or ""
+    ).upper() in ("ERROR", "FATAL"):
         command.error_code = ErrorCode.COMMAND_REJECTED
         command.error_message = str(
-            payload.get("description") or payload.get("code") or "platform error"
+            payload.get("description")
+            or (event.provider_metadata or {}).get("description")
+            or payload.get("code")
+            or "platform error"
         )
         moved = await _record(
             session, command, CommandStatus.FAILED, source, {"code": payload.get("code")}

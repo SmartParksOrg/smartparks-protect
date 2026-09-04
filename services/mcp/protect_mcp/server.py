@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
+from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import MCPServer, Message
 from mcp.server.mcpserver.exceptions import ResourceNotFoundError, ToolError
@@ -15,7 +16,7 @@ from pydantic import Field
 from protect_mcp.api import ProtectApi
 from protect_mcp.auth import JWTTokenVerifier
 from shared.config import get_settings
-from shared.oauth import READ_SCOPES, issuer_url, mcp_resource_url
+from shared.oauth import READ_SCOPES, Scope, issuer_url, mcp_resource_url
 
 MAX_ITEMS = 100
 MAX_PROJECTS_FOR_SEARCH = 10
@@ -407,6 +408,112 @@ def build_server(api: ProtectApi) -> MCPServer[None]:
         }
 
     # ChatGPT's search and fetch contract (developer documentation for connectors)
+
+    # Write tools (architecture 27.4 and 27.6, decision D87): every write goes through the
+    # API's AI action endpoint, which applies the server's AI action policy and the person's
+    # permissions, and may hold the action for `confirm_action`.
+
+    def _needs_scope(scope: str) -> None:
+        access = get_access_token()
+        if access is None or scope not in access.scopes:
+            raise ToolError(
+                f"This tool needs the {scope} scope, which this connection was not granted. "
+                "Reconnect and grant it on the consent page."
+            )
+
+    async def _action(tool: str, action: str, parameters: dict[str, Any]) -> dict[str, Any]:
+        answer = await api.post(
+            "/mcp/actions", tool=tool, body={"action": action, "parameters": parameters}
+        )
+        if answer.get("status") == "confirmation_required":
+            answer["next_step"] = (
+                "Show the summary to the user and ask them to confirm. When they confirm, call "
+                f"confirm_action with action_id {answer['id']} within ten minutes. Do not "
+                "call confirm_action without an explicit confirmation from the user."
+            )
+        return dict(answer)
+
+    @mcp.tool()
+    async def create_event(
+        project_id: Uuid,
+        event_type: Annotated[str, Field(description="Upper snake case, for example SIGHTING")],
+        title: Annotated[str, Field(max_length=200)],
+        severity: Annotated[str, Field(description="info, warning or critical")] = "info",
+        description: str | None = None,
+        entity_id: Uuid | None = None,
+        device_id: Uuid | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        create_alert: Annotated[bool, Field(description="Also open an alert for a person")] = False,
+    ) -> dict[str, Any]:
+        """Record an event (a report: a sighting, an incident, a note) in a project on behalf
+        of the user. A safe write: the server's AI action policy may require the user's
+        confirmation first; then this tool returns a summary and an action id."""
+        _needs_scope(str(Scope.EVENTS_WRITE))
+        return await _action(
+            "create_event",
+            "create_event",
+            {
+                "project_id": str(project_id),
+                "event_type": event_type,
+                "title": title,
+                "severity": severity,
+                "description": description,
+                "entity_id": str(entity_id) if entity_id else None,
+                "device_id": str(device_id) if device_id else None,
+                "latitude": latitude,
+                "longitude": longitude,
+                "create_alert": create_alert,
+            },
+        )
+
+    @mcp.tool()
+    async def acknowledge_alert(
+        project_id: Uuid, alert_id: Uuid, note: str | None = None
+    ) -> dict[str, Any]:
+        """Acknowledge an open alert on behalf of the user (they take ownership of it). A safe
+        write under the AI action policy; may need the user's confirmation first."""
+        _needs_scope(str(Scope.ALERTS_WRITE))
+        return await _action(
+            "acknowledge_alert",
+            "acknowledge_alert",
+            {"project_id": str(project_id), "alert_id": str(alert_id), "note": note},
+        )
+
+    @mcp.tool()
+    async def request_device_status(device_id: Uuid) -> dict[str, Any]:
+        """Ask a device for a status message (battery, temperature, errors) through the normal
+        device control path. Operational control: needs the device control permission and,
+        by policy, the user's confirmation."""
+        _needs_scope(str(Scope.DEVICES_CONTROL))
+        return await _action(
+            "request_device_status", "request_device_status", {"device_id": str(device_id)}
+        )
+
+    @mcp.tool()
+    async def request_device_position(device_id: Uuid) -> dict[str, Any]:
+        """Ask a device for a GNSS fix now, through the normal device control path.
+        Operational control: needs the device control permission and, by policy, the user's
+        confirmation."""
+        _needs_scope(str(Scope.DEVICES_CONTROL))
+        return await _action(
+            "request_device_position", "request_device_position", {"device_id": str(device_id)}
+        )
+
+    @mcp.tool()
+    async def confirm_action(action_id: Uuid) -> dict[str, Any]:
+        """Execute an action that was proposed by another tool and held for confirmation.
+        Call this only after the user explicitly confirmed the summary; the proposal expires
+        after ten minutes."""
+        return dict(
+            await api.post(f"/mcp/actions/{action_id}/confirm", tool="confirm_action", body={})
+        )
+
+    @mcp.tool()
+    async def get_ai_policy() -> dict[str, Any]:
+        """The server's AI action policy: which write actions are allowed, need confirmation
+        or are disabled for AI clients."""
+        return dict(await api.get("/mcp/policy", tool="get_ai_policy"))
 
     @mcp.tool()
     async def search(query: str) -> dict[str, Any]:

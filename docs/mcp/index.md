@@ -45,7 +45,31 @@ Resources: `smartparks://projects/{id}`, `smartparks://projects/{id}/entities/{i
 
 Prompts: `analyze_device_health` and `investigate_missing_data` guide a client through the tools for the two questions rangers ask most.
 
-Writes, device control and rule changes are not exposed. The AI action policy of this release is: read allowed, everything else disabled. Write tools arrive in phase 13 with their own scopes and confirmation flows.
+### Write and action tools
+
+Since phase 13 (decision D87, ADR 0019) a client can also act, within the AI action policy:
+
+| Tool | Does | Scope |
+| --- | --- | --- |
+| `create_event` | A manual event (sighting, note, incident) with type, title, optional entity and location | `events:write` |
+| `acknowledge_alert` | Closes an alert with a note | `alerts:write` |
+| `request_device_status` | Queues a status request to a device | `devices:control` |
+| `request_device_position` | Queues a position request to a device | `devices:control` |
+| `confirm_action` | Executes a proposal the policy held for confirmation | the action's scope |
+| `get_ai_policy` | The server's policy per action, so the client knows what to expect | none |
+
+Every action goes through one API endpoint, `POST /api/v1/mcp/actions`, which checks the
+token's scope, the person's project permission and the policy. The policy (Server admin, AI
+clients policy) has a mode per action: **allowed** executes at once, **confirmation** (the
+default) stores a proposal for ten minutes and the client must show the person the summary
+and call `confirm_action` after they agree, **privileged** is the same with the note that a
+privileged client should hold it, **disabled** refuses. High-impact control (configuration
+downlinks, firmware) is disabled and not configurable in this version. Actions are audited
+as the person through the client, and the results carry the MCP actor in traces and the
+command lifecycle. Rule changes and configuration are not exposed.
+
+Consent: the consent page lists the write scopes separately; a client that requests no
+scopes is offered all of them, and the person may untick the writes.
 
 ## Authentication in detail
 

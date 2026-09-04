@@ -78,6 +78,11 @@ export type Correction = Schemas["CorrectionRead"];
 export type CurationJob = Schemas["JobRead"];
 export type CurationSummary = Schemas["CurationSummary"];
 export type RecordHistory = Schemas["RecordHistory"];
+export type Dashboard = Schemas["DashboardRead"];
+export type DashboardTile = Schemas["DashboardTile"];
+export type ProjectIcon = Schemas["ProjectIconRead"];
+export type AiPolicy = Schemas["AiPolicyRead"];
+export type EventCreate = Schemas["EventCreate"];
 
 export interface Page<T> {
   items: T[];

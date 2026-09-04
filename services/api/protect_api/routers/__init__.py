@@ -27,7 +27,10 @@ from protect_api.routers.ingest import router as ingest_router
 from protect_api.routers.integrations import router as integrations_router
 from protect_api.routers.log_files import router as log_files_router
 from protect_api.routers.map import router as map_router
+from protect_api.routers.mcp_actions import admin_router as admin_ai_policy_router
+from protect_api.routers.mcp_actions import router as mcp_actions_router
 from protect_api.routers.network import router as network_router
+from protect_api.routers.platform import router as platform_router
 from protect_api.routers.projects import router as projects_router
 from protect_api.routers.rules import router as rules_router
 
@@ -60,6 +63,9 @@ for router in (
     gateways_router,
     admin_gateways_router,
     backups_router,
+    platform_router,
+    mcp_actions_router,
+    admin_ai_policy_router,
     realtime_router,
 ):
     v1_router.include_router(router)

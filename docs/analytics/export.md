@@ -8,7 +8,7 @@ Both paths take the same parameters, as a JSON body for jobs and as query parame
 
 | Parameter | Meaning |
 | --- | --- |
-| `dataset` | `positions`, `measurements` (normalized), `source_events` (raw inbound messages with payload) or `aggregates` (the Data Explorer series). |
+| `dataset` | `positions`, `measurements` (normalized), `source_events` (raw inbound messages with payload), `aggregates` (the Data Explorer series), `movebank_events` or `movebank_reference` (see Movebank below). |
 | `format` | `csv`, `xlsx`, `json`; positions also `geojson` and `gpx`. |
 | `time_from`, `time_to` | Required, with offset. Source events are selected on `ingested_at`, everything else on the device time. |
 | `entity_ids`, `device_ids`, `metric_keys`, `data_source_id` | Filters. Source events are per device and refuse `entity_ids`. |
@@ -43,6 +43,25 @@ Files are kept for seven days (`expires_at`). Cleanup of expired objects is a la
 - **JSON**: `{"metadata": {...}, "columns": [...], "rows": [...]}`.
 - **GeoJSON**: a FeatureCollection of points, the other columns as properties.
 - **GPX**: one track per entity (per device when unassigned), points in time order with elevation and UTC time.
+
+## Movebank
+
+Movebank takes data through arranged live feeds or file import, so Smart Parks Protect offers
+it as two datasets in Movebank's import format (decision D85) rather than as a push
+connector. Both are tabular (CSV, XLSX, JSON) and always use the effective (curated) view.
+
+- `movebank_events`: one row per position with `timestamp` (`yyyy-MM-dd HH:mm:ss.SSS` in
+  UTC), `location-long`, `location-lat`, `sensor-type` (`GPS`),
+  `individual-local-identifier` (the entity name), `tag-local-identifier` (the device name),
+  `individual-taxon-canonical-name` (the entity type's `taxon` attribute when set),
+  `height-above-msl`, `ground-speed`, `heading`, `gps:satellite-count`,
+  `location-error-numerical`, `study-name` (the project name) and `smart-parks-position-id`.
+- `movebank_reference`: one row per assignment of a device to an entity in the window:
+  `animal-id`, `tag-id`, `deploy-on-date`, `deploy-off-date`, `animal-taxon`,
+  `animal-comments`, `tag-manufacturer-name`, `tag-model`, `tag-serial-no`, `study-name`.
+
+Import in Movebank as "custom import" with the columns mapped by name; the reference data
+file matches Movebank's reference data terms.
 
 ## Reproducibility
 

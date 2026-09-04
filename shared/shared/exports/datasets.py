@@ -9,7 +9,7 @@ import json
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Select, func, select
@@ -35,14 +35,49 @@ from shared.exports import ExportParameters
 from shared.models import (
     DataCorrection,
     Device,
+    DeviceEntityAssignment,
     DeviceProjectAssignment,
+    DeviceType,
     Entity,
+    EntityType,
     Measurement,
     Metric,
     Position,
+    Project,
     SourceEvent,
 )
 
+# Movebank's import format (decision D85): the attribute names of the Movebank attribute
+# dictionary as they appear in Movebank CSV files; Movebank's import dialog maps columns to
+# attributes, so the names here are what a person recognises there.
+MOVEBANK_EVENT_COLUMNS = [
+    "timestamp",
+    "location-long",
+    "location-lat",
+    "sensor-type",
+    "individual-local-identifier",
+    "tag-local-identifier",
+    "individual-taxon-canonical-name",
+    "height-above-msl",
+    "ground-speed",
+    "heading",
+    "gps:satellite-count",
+    "location-error-numerical",
+    "study-name",
+    "smart-parks-position-id",
+]
+MOVEBANK_REFERENCE_COLUMNS = [
+    "animal-id",
+    "tag-id",
+    "deploy-on-date",
+    "deploy-off-date",
+    "animal-taxon",
+    "animal-comments",
+    "tag-manufacturer-name",
+    "tag-model",
+    "tag-serial-no",
+    "study-name",
+]
 CURATION_COLUMNS = [
     "is_curated",
     "curated_fields",
@@ -145,6 +180,10 @@ def columns(params: ExportParameters, lookups: Lookups) -> list[str]:
             "trace_id",
         ]
         return cols
+    if params.dataset is ExportDataset.MOVEBANK_EVENTS:
+        return list(MOVEBANK_EVENT_COLUMNS)
+    if params.dataset is ExportDataset.MOVEBANK_REFERENCE:
+        return list(MOVEBANK_REFERENCE_COLUMNS)
     # aggregates
     owner = "entity" if params.group_by.value == "entity" else "device"
     if params.layout is Layout.WIDE:
@@ -220,6 +259,19 @@ def count_statement(project_id: uuid.UUID, params: ExportParameters) -> Select[A
             .select_from(SourceEvent)
             .where(*_source_event_conditions(project_id, params))
         )
+    if params.dataset is ExportDataset.MOVEBANK_EVENTS:
+        return (
+            select(func.count())
+            .select_from(Position)
+            .where(*_base_conditions(Position, project_id, params))
+        )
+    if params.dataset is ExportDataset.MOVEBANK_REFERENCE:
+        return (
+            select(func.count())
+            .select_from(DeviceEntityAssignment)
+            .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
+            .where(Entity.project_id == project_id)
+        )
     return None
 
 
@@ -240,6 +292,12 @@ async def stream_rows(
             yield row
     elif params.dataset is ExportDataset.SOURCE_EVENTS:
         async for row in _source_events(session, project_id, params, lookups):
+            yield row
+    elif params.dataset is ExportDataset.MOVEBANK_EVENTS:
+        async for row in _movebank_events(session, project_id, params, lookups):
+            yield row
+    elif params.dataset is ExportDataset.MOVEBANK_REFERENCE:
+        async for row in _movebank_reference(session, project_id, params, lookups):
             yield row
     else:
         async for row in _aggregates(session, project_id, params, lookups):
@@ -471,6 +529,127 @@ async def _source_events(
             "payload_object_key": e.payload_object_key,
             "provider_metadata": e.provider_metadata,
             "trace_id": e.trace_id,
+        }
+
+
+def _movebank_time(value: datetime | None) -> str | None:
+    """Movebank's timestamp format, `yyyy-MM-dd HH:mm:ss.SSS` in UTC."""
+    if value is None:
+        return None
+    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S.") + f"{value.microsecond // 1000:03d}"
+
+
+async def _movebank_lookups(
+    session: AsyncSession, project_id: uuid.UUID
+) -> tuple[
+    str, dict[uuid.UUID, tuple[str, dict[str, Any]]], dict[uuid.UUID, tuple[Device, DeviceType]]
+]:
+    project = await session.get(Project, project_id)
+    entities = {
+        entity.id: (entity_type.label, entity.attributes or {})
+        for entity, entity_type in (
+            await session.execute(
+                select(Entity, EntityType)
+                .join(EntityType, EntityType.id == Entity.entity_type_id)
+                .where(Entity.project_id == project_id)
+            )
+        ).all()
+    }
+    devices = {
+        device.id: (device, device_type)
+        for device, device_type in (
+            await session.execute(
+                select(Device, DeviceType).join(DeviceType, DeviceType.id == Device.device_type_id)
+            )
+        ).all()
+    }
+    return (project.name if project else str(project_id)), entities, devices
+
+
+def _taxon(entity_type_label: str, attributes: dict[str, Any]) -> str:
+    for key in ("taxon", "species", "scientific_name"):
+        if attributes.get(key):
+            return str(attributes[key])
+    return entity_type_label
+
+
+async def _movebank_events(
+    session: AsyncSession, project_id: uuid.UUID, params: ExportParameters, lookups: Lookups
+) -> AsyncIterator[dict[str, Any]]:
+    """One row per position in Movebank's event format; the effective view (decision D85)."""
+    study, entities, devices = await _movebank_lookups(session, project_id)
+    statement = (
+        select(
+            effective_time(Position).label("time"),
+            func.ST_Y(effective_geom()).label("lat"),
+            func.ST_X(effective_geom()).label("lon"),
+            Position.entity_id,
+            Position.device_id,
+            Position.altitude_m,
+            Position.speed_mps,
+            Position.heading_deg,
+            Position.accuracy_m,
+            Position.satellites,
+            Position.id,
+        )
+        .where(*_base_conditions(Position, project_id, params), Position.entity_id.is_not(None))
+        .order_by(Position.entity_id, effective_time(Position), Position.id)
+    )
+    result = await session.stream(statement.execution_options(yield_per=YIELD_PER))
+    async for row in result:
+        type_label, attributes = entities.get(row.entity_id, ("", {}))
+        device, _device_type = devices.get(row.device_id, (None, None))
+        yield {
+            "timestamp": _movebank_time(row.time),
+            "time_utc": _utc(row.time),
+            "location-long": row.lon,
+            "location-lat": row.lat,
+            "sensor-type": "GPS",
+            "individual-local-identifier": lookups.entities.get(row.entity_id),
+            "tag-local-identifier": (device.serial_number or device.name) if device else None,
+            "individual-taxon-canonical-name": _taxon(type_label, attributes),
+            "height-above-msl": row.altitude_m,
+            "ground-speed": row.speed_mps,
+            "heading": row.heading_deg,
+            "gps:satellite-count": row.satellites,
+            "location-error-numerical": row.accuracy_m,
+            "study-name": study,
+            "smart-parks-position-id": row.id,
+        }
+
+
+async def _movebank_reference(
+    session: AsyncSession, project_id: uuid.UUID, params: ExportParameters, lookups: Lookups
+) -> AsyncIterator[dict[str, Any]]:
+    """Movebank reference data: one row per device to entity assignment (a deployment)."""
+    study, entities, devices = await _movebank_lookups(session, project_id)
+    statement = (
+        select(DeviceEntityAssignment)
+        .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
+        .where(Entity.project_id == project_id)
+        .order_by(DeviceEntityAssignment.entity_id, DeviceEntityAssignment.validity)
+    )
+    if params.entity_ids:
+        statement = statement.where(DeviceEntityAssignment.entity_id.in_(params.entity_ids))
+    if params.device_ids:
+        statement = statement.where(DeviceEntityAssignment.device_id.in_(params.device_ids))
+    for assignment in (await session.scalars(statement)).all():
+        type_label, attributes = entities.get(assignment.entity_id, ("", {}))
+        device, device_type = devices.get(assignment.device_id, (None, None))
+        lower = assignment.validity.lower if assignment.validity else None
+        upper = assignment.validity.upper if assignment.validity else None
+        yield {
+            "animal-id": lookups.entities.get(assignment.entity_id),
+            "tag-id": (device.serial_number or device.name) if device else None,
+            "deploy-on-date": _movebank_time(lower),
+            "deploy-off-date": _movebank_time(upper),
+            "animal-taxon": _taxon(type_label, attributes),
+            "animal-comments": attributes.get("notes") or attributes.get("comments"),
+            "tag-manufacturer-name": device_type.manufacturer if device_type else None,
+            "tag-model": device_type.label if device_type else None,
+            "tag-serial-no": device.serial_number if device else None,
+            "study-name": study,
+            "time_utc": _utc(lower),
         }
 
 

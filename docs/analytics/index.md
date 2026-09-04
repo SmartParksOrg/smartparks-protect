@@ -4,3 +4,4 @@ The Analyze section: the [Data Explorer](data-explorer.md) queries aggregates se
 
 Both are bounded by design (architecture 13.10): no request can return more than a few thousand points per series, and exports stream from the database to the file without holding rows in memory.
 - [Data curation](curation.md): reversible, audited corrections on canonical records, bulk jobs, the effective value and export views.
+- [Dashboards](dashboards.md): saved views and live tiles on a shared grid per project.

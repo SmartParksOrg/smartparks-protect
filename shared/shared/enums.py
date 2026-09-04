@@ -238,6 +238,8 @@ class ExportDataset(StrEnum):
     POSITIONS = "positions"  # normalized
     MEASUREMENTS = "measurements"  # normalized
     AGGREGATES = "aggregates"  # bucketed series, same query as the Data Explorer
+    MOVEBANK_EVENTS = "movebank_events"  # positions in Movebank's import format (D85)
+    MOVEBANK_REFERENCE = "movebank_reference"  # animals, tags and deployments for Movebank
 
 
 class ExportStatus(StrEnum):

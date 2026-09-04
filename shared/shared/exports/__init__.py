@@ -23,6 +23,8 @@ FORMATS_BY_DATASET: dict[ExportDataset, frozenset[ExportFormat]] = {
     ExportDataset.MEASUREMENTS: _TABULAR,
     ExportDataset.AGGREGATES: _TABULAR,
     ExportDataset.POSITIONS: frozenset(ExportFormat),  # also GeoJSON and GPX
+    ExportDataset.MOVEBANK_EVENTS: _TABULAR,
+    ExportDataset.MOVEBANK_REFERENCE: _TABULAR,
 }
 
 
@@ -88,6 +90,8 @@ class ExportParameters(BaseModel):
             raise ValueError("aggregates need at least one metric")
         if self.dataset is ExportDataset.SOURCE_EVENTS and self.entity_ids:
             raise ValueError("source events are per device; filter by device_ids")
+        if self.dataset is ExportDataset.MOVEBANK_EVENTS and self.view == "original":
+            raise ValueError("Movebank exports carry the effective values")
         if self.layout is Layout.SERIES:
             raise ValueError("exports use the long or wide layout")
         return self

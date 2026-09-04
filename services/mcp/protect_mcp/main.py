@@ -11,7 +11,7 @@ from protect_mcp.api import ProtectApi
 from protect_mcp.server import build_server
 from shared.config import get_settings
 from shared.logger import configure_logging, get_logger
-from shared.oauth import READ_SCOPES, issuer_url, mcp_resource_url
+from shared.oauth import ALL_SCOPES, issuer_url, mcp_resource_url
 from shared.telemetry import configure_telemetry
 from shared.version import __version__
 
@@ -45,7 +45,7 @@ async def protected_resource_root(_: Request) -> Response:
         {
             "resource": mcp_resource_url(),
             "authorization_servers": [issuer_url()],
-            "scopes_supported": list(READ_SCOPES),
+            "scopes_supported": list(ALL_SCOPES),
             "bearer_methods_supported": ["header"],
             "resource_name": "Smart Parks Protect",
         },

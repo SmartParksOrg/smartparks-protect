@@ -7,7 +7,11 @@ import { z } from "zod";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { AuditEntry, Project } from "@/api/types";
+import type { AuditEntry, Project, ProjectIcon } from "@/api/types";
+import { Icon } from "@/components/icons/Icon";
+import { useIconStore } from "@/stores/icons";
+import { toast } from "sonner";
+import { useRef, useState } from "react";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -53,6 +57,7 @@ export function ProjectSettingsPage() {
             </form>
           </CardContent>
         </Card>
+        <IconsCard projectId={projectId} />
         <Card>
           <CardHeader><CardTitle>Recent changes</CardTitle></CardHeader>
           <CardContent>
@@ -64,5 +69,44 @@ export function ProjectSettingsPage() {
         </Card>
       </Page>
     </>
+  );
+}
+
+/** The project's own SVG icons (architecture 24.6): uploaded here, usable as icon keys on
+ * entity types, device types and entities as `project.<slug>`. */
+function IconsCard({ projectId }: { projectId: string }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [label, setLabel] = useState("");
+  const icons = useQuery({ queryKey: queryKeys.projectIcons(projectId), queryFn: () => api.get<ProjectIcon[]>(`/api/v1/projects/${projectId}/icons`) });
+  const reload = () => { useIconStore.setState({ projectId: null }); void useIconStore.getState().load(projectId); };
+  const upload = useMutationToast({
+    mutationFn: async (file: File) => api.post<ProjectIcon>(`/api/v1/projects/${projectId}/icons`, { body: { label: label.trim() || file.name.replace(/\.svg$/i, ""), svg: await file.text() } }),
+    invalidate: [queryKeys.projectIcons(projectId)],
+    onSuccess: (icon) => { toast.success(`Icon ${icon.key} saved`); setLabel(""); reload(); },
+  });
+  const remove = useMutationToast({ mutationFn: (key: string) => api.delete<void>(`/api/v1/projects/${projectId}/icons/${key}`), invalidate: [queryKeys.projectIcons(projectId)], success: "Icon removed", onSuccess: reload });
+  return (
+    <Card>
+      <CardHeader><CardTitle>Custom icons</CardTitle></CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">Small SVG files (up to 64 KB, no scripts or external references) become icon keys `project.name` for this project's entity types, device types and entities. Colour follows the text colour when the SVG uses currentColor.</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="Label" htmlFor="icon-label"><Input id="icon-label" className="w-56" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Pangolin" /></Field>
+          <input ref={input} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload.mutate(f); e.target.value = ""; }} />
+          <Button variant="outline" disabled={upload.isPending} onClick={() => input.current?.click()}>{upload.isPending ? "Uploading…" : "Upload SVG"}</Button>
+        </div>
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {icons.data?.map((i) => (
+            <li key={i.id} className="flex items-center gap-3 rounded-md border p-2">
+              <span className="inline-flex size-8 items-center justify-center [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: i.svg }} />
+              <span className="min-w-0 flex-1"><span className="block truncate font-medium">{i.label}</span><span className="block truncate font-mono text-xs text-muted-foreground">{i.key}</span></span>
+              <Icon iconKey={i.key} className="size-5 text-muted-foreground" />
+              <Button variant="ghost" size="sm" onClick={() => remove.mutate(i.key)}>Remove</Button>
+            </li>
+          ))}
+          {icons.data?.length === 0 && <li className="text-muted-foreground">No custom icons yet.</li>}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }

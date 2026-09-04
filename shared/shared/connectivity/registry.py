@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from shared.connectivity.adapters.actility_thingpark import ActilityThingParkAdapter
 from shared.connectivity.adapters.addaxai_connect import AddaxAiConnectAdapter
 from shared.connectivity.adapters.akenza import AkenzaAdapter
 from shared.connectivity.adapters.chirpstack import ChirpStackAdapter
@@ -13,6 +14,7 @@ from shared.connectivity.adapters.log_file import LogFileAdapter
 from shared.connectivity.adapters.loriot import LoriotAdapter
 from shared.connectivity.adapters.netmore import NetmoreAdapter
 from shared.connectivity.adapters.traccar import TraccarAdapter
+from shared.connectivity.adapters.tts import TtsAdapter
 from shared.connectivity.adapters.webble import WebBleAdapter
 from shared.connectivity.base import Adapter
 
@@ -24,6 +26,8 @@ ADAPTERS: dict[str, Adapter] = {
         ChirpStackAdapter(),
         KpnThingParkAdapter(),
         LoriotAdapter(),
+        TtsAdapter(),
+        ActilityThingParkAdapter(),
         NetmoreAdapter(),
         AkenzaAdapter(),
         TraccarAdapter(),

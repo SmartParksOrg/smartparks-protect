@@ -62,6 +62,13 @@ class DeliveryItem:
     location_is_fallback: bool = False
     data: dict[str, Any] = field(default_factory=dict)
     link: str | None = None
+    previous_external_id: str | None = field(
+        default=None,
+        metadata={
+            "doc": "The target's id from an earlier delivery of the same object, so a corrected "
+            "object updates instead of duplicating where the target allows it"
+        },
+    )
 
 
 @dataclass(frozen=True, slots=True)

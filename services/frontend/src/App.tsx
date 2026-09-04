@@ -18,6 +18,8 @@ const TracesPage = lazy(() => import("@/pages/project/TracesPage").then((m) => (
 const ExplorerPage = lazy(() => import("@/pages/project/ExplorerPage").then((m) => ({ default: m.ExplorerPage })));
 const ExportsPage = lazy(() => import("@/pages/project/ExportsPage").then((m) => ({ default: m.ExportsPage })));
 const CurationPage = lazy(() => import("@/pages/project/CurationPage").then((m) => ({ default: m.CurationPage })));
+const DashboardsPage = lazy(() => import("@/pages/project/DashboardsPage").then((m) => ({ default: m.DashboardsPage })));
+const AiPolicyPage = lazy(() => import("@/pages/admin/AiPolicyPage").then((m) => ({ default: m.AiPolicyPage })));
 const MembersPage = lazy(() => import("@/pages/project/MembersPage").then((m) => ({ default: m.MembersPage })));
 const FeaturesPage = lazy(() => import("@/pages/project/FeaturesPage").then((m) => ({ default: m.FeaturesPage })));
 const ProjectSettingsPage = lazy(() => import("@/pages/project/ProjectSettingsPage").then((m) => ({ default: m.ProjectSettingsPage })));
@@ -79,6 +81,7 @@ export default function App() {
               <Route path="analyze/explorer" element={<ExplorerPage />} />
               <Route path="analyze/exports" element={<ExportsPage />} />
               <Route path="analyze/curation" element={<CurationPage />} />
+              <Route path="analyze/dashboards" element={<DashboardsPage />} />
               <Route path="network/traffic" element={<TrafficPage />} />
               <Route path="network/gateways" element={<GatewaysPage />} />
               <Route path="integrate/integrations" element={<IntegrationsPage />} />
@@ -104,6 +107,7 @@ export default function App() {
               <Route path="entity-types" element={<EntityTypesPage />} />
               <Route path="metrics" element={<MetricsPage />} />
               <Route path="audit" element={<AuditPage />} />
+              <Route path="ai-policy" element={<AiPolicyPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Route>

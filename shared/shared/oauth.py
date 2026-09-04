@@ -28,9 +28,14 @@ class Scope(StrEnum):
     MEASUREMENTS_READ = "measurements:read"
     EVENTS_READ = "events:read"
     TRACES_READ = "traces:read"
+    EVENTS_WRITE = "events:write"
+    ALERTS_WRITE = "alerts:write"
+    DEVICES_CONTROL = "devices:control"
 
 
-READ_SCOPES: tuple[str, ...] = tuple(scope.value for scope in Scope)
+WRITE_SCOPES: tuple[str, ...] = (Scope.EVENTS_WRITE, Scope.ALERTS_WRITE, Scope.DEVICES_CONTROL)
+READ_SCOPES: tuple[str, ...] = tuple(s.value for s in Scope if s not in WRITE_SCOPES)
+ALL_SCOPES: tuple[str, ...] = tuple(scope.value for scope in Scope)
 
 SCOPE_DESCRIPTIONS: dict[str, str] = {
     Scope.PROJECTS_READ: "See which projects you belong to and their settings",
@@ -40,6 +45,10 @@ SCOPE_DESCRIPTIONS: dict[str, str] = {
     Scope.MEASUREMENTS_READ: "Read measurements and aggregates",
     Scope.EVENTS_READ: "Read events and alerts",
     Scope.TRACES_READ: "Read processing traces and raw source events",
+    Scope.EVENTS_WRITE: "Create events (reports) in your projects, subject to the AI action policy",
+    Scope.ALERTS_WRITE: "Acknowledge alerts, subject to the AI action policy",
+    Scope.DEVICES_CONTROL: "Ask a device for its status or position, subject to the AI action "
+    "policy and your device control permission",
     OFFLINE_ACCESS: "Stay connected without signing in again (refresh token)",
 }
 

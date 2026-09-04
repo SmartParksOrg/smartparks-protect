@@ -272,6 +272,21 @@ async def load_item(session: AsyncSession, delivery: IntegrationDelivery) -> Del
         if value is None:
             value = measurement.value_json
         item.data = {"metric_key": measurement.metric_key, "value": value}
+    if delivery.object_version > 1:
+        earlier = await session.scalar(
+            select(IntegrationDelivery.external_id)
+            .where(
+                IntegrationDelivery.integration_id == delivery.integration_id,
+                IntegrationDelivery.object_type == delivery.object_type,
+                IntegrationDelivery.object_id == delivery.object_id,
+                IntegrationDelivery.object_version < delivery.object_version,
+                IntegrationDelivery.status == DeliveryStatus.SENT,
+                IntegrationDelivery.external_id.is_not(None),
+            )
+            .order_by(IntegrationDelivery.object_version.desc())
+            .limit(1)
+        )
+        item.previous_external_id = earlier
     if entity_id is not None:
         row = (
             await session.execute(

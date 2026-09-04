@@ -1,11 +1,12 @@
 import { Menu } from "lucide-react";
-import { useState } from "react";
-import { Outlet } from "react-router";
+import { useEffect, useState } from "react";
+import { Outlet, useParams } from "react-router";
 
 import LogoMark from "@/assets/brand/logo-mark.svg?react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useIconStore } from "@/stores/icons";
 
 /**
  * Fixed sidebar from 1024 px, a drawer below. The shell is exactly one viewport high and the main
@@ -14,6 +15,9 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
  */
 export function AppLayout() {
   const [open, setOpen] = useState(false);
+  const { projectId } = useParams();
+  const loadIcons = useIconStore((s) => s.load);
+  useEffect(() => { void loadIcons(projectId ?? null); }, [projectId, loadIcons]);
   return (
     <div className="flex h-screen">
       <aside className="hidden w-64 shrink-0 border-r bg-card lg:block">

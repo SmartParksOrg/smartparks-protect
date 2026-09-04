@@ -41,6 +41,8 @@ def test_registries():
         "cloudloop",
         "webble",
         "log_file",
+        "tts",
+        "actility_thingpark",
     }
     assert set(DRIVERS) == {"generic_json", "opencollar"}
     assert (

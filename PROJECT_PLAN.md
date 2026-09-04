@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 12 (data curation and corrections) built on the local stack; phase 11 live checks with a collar and a Cloudloop account pending |
-| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10, 11 and 12 and the deployment fixes unreleased |
+| Active phase | Phase 13 (platform expansion) built on the local stack; WildlifeNL and FerusTracker deferred for lack of a public API; live checks of the new adapters and connectors pending |
+| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-04 |
-| Next item | Commit phase 12 on Tim's word, then phase 13 (platform expansion); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the phase 7, 8 and 11 live items follow the accounts and a collar with BLE |
+| Next item | Commit phase 13 on Tim's word, then phase 14 (production hardening and 2.0); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -124,6 +124,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D81 | Curation approval | Project setting `curation_requires_approval`, off by default: off, `data:curate` applies single corrections at once and bulk jobs need `data:curate_bulk` plus a preview; on, corrections and jobs stay `PENDING` until a different user with `data:approve` approves; reverting needs `data:revert` | Architecture 28.11 makes the two-step workflow optional per project. Decided by Tim on 2026-09-04. |
 | D82 | Recomputation after curation | Timestamp corrections rerun project and entity attribution; device and entity current state are recomputed; analytics aggregates are computed live, so nothing is cached; outbound deliveries of corrected records are flagged stale for review with a resend that bumps the object version; rule re-evaluation is a per-job option that runs the existing rule replay over the affected window | Architecture 28.8 to 28.10 ask for controlled recomputation and reviewed retransmission, not automatic resends. Decided by Tim on 2026-09-04. |
 | D83 | Export views | Export parameter `view` (`effective`, default, or `original`) for positions and measurements plus `curation_metadata` adding the columns of architecture 28.13; the raw view is the source events dataset; any project member may export either view | Scientific reproducibility needs the original next to the effective value. Decided by Tim on 2026-09-04. |
+| D84 | Phase 13 scope | The Things Stack and Actility ThingPark adapters, a direct EarthRanger API connector, Movebank as an export format, project SVG icon upload, project dashboards and MCP write tools now; WildlifeNL (an EarthRanger-based platform without its own public API) and FerusTracker (no public API found) wait for access | Everything chosen builds from published documentation; the two deferred platforms cannot. Decided by Tim on 2026-09-04. |
+| D85 | Movebank | An export dataset in Movebank's import format (reference data per animal, tag and deployment plus the event rows with timestamp, location and sensor attributes) instead of a push connector | Movebank ingests through arranged live feeds or file import only; the export fits its custom tabular import. Decided by Tim on 2026-09-04. |
+| D86 | Project dashboards | Dashboards per project, shared, stored as a grid layout of tiles; tiles are saved Data Explorer views and built-in tiles (latest positions map, active alerts, recent events, entity status counts) with a size and an order; no free-form canvas | Architecture 30.2: not a Grafana clone. Decided by Tim on 2026-09-04. |
+| D87 | MCP write tools | `create_event`, `acknowledge_alert`, `request_device_status`, `request_device_position` and `confirm_action`; a server-level AI action policy per class (allowed, confirmation, privileged, disabled) edited by server admins; a two-step confirmation flow where the tool returns a confirmation token that `confirm_action` executes; scopes `events:write`, `alerts:write`, `devices:control`; high-impact control disabled by default | Architecture 27.4 and 27.6: the same frameworks as people use, no alternative control path. Decided by Tim on 2026-09-04. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -622,18 +626,18 @@ Release:
 
 **Deliverables.**
 
-- [ ] The Things Stack adapter (events, gateways, downlinks).
-- [ ] Actility ThingPark adapter (private and public variants share code with KPN).
-- [ ] WildlifeNL outbound connector (API and mappings confirmed in a spike first).
-- [ ] FerusTracker outbound connector.
-- [ ] Movebank outbound connector with entity, assignment period, timestamp and sensor mappings.
-- [ ] Direct EarthRanger API connector variant with stable object ids and updates.
-- [ ] Project dashboards: saved views arranged on a grid, shared per project. Not a Grafana clone (30.2).
-- [ ] MCP write tools by impact class with the AI action policy: `acknowledge_alert`, `create_event`, `request_device_status`, confirmation flows, privileged scopes.
-- [ ] Project-specific SVG icon upload with validation (24.6, optional).
-- [ ] Docs and runbooks per connector.
+- [x] The Things Stack adapter (events, gateways, downlinks). (2026-09-04, D84, `adapters/tts`, from the webhook, downlink and gateway documentation)
+- [x] Actility ThingPark adapter (private and public variants share code with KPN). (2026-09-04, `adapters/actility_thingpark`, a subclass of the KPN adapter)
+- [ ] WildlifeNL outbound connector (API and mappings confirmed in a spike first). (Deferred, D84: the platform is EarthRanger based and publishes no API of its own; the direct EarthRanger connector is the route once a site and a token exist.)
+- [ ] FerusTracker outbound connector. (Deferred, D84: no public API found.)
+- [x] Movebank outbound connector with entity, assignment period, timestamp and sensor mappings. (2026-09-04, D85: two export datasets in Movebank's import format instead of a push connector, since Movebank ingests through arranged live feeds or file import)
+- [x] Direct EarthRanger API connector variant with stable object ids and updates. (2026-09-04, `connectors/earthranger.py`, updates through the previous delivery's id)
+- [x] Project dashboards: saved views arranged on a grid, shared per project. Not a Grafana clone (30.2). (2026-09-04, D86)
+- [x] MCP write tools by impact class with the AI action policy: `acknowledge_alert`, `create_event`, `request_device_status`, confirmation flows, privileged scopes. (2026-09-04, D87, ADR 0019; plus `request_device_position`, `confirm_action`, `get_ai_policy`; high-impact control disabled)
+- [x] Project-specific SVG icon upload with validation (24.6, optional). (2026-09-04)
+- [x] Docs and runbooks per connector. (2026-09-04: The Things Stack, Actility, EarthRanger direct, dashboards, icons, MCP write tools)
 
-**Exit criteria.** Each connector has a runbook, fixture tests and a recorded live test.
+**Exit criteria.** Each connector has a runbook, fixture tests and a recorded live test. (Runbooks and fixture tests exist for The Things Stack, Actility and the direct EarthRanger connector; the recorded live tests wait for an application, a deployment and a site, listed under the inputs.)
 
 ---
 
@@ -692,7 +696,7 @@ Listed by the phase where they are first needed.
 - [ ] Phase 9: a ChatGPT account with Developer mode (Pro or Business) to connect https://dev-protect.smartparks.org/mcp; Claude was verified on 2026-09-04.
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work. (Built from documentation on 2026-09-04; the card and the adapter wait for a collar and an account.)
-- [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access.
+- [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access. (2026-09-04: no public API found for WildlifeNL and FerusTracker; Movebank became an export format. Still needed for live checks: a The Things Stack application, an Actility ThingPark deployment and an EarthRanger site with a token.)
 
 ## Session log
 
@@ -876,4 +880,12 @@ Listed by the phase where they are first needed.
 - Frontend: the Curation workspace under Analyze, the curate dialog and history on device positions and explorer rows, the approval switch in project settings, stale deliveries with resend, export view options.
 - Verified: the curation API tests (single corrections through every reader, the approval switch with four eyes, the bulk shift with preview, apply, stale delivery, resend and revert), lint, mypy, frontend lint, typecheck and tests, strict docs build.
 - Note: migration 0012 creates partial indexes on positions and measurements; on the local benchmark database (73 GB) that scan takes minutes once. Production servers start from an empty schema.
+
+### 2026-09-04, phase 13 (Claude)
+
+- Decisions D84 to D87 asked and taken: everything with a public API built now (The Things Stack, Actility, EarthRanger direct, icons, dashboards, MCP writes), Movebank as an export format, WildlifeNL and FerusTracker deferred.
+- Backend: the TTS adapter (webhook documents to messages with gateway receptions, downlinks with correlation ids, gateway and device sync), Actility as a subclass of the KPN adapter, downlink events matched through provider metadata, the direct EarthRanger connector with in-place updates through the previous delivery id, the Movebank event and reference datasets, migration 0013 (server settings, pending MCP actions, project icons, dashboards), the manual event endpoint, SVG validation, dashboards, the AI action policy and endpoint with the confirmation flow, the write scopes and the MCP write tools.
+- Frontend: Dashboards under Analyze with saved view, map, alerts, events and status tiles; custom icons in project settings with the icon store; the AI clients policy page; Movebank datasets in the export dialog.
+- Verified: adapter, connector, platform API and MCP tests, lint, mypy, frontend lint, typecheck and tests, strict docs build.
+- Open: live checks with a The Things Stack application, a ThingPark deployment and an EarthRanger site; WildlifeNL and FerusTracker when access exists; Cloudloop's, TTS's and EarthRanger's deep link paths are guesses until seen live.
 

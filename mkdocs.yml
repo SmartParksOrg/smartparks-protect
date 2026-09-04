@@ -80,17 +80,21 @@ nav:
       - LORIOT: integrations/loriot/index.md
       - Netmore: integrations/netmore/index.md
       - akenza.io: integrations/akenza/index.md
+      - The Things Stack: integrations/tts/index.md
+      - Actility ThingPark: integrations/actility/index.md
       - Traccar: integrations/traccar/index.md
       - AddaxAI Connect: integrations/addaxai-connect/index.md
       - Cloudloop (Iridium): integrations/cloudloop/index.md
       - Gateways and connectivity: integrations/gateways.md
       - Outbound integrations: integrations/outbound.md
       - EarthRanger via Gundi: integrations/earthranger-gundi/index.md
+      - EarthRanger direct API: integrations/earthranger/index.md
   - Analytics:
       - analytics/index.md
       - Data Explorer: analytics/data-explorer.md
       - Export: analytics/export.md
       - Data curation: analytics/curation.md
+      - Dashboards: analytics/dashboards.md
   - Rules:
       - rules/index.md
       - Automations and notifications: rules/automations.md
@@ -98,6 +102,7 @@ nav:
       - administration/index.md
       - Permissions: administration/permissions.md
       - Notifications: administration/notifications.md
+      - Custom icons: administration/icons.md
   - Operations:
       - operations/index.md
       - Update guide: operations/update-guide.md
@@ -128,3 +133,4 @@ nav:
       - adr/0016-backup-and-observability.md
       - adr/0017-multi-path-acquisition.md
       - adr/0018-immutable-source-layered-interpretation.md
+      - adr/0019-ai-writes-through-one-policy.md

@@ -36,6 +36,21 @@ class ProtectApi:
             raise ToolError(_describe(response))
         return response.json()
 
+    async def post(self, path: str, *, tool: str, body: dict[str, Any]) -> Any:
+        """POST `path` under `/api/v1` as the authenticated client: the AI action endpoint and
+        nothing else (architecture 27.4)."""
+        access = get_access_token()
+        if access is None:
+            raise ToolError("Not authenticated")
+        response = await self._client.post(
+            f"/api/v1{path}",
+            json=body,
+            headers={"Authorization": f"Bearer {access.token}", TOOL_HEADER: tool},
+        )
+        if response.status_code >= 400:
+            raise ToolError(_describe(response))
+        return response.json()
+
     async def aclose(self) -> None:
         await self._client.aclose()
 

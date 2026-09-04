@@ -8631,6 +8631,63 @@
       }
      }
     }
+   },
+   "post": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "Report Event",
+    "description": "Report an event by hand: a sighting, an incident, a note with a place and a time.",
+    "operationId": "report_event_api_v1_projects__project_id__events_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EventCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EventRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/api/v1/projects/{project_id}/events/{event_id}": {
@@ -14085,6 +14142,712 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/icons": {
+   "get": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "List Icons",
+    "operationId": "list_icons_api_v1_projects__project_id__icons_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ProjectIconRead"
+         },
+         "title": "Response List Icons Api V1 Projects  Project Id  Icons Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "Upload Icon",
+    "description": "Upload an SVG icon for this project under `project.<slug>`; usable as an icon key on\nentity types, device types and entities. Replaces an icon with the same key.",
+    "operationId": "upload_icon_api_v1_projects__project_id__icons_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectIconCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectIconRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/icons/{key}": {
+   "delete": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "Delete Icon",
+    "operationId": "delete_icon_api_v1_projects__project_id__icons__key__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/dashboards": {
+   "get": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "List Dashboards",
+    "operationId": "list_dashboards_api_v1_projects__project_id__dashboards_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_DashboardRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "Create Dashboard",
+    "operationId": "create_dashboard_api_v1_projects__project_id__dashboards_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DashboardCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DashboardRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/dashboards/{dashboard_id}": {
+   "get": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "Get Dashboard",
+    "operationId": "get_dashboard_api_v1_projects__project_id__dashboards__dashboard_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "dashboard_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Dashboard Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DashboardRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "Update Dashboard",
+    "operationId": "update_dashboard_api_v1_projects__project_id__dashboards__dashboard_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "dashboard_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Dashboard Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DashboardUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DashboardRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "platform"
+    ],
+    "summary": "Delete Dashboard",
+    "operationId": "delete_dashboard_api_v1_projects__project_id__dashboards__dashboard_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "dashboard_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Dashboard Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/mcp/policy": {
+   "get": {
+    "tags": [
+     "mcp"
+    ],
+    "summary": "Get Policy",
+    "operationId": "get_policy_api_v1_mcp_policy_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiPolicyRead"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/mcp/actions": {
+   "post": {
+    "tags": [
+     "mcp"
+    ],
+    "summary": "Propose Action",
+    "description": "Run a write on behalf of the person, or hold it for confirmation (decision D87).",
+    "operationId": "propose_action_api_v1_mcp_actions_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AiActionRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiActionRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/mcp/actions/{action_id}": {
+   "get": {
+    "tags": [
+     "mcp"
+    ],
+    "summary": "Get Action",
+    "operationId": "get_action_api_v1_mcp_actions__action_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "action_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Action Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiActionRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/mcp/actions/{action_id}/confirm": {
+   "post": {
+    "tags": [
+     "mcp"
+    ],
+    "summary": "Confirm Action",
+    "description": "The second call of the confirmation flow: the same person and client execute what was\nproposed, within ten minutes.",
+    "operationId": "confirm_action_api_v1_mcp_actions__action_id__confirm_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "action_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Action Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiActionRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/ai-policy": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Admin Get Policy",
+    "operationId": "admin_get_policy_api_v1_admin_ai_policy_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiPolicyRead"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   },
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Admin Set Policy",
+    "operationId": "admin_set_policy_api_v1_admin_ai_policy_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AiPolicyUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiPolicyRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/version": {
    "get": {
     "tags": [
@@ -14449,6 +15212,178 @@
      "last"
     ],
     "title": "Aggregate"
+   },
+   "AiActionInfo": {
+    "properties": {
+     "action": {
+      "type": "string",
+      "title": "Action"
+     },
+     "action_class": {
+      "type": "string",
+      "title": "Action Class"
+     },
+     "scope": {
+      "type": "string",
+      "title": "Scope"
+     },
+     "mode": {
+      "type": "string",
+      "title": "Mode"
+     }
+    },
+    "type": "object",
+    "required": [
+     "action",
+     "action_class",
+     "scope",
+     "mode"
+    ],
+    "title": "AiActionInfo"
+   },
+   "AiActionRead": {
+    "properties": {
+     "id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "action": {
+      "type": "string",
+      "title": "Action"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "executed",
+       "confirmation_required",
+       "expired"
+      ],
+      "title": "Status"
+     },
+     "summary": {
+      "type": "string",
+      "title": "Summary"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "result": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Result"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "action",
+     "status",
+     "summary"
+    ],
+    "title": "AiActionRead"
+   },
+   "AiActionRequest": {
+    "properties": {
+     "action": {
+      "type": "string",
+      "pattern": "^(create_event|acknowledge_alert|request_device_status|request_device_position)$",
+      "title": "Action"
+     },
+     "parameters": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Parameters"
+     }
+    },
+    "type": "object",
+    "required": [
+     "action"
+    ],
+    "title": "AiActionRequest"
+   },
+   "AiPolicyRead": {
+    "properties": {
+     "policy": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Policy"
+     },
+     "actions": {
+      "items": {
+       "$ref": "#/components/schemas/AiActionInfo"
+      },
+      "type": "array",
+      "title": "Actions"
+     },
+     "modes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Modes"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "policy",
+     "actions",
+     "modes"
+    ],
+    "title": "AiPolicyRead"
+   },
+   "AiPolicyUpdate": {
+    "properties": {
+     "policy": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Policy"
+     }
+    },
+    "type": "object",
+    "required": [
+     "policy"
+    ],
+    "title": "AiPolicyUpdate"
    },
    "AlertAction": {
     "properties": {
@@ -16774,6 +17709,224 @@
     "type": "object",
     "title": "CursorReset"
    },
+   "DashboardCreate": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "tiles": {
+      "items": {
+       "$ref": "#/components/schemas/DashboardTile"
+      },
+      "type": "array",
+      "maxItems": 30,
+      "title": "Tiles"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "DashboardCreate"
+   },
+   "DashboardRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "tiles": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Tiles"
+     },
+     "created_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By User Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "name",
+     "description",
+     "tiles",
+     "created_by_user_id",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "DashboardRead"
+   },
+   "DashboardTile": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Id"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "saved_view",
+       "map",
+       "alerts",
+       "events",
+       "entity_status"
+      ],
+      "title": "Kind"
+     },
+     "size": {
+      "type": "string",
+      "enum": [
+       "s",
+       "m",
+       "l"
+      ],
+      "title": "Size",
+      "default": "m"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 120
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "saved_view_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Saved View Id"
+     },
+     "options": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Options"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "kind"
+    ],
+    "title": "DashboardTile"
+   },
+   "DashboardUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "tiles": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/DashboardTile"
+        },
+        "type": "array",
+        "maxItems": 30
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tiles"
+     }
+    },
+    "type": "object",
+    "title": "DashboardUpdate"
+   },
    "DataSourceCreate": {
     "properties": {
      "name": {
@@ -18873,6 +20026,125 @@
     ],
     "title": "ErrorModel"
    },
+   "EventCreate": {
+    "properties": {
+     "event_type": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+      "title": "Event Type",
+      "description": "Upper snake case, for example SIGHTING"
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title"
+     },
+     "severity": {
+      "type": "string",
+      "enum": [
+       "info",
+       "warning",
+       "critical"
+      ],
+      "title": "Severity",
+      "default": "info"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 4000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "time": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Time",
+      "description": "Default now"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "latitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 90.0,
+        "minimum": -90.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latitude"
+     },
+     "longitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 180.0,
+        "minimum": -180.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Longitude"
+     },
+     "context": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Context"
+     },
+     "create_alert": {
+      "type": "boolean",
+      "title": "Create Alert",
+      "description": "Also open an alert for a person",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "event_type",
+     "title"
+    ],
+    "title": "EventCreate",
+    "description": "A report by a person (or an AI client on their behalf): an event that is a fact."
+   },
    "EventDetail": {
     "properties": {
      "event": {
@@ -19094,7 +20366,9 @@
      "source_events",
      "positions",
      "measurements",
-     "aggregates"
+     "aggregates",
+     "movebank_events",
+     "movebank_reference"
     ],
     "title": "ExportDataset",
     "description": "What an export contains (architecture 14, data level)."
@@ -22858,6 +24132,33 @@
     ],
     "title": "PageResponse[CorrectionRead]"
    },
+   "PageResponse_DashboardRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/DashboardRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[DashboardRead]"
+   },
    "PageResponse_DataSourceRead_": {
     "properties": {
      "items": {
@@ -23883,6 +25184,100 @@
      "slug"
     ],
     "title": "ProjectCreate"
+   },
+   "ProjectIconCreate": {
+    "properties": {
+     "label": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Label"
+     },
+     "key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^project\\.[a-z][a-z0-9_]{0,60}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Key",
+      "description": "Default project.<slug of the label>"
+     },
+     "svg": {
+      "type": "string",
+      "maxLength": 65536,
+      "minLength": 10,
+      "title": "Svg"
+     }
+    },
+    "type": "object",
+    "required": [
+     "label",
+     "svg"
+    ],
+    "title": "ProjectIconCreate"
+   },
+   "ProjectIconRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "svg": {
+      "type": "string",
+      "title": "Svg"
+     },
+     "sha256": {
+      "type": "string",
+      "title": "Sha256"
+     },
+     "created_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By User Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "key",
+     "label",
+     "svg",
+     "sha256",
+     "created_by_user_id",
+     "created_at"
+    ],
+    "title": "ProjectIconRead"
    },
    "ProjectRead": {
     "properties": {
