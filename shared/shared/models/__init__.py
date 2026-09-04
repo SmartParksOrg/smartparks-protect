@@ -36,6 +36,7 @@ from shared.models.events import (
 )
 from shared.models.integrations import Integration, IntegrationDelivery
 from shared.models.network import DataSourceCursor, Gateway
+from shared.models.oauth import OAuthAuthorizationCode, OAuthClient, OAuthRefreshToken
 from shared.models.timeseries import (
     HYPERTABLES,
     ConnectivityState,
@@ -85,6 +86,9 @@ __all__ = [
     "Measurement",
     "Metric",
     "NotificationTarget",
+    "OAuthAuthorizationCode",
+    "OAuthClient",
+    "OAuthRefreshToken",
     "Organization",
     "Position",
     "ProcessingStep",

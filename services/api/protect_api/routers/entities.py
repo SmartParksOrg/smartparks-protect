@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,6 +70,7 @@ async def list_entities(
     page: Page = Depends(page),
     entity_type_id: uuid.UUID | None = None,
     status_filter: str | None = None,
+    q: str | None = Query(None, max_length=200, description="Name contains, case-insensitive"),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[EntityRead]:
@@ -78,6 +79,8 @@ async def list_entities(
         statement = statement.where(Entity.entity_type_id == entity_type_id)
     if status_filter is not None:
         statement = statement.where(Entity.status == status_filter)
+    if q:
+        statement = statement.where(Entity.name.ilike(f"%{q}%"))
     rows, next_cursor = await paginate(session, Entity.id, statement, page)
     return PageResponse(items=[entity_read(r) for r in rows], next_cursor=next_cursor)
 

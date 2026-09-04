@@ -142,7 +142,9 @@ def test_gateway_events_and_listing():
     assert stats.gateway.latitude == -24.95 and stats.gateway.altitude_m == 300
     assert stats.gateway.attributes["metadata"] == {"region_common_name": "EU868"}
     conn = parse_gateway_event(
-        source, "gateway/aa555a0000000101/state/conn", b'{"gatewayId": "aa555a0000000101", "state": "OFFLINE"}'
+        source,
+        "gateway/aa555a0000000101/state/conn",
+        b'{"gatewayId": "aa555a0000000101", "state": "OFFLINE"}',
     )
     assert conn.event_type == "gateway_conn" and conn.gateway.status == "offline"
     with pytest.raises(ApplicationError):

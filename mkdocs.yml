@@ -117,3 +117,4 @@ nav:
       - adr/0012-rule-representation.md
       - adr/0013-control-action-schema.md
       - adr/0014-integration-deliveries.md
+      - adr/0015-mcp-security-boundary.md

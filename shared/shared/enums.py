@@ -20,6 +20,13 @@ class ActorType(StrEnum):
     MCP = "mcp"
 
 
+class OAuthClientKind(StrEnum):
+    """How an AI client was registered (architecture 27.5)."""
+
+    DYNAMIC = "dynamic"  # RFC 7591 dynamic client registration
+    METADATA_DOCUMENT = "metadata_document"  # client id metadata document at the client id URL
+
+
 class EntityGroup(StrEnum):
     TRACKED = "tracked"
     INFRASTRUCTURE = "infrastructure"

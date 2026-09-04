@@ -14,6 +14,8 @@ def test_every_list_endpoint_has_a_limit():
         methods = getattr(route, "methods", set()) or set()
         if "GET" not in methods or not path.startswith("/api/v1"):
             continue
+        if not hasattr(route, "dependant"):
+            continue  # OAuth protocol endpoints are plain Starlette routes with a fixed shape
         if path.endswith(
             (
                 "}",

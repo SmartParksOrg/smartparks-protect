@@ -38,6 +38,8 @@ const NotificationsPage = lazy(() => import("@/pages/project/NotificationsPage")
 const CommandsPage = lazy(() => import("@/pages/project/CommandsPage").then((m) => ({ default: m.CommandsPage })));
 const IntegrationsPage = lazy(() => import("@/pages/project/IntegrationsPage").then((m) => ({ default: m.IntegrationsPage })));
 const GatewaysPage = lazy(() => import("@/pages/project/GatewaysPage").then((m) => ({ default: m.GatewaysPage })));
+const ConnectionsPage = lazy(() => import("@/pages/account/ConnectionsPage").then((m) => ({ default: m.ConnectionsPage })));
+const ConsentPage = lazy(() => import("@/pages/auth/ConsentPage").then((m) => ({ default: m.ConsentPage })));
 const AdminAlertsPage = lazy(() => import("@/pages/project/AlertsPage").then((m) => ({ default: m.AdminAlertsPage })));
 const AdminAutomationsPage = lazy(() => import("@/pages/project/AutomationsPage").then((m) => ({ default: m.AdminAutomationsPage })));
 const AdminNotificationsPage = lazy(() => import("@/pages/project/NotificationsPage").then((m) => ({ default: m.AdminNotificationsPage })));
@@ -55,9 +57,11 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route element={<RequireAuth />}>
+          <Route path="/oauth/consent" element={<ConsentPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Navigate to="/projects" replace />} />
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/account/connections" element={<ConnectionsPage />} />
             <Route path="/projects/:projectId">
               <Route index element={<Navigate to="map" replace />} />
               <Route path="map" element={<MapPage />} />

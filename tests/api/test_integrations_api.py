@@ -75,7 +75,9 @@ async def test_integration_lifecycle(client, db, monkeypatch):
     viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
     assert (await client.get(base, headers=viewer.headers)).status_code == 200
     assert (
-        await client.post(base, json={"name": "v", "connector_key": "webhook"}, headers=viewer.headers)
+        await client.post(
+            base, json={"name": "v", "connector_key": "webhook"}, headers=viewer.headers
+        )
     ).status_code == 403
     project_admin = await project_actor(client, db, project, Role.PROJECT_ADMIN)
     assert (
@@ -147,9 +149,7 @@ async def test_deliveries_retry_and_backfill(client, db):
     listed = (await client.get(f"{base}/deliveries", headers=h)).json()
     assert len(listed["items"]) == 1 and listed["items"][0]["status"] == "queued"
     assert "request" not in listed["items"][0]
-    filtered = (
-        await client.get(f"{base}/deliveries", params={"status": "sent"}, headers=h)
-    ).json()
+    filtered = (await client.get(f"{base}/deliveries", params={"status": "sent"}, headers=h)).json()
     assert filtered["items"] == []
     by_integration = (
         await client.get(
@@ -171,7 +171,9 @@ async def test_deliveries_retry_and_backfill(client, db):
     await db.refresh(row)
     row.status = "sent"
     await db.commit()
-    assert (await client.post(f"{base}/deliveries/{delivery.id}/retry", headers=h)).status_code == 409
+    assert (
+        await client.post(f"{base}/deliveries/{delivery.id}/retry", headers=h)
+    ).status_code == 409
 
     bus = RedisStreamsBus()
     try:

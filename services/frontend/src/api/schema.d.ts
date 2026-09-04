@@ -189,6 +189,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/oauth/consent/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consent Info */
+        get: operations["consent_info_api_v1_oauth_consent__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/consent/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Consent */
+        post: operations["approve_consent_api_v1_oauth_consent__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/consent/{request_id}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deny Consent */
+        post: operations["deny_consent_api_v1_oauth_consent__request_id__deny_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Connections
+         * @description Clients holding a live refresh token for the caller, one row per client.
+         */
+        get: operations["list_connections_api_v1_oauth_connections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/connections/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Connection
+         * @description Ends every session of one client for the caller: refresh tokens are revoked at once and
+         *     the access token expires within its lifetime.
+         */
+        post: operations["revoke_connection_api_v1_oauth_connections_revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -3069,6 +3161,75 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ConnectionRead */
+        ConnectionRead: {
+            /** Client Id */
+            client_id: string;
+            /** Client Name */
+            client_name: string | null;
+            /** Client Uri */
+            client_uri: string | null;
+            /** Client Host */
+            client_host: string | null;
+            /** Registration */
+            registration: string;
+            /** Scopes */
+            scopes: string[];
+            /**
+             * First Authorized At
+             * Format: date-time
+             */
+            first_authorized_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Active Tokens */
+            active_tokens: number;
+        };
+        /** ConnectionRevoke */
+        ConnectionRevoke: {
+            /** Client Id */
+            client_id: string;
+        };
+        /** ConsentDecision */
+        ConsentDecision: {
+            /** Redirect To */
+            redirect_to: string;
+        };
+        /**
+         * ConsentInfo
+         * @description What the consent page shows. `client_host` is the host of a client id metadata document,
+         *     the name the user must judge by (the document is self-asserted).
+         */
+        ConsentInfo: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /** Client Id */
+            client_id: string;
+            /** Client Name */
+            client_name: string | null;
+            /** Client Uri */
+            client_uri: string | null;
+            /** Client Host */
+            client_host: string | null;
+            /** Registration */
+            registration: string;
+            /** Redirect Uri */
+            redirect_uri: string;
+            /** Redirect Host */
+            redirect_host: string;
+            /** Loopback Redirect */
+            loopback_redirect: boolean;
+            /** Scopes */
+            scopes: components["schemas"]["ScopeInfo"][];
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
         /** CreateDeviceForIdentity */
         CreateDeviceForIdentity: {
             /** Name */
@@ -5611,6 +5772,13 @@ export interface components {
             /** Schema Version */
             schema_version?: number | null;
         };
+        /** ScopeInfo */
+        ScopeInfo: {
+            /** Key */
+            key: string;
+            /** Description */
+            description: string;
+        };
         /** Series */
         Series: {
             /** Metric Key */
@@ -6701,6 +6869,161 @@ export interface operations {
             };
         };
     };
+    consent_info_api_v1_oauth_consent__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_consent_api_v1_oauth_consent__request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deny_consent_api_v1_oauth_consent__request_id__deny_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_connections_api_v1_oauth_connections_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_connection_api_v1_oauth_connections_revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionRevoke"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_projects_api_v1_projects_get: {
         parameters: {
             query?: {
@@ -7108,6 +7431,8 @@ export interface operations {
             query?: {
                 entity_type_id?: string | null;
                 status_filter?: string | null;
+                /** @description Name contains, case-insensitive */
+                q?: string | null;
                 limit?: number;
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;

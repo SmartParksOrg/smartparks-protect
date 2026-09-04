@@ -63,6 +63,9 @@ export type IntegrationTestResult = Schemas["IntegrationTestResult"];
 export type Gateway = Schemas["GatewayRead"];
 export type GatewayDetail = Schemas["GatewayDetail"];
 export type DeviceConnectivity = Schemas["DeviceConnectivity"];
+export type ConsentInfo = Schemas["ConsentInfo"];
+export type ConsentDecision = Schemas["ConsentDecision"];
+export type Connection = Schemas["ConnectionRead"];
 
 export interface Page<T> {
   items: T[];

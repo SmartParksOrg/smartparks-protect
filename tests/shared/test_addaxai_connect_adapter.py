@@ -30,7 +30,9 @@ def _source(config=None, credentials=None, cursors=None):
         name="Connect",
         adapter_key="addaxai_connect",
         config={"url": "https://connect.example.org", **(config or {})},
-        credentials=credentials if credentials is not None else {"email": "bot@example.org", "password": "pw"},
+        credentials=credentials
+        if credentials is not None
+        else {"email": "bot@example.org", "password": "pw"},
         capabilities=AdapterCapabilities(uplink=True),
         cursors=cursors,
     )

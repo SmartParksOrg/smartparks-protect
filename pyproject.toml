@@ -21,6 +21,7 @@ smartparks-protect-export = { workspace = true }
 smartparks-protect-rules = { workspace = true }
 smartparks-protect-automation = { workspace = true }
 smartparks-protect-integration = { workspace = true }
+smartparks-protect-mcp = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -32,6 +33,7 @@ dev = [
     "smartparks-protect-rules",
     "smartparks-protect-automation",
     "smartparks-protect-integration",
+    "smartparks-protect-mcp",
     "ruff==0.16.5",
     "mypy==2.3.1",
     "pytest==9.1.1",
@@ -48,7 +50,7 @@ docs = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "services/integration", "tests"]
+src = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "services/integration", "services/mcp", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF", "ANN"]
@@ -67,8 +69,8 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "f
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation"]
-packages = ["shared", "protect_api", "protect_ingest", "protect_decoder", "protect_export", "protect_rules", "protect_automation"]
+mypy_path = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "services/integration", "services/mcp"]
+packages = ["shared", "protect_api", "protect_ingest", "protect_decoder", "protect_export", "protect_rules", "protect_automation", "protect_integration", "protect_mcp"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]

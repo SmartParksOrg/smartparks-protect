@@ -6,7 +6,7 @@
 
 Self-hosted operational data platform for [Smart Parks](https://www.smartparks.org) deployments. It connects field devices and IoT platforms to one Smart Parks domain and makes that data useful: a live map, analysis and export, a rules engine that turns observations into events and alerts, device control, and durable integrations with systems such as EarthRanger.
 
-**Status: pre-alpha.** The repository foundation exists (services, compose stack, CI, docs). Nothing user-facing runs yet. The roadmap is in [`PROJECT_PLAN.md`](PROJECT_PLAN.md); the first release, v0.1.0, is a simulated OpenCollar moving on the map.
+**Status: pre-release.** Releases v0.1.0 to v0.4.0 cover the live map, the Data Explorer and exports, rules, alerts, automations and device control on a local ChirpStack; the production LoRaWAN adapters, deployment automation, integrations and the MCP server for AI clients are built and wait for live verification. The roadmap is in [`PROJECT_PLAN.md`](PROJECT_PLAN.md).
 
 ## Core concepts
 

@@ -1,6 +1,8 @@
 /** One place for query keys, so invalidation cannot drift from the queries. */
 export const queryKeys = {
   me: ["me"] as const,
+  oauthConsent: (requestId: string) => ["oauth", "consent", requestId] as const,
+  connections: ["oauth", "connections"] as const,
   version: ["version"] as const,
   projects: ["projects"] as const,
   project: (id: string) => ["projects", id] as const,

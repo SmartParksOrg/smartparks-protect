@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from protect_api.auth.routes import router as auth_router
+from protect_api.oauth.routes import router as oauth_router
 from protect_api.realtime import router as realtime_router
 from protect_api.routers.admin import router as admin_router
 from protect_api.routers.analytics import router as analytics_router
@@ -30,6 +31,7 @@ from protect_api.routers.rules import router as rules_router
 v1_router = APIRouter()
 for router in (
     auth_router,
+    oauth_router,
     projects_router,
     entities_router,
     devices_router,

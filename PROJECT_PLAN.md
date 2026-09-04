@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 8, integrations, Traccar, gateways and the first demonstrator (built from documentation and the local stack; the live demonstration waits for accounts) |
-| Latest release | v0.4.0 (2026-09-04); phases 7 and 8 unreleased, v0.6.0 planned once CI is green (D67) |
+| Active phase | Phase 9, MCP read-only proof of concept (built and tested locally; the Claude and ChatGPT verification waits for the dev server) |
+| Latest release | v0.4.0 (2026-09-04); phases 7, 8 and 9 unreleased, v0.6.0 planned once CI is green (D67) |
 | Last session | 2026-09-04 |
-| Next item | Tag v0.6.0 after CI; then phase 9 (MCP read-only proof of concept) unless Tim provides accounts first: phase 7 live items (KPN, LORIOT, Netmore, akenza, a dev VM and a domain) and phase 8 live items (Gundi connection and EarthRanger site, an AddaxAI Connect viewer account, a Traccar instance) close the section 33 demonstration and v1.0.0 |
-| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, no dev VM, no domain; deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live |
+| Next item | Tag v0.6.0 after CI; then the dev server (VM and domain) closes the phase 9 exit criterion and the phase 7 and 8 live items in one batch; phase 10 (observability, backup, disaster recovery) is the next buildable phase without accounts |
+| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, no dev VM, no domain (also needed for Claude and ChatGPT to reach the MCP server); deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live |
 
 ## What we are building
 
@@ -108,6 +108,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D65 | Traccar | Session login (`POST /api/session`), the `/api/socket` websocket for positions, events and device status with reconnect, `GET /api/positions` on every connect, `GET /api/devices` for management, `POST /api/commands/send` as the command proof of concept, deep links to the Traccar web UI | Real time with Traccar's own event stream; polling would lose geofence and alarm events. Built from the Traccar OpenAPI document. Decided by Tim on 2026-09-04. |
 | D66 | Gateway registry | Server-level `gateways` table unique on (data source, provider gateway id) with name, location, state, last seen, statistics and provider diagnostics in attributes; rows come from receptions, gateway events and a sync against the platform; a project sees the gateways that received its devices | Matches "devices are server-level physical objects"; public-network gateways belong to nobody. Decided by Tim on 2026-09-04. |
 | D67 | Phase 8 release | Everything buildable from documentation and the local stack ships as v0.6.0 once CI is green; v1.0.0 waits for the section 33 demonstration with real accounts | The demonstration needs a second LoRaWAN network, an EarthRanger site, an AddaxAI Connect account and a Traccar instance. Decided by Tim on 2026-09-04. |
+| D68 | MCP authorization server | The API hosts OAuth 2.1 with the MCP SDK's authorize, token, registration and revocation handlers under `/api/v1/oauth`, metadata at the well-known path of the public URL, a database-backed provider, consent as a frontend page | One authorization model and audit trail; the MCP service stays database-free (27.1); the SDK's handlers carry PKCE and the registration rules. ADR 0015. Decided by Tim on 2026-09-04. |
+| D69 | MCP client registration | Client id metadata documents (fetched from the client id URL, self-referential, redirect URIs on the client's host or loopback) and dynamic registration (HTTPS or loopback redirect URIs); loopback URIs match with the port ignored | Claude and ChatGPT prefer metadata documents and fall back to dynamic registration; Claude Code and the inspector use loopback ports. Recorded by Claude on 2026-09-04. |
+| D70 | MCP access tokens | JWTs signed with `JWT_SECRET`, audience the MCP URL, subject the user, `client_id` and `scope` claims, one hour; refresh tokens hashed and rotated, thirty days; the MCP service verifies locally and calls the API with the same bearer, which the API admits read-only within the scopes and audits per request | Stateless and no introspection round trip; the API is the issuer, so admitting its own audience under a stricter policy is deliberate, not token passthrough. Decided by Tim on 2026-09-04. |
+| D71 | MCP tool set of the proof of concept | The eight tools of the plan plus `list_metrics` and `search_traces` (needed by the prompts), ChatGPT's `search` and `fetch`, `smartparks://` resources for projects, entities, events, devices and traces, two prompts; entities and events carry the project in their URI | ChatGPT deep research requires `search` and `fetch`; the API is project scoped. Decided by Tim on 2026-09-04. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -518,15 +522,15 @@ Release:
 
 **Deliverables.**
 
-- [ ] `services/mcp`: MCP server over HTTP using the official Python SDK, calling the API with the user's token, never the database.
-- [ ] OAuth 2.1 authorization server endpoints on the API (or a small dedicated module) issuing scoped tokens for MCP clients, scopes from 27.5, dynamic client registration if the clients require it.
-- [ ] Resources from 27.2 for projects, entities, devices, events, rules, data sources and traces.
-- [ ] Tools: `search_entities`, `get_entity`, `get_device`, `get_latest_position`, `query_measurements`, `query_events`, `get_processing_trace`, plus `list_projects`. Every tool bounded (27.7).
-- [ ] Prompts: `analyze-device-health`, `investigate-missing-data`.
-- [ ] Audit: every tool invocation logged with user, client type and name, tool and trace id.
-- [ ] AI action policy table with all write classes disabled.
-- [ ] Verified with Claude and ChatGPT. Results and screenshots in `docs/mcp/`.
-- [ ] Docs: `docs/mcp/` (setup, authentication, tools, limits). ADR: MCP security boundary.
+- [x] `services/mcp`: MCP server over HTTP using the official Python SDK, calling the API with the user's token, never the database. (2026-09-04, `mcp` 2.1.1, streamable HTTP, stateless, `protect-mcp` on :8001)
+- [x] OAuth 2.1 authorization server endpoints on the API (or a small dedicated module) issuing scoped tokens for MCP clients, scopes from 27.5, dynamic client registration if the clients require it. (2026-09-04, D68 to D70: `protect_api/oauth`, client id metadata documents and dynamic registration, PKCE, JWT access tokens, rotated refresh tokens, consent page, Connected AI clients page)
+- [x] Resources from 27.2 for projects, entities, devices, events, rules, data sources and traces. (2026-09-04, projects, entities, events, devices and traces; rules and data sources wait for their scopes in phase 13)
+- [x] Tools: `search_entities`, `get_entity`, `get_device`, `get_latest_position`, `query_measurements`, `query_events`, `get_processing_trace`, plus `list_projects`. Every tool bounded (27.7). (2026-09-04, plus `list_metrics`, `search_traces`, `search` and `fetch`, D71)
+- [x] Prompts: `analyze-device-health`, `investigate-missing-data`. (2026-09-04)
+- [x] Audit: every tool invocation logged with user, client type and name, tool and trace id. (2026-09-04, one `mcp.request` audit row per API request a tool makes, with the tool name and the client id; the request id links to the API log)
+- [x] AI action policy table with all write classes disabled. (2026-09-04, `protect_api/oauth/scopes.py`: reads per scope, everything else refused)
+- [ ] Verified with Claude and ChatGPT. Results and screenshots in `docs/mcp/`. (needs the dev server: both clients connect from their own networks over HTTPS; verified locally with the test suite and the local stack)
+- [x] Docs: `docs/mcp/` (setup, authentication, tools, limits). ADR: MCP security boundary. (2026-09-04, ADR 0015)
 
 **Exit criteria.** Both clients answer "Why has device X stopped updating?" using the tools against the dev server.
 
@@ -672,6 +676,7 @@ Listed by the phase where they are first needed.
 - [ ] Phase 3: recorded OpenCollar uplinks (ChirpStack, KPN or LORIOT exports) and links to the public Smart Parks decoder and protocol repositories.
 - [ ] Phase 3: confirmation which EarthRanger icons may be reused and under which licence.
 - [ ] Phase 7: KPN/ThingPark, LORIOT, Netmore (portal.blink.services, LoRaWAN Portal) and akenza test accounts, a dev VM (Ubuntu 24.04) and a domain. Device deep link paths for Netmore and akenza are guesses until seen live.
+- [ ] Phase 9: the dev VM and domain (the phase 7 input) so Claude and ChatGPT can reach the MCP server; a Claude and a ChatGPT account able to add a custom connector.
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work.
 - [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access.
@@ -813,3 +818,11 @@ Listed by the phase where they are first needed.
 - Live check on the dev stack: a webhook integration on Demo park pointing at a local receiver; three simulated OpenCollar uplinks became three sent deliveries (signed body, `X-Protect-Delivery`, target response recorded), the local gateway appeared in the registry with 22 receptions and a ChirpStack deep link, the connectivity view showed the collar heard by one gateway, and Sync gateways read the gateway from the ChirpStack API. The integration was removed again afterwards.
 - Open: the live steps of the demonstration and the deep links of four platforms wait for accounts.
 
+### 2026-09-04, phase 9 (Claude)
+
+- Tim decided to defer the live tests of phases 7 and 8 until the dev server exists, with two limits: run the Ansible playbook against any VM before phase 10 adds to it, and confirm one documentation-built adapter live before phase 13 adds more. Phase 9 started; the four decisions (D68 to D71, all recommendations accepted): the API is the OAuth 2.1 authorization server reusing the MCP SDK's handlers, JWT access tokens with the MCP URL as audience, the full tool set with `search` and `fetch`, resources and prompts, a consent page plus a connections page.
+- Researched the current documentation first: the MCP authorization specification (protected resource metadata, RFC 8414 metadata, PKCE, resource indicators, client id metadata documents as the preferred registration, dynamic registration deprecated), Claude's connector requirements (streamable HTTP, callback `https://claude.ai/api/mcp/auth_callback`, loopback for Claude Code, `WWW-Authenticate` with `resource_metadata` on 401, CIMD selected only when `none` is a token endpoint auth method), ChatGPT's requirements (CIMD at `https://chatgpt.com/oauth/client.json`, `search` and `fetch` for deep research), and the MCP Python SDK 2.1.1 (`MCPServer`, `TokenVerifier`, `AuthSettings`, the authorize, token and registration handlers, the provider protocol) read from the installed package.
+- Built `shared/oauth.py` (scopes, JWT mint and decode), the OAuth tables and migration 0009, `protect_api/oauth` (provider, scope policy, admission middleware with audit, routes with the SDK handlers, consent and connections endpoints), the audience change in the JWT strategy, `services/mcp` (token verifier, API client, twelve tools, five resource templates, two prompts, the ASGI app with both metadata paths and a health route), the compose service, Dockerfile, nginx routes in the frontend container and the Ansible template, env variables, the CI matrix entry, the consent and Connected AI clients pages with the sidebar link, `docs/mcp/index.md`, ADR 0015, and the `q` filter on the entity list that `search_entities` needs.
+- Verification: ruff, mypy strict, eslint, tsc, vitest, vite build, OpenAPI regenerated; the Python suites (`tests/api/test_oauth.py`: metadata, registration rules, the full PKCE flow, scoped and audited access, code reuse, refresh rotation, revocation, consent denial, resource and redirect validation, a client id metadata document; `tests/mcp`: discovery, 401 and 403 challenges, tools over streamable HTTP against the real API, resources, prompts, audit rows, no data without membership) pass (15 tests), the full Python suite passes (279 tests), the screenshot sweep is clean on 37 routes at three viewports including the consent and Connected AI clients pages, and on the rebuilt local stack the whole flow ran through nginx: metadata, dynamic registration, authorize, consent, PKCE token exchange, then every tool over `/mcp` against Demo park (Rhino 14, its collar, traces, metrics, aggregates, position, search and fetch, a prompt), a write with the token refused with `insufficient_scope`, the connection listed and revoked.
+- Found while testing: a URL object built outside the SDK's metadata models gains a trailing slash on a path-less issuer, which would break RFC 8414 issuer comparison in clients; the models now receive strings. Entity and device types are named by `label`, not `name`.
+- Not done: the exit criterion (Claude and ChatGPT against the dev server) waits for the VM and the domain. `ruff format` also reformatted five test files of phase 8 that had drifted. Not committed; Tim reviews and commits.

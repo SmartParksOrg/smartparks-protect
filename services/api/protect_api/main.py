@@ -10,6 +10,8 @@ from pydantic import BaseModel
 
 from protect_api.health import router as health_router
 from protect_api.middleware import RequestIdMiddleware
+from protect_api.oauth.middleware import MCPAccessMiddleware
+from protect_api.oauth.routes import install_oauth_routes
 from protect_api.realtime import broadcaster
 from protect_api.routers import v1_router
 from shared.config import get_settings
@@ -41,6 +43,8 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
     )
+    # Added first, so it runs inside the request id middleware and its audit rows carry the id.
+    app.add_middleware(MCPAccessMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -51,6 +55,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(v1_router, prefix="/api/v1")
+    install_oauth_routes(app)
 
     @app.get("/api/version", response_model=VersionResponse, tags=["health"])
     async def version() -> VersionResponse:

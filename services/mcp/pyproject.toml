@@ -1,0 +1,19 @@
+[project]
+name = "smartparks-protect-mcp"
+version = "0.0.0"
+description = "Smart Parks Protect MCP server: read-only tools, resources and prompts for AI clients, calling the API with the user's token."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "smartparks-protect-shared",
+    "mcp==2.1.1",
+    "uvicorn[standard]==0.52.4",
+    "httpx==0.28.1",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "protect_mcp"
+module-root = ""

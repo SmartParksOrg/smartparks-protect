@@ -14,9 +14,11 @@ from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.manager import UserManager
+from protect_api.oauth.middleware import mcp_access_var
 from shared.config import get_settings
 from shared.database import get_session
 from shared.models import User
+from shared.oauth import mcp_resource_url
 
 # The ORM model satisfies UserProtocol at runtime, but its columns are `Mapped` descriptors and
 # mypy does not apply descriptors when checking protocol attributes. Hence the ignores below.
@@ -38,7 +40,10 @@ async def get_user_manager(
 class PasswordChangeAwareJWTStrategy(JWTStrategy[User, uuid.UUID]):  # type: ignore[type-var]
     """Adds an `iat` claim and rejects tokens issued before `user.password_changed_at`, so a
     password change logs out every other session (pattern from AddaxAI Connect). `iat` has whole
-    seconds, so the stamp is truncated to seconds where it is written."""
+    seconds, so the stamp is truncated to seconds where it is written.
+
+    Also accepts the access tokens of AI clients (audience: the MCP server URL), but only when
+    `MCPAccessMiddleware` has already admitted this request under the token's scopes."""
 
     async def write_token(self, user: User) -> str:
         data = {"sub": str(user.id), "aud": self.token_audience, "iat": datetime.now(UTC)}
@@ -64,13 +69,19 @@ class PasswordChangeAwareJWTStrategy(JWTStrategy[User, uuid.UUID]):  # type: ign
         issued = datetime.fromtimestamp(int(issued_at), tz=UTC)
         if user.password_changed_at is not None and issued < user.password_changed_at:
             return None
+        if data.get("aud") == mcp_resource_url():
+            admitted = mcp_access_var.get()
+            if admitted is None or admitted.jti != data.get("jti"):
+                return None
         return user
 
 
 def get_jwt_strategy() -> PasswordChangeAwareJWTStrategy:
     settings = get_settings()
     return PasswordChangeAwareJWTStrategy(
-        secret=settings.jwt_secret, lifetime_seconds=settings.jwt_lifetime_seconds
+        secret=settings.jwt_secret,
+        lifetime_seconds=settings.jwt_lifetime_seconds,
+        token_audience=["fastapi-users:auth", mcp_resource_url()],
     )
 
 

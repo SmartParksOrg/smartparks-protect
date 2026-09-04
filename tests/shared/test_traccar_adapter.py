@@ -33,7 +33,9 @@ def _source(credentials=None, config=None):
         name="Traccar",
         adapter_key="traccar",
         config=config if config is not None else {"url": "https://tracks.example.org"},
-        credentials=credentials if credentials is not None else {"email": "bot@example.org", "password": "pw"},
+        credentials=credentials
+        if credentials is not None
+        else {"email": "bot@example.org", "password": "pw"},
         capabilities=AdapterCapabilities(uplink=True, downlink=True),
     )
 

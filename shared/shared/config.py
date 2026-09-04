@@ -37,6 +37,26 @@ class Settings(BaseSettings):
         min_length=16, description="Key for encrypting data source credentials at rest"
     )
     invitation_lifetime_hours: int = 168
+    documentation_url: str = Field(
+        default="https://smartparksorg.github.io/smartparks-protect/",
+        description="Documentation site, linked from OAuth metadata and MCP results",
+    )
+    mcp_public_url: str | None = Field(
+        default=None,
+        description="Public MCP URL, default PUBLIC_URL plus /mcp; the audience of access tokens",
+    )
+    api_internal_url: str = Field(
+        default="http://localhost:8000", description="Where the MCP service reaches the API"
+    )
+    oauth_code_lifetime_seconds: int = Field(
+        default=300, ge=30, description="Lifetime of an authorization code after consent"
+    )
+    oauth_consent_lifetime_seconds: int = Field(
+        default=600, ge=60, description="How long a pending consent request stays valid"
+    )
+    oauth_refresh_token_lifetime_days: int = Field(
+        default=30, ge=1, description="Lifetime of a refresh token; rotated on every use"
+    )
 
     mail_server: str | None = None
     mail_port: int = 587

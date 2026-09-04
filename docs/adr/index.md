@@ -19,3 +19,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 | [0011](0011-connectivity-adapter-boundary.md) | Connectivity adapter boundary | accepted |
 - [0012 rule representation](0012-rule-representation.md)
 - [0013 control action schema](0013-control-action-schema.md)
+- [0015 MCP security boundary](0015-mcp-security-boundary.md)

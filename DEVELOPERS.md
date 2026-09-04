@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: v0.4.0 released, phase 7 in progress (KPN and LORIOT adapters and the Ansible deployment built from documentation, live verification pending). Phases 0 to 6 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: v0.4.0 released; phases 7 and 8 (production LoRaWAN adapters, deployment automation, integrations, Traccar, AddaxAI Connect, gateways) and phase 9 (the MCP server for AI clients) are built and wait for live verification. Phases 0 to 6 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters, drivers, the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, the React frontend, the Data Explorer and exports, rules, events, alerts, automations, notifications, and device control. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -50,13 +50,14 @@ smartparks-protect/
 │   ├── rules/               # `protect_rules`: rule evaluation, scheduler, system checks
 │   ├── automation/          # `protect_automation`: actions, notification delivery, Telegram poller
 │   ├── integration/         # `protect_integration`: outbound deliveries, retry loop, backfill
+│   ├── mcp/                 # `protect_mcp`: MCP server for AI clients, calls the API with the client's token
 │   └── frontend/            # React + Vite + TypeScript, nginx Dockerfile, FRONTEND_CONVENTIONS.md
 ├── shared/shared/           # package `shared`: config, database, logger, version, enums, permissions,
 │                            # models/, domain/assignments.py, trace.py, timeutil.py, secrets.py, bus.py,
 │                            # worker.py, ingest.py, storage.py, connectivity/ (base, transports, adapters),
 │                            # device_drivers/ (base, registry, generic_json, opencollar), analytics.py, exports/,
 │                            # rules/ (schema, templates, evaluator, data, events, replay), notifications/,
-│                            # control/ (actions, commands)
+│                            # control/ (actions, commands), oauth.py (scopes, access tokens)
 ├── ansible/                 # playbook, roles, *.example inventory and vars (phase 7)
 ├── tests/                   # tests/shared, tests/api, tests/fixtures/payloads
 ├── docs/                    # MkDocs site, docs/adr/ holds the ADRs
@@ -161,7 +162,7 @@ cd services/frontend && npm ci            # frontend dependencies
 
 Daily commands through `scripts/dev.sh`: `up`, `down`, `logs [service]`, `migrate`, `revision`, `bootstrap-admin`, `test`, `lint`, `format`, `docs`, `hooks`. `sweep` arrives in phase 3.
 
-Ports (all bound to localhost except the frontend): API 8000, frontend 3000, Postgres 5432, Redis 6379, MinIO 9000 and console 9001. `/api/docs` is the OpenAPI UI, `/api/health` reports database, Redis and MinIO, `/api/version` reports the version and commit.
+Ports (all bound to localhost except the frontend): API 8000, MCP 8001, frontend 3000, Postgres 5432, Redis 6379, MinIO 9000 and console 9001. `/api/docs` is the OpenAPI UI, `/api/health` reports database, Redis and MinIO, `/api/version` reports the version and commit.
 
 The frontend dev server (`npm run dev` in `services/frontend`) runs on :5173 and proxies `/api` and `/ws` to `VITE_PROXY_TARGET` from the root `.env`. The frontend reads the root `.env`, there is no second env file.
 
@@ -221,6 +222,14 @@ API in `routers/control.py`: permissions are judged in the device's current proj
 
 `services/integration/protect_integration/worker.py`: `handle_message` turns `position.created` (payload only), `event.created` and `measurement.created` (rows loaded) into refs and enqueues them for the project's enabled integrations (`IntegrationCache`, re-read every 30 s), then the bus message is acknowledged. `delivery_loop` calls `deliver_due` every two seconds: due rows in order, one integration's share of a cycle ends at its first transient failure, disabled integrations get their rows skipped. `handle_backfill` runs the backfill for `integration.backfill_requested`. The API (`routers/integrations.py`) only writes rows, publishes the backfill request and runs test sends inline.
 
+## AI clients (MCP)
+
+Architecture 27, ADR 0015. `services/mcp/protect_mcp` is a streamable HTTP MCP server built with the official SDK (`MCPServer`), stateless, at `/mcp` on port 8001 (`protect-mcp`). It never opens the database: every tool calls the API through `protect_mcp/api.py` with the client's own bearer and names the tool in `X-Protect-MCP-Tool`. `server.py` holds the tools (bounded reads: projects, entities, devices, positions, aggregated measurements, events, traces, plus the `search` and `fetch` pair ChatGPT expects), the `smartparks://` resource templates and the two prompts. `auth.py` verifies access tokens locally (`shared/oauth.py`). The protected resource metadata is served at both RFC 9728 paths; a request without a valid token gets 401 with `resource_metadata` in `WWW-Authenticate`, one without every read scope gets 403 with `insufficient_scope`.
+
+The API is the OAuth 2.1 authorization server (`protect_api/oauth/`): `routes.py` mounts the SDK's authorize, token, registration and revocation handlers under `/api/v1/oauth` and serves `/.well-known/oauth-authorization-server`; `provider.py` implements the SDK's provider protocol on `oauth_clients`, `oauth_authorization_codes` and `oauth_refresh_tokens` (migration 0009): clients by client id metadata document (fetched from the client id URL, validated, cached an hour) or dynamic registration, consent requests that `/oauth/consent` in the frontend approves or denies (`POST /oauth/consent/{id}/approve|deny` return the redirect), JWT access tokens (`shared.oauth.mint_access_token`: audience the MCP URL, subject the user, `client_id` and `scope` claims, one hour), refresh tokens hashed and rotated. `scopes.py` is the AI action policy: `GET` only, one scope per path family, everything else refused. `middleware.py` admits an MCP token only through that policy, stores it in `mcp_access_var`, and writes an `mcp.request` audit row (user, client, tool, path, status) per request; the JWT strategy in `auth/users.py` accepts the MCP audience only when the middleware admitted the request. `GET /oauth/connections` and `POST /oauth/connections/revoke` back the Connected AI clients page.
+
+Locally: `docker compose up -d` starts `protect-mcp`; the MCP inspector connects to `http://localhost:8001/mcp` (add `http://localhost:6274` to `CORS_ORIGINS`), Claude Code with `claude mcp add --transport http protect http://localhost:8001/mcp`. `tests/mcp` drives the MCP ASGI app with the API app in process over `httpx.ASGITransport`. User documentation: `docs/mcp/`.
+
 ## Gateways
 
 `shared/models/network.py`: `Gateway` (server level, unique on data source and provider id) and `DataSourceCursor`. `shared/ingest.py` keeps the registry: `upsert_gateways` for every reception (online, last seen, a location from the reception's `location` attribute) and `apply_gateway_update` for `GatewayUpdate` messages (`InboundMessage.gateway`, `external_id` None): stored as a source event without a device, `processing_status` processed, no bus message. The ChirpStack adapter parses `gateway/+/event/stats` and `gateway/+/state/conn` and its management connector's `list_gateway_updates` backs `POST /data-sources/{id}/sync-gateways`. `routers/gateways.py` aggregates `gateway_receptions` per project window: gateways busiest first, gateway detail with the devices heard, and `connectivity` per device (gateways heard, best gateway and its share of uplinks, mean signal).
@@ -274,7 +283,7 @@ uv run pytest tests/shared -q               # one package
 cd services/frontend && npm run test && npm run build
 ```
 
-`tests/conftest.py` sets default environment values that match `.env.example`, so tests run against the local compose stack without extra setup. CI runs one job per package (`tests/shared`, `tests/api`, `tests/decoder`, `tests/export`, `tests/rules`, `tests/automation`) against Postgres/Timescale and Redis service containers and a MinIO container. A test that reads rows a worker committed in another session must end its own transaction first (`await db.rollback()`): the test session's snapshot predates the commit otherwise.
+`tests/conftest.py` sets default environment values that match `.env.example`, so tests run against the local compose stack without extra setup. CI runs one job per package (`tests/shared`, `tests/api`, `tests/decoder`, `tests/export`, `tests/rules`, `tests/automation`, `tests/integration`, `tests/mcp`) against Postgres/Timescale and Redis service containers and a MinIO container. A test that reads rows a worker committed in another session must end its own transaction first (`await db.rollback()`): the test session's snapshot predates the commit otherwise.
 
 All tests share one event loop (`asyncio_default_test_loop_scope = session`) because asyncpg connections cannot move between loops. `tests/api/conftest.py` has helpers for actors per role (`actor`, `project_actor`), committed fixture rows and invitations. `tests/api/test_phase1_scenario.py` runs the phase 1 exit criteria end to end.
 

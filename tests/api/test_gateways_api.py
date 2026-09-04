@@ -22,7 +22,9 @@ async def _uplink(db, bus, source, external_id, receptions, when):  # noqa: F811
         payload={"time": when, "lat": -24.9, "lon": 31.5},
         acquisition_channel=AcquisitionChannel.LORAWAN,
         ingestion_method=IngestionMethod.MQTT,
-        gateway_receptions=[GatewayReceptionData(gateway_id=g, rssi=r, snr=s) for g, r, s in receptions],
+        gateway_receptions=[
+            GatewayReceptionData(gateway_id=g, rssi=r, snr=s) for g, r, s in receptions
+        ],
     )
     stored = await store_inbound(db, source, message)
     await commit_and_publish(db, bus, [stored])
@@ -45,7 +47,9 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
             [("gw-a", -98, 9.0), ("gw-b", -118, -1.0)],
         ]
     ):
-        await _uplink(db, bus, row, external_id, receptions, (now - timedelta(minutes=i)).isoformat())
+        await _uplink(
+            db, bus, row, external_id, receptions, (now - timedelta(minutes=i)).isoformat()
+        )
 
     base = f"/api/v1/projects/{project.id}"
     gateways = (await client.get(f"{base}/gateways", headers=h)).json()
@@ -77,7 +81,11 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     assert (await client.get(f"/api/v1/projects/{other.id}/connectivity", headers=h)).json() == []
 
     # the server registry and overrides
-    registry = (await client.get("/api/v1/admin/gateways", params={"data_source_id": source["id"]}, headers=h)).json()
+    registry = (
+        await client.get(
+            "/api/v1/admin/gateways", params={"data_source_id": source["id"]}, headers=h
+        )
+    ).json()
     assert {g["external_id"] for g in registry["items"]} == {"gw-a", "gw-b"}
     patched = await client.patch(
         f"/api/v1/admin/gateways/{best['id']}",
@@ -87,23 +95,37 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     assert patched.status_code == 200, patched.text
     assert patched.json()["display_name"] == "North ridge"
     assert patched.json()["geometry"]["coordinates"] == [31.55, -24.95]
-    half = await client.patch(f"/api/v1/admin/gateways/{best['id']}", json={"latitude": 1}, headers=h)
+    half = await client.patch(
+        f"/api/v1/admin/gateways/{best['id']}", json={"latitude": 1}, headers=h
+    )
     assert half.status_code == 422
 
     # sync against the platform through the adapter's management connector
     class FakeManagement:
         async def list_gateway_updates(self):
             return [
-                GatewayUpdate(gateway_id="gw-b", name="South mast", status="offline", latitude=-24.7, longitude=31.3),
+                GatewayUpdate(
+                    gateway_id="gw-b",
+                    name="South mast",
+                    status="offline",
+                    latitude=-24.7,
+                    longitude=31.3,
+                ),
                 GatewayUpdate(gateway_id="gw-c", name="Spare", status="unknown"),
             ]
 
     adapter = ADAPTERS[row.adapter_key]
-    monkeypatch.setattr(type(adapter), "management_connector", lambda self, ctx: FakeManagement(), raising=False)
+    monkeypatch.setattr(
+        type(adapter), "management_connector", lambda self, ctx: FakeManagement(), raising=False
+    )
     synced = await client.post(f"/api/v1/data-sources/{source['id']}/sync-gateways", headers=h)
     assert synced.status_code == 200, synced.text
     assert synced.json()["synced"] == 2
-    registry = (await client.get("/api/v1/admin/gateways", params={"data_source_id": source["id"]}, headers=h)).json()
+    registry = (
+        await client.get(
+            "/api/v1/admin/gateways", params={"data_source_id": source["id"]}, headers=h
+        )
+    ).json()
     by_id = {g["external_id"]: g for g in registry["items"]}
     assert by_id["gw-b"]["name"] == "South mast" and by_id["gw-b"]["status"] == "offline"
     assert by_id["gw-c"]["status"] == "unknown" and by_id["gw-c"]["geometry"] is None

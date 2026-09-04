@@ -1,5 +1,5 @@
-import { LogOut } from "lucide-react";
-import { NavLink, useParams } from "react-router";
+import { LogOut, Plug } from "lucide-react";
+import { Link, NavLink, useParams } from "react-router";
 
 import LogoWide from "@/assets/brand/logo-wide.svg?react";
 import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
@@ -87,7 +87,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="truncate px-3 text-xs text-muted-foreground" title={user?.email}>
           {user?.full_name || user?.email}
         </div>
-        <Button variant="ghost" size="sm" className="mt-1 w-full justify-start" onClick={logout}>
+        <Button asChild variant="ghost" size="sm" className="mt-1 w-full justify-start">
+          <Link to="/account/connections" onClick={onNavigate}>
+            <Plug className="size-4" /> Connected AI clients
+          </Link>
+        </Button>
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={logout}>
           <LogOut className="size-4" /> Sign out
         </Button>
       </div>

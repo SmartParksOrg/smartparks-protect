@@ -4,10 +4,15 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
-Production LoRaWAN networks and the dev server (phase 7), and integrations, Traccar, AddaxAI Connect and gateways (phase 8), built from documentation; live verification pending.
+Production LoRaWAN networks and the dev server (phase 7), integrations, Traccar, AddaxAI Connect and gateways (phase 8), and the MCP server for AI clients (phase 9), built from documentation and the local stack; live verification pending.
 
 ### Added
 
+- MCP server for AI clients (ADR 0015, architecture 27): the `protect-mcp` service at `/mcp` (streamable HTTP, stateless) with read-only, bounded tools (`list_projects`, `search_entities`, `get_entity`, `get_device`, `get_latest_position`, `query_measurements`, `list_metrics`, `query_events`, `get_processing_trace`, `search_traces`, and `search` and `fetch` for ChatGPT), `smartparks://` resources and the prompts `analyze_device_health` and `investigate_missing_data`. It calls the API with the client's token and never the database.
+- OAuth 2.1 authorization server in the API: metadata at `/.well-known/oauth-authorization-server`, authorize, token, registration and revocation endpoints from the MCP SDK under `/api/v1/oauth`, client id metadata documents and dynamic registration, PKCE, JWT access tokens with the MCP URL as audience and the read scopes of architecture 27.5, hashed and rotated refresh tokens, consent page `/oauth/consent`, Connected AI clients page with disconnect. Access tokens reach the API read-only within their scopes; every request is audited with the tool name (AI action policy: reads allowed, every write disabled).
+- Migration 0009: `oauth_clients`, `oauth_authorization_codes`, `oauth_refresh_tokens`.
+- `q` filter on the entity list (name contains).
+- nginx routes for `/mcp` and the OAuth discovery documents, an MCP rate limit zone; `MCP_PUBLIC_URL`, `MCP_PORT`, `API_INTERNAL_URL` and the OAuth lifetimes in `.env.example`.
 - Integration framework (ADR 0014): integrations per project with connector, encrypted credentials, filters (object types, entities, devices, event types, minimum severity, metric keys, freshness bound); one idempotent `integration_deliveries` row per (integration, object type, object id, object version) with the retry schedule on the row (30 s doubling to 6 h, 30 attempts), request, response, external id and trace; the `protect-integration` service (live path, delivery loop that isolates an unreachable target, backfill in batches with progress); API for integrations, connectors, the delivery log with inspection, retry, test sends and backfill; the Integrate section in the frontend.
 - Outbound connectors: EarthRanger via Gundi (positions as observations with the entity as source, events in the `smartparks_protect_` namespace, subject and event type mapping, test event), signed webhook with `X-Protect-Delivery`, MQTT with a topic template.
 - Traccar adapter: session login, the `/api/socket` websocket with the latest positions on every connect, positions, events and device status as generic JSON with the Traccar record under `raw`, Traccar's forwarding accepted on the webhook, `POST /api/commands/send` as the command proof of concept, device listing. Runbook.
