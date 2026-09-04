@@ -3,7 +3,7 @@
 The second way to reach EarthRanger next to [Gundi](../earthranger-gundi/index.md): the
 site's own API (decision D84). Positions become observations of a generic sensor source,
 events become EarthRanger events, and a corrected event is updated in place (architecture
-28.10). Also the route to WildlifeNL, whose platform is EarthRanger based.
+28.10).
 
 Built from the EarthRanger API primer and the public client library; live verification waits
 for a site and a token.

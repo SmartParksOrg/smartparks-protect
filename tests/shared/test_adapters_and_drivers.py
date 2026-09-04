@@ -43,6 +43,7 @@ def test_registries():
         "log_file",
         "tts",
         "actility_thingpark",
+        "cra_iot",
     }
     assert set(DRIVERS) == {"generic_json", "opencollar"}
     assert (

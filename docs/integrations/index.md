@@ -8,6 +8,7 @@
 - [akenza.io](akenza/index.md): webhook samples, downlinks through the akenza REST API.
 - [The Things Stack](tts/index.md): webhook events, downlinks through the application API, gateways from the gateway API.
 - [Actility ThingPark](actility/index.md): the ThingPark adapter of KPN under its own name for public and private deployments.
+- [CRA IoT](cra-iot/index.md): the Czech national LoRaWAN network; LORIOT-shaped messages over its HTTP endpoint, downlinks and devices through its REST API.
 - [Traccar](traccar/index.md): the non-LoRaWAN tracking source over its websocket, with the command proof of concept.
 - [AddaxAI Connect](addaxai-connect/index.md): camera trap detections as `SPECIES_DETECTION` events, polled with a cursor.
 - [Cloudloop (Iridium)](cloudloop/index.md): RockBLOCK satellite messages over a webhook, commands as SBD messages.
@@ -15,4 +16,6 @@
 - [Outbound integrations](outbound.md): durable deliveries with retries, backfill and a delivery log; webhook and MQTT targets.
 - [EarthRanger via Gundi](earthranger-gundi/index.md): positions as observations and events as EarthRanger events.
 - [EarthRanger direct API](earthranger/index.md): the same, straight to a site with its token; corrected events are updated in place.
+- [WildlifeNL](wildlifenl/index.md): collar positions and temperatures as borne sensor readings, camera trap detections as species detections.
+- [FerusTracker](ferustracker/index.md): collar positions and status as the decoded uplink documents its Node-RED flow sends today.
 - Generic HTTP and generic MQTT sources exist as well, and two built-in sources carry what a browser reads over Web Bluetooth and what a person uploads as a raw log file (see [devices](../devices/index.md)).

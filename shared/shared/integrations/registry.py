@@ -4,13 +4,22 @@ from typing import Any
 
 from shared.integrations.base import OutboundConnector
 from shared.integrations.connectors.earthranger import EarthRangerConnector
+from shared.integrations.connectors.ferustracker import FerusTrackerConnector
 from shared.integrations.connectors.gundi import GundiConnector
 from shared.integrations.connectors.mqtt import MqttConnector
 from shared.integrations.connectors.webhook import WebhookConnector
+from shared.integrations.connectors.wildlifenl import WildlifeNlConnector
 
 CONNECTORS: dict[str, OutboundConnector] = {
     connector.key: connector
-    for connector in (GundiConnector(), EarthRangerConnector(), WebhookConnector(), MqttConnector())
+    for connector in (
+        GundiConnector(),
+        EarthRangerConnector(),
+        WildlifeNlConnector(),
+        FerusTrackerConnector(),
+        WebhookConnector(),
+        MqttConnector(),
+    )
 }
 
 

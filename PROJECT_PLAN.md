@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 13 (platform expansion) built on the local stack; WildlifeNL and FerusTracker deferred for lack of a public API; live checks of the new adapters and connectors pending |
+| Active phase | Phase 13 (platform expansion) committed (3d5fe4f, CI green) and extended with the WildlifeNL and FerusTracker connectors and the CRA IoT adapter; live checks of the new adapters and connectors pending |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-04 |
-| Next item | Commit phase 13 on Tim's word, then phase 14 (production hardening and 2.0); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
+| Next item | Commit the WildlifeNL and FerusTracker connectors and the CRA IoT adapter on Tim's word, then phase 14 (production hardening and 2.0); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -124,10 +124,13 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D81 | Curation approval | Project setting `curation_requires_approval`, off by default: off, `data:curate` applies single corrections at once and bulk jobs need `data:curate_bulk` plus a preview; on, corrections and jobs stay `PENDING` until a different user with `data:approve` approves; reverting needs `data:revert` | Architecture 28.11 makes the two-step workflow optional per project. Decided by Tim on 2026-09-04. |
 | D82 | Recomputation after curation | Timestamp corrections rerun project and entity attribution; device and entity current state are recomputed; analytics aggregates are computed live, so nothing is cached; outbound deliveries of corrected records are flagged stale for review with a resend that bumps the object version; rule re-evaluation is a per-job option that runs the existing rule replay over the affected window | Architecture 28.8 to 28.10 ask for controlled recomputation and reviewed retransmission, not automatic resends. Decided by Tim on 2026-09-04. |
 | D83 | Export views | Export parameter `view` (`effective`, default, or `original`) for positions and measurements plus `curation_metadata` adding the columns of architecture 28.13; the raw view is the source events dataset; any project member may export either view | Scientific reproducibility needs the original next to the effective value. Decided by Tim on 2026-09-04. |
-| D84 | Phase 13 scope | The Things Stack and Actility ThingPark adapters, a direct EarthRanger API connector, Movebank as an export format, project SVG icon upload, project dashboards and MCP write tools now; WildlifeNL (an EarthRanger-based platform without its own public API) and FerusTracker (no public API found) wait for access | Everything chosen builds from published documentation; the two deferred platforms cannot. Decided by Tim on 2026-09-04. |
+| D84 | Phase 13 scope | The Things Stack and Actility ThingPark adapters, a direct EarthRanger API connector, Movebank as an export format, project SVG icon upload, project dashboards and MCP write tools now; WildlifeNL and FerusTracker (no public API found at the time) wait for access | Everything chosen builds from published documentation; the two deferred platforms could not. Decided by Tim on 2026-09-04. Amended the same day: WildlifeNL's API turned out to be open source (see D88); FerusTracker stays deferred. |
 | D85 | Movebank | An export dataset in Movebank's import format (reference data per animal, tag and deployment plus the event rows with timestamp, location and sensor attributes) instead of a push connector | Movebank ingests through arranged live feeds or file import only; the export fits its custom tabular import. Decided by Tim on 2026-09-04. |
 | D86 | Project dashboards | Dashboards per project, shared, stored as a grid layout of tiles; tiles are saved Data Explorer views and built-in tiles (latest positions map, active alerts, recent events, entity status counts) with a size and an order; no free-form canvas | Architecture 30.2: not a Grafana clone. Decided by Tim on 2026-09-04. |
 | D87 | MCP write tools | `create_event`, `acknowledge_alert`, `request_device_status`, `request_device_position` and `confirm_action`; a server-level AI action policy per class (allowed, confirmation, privileged, disabled) edited by server admins; a two-step confirmation flow where the tool returns a confirmation token that `confirm_action` executes; scopes `events:write`, `alerts:write`, `devices:control`; high-impact control disabled by default | Architecture 27.4 and 27.6: the same frameworks as people use, no alternative control path. Decided by Tim on 2026-09-04. |
+| D88 | WildlifeNL connector | Built from the platform's open source API (github.com/UtrechtUniversity/wildlifenl): positions and temperature measurements as borne sensor readings, `SPECIES_DETECTION` events as detections with the species resolved by name, other events skipped; the sensor id is the device's primary identity by default, configurable to the device name or the entity id | The API is the published contract; WildlifeNL links readings to animals through deployments a herd manager registers by sensor id, so the value printed on the collar is the natural key. Decided by Tim on 2026-09-04. |
+| D89 | FerusTracker connector | Built from the Node-RED flow that feeds ferustracker.nl today: the same unauthenticated document (`devEUI`, `fPort`, `tags.payloadType`, `objectJSON` with the collar decoder's field names, `provider`, `site`) rendered from canonical positions and measurements, the payload type per device type, plus a top-level `time`; events skipped | FerusTracker publishes no API; the flow is the only contract, and reproducing it lets the platform keep working unchanged when the flow is retired. Decided by Claude on 2026-09-04 after Tim shared the flow; to confirm live. |
+| D90 | CRA IoT adapter | České Radiokomunikace's platform as a push source: the HTTP endpoint's envelope with the LORIOT-shaped message (`gw` as the uplink, `rx` ignored unless configured, `geo` as a location), downlinks through `POST /lora/devices/{EUI}/down/messages` and the device list through `GET /lora/devices`, with tokens from the CRA single sign-on password grant | Tim asked for it on 2026-09-04; the platform's documentation and Swagger are public and its message is LORIOT's, so the parser shares LORIOT's field reading. Decided by Claude on 2026-09-04; to confirm live. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -266,7 +269,7 @@ smartparks-protect/
 │           ├── base.py
 │           ├── registry.py
 │           ├── transports/  # mqtt, http, websocket, polling
-│           └── adapters/    # chirpstack, kpn_thingpark, loriot, tts, actility, traccar, cloudloop, addaxai_connect
+│           └── adapters/    # chirpstack, kpn_thingpark, loriot, tts, actility, cra_iot, traccar, cloudloop, addaxai_connect
 ├── tests/
 │   ├── fixtures/payloads/   # recorded real payloads per adapter and driver
 │   └── <package>/           # one directory per package, mirrors CI matrix
@@ -628,8 +631,9 @@ Release:
 
 - [x] The Things Stack adapter (events, gateways, downlinks). (2026-09-04, D84, `adapters/tts`, from the webhook, downlink and gateway documentation)
 - [x] Actility ThingPark adapter (private and public variants share code with KPN). (2026-09-04, `adapters/actility_thingpark`, a subclass of the KPN adapter)
-- [ ] WildlifeNL outbound connector (API and mappings confirmed in a spike first). (Deferred, D84: the platform is EarthRanger based and publishes no API of its own; the direct EarthRanger connector is the route once a site and a token exist.)
-- [ ] FerusTracker outbound connector. (Deferred, D84: no public API found.)
+- [x] CRA IoT adapter (added on Tim's request). (2026-09-04, D90, `adapters/cra_iot`, from the platform's public documentation and Swagger; the live check waits for an account with a LoRa device)
+- [x] WildlifeNL outbound connector (API and mappings confirmed in a spike first). (2026-09-04, D88, `connectors/wildlifenl.py`, from the platform's open source API after Tim sent the repository; the live check waits for the platform's URL and a data-system account)
+- [x] FerusTracker outbound connector. (2026-09-04, D89, `connectors/ferustracker.py`, from the Node-RED flow Tim shared; the live check waits for the site value and a look at the platform)
 - [x] Movebank outbound connector with entity, assignment period, timestamp and sensor mappings. (2026-09-04, D85: two export datasets in Movebank's import format instead of a push connector, since Movebank ingests through arranged live feeds or file import)
 - [x] Direct EarthRanger API connector variant with stable object ids and updates. (2026-09-04, `connectors/earthranger.py`, updates through the previous delivery's id)
 - [x] Project dashboards: saved views arranged on a grid, shared per project. Not a Grafana clone (30.2). (2026-09-04, D86)
@@ -637,7 +641,7 @@ Release:
 - [x] Project-specific SVG icon upload with validation (24.6, optional). (2026-09-04)
 - [x] Docs and runbooks per connector. (2026-09-04: The Things Stack, Actility, EarthRanger direct, dashboards, icons, MCP write tools)
 
-**Exit criteria.** Each connector has a runbook, fixture tests and a recorded live test. (Runbooks and fixture tests exist for The Things Stack, Actility and the direct EarthRanger connector; the recorded live tests wait for an application, a deployment and a site, listed under the inputs.)
+**Exit criteria.** Each connector has a runbook, fixture tests and a recorded live test. (Runbooks and fixture tests exist for The Things Stack, Actility, CRA IoT, the direct EarthRanger connector, WildlifeNL and FerusTracker; the recorded live tests wait for an application, a deployment and a site, listed under the inputs.)
 
 ---
 
@@ -696,7 +700,7 @@ Listed by the phase where they are first needed.
 - [ ] Phase 9: a ChatGPT account with Developer mode (Pro or Business) to connect https://dev-protect.smartparks.org/mcp; Claude was verified on 2026-09-04.
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work. (Built from documentation on 2026-09-04; the card and the adapter wait for a collar and an account.)
-- [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access. (2026-09-04: no public API found for WildlifeNL and FerusTracker; Movebank became an export format. Still needed for live checks: a The Things Stack application, an Actility ThingPark deployment and an EarthRanger site with a token.)
+- [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access. (2026-09-04: WildlifeNL's API is open source and the connector is built; FerusTracker's contract is the Node-RED flow Tim shared and the connector is built; Movebank became an export format. Still needed for live checks: a The Things Stack application, an Actility ThingPark deployment, an EarthRanger site with a token, WildlifeNL's API URL with a data-system account, FerusTracker's site value, and a CRA IoT account with a LoRa device.)
 
 ## Session log
 
@@ -888,4 +892,12 @@ Listed by the phase where they are first needed.
 - Frontend: Dashboards under Analyze with saved view, map, alerts, events and status tiles; custom icons in project settings with the icon store; the AI clients policy page; Movebank datasets in the export dialog.
 - Verified: adapter, connector, platform API and MCP tests, lint, mypy, frontend lint, typecheck and tests, strict docs build.
 - Open: live checks with a The Things Stack application, a ThingPark deployment and an EarthRanger site; WildlifeNL and FerusTracker when access exists; Cloudloop's, TTS's and EarthRanger's deep link paths are guesses until seen live.
+
+### 2026-09-04, phase 13 addendum: WildlifeNL, FerusTracker and CRA IoT (Claude)
+
+- Phase 13 committed and pushed (3d5fe4f, CI green). Tim sent the WildlifeNL API repository (UtrechtUniversity/wildlifenl, MPL-2.0, Go with huma; Postgres and InfluxDB), which corrects D84's assumption that the platform is EarthRanger based.
+- D88 asked and taken: positions and temperatures as borne sensor readings, camera trap detections as detections, the device identity as the sensor id. Built `connectors/wildlifenl.py` with species resolution by name, the role check in the connection test, `DeliveryItem.device_identity`, tests, the runbook and the plan and changelog entries.
+- FerusTracker: ferustracker.nl is a login page (version 11.48.0) without documentation and no API was found. Tim then shared the Node-RED flow that feeds it (an unauthenticated post per uplink with the decoded fields as `objectJSON`); D89 records the connector built from it, with the assumptions to confirm live listed in its runbook.
+- CRA IoT (portal.iot.cra.cz), asked for by Tim the same evening: built from the platform's public documentation repository and Swagger as `adapters/cra_iot` (D90); its message is the LORIOT format in an envelope, downlinks and devices go through the REST API with single sign-on tokens.
+- Open: WildlifeNL's API URL and a data-system account, FerusTracker's site value and a look at the platform, and a CRA IoT account with a LoRa device, for the live checks.
 

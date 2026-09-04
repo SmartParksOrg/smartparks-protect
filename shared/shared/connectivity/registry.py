@@ -7,6 +7,7 @@ from shared.connectivity.adapters.addaxai_connect import AddaxAiConnectAdapter
 from shared.connectivity.adapters.akenza import AkenzaAdapter
 from shared.connectivity.adapters.chirpstack import ChirpStackAdapter
 from shared.connectivity.adapters.cloudloop import CloudloopAdapter
+from shared.connectivity.adapters.cra_iot import CraIotAdapter
 from shared.connectivity.adapters.generic_http import GenericHttpAdapter
 from shared.connectivity.adapters.generic_mqtt import GenericMqttAdapter
 from shared.connectivity.adapters.kpn_thingpark import KpnThingParkAdapter
@@ -25,6 +26,7 @@ ADAPTERS: dict[str, Adapter] = {
         GenericMqttAdapter(),
         ChirpStackAdapter(),
         KpnThingParkAdapter(),
+        CraIotAdapter(),
         LoriotAdapter(),
         TtsAdapter(),
         ActilityThingParkAdapter(),

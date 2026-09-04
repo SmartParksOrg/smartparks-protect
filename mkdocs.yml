@@ -82,6 +82,7 @@ nav:
       - akenza.io: integrations/akenza/index.md
       - The Things Stack: integrations/tts/index.md
       - Actility ThingPark: integrations/actility/index.md
+      - CRA IoT: integrations/cra-iot/index.md
       - Traccar: integrations/traccar/index.md
       - AddaxAI Connect: integrations/addaxai-connect/index.md
       - Cloudloop (Iridium): integrations/cloudloop/index.md
@@ -89,6 +90,8 @@ nav:
       - Outbound integrations: integrations/outbound.md
       - EarthRanger via Gundi: integrations/earthranger-gundi/index.md
       - EarthRanger direct API: integrations/earthranger/index.md
+      - WildlifeNL: integrations/wildlifenl/index.md
+      - FerusTracker: integrations/ferustracker/index.md
   - Analytics:
       - analytics/index.md
       - Data Explorer: analytics/data-explorer.md

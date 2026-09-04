@@ -57,6 +57,14 @@ class DeliveryItem:
     device_id: uuid.UUID | None = None
     device_name: str | None = None
     device_serial: str | None = None
+    device_type_key: str | None = None
+    device_identity: str | None = field(
+        default=None,
+        metadata={
+            "doc": "The device's primary external identity (DevEUI, IMEI, serial), the value "
+            "printed on the hardware, for targets that register sensors by it"
+        },
+    )
     data_source_name: str | None = None
     location: tuple[float, float] | None = None
     location_is_fallback: bool = False

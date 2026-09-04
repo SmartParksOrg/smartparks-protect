@@ -39,10 +39,12 @@ from shared.logger import get_logger
 from shared.models import (
     DataSource,
     Device,
+    DeviceType,
     Entity,
     EntityCurrentState,
     EntityType,
     Event,
+    ExternalIdentity,
     Integration,
     IntegrationDelivery,
     Measurement,
@@ -312,6 +314,15 @@ async def load_item(session: AsyncSession, delivery: IntegrationDelivery) -> Del
             item.device_id = device.id
             item.device_name = device.name
             item.device_serial = device.serial_number
+            item.device_type_key = await session.scalar(
+                select(DeviceType.key).where(DeviceType.id == device.device_type_id)
+            )
+            item.device_identity = await session.scalar(
+                select(ExternalIdentity.external_id)
+                .where(ExternalIdentity.device_id == device.id, ExternalIdentity.ignored.is_(False))
+                .order_by(ExternalIdentity.last_seen_at.desc().nulls_last())
+                .limit(1)
+            )
             if item.link is None:
                 item.link = f"{base_url}/projects/{project.id}/devices/{device.id}"
     if data_source_id is not None:
