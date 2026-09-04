@@ -130,10 +130,14 @@ jobs:
       - run: uv run mkdocs build --strict
       - name: Links, anchors, diagrams and the MCP tool reference
         run: uv run scripts/docs_check.py
-        env:
+        env:  # the MCP server is built to list its tools; the settings need these
           DATABASE_URL: postgresql+asyncpg://protect:protect-dev-password@localhost:5432/smartparks_protect
           REDIS_URL: redis://localhost:6379/0
+          MINIO_ENDPOINT: localhost:9000
+          MINIO_ROOT_USER: protect
+          MINIO_ROOT_PASSWORD: protect-dev-minio
           JWT_SECRET: ci-secret-that-is-at-least-32-bytes-long
+          CREDENTIALS_KEY: ci-credentials-key-long-enough
 
   audit:
     name: dependency audit
