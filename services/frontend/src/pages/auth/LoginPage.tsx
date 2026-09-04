@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -20,6 +21,7 @@ const schema = z.object({
 type Values = z.infer<typeof schema>;
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const { status, login } = useAuthStore();
   const version = useQuery({
@@ -41,11 +43,11 @@ export function LoginPage() {
 
   return (
     <AuthShell
-      title="Smart Parks Protect"
-      description="Sign in to your project"
+      title={t("Smart Parks Protect")}
+      description={t("Sign in to your project")}
       footer={
         <>
-          <Link to="/forgot-password" className="underline">Forgot your password?</Link>
+          <Link to="/forgot-password" className="underline">{t("Forgot your password?")}</Link>
           <div className="mt-3 text-xs" data-testid="api-version">
             {version.isPending && "Connecting to the API"}
             {version.isError && "API not reachable"}
@@ -54,15 +56,15 @@ export function LoginPage() {
         </>
       }
     >
-      {params.get("expired") && <Callout kind="warning">Your session ended. Sign in again.</Callout>}
+      {params.get("expired") && <Callout kind="warning">{t("Your session ended. Sign in again.")}</Callout>}
       <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t("Email")}</Label>
           <Input id="email" type="email" autoComplete="username" aria-invalid={!!form.formState.errors.email} {...form.register("email")} />
           {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{t("Password")}</Label>
           <Input id="password" type="password" autoComplete="current-password" aria-invalid={!!form.formState.errors.password} {...form.register("password")} />
           {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
         </div>

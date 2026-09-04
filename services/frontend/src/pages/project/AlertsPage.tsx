@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
@@ -23,6 +24,7 @@ const STATUSES = ["open", "acknowledged", "resolved"] as const;
 
 /** The alert inbox (architecture 16): open, acknowledged and resolved, with the lifecycle actions. */
 export function AlertsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
+  const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const scope = scopeProp ?? projectId;
   const [params, setParams] = useSearchParams();
@@ -36,11 +38,11 @@ export function AlertsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   const projectPath = scope === "server" ? null : `/projects/${scope}`;
 
   const columns: ColumnDef<Alert, unknown>[] = [
-    { header: "Severity", accessorKey: "severity", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
-    { header: "Alert", accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{row.original.title}</span> },
-    { header: "When", accessorKey: "time", cell: ({ row }) => <span title={formatTime(row.original.time)}>{formatAgo(row.original.time)}</span> },
-    { header: "Entity", accessorKey: "entity_id", cell: ({ getValue }) => { const id = getValue<string | null>(); return id && projectPath ? <Link className="underline" to={`${projectPath}/map?entity=${id}`} onClick={(e) => e.stopPropagation()}>on map</Link> : ""; } },
-    { header: "Status", accessorKey: "status", cell: ({ row }) => <span className="inline-flex items-center gap-2"><StatusBadge value={row.original.status} />{row.original.status === "acknowledged" && <span className="text-xs text-muted-foreground">{formatAgo(row.original.acknowledged_at)}</span>}</span> },
+    { header: t("Severity"), accessorKey: "severity", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
+    { header: t("Alert"), accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{row.original.title}</span> },
+    { header: t("When"), accessorKey: "time", cell: ({ row }) => <span title={formatTime(row.original.time)}>{formatAgo(row.original.time)}</span> },
+    { header: t("Entity"), accessorKey: "entity_id", cell: ({ getValue }) => { const id = getValue<string | null>(); return id && projectPath ? <Link className="underline" to={`${projectPath}/map?entity=${id}`} onClick={(e) => e.stopPropagation()}>{t("on map")}</Link> : ""; } },
+    { header: t("Status"), accessorKey: "status", cell: ({ row }) => <span className="inline-flex items-center gap-2"><StatusBadge value={row.original.status} />{row.original.status === "acknowledged" && <span className="text-xs text-muted-foreground">{formatAgo(row.original.acknowledged_at)}</span>}</span> },
     { id: "actions", header: "", cell: ({ row }) => row.original.status !== "resolved" && <span onClick={(e) => e.stopPropagation()}><Button size="sm" variant="outline" onClick={() => setActing(row.original)}>{row.original.status === "open" ? "Acknowledge" : "Resolve"}</Button></span> },
   ];
 
@@ -56,7 +58,7 @@ export function AlertsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
       </Page>
       <Dialog open={acting !== null} onOpenChange={(o) => !o && setActing(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{acting?.title}</DialogTitle><DialogDescription>{acting?.event_type} at {formatTime(acting?.time)}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{acting?.title}</DialogTitle><DialogDescription>{t("{{type}} at {{time}}", { type: acting?.event_type, time: formatTime(acting?.time) })}</DialogDescription></DialogHeader>
           {acting && <AlertActions scope={scope} alert={acting} onDone={() => setActing(null)} />}
         </DialogContent>
       </Dialog>

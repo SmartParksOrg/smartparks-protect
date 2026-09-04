@@ -8,12 +8,34 @@ from protect_api.schemas.common import ORMModel
 from shared.enums import Role
 
 
+class OrganizationCreate(BaseModel):
+    """A grouping of projects for server admins (decision D92), not a security boundary."""
+
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(pattern="^[a-z0-9][a-z0-9-]{1,98}$")
+
+
+class OrganizationUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    slug: str | None = Field(default=None, pattern="^[a-z0-9][a-z0-9-]{1,98}$")
+
+
+class OrganizationRead(ORMModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    created_at: datetime
+    updated_at: datetime
+    project_count: int = 0
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     slug: str = Field(pattern="^[a-z0-9][a-z0-9-]{1,98}$")
     description: str | None = None
     timezone: str = "UTC"
     settings: dict[str, Any] = Field(default_factory=dict)
+    organization_id: uuid.UUID | None = None
 
 
 class ProjectUpdate(BaseModel):
@@ -22,10 +44,12 @@ class ProjectUpdate(BaseModel):
     timezone: str | None = None
     settings: dict[str, Any] | None = None
     archived_at: datetime | None = None
+    organization_id: uuid.UUID | None = None
 
 
 class ProjectRead(ORMModel):
     id: uuid.UUID
+    organization_id: uuid.UUID | None = None
     name: str
     slug: str
     description: str | None

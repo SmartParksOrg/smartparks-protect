@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -25,23 +26,24 @@ const MODES: Record<string, string> = { allowed: "allowed at once", confirmation
 /** The AI action policy (architecture 27.6): what AI clients may do on a person's behalf,
  * per action class, on top of that person's permissions. */
 export function AiPolicyPage() {
+  const { t } = useTranslation();
   const policy = useQuery({ queryKey: queryKeys.aiPolicy, queryFn: () => api.get<AiPolicy>("/api/v1/admin/ai-policy") });
   const [edits, setEdits] = useState<Record<string, string>>({});
   const stored = policy.data?.policy ?? {};
   const draft = { ...stored, ...edits };
-  const save = useMutationToast({ mutationFn: () => api.put<AiPolicy>("/api/v1/admin/ai-policy", { body: { policy: draft } }), invalidate: [queryKeys.aiPolicy], success: "Policy saved", onSuccess: () => setEdits({}) });
+  const save = useMutationToast({ mutationFn: () => api.put<AiPolicy>("/api/v1/admin/ai-policy", { body: { policy: draft } }), invalidate: [queryKeys.aiPolicy], success: t("Policy saved"), onSuccess: () => setEdits({}) });
   const dirty = Object.entries(edits).some(([k, v]) => stored[k] !== v);
   return (
     <>
-      <PageHeader title="AI clients policy" description="What AI clients connected over MCP may do on a person's behalf, beyond reading. The person's own permissions and the granted scopes apply as well." actions={<Button disabled={!dirty || save.isPending} onClick={() => save.mutate()}>Save</Button>} />
+      <PageHeader title={t("AI clients policy")} description={t("What AI clients connected over MCP may do on a person's behalf, beyond reading. The person's own permissions and the granted scopes apply as well.")} actions={<Button disabled={!dirty || save.isPending} onClick={() => save.mutate()}>{t("Save")}</Button>} />
       <Page>
         {policy.error && <Callout kind="error">{policy.error.message}</Callout>}
-        <Callout kind="info">Reads and analysis are always allowed within the person's access. A write held for confirmation returns a summary to the AI client, which must ask the person before executing it. High-impact control stays disabled for AI clients in this version.</Callout>
+        <Callout kind="info">{t("Reads and analysis are always allowed within the person's access. A write held for confirmation returns a summary to the AI client, which must ask the person before executing it. High-impact control stays disabled for AI clients in this version.")}</Callout>
         <Card>
-          <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t("Actions")}</CardTitle></CardHeader>
           <CardContent>
             <table className="w-full text-sm">
-              <thead><tr className="text-left text-muted-foreground"><th className="py-1">Action</th><th>Class</th><th>Scope</th><th>Policy</th></tr></thead>
+              <thead><tr className="text-left text-muted-foreground"><th className="py-1">{t("Action")}</th><th>{t("Class")}</th><th>{t("Scope")}</th><th>{t("Policy")}</th></tr></thead>
               <tbody>
                 {policy.data?.actions.map((a) => (
                   <tr key={a.action} className="border-t">
@@ -60,7 +62,7 @@ export function AiPolicyPage() {
                 ))}
               </tbody>
             </table>
-            {policy.data?.updated_at && <p className="mt-2 text-xs text-muted-foreground">Last changed {formatTime(policy.data.updated_at)}.</p>}
+            {policy.data?.updated_at && <p className="mt-2 text-xs text-muted-foreground">{t("Last changed")} {formatTime(policy.data.updated_at)}.</p>}
           </CardContent>
         </Card>
       </Page>

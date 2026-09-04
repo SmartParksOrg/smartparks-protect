@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -31,6 +32,7 @@ type Values = z.infer<typeof schema>;
 
 /** Notification targets of a project or of the server: email addresses and Telegram chats linked with a code (decision D43). */
 export function NotificationsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
+  const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const scope = scopeProp ?? projectId;
   const base = `${scopeBase(scope)}/notification-targets`;
@@ -55,19 +57,19 @@ export function NotificationsPage({ scope: scopeProp }: { scope?: Scope } = {}) 
     mutationFn: (t: NotificationTarget) => api.post<{ status: string; detail: string | null }>(`${base}/${t.id}/test`),
     onSuccess: (r) => (r.status === "sent" ? toast.success("Test message sent") : r.status === "skipped" ? toast.info(`Not sent: ${r.detail}`) : toast.error(`Failed: ${r.detail}`)),
   });
-  const remove = useMutationToast({ mutationFn: (t: NotificationTarget) => api.delete<void>(`${base}/${t.id}`), invalidate, success: "Target deleted", onSuccess: () => setRemoving(null) });
+  const remove = useMutationToast({ mutationFn: (t: NotificationTarget) => api.delete<void>(`${base}/${t.id}`), invalidate, success: t("Target deleted"), onSuccess: () => setRemoving(null) });
 
   const columns: ColumnDef<NotificationTarget, unknown>[] = [
-    { header: "Name", accessorKey: "name" },
-    { header: "Channel", accessorKey: "channel" },
-    { header: "Address", id: "address", cell: ({ row }) => row.original.channel === "email" ? row.original.address : row.original.linked ? "chat linked" : <span className="text-brand-sand">not linked</span> },
-    { header: "Enabled", accessorKey: "enabled", cell: ({ getValue }) => <StatusBadge value={getValue<boolean>() ? "enabled" : "disabled"} /> },
-    { header: "Updated", accessorKey: "updated_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
+    { header: t("Name"), accessorKey: "name" },
+    { header: t("Channel"), accessorKey: "channel" },
+    { header: t("Address"), id: "address", cell: ({ row }) => row.original.channel === "email" ? row.original.address : row.original.linked ? "chat linked" : <span className="text-brand-sand">{t("not linked")}</span> },
+    { header: t("Enabled"), accessorKey: "enabled", cell: ({ getValue }) => <StatusBadge value={getValue<boolean>() ? "enabled" : "disabled"} /> },
+    { header: t("Updated"), accessorKey: "updated_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
     { id: "actions", header: "", cell: ({ row }) => (
         <span className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           {row.original.channel === "telegram" && <Button variant="ghost" size="sm" onClick={() => (row.original.telegram_link_code ? setLinking(row.original) : relink.mutate(row.original))}><RefreshCw className="size-4" /> {row.original.linked ? "Relink" : "Link code"}</Button>}
-          <Button variant="ghost" size="sm" onClick={() => test.mutate(row.original)} disabled={test.isPending}><Send className="size-4" /> Test</Button>
-          <Button variant="ghost" size="icon" aria-label="Delete target" onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => test.mutate(row.original)} disabled={test.isPending}><Send className="size-4" /> {t("Test")}</Button>
+          <Button variant="ghost" size="icon" aria-label={t("Delete target")} onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button>
         </span>
       ) },
   ];
@@ -75,45 +77,45 @@ export function NotificationsPage({ scope: scopeProp }: { scope?: Scope } = {}) 
 
   return (
     <>
-      <PageHeader title="Notifications" description={scope === "server" ? "Where system alerts go: server-level targets used by server-level automations" : "Where this project's automations deliver: email addresses and Telegram chats"} actions={<Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> New target</Button>} />
+      <PageHeader title={t("Notifications")} description={scope === "server" ? "Where system alerts go: server-level targets used by server-level automations" : "Where this project's automations deliver: email addresses and Telegram chats"} actions={<Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> {t("New target")}</Button>} />
       <Page>
-        {caps.data && !caps.data.mail_configured && <Callout kind="warning">Mail is not configured on this server (MAIL_SERVER and friends in the environment). Email notifications are logged, not sent.</Callout>}
-        {caps.data && !caps.data.telegram_configured && <Callout kind="info">Telegram is not configured (TELEGRAM_BOT_TOKEN). Telegram targets can be created but cannot be linked or reached.</Callout>}
+        {caps.data && !caps.data.mail_configured && <Callout kind="warning">{t("Mail is not configured on this server (MAIL_SERVER and friends in the environment). Email notifications are logged, not sent.")}</Callout>}
+        {caps.data && !caps.data.telegram_configured && <Callout kind="info">{t("Telegram is not configured (TELEGRAM_BOT_TOKEN). Telegram targets can be created but cannot be linked or reached.")}</Callout>}
         {targets.error && <Callout kind="error">{targets.error.message}</Callout>}
-        <DataTable columns={columns} data={targets.data?.items} isLoading={targets.isPending} emptyMessage="No targets yet. Add an email address or a Telegram chat, then use it in an automation." onRowClick={(t) => { setEditing(t); setOpen(true); }} />
+        <DataTable columns={columns} data={targets.data?.items} isLoading={targets.isPending} emptyMessage={t("No targets yet. Add an email address or a Telegram chat, then use it in an automation.")} onRowClick={(t) => { setEditing(t); setOpen(true); }} />
       </Page>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editing ? "Edit target" : "New target"}</DialogTitle><DialogDescription>A Telegram target gets a code; send it to the bot from the chat that should receive alerts.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Edit target" : "New target"}</DialogTitle><DialogDescription>{t("A Telegram target gets a code; send it to the bot from the chat that should receive alerts.")}</DialogDescription></DialogHeader>
           <form className="space-y-3" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
-            <Field label="Name" htmlFor="nt-name" error={form.formState.errors.name?.message}><Input id="nt-name" {...form.register("name")} /></Field>
-            <Field label="Channel" htmlFor="nt-channel">
+            <Field label={t("Name")} htmlFor="nt-name" error={form.formState.errors.name?.message}><Input id="nt-name" {...form.register("name")} /></Field>
+            <Field label={t("Channel")} htmlFor="nt-channel">
               <Select value={channel} disabled={Boolean(editing)} onValueChange={(v) => form.setValue("channel", v as "email" | "telegram")}>
                 <SelectTrigger id="nt-channel"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="email">Email</SelectItem><SelectItem value="telegram">Telegram</SelectItem></SelectContent>
+                <SelectContent><SelectItem value="email">{t("Email")}</SelectItem><SelectItem value="telegram">{t("Telegram")}</SelectItem></SelectContent>
               </Select>
             </Field>
-            {channel === "email" && <Field label="Email address" htmlFor="nt-address" error={form.formState.errors.address?.message}><Input id="nt-address" type="email" {...form.register("address")} /></Field>}
-            <div className="flex items-center gap-2"><Switch id="nt-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="nt-enabled" className="text-sm">Enabled</label></div>
+            {channel === "email" && <Field label={t("Email address")} htmlFor="nt-address" error={form.formState.errors.address?.message}><Input id="nt-address" type="email" {...form.register("address")} /></Field>}
+            <div className="flex items-center gap-2"><Switch id="nt-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="nt-enabled" className="text-sm">{t("Enabled")}</label></div>
             {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
-            <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={save.isPending}>Save</Button></DialogFooter>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>{t("Cancel")}</Button><Button type="submit" disabled={save.isPending}>{t("Save")}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
       <Dialog open={linking !== null} onOpenChange={(o) => !o && setLinking(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Link a Telegram chat</DialogTitle><DialogDescription>From the chat or group that should receive alerts, send this command to the bot. The code is valid until {formatTime(linking?.telegram_link_expires_at)}.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{t("Link a Telegram chat")}</DialogTitle><DialogDescription>{t("From the chat or group that should receive alerts, send this command to the bot. The code is valid until")} {formatTime(linking?.telegram_link_expires_at)}.</DialogDescription></DialogHeader>
           {linking && (
             <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2"><code className="flex-1 rounded bg-muted p-2">/start {linking.telegram_link_code}</code><Button variant="outline" size="icon" aria-label="Copy command" onClick={() => { void navigator.clipboard.writeText(`/start ${linking.telegram_link_code}`); toast.success("Copied"); }}><Copy className="size-4" /></Button></div>
-              {linking.link_url ? <div>Or open <a className="underline" href={linking.link_url} target="_blank" rel="noreferrer">{linking.link_url}</a> on a phone with Telegram.</div> : <div className="text-muted-foreground">The bot username is not known to the server yet; find the bot by the name it was created with.</div>}
-              <div className="text-muted-foreground">The automation service links the chat within a few seconds; the target then shows as linked. Use Test to confirm.</div>
+              <div className="flex items-center gap-2"><code className="flex-1 rounded bg-muted p-2">{`/start ${linking.telegram_link_code}`}</code><Button variant="outline" size="icon" aria-label={t("Copy command")} onClick={() => { void navigator.clipboard.writeText(`/start ${linking.telegram_link_code}`); toast.success("Copied"); }}><Copy className="size-4" /></Button></div>
+              {linking.link_url ? <div>{t("Or open")} <a className="underline" href={linking.link_url} target="_blank" rel="noreferrer">{linking.link_url}</a> {t("on a phone with Telegram.")}</div> : <div className="text-muted-foreground">{t("The bot username is not known to the server yet; find the bot by the name it was created with.")}</div>}
+              <div className="text-muted-foreground">{t("The automation service links the chat within a few seconds; the target then shows as linked. Use Test to confirm.")}</div>
             </div>
           )}
-          <DialogFooter><Button onClick={() => setLinking(null)}>Done</Button></DialogFooter>
+          <DialogFooter><Button onClick={() => setLinking(null)}>{t("Done")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-      <ConfirmDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={`Delete target ${removing?.name ?? ""}?`} description="Automations that use it will fail their notify action until they are edited." confirmLabel="Delete" pending={remove.isPending} onConfirm={() => removing && remove.mutate(removing)} />
+      <ConfirmDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={`Delete target ${removing?.name ?? ""}?`} description={t("Automations that use it will fail their notify action until they are edited.")} confirmLabel={t("Delete")} pending={remove.isPending} onConfirm={() => removing && remove.mutate(removing)} />
     </>
   );
 }

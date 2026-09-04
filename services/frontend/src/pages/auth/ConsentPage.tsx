@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 
@@ -19,6 +20,7 @@ import { useAuthStore } from "@/stores/auth";
  * name inside the document is self-asserted.
  */
 export function ConsentPage() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const requestId = params.get("request") ?? "";
   const user = useAuthStore((s) => s.user);
@@ -35,17 +37,17 @@ export function ConsentPage() {
 
   if (!requestId) {
     return (
-      <AuthShell title="Connect an AI client">
-        <Callout kind="error">This page needs an authorization request. Start the connection from the AI client again.</Callout>
+      <AuthShell title={t("Connect an AI client")}>
+        <Callout kind="error">{t("This page needs an authorization request. Start the connection from the AI client again.")}</Callout>
       </AuthShell>
     );
   }
   if (info.isPending) {
-    return <AuthShell title="Connect an AI client"><p className="text-center text-sm text-muted-foreground">Loading the request…</p></AuthShell>;
+    return <AuthShell title={t("Connect an AI client")}><p className="text-center text-sm text-muted-foreground">{t("Loading the request…")}</p></AuthShell>;
   }
   if (info.isError) {
     return (
-      <AuthShell title="Connect an AI client">
+      <AuthShell title={t("Connect an AI client")}>
         <Callout kind="error">{info.error.message}</Callout>
       </AuthShell>
     );
@@ -53,14 +55,14 @@ export function ConsentPage() {
   const c = info.data;
   const clientLabel = c.registration === "metadata_document" ? c.client_host ?? c.client_id : c.client_name ?? c.client_id;
   return (
-    <AuthShell title="Connect an AI client" description={`Signed in as ${user?.email ?? ""}`}>
+    <AuthShell title={t("Connect an AI client")} description={`Signed in as ${user?.email ?? ""}`}>
       <div className="space-y-3 text-sm">
         <p>
-          <span className="font-medium">{clientLabel}</span> asks for read access to your Smart Parks Protect data.
-          {c.registration === "metadata_document" && c.client_name && <span className="text-muted-foreground"> It calls itself “{c.client_name}”.</span>}
+          <span className="font-medium">{clientLabel}</span> {t("asks for read access to your Smart Parks Protect data.")}
+          {c.registration === "metadata_document" && c.client_name && <span className="text-muted-foreground"> {t("It calls itself “{{name}}”.", { name: c.client_name })}</span>}
         </p>
         <div className="rounded-md border bg-muted/40 px-3 py-2">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">It may</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">{t("It may")}</div>
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             {c.scopes.map((s) => (
               <li key={s.key}>{s.description}</li>
@@ -68,14 +70,14 @@ export function ConsentPage() {
           </ul>
         </div>
         <p className="text-muted-foreground">
-          After approval you return to <span className="font-mono">{c.redirect_host}</span>. Everything the client reads is done as you and recorded in the audit log. You can disconnect it later under Connected AI clients.
+          {t("After approval you return to {{host}}.", { host: c.redirect_host })} {t("Everything the client reads is done as you and recorded in the audit log. You can disconnect it later under Connected AI clients.")}
         </p>
         {c.loopback_redirect && (
-          <Callout kind="warning">The client runs on this computer (it returns to {c.redirect_host}). Approve only if you started this connection yourself.</Callout>
+          <Callout kind="warning">{t("The client runs on this computer (it returns to {{host}}). Approve only if you started this connection yourself.", { host: c.redirect_host })}</Callout>
         )}
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={() => decide.mutate("approve")} disabled={decide.isPending}>Allow</Button>
-          <Button className="flex-1" variant="outline" onClick={() => decide.mutate("deny")} disabled={decide.isPending}>Deny</Button>
+          <Button className="flex-1" onClick={() => decide.mutate("approve")} disabled={decide.isPending}>{t("Allow")}</Button>
+          <Button className="flex-1" variant="outline" onClick={() => decide.mutate("deny")} disabled={decide.isPending}>{t("Deny")}</Button>
         </div>
       </div>
     </AuthShell>

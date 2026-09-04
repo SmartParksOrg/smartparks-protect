@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -14,22 +15,23 @@ import { AuthShell } from "@/pages/auth/AuthShell";
 const emailSchema = z.object({ email: z.email("Enter a valid email address") });
 
 export function ForgotPasswordPage() {
+  const { t } = useTranslation();
   const form = useForm<z.infer<typeof emailSchema>>({ resolver: zodResolver(emailSchema), defaultValues: { email: "" } });
   const request = useMutation({
     mutationFn: (values: { email: string }) => api.post("/api/v1/auth/forgot-password", { body: values, anonymous: true }),
   });
   return (
-    <AuthShell title="Reset your password" description="We send a link to your email address" footer={<Link to="/login" className="underline">Back to sign in</Link>}>
+    <AuthShell title={t("Reset your password")} description={t("We send a link to your email address")} footer={<Link to="/login" className="underline">{t("Back to sign in")}</Link>}>
       {request.isSuccess ? (
-        <Callout kind="success">If an account exists for this address, a reset link is on its way.</Callout>
+        <Callout kind="success">{t("If an account exists for this address, a reset link is on its way.")}</Callout>
       ) : (
         <form className="flex flex-col gap-4" onSubmit={form.handleSubmit((v) => request.mutate(v))} noValidate>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("Email")}</Label>
             <Input id="email" type="email" autoComplete="username" {...form.register("email")} />
             {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
           </div>
-          <Button type="submit" disabled={request.isPending}>Send reset link</Button>
+          <Button type="submit" disabled={request.isPending}>{t("Send reset link")}</Button>
         </form>
       )}
     </AuthShell>
@@ -41,6 +43,7 @@ const resetSchema = z
   .refine((v) => v.password === v.confirm, { message: "Passwords do not match", path: ["confirm"] });
 
 export function ResetPasswordPage() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const token = params.get("token") ?? "";
@@ -50,22 +53,22 @@ export function ResetPasswordPage() {
     onSuccess: () => void navigate("/login", { replace: true }),
     onError: (error) => form.setError("root", { message: (error as Error).message }),
   });
-  if (!token) return <AuthShell title="Reset link needed"><Callout kind="error">Open the link from the reset email.</Callout></AuthShell>;
+  if (!token) return <AuthShell title={t("Reset link needed")}><Callout kind="error">{t("Open the link from the reset email.")}</Callout></AuthShell>;
   return (
-    <AuthShell title="Choose a new password">
+    <AuthShell title={t("Choose a new password")}>
       <form className="flex flex-col gap-4" onSubmit={form.handleSubmit((v) => reset.mutate(v))} noValidate>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="password">New password</Label>
+          <Label htmlFor="password">{t("New password")}</Label>
           <Input id="password" type="password" autoComplete="new-password" {...form.register("password")} />
           {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="confirm">Repeat password</Label>
+          <Label htmlFor="confirm">{t("Repeat password")}</Label>
           <Input id="confirm" type="password" autoComplete="new-password" {...form.register("confirm")} />
           {form.formState.errors.confirm && <p className="text-sm text-destructive">{form.formState.errors.confirm.message}</p>}
         </div>
         {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
-        <Button type="submit" disabled={reset.isPending}>Set password</Button>
+        <Button type="submit" disabled={reset.isPending}>{t("Set password")}</Button>
       </form>
     </AuthShell>
   );

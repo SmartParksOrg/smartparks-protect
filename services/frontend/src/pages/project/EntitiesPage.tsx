@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
@@ -18,6 +19,7 @@ import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { formatAgo } from "@/lib/format";
 
 export function EntitiesPage() {
+  const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const role = useProjectRole(projectId);
   const navigate = useNavigate();
@@ -30,18 +32,18 @@ export function EntitiesPage() {
   const lastSeen = useMemo(() => new Map((state.data?.features as unknown as { properties: EntityFeatureProperties }[] | undefined)?.map((f) => [f.properties.entity_id, f.properties])), [state.data]);
 
   const columns: ColumnDef<Entity, unknown>[] = [
-    { header: "Name", accessorKey: "name", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={row.original.icon_key ?? typeById.get(row.original.entity_type_id)?.icon_key} />{row.original.name}</span> },
-    { header: "Type", accessorFn: (e) => typeById.get(e.entity_type_id)?.label ?? "" },
-    { header: "Status", accessorKey: "status", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
-    { header: "Last seen", accessorFn: (e) => lastSeen.get(e.id)?.last_seen_at ?? undefined, cell: ({ getValue }) => formatAgo(getValue<string | undefined>()) },
-    { header: "Device", accessorFn: (e) => lastSeen.get(e.id)?.device_id ?? undefined, cell: ({ getValue }) => (getValue<string | undefined>() ? "assigned" : "none") },
+    { header: t("Name"), accessorKey: "name", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={row.original.icon_key ?? typeById.get(row.original.entity_type_id)?.icon_key} />{row.original.name}</span> },
+    { header: t("Type"), accessorFn: (e) => typeById.get(e.entity_type_id)?.label ?? "" },
+    { header: t("Status"), accessorKey: "status", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
+    { header: t("Last seen"), accessorFn: (e) => lastSeen.get(e.id)?.last_seen_at ?? undefined, cell: ({ getValue }) => formatAgo(getValue<string | undefined>()) },
+    { header: t("Device"), accessorFn: (e) => lastSeen.get(e.id)?.device_id ?? undefined, cell: ({ getValue }) => (getValue<string | undefined>() ? "assigned" : "none") },
   ];
 
   return (
     <>
-      <PageHeader title="Entities" description="Animals, people, vehicles, gates and other monitored objects" actions={canAdmin(role) && <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> New entity</Button>} />
+      <PageHeader title={t("Entities")} description={t("Animals, people, vehicles, gates and other monitored objects")} actions={canAdmin(role) && <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> {t("New entity")}</Button>} />
       <Page>
-        <DataTable columns={columns} data={entities.data?.items} isLoading={entities.isPending} emptyMessage="No entities yet." onRowClick={(e) => {
+        <DataTable columns={columns} data={entities.data?.items} isLoading={entities.isPending} emptyMessage={t("No entities yet.")} onRowClick={(e) => {
             if (canAdmin(role)) {
               setEditing(e);
               setOpen(true);

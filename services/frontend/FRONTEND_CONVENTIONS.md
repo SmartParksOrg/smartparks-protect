@@ -84,3 +84,7 @@ A typed `fetch` wrapper in `src/api/client.ts` (phase 1) attaches the token, ret
 
 - Vitest with Testing Library for components and hooks. A test per component that has logic.
 - Playwright smoke (phase 3) logs in and opens every route at the three viewports, fails on console errors and horizontal overflow.
+
+## Text people read
+
+Every string a person reads goes through the translation layer (decision D93): `const { t } = useTranslation()` in a component or hook, `i18n.t()` at module level, with the English text as the key. Interpolate with `t("{{count}} devices", { count })`, never by concatenation; pluralise with i18next's `count` option. Units, codes and identifiers are not translated. The lint rule `i18next/no-literal-string` refuses JSX text and the attributes people see; after adding strings run `npm run i18n:extract` so the English catalogue stays complete (CI checks it).

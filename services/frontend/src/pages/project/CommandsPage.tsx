@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useParams, useSearchParams } from "react-router";
@@ -18,6 +19,7 @@ const STATUSES = ["queued", "transmitted", "acknowledged", "confirmed_by_device"
 
 /** Every command of the project, newest first (architecture 17): who asked, what was sent, how far it got. */
 export function CommandsPage() {
+  const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const status = params.get("status") ?? "";
@@ -28,25 +30,25 @@ export function CommandsPage() {
   useProjectStream(projectId, (m) => { if (m.topic === "command.updated") void client.invalidateQueries({ queryKey: ["projects", projectId, "commands"] }); });
 
   const columns: ColumnDef<CommandItem, unknown>[] = [
-    { header: "Created", accessorKey: "created_at", cell: ({ getValue }) => <span className="whitespace-nowrap">{formatTime(getValue<string>())}</span> },
-    { header: "Action", accessorKey: "action_key" },
-    { header: "Device", accessorKey: "external_id", cell: ({ row }) => <span className="font-mono text-xs">{row.original.external_id ?? row.original.device_id.slice(0, 8)}</span> },
-    { header: "Route", accessorKey: "route" },
-    { header: "Status", accessorKey: "status", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
-    { header: "By", accessorFn: (c) => String(c.actor.kind ?? "") },
-    { header: "Detail", accessorKey: "error_message", cell: ({ getValue }) => <span className="text-xs text-destructive">{getValue<string | null>() ?? ""}</span> },
+    { header: t("Created"), accessorKey: "created_at", cell: ({ getValue }) => <span className="whitespace-nowrap">{formatTime(getValue<string>())}</span> },
+    { header: t("Action"), accessorKey: "action_key" },
+    { header: t("Device"), accessorKey: "external_id", cell: ({ row }) => <span className="font-mono text-xs">{row.original.external_id ?? row.original.device_id.slice(0, 8)}</span> },
+    { header: t("Route"), accessorKey: "route" },
+    { header: t("Status"), accessorKey: "status", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
+    { header: t("By"), accessorFn: (c) => String(c.actor.kind ?? "") },
+    { header: t("Detail"), accessorKey: "error_message", cell: ({ getValue }) => <span className="text-xs text-destructive">{getValue<string | null>() ?? ""}</span> },
   ];
 
   return (
     <>
-      <PageHeader title="Commands" description="Every command sent to a device of this project, by people and by automations, with its lifecycle" />
+      <PageHeader title={t("Commands")} description={t("Every command sent to a device of this project, by people and by automations, with its lifecycle")} />
       <Page>
         <Select value={status || "all"} onValueChange={(v) => setParams((p) => { if (v === "all") p.delete("status"); else p.set("status", v); return p; }, { replace: true })}>
-          <SelectTrigger className="w-48" aria-label="Status"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="all">Any status</SelectItem>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replaceAll("_", " ")}</SelectItem>)}</SelectContent>
+          <SelectTrigger className="w-48" aria-label={t("Status")}><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="all">{t("Any status")}</SelectItem>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replaceAll("_", " ")}</SelectItem>)}</SelectContent>
         </Select>
         {commands.error && <Callout kind="error">{commands.error.message}</Callout>}
-        <DataTable columns={columns} data={commands.data?.items} isLoading={commands.isPending} emptyMessage="No commands yet. Open a device and use its Actions menu." onRowClick={(c) => setParams((p) => { p.set("command", c.id); return p; }, { replace: true })} footer={commands.data && `${commands.data.items.length} commands`} />
+        <DataTable columns={columns} data={commands.data?.items} isLoading={commands.isPending} emptyMessage={t("No commands yet. Open a device and use its Actions menu.")} onRowClick={(c) => setParams((p) => { p.set("command", c.id); return p; }, { replace: true })} footer={commands.data && `${commands.data.items.length} commands`} />
       </Page>
       <CommandDetailDialog commandId={selected} projectId={projectId} onClose={() => setParams((p) => { p.delete("command"); return p; }, { replace: true })} />
     </>

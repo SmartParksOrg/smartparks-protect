@@ -24,7 +24,7 @@ The subject of a rule is the entity the data belongs to, or the device when no e
 | No data | duration | The subject has not been seen for this long; needs a schedule trigger. A subject that never reported does not count |
 | Window aggregate | metric, aggregate (avg, min, max, sum, count), window, operator, value | The aggregate over the last window of the metric compared with the value |
 
-Reserved for a later phase, accepted by the schema but not by the evaluator: `near`, `dwell`, `crossed`, `baseline`, `correlation`, `event_chain`. A rule that uses one can be saved but not enabled.
+Reserved for a later release, accepted by the schema but not by the evaluator: `near`, `dwell`, `crossed`, `baseline`, `correlation`, `event_chain`. A rule that uses one can be saved but not enabled.
 
 ## Firing
 

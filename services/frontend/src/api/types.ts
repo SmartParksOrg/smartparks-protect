@@ -5,6 +5,7 @@ type Schemas = components["schemas"];
 
 export type User = Schemas["UserRead"];
 export type Project = Schemas["ProjectRead"];
+export type Organization = Schemas["OrganizationRead"];
 export type ProjectWithRole = Schemas["ProjectWithRole"];
 export type Member = Schemas["MemberRead"];
 export type Invitation = Schemas["InvitationRead"];

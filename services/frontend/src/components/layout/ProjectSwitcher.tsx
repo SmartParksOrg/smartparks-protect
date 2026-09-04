@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/stores/project";
 
 export function ProjectSwitcher() {
+  const { t } = useTranslation();
   const { projectId } = useParams();
   const { data } = useProjects();
   const navigate = useNavigate();
@@ -28,9 +30,9 @@ export function ProjectSwitcher() {
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <Command>
-          <CommandInput placeholder="Search projects" />
+          <CommandInput placeholder={t("Search projects")} />
           <CommandList>
-            <CommandEmpty>No project found.</CommandEmpty>
+            <CommandEmpty>{t("No project found.")}</CommandEmpty>
             <CommandGroup>
               {projects.map((project) => (
                 <CommandItem

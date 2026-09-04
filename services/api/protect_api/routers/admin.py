@@ -4,22 +4,25 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
-from protect_api.crud import apply_patch, get_or_404
+from protect_api.crud import apply_patch, flush_or_409, get_or_404
 from protect_api.deps import require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.routers.projects import create_invitation_row
 from protect_api.schemas.access import (
     AuditRead,
     InvitationRead,
+    OrganizationCreate,
+    OrganizationRead,
+    OrganizationUpdate,
     ServerAdminInvitationCreate,
     UserAdminRead,
 )
 from shared.database import get_session
-from shared.models import AuditLog, Invitation, User
+from shared.models import AuditLog, Invitation, Organization, Project, User
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_server_admin)])
 
@@ -115,3 +118,88 @@ async def server_audit(
     if before is not None:
         statement = statement.where(AuditLog.id < before)
     return list(await session.scalars(statement.order_by(AuditLog.id.desc()).limit(limit)))
+
+
+# Organizations: a grouping of projects for server admins (decision D92). Membership and
+# permissions stay per project; an organization carries no rights of its own.
+
+
+async def _organization_read(session: AsyncSession, organization: Organization) -> OrganizationRead:
+    count = await session.scalar(
+        select(func.count()).select_from(Project).where(Project.organization_id == organization.id)
+    )
+    return OrganizationRead(
+        **{k: getattr(organization, k) for k in ("id", "name", "slug", "created_at", "updated_at")},
+        project_count=int(count or 0),
+    )
+
+
+@router.get("/organizations", response_model=list[OrganizationRead])
+async def list_organizations(
+    session: AsyncSession = Depends(get_session),
+) -> list[OrganizationRead]:
+    rows = await session.scalars(select(Organization).order_by(Organization.name))
+    return [await _organization_read(session, organization) for organization in rows]
+
+
+@router.post("/organizations", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
+async def create_organization(
+    body: OrganizationCreate,
+    admin: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> OrganizationRead:
+    organization = Organization(name=body.name, slug=body.slug)
+    session.add(organization)
+    await flush_or_409(session, "organization")
+    await record_audit(
+        session,
+        user=admin,
+        action="organization.created",
+        object_type="organization",
+        object_id=str(organization.id),
+        details=body.model_dump(),
+    )
+    await session.commit()
+    return await _organization_read(session, organization)
+
+
+@router.patch("/organizations/{organization_id}", response_model=OrganizationRead)
+async def update_organization(
+    organization_id: uuid.UUID,
+    body: OrganizationUpdate,
+    admin: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> OrganizationRead:
+    organization = await get_or_404(session, Organization, organization_id, "organization")
+    changes = apply_patch(organization, body)
+    await flush_or_409(session, "organization")
+    await record_audit(
+        session,
+        user=admin,
+        action="organization.updated",
+        object_type="organization",
+        object_id=str(organization.id),
+        details=changes,
+    )
+    await session.commit()
+    return await _organization_read(session, organization)
+
+
+@router.delete("/organizations/{organization_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_organization(
+    organization_id: uuid.UUID,
+    admin: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Deleting a grouping leaves its projects without an organization."""
+    organization = await get_or_404(session, Organization, organization_id, "organization")
+    await record_audit(
+        session,
+        user=admin,
+        action="organization.deleted",
+        object_type="organization",
+        object_id=str(organization.id),
+        details={"name": organization.name, "slug": organization.slug},
+    )
+    await session.delete(organization)
+    await session.commit()

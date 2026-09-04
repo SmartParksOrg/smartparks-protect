@@ -42,12 +42,17 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 @router.get("", response_model=PageResponse[ProjectWithRole])
 async def list_projects(
     page: Page = Depends(page),
+    organization_id: uuid.UUID | None = None,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[ProjectWithRole]:
-    """Projects the caller can open, with the caller's role. Server admins see all projects."""
+    """Projects the caller can open, with the caller's role. Server admins see all projects.
+    `organization_id` narrows the list to one grouping (decision D92)."""
     if user.is_superuser:
-        rows, next_cursor = await paginate(session, Project.id, select(Project), page)
+        statement = select(Project)
+        if organization_id is not None:
+            statement = statement.where(Project.organization_id == organization_id)
+        rows, next_cursor = await paginate(session, Project.id, statement, page)
         items = [
             ProjectWithRole(**ProjectRead.model_validate(p).model_dump(), role="server-admin")
             for p in rows
@@ -58,6 +63,8 @@ async def list_projects(
         .join(ProjectMembership, ProjectMembership.project_id == Project.id)
         .where(ProjectMembership.user_id == user.id)
     )
+    if organization_id is not None:
+        statement = statement.where(Project.organization_id == organization_id)
     rows, next_cursor = await paginate(session, Project.id, statement, page)
     membership_rows = await session.execute(
         select(ProjectMembership.project_id, ProjectMembership.role).where(
@@ -105,6 +112,10 @@ async def update_project(
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> Project:
+    if body.organization_id != context.project.organization_id and not context.is_server_admin:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Only a server admin moves a project between organizations"
+        )
     changed = apply_patch(context.project, body)
     await flush_or_409(session, "Project")
     await record_audit(

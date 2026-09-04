@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
@@ -100,6 +101,7 @@ interface Props {
  * existing rule saves a new version; name, description and enabled are patched separately.
  */
 export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
+  const { t } = useTranslation();
   const base = `/api/v1/projects/${projectId}/rules`;
   const templates = useQuery({ queryKey: queryKeys.ruleTemplates(projectId), queryFn: () => api.get<RuleTemplate[]>(`${base}/templates`), enabled: open });
   const entities = useQuery({ queryKey: queryKeys.entities(projectId), queryFn: () => api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, { query: { limit: 500 } }), enabled: open });
@@ -178,46 +180,46 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
         </DialogHeader>
         <Tabs defaultValue="definition">
           <TabsList>
-            <TabsTrigger value="definition">Definition</TabsTrigger>
-            <TabsTrigger value="test">Test on history</TabsTrigger>
-            {rule && <TabsTrigger value="versions">Versions</TabsTrigger>}
+            <TabsTrigger value="definition">{t("Definition")}</TabsTrigger>
+            <TabsTrigger value="test">{t("Test on history")}</TabsTrigger>
+            {rule && <TabsTrigger value="versions">{t("Versions")}</TabsTrigger>}
           </TabsList>
           <TabsContent value="definition">
             <form id="rule-form" className="space-y-4" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
               {!rule && (
-                <Field label="Template" htmlFor="rule-template" hint="Optional starting point; every field stays editable">
+                <Field label={t("Template")} htmlFor="rule-template" hint={t("Optional starting point; every field stays editable")}>
                   <Select value={template || "none"} onValueChange={(v) => setTemplate(v === "none" ? "" : v)}>
                     <SelectTrigger id="rule-template"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">From scratch</SelectItem>{templates.data?.map((t) => <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>)}</SelectContent>
+                    <SelectContent><SelectItem value="none">{t("From scratch")}</SelectItem>{templates.data?.map((t) => <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
               )}
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Name" htmlFor="rule-name" error={err.name?.message}><Input id="rule-name" {...form.register("name")} /></Field>
-                <Field label="Description" htmlFor="rule-description"><Input id="rule-description" {...form.register("description")} /></Field>
+                <Field label={t("Name")} htmlFor="rule-name" error={err.name?.message}><Input id="rule-name" {...form.register("name")} /></Field>
+                <Field label={t("Description")} htmlFor="rule-description"><Input id="rule-description" {...form.register("description")} /></Field>
               </div>
               {json !== null ? (
-                <Field label="Document (JSON)" htmlFor="rule-json" hint="This document uses nesting the form cannot show, so it is edited as JSON" error={jsonError ?? undefined}>
+                <Field label={t("Document (JSON)")} htmlFor="rule-json" hint={t("This document uses nesting the form cannot show, so it is edited as JSON")} error={jsonError ?? undefined}>
                   <Textarea id="rule-json" rows={18} className="font-mono text-xs" value={json} onChange={(e) => setJson(e.target.value)} />
                 </Field>
               ) : (
                 <>
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <Field label="Trigger" htmlFor="rule-trigger">
+                    <Field label={t("Trigger")} htmlFor="rule-trigger">
                       <Select value={kind} onValueChange={(v) => form.setValue("trigger_kind", v)}>
                         <SelectTrigger id="rule-trigger"><SelectValue /></SelectTrigger>
                         <SelectContent>{TRIGGER_KINDS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
                       </Select>
                     </Field>
                     {kind === "measurement" && (
-                      <Field label="Metric" htmlFor="rule-metric" hint="Empty means any metric">
+                      <Field label={t("Metric")} htmlFor="rule-metric" hint={t("Empty means any metric")}>
                         <Input id="rule-metric" list="metric-keys" {...form.register("metric_key")} />
                       </Field>
                     )}
                     {kind === "schedule" && (
-                      <Field label="Check every (seconds)" htmlFor="rule-every" error={err.every_seconds?.message}><Input id="rule-every" type="number" {...form.register("every_seconds", { valueAsNumber: true })} /></Field>
+                      <Field label={t("Check every (seconds)")} htmlFor="rule-every" error={err.every_seconds?.message}><Input id="rule-every" type="number" {...form.register("every_seconds", { valueAsNumber: true })} /></Field>
                     )}
-                    <Field label="Entities" htmlFor="rule-scope" hint="Empty means every entity of the project">
+                    <Field label={t("Entities")} htmlFor="rule-scope" hint={t("Empty means every entity of the project")}>
                       <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
                         {entities.data?.items.map((e) => { const on = form.watch("entity_ids").includes(e.id); return <Button key={e.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => form.setValue("entity_ids", on ? form.getValues("entity_ids").filter((x) => x !== e.id) : [...form.getValues("entity_ids"), e.id])}>{e.name}</Button>; })}
                       </div>
@@ -225,46 +227,46 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
                   </div>
                   <datalist id="metric-keys">{metricOptions.map((m) => <option key={m} value={m} />)}</datalist>
                   <div className="space-y-2 rounded-md border p-3">
-                    <div className="flex items-center justify-between"><span className="text-sm font-medium">Conditions (all must hold)</span><Button type="button" size="sm" variant="outline" onClick={() => conditions.append(emptyCondition())}><Plus className="size-4" /> Add condition</Button></div>
+                    <div className="flex items-center justify-between"><span className="text-sm font-medium">{t("Conditions (all must hold)")}</span><Button type="button" size="sm" variant="outline" onClick={() => conditions.append(emptyCondition())}><Plus className="size-4" /> {t("Add condition")}</Button></div>
                     {typeof err.conditions?.message === "string" && <p className="text-sm text-destructive">{err.conditions.message}</p>}
                     {conditions.fields.map((field, index) => {
                       const type = form.watch(`conditions.${index}.type`);
                       return (
                         <div key={field.id} className="flex flex-wrap items-end gap-2 rounded bg-muted/40 p-2">
                           <Select value={type} onValueChange={(v) => form.setValue(`conditions.${index}`, { ...emptyCondition(v), ...(v === "threshold" || v === "window" ? { metric: form.getValues(`conditions.${index}.metric`) } : {}) })}>
-                            <SelectTrigger className="h-8 w-44" aria-label="Condition type"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-8 w-44" aria-label={t("Condition type")}><SelectValue /></SelectTrigger>
                             <SelectContent>{CONDITION_TYPES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
                           </Select>
-                          {(type === "threshold" || type === "window") && <Input className="h-8 w-40" list="metric-keys" aria-label="Metric" {...form.register(`conditions.${index}.metric`)} />}
+                          {(type === "threshold" || type === "window") && <Input className="h-8 w-40" list="metric-keys" aria-label={t("Metric")} {...form.register(`conditions.${index}.metric`)} />}
                           {type === "window" && (
                             <>
                               <Select value={form.watch(`conditions.${index}.aggregate`)} onValueChange={(v) => form.setValue(`conditions.${index}.aggregate`, v)}>
-                                <SelectTrigger className="h-8 w-24" aria-label="Aggregate"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-8 w-24" aria-label={t("Aggregate")}><SelectValue /></SelectTrigger>
                                 <SelectContent>{AGGREGATES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
                               </Select>
-                              <span className="text-xs text-muted-foreground">over</span>
-                              <Input className={NUMBER} type="number" aria-label="Window seconds" {...form.register(`conditions.${index}.seconds`, { valueAsNumber: true })} />
-                              <span className="text-xs text-muted-foreground">s</span>
+                              <span className="text-xs text-muted-foreground">{t("over")}</span>
+                              <Input className={NUMBER} type="number" aria-label={t("Window seconds")} {...form.register(`conditions.${index}.seconds`, { valueAsNumber: true })} />
+                              <span className="text-xs text-muted-foreground">{t("s", { context: "seconds" })}</span>
                             </>
                           )}
                           {(type === "threshold" || type === "window") && (
                             <>
                               <Select value={form.watch(`conditions.${index}.op`)} onValueChange={(v) => form.setValue(`conditions.${index}.op`, v)}>
-                                <SelectTrigger className="h-8 w-16" aria-label="Operator"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-8 w-16" aria-label={t("Operator")}><SelectValue /></SelectTrigger>
                                 <SelectContent>{OPERATORS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                               </Select>
-                              <Input className={NUMBER} type="number" step="any" aria-label="Value" {...form.register(`conditions.${index}.value`, { valueAsNumber: true })} />
+                              <Input className={NUMBER} type="number" step="any" aria-label={t("Value")} {...form.register(`conditions.${index}.value`, { valueAsNumber: true })} />
                             </>
                           )}
                           {type === "spatial" && (
                             <>
                               <Select value={form.watch(`conditions.${index}.relation`)} onValueChange={(v) => form.setValue(`conditions.${index}.relation`, v)}>
-                                <SelectTrigger className="h-8 w-28" aria-label="Relation"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-8 w-28" aria-label={t("Relation")}><SelectValue /></SelectTrigger>
                                 <SelectContent>{RELATIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                               </Select>
                               <Select value={form.watch(`conditions.${index}.feature_ids`).length > 0 ? "selected" : form.watch(`conditions.${index}.feature_type`)} onValueChange={(v) => { if (v === "selected") return; form.setValue(`conditions.${index}.feature_type`, v); form.setValue(`conditions.${index}.feature_ids`, []); }}>
-                                <SelectTrigger className="h-8 w-36" aria-label="Feature type"><SelectValue /></SelectTrigger>
-                                <SelectContent>{FEATURE_TYPES.map((f) => <SelectItem key={f} value={f}>every {f}</SelectItem>)}<SelectItem value="selected" disabled>selected features</SelectItem></SelectContent>
+                                <SelectTrigger className="h-8 w-36" aria-label={t("Feature type")}><SelectValue /></SelectTrigger>
+                                <SelectContent>{FEATURE_TYPES.map((f) => <SelectItem key={f} value={f}>{t("every")} {f}</SelectItem>)}<SelectItem value="selected" disabled>{t("selected features")}</SelectItem></SelectContent>
                               </Select>
                               <div className="flex flex-wrap gap-1">
                                 {features.data?.items.map((f) => { const on = form.watch(`conditions.${index}.feature_ids`).includes(f.id); return <Button key={f.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => { const current = form.getValues(`conditions.${index}.feature_ids`); form.setValue(`conditions.${index}.feature_ids`, on ? current.filter((x) => x !== f.id) : [...current, f.id]); }}>{f.name}</Button>; })}
@@ -273,34 +275,34 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
                           )}
                           {type === "no_data" && (
                             <>
-                              <span className="text-xs text-muted-foreground">for</span>
-                              <Input className={NUMBER} type="number" aria-label="Silence seconds" {...form.register(`conditions.${index}.for_seconds`, { valueAsNumber: true })} />
-                              <span className="text-xs text-muted-foreground">seconds</span>
+                              <span className="text-xs text-muted-foreground">{t("for")}</span>
+                              <Input className={NUMBER} type="number" aria-label={t("Silence seconds")} {...form.register(`conditions.${index}.for_seconds`, { valueAsNumber: true })} />
+                              <span className="text-xs text-muted-foreground">{t("seconds")}</span>
                             </>
                           )}
-                          <Button type="button" size="icon" variant="ghost" className="ml-auto size-8" aria-label="Remove condition" onClick={() => conditions.remove(index)}><Trash2 className="size-4" /></Button>
+                          <Button type="button" size="icon" variant="ghost" className="ml-auto size-8" aria-label={t("Remove condition")} onClick={() => conditions.remove(index)}><Trash2 className="size-4" /></Button>
                         </div>
                       );
                     })}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="Must hold for (seconds)" htmlFor="rule-for" hint="0 fires as soon as the condition is true" error={err.for_seconds?.message}><Input id="rule-for" type="number" {...form.register("for_seconds", { valueAsNumber: true })} /></Field>
-                    <Field label="Cooldown (seconds)" htmlFor="rule-cooldown" hint="While the condition stays true, remind again after this long; 0 never" error={err.cooldown_seconds?.message}><Input id="rule-cooldown" type="number" {...form.register("cooldown_seconds", { valueAsNumber: true })} /></Field>
+                    <Field label={t("Must hold for (seconds)")} htmlFor="rule-for" hint={t("0 fires as soon as the condition is true")} error={err.for_seconds?.message}><Input id="rule-for" type="number" {...form.register("for_seconds", { valueAsNumber: true })} /></Field>
+                    <Field label={t("Cooldown (seconds)")} htmlFor="rule-cooldown" hint={t("While the condition stays true, remind again after this long; 0 never")} error={err.cooldown_seconds?.message}><Input id="rule-cooldown" type="number" {...form.register("cooldown_seconds", { valueAsNumber: true })} /></Field>
                   </div>
                   <div className="space-y-3 rounded-md border p-3">
-                    <span className="text-sm font-medium">Event</span>
+                    <span className="text-sm font-medium">{t("Event")}</span>
                     <div className="grid gap-3 sm:grid-cols-3">
-                      <Field label="Event type" htmlFor="rule-event-type" error={err.event_type?.message}><Input id="rule-event-type" placeholder="GEOFENCE_EXIT" {...form.register("event_type")} /></Field>
-                      <Field label="Severity" htmlFor="rule-severity">
+                      <Field label={t("Event type")} htmlFor="rule-event-type" error={err.event_type?.message}><Input id="rule-event-type" placeholder={t("GEOFENCE_EXIT")} {...form.register("event_type")} /></Field>
+                      <Field label={t("Severity")} htmlFor="rule-severity">
                         <Select value={form.watch("severity")} onValueChange={(v) => form.setValue("severity", v)}>
                           <SelectTrigger id="rule-severity"><SelectValue /></SelectTrigger>
                           <SelectContent>{SEVERITIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                         </Select>
                       </Field>
-                      <div className="flex items-end gap-2 pb-2"><Switch id="rule-alert" checked={form.watch("create_alert")} onCheckedChange={(v) => form.setValue("create_alert", v)} /><label htmlFor="rule-alert" className="text-sm">Create an alert</label></div>
+                      <div className="flex items-end gap-2 pb-2"><Switch id="rule-alert" checked={form.watch("create_alert")} onCheckedChange={(v) => form.setValue("create_alert", v)} /><label htmlFor="rule-alert" className="text-sm">{t("Create an alert")}</label></div>
                     </div>
-                    <Field label="Title" htmlFor="rule-title" hint="Placeholders: {entity} {device} {feature} {metric} {value} {rule}" error={err.title?.message}><Input id="rule-title" {...form.register("title")} /></Field>
-                    <Field label="Description" htmlFor="rule-event-description"><Textarea id="rule-event-description" rows={2} {...form.register("event_description")} /></Field>
+                    <Field label={t("Title")} htmlFor="rule-title" hint={t("Placeholders: {entity} {device} {feature} {metric} {value} {rule}")} error={err.title?.message}><Input id="rule-title" {...form.register("title")} /></Field>
+                    <Field label={t("Description")} htmlFor="rule-event-description"><Textarea id="rule-event-description" rows={2} {...form.register("event_description")} /></Field>
                   </div>
                 </>
               )}
@@ -309,16 +311,16 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
           </TabsContent>
           <TabsContent value="test">
             <div className="space-y-3">
-              <Callout kind="info">Replays the definition above over the project's positions and measurements without creating anything. Bounded to 50,000 rows and 500 events.</Callout>
+              <Callout kind="info">{t("Replays the definition above over the project's positions and measurements without creating anything. Bounded to 50,000 rows and 500 events.")}</Callout>
               <div className="flex flex-wrap items-end gap-2">
-                <Field label="From" htmlFor="replay-from"><Input id="replay-from" type="datetime-local" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /></Field>
-                <Field label="To" htmlFor="replay-to"><Input id="replay-to" type="datetime-local" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></Field>
+                <Field label={t("From")} htmlFor="replay-from"><Input id="replay-from" type="datetime-local" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /></Field>
+                <Field label={t("To")} htmlFor="replay-to"><Input id="replay-to" type="datetime-local" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></Field>
                 <Button type="button" onClick={() => void form.handleSubmit((v: Values) => test.mutate(v))()} disabled={test.isPending}>{test.isPending ? "Running…" : "Run test"}</Button>
               </div>
               {replay && (
                 <>
-                  <div className="text-sm text-muted-foreground">{replay.total} events over {replay.samples} samples{replay.truncated ? ", showing the first 500" : ""}</div>
-                  <DataTable columns={[{ header: "Time", accessorKey: "time", cell: ({ getValue }) => formatTime(getValue<string>()) }, { header: "Subject", accessorKey: "subject_key" }, { header: "Title", accessorKey: "title" }, { header: "Reason", accessorKey: "reason" }]} data={replay.events} emptyMessage="The rule would not have fired in this range." />
+                  <div className="text-sm text-muted-foreground">{replay.total} {t("events over")} {replay.samples} {t("samples")}{replay.truncated ? ", showing the first 500" : ""}</div>
+                  <DataTable columns={[{ header: t("Time"), accessorKey: "time", cell: ({ getValue }) => formatTime(getValue<string>()) }, { header: t("Subject"), accessorKey: "subject_key" }, { header: t("Title"), accessorKey: "title" }, { header: t("Reason"), accessorKey: "reason" }]} data={replay.events} emptyMessage={t("The rule would not have fired in this range.")} />
                 </>
               )}
             </div>
@@ -328,7 +330,7 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
               <div className="space-y-2">
                 {versions.data?.map((v) => (
                   <details key={v.id} className="rounded-md border p-2" open={v.version === rule.current_version}>
-                    <summary className="cursor-pointer text-sm">Version {v.version} <span className="text-muted-foreground">{formatTime(v.created_at)}</span> {v.version === rule.current_version && <StatusBadge value="active" />}</summary>
+                    <summary className="cursor-pointer text-sm">{t("Version")} {v.version} <span className="text-muted-foreground">{formatTime(v.created_at)}</span> {v.version === rule.current_version && <StatusBadge value="active" />}</summary>
                     <div className="mt-2"><JsonView value={v.document} /></div>
                   </details>
                 ))}
@@ -337,7 +339,7 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
           )}
         </Tabs>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t("Cancel")}</Button>
           <Button type="submit" form="rule-form" disabled={save.isPending}>{rule ? "Save new version" : "Create rule"}</Button>
         </DialogFooter>
       </DialogContent>

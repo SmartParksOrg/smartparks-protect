@@ -291,6 +291,7 @@ export interface paths {
         /**
          * List Projects
          * @description Projects the caller can open, with the caller's role. Server admins see all projects.
+         *     `organization_id` narrows the list to one grouping (decision D92).
          */
         get: operations["list_projects_api_v1_projects_get"];
         put?: never;
@@ -1028,6 +1029,45 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Organizations */
+        get: operations["list_organizations_api_v1_admin_organizations_get"];
+        put?: never;
+        /** Create Organization */
+        post: operations["create_organization_api_v1_admin_organizations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations/{organization_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Organization
+         * @description Deleting a grouping leaves its projects without an organization.
+         */
+        delete: operations["delete_organization_api_v1_admin_organizations__organization_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Organization */
+        patch: operations["update_organization_api_v1_admin_organizations__organization_id__patch"];
         trace?: never;
     };
     "/api/v1/ingest/http/{data_source_id}": {
@@ -2504,7 +2544,8 @@ export interface paths {
         /**
          * Create Correction
          * @description Correct one field of one record. Applied at once, or left pending when the project
-         *     requires approval (decision D81).
+         *     requires approval (decision D81). The permission is a route dependency, so a caller
+         *     without it is refused before the body is read (decision D94).
          */
         post: operations["create_correction_api_v1_projects__project_id__curation_corrections_post"];
         delete?: never;
@@ -6501,6 +6542,50 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
         };
+        /**
+         * OrganizationCreate
+         * @description A grouping of projects for server admins (decision D92), not a security boundary.
+         */
+        OrganizationCreate: {
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
+        /** OrganizationRead */
+        OrganizationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Project Count
+             * @default 0
+             */
+            project_count: number;
+        };
+        /** OrganizationUpdate */
+        OrganizationUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Slug */
+            slug?: string | null;
+        };
         /** PageResponse[ActionDeliveryRead] */
         PageResponse_ActionDeliveryRead_: {
             /** Items */
@@ -6859,6 +6944,8 @@ export interface components {
             settings?: {
                 [key: string]: unknown;
             };
+            /** Organization Id */
+            organization_id?: string | null;
         };
         /** ProjectIconCreate */
         ProjectIconCreate: {
@@ -6907,6 +6994,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Organization Id */
+            organization_id?: string | null;
             /** Name */
             name: string;
             /** Slug */
@@ -6946,6 +7035,8 @@ export interface components {
             } | null;
             /** Archived At */
             archived_at?: string | null;
+            /** Organization Id */
+            organization_id?: string | null;
         };
         /** ProjectWithRole */
         ProjectWithRole: {
@@ -6954,6 +7045,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Organization Id */
+            organization_id?: string | null;
             /** Name */
             name: string;
             /** Slug */
@@ -8616,6 +8709,7 @@ export interface operations {
     list_projects_api_v1_projects_get: {
         parameters: {
             query?: {
+                organization_id?: string | null;
                 limit?: number;
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
@@ -10860,6 +10954,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_organizations_api_v1_admin_organizations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationRead"][];
+                };
+            };
+        };
+    };
+    create_organization_api_v1_admin_organizations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_organization_api_v1_admin_organizations__organization_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_organization_api_v1_admin_organizations__organization_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationRead"];
                 };
             };
             /** @description Validation Error */

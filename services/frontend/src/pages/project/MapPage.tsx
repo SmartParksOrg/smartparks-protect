@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Layers, X } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
@@ -26,7 +28,7 @@ interface CurrentFeature {
   properties: EntityFeatureProperties;
 }
 
-const TRACK_PERIODS = [{ label: "6 hours", hours: 6 }, { label: "24 hours", hours: 24 }, { label: "7 days", hours: 168 }, { label: "30 days", hours: 720 }];
+const TRACK_PERIODS = [{ label: i18n.t("6 hours"), hours: 6 }, { label: i18n.t("24 hours"), hours: 24 }, { label: i18n.t("7 days"), hours: 168 }, { label: i18n.t("30 days"), hours: 720 }];
 
 /**
  * Live map (architecture 11 and 13). Entities come from the current-state endpoint (bounded),
@@ -34,6 +36,7 @@ const TRACK_PERIODS = [{ label: "6 hours", hours: 6 }, { label: "24 hours", hour
  * container has `z-0` so MapLibre's internals never paint over the app (z-index ladder).
  */
 export function MapPage() {
+  const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("entity");
@@ -148,8 +151,8 @@ export function MapPage() {
           <SelectTrigger className="h-9 w-32 bg-card"><Layers className="size-4" /><SelectValue /></SelectTrigger>
           <SelectContent>{Object.entries(BASEMAPS).map(([key, b]) => <SelectItem key={key} value={key}>{b.label}</SelectItem>)}</SelectContent>
         </Select>
-        {current.data && <Badge variant="secondary" className="bg-card">{current.data.total} entities{current.data.use_tiles ? ", tiles" : ""}</Badge>}
-        {events.data && events.data.features.length > 0 && <Badge variant="secondary" className="bg-card cursor-pointer" onClick={() => void navigate(`/projects/${projectId}/rules/events`)}>{events.data.features.length} events, 24 h</Badge>}
+        {current.data && <Badge variant="secondary" className="bg-card">{current.data.total} {t("entities")}{current.data.use_tiles ? ", tiles" : ""}</Badge>}
+        {events.data && events.data.features.length > 0 && <Badge variant="secondary" className="bg-card cursor-pointer" onClick={() => void navigate(`/projects/${projectId}/rules/events`)}>{events.data.features.length} {t("events, 24 h")}</Badge>}
       </div>
       {selected && (
         <aside className="absolute bottom-3 left-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80">
@@ -159,20 +162,20 @@ export function MapPage() {
               <div className="truncate font-semibold">{selected.name}</div>
               <div className="text-xs text-muted-foreground">{selected.entity_type}</div>
             </div>
-            <Button variant="ghost" size="icon" aria-label="Close" onClick={() => select(null)}><X className="size-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label={t("Close")} onClick={() => select(null)}><X className="size-4" /></Button>
           </div>
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">Last seen</dt><dd title={formatTime(selected.last_seen_at)}>{formatAgo(selected.last_seen_at)}</dd>
-            <dt className="text-muted-foreground">Position</dt><dd>{formatTime(selected.position_time)}</dd>
-            <dt className="text-muted-foreground">Device</dt><dd>{selected.device_id ? <Link className="underline" to={`/projects/${projectId}/devices/${selected.device_id}`}>open device</Link> : "none"}</dd>
-            <dt className="text-muted-foreground">Alerts</dt><dd>{selected.active_alert_count > 0 ? <Link className="underline" to={`/projects/${projectId}/alerts`}>{selected.active_alert_count} open</Link> : "none"}</dd>
+            <dt className="text-muted-foreground">{t("Last seen")}</dt><dd title={formatTime(selected.last_seen_at)}>{formatAgo(selected.last_seen_at)}</dd>
+            <dt className="text-muted-foreground">{t("Position")}</dt><dd>{formatTime(selected.position_time)}</dd>
+            <dt className="text-muted-foreground">{t("Device")}</dt><dd>{selected.device_id ? <Link className="underline" to={`/projects/${projectId}/devices/${selected.device_id}`}>{t("open device")}</Link> : "none"}</dd>
+            <dt className="text-muted-foreground">{t("Alerts")}</dt><dd>{selected.active_alert_count > 0 ? <Link className="underline" to={`/projects/${projectId}/alerts`}>{selected.active_alert_count} {t("open")}</Link> : "none"}</dd>
           </dl>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Select value={String(trackHours)} onValueChange={(v) => setParams((p) => { if (v === "0") p.delete("track"); else p.set("track", v); return p; }, { replace: true })}>
-              <SelectTrigger className="h-8 w-36"><SelectValue placeholder="Track" /></SelectTrigger>
-              <SelectContent><SelectItem value="0">No track</SelectItem>{TRACK_PERIODS.map((p) => <SelectItem key={p.hours} value={String(p.hours)}>Track {p.label}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="h-8 w-36"><SelectValue placeholder={t("Track")} /></SelectTrigger>
+              <SelectContent><SelectItem value="0">{t("No track")}</SelectItem>{TRACK_PERIODS.map((p) => <SelectItem key={p.hours} value={String(p.hours)}>{t("Track")} {p.label}</SelectItem>)}</SelectContent>
             </Select>
-            {track.data && <span className="text-xs text-muted-foreground">{track.data.returned_points} of {track.data.total_points} points</span>}
+            {track.data && <span className="text-xs text-muted-foreground">{t("{{returned}} of {{total}} points", { returned: track.data.returned_points, total: track.data.total_points })}</span>}
           </div>
         </aside>
       )}

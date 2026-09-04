@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 
@@ -14,6 +15,7 @@ export interface Option {
 
 /** Searchable multi select on a popover; the trigger shows a count when more than one is chosen. */
 export function MultiSelect({ options, value, onChange, placeholder, label, className, maxSelected }: { options: Option[]; value: string[]; onChange: (next: string[]) => void; placeholder: string; label: string; className?: string; maxSelected?: number }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const chosen = options.filter((o) => value.includes(o.value));
   const text = chosen.length === 0 ? placeholder : chosen.length === 1 ? chosen[0].label : `${chosen.length} ${label}`;
@@ -35,7 +37,7 @@ export function MultiSelect({ options, value, onChange, placeholder, label, clas
         <Command>
           <CommandInput placeholder={`Search ${label}…`} />
           <CommandList>
-            <CommandEmpty>Nothing matches.</CommandEmpty>
+            <CommandEmpty>{t("Nothing matches.")}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
                 const selected = value.includes(option.value);
@@ -52,7 +54,7 @@ export function MultiSelect({ options, value, onChange, placeholder, label, clas
         </Command>
         {value.length > 0 && (
           <div className="border-t p-1">
-            <Button variant="ghost" size="sm" className="w-full" onClick={() => onChange([])}>Clear</Button>
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => onChange([])}>{t("Clear")}</Button>
           </div>
         )}
       </PopoverContent>

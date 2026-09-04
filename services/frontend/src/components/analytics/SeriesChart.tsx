@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { BarChart, LineChart, ScatterChart } from "echarts/charts";
 import { DataZoomComponent, GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
 import * as echarts from "echarts/core";
@@ -24,6 +25,7 @@ interface Props {
 
 /** One ECharts instance per mount; options are rebuilt when the data changes. */
 export function SeriesChart({ response, type, aggregate, timezone, labels, unit, className }: Props) {
+  const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
   const chart = useRef<echarts.ECharts | null>(null);
 
@@ -46,7 +48,7 @@ export function SeriesChart({ response, type, aggregate, timezone, labels, unit,
     instance.setOption(buildOption(response, type, aggregate, timezone, labels, unit), true);
   }, [response, type, aggregate, timezone, labels, unit]);
 
-  return <div ref={container} className={className ?? "h-80 w-full"} role="img" aria-label="Chart of the selected series" />;
+  return <div ref={container} className={className ?? "h-80 w-full"} role="img" aria-label={t("Chart of the selected series")} />;
 }
 
 function buildOption(response: SeriesResponse | undefined, type: ChartType, aggregate: string, timezone: string, labels: (index: number) => string, unit?: string | null): echarts.EChartsCoreOption {

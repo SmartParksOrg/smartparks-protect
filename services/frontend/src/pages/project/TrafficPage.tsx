@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { RefreshCw } from "lucide-react";
@@ -20,6 +21,7 @@ const EVENT_TYPES = ["uplink", "join", "status", "downlink_ack", "downlink_trans
 
 /** LoRaWAN traffic viewer (architecture 8.3). Filters live in the URL. */
 export function TrafficPage() {
+  const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const eventType = params.get("type") ?? "";
@@ -32,35 +34,35 @@ export function TrafficPage() {
   });
 
   const columns: ColumnDef<TrafficRow, unknown>[] = [
-    { header: "Time", accessorKey: "ingested_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { header: "Device", accessorKey: "device_name", cell: ({ row }) => <span title={row.original.external_id ?? ""}>{row.original.device_name}</span> },
-    { header: "Type", accessorKey: "event_type" },
-    { header: "Port", accessorKey: "f_port" },
-    { header: "FCnt", accessorKey: "f_cnt" },
-    { header: "SF", accessorKey: "spreading_factor" },
-    { header: "RSSI", accessorKey: "best_rssi", cell: ({ getValue }) => getValue<number | null>()?.toFixed(0) ?? "" },
-    { header: "SNR", accessorKey: "best_snr", cell: ({ getValue }) => getValue<number | null>()?.toFixed(1) ?? "" },
-    { header: "Gateways", accessorKey: "gateway_count" },
-    { header: "Source", accessorKey: "data_source_name" },
-    { header: "Status", accessorKey: "processing_status", cell: ({ row }) => <span className="inline-flex items-center gap-1"><StatusBadge value={row.original.processing_status} />{row.original.error_code && <span className="text-xs text-destructive">{row.original.error_code}</span>}</span> },
+    { header: t("Time"), accessorKey: "ingested_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
+    { header: t("Device"), accessorKey: "device_name", cell: ({ row }) => <span title={row.original.external_id ?? ""}>{row.original.device_name}</span> },
+    { header: t("Type"), accessorKey: "event_type" },
+    { header: t("Port"), accessorKey: "f_port" },
+    { header: t("FCnt"), accessorKey: "f_cnt" },
+    { header: t("SF"), accessorKey: "spreading_factor" },
+    { header: t("RSSI"), accessorKey: "best_rssi", cell: ({ getValue }) => getValue<number | null>()?.toFixed(0) ?? "" },
+    { header: t("SNR"), accessorKey: "best_snr", cell: ({ getValue }) => getValue<number | null>()?.toFixed(1) ?? "" },
+    { header: t("Gateways"), accessorKey: "gateway_count" },
+    { header: t("Source"), accessorKey: "data_source_name" },
+    { header: t("Status"), accessorKey: "processing_status", cell: ({ row }) => <span className="inline-flex items-center gap-1"><StatusBadge value={row.original.processing_status} />{row.original.error_code && <span className="text-xs text-destructive">{row.original.error_code}</span>}</span> },
   ];
 
   return (
     <>
       <PageHeader
-        title="LoRaWAN traffic"
-        description="Every message received for this project's devices, with raw payload, decode result, gateway receptions and trace"
+        title={t("LoRaWAN traffic")}
+        description={t("Every message received for this project's devices, with raw payload, decode result, gateway receptions and trace")}
         actions={<>
           <Select value={eventType || "all"} onValueChange={(v) => setParams((p) => { if (v === "all") p.delete("type"); else p.set("type", v); return p; })}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="All types" /></SelectTrigger>
-            <SelectContent><SelectItem value="all">All types</SelectItem>{EVENT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+            <SelectTrigger className="w-44"><SelectValue placeholder={t("All types")} /></SelectTrigger>
+            <SelectContent><SelectItem value="all">{t("All types")}</SelectItem>{EVENT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
           </Select>
-          <Input type="number" min={1} max={720} className="w-24" value={hours} onChange={(e) => setParams((p) => { p.set("hours", e.target.value); return p; })} aria-label="Hours back" />
-          <Button variant="outline" size="icon" onClick={() => traffic.refetch()} aria-label="Refresh"><RefreshCw className="size-4" /></Button>
+          <Input type="number" min={1} max={720} className="w-24" value={hours} onChange={(e) => setParams((p) => { p.set("hours", e.target.value); return p; })} aria-label={t("Hours back")} />
+          <Button variant="outline" size="icon" onClick={() => traffic.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
         </>}
       />
       <Page>
-        <DataTable columns={columns} data={traffic.data} isLoading={traffic.isPending} emptyMessage="No traffic in this window." onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && `${traffic.data.length} messages, last ${hours} hours`} />
+        <DataTable columns={columns} data={traffic.data} isLoading={traffic.isPending} emptyMessage={t("No traffic in this window.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && `${traffic.data.length} messages, last ${hours} hours`} />
       </Page>
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>

@@ -23,4 +23,4 @@ Rollback is the same with the previous tag. A migration that cannot be reversed 
 
 ## Before a major update
 
-Read the changelog entry for breaking changes and migration notes. Take a database dump (`docker compose exec -T postgres pg_dump -U protect smartparks_protect | gzip > backup.sql.gz`) until the backup work of phase 10 lands.
+Read the changelog entry for breaking changes, migration notes and configuration changes (see the [release process](release-process.md)). Take a backup first: `scripts/backup.sh` writes a full pgBackRest backup and mirrors the object storage (the [backup and recovery guide](backup-and-recovery.md)). A database dump (`docker compose exec -T postgres pg_dump -U protect smartparks_protect | gzip > backup.sql.gz`) is the lightweight alternative on a server without backups configured.

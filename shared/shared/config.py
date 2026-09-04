@@ -124,6 +124,21 @@ class Settings(BaseSettings):
         default=200, ge=1, description="Frames of a log file decoded per transaction"
     )
 
+    rate_limit_enabled: bool = Field(
+        default=True,
+        description="Application-level throttling of login, token, webhook and AI action calls",
+    )
+    rate_limit_auth_per_minute: int = Field(
+        default=20,
+        description="Login, registration, password reset and token calls per address per minute",
+    )
+    rate_limit_ingest_per_minute: int = Field(
+        default=3000, description="Webhook posts per data source per minute"
+    )
+    rate_limit_actions_per_minute: int = Field(
+        default=60, description="AI action calls per client address per minute"
+    )
+
     log_level: str = "INFO"
     log_format: Literal["json", "text"] = "json"
 

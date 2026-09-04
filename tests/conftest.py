@@ -21,6 +21,10 @@ DEFAULTS = {
     "JWT_SECRET": "test-secret-that-is-at-least-32-bytes-long",
     "CREDENTIALS_KEY": "test-credentials-key-long-enough",
     "LOG_FORMAT": "text",
+    # The suite logs in hundreds of times a minute from one address; the throttle is tested on its own.
+    "RATE_LIMIT_AUTH_PER_MINUTE": "1000000",
+    "RATE_LIMIT_INGEST_PER_MINUTE": "1000000",
+    "RATE_LIMIT_ACTIONS_PER_MINUTE": "1000000",
 }
 
 for key, value in DEFAULTS.items():

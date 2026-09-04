@@ -32,7 +32,7 @@ bash scripts/verify-server.sh                    # containers, migrations, healt
 
 ## What the playbook does not do
 
-No backups yet (phase 10), no monitoring stack, no intrusion detection. The daily `scripts/security-status.sh` publishes the security check result to Redis for the health page.
+No monitoring stack beyond System Health and no intrusion detection beyond fail2ban on SSH. Backups are configured through the `BACKUP_*` host vars (the [backup and recovery guide](../operations/backup-and-recovery.md)); a server without them has no backup. The daily `scripts/security-status.sh` publishes the security check result to Redis for the health page.
 
 ## Updating
 

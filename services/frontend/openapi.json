@@ -898,7 +898,7 @@
      "projects"
     ],
     "summary": "List Projects",
-    "description": "Projects the caller can open, with the caller's role. Server admins see all projects.",
+    "description": "Projects the caller can open, with the caller's role. Server admins see all projects.\n`organization_id` narrows the list to one grouping (decision D92).",
     "operationId": "list_projects_api_v1_projects_get",
     "security": [
      {
@@ -906,6 +906,23 @@
      }
     ],
     "parameters": [
+     {
+      "name": "organization_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Organization Id"
+      }
+     },
      {
       "name": "limit",
       "in": "query",
@@ -4906,6 +4923,178 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/organizations": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "List Organizations",
+    "operationId": "list_organizations_api_v1_admin_organizations_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/OrganizationRead"
+         },
+         "type": "array",
+         "title": "Response List Organizations Api V1 Admin Organizations Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Create Organization",
+    "operationId": "create_organization_api_v1_admin_organizations_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OrganizationCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrganizationRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/admin/organizations/{organization_id}": {
+   "patch": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Update Organization",
+    "operationId": "update_organization_api_v1_admin_organizations__organization_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "organization_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Organization Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OrganizationUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrganizationRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Delete Organization",
+    "description": "Deleting a grouping leaves its projects without an organization.",
+    "operationId": "delete_organization_api_v1_admin_organizations__organization_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "organization_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Organization Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -11720,7 +11909,7 @@
      "curation"
     ],
     "summary": "Create Correction",
-    "description": "Correct one field of one record. Applied at once, or left pending when the project\nrequires approval (decision D81).",
+    "description": "Correct one field of one record. Applied at once, or left pending when the project\nrequires approval (decision D81). The permission is a route dependency, so a caller\nwithout it is refused before the body is read (decision D94).",
     "operationId": "create_correction_api_v1_projects__project_id__curation_corrections_post",
     "security": [
      {
@@ -23997,6 +24186,100 @@
     "type": "object",
     "title": "NotificationTargetUpdate"
    },
+   "OrganizationCreate": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,98}$",
+      "title": "Slug"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "slug"
+    ],
+    "title": "OrganizationCreate",
+    "description": "A grouping of projects for server admins (decision D92), not a security boundary."
+   },
+   "OrganizationRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "slug": {
+      "type": "string",
+      "title": "Slug"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     },
+     "project_count": {
+      "type": "integer",
+      "title": "Project Count",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "slug",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "OrganizationRead"
+   },
+   "OrganizationUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "slug": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,98}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Slug"
+     }
+    },
+    "type": "object",
+    "title": "OrganizationUpdate"
+   },
    "PageResponse_ActionDeliveryRead_": {
     "properties": {
      "items": {
@@ -25176,6 +25459,18 @@
       "additionalProperties": true,
       "type": "object",
       "title": "Settings"
+     },
+     "organization_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Organization Id"
      }
     },
     "type": "object",
@@ -25285,6 +25580,18 @@
       "type": "string",
       "format": "uuid",
       "title": "Id"
+     },
+     "organization_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Organization Id"
      },
      "name": {
       "type": "string",
@@ -25411,6 +25718,18 @@
        }
       ],
       "title": "Archived At"
+     },
+     "organization_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Organization Id"
      }
     },
     "type": "object",
@@ -25422,6 +25741,18 @@
       "type": "string",
       "format": "uuid",
       "title": "Id"
+     },
+     "organization_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Organization Id"
      },
      "name": {
       "type": "string",

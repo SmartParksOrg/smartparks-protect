@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 
@@ -49,7 +50,8 @@ const AdminAutomationsPage = lazy(() => import("@/pages/project/AutomationsPage"
 const AdminNotificationsPage = lazy(() => import("@/pages/project/NotificationsPage").then((m) => ({ default: m.AdminNotificationsPage })));
 
 function Loading() {
-  return <div className="p-6 text-muted-foreground">Loading…</div>;
+  const { t } = useTranslation();
+  return <div className="p-6 text-muted-foreground">{t("Loading…")}</div>;
 }
 
 export default function App() {

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from protect_api.audit import record_audit
 from protect_api.bus import get_bus
 from protect_api.crud import get_or_404
-from protect_api.deps import ProjectContext, get_project_context
+from protect_api.deps import ProjectContext, get_project_context, require_permission
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.curation import (
     CorrectionCreate,
@@ -211,12 +211,12 @@ async def record_history(
 @router.post("/corrections", response_model=CorrectionRead, status_code=status.HTTP_201_CREATED)
 async def create_correction(
     body: CorrectionCreate,
-    context: ProjectContext = Depends(get_project_context),
+    context: ProjectContext = Depends(require_permission(Permission.DATA_CURATE)),
     session: AsyncSession = Depends(get_session),
 ) -> DataCorrection:
     """Correct one field of one record. Applied at once, or left pending when the project
-    requires approval (decision D81)."""
-    _need(context, Permission.DATA_CURATE)
+    requires approval (decision D81). The permission is a route dependency, so a caller
+    without it is refused before the body is read (decision D94)."""
     record = await load_record(session, body.target_type, body.target_id, body.target_time)
     if record is None or record.project_id != context.project.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Record not found in this project")
@@ -384,12 +384,11 @@ async def list_jobs(
 @router.post("/jobs", response_model=JobRead, status_code=status.HTTP_201_CREATED)
 async def create_job(
     body: JobCreate,
-    context: ProjectContext = Depends(get_project_context),
+    context: ProjectContext = Depends(require_permission(Permission.DATA_CURATE_BULK)),
     session: AsyncSession = Depends(get_session),
 ) -> CurationJob:
     """Define a bulk correction and preview it (architecture 28.5): the count, samples before
     and after, and the impact on attribution, deliveries and rules. Nothing is applied."""
-    _need(context, Permission.DATA_CURATE_BULK)
     try:
         transformation = Transformation.model_validate(body.transformation.model_dump())
     except ValueError as error:

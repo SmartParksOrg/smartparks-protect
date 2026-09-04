@@ -1,6 +1,6 @@
 # MCP: AI clients
 
-Smart Parks Protect exposes a read-only [Model Context Protocol](https://modelcontextprotocol.io) server so that Claude, ChatGPT and other MCP clients can answer questions about a project's entities, devices, positions, measurements, events and processing traces. This is the proof of concept of architecture section 27 (phase 9). Every request an AI client makes runs as the user who connected it, within the permissions of that user, read only, and lands in the audit log.
+Smart Parks Protect exposes a [Model Context Protocol](https://modelcontextprotocol.io) server so that Claude, ChatGPT and other MCP clients can answer questions about a project's entities, devices, positions, measurements, events and processing traces, and act within the AI action policy (architecture section 27). Every request an AI client makes runs as the user who connected it, within the permissions of that user and the scopes the user granted, and lands in the audit log.
 
 ## How it fits together
 
@@ -39,7 +39,8 @@ Tools, all read-only and bounded:
 | `query_events` | Events with alert status, newest first (at most 100) |
 | `get_processing_trace` | One processing trace with its steps and error |
 | `search_traces` | Traces of a project's devices, filtered by device, identity, status or error code |
-| `search`, `fetch` | The generic pair ChatGPT expects: search entities and devices by name, fetch any `smartparks://` record |
+| `search` | The generic search ChatGPT expects: entities and devices by name |
+| `fetch` | The generic fetch ChatGPT expects: any `smartparks://` record |
 
 Resources: `smartparks://projects/{id}`, `smartparks://projects/{id}/entities/{id}`, `smartparks://projects/{id}/events/{id}`, `smartparks://devices/{id}`, `smartparks://traces/{id}`. Entities and events carry the project in the URI because the API is project scoped.
 
@@ -47,7 +48,7 @@ Prompts: `analyze_device_health` and `investigate_missing_data` guide a client t
 
 ### Write and action tools
 
-Since phase 13 (decision D87, ADR 0019) a client can also act, within the AI action policy:
+A client can also act, within the AI action policy (decision D87, ADR 0019):
 
 | Tool | Does | Scope |
 | --- | --- | --- |

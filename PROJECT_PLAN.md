@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 13 (platform expansion) committed (3d5fe4f, CI green) and extended with the WildlifeNL and FerusTracker connectors and the CRA IoT adapter; live checks of the new adapters and connectors pending |
+| Active phase | Phase 14 (production hardening and 2.0) built on the local stack except the benchmark run, whose scale 0.2 generation is running on the dev server; decisions D91 to D94; awaiting commit; live checks of the phase 13 adapters and connectors pending |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-04 |
-| Next item | Commit the WildlifeNL and FerusTracker connectors and the CRA IoT adapter on Tim's word, then phase 14 (production hardening and 2.0); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
+| Next item | Commit phase 14 on Tim's word; when the generation on the dev server finishes, run `scripts/benchmark/run.py` there and record the results; then v2.0.0 on Tim's word; the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -131,6 +131,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D88 | WildlifeNL connector | Built from the platform's open source API (github.com/UtrechtUniversity/wildlifenl): positions and temperature measurements as borne sensor readings, `SPECIES_DETECTION` events as detections with the species resolved by name, other events skipped; the sensor id is the device's primary identity by default, configurable to the device name or the entity id | The API is the published contract; WildlifeNL links readings to animals through deployments a herd manager registers by sensor id, so the value printed on the collar is the natural key. Decided by Tim on 2026-09-04. |
 | D89 | FerusTracker connector | Built from the Node-RED flow that feeds ferustracker.nl today: the same unauthenticated document (`devEUI`, `fPort`, `tags.payloadType`, `objectJSON` with the collar decoder's field names, `provider`, `site`) rendered from canonical positions and measurements, the payload type per device type, plus a top-level `time`; events skipped | FerusTracker publishes no API; the flow is the only contract, and reproducing it lets the platform keep working unchanged when the flow is retired. Decided by Claude on 2026-09-04 after Tim shared the flow; to confirm live. |
 | D90 | CRA IoT adapter | České Radiokomunikace's platform as a push source: the HTTP endpoint's envelope with the LORIOT-shaped message (`gw` as the uplink, `rx` ignored unless configured, `geo` as a location), downlinks through `POST /lora/devices/{EUI}/down/messages` and the device list through `GET /lora/devices`, with tokens from the CRA single sign-on password grant | Tim asked for it on 2026-09-04; the platform's documentation and Swagger are public and its message is LORIOT's, so the parser shares LORIOT's field reading. Decided by Claude on 2026-09-04; to confirm live. |
+| D91 | Full-scale benchmark | The phase 14 benchmark runs at reduced scale (0.2 of the envelope: 50 million positions, 200 million measurements) on the dev server, with the generator writing in time order so chunks compress behind the write frontier; the full envelope waits for a production-sized server and is documented as extrapolated | The dev server has 146 GB of disk and 8 GB of memory; a temporary 32 GB droplet with a 1 TB volume was offered and declined. Decided by Tim on 2026-09-04. |
+| D92 | Tenancy revisited (D21) | Project isolation stays the security boundary; organizations become a visible, optional grouping of projects for server admins (list, filter, assignment) without an enforced boundary; enforcement is reconsidered when two organizations share one server | No deployment shares a server between organizations yet; grouping gives the admin pages structure without a second RBAC tier. Decided by Tim on 2026-09-04. |
+| D93 | Multi-language UI | The frontend becomes translation-ready: an i18n layer, every UI string in an English catalogue, a lint rule against hard-coded text, language detection and a switch; English is the only shipped language, translations come after 2.0 | The mechanical extraction is best done once before 2.0; a second language is a content job for native speakers. Decided by Tim on 2026-09-04. |
+| D94 | Security audit scope | A generated access matrix test over every API operation and role, MCP scope tests, a credential handling review, dependency audits in CI failing on high severity, application-level throttling of login, password reset, registration, token and webhook calls that holds without nginx, and a written audit report with findings and fixes | Production across parks needs the guarantees tested, not assumed; nginx limits protect deployed servers only. Decided by Tim on 2026-09-04. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -651,12 +655,12 @@ Release:
 
 **Deliverables.**
 
-- [ ] Benchmark at the full reference envelope (13.9) on a representative server; performance budgets met or documented.
-- [ ] Documentation Definition of Done audit over the whole site; link check, OpenAPI freshness check and diagram validation in CI (28.8).
-- [ ] Security audit: RBAC on every endpoint tested, credential handling, MCP scopes, rate limits, dependency audit.
-- [ ] Organization tenancy decision revisited (D21).
-- [ ] Multi-language UI decision.
-- [ ] Release process documented: version, changelog, upgrade notes, migration and rollback guidance (28.9).
+- [ ] Benchmark at the full reference envelope (13.9) on a representative server; performance budgets met or documented. (D91: scale 0.2 on the dev server; the time-ordered generator with `--compress` was proven at scale 0.005 there on 2026-09-04 and the 0.2 generation started at 20:47 UTC, about six hours; the benchmark run and the results page follow)
+- [x] Documentation Definition of Done audit over the whole site; link check, OpenAPI freshness check and diagram validation in CI (28.8). (2026-09-04: `scripts/docs_check.py` for links, anchors, Mermaid fences and the MCP tool reference in the docs CI job next to the OpenAPI freshness job; the audit walked the navigation against the feature list and fixed what was stale: the getting-started page became the quick start with the language note, the deployment and update guides lost their pre-phase-10 wording, phase numbers left the OpenCollar, adapter interface, ChirpStack, MCP and rules pages, and new pages cover security, the release process and organizations)
+- [x] Security audit: RBAC on every endpoint tested, credential handling, MCP scopes, rate limits, dependency audit. (2026-09-04, D94: `tests/api/test_access_matrix.py`, application-level throttling, `pip-audit` and `npm audit` in CI, `docs/operations/security.md` with the findings; one fix: curation permissions moved into route dependencies)
+- [x] Organization tenancy decision revisited (D21). (2026-09-04, D92: organizations as a grouping; `/admin/organizations`, `organization_id` on projects, filter and column on the Projects page, `docs/administration/organizations.md`)
+- [x] Multi-language UI decision. (2026-09-04, D93: translation-ready with i18next, the English catalogue extracted from every component, the lint rule, the catalogue check in CI, a language switch; English only)
+- [x] Release process documented: version, changelog, upgrade notes, migration and rollback guidance (28.9). (2026-09-04, `docs/operations/release-process.md`; the update and deployment guides lost their pre-phase-10 wording)
 - [ ] `VERSION` v2.0.0.
 
 **Exit criteria.** A new operator deploys production from the docs alone; a new developer adds a driver from the extension docs alone.
@@ -900,4 +904,16 @@ Listed by the phase where they are first needed.
 - FerusTracker: ferustracker.nl is a login page (version 11.48.0) without documentation and no API was found. Tim then shared the Node-RED flow that feeds it (an unauthenticated post per uplink with the decoded fields as `objectJSON`); D89 records the connector built from it, with the assumptions to confirm live listed in its runbook.
 - CRA IoT (portal.iot.cra.cz), asked for by Tim the same evening: built from the platform's public documentation repository and Swagger as `adapters/cra_iot` (D90); its message is the LORIOT format in an envelope, downlinks and devices go through the REST API with single sign-on tokens.
 - Open: WildlifeNL's API URL and a data-system account, FerusTracker's site value and a look at the platform, and a CRA IoT account with a LoRa device, for the live checks.
+
+### 2026-09-04, phase 14 (Claude)
+
+- Decisions D91 to D94 asked and taken: reduced-scale benchmark on the dev server, organizations as grouping, translation-ready English-only frontend, full security audit with application-level throttling.
+- Security: `shared/ratelimit.py` and the API middleware (login, registration, password reset, token, webhook and AI action windows on Redis, 429 with Retry-After, `RATE_LIMIT_*` settings), the access matrix test over every OpenAPI operation with four callers, one finding fixed (curation permissions were checked after body validation), `pip-audit` and `npm audit` in CI with a weekly schedule, `docs/operations/security.md`.
+- Docs CI: `scripts/docs_check.py` (internal links and anchors in the built site, Mermaid fences, the MCP tool reference against the server's tools) in the docs job.
+- Organizations: admin CRUD, `organization_id` on projects (server admins move projects), the filter, the Projects page card and column, the project settings control, docs.
+- Release process guide; the update and deployment guides brought current.
+- Translation layer: i18next with the English catalogue (860 strings, extracted by a codemod over 57 files and by hand where sentences mixed text and values), the lint rule, the catalogue check in CI, the language switch in the sidebar, the frontend conventions.
+- Benchmark generator rewritten to write in time order with a barrier between workers and `--compress`; proven at scale 0.005 on the dev server (all but one chunk compressed while loading); the reset lifts TimescaleDB's decompression limit; the 0.2 generation is running there.
+- Verified: ruff, mypy, 337 backend tests, frontend lint, typecheck, catalogue check, tests and build, strict docs build, docs check, the rebuilt stack (throttle headers, organizations) and a clean UI sweep.
+- Open: the benchmark run and results page; `VERSION` v2.0.0 on Tim's word; the live checks of earlier phases.
 

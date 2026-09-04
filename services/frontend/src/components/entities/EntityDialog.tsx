@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -28,6 +29,7 @@ const schema = z.object({
 type Values = z.infer<typeof schema>;
 
 export function EntityDialog({ projectId, entity, open, onOpenChange }: { projectId: string; entity: Entity | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { t } = useTranslation();
   const types = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<Page<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", entity_type_id: "", status: "active", latitude: "", longitude: "", notes: "" } });
 
@@ -61,12 +63,12 @@ export function EntityDialog({ projectId, entity, open, onOpenChange }: { projec
       <DialogContent>
         <DialogHeader><DialogTitle>{entity ? "Edit entity" : "New entity"}</DialogTitle></DialogHeader>
         <form className="space-y-4" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
-          <Field label="Name" htmlFor="name" error={form.formState.errors.name?.message}>
+          <Field label={t("Name")} htmlFor="name" error={form.formState.errors.name?.message}>
             <Input id="name" {...form.register("name")} />
           </Field>
-          <Field label="Type" htmlFor="entity_type_id" error={form.formState.errors.entity_type_id?.message}>
+          <Field label={t("Type")} htmlFor="entity_type_id" error={form.formState.errors.entity_type_id?.message}>
             <Select value={form.watch("entity_type_id")} onValueChange={(v) => form.setValue("entity_type_id", v, { shouldValidate: true })}>
-              <SelectTrigger id="entity_type_id"><SelectValue placeholder="Choose a type" /></SelectTrigger>
+              <SelectTrigger id="entity_type_id"><SelectValue placeholder={t("Choose a type")} /></SelectTrigger>
               <SelectContent>
                 {types.data?.items.map((t) => (
                   <SelectItem key={t.id} value={t.id}><span className="inline-flex items-center gap-2"><Icon iconKey={t.icon_key} className="size-4" />{t.label}</span></SelectItem>
@@ -74,30 +76,30 @@ export function EntityDialog({ projectId, entity, open, onOpenChange }: { projec
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Status" htmlFor="status">
+          <Field label={t("Status")} htmlFor="status">
             <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v as Values["status"])}>
               <SelectTrigger id="status"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">active</SelectItem>
-                <SelectItem value="inactive">inactive</SelectItem>
-                <SelectItem value="archived">archived</SelectItem>
+                <SelectItem value="active">{t("active")}</SelectItem>
+                <SelectItem value="inactive">{t("inactive")}</SelectItem>
+                <SelectItem value="archived">{t("archived")}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Latitude" htmlFor="latitude" hint="Static location, for infrastructure">
+            <Field label={t("Latitude")} htmlFor="latitude" hint={t("Static location, for infrastructure")}>
               <Input id="latitude" inputMode="decimal" {...form.register("latitude")} />
             </Field>
-            <Field label="Longitude" htmlFor="longitude">
+            <Field label={t("Longitude")} htmlFor="longitude">
               <Input id="longitude" inputMode="decimal" {...form.register("longitude")} />
             </Field>
           </div>
-          <Field label="Notes" htmlFor="notes">
+          <Field label={t("Notes")} htmlFor="notes">
             <Textarea id="notes" rows={2} {...form.register("notes")} />
           </Field>
           {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t("Cancel")}</Button>
             <Button type="submit" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
           </DialogFooter>
         </form>

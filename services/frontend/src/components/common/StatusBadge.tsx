@@ -1,9 +1,10 @@
+import i18n from "@/i18n";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const tones: Record<string, string> = {
   ok: "bg-brand-green-light/40 text-foreground border-transparent",
-  success: "bg-brand-green-light/40 text-foreground border-transparent",
+  success: i18n.t("bg-brand-green-light/40 text-foreground border-transparent"),
   processed: "bg-brand-green-light/40 text-foreground border-transparent",
   active: "bg-brand-green-light/40 text-foreground border-transparent",
   online: "bg-brand-green-light/40 text-foreground border-transparent",

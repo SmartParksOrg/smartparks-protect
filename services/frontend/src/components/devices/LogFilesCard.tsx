@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileUp, RefreshCw, ScrollText } from "lucide-react";
 import { useRef, useState } from "react";
@@ -17,10 +18,11 @@ import { formatAgo, formatTime } from "@/lib/format";
 const CHANNEL_LABEL: Record<string, string> = { log_file: "uploaded file", webble: "browser sync" };
 
 function Counts({ f }: { f: DeviceLogFile }) {
-  if (f.status === "queued") return <span className="text-muted-foreground">waiting for the decoder</span>;
+  const { t } = useTranslation();
+  if (f.status === "queued") return <span className="text-muted-foreground">{t("waiting for the decoder")}</span>;
   return (
     <span className="text-muted-foreground">
-      {f.frames_total} frames, {f.records_new} new, {f.records_duplicate} known through another path{f.frames_failed > 0 ? `, ${f.frames_failed} malformed` : ""}
+      {t("{{frames}} frames, {{fresh}} new, {{known}} known through another path", { frames: f.frames_total, fresh: f.records_new, known: f.records_duplicate })}{f.frames_failed > 0 ? t(", {{count}} malformed", { count: f.frames_failed }) : ""}
       {f.period_start && f.period_end ? `, ${formatTime(f.period_start)} to ${formatTime(f.period_end)}` : ""}
       {f.firmware_version ? `, firmware ${f.firmware_version}` : ""}
     </span>
@@ -30,6 +32,7 @@ function Counts({ f }: { f: DeviceLogFile }) {
 /** Raw log files and browser syncs of a device as managed assets (architecture 25.6): upload,
  * status and counts, the original for download, decode again after a decoder update. */
 export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrite: boolean }) {
+  const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   const [trace, setTrace] = useState<string | null>(null);
   const files = useQuery({
@@ -46,13 +49,13 @@ export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrit
   const redecode = useMutationToast({
     mutationFn: (id: string) => api.post<DeviceLogFile>(`/api/v1/log-files/${id}/redecode`),
     invalidate: [queryKeys.logFiles(deviceId)],
-    success: "Decoding the stored frames again",
+    success: t("Decoding the stored frames again"),
   });
   return (
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="flex items-center gap-2"><ScrollText className="size-4" /> Log files</CardTitle>
+          <CardTitle className="flex items-center gap-2"><ScrollText className="size-4" /> {t("Log files")}</CardTitle>
           {canWrite && (
             <>
               <input ref={input} type="file" accept=".txt,.log,text/plain" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) upload.mutate(file); e.target.value = ""; }} />
@@ -61,8 +64,8 @@ export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrit
           )}
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <p className="text-xs text-muted-foreground">Raw logs retrieved from the device: one frame per line as the OpenCollar BLE app exports them, or the frames synced from this browser. Every frame is a delivery; records already known from another path are recognised, not duplicated.</p>
-          {files.isSuccess && files.data.length === 0 && <div className="text-muted-foreground">No log files yet.</div>}
+          <p className="text-xs text-muted-foreground">{t("Raw logs retrieved from the device: one frame per line as the OpenCollar BLE app exports them, or the frames synced from this browser. Every frame is a delivery; records already known from another path are recognised, not duplicated.")}</p>
+          {files.isSuccess && files.data.length === 0 && <div className="text-muted-foreground">{t("No log files yet.")}</div>}
           <ul className="divide-y">
             {files.data?.map((f) => (
               <li key={f.id} className="space-y-1 py-2">
@@ -70,11 +73,11 @@ export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrit
                   <span className="font-medium">{f.original_filename}</span>
                   <Badge variant="outline">{CHANNEL_LABEL[f.acquisition_channel] ?? f.acquisition_channel}</Badge>
                   <StatusBadge value={f.status} />
-                  <span className="text-xs text-muted-foreground">{Math.round(f.size_bytes / 1024)} kB, {formatAgo(f.uploaded_at)}{f.ble_synced_at ? `, read from the device ${formatTime(f.ble_synced_at)}` : ""}</span>
+                  <span className="text-xs text-muted-foreground">{t("{{size}} kB, {{ago}}", { size: Math.round(f.size_bytes / 1024), ago: formatAgo(f.uploaded_at) })}{f.ble_synced_at ? t(", read from the device {{time}}", { time: formatTime(f.ble_synced_at) }) : ""}</span>
                   <span className="ml-auto flex gap-1">
-                    {f.trace_id && <Button variant="ghost" size="sm" onClick={() => setTrace(f.trace_id)}>trace</Button>}
-                    <Button variant="ghost" size="sm" onClick={() => downloadFile(`/api/v1/log-files/${f.id}/download`, f.original_filename).catch((e: Error) => toast.error(e.message))}><Download className="size-4" /> original</Button>
-                    {canWrite && <Button variant="ghost" size="sm" disabled={f.status === "processing" || redecode.isPending} onClick={() => redecode.mutate(f.id)}><RefreshCw className="size-4" /> decode again</Button>}
+                    {f.trace_id && <Button variant="ghost" size="sm" onClick={() => setTrace(f.trace_id)}>{t("trace")}</Button>}
+                    <Button variant="ghost" size="sm" onClick={() => downloadFile(`/api/v1/log-files/${f.id}/download`, f.original_filename).catch((e: Error) => toast.error(e.message))}><Download className="size-4" /> {t("original")}</Button>
+                    {canWrite && <Button variant="ghost" size="sm" disabled={f.status === "processing" || redecode.isPending} onClick={() => redecode.mutate(f.id)}><RefreshCw className="size-4" /> {t("decode again")}</Button>}
                   </span>
                 </div>
                 <div className="text-xs"><Counts f={f} /></div>

@@ -8,7 +8,7 @@ ChirpStack v4 is the reference LoRaWAN network server of Smart Parks Protect: it
 - Records every gateway reception of an uplink with RSSI, SNR and frequency, and the best RSSI and SNR, spreading factor, port and frame counter as provider metadata.
 - Keeps the ChirpStack receive time as `network_received_at`; the device time comes from the driver.
 - Merges tenant, application and device profile ids and names into the external identity, so "Open in ChirpStack" links can be built.
-- Lists applications, devices and gateways through the ChirpStack REST API (management connector, phase 3) and tests the connection.
+- Lists applications, devices and gateways through the ChirpStack REST API (management connector) and tests the connection.
 - Accepts the same events over the ChirpStack HTTP integration at `POST /api/v1/ingest/http/{data_source_id}?event=up` with the source's bearer token.
 
 Downlinks go through the REST API device queue, see [device control](../../devices/device-control.md).

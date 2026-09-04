@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Menu } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Outlet, useParams } from "react-router";
@@ -14,6 +15,7 @@ import { useIconStore } from "@/stores/icons";
  * with long content scroll inside `main` (z-index ladder: map 0, sticky bar 30, drawer 50).
  */
 export function AppLayout() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { projectId } = useParams();
   const loadIcons = useIconStore((s) => s.load);
@@ -27,17 +29,17 @@ export function AppLayout() {
       </aside>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-72 p-0">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetTitle className="sr-only">{t("Navigation")}</SheetTitle>
           <Sidebar onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-card px-3 py-2 lg:hidden">
-          <Button variant="ghost" size="icon" aria-label="Open navigation" onClick={() => setOpen(true)}>
+          <Button variant="ghost" size="icon" aria-label={t("Open navigation")} onClick={() => setOpen(true)}>
             <Menu className="size-5" />
           </Button>
           <LogoMark className="h-6 w-auto text-primary" />
-          <span className="font-medium">Smart Parks Protect</span>
+          <span className="font-medium">{t("Smart Parks Protect")}</span>
         </header>
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <Outlet />

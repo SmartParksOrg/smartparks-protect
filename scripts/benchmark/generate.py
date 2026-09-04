@@ -3,13 +3,16 @@
 
     uv run scripts/benchmark/generate.py --scale 0.01          # 2.5 M positions, 10 M measurements
     uv run scripts/benchmark/generate.py --scale 0.1 --workers 6
+    uv run scripts/benchmark/generate.py --scale 0.2 --workers 4 --compress   # on a small disk
     uv run scripts/benchmark/generate.py --reset                # remove every benchmark row
 
 The envelope at scale 1 is 10,000 active devices, 5,000 entities, 250 million positions and
 1 billion measurements. Devices report at a fixed interval between 5 minutes and 1 hour with
 jitter; positions walk around a home range inside one of eight parks; four measurements go
 with every position (battery, temperature, activity, satellites). Rows go in with COPY, in
-device batches, from several connections. Raw source events are not generated: they would
+time blocks (oldest first, decision D91) from several connections, and `--compress` compresses
+the chunks behind the write frontier so the disk holds compressed history plus one block. Raw
+source events are not generated: they would
 double the volume and the ingest benchmark produces real ones.
 
 Everything the generator creates is named `bench-...` or lives in a `Benchmark ...` project,
@@ -32,8 +35,10 @@ from pathlib import Path
 
 import asyncpg
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from shared.connectivity.transports.http import hash_token, new_webhook_token
+_here = Path(__file__).resolve()
+if len(_here.parents) > 2:  # from the checkout; inside a container the package is installed
+    sys.path.insert(0, str(_here.parents[2] / "shared"))
+from shared.connectivity.transports.http import hash_token, new_webhook_token  # noqa: E402
 
 ENVELOPE = {
     "devices": 10_000,
@@ -65,6 +70,8 @@ def database_dsn() -> str:
 
 
 async def reset(conn: asyncpg.Connection) -> None:
+    # Deleting from compressed chunks decompresses them; lift the per-transaction limit.
+    await conn.execute("SET timescaledb.max_tuples_decompressed_per_dml_transaction = 0")
     projects = [
         r["id"] for r in await conn.fetch("SELECT id FROM projects WHERE slug LIKE 'bench-%'")
     ]
@@ -189,31 +196,54 @@ async def registry(conn: asyncpg.Connection, scale: float, sources: int, since: 
     }
 
 
-def walk(
-    device: dict, since: datetime, until: datetime, positions_per_device: int, rng: random.Random
-) -> Iterator[tuple[datetime, float, float, float, float, float, int]]:
-    """Positions and measurements of one device: an Ornstein-Uhlenbeck walk around the home."""
-    interval = device["interval"]
-    span = (until - since).total_seconds()
-    count = min(positions_per_device, int(span // interval))
-    step = span / max(count, 1)
-    lat, lon = device["home"]
-    home_lat, home_lon = device["home"]
-    sigma = 0.0005 * math.sqrt(interval / 300)  # about 50 m per 5 minutes
-    battery = rng.uniform(3.9, 4.15)
-    drain = rng.uniform(0.2, 0.5) / max(count, 1)  # volts over the whole span
-    for k in range(count):
-        t = since + timedelta(seconds=k * step + rng.uniform(-0.1, 0.1) * step)
-        lat += 0.05 * (home_lat - lat) + rng.gauss(0, sigma)
-        lon += 0.05 * (home_lon - lon) + rng.gauss(0, sigma)
-        hour = t.hour + t.minute / 60
-        activity = max(
-            0.0, min(100.0, 50 + 40 * math.sin((hour - 6) / 24 * 2 * math.pi) + rng.gauss(0, 12))
-        )
-        temperature = 24 + 8 * math.sin((hour - 9) / 24 * 2 * math.pi) + rng.gauss(0, 1)
-        battery -= drain
-        satellites = rng.randint(4, 12)
-        yield t, lat, lon, activity, temperature, battery, satellites
+class Walker:
+    """The positions and measurements of one device: an Ornstein-Uhlenbeck walk around the
+    home, advanced block by block so rows can be written in time order (decision D91)."""
+
+    def __init__(
+        self,
+        device: dict,
+        since: datetime,
+        until: datetime,
+        positions_per_device: int,
+        rng: random.Random,
+    ) -> None:
+        self.rng = rng
+        interval = device["interval"]
+        self.since = since
+        span = (until - since).total_seconds()
+        self.count = min(positions_per_device, int(span // interval))
+        self.step = span / max(self.count, 1)
+        self.lat, self.lon = device["home"]
+        self.home_lat, self.home_lon = device["home"]
+        self.sigma = 0.0005 * math.sqrt(interval / 300)  # about 50 m per 5 minutes
+        self.battery = rng.uniform(3.9, 4.15)
+        self.drain = rng.uniform(0.2, 0.5) / max(self.count, 1)  # volts over the whole span
+        self.k = 0
+
+    def rows(
+        self, block_end: datetime
+    ) -> Iterator[tuple[datetime, float, float, float, float, float, int]]:
+        """Every sample up to `block_end`, in time order; the walk state carries over."""
+        rng = self.rng
+        while self.k < self.count:
+            t = self.since + timedelta(
+                seconds=self.k * self.step + rng.uniform(-0.1, 0.1) * self.step
+            )
+            if t >= block_end:
+                return
+            self.k += 1
+            self.lat += 0.05 * (self.home_lat - self.lat) + rng.gauss(0, self.sigma)
+            self.lon += 0.05 * (self.home_lon - self.lon) + rng.gauss(0, self.sigma)
+            hour = t.hour + t.minute / 60
+            activity = max(
+                0.0,
+                min(100.0, 50 + 40 * math.sin((hour - 6) / 24 * 2 * math.pi) + rng.gauss(0, 12)),
+            )
+            temperature = 24 + 8 * math.sin((hour - 9) / 24 * 2 * math.pi) + rng.gauss(0, 1)
+            self.battery -= self.drain
+            satellites = rng.randint(4, 12)
+            yield t, self.lat, self.lon, activity, temperature, self.battery, satellites
 
 
 async def load_devices(
@@ -224,52 +254,91 @@ async def load_devices(
     positions_per_device: int,
     seed: int,
     progress: dict,
+    blocks: list[datetime],
+    barrier: asyncio.Barrier,
 ) -> None:
+    """One worker: its shard of devices, block by block. Every worker waits at the barrier
+    after each block, so the write frontier moves in step and chunks behind it can be
+    compressed while the run continues."""
     conn = await asyncpg.connect(dsn)
     try:
-        position_rows: list[str] = []
-        measurement_rows: list[tuple] = []
+        walkers = []
         for device in devices:
             rng = random.Random(f"{seed}-{device['name']}")
-            device_id, project_id, entity_id = (
-                device["id"],
-                device["project_id"],
-                device["entity_id"],
-            )
-            source_id = device["source_id"]
-            for t, lat, lon, activity, temperature, battery, satellites in walk(
-                device, since, until, positions_per_device, rng
-            ):
-                ingested = t + timedelta(seconds=rng.uniform(2, 60))
-                stamp = t.isoformat()
-                key = f"{device_id}|gnss|{int(t.timestamp())}"
-                position_rows.append(
-                    f"{stamp},{ingested.isoformat()},{device_id},{project_id},{entity_id or ''},{source_id},gnss,{key},"
-                    f"SRID=4326;POINT({lon:.6f} {lat:.6f}),{rng.uniform(280, 420):.1f},{rng.randint(3, 40)},{satellites},{{}}\n"
+            walkers.append((device, Walker(device, since, until, positions_per_device, rng)))
+        for block_end in blocks:
+            position_rows: list[str] = []
+            measurement_rows: list[tuple] = []
+            for device, walker in walkers:
+                rng = walker.rng
+                device_id, project_id, entity_id = (
+                    device["id"],
+                    device["project_id"],
+                    device["entity_id"],
                 )
-                for metric, value in (
-                    ("battery_voltage", round(battery, 3)),
-                    ("device_temperature", round(temperature, 2)),
-                    ("activity", round(activity, 1)),
-                    ("gnss_satellites", float(satellites)),
+                source_id = device["source_id"]
+                for t, lat, lon, activity, temperature, battery, satellites in walker.rows(
+                    block_end
                 ):
-                    measurement_rows.append(
-                        (
-                            t,
-                            ingested,
-                            device_id,
-                            project_id,
-                            entity_id,
-                            source_id,
-                            metric,
-                            f"{device_id}|{metric}|{int(t.timestamp())}",
-                            value,
-                        )
+                    ingested = t + timedelta(seconds=rng.uniform(2, 60))
+                    stamp = t.isoformat()
+                    key = f"{device_id}|gnss|{int(t.timestamp())}"
+                    position_rows.append(
+                        f"{stamp},{ingested.isoformat()},{device_id},{project_id},{entity_id or ''},{source_id},gnss,{key},"
+                        f"SRID=4326;POINT({lon:.6f} {lat:.6f}),{rng.uniform(280, 420):.1f},{rng.randint(3, 40)},{satellites},{{}}\n"
                     )
-            if len(measurement_rows) >= BATCH_ROWS:
-                await flush(conn, position_rows, measurement_rows, progress)
-                position_rows, measurement_rows = [], []
-        await flush(conn, position_rows, measurement_rows, progress)
+                    for metric, value in (
+                        ("battery_voltage", round(battery, 3)),
+                        ("device_temperature", round(temperature, 2)),
+                        ("activity", round(activity, 1)),
+                        ("gnss_satellites", float(satellites)),
+                    ):
+                        measurement_rows.append(
+                            (
+                                t,
+                                ingested,
+                                device_id,
+                                project_id,
+                                entity_id,
+                                source_id,
+                                metric,
+                                f"{device_id}|{metric}|{int(t.timestamp())}",
+                                value,
+                            )
+                        )
+                if len(measurement_rows) >= BATCH_ROWS:
+                    await flush(conn, position_rows, measurement_rows, progress)
+                    position_rows, measurement_rows = [], []
+            await flush(conn, position_rows, measurement_rows, progress)
+            await barrier.wait()
+    finally:
+        await conn.close()
+
+
+async def compress_behind(
+    dsn: str, blocks: list[datetime], barrier: asyncio.Barrier, progress: dict
+) -> None:
+    """After every block, compress the chunks that end before the block that was just written
+    (they receive no more rows), so the disk holds compressed history plus one block."""
+    conn = await asyncpg.connect(dsn)
+    try:
+        for block_end in blocks:
+            await barrier.wait()
+            for table in ("positions", "measurements"):
+                chunks = await conn.fetch(
+                    """
+                    SELECT format('%I.%I', chunk_schema, chunk_name) AS chunk
+                    FROM timescaledb_information.chunks
+                    WHERE hypertable_name = $1 AND NOT is_compressed AND range_end <= $2
+                    """,
+                    table,
+                    block_end - timedelta(days=1),
+                )
+                for row in chunks:
+                    await conn.execute(
+                        f"SELECT compress_chunk('{row['chunk']}', if_not_compressed => true)"
+                    )
+                    progress["compressed"] = progress.get("compressed", 0) + 1
     finally:
         await conn.close()
 
@@ -364,6 +433,17 @@ async def main() -> None:
     parser.add_argument("--days", type=int, default=365, help="history span ending now")
     parser.add_argument("--sources", type=int, default=2, help="number of data sources")
     parser.add_argument("--workers", type=int, default=4, help="parallel connections for the load")
+    parser.add_argument(
+        "--block-days",
+        type=int,
+        default=7,
+        help="rows are written in time blocks of this many days, oldest first",
+    )
+    parser.add_argument(
+        "--compress",
+        action="store_true",
+        help="compress chunks behind the write frontier while loading (keeps the disk small)",
+    )
     parser.add_argument("--seed", type=int, default=2026)
     parser.add_argument("--reset", action="store_true", help="remove benchmark rows and stop")
     parser.add_argument("--manifest", type=Path, help="write the dataset manifest as JSON here")
@@ -394,12 +474,23 @@ async def main() -> None:
     )
     progress = {"positions": 0, "measurements": 0, "started": time.perf_counter()}
     shards = [devices[i :: args.workers] for i in range(args.workers)]
-    await asyncio.gather(
-        *(
-            load_devices(dsn, shard, since, until, per_device, args.seed, progress)
-            for shard in shards
-        )
-    )
+    blocks: list[datetime] = []
+    cursor = since
+    while cursor < until:
+        cursor = min(cursor + timedelta(days=args.block_days), until)
+        blocks.append(cursor)
+    blocks[-1] = until + timedelta(days=1)  # the last block takes every remaining sample
+    parties = len(shards) + (1 if args.compress else 0)
+    barrier = asyncio.Barrier(parties)
+    tasks = [
+        load_devices(dsn, shard, since, until, per_device, args.seed, progress, blocks, barrier)
+        for shard in shards
+    ]
+    if args.compress:
+        tasks.append(compress_behind(dsn, blocks, barrier, progress))
+    await asyncio.gather(*tasks)
+    if progress.get("compressed"):
+        sys.stderr.write(f"  compressed {progress['compressed']} chunks during the load\n")
 
     conn = await asyncpg.connect(dsn)
     try:

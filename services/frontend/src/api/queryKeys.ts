@@ -5,6 +5,7 @@ export const queryKeys = {
   connections: ["oauth", "connections"] as const,
   version: ["version"] as const,
   projects: ["projects"] as const,
+  organizations: ["organizations"] as const,
   project: (id: string) => ["projects", id] as const,
   members: (projectId: string) => ["projects", projectId, "members"] as const,
   invitations: (projectId: string) => ["projects", projectId, "invitations"] as const,

@@ -106,9 +106,12 @@ nav:
       - Permissions: administration/permissions.md
       - Notifications: administration/notifications.md
       - Custom icons: administration/icons.md
+      - Organizations: administration/organizations.md
   - Operations:
       - operations/index.md
       - Update guide: operations/update-guide.md
+      - Release process: operations/release-process.md
+      - Security: operations/security.md
       - Backup and recovery: operations/backup-and-recovery.md
       - Restore guide: operations/restore-guide.md
       - Observability: operations/observability.md

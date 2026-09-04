@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
@@ -35,6 +36,7 @@ function tileTitle(tile: Tile, views: SavedView[]): string {
 /** Project dashboards (decision D86): a shared grid of saved views and built-in tiles with a
  * size and an order. Not a Grafana clone. */
 export function DashboardsPage() {
+  const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const role = useProjectRole(projectId);
@@ -61,10 +63,10 @@ export function DashboardsPage() {
   const save = useMutationToast({
     mutationFn: () => api.patch<Dashboard>(`${base}/${current?.id}`, { body: { tiles } }),
     invalidate: [queryKeys.dashboards(projectId)],
-    success: "Dashboard saved",
+    success: t("Dashboard saved"),
     onSuccess: () => { setEditing(false); setDraft(null); },
   });
-  const remove = useMutationToast({ mutationFn: () => api.delete<void>(`${base}/${current?.id}`), invalidate: [queryKeys.dashboards(projectId)], success: "Dashboard deleted", onSuccess: () => { setDeleting(false); setParams((p) => { p.delete("dashboard"); return p; }, { replace: true }); } });
+  const remove = useMutationToast({ mutationFn: () => api.delete<void>(`${base}/${current?.id}`), invalidate: [queryKeys.dashboards(projectId)], success: t("Dashboard deleted"), onSuccess: () => { setDeleting(false); setParams((p) => { p.delete("dashboard"); return p; }, { replace: true }); } });
   const startEdit = () => { setDraft((current?.tiles ?? []) as Tile[]); setEditing(true); };
   const move = (index: number, delta: number) => { const next = [...tiles]; const target = index + delta; if (target < 0 || target >= next.length) return; [next[index], next[target]] = [next[target], next[index]]; setDraft(next); };
   const update = (index: number, patch: Partial<Tile>) => setDraft(tiles.map((t, i) => (i === index ? { ...t, ...patch } : t)));
@@ -76,23 +78,23 @@ export function DashboardsPage() {
   return (
     <>
       <PageHeader
-        title="Dashboards"
-        description="Saved views and live tiles on a grid, shared with the project"
+        title={t("Dashboards")}
+        description={t("Saved views and live tiles on a grid, shared with the project")}
         actions={<>
           {dashboards.data && dashboards.data.items.length > 0 && (
             <Select value={selectedId ?? ""} onValueChange={select}>
-              <SelectTrigger className="w-56" aria-label="Dashboard"><SelectValue placeholder="Choose a dashboard" /></SelectTrigger>
+              <SelectTrigger className="w-56" aria-label={t("Dashboard")}><SelectValue placeholder={t("Choose a dashboard")} /></SelectTrigger>
               <SelectContent>{dashboards.data.items.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
             </Select>
           )}
-          {admin && current && !editing && <Button variant="outline" onClick={startEdit}><Pencil className="size-4" /> Edit</Button>}
-          {admin && editing && <><Button variant="outline" onClick={() => setAdding(true)}><Plus className="size-4" /> Add tile</Button><Button variant="ghost" onClick={() => { setEditing(false); setDraft(null); }}>Cancel</Button><Button onClick={() => save.mutate()} disabled={save.isPending}>Save</Button></>}
-          {admin && <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New dashboard</Button>}
+          {admin && current && !editing && <Button variant="outline" onClick={startEdit}><Pencil className="size-4" /> {t("Edit")}</Button>}
+          {admin && editing && <><Button variant="outline" onClick={() => setAdding(true)}><Plus className="size-4" /> {t("Add tile")}</Button><Button variant="ghost" onClick={() => { setEditing(false); setDraft(null); }}>{t("Cancel")}</Button><Button onClick={() => save.mutate()} disabled={save.isPending}>{t("Save")}</Button></>}
+          {admin && <Button onClick={() => setCreating(true)}><Plus className="size-4" /> {t("New dashboard")}</Button>}
         </>}
       />
       <Page>
         {dashboards.error && <Callout kind="error">{dashboards.error.message}</Callout>}
-        {dashboards.isSuccess && dashboards.data.items.length === 0 && <EmptyState title="No dashboards yet" description={admin ? "Create one: it starts with the map, open alerts and recent events, and takes saved Data Explorer views as chart tiles." : "A project admin can create dashboards."} />}
+        {dashboards.isSuccess && dashboards.data.items.length === 0 && <EmptyState title={t("No dashboards yet")} description={admin ? "Create one: it starts with the map, open alerts and recent events, and takes saved Data Explorer views as chart tiles." : "A project admin can create dashboards."} />}
         {current && (
           <div className="grid grid-cols-12 gap-4">
             {tiles.map((tile, index) => (
@@ -102,17 +104,17 @@ export function DashboardsPage() {
                   {editing && (
                     <span className="flex items-center gap-1">
                       <Select value={tile.size} onValueChange={(v) => update(index, { size: v as Tile["size"] })}>
-                        <SelectTrigger className="h-7 w-24" aria-label="Tile size"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="s">small</SelectItem><SelectItem value="m">medium</SelectItem><SelectItem value="l">large</SelectItem></SelectContent>
+                        <SelectTrigger className="h-7 w-24" aria-label={t("Tile size")}><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="s">{t("small")}</SelectItem><SelectItem value="m">{t("medium")}</SelectItem><SelectItem value="l">{t("large")}</SelectItem></SelectContent>
                       </Select>
-                      <Button size="icon" variant="ghost" aria-label="Move up" onClick={() => move(index, -1)}><ArrowUp className="size-4" /></Button>
-                      <Button size="icon" variant="ghost" aria-label="Move down" onClick={() => move(index, 1)}><ArrowDown className="size-4" /></Button>
-                      <Button size="icon" variant="ghost" aria-label="Remove tile" onClick={() => setDraft(tiles.filter((_, i) => i !== index))}><X className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" aria-label={t("Move up")} onClick={() => move(index, -1)}><ArrowUp className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" aria-label={t("Move down")} onClick={() => move(index, 1)}><ArrowDown className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" aria-label={t("Remove tile")} onClick={() => setDraft(tiles.filter((_, i) => i !== index))}><X className="size-4" /></Button>
                     </span>
                   )}
                 </CardHeader>
                 <CardContent className="h-72 overflow-auto">
-                  {tile.kind === "saved_view" && (views.data?.items.find((v) => v.id === tile.saved_view_id) ? <SavedViewTile projectId={projectId} view={views.data.items.find((v) => v.id === tile.saved_view_id)!} /> : <p className="text-sm text-muted-foreground">The saved view no longer exists.</p>)}
+                  {tile.kind === "saved_view" && (views.data?.items.find((v) => v.id === tile.saved_view_id) ? <SavedViewTile projectId={projectId} view={views.data.items.find((v) => v.id === tile.saved_view_id)!} /> : <p className="text-sm text-muted-foreground">{t("The saved view no longer exists.")}</p>)}
                   {tile.kind === "map" && <MapTile projectId={projectId} />}
                   {tile.kind === "alerts" && <AlertsTile projectId={projectId} />}
                   {tile.kind === "events" && <EventsTile projectId={projectId} />}
@@ -120,29 +122,29 @@ export function DashboardsPage() {
                 </CardContent>
               </Card>
             ))}
-            {tiles.length === 0 && <div className="col-span-12 text-sm text-muted-foreground">This dashboard has no tiles yet.{admin && !editing ? " Edit it to add some." : ""}</div>}
+            {tiles.length === 0 && <div className="col-span-12 text-sm text-muted-foreground">{t("This dashboard has no tiles yet.")}{admin && !editing ? " Edit it to add some." : ""}</div>}
           </div>
         )}
-        {current && admin && !editing && <div className="text-right"><Button variant="ghost" size="sm" onClick={() => setDeleting(true)}><Trash2 className="size-4" /> Delete dashboard</Button></div>}
+        {current && admin && !editing && <div className="text-right"><Button variant="ghost" size="sm" onClick={() => setDeleting(true)}><Trash2 className="size-4" /> {t("Delete dashboard")}</Button></div>}
       </Page>
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>New dashboard</DialogTitle><DialogDescription>It starts with the map, open alerts and recent events; edit it afterwards.</DialogDescription></DialogHeader>
-          <Field label="Name" htmlFor="dashboard-name"><Input id="dashboard-name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Operations" /></Field>
-          <DialogFooter><Button onClick={() => create.mutate(newName.trim())} disabled={!newName.trim() || create.isPending}>Create</Button></DialogFooter>
+          <DialogHeader><DialogTitle>{t("New dashboard")}</DialogTitle><DialogDescription>{t("It starts with the map, open alerts and recent events; edit it afterwards.")}</DialogDescription></DialogHeader>
+          <Field label={t("Name")} htmlFor="dashboard-name"><Input id="dashboard-name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("Operations")} /></Field>
+          <DialogFooter><Button onClick={() => create.mutate(newName.trim())} disabled={!newName.trim() || create.isPending}>{t("Create")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       <Dialog open={adding} onOpenChange={setAdding}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Add a tile</DialogTitle><DialogDescription>A saved Data Explorer view, or a live tile.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{t("Add a tile")}</DialogTitle><DialogDescription>{t("A saved Data Explorer view, or a live tile.")}</DialogDescription></DialogHeader>
           <div className="space-y-2">
             {(["map", "alerts", "events", "entity_status"] as const).map((k) => <Button key={k} variant="outline" className="w-full justify-start" onClick={() => addTile(k)}>{KINDS[k]}</Button>)}
-            {(views.data?.items ?? []).map((v) => <Button key={v.id} variant="outline" className="w-full justify-start" onClick={() => addTile("saved_view", v.id)}>Chart: {v.name}</Button>)}
-            {views.data?.items.length === 0 && <p className="text-xs text-muted-foreground">Save a view in the Data Explorer to add charts.</p>}
+            {(views.data?.items ?? []).map((v) => <Button key={v.id} variant="outline" className="w-full justify-start" onClick={() => addTile("saved_view", v.id)}>{t("Chart: {{name}}", { name: v.name })}</Button>)}
+            {views.data?.items.length === 0 && <p className="text-xs text-muted-foreground">{t("Save a view in the Data Explorer to add charts.")}</p>}
           </div>
         </DialogContent>
       </Dialog>
-      <ConfirmDialog open={deleting} onOpenChange={setDeleting} title={`Delete ${current?.name}?`} description="Tiles are only layout; saved views and data stay." confirmLabel="Delete" pending={remove.isPending} onConfirm={() => remove.mutate()} />
+      <ConfirmDialog open={deleting} onOpenChange={setDeleting} title={`Delete ${current?.name}?`} description={t("Tiles are only layout; saved views and data stay.")} confirmLabel={t("Delete")} pending={remove.isPending} onConfirm={() => remove.mutate()} />
     </>
   );
 }

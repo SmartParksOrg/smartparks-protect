@@ -1,4 +1,5 @@
-import { LogOut, Plug } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Languages, LogOut, Plug } from "lucide-react";
 import { Link, NavLink, useParams } from "react-router";
 
 import LogoWide from "@/assets/brand/logo-wide.svg?react";
@@ -8,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import i18n, { LANGUAGES } from "@/i18n";
 
 function Item({ item, projectId, onNavigate }: { item: NavItem; projectId?: string; onNavigate?: () => void }) {
+  const { t } = useTranslation();
   const Icon = item.icon;
   if (!item.to) {
     return (
@@ -19,7 +22,7 @@ function Item({ item, projectId, onNavigate }: { item: NavItem; projectId?: stri
       >
         <Icon className="size-4" />
         <span className="flex-1">{item.label}</span>
-        <span className="text-[10px] uppercase tracking-wide">phase {item.phase}</span>
+        <span className="text-[10px] uppercase tracking-wide">{t("phase")} {item.phase}</span>
       </span>
     );
   }
@@ -42,6 +45,7 @@ function Item({ item, projectId, onNavigate }: { item: NavItem; projectId?: stri
 }
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { t } = useTranslation();
   const { projectId } = useParams();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -89,12 +93,23 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </div>
         <Button asChild variant="ghost" size="sm" className="mt-1 w-full justify-start">
           <Link to="/account/connections" onClick={onNavigate}>
-            <Plug className="size-4" /> Connected AI clients
+            <Plug className="size-4" /> {t("Connected AI clients")}
           </Link>
         </Button>
         <Button variant="ghost" size="sm" className="w-full justify-start" onClick={logout}>
-          <LogOut className="size-4" /> Sign out
+          <LogOut className="size-4" /> {t("Sign out")}
         </Button>
+        <label className="mt-1 flex items-center gap-2 px-3 text-xs text-muted-foreground">
+          <Languages className="size-4" />
+          <select
+            aria-label={t("Language")}
+            className="flex-1 rounded-md border bg-background px-1 py-0.5 text-xs"
+            value={i18n.resolvedLanguage ?? "en"}
+            onChange={(event) => void i18n.changeLanguage(event.target.value)}
+          >
+            {Object.entries(LANGUAGES).map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+          </select>
+        </label>
       </div>
     </div>
   );

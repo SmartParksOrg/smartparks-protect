@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "30 5 * * 1"
 
 env:
   UV_VERSION: "0.12.9"
@@ -83,6 +85,8 @@ jobs:
           cache-dependency-path: services/frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - name: English catalogue is current
+        run: npm run i18n:check
       - run: npm run build
       - run: npm run test
 
@@ -122,8 +126,35 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - run: uv sync --frozen --only-group docs
-      - run: uv run --only-group docs mkdocs build --strict
+      - run: uv sync --frozen --all-groups
+      - run: uv run mkdocs build --strict
+      - name: Links, anchors, diagrams and the MCP tool reference
+        run: uv run scripts/docs_check.py
+        env:
+          DATABASE_URL: postgresql+asyncpg://protect:protect-dev-password@localhost:5432/smartparks_protect
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: ci-secret-that-is-at-least-32-bytes-long
+
+  audit:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/frontend/package-lock.json
+      - name: Python dependencies (pip-audit, high and critical fail)
+        run: |
+          uv export --frozen --all-groups --no-hashes --no-emit-workspace --format requirements-txt -o requirements-audit.txt
+          uvx pip-audit -r requirements-audit.txt --strict
+      - name: Frontend dependencies (npm audit, high and critical fail)
+        run: cd services/frontend && npm ci --ignore-scripts && npm audit --audit-level=high
 
   compose:
     runs-on: ubuntu-latest

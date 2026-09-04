@@ -1,6 +1,6 @@
 # Adapter interface
 
-An adapter knows one external platform: how to receive its events, how to send commands (phase 6) and how to list its devices. It never looks inside a device payload. Adapters live in `shared/connectivity/adapters/<provider>/` and are registered in `shared/connectivity/registry.py`. Provider-specific code lives nowhere else; a test enforces this from phase 7. Use `examples/adapters/example_platform/` as the starting point.
+An adapter knows one external platform: how to receive its events, how to send commands and how to list its devices. It never looks inside a device payload. Adapters live in `shared/connectivity/adapters/<provider>/` and are registered in `shared/connectivity/registry.py`. Provider-specific code lives nowhere else; a test enforces this. Use `examples/adapters/example_platform/` as the starting point.
 
 ## Contract
 

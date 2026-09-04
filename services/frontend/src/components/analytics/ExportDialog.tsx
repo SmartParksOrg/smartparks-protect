@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Download, ListPlus } from "lucide-react";
 import { useState } from "react";
@@ -28,12 +29,13 @@ interface Props {
 /** One form for both paths: download now (bounded) or queue a job for the export service. The
  * form remounts on every open, so the preset is read once as initial state. */
 export function ExportDialog({ projectId, open, onOpenChange, preset }: Props) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Export</DialogTitle>
-          <DialogDescription>Download up to 100,000 rows at once, or queue a job for anything larger. Times are written in the chosen timezone.</DialogDescription>
+          <DialogTitle>{t("Export")}</DialogTitle>
+          <DialogDescription>{t("Download up to 100,000 rows at once, or queue a job for anything larger. Times are written in the chosen timezone.")}</DialogDescription>
         </DialogHeader>
         {open && <ExportForm projectId={projectId} preset={preset} onDone={() => onOpenChange(false)} />}
       </DialogContent>
@@ -42,6 +44,7 @@ export function ExportDialog({ projectId, open, onOpenChange, preset }: Props) {
 }
 
 function ExportForm({ projectId, preset, onDone }: { projectId: string; preset?: ExportPreset; onDone: () => void }) {
+  const { t } = useTranslation();
   const [dataset, setDataset] = useState<Dataset>(preset?.dataset ?? "positions");
   const [chosenFormat, setFormat] = useState(preset?.format ?? "csv");
   const [range, setRange] = useState<RangePreset | "custom">(preset?.from && preset.to ? "custom" : preset?.range ?? "7d");
@@ -92,7 +95,7 @@ function ExportForm({ projectId, preset, onDone }: { projectId: string; preset?:
   const queue = useMutationToast({
     mutationFn: (body: Record<string, unknown>) => api.post<ExportJob>(`/api/v1/projects/${projectId}/exports`, { body }),
     invalidate: [queryKeys.exports(projectId)],
-    success: "Export queued; it appears under Exports when done",
+    success: t("Export queued; it appears under Exports when done"),
     onSuccess: onDone,
     onError: (e) => setError(e.message),
   });
@@ -117,28 +120,28 @@ function ExportForm({ projectId, preset, onDone }: { projectId: string; preset?:
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Data" htmlFor="dataset">
+        <Field label={t("Data")} htmlFor="dataset">
           <Select value={dataset} onValueChange={(v) => setDataset(v as Dataset)}>
             <SelectTrigger id="dataset"><SelectValue /></SelectTrigger>
             <SelectContent>{Object.entries(DATASETS).map(([k, d]) => <SelectItem key={k} value={k}>{d.label}</SelectItem>)}</SelectContent>
           </Select>
         </Field>
-        <Field label="Format" htmlFor="format">
+        <Field label={t("Format")} htmlFor="format">
           <Select value={format} onValueChange={setFormat}>
             <SelectTrigger id="format"><SelectValue /></SelectTrigger>
             <SelectContent>{formats.map((f) => <SelectItem key={f} value={f}>{f.toUpperCase()}</SelectItem>)}</SelectContent>
           </Select>
         </Field>
-        <Field label="Range" htmlFor="range">
+        <Field label={t("Range")} htmlFor="range">
           <Select value={range} onValueChange={(v) => setRange(v as RangePreset | "custom")}>
             <SelectTrigger id="range"><SelectValue /></SelectTrigger>
             <SelectContent>
               {Object.entries(RANGE_PRESETS).map(([k, p]) => <SelectItem key={k} value={k}>{p.label}</SelectItem>)}
-              <SelectItem value="custom">Custom</SelectItem>
+              <SelectItem value="custom">{t("Custom")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Timezone" htmlFor="timezone">
+        <Field label={t("Timezone")} htmlFor="timezone">
           <Select value={timezone} onValueChange={setTimezone}>
             <SelectTrigger id="timezone"><SelectValue /></SelectTrigger>
             <SelectContent>{[...new Set([browserTimezone(), ...TIMEZONES])].map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}</SelectContent>
@@ -146,59 +149,59 @@ function ExportForm({ projectId, preset, onDone }: { projectId: string; preset?:
         </Field>
         {range === "custom" && (
           <>
-            <Field label="From" htmlFor="from"><Input id="from" type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-            <Field label="To" htmlFor="to"><Input id="to" type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+            <Field label={t("From")} htmlFor="from"><Input id="from" type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+            <Field label={t("To")} htmlFor="to"><Input id="to" type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
           </>
         )}
         {dataset !== "source_events" && (
-          <Field label="Entities" htmlFor="entities" hint="Empty means every entity of the project">
-            <MultiSelect options={(entities.data?.items ?? []).map((e) => ({ value: e.id, label: e.name }))} value={entityIds} onChange={setEntityIds} placeholder="All entities" label="entities" className="w-full" />
+          <Field label={t("Entities")} htmlFor="entities" hint={t("Empty means every entity of the project")}>
+            <MultiSelect options={(entities.data?.items ?? []).map((e) => ({ value: e.id, label: e.name }))} value={entityIds} onChange={setEntityIds} placeholder={t("All entities")} label={t("entities")} className="w-full" />
           </Field>
         )}
         {(dataset === "measurements" || dataset === "aggregates") && (
-          <Field label="Metrics" htmlFor="metrics" hint={dataset === "aggregates" ? "Required" : "Empty means every metric"}>
-            <MultiSelect options={(metrics.data ?? []).map((m) => ({ value: m.key, label: m.label, hint: m.unit ?? undefined }))} value={metricKeys} onChange={setMetricKeys} placeholder={dataset === "aggregates" ? "Choose metrics" : "All metrics"} label="metrics" className="w-full" />
+          <Field label={t("Metrics")} htmlFor="metrics" hint={dataset === "aggregates" ? "Required" : "Empty means every metric"}>
+            <MultiSelect options={(metrics.data ?? []).map((m) => ({ value: m.key, label: m.label, hint: m.unit ?? undefined }))} value={metricKeys} onChange={setMetricKeys} placeholder={dataset === "aggregates" ? "Choose metrics" : "All metrics"} label={t("metrics")} className="w-full" />
           </Field>
         )}
         {dataset === "aggregates" && (
           <>
-            <Field label="Bucket" htmlFor="bucket">
+            <Field label={t("Bucket")} htmlFor="bucket">
               <Select value={bucket} onValueChange={setBucket}>
                 <SelectTrigger id="bucket"><SelectValue /></SelectTrigger>
                 <SelectContent>{BUCKETS.map((b) => <SelectItem key={b} value={b}>{b === "auto" ? "Automatic" : b === "all" ? "Whole range" : b}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
-            <Field label="Aggregates" htmlFor="aggregates">
-              <MultiSelect options={AGGREGATES.map((a) => ({ value: a, label: a }))} value={aggregates} onChange={(v) => setAggregates(v as Aggregate[])} placeholder="Choose aggregates" label="aggregates" className="w-full" />
+            <Field label={t("Aggregates")} htmlFor="aggregates">
+              <MultiSelect options={AGGREGATES.map((a) => ({ value: a, label: a }))} value={aggregates} onChange={(v) => setAggregates(v as Aggregate[])} placeholder={t("Choose aggregates")} label={t("aggregates")} className="w-full" />
             </Field>
-            <Field label="Layout" htmlFor="layout">
+            <Field label={t("Layout")} htmlFor="layout">
               <Select value={layout} onValueChange={(v) => setLayout(v as "long" | "wide")}>
                 <SelectTrigger id="layout"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="long">Long (one row per bucket and series)</SelectItem><SelectItem value="wide">Wide (one column per series)</SelectItem></SelectContent>
+                <SelectContent><SelectItem value="long">{t("Long (one row per bucket and series)")}</SelectItem><SelectItem value="wide">{t("Wide (one column per series)")}</SelectItem></SelectContent>
               </Select>
             </Field>
           </>
         )}
         <div className="flex items-center gap-2 sm:col-span-2">
           <Switch id="names" checked={includeNames} onCheckedChange={setIncludeNames} />
-          <label htmlFor="names" className="text-sm">Include entity, device and metric names</label>
+          <label htmlFor="names" className="text-sm">{t("Include entity, device and metric names")}</label>
         </div>
       </div>
       {error && <Callout kind="error">{error}</Callout>}
       {(dataset === "positions" || dataset === "measurements") && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Values" htmlFor="export-view" hint="Effective is what maps and charts show; original is the value as decoded (architecture 28.13)">
+          <Field label={t("Values")} htmlFor="export-view" hint={t("Effective is what maps and charts show; original is the value as decoded (architecture 28.13)")}>
             <Select value={view} onValueChange={(v) => setView(v as "effective" | "original")}>
               <SelectTrigger id="export-view"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="effective">effective (curated)</SelectItem><SelectItem value="original">original canonical</SelectItem></SelectContent>
+              <SelectContent><SelectItem value="effective">{t("effective (curated)")}</SelectItem><SelectItem value="original">{t("original canonical")}</SelectItem></SelectContent>
             </Select>
           </Field>
-          <div className="flex items-center gap-2 pt-6"><Switch id="curation-meta" checked={curationMeta} onCheckedChange={setCurationMeta} /><label htmlFor="curation-meta" className="text-sm">Curation metadata columns</label></div>
+          <div className="flex items-center gap-2 pt-6"><Switch id="curation-meta" checked={curationMeta} onCheckedChange={setCurationMeta} /><label htmlFor="curation-meta" className="text-sm">{t("Curation metadata columns")}</label></div>
         </div>
       )}
       <DialogFooter className="gap-2 sm:justify-between">
         <Button variant="outline" onClick={() => void downloadNow()} disabled={downloading}><Download className="size-4" /> {downloading ? "Preparing…" : "Download now"}</Button>
-        <Button onClick={() => { const p = parameters(); if (p) queue.mutate(p); }} disabled={queue.isPending}><ListPlus className="size-4" /> Queue as job</Button>
+        <Button onClick={() => { const p = parameters(); if (p) queue.mutate(p); }} disabled={queue.isPending}><ListPlus className="size-4" /> {t("Queue as job")}</Button>
       </DialogFooter>
     </>
   );

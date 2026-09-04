@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -24,6 +25,7 @@ type Values = z.infer<typeof schema>;
 
 /** Registration by invitation: the token in the link decides the email and the role. */
 export function RegisterPage() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
   const navigate = useNavigate();
@@ -45,11 +47,11 @@ export function RegisterPage() {
     onError: (error) => form.setError("root", { message: (error as Error).message }),
   });
 
-  if (!token) return <AuthShell title="Invitation needed"><Callout kind="error">This page needs an invitation link. Ask a project admin to invite you.</Callout></AuthShell>;
+  if (!token) return <AuthShell title={t("Invitation needed")}><Callout kind="error">{t("This page needs an invitation link. Ask a project admin to invite you.")}</Callout></AuthShell>;
   if (invitation.isError) {
     const error = invitation.error as ApiError;
     return (
-      <AuthShell title="Invitation not valid" footer={<Link to="/login" className="underline">Back to sign in</Link>}>
+      <AuthShell title={t("Invitation not valid")} footer={<Link to="/login" className="underline">{t("Back to sign in")}</Link>}>
         <Callout kind="error">{error.status === 410 ? "This invitation was used already or has expired." : "This invitation link is not valid."}</Callout>
       </AuthShell>
     );
@@ -57,25 +59,25 @@ export function RegisterPage() {
   const info = invitation.data;
   return (
     <AuthShell
-      title="Create your account"
+      title={t("Create your account")}
       description={info ? (info.server_admin ? "You are invited as server admin" : `You are invited to ${info.project_name ?? "a project"} as ${info.role?.replace("project-", "")}`) : undefined}
     >
       <form className="flex flex-col gap-4" onSubmit={form.handleSubmit((v) => register.mutate(v))} noValidate>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t("Email")}</Label>
           <Input id="email" value={info?.email ?? ""} disabled readOnly />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="full_name">Name</Label>
+          <Label htmlFor="full_name">{t("Name")}</Label>
           <Input id="full_name" autoComplete="name" {...form.register("full_name")} />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{t("Password")}</Label>
           <Input id="password" type="password" autoComplete="new-password" aria-invalid={!!form.formState.errors.password} {...form.register("password")} />
           {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="confirm">Repeat password</Label>
+          <Label htmlFor="confirm">{t("Repeat password")}</Label>
           <Input id="confirm" type="password" autoComplete="new-password" aria-invalid={!!form.formState.errors.confirm} {...form.register("confirm")} />
           {form.formState.errors.confirm && <p className="text-sm text-destructive">{form.formState.errors.confirm.message}</p>}
         </div>

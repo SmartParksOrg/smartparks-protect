@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Bluetooth, BluetoothOff, Download, Eraser, RefreshCw, Settings2 } from "lucide-react";
 import { useState } from "react";
@@ -23,15 +24,16 @@ function describe(error: unknown): string {
 /** The settings table of the connected device: current values read over BLE, editable per row
  * (research 4.4). Keys and binary blobs are shown as hex. */
 function SettingsEditor({ catalog, values, onWrite, canWrite }: { catalog: Catalog; values: Map<number, Uint8Array>; onWrite: (setting: CatalogSetting, value: unknown) => Promise<void>; canWrite: boolean }) {
+  const { t } = useTranslation();
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [filter, setFilter] = useState("");
   const rows = catalog.settings.filter((s) => !filter || s.name.includes(filter.toLowerCase()));
   return (
     <div className="space-y-2">
-      <Input placeholder="Filter settings" value={filter} onChange={(e) => setFilter(e.target.value)} className="h-8 max-w-xs" />
+      <Input placeholder={t("Filter settings")} value={filter} onChange={(e) => setFilter(e.target.value)} className="h-8 max-w-xs" />
       <div className="max-h-96 overflow-auto rounded-md border">
         <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-muted"><tr><th className="p-1 text-left">Setting</th><th className="p-1 text-left">Type</th><th className="p-1 text-left">Device</th>{canWrite && <th className="p-1 text-left">New value</th>}</tr></thead>
+          <thead className="sticky top-0 bg-muted"><tr><th className="p-1 text-left">{t("Setting")}</th><th className="p-1 text-left">{t("Type")}</th><th className="p-1 text-left">{t("Device")}</th>{canWrite && <th className="p-1 text-left">{t("New value")}</th>}</tr></thead>
           <tbody>
             {rows.map((s) => {
               const raw = values.get(s.id);
@@ -40,9 +42,9 @@ function SettingsEditor({ catalog, values, onWrite, canWrite }: { catalog: Catal
               const secret = s.type === "byte_array" && /key|pin/.test(s.name);
               return (
                 <tr key={s.id} className="border-t">
-                  <td className="p-1 font-mono">{s.name} <span className="text-muted-foreground">0x{s.id.toString(16).padStart(2, "0")}</span></td>
+                  <td className="p-1 font-mono">{s.name} <span className="text-muted-foreground">{`0x${s.id.toString(16).padStart(2, "0")}`}</span></td>
                   <td className="p-1 text-muted-foreground">{s.type}{s.min != null && s.max != null && s.type !== "bool" ? ` ${String(s.min)} to ${String(s.max)}` : ""}</td>
-                  <td className="p-1 font-mono">{raw === undefined ? <span className="text-muted-foreground">not reported</span> : secret ? "••••" : String(current)}</td>
+                  <td className="p-1 font-mono">{raw === undefined ? <span className="text-muted-foreground">{t("not reported")}</span> : secret ? "••••" : String(current)}</td>
                   {canWrite && (
                     <td className="p-1">
                       <span className="flex items-center gap-1">
@@ -51,7 +53,7 @@ function SettingsEditor({ catalog, values, onWrite, canWrite }: { catalog: Catal
                         ) : (
                           <Input className="h-7 w-40 font-mono text-xs" value={draft ?? ""} placeholder={raw === undefined ? String(s.default ?? "") : ""} onChange={(e) => setDrafts({ ...drafts, [s.id]: e.target.value })} />
                         )}
-                        <Button size="sm" variant="outline" className="h-7" disabled={draft === undefined} onClick={async () => { await onWrite(s, s.type === "bool" ? draft === "true" : draft); setDrafts((d) => { const next = { ...d }; delete next[s.id]; return next; }); }}>write</Button>
+                        <Button size="sm" variant="outline" className="h-7" disabled={draft === undefined} onClick={async () => { await onWrite(s, s.type === "bool" ? draft === "true" : draft); setDrafts((d) => { const next = { ...d }; delete next[s.id]; return next; }); }}>{t("write")}</Button>
                       </span>
                     </td>
                   )}
@@ -69,6 +71,7 @@ function SettingsEditor({ catalog, values, onWrite, canWrite }: { catalog: Catal
  * flash logs, all synced to the backend as deliveries. Commands go through Control with the
  * WebBLE route (decision D79). */
 export function WebBleCard({ deviceId, deviceName, driverKey, canWrite }: { deviceId: string; deviceName: string; driverKey: string | undefined; canWrite: boolean }) {
+  const { t } = useTranslation();
   const ble = useWebBle(deviceId);
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ frames: number; bytes: number } | null>(null);
@@ -166,47 +169,47 @@ export function WebBleCard({ deviceId, deviceName, driverKey, canWrite }: { devi
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="flex items-center gap-2"><Bluetooth className="size-4" /> Nearby over Bluetooth</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Bluetooth className="size-4" /> {t("Nearby over Bluetooth")}</CardTitle>
           {connection ? (
-            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => run("Disconnect", ble.disconnect)}><BluetoothOff className="size-4" /> Disconnect</Button>
+            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => run("Disconnect", ble.disconnect)}><BluetoothOff className="size-4" /> {t("Disconnect")}</Button>
           ) : (
             <Button size="sm" disabled={!available || busy !== null || !canWrite} onClick={connect}><Bluetooth className="size-4" /> {busy === "Connect" ? "Connecting…" : "Connect"}</Button>
           )}
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {!available && <Callout kind="info">Web Bluetooth needs Chrome or Edge over HTTPS (or localhost). Safari and Firefox do not offer it.</Callout>}
-          {available && !connection && <p className="text-muted-foreground">Connect the collar next to you to read its status and settings and to retrieve stored logs. Everything read is stored as a delivery on the WebBLE channel; commands are sent from Control with the WebBLE route.</p>}
-          {available && !canWrite && <p className="text-xs text-muted-foreground">Connecting needs the device control permission in this project.</p>}
+          {!available && <Callout kind="info">{t("Web Bluetooth needs Chrome or Edge over HTTPS (or localhost). Safari and Firefox do not offer it.")}</Callout>}
+          {available && !connection && <p className="text-muted-foreground">{t("Connect the collar next to you to read its status and settings and to retrieve stored logs. Everything read is stored as a delivery on the WebBLE channel; commands are sent from Control with the WebBLE route.")}</p>}
+          {available && !canWrite && <p className="text-xs text-muted-foreground">{t("Connecting needs the device control permission in this project.")}</p>}
           {connection && (
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{connection.name}</span>
-                <span className="text-xs text-muted-foreground">connected {formatAgo(connection.since)}</span>
+                <span className="text-xs text-muted-foreground">{t("connected")} {formatAgo(connection.since)}</span>
                 <span className="ml-auto flex gap-1">
-                  <Button size="sm" variant="ghost" disabled={busy !== null} onClick={refreshStatus}><RefreshCw className="size-4" /> status</Button>
-                  <Button size="sm" variant="ghost" disabled={busy !== null} onClick={readSettings}><Settings2 className="size-4" /> settings</Button>
-                  <Button size="sm" variant="ghost" disabled={busy !== null} onClick={downloadLogs}><Download className="size-4" /> logs</Button>
-                  {canWrite && <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => setErasing(true)}><Eraser className="size-4" /> erase</Button>}
+                  <Button size="sm" variant="ghost" disabled={busy !== null} onClick={refreshStatus}><RefreshCw className="size-4" /> {t("status")}</Button>
+                  <Button size="sm" variant="ghost" disabled={busy !== null} onClick={readSettings}><Settings2 className="size-4" /> {t("settings")}</Button>
+                  <Button size="sm" variant="ghost" disabled={busy !== null} onClick={downloadLogs}><Download className="size-4" /> {t("logs")}</Button>
+                  {canWrite && <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => setErasing(true)}><Eraser className="size-4" /> {t("erase")}</Button>}
                 </span>
               </div>
               {status && (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs sm:grid-cols-[auto_1fr_auto_1fr]">
-                  <dt className="text-muted-foreground">Battery</dt><dd>{(status.batteryMv / 1000).toFixed(2)} V{status.chargingMv ? `, charging at ${(status.chargingMv / 1000).toFixed(1)} V` : ""}</dd>
-                  <dt className="text-muted-foreground">Temperature</dt><dd>{status.temperatureC} °C</dd>
-                  <dt className="text-muted-foreground">Firmware</dt><dd>{status.firmwareVersion} on hardware {status.hardwareVersion} (types {status.firmwareType}/{status.hardwareType})</dd>
-                  <dt className="text-muted-foreground">Uptime</dt><dd>{status.uptimeDays} days{status.locked ? ", PIN locked" : ""}{status.joinError ? ", LoRaWAN join error" : ""}</dd>
-                  <dt className="text-muted-foreground">Flash</dt><dd>{connection.flash ? `${connection.flash.messages} stored messages, ${connection.flash.usedPercent}% used` : "unknown"}</dd>
-                  <dt className="text-muted-foreground">Errors</dt><dd className={errors.length ? "text-destructive" : ""}>{errors.length ? errors.join(", ") : "none"}</dd>
+                  <dt className="text-muted-foreground">{t("Battery")}</dt><dd>{(status.batteryMv / 1000).toFixed(2)} V{status.chargingMv ? `, charging at ${(status.chargingMv / 1000).toFixed(1)} V` : ""}</dd>
+                  <dt className="text-muted-foreground">{t("Temperature")}</dt><dd>{t("{{value}} °C", { value: status.temperatureC })}</dd>
+                  <dt className="text-muted-foreground">{t("Firmware")}</dt><dd>{status.firmwareVersion} {t("on hardware")} {status.hardwareVersion} {t("(types")} {status.firmwareType}/{status.hardwareType})</dd>
+                  <dt className="text-muted-foreground">{t("Uptime")}</dt><dd>{status.uptimeDays} {t("days")}{status.locked ? ", PIN locked" : ""}{status.joinError ? ", LoRaWAN join error" : ""}</dd>
+                  <dt className="text-muted-foreground">{t("Flash")}</dt><dd>{connection.flash ? `${connection.flash.messages} stored messages, ${connection.flash.usedPercent}% used` : "unknown"}</dd>
+                  <dt className="text-muted-foreground">{t("Errors")}</dt><dd className={errors.length ? "text-destructive" : ""}>{errors.length ? errors.join(", ") : "none"}</dd>
                 </dl>
               )}
-              {progress && <div className="text-xs text-muted-foreground">Reading logs: {progress.frames} frames, {Math.round(progress.bytes / 1024)} kB…</div>}
+              {progress && <div className="text-xs text-muted-foreground">{t("Reading logs: {{frames}} frames, {{size}} kB…", { frames: progress.frames, size: Math.round(progress.bytes / 1024) })}</div>}
               {settings && catalog.data && (catalog.data.catalog as unknown as Catalog).settings && <SettingsEditor catalog={catalog.data.catalog as unknown as Catalog} values={settings} onWrite={writeSetting} canWrite={canWrite} />}
-              {settings && catalog.data && !(catalog.data.catalog as unknown as Catalog).settings && <p className="text-xs text-muted-foreground">The driver publishes no settings catalogue; {settings.size} settings were read.</p>}
+              {settings && catalog.data && !(catalog.data.catalog as unknown as Catalog).settings && <p className="text-xs text-muted-foreground">{t("The driver publishes no settings catalogue;")} {settings.size} {t("settings were read.")}</p>}
             </>
           )}
         </CardContent>
       </Card>
-      <ConfirmDialog open={erasing} onOpenChange={setErasing} title="Erase the device's flash log?" description="Every stored record on the device is deleted. Sync the logs first; records already received are safe on the server." confirmLabel="Erase" pending={busy === "Erase logs"} onConfirm={eraseLogs} />
+      <ConfirmDialog open={erasing} onOpenChange={setErasing} title={t("Erase the device's flash log?")} description={t("Every stored record on the device is deleted. Sync the logs first; records already received are safe on the server.")} confirmLabel={t("Erase")} pending={busy === "Erase logs"} onConfirm={eraseLogs} />
     </>
   );
 }

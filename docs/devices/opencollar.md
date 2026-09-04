@@ -24,7 +24,7 @@ The protocol catalogue (settings, commands and readable values of firmware 7.3.0
 | 29 | Flash log | Each stored record is decoded as if it had arrived on its own port; positions keep their fix time, clockless messages take the store timestamp | Per record |
 | 31 | Command confirmation, BLE MAC, requested last position | State `last_command`, state `ble_mac`, Position (firmware byte order: longitude first) | Fix timestamp for the position |
 | 3, 30 | Settings and values readback | State with the raw `id: hex` list | Network receive time |
-| 1, 5, 6, 7, 9, 10, 11, 15, 21, 27, 28 | LR11xx NAV, satellite lists, Wi-Fi and BLE scans, cardiac monitor, air quality, Memfault, messaging | Accepted, no canonical rows yet (later phases; the LR11xx NAV needs an external solver) | |
+| 1, 5, 6, 7, 9, 10, 11, 15, 21, 27, 28 | LR11xx NAV, satellite lists, Wi-Fi and BLE scans, cardiac monitor, air quality, Memfault, messaging | Accepted, no canonical rows yet (the LR11xx NAV needs an external solver) | |
 
 Unknown ports, wrong message ids and length mismatches raise `PAYLOAD_DECODE_FAILED` and land in Needs Attention.
 
@@ -44,9 +44,9 @@ The status message carries firmware and hardware version as major.minor nibbles;
 
 Documented in section 8 of the research: the course over ground byte order in port 2 (the driver follows the firmware, little-endian), the longitude and latitude order in port 31 message 0xFE (the driver follows the firmware), and the wiki's big-endian count in flash read examples.
 
-## Control (phase 6)
+## Control
 
-Downlinks are settings on FPort 3 (`id len value`) and commands on FPort 32; `cmd_reset` is 0xA1, `cmd_send_status` 0xA4, `cmd_send_position` 0xA5. The complete command and settings tables are in the research document. Encoders arrive with the Device Control Framework in phase 6.
+Downlinks are settings on FPort 3 (`id len value`) and commands on FPort 32; `cmd_reset` is 0xA1, `cmd_send_status` 0xA4, `cmd_send_position` 0xA5. The complete command and settings tables are in the research document; the encoders and the command lifecycle are described under [device control](device-control.md).
 
 ## Testing
 

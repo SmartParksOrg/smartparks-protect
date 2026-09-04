@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 
@@ -6,6 +7,7 @@ import { useAuthStore } from "@/stores/auth";
 /** Loads the account once a token exists and redirects to login otherwise, remembering where the
  * user wanted to go. */
 export function RequireAuth() {
+  const { t } = useTranslation();
   const { token, status, loadMe } = useAuthStore();
   const location = useLocation();
 
@@ -18,7 +20,7 @@ export function RequireAuth() {
     return <Navigate to={`/login?from=${from}${status === "expired" ? "&expired=1" : ""}`} replace />;
   }
   if (status === "loading" || !useAuthStore.getState().user) {
-    return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading…</div>;
+    return <div className="flex min-h-screen items-center justify-center text-muted-foreground">{t("Loading…")}</div>;
   }
   return <Outlet />;
 }

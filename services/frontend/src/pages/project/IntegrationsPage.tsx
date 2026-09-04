@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -91,6 +92,8 @@ const dateLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60
 
 /** Outbound integrations (architecture 18): what leaves the platform, to where, and what happened to every object. */
 export function IntegrationsPage() {
+  const { t } = useTranslation();
+  const translate = t;
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "deliveries" ? "deliveries" : "integrations";
@@ -127,7 +130,7 @@ export function IntegrationsPage() {
     onError: (e) => form.setError("root", { message: e.message }),
   });
   const toggle = useMutationToast({ mutationFn: ({ i, enabled }: { i: Integration; enabled: boolean }) => api.patch<Integration>(`${base}/${i.id}`, { body: { enabled } }), invalidate, success: (i) => (i.enabled ? "Integration enabled" : "Integration disabled") });
-  const remove = useMutationToast({ mutationFn: (i: Integration) => api.delete<void>(`${base}/${i.id}`), invalidate, success: "Integration deleted", onSuccess: () => setRemoving(null) });
+  const remove = useMutationToast({ mutationFn: (i: Integration) => api.delete<void>(`${base}/${i.id}`), invalidate, success: t("Integration deleted"), onSuccess: () => setRemoving(null) });
   const test = useMutationToast({
     mutationFn: (i: Integration) => api.post<IntegrationTestResult>(`${base}/${i.id}/test`, { body: { latitude: testLocation.latitude ? Number(testLocation.latitude) : null, longitude: testLocation.longitude ? Number(testLocation.longitude) : null } }),
     invalidate,
@@ -136,72 +139,72 @@ export function IntegrationsPage() {
   const backfill = useMutationToast({
     mutationFn: (i: Integration) => api.post<Integration>(`${base}/${i.id}/backfill`, { body: { time_from: new Date(backfillRange.from).toISOString(), time_to: new Date(backfillRange.to).toISOString() } }),
     invalidate,
-    success: "Backfill queued; the integration service works through the range in batches",
+    success: t("Backfill queued; the integration service works through the range in batches"),
     onSuccess: () => setBackfilling(null),
   });
-  const retry = useMutationToast({ mutationFn: (d: IntegrationDelivery) => api.post<IntegrationDelivery>(`${base}/deliveries/${d.id}/retry`), invalidate: [queryKeys.integrationDeliveries(projectId, { status: deliveryStatus, integration: deliveryIntegration })], success: "Queued again", onSuccess: () => setDeliveryDetail(null) });
-  const resend = useMutationToast({ mutationFn: (d: IntegrationDelivery) => api.post<IntegrationDelivery>(`${base}/deliveries/${d.id}/resend`), invalidate: [queryKeys.integrationDeliveries(projectId, { status: deliveryStatus, integration: deliveryIntegration })], success: "Corrected object queued for delivery", onSuccess: () => setDeliveryDetail(null) });
+  const retry = useMutationToast({ mutationFn: (d: IntegrationDelivery) => api.post<IntegrationDelivery>(`${base}/deliveries/${d.id}/retry`), invalidate: [queryKeys.integrationDeliveries(projectId, { status: deliveryStatus, integration: deliveryIntegration })], success: t("Queued again"), onSuccess: () => setDeliveryDetail(null) });
+  const resend = useMutationToast({ mutationFn: (d: IntegrationDelivery) => api.post<IntegrationDelivery>(`${base}/deliveries/${d.id}/resend`), invalidate: [queryKeys.integrationDeliveries(projectId, { status: deliveryStatus, integration: deliveryIntegration })], success: t("Corrected object queued for delivery"), onSuccess: () => setDeliveryDetail(null) });
   const connectorLabel = (key: string) => CONNECTORS.find((c) => c.key === key)?.label ?? key;
   const integrationName = (id: string) => integrations.data?.items.find((i) => i.id === id)?.name ?? "";
   const entityName = (id: string | null | undefined) => entities.data?.items.find((e) => e.id === id)?.name ?? "";
 
   const columns: ColumnDef<Integration, unknown>[] = [
-    { header: "Enabled", accessorKey: "enabled", cell: ({ row }) => <span onClick={(e) => e.stopPropagation()}><Switch checked={row.original.enabled} aria-label={`Enable ${row.original.name}`} onCheckedChange={(v) => toggle.mutate({ i: row.original, enabled: v })} /></span> },
-    { header: "Name", accessorKey: "name" },
-    { header: "Target", accessorKey: "connector_key", cell: ({ getValue }) => connectorLabel(getValue<string>()) },
-    { header: "Forwards", id: "forwards", cell: ({ row }) => <span className="text-xs">{row.original.object_types.join(", ")}{row.original.event_types.length ? `; ${row.original.event_types.join(", ")}` : ""}{row.original.entity_ids.length ? `; ${row.original.entity_ids.length} entities` : ""}</span> },
-    { header: "Last delivery", accessorKey: "last_delivery_at", cell: ({ getValue }) => formatTime(getValue<string | null>()) },
-    { header: "Status", id: "status", cell: ({ row }) => row.original.last_error ? <span className="text-xs text-destructive" title={row.original.last_error}>{row.original.last_error.slice(0, 60)}</span> : row.original.backfill?.status ? <StatusBadge value={String(row.original.backfill.status)} /> : <StatusBadge value="ok" /> },
+    { header: t("Enabled"), accessorKey: "enabled", cell: ({ row }) => <span onClick={(e) => e.stopPropagation()}><Switch checked={row.original.enabled} aria-label={`Enable ${row.original.name}`} onCheckedChange={(v) => toggle.mutate({ i: row.original, enabled: v })} /></span> },
+    { header: t("Name"), accessorKey: "name" },
+    { header: t("Target"), accessorKey: "connector_key", cell: ({ getValue }) => connectorLabel(getValue<string>()) },
+    { header: t("Forwards"), id: "forwards", cell: ({ row }) => <span className="text-xs">{row.original.object_types.join(", ")}{row.original.event_types.length ? `; ${row.original.event_types.join(", ")}` : ""}{row.original.entity_ids.length ? `; ${row.original.entity_ids.length} entities` : ""}</span> },
+    { header: t("Last delivery"), accessorKey: "last_delivery_at", cell: ({ getValue }) => formatTime(getValue<string | null>()) },
+    { header: t("Status"), id: "status", cell: ({ row }) => row.original.last_error ? <span className="text-xs text-destructive" title={row.original.last_error}>{row.original.last_error.slice(0, 60)}</span> : row.original.backfill?.status ? <StatusBadge value={String(row.original.backfill.status)} /> : <StatusBadge value="ok" /> },
     { id: "actions", header: "", cell: ({ row }) => <span className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-      <Button variant="ghost" size="sm" aria-label="Test" onClick={() => { setTestResult(null); setTesting(row.original); }}><Send className="size-4" /></Button>
-      <Button variant="ghost" size="sm" aria-label="Backfill" onClick={() => setBackfilling(row.original)}><History className="size-4" /></Button>
-      <Button variant="ghost" size="icon" aria-label="Delete integration" onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button>
+      <Button variant="ghost" size="sm" aria-label={t("Test")} onClick={() => { setTestResult(null); setTesting(row.original); }}><Send className="size-4" /></Button>
+      <Button variant="ghost" size="sm" aria-label={t("Backfill")} onClick={() => setBackfilling(row.original)}><History className="size-4" /></Button>
+      <Button variant="ghost" size="icon" aria-label={t("Delete integration")} onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button>
     </span> },
   ];
   const deliveryColumns: ColumnDef<IntegrationDelivery, unknown>[] = [
-    { header: "Created", accessorKey: "created_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { header: "Integration", accessorKey: "integration_id", cell: ({ getValue }) => integrationName(getValue<string>()) },
-    { header: "Object", id: "object", cell: ({ row }) => <span className="text-xs">{row.original.object_type} {row.original.object_type === "event" ? row.original.object_id.slice(0, 8) : row.original.object_id}<span className="text-muted-foreground"> at {formatTime(row.original.object_time)}</span></span> },
-    { header: "Entity", accessorKey: "entity_id", cell: ({ getValue }) => entityName(getValue<string | null>()) },
-    { header: "Origin", accessorKey: "origin" },
-    { header: "Status", accessorKey: "status", cell: ({ row }) => <span className="inline-flex items-center gap-2"><StatusBadge value={row.original.status} />{row.original.stale_at && <Badge variant="outline" title={row.original.stale_reason ?? undefined}>stale</Badge>}<span className="text-xs text-muted-foreground">{row.original.attempts} attempt{row.original.attempts === 1 ? "" : "s"}</span></span> },
-    { header: "Detail", id: "detail", cell: ({ row }) => <span className="text-xs">{row.original.external_id ? `ref ${row.original.external_id}` : row.original.error_message ?? (row.original.next_attempt_at ? `next ${formatTime(row.original.next_attempt_at)}` : "")}</span> },
+    { header: t("Created"), accessorKey: "created_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
+    { header: t("Integration"), accessorKey: "integration_id", cell: ({ getValue }) => integrationName(getValue<string>()) },
+    { header: t("Object"), id: "object", cell: ({ row }) => <span className="text-xs">{row.original.object_type} {row.original.object_type === "event" ? row.original.object_id.slice(0, 8) : row.original.object_id}<span className="text-muted-foreground"> {t("at {{time}}", { time: formatTime(row.original.object_time) })}</span></span> },
+    { header: t("Entity"), accessorKey: "entity_id", cell: ({ getValue }) => entityName(getValue<string | null>()) },
+    { header: t("Origin"), accessorKey: "origin" },
+    { header: t("Status"), accessorKey: "status", cell: ({ row }) => <span className="inline-flex items-center gap-2"><StatusBadge value={row.original.status} />{row.original.stale_at && <Badge variant="outline" title={row.original.stale_reason ?? undefined}>{t("stale")}</Badge>}<span className="text-xs text-muted-foreground">{row.original.attempts} {t("attempt")}{row.original.attempts === 1 ? "" : "s"}</span></span> },
+    { header: t("Detail"), id: "detail", cell: ({ row }) => <span className="text-xs">{row.original.external_id ? `ref ${row.original.external_id}` : row.original.error_message ?? (row.original.next_attempt_at ? `next ${formatTime(row.original.next_attempt_at)}` : "")}</span> },
   ];
 
   return (
     <>
-      <PageHeader title="Integrations" description="Durable outbound delivery of positions, events and measurements to external platforms, webhooks and MQTT brokers, with retries, a delivery log and backfill" actions={<Button onClick={() => { setEditing(null); setOpen(true); }} disabled={CONNECTORS.length === 0}><Plus className="size-4" /> New integration</Button>} />
+      <PageHeader title={t("Integrations")} description={t("Durable outbound delivery of positions, events and measurements to external platforms, webhooks and MQTT brokers, with retries, a delivery log and backfill")} actions={<Button onClick={() => { setEditing(null); setOpen(true); }} disabled={CONNECTORS.length === 0}><Plus className="size-4" /> {t("New integration")}</Button>} />
       <Page>
         <div className="flex flex-wrap items-center gap-3">
-          <Tabs value={tab} onValueChange={(v) => setParams((p) => { p.set("tab", v); return p; }, { replace: true })}><TabsList><TabsTrigger value="integrations">Integrations</TabsTrigger><TabsTrigger value="deliveries">Deliveries</TabsTrigger></TabsList></Tabs>
+          <Tabs value={tab} onValueChange={(v) => setParams((p) => { p.set("tab", v); return p; }, { replace: true })}><TabsList><TabsTrigger value="integrations">{t("Integrations")}</TabsTrigger><TabsTrigger value="deliveries">{t("Deliveries")}</TabsTrigger></TabsList></Tabs>
           {tab === "deliveries" && (
             <>
               <Select value={deliveryStatus || "all"} onValueChange={(v) => setParams((p) => { if (v === "all") p.delete("status"); else p.set("status", v); return p; }, { replace: true })}>
-                <SelectTrigger className="w-36" aria-label="Delivery status"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="all">Any status</SelectItem>{DELIVERY_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="w-36" aria-label={t("Delivery status")}><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">{t("Any status")}</SelectItem>{DELIVERY_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={deliveryIntegration || "all"} onValueChange={(v) => setParams((p) => { if (v === "all") p.delete("integration"); else p.set("integration", v); return p; }, { replace: true })}>
-                <SelectTrigger className="w-48" aria-label="Integration filter"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="all">Any integration</SelectItem>{integrations.data?.items.map((i) => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="w-48" aria-label={t("Integration filter")}><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">{t("Any integration")}</SelectItem>{integrations.data?.items.map((i) => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent>
               </Select>
             </>
           )}
         </div>
         {(integrations.error ?? deliveries.error ?? connectors.error) && <Callout kind="error">{(integrations.error ?? deliveries.error ?? connectors.error)?.message}</Callout>}
         {tab === "integrations" ? (
-          <DataTable columns={columns} data={integrations.data?.items} isLoading={integrations.isPending} emptyMessage="No integrations yet. Create one to forward this project's positions and events to an external system." onRowClick={(i) => setInspecting(i)} />
+          <DataTable columns={columns} data={integrations.data?.items} isLoading={integrations.isPending} emptyMessage={t("No integrations yet. Create one to forward this project's positions and events to an external system.")} onRowClick={(i) => setInspecting(i)} />
         ) : (
-          <DataTable columns={deliveryColumns} data={deliveries.data?.items} isLoading={deliveries.isPending} emptyMessage="No deliveries yet." onRowClick={(d) => setDeliveryDetail(d)} footer={deliveries.data && `${deliveries.data.items.length} deliveries, newest first`} />
+          <DataTable columns={deliveryColumns} data={deliveries.data?.items} isLoading={deliveries.isPending} emptyMessage={t("No deliveries yet.")} onRowClick={(d) => setDeliveryDetail(d)} footer={deliveries.data && `${deliveries.data.items.length} deliveries, newest first`} />
         )}
       </Page>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader><DialogTitle>{editing ? "Edit integration" : "New integration"}</DialogTitle><DialogDescription>Every matching object becomes one delivery, sent once and retried on failure. Credentials are encrypted and never shown again.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Edit integration" : "New integration"}</DialogTitle><DialogDescription>{t("Every matching object becomes one delivery, sent once and retried on failure. Credentials are encrypted and never shown again.")}</DialogDescription></DialogHeader>
           <form className="space-y-3" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Name" htmlFor="in-name" error={form.formState.errors.name?.message}><Input id="in-name" {...form.register("name")} /></Field>
-              <Field label="Target" htmlFor="in-connector">
+              <Field label={t("Name")} htmlFor="in-name" error={form.formState.errors.name?.message}><Input id="in-name" {...form.register("name")} /></Field>
+              <Field label={t("Target")} htmlFor="in-connector">
                 <Select value={connectorKey} disabled={Boolean(editing)} onValueChange={(v) => { form.setValue("connector_key", v); const c = CONNECTORS.find((x) => x.key === v); if (c && !editing) { form.setValue("config", JSON.stringify(c.config_example, null, 2)); form.setValue("credentials", JSON.stringify(credentialsTemplate(c), null, 2)); form.setValue("object_types", c.supports.filter((s) => s !== "measurement") as Values["object_types"]); } }}>
                   <SelectTrigger id="in-connector"><SelectValue /></SelectTrigger>
                   <SelectContent>{CONNECTORS.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}</SelectContent>
@@ -209,33 +212,33 @@ export function IntegrationsPage() {
               </Field>
             </div>
             {connector && <Callout kind="info"><div>{connector.description}.</div>{connector.setup_hint && <div className="mt-1 text-xs">{connector.setup_hint}</div>}</Callout>}
-            <Field label="Description" htmlFor="in-description"><Input id="in-description" {...form.register("description")} /></Field>
-            <Field label="Forward" htmlFor="in-types" error={form.formState.errors.object_types?.message}>
+            <Field label={t("Description")} htmlFor="in-description"><Input id="in-description" {...form.register("description")} /></Field>
+            <Field label={t("Forward")} htmlFor="in-types" error={form.formState.errors.object_types?.message}>
               <div className="flex flex-wrap gap-2" id="in-types">
-                {OBJECT_TYPES.map((t) => { const supported = connector?.supports.includes(t) ?? true; const on = form.watch("object_types").includes(t); return <Button key={t} type="button" size="sm" variant={on ? "default" : "outline"} disabled={!supported} title={supported ? undefined : `${connector?.label} cannot receive ${t}s`} onClick={() => form.setValue("object_types", on ? form.getValues("object_types").filter((x) => x !== t) : [...form.getValues("object_types"), t])}>{t}s</Button>; })}
+                {OBJECT_TYPES.map((t) => { const supported = connector?.supports.includes(t) ?? true; const on = form.watch("object_types").includes(t); return <Button key={t} type="button" size="sm" variant={on ? "default" : "outline"} disabled={!supported} title={supported ? undefined : translate("{{connector}} cannot receive {{type}}s", { connector: connector?.label, type: t })} onClick={() => form.setValue("object_types", on ? form.getValues("object_types").filter((x) => x !== t) : [...form.getValues("object_types"), t])}>{translate("{{type}}s", { type: t })}</Button>; })}
               </div>
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Event types" htmlFor="in-events" hint="Comma separated; empty means every type"><Input id="in-events" placeholder="GEOFENCE_EXIT, SPECIES_DETECTION" {...form.register("event_types")} /></Field>
-              <Field label="Minimum event severity" htmlFor="in-severity">
+              <Field label={t("Event types")} htmlFor="in-events" hint={t("Comma separated; empty means every type")}><Input id="in-events" placeholder={t("GEOFENCE_EXIT, SPECIES_DETECTION")} {...form.register("event_types")} /></Field>
+              <Field label={t("Minimum event severity")} htmlFor="in-severity">
                 <Select value={form.watch("min_severity")} onValueChange={(v) => form.setValue("min_severity", v as Values["min_severity"])}>
                   <SelectTrigger id="in-severity"><SelectValue /></SelectTrigger>
                   <SelectContent>{SEVERITIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
-              <Field label="Metric keys" htmlFor="in-metrics" hint="For measurements; empty means every metric"><Input id="in-metrics" placeholder="battery_voltage, temperature" {...form.register("metric_keys")} /></Field>
-              <Field label="Skip live objects older than (hours)" htmlFor="in-age" hint="Backfill ignores this bound" error={form.formState.errors.max_object_age_hours?.message}><Input id="in-age" type="number" step="any" {...form.register("max_object_age_hours", { valueAsNumber: true })} /></Field>
+              <Field label={t("Metric keys")} htmlFor="in-metrics" hint={t("For measurements; empty means every metric")}><Input id="in-metrics" placeholder={t("battery_voltage, temperature")} {...form.register("metric_keys")} /></Field>
+              <Field label={t("Skip live objects older than (hours)")} htmlFor="in-age" hint={t("Backfill ignores this bound")} error={form.formState.errors.max_object_age_hours?.message}><Input id="in-age" type="number" step="any" {...form.register("max_object_age_hours", { valueAsNumber: true })} /></Field>
             </div>
-            <Field label="Entities" htmlFor="in-entities" hint="Optional. Leave empty for every entity of the project.">
+            <Field label={t("Entities")} htmlFor="in-entities" hint={t("Optional. Leave empty for every entity of the project.")}>
               <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto" id="in-entities">
                 {entities.data?.items.map((e) => { const on = form.watch("entity_ids").includes(e.id); return <Button key={e.id} type="button" size="sm" variant={on ? "default" : "outline"} onClick={() => form.setValue("entity_ids", on ? form.getValues("entity_ids").filter((x) => x !== e.id) : [...form.getValues("entity_ids"), e.id])}>{e.name}</Button>; })}
               </div>
             </Field>
-            <Field label="Configuration (JSON)" htmlFor="in-config" error={form.formState.errors.config?.message}><Textarea id="in-config" rows={6} className="font-mono text-xs" {...form.register("config")} /></Field>
-            <Field label="Credentials (JSON)" htmlFor="in-credentials" hint={editing ? "Leave empty to keep the stored credentials" : Object.entries(connector?.credentials_schema ?? {}).map(([k, v]) => `${k}: ${v}`).join("; ")} error={form.formState.errors.credentials?.message}><Textarea id="in-credentials" rows={3} className="font-mono text-xs" {...form.register("credentials")} /></Field>
-            <div className="flex items-center gap-2"><Switch id="in-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="in-enabled" className="text-sm">Enabled</label></div>
+            <Field label={t("Configuration (JSON)")} htmlFor="in-config" error={form.formState.errors.config?.message}><Textarea id="in-config" rows={6} className="font-mono text-xs" {...form.register("config")} /></Field>
+            <Field label={t("Credentials (JSON)")} htmlFor="in-credentials" hint={editing ? "Leave empty to keep the stored credentials" : Object.entries(connector?.credentials_schema ?? {}).map(([k, v]) => `${k}: ${v}`).join("; ")} error={form.formState.errors.credentials?.message}><Textarea id="in-credentials" rows={3} className="font-mono text-xs" {...form.register("credentials")} /></Field>
+            <div className="flex items-center gap-2"><Switch id="in-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="in-enabled" className="text-sm">{t("Enabled")}</label></div>
             {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
-            <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={save.isPending}>Save</Button></DialogFooter>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>{t("Cancel")}</Button><Button type="submit" disabled={save.isPending}>{t("Save")}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
@@ -246,60 +249,60 @@ export function IntegrationsPage() {
           {detail.data && (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {DELIVERY_STATUSES.map((s) => <div key={s} className="rounded-md border p-2"><div className="text-xs text-muted-foreground">{s}</div><div className="text-lg font-semibold">{(detail.data.counts ?? {})[s] ?? 0}</div><div className="text-xs text-muted-foreground">{(detail.data.counts_24h ?? {})[s] ?? 0} in 24 h</div></div>)}
+                {DELIVERY_STATUSES.map((s) => <div key={s} className="rounded-md border p-2"><div className="text-xs text-muted-foreground">{s}</div><div className="text-lg font-semibold">{(detail.data.counts ?? {})[s] ?? 0}</div><div className="text-xs text-muted-foreground">{(detail.data.counts_24h ?? {})[s] ?? 0} {t("in 24 h")}</div></div>)}
               </div>
-              {detail.data.last_error && <Callout kind="warning">Last error {formatTime(detail.data.last_error_at)}: {detail.data.last_error}</Callout>}
-              {Boolean(detail.data.backfill?.status) && <Callout kind="info">Backfill {String(detail.data.backfill.status)}: {String(detail.data.backfill.queued ?? 0)} queued of {String(detail.data.backfill.scanned ?? 0)} scanned, {String(detail.data.backfill.from ?? "")} to {String(detail.data.backfill.to ?? "")}{detail.data.backfill.error ? `; ${String(detail.data.backfill.error)}` : ""}</Callout>}
+              {detail.data.last_error && <Callout kind="warning">{t("Last error")} {formatTime(detail.data.last_error_at)}: {detail.data.last_error}</Callout>}
+              {Boolean(detail.data.backfill?.status) && <Callout kind="info">{t("Backfill {{status}}: {{queued}} queued of {{scanned}} scanned, {{from}} to {{to}}", { status: String(detail.data.backfill.status), queued: String(detail.data.backfill.queued ?? 0), scanned: String(detail.data.backfill.scanned ?? 0), from: String(detail.data.backfill.from ?? ""), to: String(detail.data.backfill.to ?? "") })}{detail.data.backfill.error ? `; ${String(detail.data.backfill.error)}` : ""}</Callout>}
               <JsonView value={detail.data.config} />
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setInspecting(null); setParams((p) => { p.set("tab", "deliveries"); if (inspecting) p.set("integration", inspecting.id); return p; }); }}>Show deliveries</Button>
-            <Button onClick={() => { setEditing(inspecting); setInspecting(null); setOpen(true); }}>Edit</Button>
+            <Button variant="outline" onClick={() => { setInspecting(null); setParams((p) => { p.set("tab", "deliveries"); if (inspecting) p.set("integration", inspecting.id); return p; }); }}>{t("Show deliveries")}</Button>
+            <Button onClick={() => { setEditing(inspecting); setInspecting(null); setOpen(true); }}>{t("Edit")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={testing !== null} onOpenChange={(o) => !o && setTesting(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Test {testing?.name}</DialogTitle><DialogDescription>Sends a test object to the target. Without coordinates the latest entity position of the project is used.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{t("Test")} {testing?.name}</DialogTitle><DialogDescription>{t("Sends a test object to the target. Without coordinates the latest entity position of the project is used.")}</DialogDescription></DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Latitude" htmlFor="test-lat"><Input id="test-lat" type="number" step="any" value={testLocation.latitude} onChange={(e) => setTestLocation((t) => ({ ...t, latitude: e.target.value }))} /></Field>
-            <Field label="Longitude" htmlFor="test-lon"><Input id="test-lon" type="number" step="any" value={testLocation.longitude} onChange={(e) => setTestLocation((t) => ({ ...t, longitude: e.target.value }))} /></Field>
+            <Field label={t("Latitude")} htmlFor="test-lat"><Input id="test-lat" type="number" step="any" value={testLocation.latitude} onChange={(e) => setTestLocation((t) => ({ ...t, latitude: e.target.value }))} /></Field>
+            <Field label={t("Longitude")} htmlFor="test-lon"><Input id="test-lon" type="number" step="any" value={testLocation.longitude} onChange={(e) => setTestLocation((t) => ({ ...t, longitude: e.target.value }))} /></Field>
           </div>
           {testResult && <Callout kind={testResult.ok ? "success" : "error"}>{testResult.detail}{testResult.ok && Object.keys(testResult.response ?? {}).length > 0 && <JsonView value={testResult.response} className="mt-2" />}</Callout>}
-          <DialogFooter><Button variant="outline" onClick={() => setTesting(null)}>Close</Button><Button disabled={test.isPending} onClick={() => testing && test.mutate(testing)}>Send test</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setTesting(null)}>{t("Close")}</Button><Button disabled={test.isPending} onClick={() => testing && test.mutate(testing)}>{t("Send test")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={backfilling !== null} onOpenChange={(o) => !o && setBackfilling(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Backfill {backfilling?.name}</DialogTitle><DialogDescription>Queues every matching object in the range that was not sent before. Objects already delivered are skipped, so a repeated backfill is harmless.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{t("Backfill")} {backfilling?.name}</DialogTitle><DialogDescription>{t("Queues every matching object in the range that was not sent before. Objects already delivered are skipped, so a repeated backfill is harmless.")}</DialogDescription></DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="From" htmlFor="bf-from"><Input id="bf-from" type="datetime-local" value={backfillRange.from} onChange={(e) => setBackfillRange((r) => ({ ...r, from: e.target.value }))} /></Field>
-            <Field label="To" htmlFor="bf-to"><Input id="bf-to" type="datetime-local" value={backfillRange.to} onChange={(e) => setBackfillRange((r) => ({ ...r, to: e.target.value }))} /></Field>
+            <Field label={t("From")} htmlFor="bf-from"><Input id="bf-from" type="datetime-local" value={backfillRange.from} onChange={(e) => setBackfillRange((r) => ({ ...r, from: e.target.value }))} /></Field>
+            <Field label={t("To")} htmlFor="bf-to"><Input id="bf-to" type="datetime-local" value={backfillRange.to} onChange={(e) => setBackfillRange((r) => ({ ...r, to: e.target.value }))} /></Field>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setBackfilling(null)}>Cancel</Button><Button disabled={backfill.isPending} onClick={() => backfilling && backfill.mutate(backfilling)}>Queue backfill</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setBackfilling(null)}>{t("Cancel")}</Button><Button disabled={backfill.isPending} onClick={() => backfilling && backfill.mutate(backfilling)}>{t("Queue backfill")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deliveryDetail !== null} onOpenChange={(o) => !o && setDeliveryDetail(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader><DialogTitle>Delivery of {deliveryDetail?.object_type} {deliveryDetail?.object_type === "event" ? deliveryDetail.object_id.slice(0, 8) : deliveryDetail?.object_id}</DialogTitle><DialogDescription>{deliveryDetail && `${integrationName(deliveryDetail.integration_id)}, ${deliveryDetail.origin}, ${deliveryDetail.attempts} attempt${deliveryDetail.attempts === 1 ? "" : "s"}`}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{t("Delivery of")} {deliveryDetail?.object_type} {deliveryDetail?.object_type === "event" ? deliveryDetail.object_id.slice(0, 8) : deliveryDetail?.object_id}</DialogTitle><DialogDescription>{deliveryDetail && `${integrationName(deliveryDetail.integration_id)}, ${deliveryDetail.origin}, ${deliveryDetail.attempts} attempt${deliveryDetail.attempts === 1 ? "" : "s"}`}</DialogDescription></DialogHeader>
           {deliveryDetail && (
             <div className="space-y-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2"><StatusBadge value={deliveryDetail.status} />{deliveryDetail.delivered_at && <span className="text-xs text-muted-foreground">delivered {formatTime(deliveryDetail.delivered_at)}</span>}{deliveryDetail.external_id && <span className="text-xs">target ref {deliveryDetail.external_id}</span>}{deliveryDetail.trace_id && <a className="text-xs underline" href={`/projects/${projectId}/network/traces?trace=${deliveryDetail.trace_id}`}>trace</a>}</div>
+              <div className="flex flex-wrap items-center gap-2"><StatusBadge value={deliveryDetail.status} />{deliveryDetail.delivered_at && <span className="text-xs text-muted-foreground">{t("delivered")} {formatTime(deliveryDetail.delivered_at)}</span>}{deliveryDetail.external_id && <span className="text-xs">{t("target ref")} {deliveryDetail.external_id}</span>}{deliveryDetail.trace_id && <a className="text-xs underline" href={`/projects/${projectId}/network/traces?trace=${deliveryDetail.trace_id}`}>{t("trace")}</a>}</div>
               {deliveryDetail.error_message && <Callout kind={deliveryDetail.status === "failed" ? "error" : "warning"}>{deliveryDetail.error_message}</Callout>}
-              {deliveryDetail.stale_at && <Callout kind="warning">The object was corrected after this delivery ({deliveryDetail.stale_reason}, {formatTime(deliveryDetail.stale_at)}). Resend delivers the corrected version as a new delivery.</Callout>}
-              <div><div className="mb-1 text-xs font-medium uppercase text-muted-foreground">Request</div><JsonView value={delivery.data?.request ?? null} /></div>
-              <div><div className="mb-1 text-xs font-medium uppercase text-muted-foreground">Response</div><JsonView value={delivery.data?.response ?? {}} /></div>
+              {deliveryDetail.stale_at && <Callout kind="warning">{t("The object was corrected after this delivery ({{reason}}, {{time}}). Resend delivers the corrected version as a new delivery.", { reason: deliveryDetail.stale_reason, time: formatTime(deliveryDetail.stale_at) })}</Callout>}
+              <div><div className="mb-1 text-xs font-medium uppercase text-muted-foreground">{t("Request")}</div><JsonView value={delivery.data?.request ?? null} /></div>
+              <div><div className="mb-1 text-xs font-medium uppercase text-muted-foreground">{t("Response")}</div><JsonView value={delivery.data?.response ?? {}} /></div>
             </div>
           )}
-          <DialogFooter><Button variant="outline" onClick={() => setDeliveryDetail(null)}>Close</Button>{deliveryDetail && deliveryDetail.status !== "sent" && <Button onClick={() => retry.mutate(deliveryDetail)} disabled={retry.isPending}><RotateCcw className="size-4" /> Retry now</Button>}{deliveryDetail?.stale_at && <Button onClick={() => resend.mutate(deliveryDetail)} disabled={resend.isPending}><RotateCcw className="size-4" /> Resend corrected</Button>}</DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDeliveryDetail(null)}>{t("Close")}</Button>{deliveryDetail && deliveryDetail.status !== "sent" && <Button onClick={() => retry.mutate(deliveryDetail)} disabled={retry.isPending}><RotateCcw className="size-4" /> {t("Retry now")}</Button>}{deliveryDetail?.stale_at && <Button onClick={() => resend.mutate(deliveryDetail)} disabled={resend.isPending}><RotateCcw className="size-4" /> {t("Resend corrected")}</Button>}</DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={`Delete integration ${removing?.name ?? ""}?`} description="Its delivery log is deleted with it." confirmLabel="Delete" pending={remove.isPending} onConfirm={() => removing && remove.mutate(removing)} />
+      <ConfirmDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={`Delete integration ${removing?.name ?? ""}?`} description={t("Its delivery log is deleted with it.")} confirmLabel={t("Delete")} pending={remove.isPending} onConfirm={() => removing && remove.mutate(removing)} />
     </>
   );
 }
