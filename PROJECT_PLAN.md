@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 10 complete on the dev server; phase 11 (WebBLE, raw log files, Cloudloop) is next |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phase 10 and the deployment fixes unreleased |
 | Last session | 2026-09-04 |
-| Next item | Tim registers on the dev server and adds it as a connector in Claude and ChatGPT (phase 9 exit criterion); phase 11 build starts; the phase 7 and 8 live items follow the accounts |
+| Next item | Phase 11 (WebBLE, raw log files, Cloudloop); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the phase 7 and 8 live items follow the accounts |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet; deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -533,7 +533,7 @@ Release:
 - [x] Prompts: `analyze-device-health`, `investigate-missing-data`. (2026-09-04)
 - [x] Audit: every tool invocation logged with user, client type and name, tool and trace id. (2026-09-04, one `mcp.request` audit row per API request a tool makes, with the tool name and the client id; the request id links to the API log)
 - [x] AI action policy table with all write classes disabled. (2026-09-04, `protect_api/oauth/scopes.py`: reads per scope, everything else refused)
-- [ ] Verified with Claude and ChatGPT. Results and screenshots in `docs/mcp/`. (needs the dev server: both clients connect from their own networks over HTTPS; verified locally with the test suite and the local stack)
+- [ ] Verified with Claude and ChatGPT. Results and screenshots in `docs/mcp/`. (Claude verified on 2026-09-04 against dev-protect.smartparks.org: registration by client id metadata document, consent, and the three questions answered through list_projects, search_entities, get_latest_position, get_device, search_traces, query_events, list_metrics and query_measurements, every call in the audit log. ChatGPT waits for access: custom MCP servers need Developer mode, which OpenAI gates to Pro, Business, Enterprise and Education; Tim's Plus account does not offer it. The server meets ChatGPT's documented requirements, including `search` and `fetch`.)
 - [x] Docs: `docs/mcp/` (setup, authentication, tools, limits). ADR: MCP security boundary. (2026-09-04, ADR 0015)
 
 **Exit criteria.** Both clients answer "Why has device X stopped updating?" using the tools against the dev server.
@@ -681,7 +681,7 @@ Listed by the phase where they are first needed.
 - [ ] Phase 3: confirmation which EarthRanger icons may be reused and under which licence.
 - [ ] Phase 7: KPN/ThingPark, LORIOT, Netmore (portal.blink.services, LoRaWAN Portal) and akenza test accounts. The dev VM and domain exist since 2026-09-04 (dev-protect.smartparks.org). Device deep link paths for Netmore and akenza are guesses until seen live.
 - [x] Phase 10: an S3-compatible bucket for backups and a throwaway VM for the timed clean-server recovery. (2026-09-04, DigitalOcean Spaces and droplets through the API token)
-- [ ] Phase 9: a Claude and a ChatGPT account able to add a custom connector, pointed at https://dev-protect.smartparks.org/mcp (the server exists since 2026-09-04).
+- [ ] Phase 9: a ChatGPT account with Developer mode (Pro or Business) to connect https://dev-protect.smartparks.org/mcp; Claude was verified on 2026-09-04.
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work.
 - [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access.
@@ -851,3 +851,4 @@ Listed by the phase where they are first needed.
 - Backups against Spaces: PostgreSQL crashed every ten seconds once archiving was on, because PostgreSQL was PID 1 in its container and pgBackRest's detached asynchronous archive process was reparented to the postmaster, whose exit the postmaster took for a crashed backend; `init: true` on the database service fixed it. Stanza, check, full and incremental backups, object mirror, integrity check and the restore test (69 s) then passed on the server.
 - The clean-server recovery drill found a data-loss risk: the drill server archived its promoted timelines into the production stanza and a later restore followed "latest", missing rows that were on the real timeline. Fixed: restores use `--target-timeline=current`, `scripts/restore.sh --test` turns archiving off on a drill server, the stray timelines were purged from the archive. The drill then took 435 s from droplet creation to a verified restored server with every archived row present (target four hours); the drill droplet was destroyed.
 - Open: Tim registers with the invitation link on the dev server and connects Claude and ChatGPT. The object restore's warning on empty buckets was a wrong emptiness test, fixed.
+- Later the same day: Tim registered on the dev server and connected Claude; the three questions of the exit criterion were answered correctly against a seeded Demo park (Rhino 14, collar SP05-demo, 48 hourly uplinks then silence). ChatGPT could not be tested: Developer mode is not offered on Tim's Plus plan. An operations admin account (protect-ops@smartparks.org, credentials in the private config directory) seeds and checks the dev server.

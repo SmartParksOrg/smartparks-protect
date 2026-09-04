@@ -80,4 +80,4 @@ nginx routes `/mcp` and `/.well-known/oauth-protected-resource` to the MCP servi
 
 ## Verification status
 
-Verified locally with the test suite (`tests/mcp`, `tests/api/test_oauth.py`) and against the local stack. The exit criterion of phase 9, Claude and ChatGPT answering "Why has device X stopped updating?" against the dev server, waits for the dev server (a public HTTPS endpoint). The result is recorded in `PROJECT_PLAN.md` when it is done.
+Verified with Claude on 2026-09-04 against the dev server: Claude registered through its client id metadata document, the user approved once on the consent page, and the questions "Which projects do I have", "What is the latest position of Rhino 14" and "Why has SP05-demo stopped updating" were answered through the tools, every call recorded in the audit log as the user, read-only. ChatGPT is pending: connecting a custom MCP server there needs Developer mode, which OpenAI offers on Pro, Business, Enterprise and Education accounts. The server meets ChatGPT's documented requirements, including the `search` and `fetch` tools, and the check takes an hour once an account with Developer mode exists.
