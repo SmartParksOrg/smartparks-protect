@@ -43,10 +43,14 @@ The script refuses to overwrite a server that already has users unless you pass 
 3. Data sources: push sources (KPN, akenza, webhooks) point at the old domain until their platform configuration is updated with the new one; polling and MQTT sources reconnect on their own once enabled. The restore leaves every source as it was.
 4. Anything that happened after the recovery point is gone: uplinks arrive again only if the network server queues them, and manual changes must be redone.
 
+## Timelines, and why a drill is different
+
+Every promoted cluster starts a new timeline and, with archiving on, writes that timeline into the stanza. The restore scripts therefore recover along the timeline of the backup set (`--target-timeline=current`), not along whatever timeline is newest in the archive. A drill on a second server must run `scripts/restore.sh --test`: it turns `BACKUP_ENABLED` off on that server after the restore, so the drill never archives into the production stanza. Without it the archive holds a second history next to the real one, which a later restore could follow.
+
 ## Rolling the same server back
 
 The same script runs on the existing server to undo a logical incident such as a wrong bulk deletion: pick the time just before it and pass `--force`. Everything after that time is lost, including data that arrived meanwhile, so decide quickly and tell the users.
 
 ## Rehearsal
 
-The weekly restore test (`scripts/restore-verify.sh`) proves the mechanics every Monday. Do a full clean-server recovery on a throwaway VM at least once after setting up backups and after every change to the deployment topology, and record the time it took in `PROJECT_PLAN.md`.
+The weekly restore test (`scripts/restore-verify.sh`) proves the mechanics every Monday. Do a full clean-server recovery on a throwaway VM with `scripts/restore.sh --test` at least once after setting up backups and after every change to the deployment topology, and record the time it took in `PROJECT_PLAN.md`.

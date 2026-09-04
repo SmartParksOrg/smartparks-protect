@@ -38,7 +38,7 @@ log "removing leftovers of an earlier run"
 "${V[@]}" down -v --remove-orphans > /dev/null 2>&1
 
 log "restoring the newest backup into an empty cluster"
-"${V[@]}" run --rm --no-deps --user postgres --entrypoint sh postgres -c 'mkdir -p /home/postgres/pgdata/data && protect-pgbackrest --stanza=protect --log-level-console=warn restore' \
+"${V[@]}" run --rm --no-deps --user postgres --entrypoint sh postgres -c 'mkdir -p /home/postgres/pgdata/data && protect-pgbackrest --stanza=protect --target-timeline=current --log-level-console=warn restore' \
     || fail "pgbackrest restore failed"
 
 log "starting PostgreSQL and replaying WAL"

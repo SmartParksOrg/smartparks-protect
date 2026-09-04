@@ -5,9 +5,15 @@
 #   scripts/restore.sh                          # newest backup, replay every archived WAL segment
 #   scripts/restore.sh "2026-09-04 03:15:00+00" # point in time, before an accidental deletion
 #   scripts/restore.sh --db-only                # database only, objects untouched
+#   scripts/restore.sh --test                   # a drill on another server: archiving stays off
 # Stops the stack, restores the database cluster with pgBackRest (delta, so an existing cluster
 # is overwritten in place), starts PostgreSQL to replay WAL to the target, copies the objects
 # back from the backup bucket, starts everything and runs scripts/verify-server.sh.
+#
+# Recovery follows the timeline of the backup set (--target-timeline=current), never "latest":
+# a drill that promoted a cluster and archived into the same stanza would otherwise be followed
+# instead of the real server's history. A drill must use --test, which turns BACKUP_ENABLED off
+# in .env after the restore so the drill server never archives into the production stanza.
 set -euo pipefail
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$APP_DIR"
@@ -15,11 +21,12 @@ log() { echo "[$(date -u +'%Y-%m-%d %H:%M:%S UTC')] $*"; }
 die() { echo "[$(date -u +'%Y-%m-%d %H:%M:%S UTC')] ERROR: $*" >&2; exit 1; }
 env_get() { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2-; }
 
-TARGET=""; DB_ONLY=false; FORCE=false
+TARGET=""; DB_ONLY=false; FORCE=false; TEST=false
 for arg in "$@"; do
     case "$arg" in
         --db-only) DB_ONLY=true ;;
         --force) FORCE=true ;;
+        --test) TEST=true ;;
         -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
         *) TARGET="$arg" ;;
     esac
@@ -37,13 +44,17 @@ fi
 log "stopping the stack"
 docker compose --profile chirpstack --profile observability stop
 
-restore_args=(--stanza=protect --delta --log-level-console=info)
+restore_args=(--stanza=protect --delta --target-timeline=current --log-level-console=info)
 if [ -n "$TARGET" ]; then
     restore_args+=(--type=time "--target=$TARGET" --target-action=promote)
 fi
 log "restoring the database cluster${TARGET:+ to $TARGET}"
 docker compose run --rm --no-deps --user postgres --entrypoint protect-pgbackrest postgres "${restore_args[@]}" restore
 
+if [ "$TEST" = true ]; then
+    log "drill: archiving stays off on this server (BACKUP_ENABLED=false in .env)"
+    sed -i 's/^BACKUP_ENABLED=true$/BACKUP_ENABLED=false/' .env
+fi
 log "starting PostgreSQL (WAL replay)"
 docker compose up -d --wait postgres
 for i in $(seq 1 120); do
