@@ -57,7 +57,10 @@ docker compose exec -T postgres psql -U "$(env_get POSTGRES_USER)" -d "$(env_get
 if [ "$DB_ONLY" != true ]; then
     log "restoring objects from the backup bucket"
     docker compose up -d --wait minio minio-init
-    docker compose --profile backup run --rm -T -e MIRROR_DIRECTION=restore object-mirror
+    if ! docker compose --profile backup run --rm -T -e MIRROR_DIRECTION=restore object-mirror; then
+        log "WARNING: the object restore reported errors; the stack starts anyway. Rerun by hand:"
+        log "  docker compose --profile backup run --rm -e MIRROR_DIRECTION=restore object-mirror"
+    fi
 fi
 
 log "starting the stack"

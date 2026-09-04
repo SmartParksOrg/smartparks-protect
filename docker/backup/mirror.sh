@@ -16,6 +16,10 @@ for bucket in ${MIRROR_BUCKETS:-uploads exports device-log-files}; do
     if [ "${MIRROR_DIRECTION:-backup}" = "restore" ]; then
         echo "restore ${remote} -> local/${bucket}"
         mc mb --ignore-existing "local/${bucket}"
+        if ! mc ls "$remote" > /dev/null 2>&1; then
+            echo "nothing under ${remote}: the bucket was empty when it was mirrored"
+            continue
+        fi
         mc mirror --overwrite --preserve --retry --summary "$remote" "local/${bucket}" || status=1
     else
         echo "mirror local/${bucket} -> ${remote}"
