@@ -16,7 +16,8 @@ for bucket in ${MIRROR_BUCKETS:-uploads exports device-log-files}; do
     if [ "${MIRROR_DIRECTION:-backup}" = "restore" ]; then
         echo "restore ${remote} -> local/${bucket}"
         mc mb --ignore-existing "local/${bucket}"
-        if ! mc ls "$remote" > /dev/null 2>&1; then
+        # `mc ls` exits 0 on a missing prefix; an empty listing is the signal.
+        if [ -z "$(mc ls "$remote" 2>/dev/null)" ]; then
             echo "nothing under ${remote}: the bucket was empty when it was mirrored"
             continue
         fi

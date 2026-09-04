@@ -65,4 +65,4 @@ Backups contain locations of animals and people, credentials of data sources (en
 
 ## Verification status
 
-The mechanisms were exercised on the development machine against a local repository (`BACKUP_REPO_TYPE=posix`): stanza creation, a full backup of the 6.6 GB benchmark database (151 seconds, 2.9 GB compressed), the info document, the run recording, the health assessment and the restore test flow. An S3 provider, the schedule on a server and the clean-server recovery timed against the four-hour target wait for the dev VM; the results are recorded in `PROJECT_PLAN.md` when done.
+Exercised on 2026-09-04 against a DigitalOcean droplet and a Spaces bucket: stanza creation, WAL archiving, full and incremental backups, the object mirror, the integrity check, the status page, the restore test on the server (69 s), and a clean-server recovery on a fresh droplet with `scripts/restore.sh --test`: 435 s from droplet creation to a verified server with every archived row present, against the four-hour target. The recovery point observed was 24 s after an incremental backup; between backups it is bounded by `archive_timeout` (15 minutes) plus the push.

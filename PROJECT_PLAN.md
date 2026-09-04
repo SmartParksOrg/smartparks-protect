@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 10, observability, System Health, backup and disaster recovery (built and exercised locally; the clean-server recovery on a VM is the open item) |
-| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phase 10 unreleased |
+| Active phase | Phase 10 complete on the dev server; phase 11 (WebBLE, raw log files, Cloudloop) is next |
+| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phase 10 and the deployment fixes unreleased |
 | Last session | 2026-09-04 |
-| Next item | The dev server: run the Ansible playbook on a throwaway VM, configure an S3 backup bucket, time the clean-server recovery (phase 10), then the phase 9 exit criterion and the phase 7 and 8 live items; phase 11 (WebBLE, raw log files, Cloudloop) is the next buildable phase without accounts |
-| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, no dev VM, no domain, no S3 backup bucket; deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live |
+| Next item | Tim registers on the dev server and adds it as a connector in Claude and ChatGPT (phase 9 exit criterion); phase 11 build starts; the phase 7 and 8 live items follow the accounts |
+| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet; deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
 
@@ -486,9 +486,9 @@ Release:
 - [x] akenza.io adapter: webhook samples, akenza device id as identity, REST downlinks, runbook. Added on 2026-09-04 (D59) from docs.akenza.io and the published API collection; live confirmation pending.
 - [x] Guard test: a test asserts that no file outside `shared/connectivity/adapters/` imports or names a provider, and the frontend has no provider string outside the adapter display metadata. (2026-09-04; the frontend now has no provider string at all, it reads `GET /data-sources/adapters`)
 - [ ] OpenCollar RESET or REQUEST_STATUS executed through KPN or LORIOT, proving the same action over two networks (30.1). (connectors and their tests exist; the live run waits for an account)
-- [x] Ansible: roles for docker, nginx with TLS, security hardening (ufw, unattended upgrades, fail2ban on SSH, SSH keys only, sshd drift check), app deploy from a git tag, env and secrets handling with vault, `inventory.yml.example` and host vars examples. Dev server can run `main`. (2026-09-04; YAML validated, not yet run against a server)
-- [x] `scripts/verify-server.sh` and `scripts/security-status.sh` equivalents. (2026-09-04; parsed, not yet run on a server)
-- [ ] Dev server deployed, real collars from KPN, LORIOT, Netmore and akenza visible on the map. (waits for the VM, the domain and the accounts)
+- [x] Ansible: roles for docker, nginx with TLS, security hardening (ufw, unattended upgrades, fail2ban on SSH, SSH keys only, sshd drift check), app deploy from a git tag, env and secrets handling with vault, `inventory.yml.example` and host vars examples. Dev server can run `main`. (2026-09-04; run against the dev server the same day, five fixes from the first runs, then fully green)
+- [x] `scripts/verify-server.sh` and `scripts/security-status.sh` equivalents. (2026-09-04; both pass on the dev server)
+- [ ] Dev server deployed, real collars from KPN, LORIOT, Netmore and akenza visible on the map. (dev server deployed on 2026-09-04 at dev-protect.smartparks.org; the collars wait for the accounts)
 - [x] Docs: `docs/getting-started/deployment.md`, `docs/operations/update-guide.md`, `docs/integrations/kpn-thingpark/`, `docs/integrations/loriot/`. (2026-09-04; a Netmore runbook follows with its adapter)
 
 **Exit criteria.** Live OpenCollar data from two different LoRaWAN backends shows on one map, a control action works over the second network, the dev server is reproducible from the playbook. Netmore joins as a third backend (D57).
@@ -556,7 +556,7 @@ Release:
 - [x] Secrets and configuration recovery procedure, separate from the repository. (2026-09-04, the vaulted host vars, the cipher passphrase and the bucket credentials in a password manager; in the backup guide)
 - [x] Automated restore verification job in an isolated compose project: restore, migrate, start, health check, record result. (2026-09-04, `scripts/restore-verify.sh`, passed locally in 54 s with 22.4 million positions and 89.7 million measurements restored)
 - [x] Backup and Recovery health page for server admins (28.11 example) integrated with System Health; backup failures raise system alerts through the notification framework. (2026-09-04)
-- [ ] Full clean-server recovery executed once on a throwaway VM and timed against the 4 hour RTO; RPO under 1 hour verified. (needs the VM; `scripts/restore.sh` and the restore guide are written)
+- [x] Full clean-server recovery executed once on a throwaway VM and timed against the 4 hour RTO; RPO under 1 hour verified. (2026-09-04, DigitalOcean: a fresh droplet deployed by the playbook and restored from the Spaces bucket with `scripts/restore.sh --test` in 435 s from droplet creation to a verified server, every row that had reached the archive present; the recovery point on the dev server was 24 s after an incremental and at most `archive_timeout` (15 min) plus push time otherwise)
 - [x] Security review of the deployment: credentials storage, backup encryption, least privilege, audit of restore access. (2026-09-04, recorded in the backup guide's security section; the restore is an audited manual action; MCP scopes and rate limits were reviewed in phase 9)
 - [x] Docs: `docs/operations/backup-and-recovery.md`, `docs/operations/restore-guide.md`, `docs/operations/observability.md`, `docs/troubleshooting/`. (2026-09-04)
 
@@ -679,9 +679,9 @@ Listed by the phase where they are first needed.
 - [x] Phase 0: Smart Parks logo received on 2026-09-03 as Illustrator, PDF and PNG in `LOGO_Smartparks_Typo/` (gitignored). SVGs derived from the PDF in `services/frontend/src/assets/brand/`. The wide variant is composed from the delivered emblem and wordmark; confirm with Smart Parks before public use. Colours #52735E and #90AE9B confirmed.
 - [ ] Phase 3: recorded OpenCollar uplinks (ChirpStack, KPN or LORIOT exports) and links to the public Smart Parks decoder and protocol repositories.
 - [ ] Phase 3: confirmation which EarthRanger icons may be reused and under which licence.
-- [ ] Phase 7: KPN/ThingPark, LORIOT, Netmore (portal.blink.services, LoRaWAN Portal) and akenza test accounts, a dev VM (Ubuntu 24.04) and a domain. Device deep link paths for Netmore and akenza are guesses until seen live.
-- [ ] Phase 10: an S3-compatible bucket for backups (Backblaze B2, Wasabi, Hetzner, Spaces) with its credentials, and a throwaway VM for the timed clean-server recovery.
-- [ ] Phase 9: the dev VM and domain (the phase 7 input) so Claude and ChatGPT can reach the MCP server; a Claude and a ChatGPT account able to add a custom connector.
+- [ ] Phase 7: KPN/ThingPark, LORIOT, Netmore (portal.blink.services, LoRaWAN Portal) and akenza test accounts. The dev VM and domain exist since 2026-09-04 (dev-protect.smartparks.org). Device deep link paths for Netmore and akenza are guesses until seen live.
+- [x] Phase 10: an S3-compatible bucket for backups and a throwaway VM for the timed clean-server recovery. (2026-09-04, DigitalOcean Spaces and droplets through the API token)
+- [ ] Phase 9: a Claude and a ChatGPT account able to add a custom connector, pointed at https://dev-protect.smartparks.org/mcp (the server exists since 2026-09-04).
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work.
 - [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access.
@@ -843,3 +843,11 @@ Listed by the phase where they are first needed.
 - Exercised on the local stack with a posix repository and the local MinIO as the mirror target: stanza, check (WAL push through the async spool), full backup (79 s, 2.9 GB), incremental, object mirror, integrity check, the status page, and the restore test end to end (54 s: restore, WAL replay to the last transaction, promote, migrate, API healthy, 22.4 million positions, referenced objects present). Found on the way: pgBackRest refuses empty options and needs the word pgbackrest in `archive_command` (hence the wrapper as the archive command), the generated `restore_command` needs the wrapper as `cmd`, and a second compose project needs its own network and container names because compose fixes both.
 - Verification: ruff, mypy strict, 286 Python tests, eslint, tsc, vitest, vite build, mkdocs strict, both compose configurations, screenshot sweep clean on 40 routes. Not committed.
 - Open: the clean-server recovery on a VM with an S3 bucket, timed against the RTO.
+
+### 2026-09-04, dev server on DigitalOcean and the recovery drill (Claude)
+
+- Tim connected the Smart Parks DigitalOcean account with an API token kept in `~/.config/smartparks-protect` (outside the repository; a pre-commit hook now refuses credentials and filled-in configuration, commit a717be9). Created with `doctl`: the droplet `smartparks-protect-dev` (4 vCPU, 8 GB, ams3, 178.62.201.128), the Spaces bucket `smartparks-protect-dev-backups` with its own key; Tim added the A record `dev-protect.smartparks.org` at TransIP. Inventory and vaulted host vars live in the same private directory.
+- First playbook runs on a real server found five defects, all fixed and pushed: the sshd drift check compared `prohibit-password` while `sshd -T` prints `without-password`; the frontend port was published on every interface and Docker bypasses ufw; the security check failed its ssh test under `pipefail` and never counted passes; a failing final check left the TLS site unreloaded because handlers had not run; the commit hash was not passed to the build. Then the run went fully green: 17 security checks, TLS from Let's Encrypt, `verify-server.sh` passing, ten cron jobs.
+- Backups against Spaces: PostgreSQL crashed every ten seconds once archiving was on, because PostgreSQL was PID 1 in its container and pgBackRest's detached asynchronous archive process was reparented to the postmaster, whose exit the postmaster took for a crashed backend; `init: true` on the database service fixed it. Stanza, check, full and incremental backups, object mirror, integrity check and the restore test (69 s) then passed on the server.
+- The clean-server recovery drill found a data-loss risk: the drill server archived its promoted timelines into the production stanza and a later restore followed "latest", missing rows that were on the real timeline. Fixed: restores use `--target-timeline=current`, `scripts/restore.sh --test` turns archiving off on a drill server, the stray timelines were purged from the archive. The drill then took 435 s from droplet creation to a verified restored server with every archived row present (target four hours); the drill droplet was destroyed.
+- Open: Tim registers with the invitation link on the dev server and connects Claude and ChatGPT. The object restore's warning on empty buckets was a wrong emptiness test, fixed.
