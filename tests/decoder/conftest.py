@@ -109,4 +109,5 @@ async def world(db: AsyncSession) -> World:
 def inbound(external_id: str | None, payload: dict, **kwargs) -> InboundMessage:
     kwargs.setdefault("acquisition_channel", AcquisitionChannel.API)
     kwargs.setdefault("ingestion_method", IngestionMethod.WEBHOOK)
-    return InboundMessage(external_id=external_id, event_type="uplink", payload=payload, **kwargs)
+    kwargs.setdefault("event_type", "uplink")
+    return InboundMessage(external_id=external_id, payload=payload, **kwargs)

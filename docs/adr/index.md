@@ -18,3 +18,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 | [0010](0010-assignment-attribution.md) | Assignment attribution stored on canonical rows | accepted |
 | [0011](0011-connectivity-adapter-boundary.md) | Connectivity adapter boundary | accepted |
 - [0012 rule representation](0012-rule-representation.md)
+- [0013 control action schema](0013-control-action-schema.md)

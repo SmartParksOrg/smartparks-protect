@@ -10,6 +10,7 @@ from protect_api.routers.attention import router as attention_router
 from protect_api.routers.automations import admin_router as admin_automations_router
 from protect_api.routers.automations import router as automations_router
 from protect_api.routers.catalog import router as catalog_router
+from protect_api.routers.control import router as control_router
 from protect_api.routers.data import router as data_router
 from protect_api.routers.data_sources import router as data_sources_router
 from protect_api.routers.devices import router as devices_router
@@ -44,6 +45,7 @@ for router in (
     admin_events_router,
     automations_router,
     admin_automations_router,
+    control_router,
     realtime_router,
 ):
     v1_router.include_router(router)

@@ -50,6 +50,11 @@ export type Delivery = Schemas["ActionDeliveryRead"];
 export type Automation = Schemas["AutomationRead"];
 export type NotificationTarget = Schemas["NotificationTargetRead"];
 export type NotificationCapabilities = Schemas["NotificationCapabilities"];
+export type ActionAvailability = Schemas["ActionAvailability"];
+export type CommandItem = Schemas["CommandRead"];
+export type CommandDetail = Schemas["CommandDetail"];
+export type CommandExecution = Schemas["CommandExecutionRead"];
+export type QueueState = Schemas["QueueState"];
 
 export interface Page<T> {
   items: T[];

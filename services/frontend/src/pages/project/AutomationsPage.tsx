@@ -26,7 +26,11 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatTime } from "@/lib/format";
 import { type Scope, scopeBase, SEVERITIES } from "@/lib/rules";
 
-const actionSchema = z.object({ type: z.enum(["notify", "webhook"]), target_id: z.string(), url: z.string(), secret: z.string() }).refine((a) => a.type !== "notify" || a.target_id, { path: ["target_id"], message: "Choose a target" }).refine((a) => a.type !== "webhook" || /^https?:\/\//.test(a.url), { path: ["url"], message: "An http(s) URL is needed" });
+const actionSchema = z.object({ type: z.enum(["notify", "webhook", "command"]), target_id: z.string(), url: z.string(), secret: z.string(), action_key: z.string(), parameters: z.string() })
+  .refine((a) => a.type !== "notify" || a.target_id, { path: ["target_id"], message: "Choose a target" })
+  .refine((a) => a.type !== "webhook" || /^https?:\/\//.test(a.url), { path: ["url"], message: "An http(s) URL is needed" })
+  .refine((a) => a.type !== "command" || /^[A-Z][A-Z0-9_]+$/.test(a.action_key), { path: ["action_key"], message: "An action key like REQUEST_STATUS is needed" })
+  .refine((a) => { if (a.type !== "command" || !a.parameters.trim()) return true; try { return typeof JSON.parse(a.parameters) === "object"; } catch { return false; } }, { path: ["parameters"], message: "Parameters must be a JSON object" });
 const schema = z.object({
   name: z.string().min(1).max(200),
   description: z.string(),
@@ -41,8 +45,8 @@ type Values = z.infer<typeof schema>;
 
 function toValues(a: Automation | null): Values {
   return a
-    ? { name: a.name, description: a.description ?? "", enabled: a.enabled, event_types: a.event_types.join(", "), min_severity: a.min_severity as Values["min_severity"], require_alert: a.require_alert, max_event_age_hours: a.max_event_age_seconds / 3600, actions: a.actions.map((x) => ({ type: (x.type as "notify" | "webhook") ?? "notify", target_id: String(x.target_id ?? ""), url: String(x.url ?? ""), secret: String(x.secret ?? "") })) }
-    : { name: "", description: "", enabled: true, event_types: "", min_severity: "warning", require_alert: false, max_event_age_hours: 6, actions: [{ type: "notify", target_id: "", url: "", secret: "" }] };
+    ? { name: a.name, description: a.description ?? "", enabled: a.enabled, event_types: a.event_types.join(", "), min_severity: a.min_severity as Values["min_severity"], require_alert: a.require_alert, max_event_age_hours: a.max_event_age_seconds / 3600, actions: a.actions.map((x) => ({ type: (x.type as "notify" | "webhook" | "command") ?? "notify", target_id: String(x.target_id ?? ""), url: String(x.url ?? ""), secret: String(x.secret ?? ""), action_key: String(x.action_key ?? ""), parameters: x.parameters ? JSON.stringify(x.parameters) : "" })) }
+    : { name: "", description: "", enabled: true, event_types: "", min_severity: "warning", require_alert: false, max_event_age_hours: 6, actions: [{ type: "notify", target_id: "", url: "", secret: "", action_key: "", parameters: "" }] };
 }
 
 function toBody(v: Values) {
@@ -54,7 +58,7 @@ function toBody(v: Values) {
     min_severity: v.min_severity,
     require_alert: v.require_alert,
     max_event_age_seconds: Math.round(v.max_event_age_hours * 3600),
-    actions: v.actions.map((a) => (a.type === "notify" ? { type: "notify", target_id: a.target_id } : { type: "webhook", url: a.url, ...(a.secret ? { secret: a.secret } : {}) })),
+    actions: v.actions.map((a) => (a.type === "notify" ? { type: "notify", target_id: a.target_id } : a.type === "command" ? { type: "command", action_key: a.action_key, parameters: a.parameters.trim() ? (JSON.parse(a.parameters) as Record<string, unknown>) : {} } : { type: "webhook", url: a.url, ...(a.secret ? { secret: a.secret } : {}) })),
   };
 }
 
@@ -93,7 +97,7 @@ export function AutomationsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
     { header: "Enabled", accessorKey: "enabled", cell: ({ row }) => <span onClick={(e) => e.stopPropagation()}><Switch checked={row.original.enabled} aria-label={`Enable ${row.original.name}`} onCheckedChange={(v) => toggle.mutate({ a: row.original, enabled: v })} /></span> },
     { header: "Name", accessorKey: "name" },
     { header: "Events", id: "events", cell: ({ row }) => <span className="text-xs">{row.original.event_types.length ? row.original.event_types.join(", ") : "any type"}, {row.original.min_severity} and up{row.original.require_alert ? ", alerts only" : ""}</span> },
-    { header: "Actions", id: "actions", cell: ({ row }) => <span className="text-xs">{row.original.actions.map((a, i) => <span key={i} className="mr-2">{a.type === "notify" ? `notify ${targetName(String(a.target_id))}` : `webhook ${String(a.url ?? "")}`}</span>)}</span> },
+    { header: "Actions", id: "actions", cell: ({ row }) => <span className="text-xs">{row.original.actions.map((a, i) => <span key={i} className="mr-2">{a.type === "notify" ? `notify ${targetName(String(a.target_id))}` : a.type === "command" ? `command ${String(a.action_key ?? "")}` : `webhook ${String(a.url ?? "")}`}</span>)}</span> },
     { header: "Max age", accessorKey: "max_event_age_seconds", cell: ({ getValue }) => `${getValue<number>() / 3600} h` },
     { id: "remove", header: "", cell: ({ row }) => <span onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" aria-label="Delete automation" onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button></span> },
   ];
@@ -147,16 +151,16 @@ export function AutomationsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
               <span className="flex items-center gap-2"><Switch id="au-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="au-enabled" className="text-sm">Enabled</label></span>
             </div>
             <div className="space-y-2 rounded-md border p-3">
-              <div className="flex items-center justify-between"><span className="text-sm font-medium">Actions</span><Button type="button" size="sm" variant="outline" onClick={() => actions.append({ type: "notify", target_id: "", url: "", secret: "" })}><Plus className="size-4" /> Add action</Button></div>
+              <div className="flex items-center justify-between"><span className="text-sm font-medium">Actions</span><Button type="button" size="sm" variant="outline" onClick={() => actions.append({ type: "notify", target_id: "", url: "", secret: "", action_key: "", parameters: "" })}><Plus className="size-4" /> Add action</Button></div>
               {typeof form.formState.errors.actions?.message === "string" && <p className="text-sm text-destructive">{form.formState.errors.actions.message}</p>}
               {actions.fields.map((field, index) => {
                 const type = form.watch(`actions.${index}.type`);
                 const errs = form.formState.errors.actions?.[index];
                 return (
                   <div key={field.id} className="flex flex-wrap items-start gap-2 rounded bg-muted/40 p-2">
-                    <Select value={type} onValueChange={(v) => form.setValue(`actions.${index}.type`, v as "notify" | "webhook")}>
+                    <Select value={type} onValueChange={(v) => form.setValue(`actions.${index}.type`, v as "notify" | "webhook" | "command")}>
                       <SelectTrigger className="h-8 w-28" aria-label="Action type"><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="notify">Notify</SelectItem><SelectItem value="webhook">Webhook</SelectItem></SelectContent>
+                      <SelectContent><SelectItem value="notify">Notify</SelectItem><SelectItem value="webhook">Webhook</SelectItem><SelectItem value="command">Device command</SelectItem></SelectContent>
                     </Select>
                     {type === "notify" ? (
                       <div className="min-w-48 flex-1">
@@ -165,6 +169,14 @@ export function AutomationsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
                           <SelectContent><SelectItem value="none" disabled>Choose a target</SelectItem>{targets.data?.items.map((t) => <SelectItem key={t.id} value={t.id}>{t.name} ({t.channel})</SelectItem>)}</SelectContent>
                         </Select>
                         {errs?.target_id && <p className="text-xs text-destructive">{errs.target_id.message}</p>}
+                      </div>
+                    ) : type === "command" ? (
+                      <div className="flex min-w-48 flex-1 flex-col gap-1">
+                        <Input className="h-8" placeholder="REQUEST_STATUS" aria-label="Action key" {...form.register(`actions.${index}.action_key`)} />
+                        <Input className="h-8 font-mono text-xs" placeholder='{"interval_seconds": 600} (optional)' aria-label="Parameters JSON" {...form.register(`actions.${index}.parameters`)} />
+                        <p className="text-xs text-muted-foreground">Sent to the event's device through the same path as the Actions menu.</p>
+                        {errs?.action_key && <p className="text-xs text-destructive">{errs.action_key.message}</p>}
+                        {errs?.parameters && <p className="text-xs text-destructive">{errs.parameters.message}</p>}
                       </div>
                     ) : (
                       <div className="flex min-w-48 flex-1 flex-col gap-1">

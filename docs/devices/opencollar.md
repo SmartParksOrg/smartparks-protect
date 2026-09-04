@@ -47,3 +47,16 @@ Downlinks are settings on FPort 3 (`id len value`) and commands on FPort 32; `cm
 ## Testing
 
 `tests/shared/test_opencollar_driver.py` runs golden tests over `tests/fixtures/payloads/opencollar/uplinks.jsonl`, the wiki examples with the values the public decoder produces. Recorded uplinks from live collars are added to the same file with their origin noted in the README next to it. The ChirpStack device profile codec for the local setup is the public decoder, `shared/device_drivers/opencollar/codec.js`, passed to `scripts/dev.sh chirpstack-bootstrap --codec`.
+
+## Control actions
+
+Downlinks follow protocol research section 4: commands on FPort 32 as `cmd_id length argument`, settings on FPort 3 as `id length value`. See [device control](device-control.md) for the path and the lifecycle.
+
+| Action | Payload | Permission | Confirmed by |
+| --- | --- | --- | --- |
+| `REQUEST_STATUS` | port 32, `A4 00` (`cmd_send_status`) | `devices:control` | the next status uplink on port 4 |
+| `REQUEST_POSITION` | port 32, `B8 00` (`cmd_get_ublox_fix`) | `devices:control` | the next port 2 position |
+| `SET_GNSS_INTERVAL` | port 3, `02 04 <u32 LE seconds>` (`ublox_send_interval`, 0 to 172800) | `devices:control_high_impact` | no answer; ends at the network stage |
+| `RESET` | port 32, `A1 00` (`cmd_reset`) | `devices:control_high_impact` | a rejoin, or a status uplink with the software reset reason |
+
+Commands and settings must not be mixed in one downlink; each action produces one.

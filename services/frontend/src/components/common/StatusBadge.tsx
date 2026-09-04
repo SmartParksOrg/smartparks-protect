@@ -29,6 +29,14 @@ const tones: Record<string, string> = {
   warning: "bg-brand-sand/50 text-foreground border-transparent",
   critical: "bg-destructive/15 text-destructive border-transparent",
   enabled: "bg-brand-green-light/40 text-foreground border-transparent",
+  created: "bg-muted text-foreground border-transparent",
+  encoded: "bg-muted text-foreground border-transparent",
+  submitted: "bg-brand-blue/50 text-foreground border-transparent",
+  accepted_by_network: "bg-brand-blue/50 text-foreground border-transparent",
+  scheduled: "bg-brand-blue/50 text-foreground border-transparent",
+  transmitted: "bg-brand-green-light/40 text-foreground border-transparent",
+  confirmed_by_device: "bg-brand-green-light/40 text-foreground border-transparent",
+  expired: "bg-brand-sand/50 text-foreground border-transparent",
   disabled: "bg-muted text-muted-foreground border-transparent",
 };
 

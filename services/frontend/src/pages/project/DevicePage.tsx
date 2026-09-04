@@ -8,17 +8,20 @@ import { queryKeys } from "@/api/queryKeys";
 import type { DeviceDetail, DeviceType, Page as PageType, Position } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DeviceControl } from "@/components/control/DeviceControl";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { Icon } from "@/components/icons/Icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
 import { useAuthStore } from "@/stores/auth";
 
 export function DevicePage() {
   const { projectId, deviceId = "" } = useParams();
   const user = useAuthStore((s) => s.user);
+  const role = useProjectRole(projectId);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(null);
   const device = useQuery({ queryKey: queryKeys.device(deviceId), queryFn: () => api.get<DeviceDetail>(`/api/v1/devices/${deviceId}`) });
   const types = useQuery({ queryKey: queryKeys.deviceTypes, queryFn: () => api.get<PageType<DeviceType>>("/api/v1/device-types", { query: { limit: 500 } }) });
@@ -85,6 +88,7 @@ export function DevicePage() {
               {d.entity_assignments.map((a) => <div key={a.id}>Entity <span className="font-mono">{a.entity_id.slice(0, 8)}</span>, {formatTime(a.valid_from)} to {a.valid_to ? formatTime(a.valid_to) : "now"}</div>)}
             </CardContent>
           </Card>
+          <div className="lg:col-span-2"><DeviceControl deviceId={d.id} projectId={projectId} canFlush={canAdmin(role) || Boolean(user?.is_superuser)} /></div>
           {projectId && (
             <Card className="lg:col-span-2">
               <CardHeader><CardTitle>Recent positions</CardTitle></CardHeader>

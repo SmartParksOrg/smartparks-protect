@@ -134,6 +134,11 @@ async def _check_actions(
                 raise HTTPException(
                     status.HTTP_422_UNPROCESSABLE_CONTENT, "webhook action needs an http(s) url"
                 )
+        elif kind == ActionType.COMMAND:
+            if not action.get("action_key"):
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_CONTENT, "command action needs an action_key"
+                )
         else:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,

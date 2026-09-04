@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: v0.2.0 released, phase 5 built (rules, events, alerts, automations, notifications). Phases 0 to 4 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: v0.3.0 released, phase 6 built (device control through ChirpStack). Phases 0 to 5 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters (generic HTTP, generic MQTT, ChirpStack), drivers (generic JSON, OpenCollar Edge), the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, and a React frontend with the app shell, live map, entities, devices, traffic viewer, trace explorer, Needs Attention, health and every admin screen. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -54,7 +54,8 @@ smartparks-protect/
 │                            # models/, domain/assignments.py, trace.py, timeutil.py, secrets.py, bus.py,
 │                            # worker.py, ingest.py, storage.py, connectivity/ (base, transports, adapters),
 │                            # device_drivers/ (base, registry, generic_json, opencollar), analytics.py, exports/,
-│                            # rules/ (schema, templates, evaluator, data, events, replay), notifications/
+│                            # rules/ (schema, templates, evaluator, data, events, replay), notifications/,
+│                            # control/ (actions, commands)
 ├── tests/                   # tests/shared, tests/api, tests/fixtures/payloads
 ├── docs/                    # MkDocs site, docs/adr/ holds the ADRs
 ├── docker/python.Dockerfile # one image for every Python service; compose sets the command per service
@@ -201,6 +202,14 @@ Events and alerts API: `routers/events.py` (project lists newest first with the 
 `shared/notifications/`: `render.py` (Jinja templates for event and test messages, the link back), `email.py` (SMTP with the development guard: non-production servers mail only `DEV_NOTIFY_EMAILS`, everything else is logged and the delivery is skipped), `telegram.py` (Bot API over httpx), `dispatch.py` (`deliver_to_target`, shared by the automation service and the API test send). The API mailer for invitations and password resets uses the same sender.
 
 Targets, automations and deliveries API: `routers/automations.py`, one implementation for the project scope and the `/admin` scope (project null). `automations:write` is project admin only.
+
+## Device control
+
+`shared/control/actions.py` is the action contract (ADR 0013): a driver declares `control_actions`, each a `ControlAction` with a Pydantic parameter model, permission, confirmation policy, required capability, `encode` and optional `interpret`. `shared/control/commands.py` is the one command path: `request_command` creates the row, encodes, selects the route (`select_route`: an enabled data source holding an identity of the device whose adapter has a `command_connector` and the capability; most recently seen identity first), submits through the connector and records every stage as a `CommandExecution`; `apply_provider_signal` (called by the decoder for `downlink_transmitted`, `downlink_ack` and `log` events, matched on `provider_ref`) and `interpret_device_records` (called by the decoder after decoding an uplink of a device with pending commands) move the lifecycle; `expire_commands` runs in the rules service ticker. Statuses only move forward (`RANK`); final states are `confirmed_by_device`, `failed`, `expired`. A refused submission is a failed command with the reason, not an exception to the caller.
+
+The ChirpStack connector (`ChirpStackCommands`) posts to `/api/devices/{dev_eui}/queue` and returns the queue item id as `provider_ref` with statuses `accepted_by_network` and `queued`; `queue` and `flush` read and clear the platform queue. Adapters without a `command_connector` method cannot send commands, which the actions endpoint reports as the reason.
+
+API in `routers/control.py`: permissions are judged in the device's current project (`_control_permissions`), confirmation policies other than `none` need `confirmed: true`, everything is audited. The automation action `command` calls `request_command` with the automation as actor and publishes `command.updated` after the commit.
 
 ## Analytics and exports
 

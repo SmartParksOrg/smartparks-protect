@@ -107,6 +107,8 @@ class DeviceDriver(Protocol):
     capabilities: ClassVar[frozenset[str]]
     timestamp_semantics: ClassVar[dict[str, TimestampSemantics]]
     decodable_event_types: ClassVar[frozenset[str]]
+    # Optional: `control_actions: ClassVar[dict[str, ControlAction]]` (shared.control.actions).
+    # Drivers without it accept no commands.
 
     def decode(self, event: SourceEventData) -> DecodedRecords: ...
 

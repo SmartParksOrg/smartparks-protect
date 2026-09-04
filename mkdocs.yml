@@ -66,6 +66,7 @@ nav:
       - Driver interface: devices/driver-interface.md
       - OpenCollar Edge: devices/opencollar.md
       - OpenCollar protocol research: devices/opencollar-protocol-research.md
+      - Device control: devices/device-control.md
   - Integrations:
       - integrations/index.md
       - Adapter interface: integrations/adapter-interface.md
@@ -101,3 +102,4 @@ nav:
       - adr/0010-assignment-attribution.md
       - adr/0011-connectivity-adapter-boundary.md
       - adr/0012-rule-representation.md
+      - adr/0013-control-action-schema.md

@@ -15,12 +15,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.config import get_settings
+from shared.control.commands import Actor, command_message, request_command
 from shared.enums import ActionType, DeliveryStatus, ErrorCode, Severity
 from shared.logger import get_logger
 from shared.models import (
     ActionDelivery,
     Alert,
     Automation,
+    Command,
     Device,
     Entity,
     Event,
@@ -149,12 +151,37 @@ async def run_action(
         return await deliver_to_target(target, render_event(message))
     if kind == ActionType.WEBHOOK:
         return await post_webhook(action, webhook_payload(message, event, alert))
-    if kind in (ActionType.INTEGRATION, ActionType.COMMAND):
+    if kind == ActionType.COMMAND:
+        if event.device_id is None:
+            raise PermanentFailure("the event has no device to command")
+        device = await session.get(Device, event.device_id)
+        if device is None:
+            raise PermanentFailure("the event's device no longer exists")
+        try:
+            command = await request_command(
+                session,
+                device=device,
+                action_key=str(action.get("action_key") or ""),
+                parameters=dict(action.get("parameters") or {}),
+                actor=Actor(kind="automation", automation_id=automation.id, event_id=event.id),
+            )
+        except ApplicationError as error:
+            raise PermanentFailure(str(error)) from error
+        if command.status == "failed":
+            if command.error_code == ErrorCode.CONNECTIVITY_UNAVAILABLE:
+                raise TransientFailure(command.error_message or "platform unavailable")
+            raise PermanentFailure(command.error_message or "command failed")
+        return {"command_id": str(command.id), "status": command.status}
+    if kind == ActionType.INTEGRATION:
         raise PermanentFailure(f"action type {kind} arrives in a later phase")
     raise PermanentFailure(f"unknown action type {kind!r}")
 
 
-async def handle_event(session: AsyncSession, payload: dict[str, Any]) -> bool:
+async def handle_event(
+    session: AsyncSession,
+    payload: dict[str, Any],
+    messages: list[tuple[str, dict[str, Any]]] | None = None,
+) -> bool:
     """Run every matching automation for the event. Returns True when a transient failure
     needs a retry. Commits before returning."""
     event_id = uuid.UUID(str(payload["event_id"]))
@@ -237,6 +264,10 @@ async def handle_event(session: AsyncSession, payload: dict[str, Any]) -> bool:
                     delivery.error_code = None
                     delivery.error_message = None
                     delivery.response = response
+                    if messages is not None and response.get("command_id"):
+                        command = await session.get(Command, uuid.UUID(str(response["command_id"])))
+                        if command is not None:
+                            messages.append(command_message(command))
     await tracer.finish()
     await session.commit()
     return retry

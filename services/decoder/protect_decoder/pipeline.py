@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
+from shared.control.commands import apply_provider_signal, interpret_device_records
 from shared.device_drivers.base import (
     DecodedMeasurement,
     DecodedPosition,
@@ -228,6 +229,7 @@ async def process_source_event(
             else:
                 records = network_event_records(event, payload)
                 step.metadata["network_event"] = event.event_type
+                outcome.messages += await apply_provider_signal(session, event, payload)
             step.metadata.update(
                 positions=len(records.positions),
                 measurements=len(records.measurements),
@@ -259,6 +261,7 @@ async def process_source_event(
                 step.metadata["unassigned_times"] = [t.isoformat() for t in unassigned]
 
         await _update_current_state(session, event, device, records, attributions)
+        outcome.messages += await interpret_device_records(session, device, driver, event, records)
     except ApplicationError as error:
         event.processing_status = ProcessingStatus.FAILED
         event.error_code = error.code

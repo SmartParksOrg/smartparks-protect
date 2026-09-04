@@ -4,6 +4,18 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+Device control through ChirpStack (phase 6).
+
+### Added
+
+- Control actions declared by drivers (`shared/control/actions.py`, ADR 0013): typed parameters as JSON schema, permission, confirmation policy, required capability, encoder, optional interpreter. OpenCollar declares `REQUEST_STATUS`, `REQUEST_POSITION`, `SET_GNSS_INTERVAL` and `RESET`.
+- One command path (`shared/control/commands.py`): create, encode, route through the device's data sources, submit, a `command_executions` timeline and an audit-class trace; provider `txack`, `ack` and `log` events and device responses move the lifecycle; commands expire after the action's expiry. `command.updated` on the bus and the WebSocket.
+- ChirpStack command connector over the REST API device queue, with queue read and flush.
+- API: device actions with availability reasons, commands per device and per project, command detail, downlink queue.
+- Automation action type `command`, sent to the event's device as the automation.
+- Frontend: Actions menu and command history with the lifecycle timeline on the device page, the platform queue with flush, the Commands page under Control, command actions in the automation editor.
+- Migration 0006: `commands`, `command_executions`.
+
 ## v0.3.0, 2026-09-04
 
 Rules, events, alerts, automations and notifications (phase 5).

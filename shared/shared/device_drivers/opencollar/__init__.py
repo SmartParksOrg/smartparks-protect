@@ -18,6 +18,7 @@ import struct
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
+from shared.control.actions import ControlAction
 from shared.device_drivers.base import (
     DEFAULT_DECODABLE_EVENT_TYPES,
     DecodedEvent,
@@ -28,6 +29,7 @@ from shared.device_drivers.base import (
     SourceEventData,
     TimestampSemantics,
 )
+from shared.device_drivers.opencollar.control import CONTROL_ACTIONS
 from shared.enums import ErrorCode, Severity
 from shared.trace import ApplicationError
 
@@ -161,6 +163,7 @@ class OpenCollarDriver:
         "clock": TimestampSemantics.NETWORK_TIME,
     }
     decodable_event_types: ClassVar[frozenset[str]] = DEFAULT_DECODABLE_EVENT_TYPES
+    control_actions: ClassVar[dict[str, ControlAction]] = CONTROL_ACTIONS
 
     def decode(self, event: SourceEventData) -> DecodedRecords:
         if event.frame is None or event.f_port is None:

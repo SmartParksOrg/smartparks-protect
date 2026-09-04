@@ -35,6 +35,7 @@ LIVE_TOPICS = (
     Topic.DEVICE_STATE_CHANGED,
     Topic.EVENT_CREATED,
     Topic.ALERT_CREATED,
+    Topic.COMMAND_UPDATED,
 )
 
 

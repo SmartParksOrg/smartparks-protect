@@ -1,9 +1,9 @@
 """ChirpStack v4 adapter: the full-feature reference LoRaWAN implementation (architecture 7.2).
 
 Events arrive over the ChirpStack MQTT integration (JSON marshaler) on
-`application/{application_id}/device/{dev_eui}/event/{event}`. Management uses the ChirpStack
-REST API (`chirpstack-rest-api`) with an API token. Downlinks (command connector) follow in
-phase 6.
+`application/{application_id}/device/{dev_eui}/event/{event}`. Management and downlinks use the
+ChirpStack REST API (`chirpstack-rest-api`) with an API token (decision D50): a command becomes
+a device queue item, `txack` and `ack` events carry its `queueItemId` back.
 
 Config keys: `mqtt_host`, `mqtt_port` (1883), `mqtt_tls` (false), `api_url` (REST API base, for
 example `http://chirpstack-rest-api:8090`), `web_url` (the ChirpStack web UI, for deep links),
@@ -11,6 +11,7 @@ example `http://chirpstack-rest-api:8090`), `web_url` (the ChirpStack web UI, fo
 Credentials: `api_token`, optional `mqtt_username` and `mqtt_password`.
 """
 
+import base64
 import json
 from datetime import datetime
 from typing import Any, ClassVar
@@ -237,6 +238,74 @@ class ChirpStackManagement:
         return {"ok": True, "applications": len(applications)}
 
 
+class ChirpStackCommands(ChirpStackManagement):
+    """Command connector: the device queue of the REST API."""
+
+    async def submit(
+        self, external_id: str, payload: bytes, options: dict[str, Any]
+    ) -> dict[str, Any]:
+        dev_eui = external_id.lower()
+        body = {
+            "queueItem": {
+                "devEui": dev_eui,
+                "confirmed": bool(options.get("confirmed", False)),
+                "data": base64.b64encode(payload).decode(),
+                "fPort": int(options["f_port"]),
+            }
+        }
+        async with self._client() as client:
+            response = await client.post(f"/api/devices/{dev_eui}/queue", json=body)
+        if response.status_code in (401, 403):
+            raise ApplicationError(
+                code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
+                message=f"ChirpStack API refused the token ({response.status_code})",
+                component="adapter.chirpstack",
+                user_actionable=True,
+            )
+        if response.status_code == 404:
+            raise ApplicationError(
+                code=ErrorCode.DEVICE_NOT_FOUND,
+                message=f"ChirpStack does not know device {dev_eui}",
+                component="adapter.chirpstack",
+                user_actionable=True,
+            )
+        if response.status_code >= 500:
+            raise ApplicationError(
+                code=ErrorCode.CONNECTIVITY_UNAVAILABLE,
+                message=f"ChirpStack answered {response.status_code}: {response.text[:200]}",
+                component="adapter.chirpstack",
+                retryable=True,
+            )
+        if response.status_code >= 400:
+            raise ApplicationError(
+                code=ErrorCode.COMMAND_REJECTED,
+                message=(
+                    f"ChirpStack rejected the downlink ({response.status_code}): "
+                    f"{response.text[:200]}"
+                ),
+                component="adapter.chirpstack",
+                user_actionable=True,
+            )
+        item_id = str(response.json().get("id") or "")
+        return {
+            "provider_ref": item_id,
+            "statuses": ["accepted_by_network", "queued"],
+            "queue_item_id": item_id,
+        }
+
+    async def queue(self, external_id: str) -> list[dict[str, Any]]:
+        async with self._client() as client:
+            response = await client.get(f"/api/devices/{external_id.lower()}/queue")
+        response.raise_for_status()
+        items: list[dict[str, Any]] = response.json().get("result") or []
+        return items
+
+    async def flush(self, external_id: str) -> None:
+        async with self._client() as client:
+            response = await client.delete(f"/api/devices/{external_id.lower()}/queue")
+        response.raise_for_status()
+
+
 class ChirpStackAdapter:
     key: ClassVar[str] = "chirpstack"
     label: ClassVar[str] = "ChirpStack"
@@ -253,6 +322,7 @@ class ChirpStackAdapter:
         statistics=True,
     )
     default_link_templates: ClassVar[dict[str, str]] = {
+        ""
         "OPEN_DEVICE": "{web_url}/#/tenants/{tenant_id}/applications/{application_id}/devices/{external_id}",  # noqa: E501
         "OPEN_APPLICATION": "{web_url}/#/tenants/{tenant_id}/applications/{application_id}",
         "OPEN_GATEWAY": "{web_url}/#/tenants/{tenant_id}/gateways/{gateway_id}",
@@ -273,6 +343,9 @@ class ChirpStackAdapter:
 
     def event_connector(self, source: DataSourceContext) -> EventConnector | None:
         return ChirpStackConnector(source)
+
+    def command_connector(self, source: DataSourceContext) -> ChirpStackCommands:
+        return ChirpStackCommands(source)
 
     def parse_webhook(
         self, source: DataSourceContext, body: Any, headers: dict[str, str]

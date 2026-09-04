@@ -2121,6 +2121,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Actions
+         * @description What the device can do now: each action with why it is unavailable, so the UI explains
+         *     instead of hiding (architecture 17.3).
+         */
+        get: operations["list_actions_api_v1_devices__device_id__actions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Device Commands */
+        get: operations["list_device_commands_api_v1_devices__device_id__commands_get"];
+        put?: never;
+        /**
+         * Create Command
+         * @description Issue a command. The response carries the lifecycle so far; a command the platform
+         *     refused is returned as failed with the reason, and stays in the history.
+         */
+        post: operations["create_command_api_v1_devices__device_id__commands_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/commands/{command_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Command */
+        get: operations["get_command_api_v1_commands__command_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Commands
+         * @description Newest first; the cursor is the created time of the last item.
+         */
+        get: operations["list_project_commands_api_v1_projects__project_id__commands_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/downlink-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Downlink Queue
+         * @description The platform's queue for the device, when the adapter can read it.
+         */
+        get: operations["downlink_queue_api_v1_devices__device_id__downlink_queue_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Flush Downlink Queue
+         * @description Drop every queued downlink on the platform. High impact: pending commands never reach
+         *     the device and expire.
+         */
+        delete: operations["flush_downlink_queue_api_v1_devices__device_id__downlink_queue_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/version": {
         parameters: {
             query?: never;
@@ -2142,6 +2247,38 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActionAvailability */
+        ActionAvailability: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /** Parameters Schema */
+            parameters_schema: {
+                [key: string]: unknown;
+            };
+            /** Permission */
+            permission: string;
+            /** Confirmation */
+            confirmation: string;
+            /** Required Capability */
+            required_capability: string;
+            /** Confirms */
+            confirms: boolean;
+            /** Schema Version */
+            schema_version: number;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Permitted
+             * @default true
+             */
+            permitted: boolean;
+        };
         /** ActionDeliveryRead */
         ActionDeliveryRead: {
             /**
@@ -2199,6 +2336,18 @@ export interface components {
             url?: string | null;
             /** Secret */
             secret?: string | null;
+            /**
+             * Action Key
+             * @description Command actions
+             */
+            action_key?: string | null;
+            /**
+             * Parameters
+             * @description Command parameters
+             */
+            parameters?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ActionType
@@ -2477,6 +2626,137 @@ export interface components {
             current_password: string;
             /** New Password */
             new_password: string;
+        };
+        /** CommandCreate */
+        CommandCreate: {
+            /** Action Key */
+            action_key: string;
+            /** Parameters */
+            parameters?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Confirmed
+             * @description The user confirmed an action whose policy asks for it
+             * @default false
+             */
+            confirmed: boolean;
+        };
+        /** CommandDetail */
+        CommandDetail: {
+            command: components["schemas"]["CommandRead"];
+            /** Executions */
+            executions: components["schemas"]["CommandExecutionRead"][];
+        };
+        /** CommandExecutionRead */
+        CommandExecutionRead: {
+            /** Id */
+            id: number;
+            /**
+             * Command Id
+             * Format: uuid
+             */
+            command_id: string;
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Status */
+            status: string;
+            /** Source */
+            source: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
+        };
+        /** CommandRead */
+        CommandRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Action Key */
+            action_key: string;
+            /** Driver Key */
+            driver_key: string;
+            /** Schema Version */
+            schema_version: number;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Payload Hex */
+            payload_hex: string | null;
+            /** F Port */
+            f_port: number | null;
+            /** Confirmed Downlink */
+            confirmed_downlink: boolean;
+            /** Data Source Id */
+            data_source_id: string | null;
+            /** External Id */
+            external_id: string | null;
+            /** Route */
+            route: string | null;
+            /** Status */
+            status: string;
+            /** Provider Ref */
+            provider_ref: string | null;
+            /** Provider Response */
+            provider_response: {
+                [key: string]: unknown;
+            };
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Actor */
+            actor: {
+                [key: string]: unknown;
+            };
+            /** Requested By User Id */
+            requested_by_user_id: string | null;
+            /** Automation Id */
+            automation_id: string | null;
+            /** Event Id */
+            event_id: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /** Submitted At */
+            submitted_at: string | null;
+            /** Transmitted At */
+            transmitted_at: string | null;
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Confirmed At */
+            confirmed_at: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** CreateDeviceForIdentity */
         CreateDeviceForIdentity: {
@@ -3821,6 +4101,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PageResponse[CommandRead] */
+        PageResponse_CommandRead_: {
+            /** Items */
+            items: components["schemas"]["CommandRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** PageResponse[DataSourceRead] */
         PageResponse_DataSourceRead_: {
             /** Items */
@@ -4164,6 +4451,32 @@ export interface components {
             updated_at: string;
             /** Role */
             role: string;
+        };
+        /** QueueItem */
+        QueueItem: {
+            /** Id */
+            id?: string | null;
+            /** F Port */
+            f_port?: number | null;
+            /** Confirmed */
+            confirmed?: boolean | null;
+            /** Is Pending */
+            is_pending?: boolean | null;
+            /** F Cnt Down */
+            f_cnt_down?: number | null;
+            /** Data Hex */
+            data_hex?: string | null;
+        };
+        /** QueueState */
+        QueueState: {
+            /** Data Source Id */
+            data_source_id: string | null;
+            /** External Id */
+            external_id: string | null;
+            /** Supported */
+            supported: boolean;
+            /** Items */
+            items: components["schemas"]["QueueItem"][];
         };
         /** ReceptionRead */
         ReceptionRead: {
@@ -10397,6 +10710,233 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ActionDeliveryRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_actions_api_v1_devices__device_id__actions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionAvailability"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_device_commands_api_v1_devices__device_id__commands_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_command_api_v1_devices__device_id__commands_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommandCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_command_api_v1_commands__command_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                command_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_commands_api_v1_projects__project_id__commands_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                device_id?: string | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_CommandRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    downlink_queue_api_v1_devices__device_id__downlink_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flush_downlink_queue_api_v1_devices__device_id__downlink_queue_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

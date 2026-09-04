@@ -10,6 +10,7 @@ from shared.models.access import (
 )
 from shared.models.analytics import ExportJob, SavedView
 from shared.models.base import Base
+from shared.models.control import Command, CommandExecution
 from shared.models.domain import (
     DataSource,
     DataSourceProjectScope,
@@ -55,6 +56,8 @@ __all__ = [
     "AuditLog",
     "Automation",
     "Base",
+    "Command",
+    "CommandExecution",
     "ConnectivityState",
     "DataSource",
     "DataSourceProjectScope",

@@ -48,4 +48,9 @@ export const queryKeys = {
   notificationCapabilities: (scope: string) => ["notification-capabilities", scope] as const,
   deliveries: (scope: string, params: Record<string, unknown>) => ["deliveries", scope, params] as const,
   mapEvents: (projectId: string, hours: number) => ["projects", projectId, "map", "events", hours] as const,
+  deviceActions: (deviceId: string) => ["devices", deviceId, "actions"] as const,
+  deviceCommands: (deviceId: string) => ["devices", deviceId, "commands"] as const,
+  command: (id: string) => ["commands", id] as const,
+  projectCommands: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "commands", params] as const,
+  downlinkQueue: (deviceId: string) => ["devices", deviceId, "downlink-queue"] as const,
 };

@@ -196,6 +196,23 @@ class ActionType(StrEnum):
     COMMAND = "command"
 
 
+class CommandStatus(StrEnum):
+    """Command lifecycle (architecture 17.4). A stage the provider cannot observe stays
+    unreached, it is never fabricated."""
+
+    CREATED = "created"
+    ENCODED = "encoded"
+    SUBMITTED = "submitted"
+    ACCEPTED_BY_NETWORK = "accepted_by_network"
+    QUEUED = "queued"
+    SCHEDULED = "scheduled"
+    TRANSMITTED = "transmitted"
+    ACKNOWLEDGED = "acknowledged"
+    CONFIRMED_BY_DEVICE = "confirmed_by_device"
+    FAILED = "failed"
+    EXPIRED = "expired"
+
+
 class DeliveryStatus(StrEnum):
     QUEUED = "queued"
     SENT = "sent"

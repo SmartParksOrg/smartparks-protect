@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 6, device control through ChirpStack |
-| Latest release | v0.2.0 (2026-09-03); v0.3.0 candidate built on 2026-09-04, Tim reviews and tags |
+| Active phase | Phase 7, production LoRaWAN networks and the dev server |
+| Latest release | v0.3.0 (2026-09-04); v0.4.0 candidate built on 2026-09-04 |
 | Last session | 2026-09-04 |
-| Next item | Tim reviews and tags v0.3.0; then phase 6: control action definitions and the command lifecycle, after the decisions at its start |
+| Next item | Tag v0.4.0 after review; then phase 7: KPN/ThingPark adapter, after the decisions at its start (accounts and a dev VM are inputs) |
 | Blockers | none |
 
 ## What we are building
@@ -89,6 +89,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D45 | Rule constructs in phase 5 | Threshold, spatial enter/exit/inside/outside, speed as a derived metric, FOR, no-data, window aggregates; `near`, `dwell`, `crossed`, `baseline`, `correlation` and `event_chain` reserved in the schema until phase 13 | Covers the four template rules and the immobility example; reserved types can be written now but not enabled. Decided by Tim on 2026-09-04. |
 | D46 | Alert lifecycle permission | `alerts:write` (acknowledge, resolve) is held by project viewers as well as admins | Rangers are viewers and acknowledging is their daily workflow; read-only stays read-only for everything else. Recorded by Claude on 2026-09-04, easy to revert in `shared/permissions.py`. |
 | D47 | System alerts | System findings (stale worker, dead letters, consumer lag) are events with `project_id` null and an alert that resolves itself when the finding clears; server-level automations and targets (project null) deliver them | One event and alert path for everything, no second notification mechanism; server admins see them under System alerts. Recorded by Claude on 2026-09-04. |
+| D49 | Control action schema | Actions are Python dataclasses in the driver with a `schema_version`, parameters as Pydantic models exported as JSON schema; commands store the version they were created with; no database table for definitions | Encoding is code; a second source of truth would drift. ADR 0013. Decided by Tim on 2026-09-04. |
+| D50 | ChirpStack downlinks | The REST API device queue, the same client and token as the management connector | No new dependency; `txack` and `ack` carry the queue item id back. Decided by Tim on 2026-09-04. |
+| D51 | Device confirmation | An action may declare an interpreter that recognises the device's answer in later decoded records; without one the lifecycle ends at the last stage the network reports | Nothing is fabricated (architecture 17.4); OpenCollar confirms status and position requests and resets. Decided by Tim on 2026-09-04. |
+| D52 | Command routing and audit | The route is the most recently seen identity on an enabled data source whose adapter can send and whose capabilities fit; a refused submission is stored as a failed command; commands have an audit-class trace and expire after the action's expiry | The attempt stays in the history for audit; a device with two networks uses the one that heard it last. Recorded by Claude on 2026-09-04. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -96,7 +100,7 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 These are not decided yet. A proposed default is given so work can start; each is confirmed or changed when its phase begins.
 
 - [x] **External deep links.** Decided on 2026-09-03: built as proposed, see D38.
-- [ ] **Control action schema versioning.** Proposed: action definitions are Python dataclasses in the driver with a `schema_version`; parameters are Pydantic models exported as JSON schema for the UI and rules. Decide in phase 6.
+- [x] **Control action schema versioning.** Decided on 2026-09-04: built as proposed, see D49 and ADR 0013.
 - [ ] **Integration delivery idempotency.** Proposed: `integration_deliveries` row per (integration, object type, object id, object version) with a unique key; backfill creates rows in batches. Decide in phase 8.
 - [x] **Raw payload placement for very large events.** Decided on 2026-09-03: 64 KB threshold, see D32.
 - [x] **Commit trailers.** Decided on 2026-09-03: strip them, see D28.
@@ -430,16 +434,16 @@ Release:
 
 **Deliverables.**
 
-- [ ] Control action definitions per driver (architecture 17.3): key, label, description, typed parameters with validation and units, required permission, confirmation policy, required connectivity capability, encoder, result interpretation. Exported as JSON schema for the UI and rules.
-- [ ] `commands` and `command_executions` tables with the lifecycle states from 17.4; unsupported stages stay unknown, never fabricated.
-- [ ] Command path: API creates the command, driver encodes, route selection chooses the connectivity adapter from active data sources and capabilities, adapter submits, provider events update the lifecycle (ChirpStack txack and ack), device responses close the loop where the driver interprets them. Every step traced (26.7).
-- [ ] ChirpStack command connector: enqueue downlink, read queue state, flush.
-- [ ] OpenCollar encoders for RESET and REQUEST_STATUS, plus SET_GNSS_INTERVAL if the protocol fixtures allow it.
-- [ ] Permissions and confirmation: `devices:control` for operational actions, `devices:control_high_impact` for reset and configuration, explicit confirmation dialog, audit entries.
-- [ ] Automations can invoke control actions through the same API as the UI.
-- [ ] UI: actions menu on the device built from capabilities with disabled reasons, command dialog with parameter form and confirmation, command history with lifecycle timeline and trace link, Control section with command list.
-- [ ] Tests: encoding golden tests, route selection with two data sources, lifecycle updates from provider events, permission checks.
-- [ ] Docs: `docs/devices/device-control.md`, `docs/devices/opencollar.md` control section. ADR: control action schema versioning.
+- [x] Control action definitions per driver (architecture 17.3): key, label, description, typed parameters with validation and units, required permission, confirmation policy, required connectivity capability, encoder, result interpretation. Exported as JSON schema for the UI and rules. (2026-09-04)
+- [x] `commands` and `command_executions` tables with the lifecycle states from 17.4; unsupported stages stay unknown, never fabricated. (2026-09-04)
+- [x] Command path: API creates the command, driver encodes, route selection chooses the connectivity adapter from active data sources and capabilities, adapter submits, provider events update the lifecycle (ChirpStack txack and ack), device responses close the loop where the driver interprets them. Every step traced (26.7). (2026-09-04)
+- [x] ChirpStack command connector: enqueue downlink, read queue state, flush. (2026-09-04)
+- [x] OpenCollar encoders for RESET and REQUEST_STATUS, plus SET_GNSS_INTERVAL if the protocol fixtures allow it. (2026-09-04; plus REQUEST_POSITION)
+- [x] Permissions and confirmation: `devices:control` for operational actions, `devices:control_high_impact` for reset and configuration, explicit confirmation dialog, audit entries. (2026-09-04)
+- [x] Automations can invoke control actions through the same API as the UI. (2026-09-04)
+- [x] UI: actions menu on the device built from capabilities with disabled reasons, command dialog with parameter form and confirmation, command history with lifecycle timeline and trace link, Control section with command list. (2026-09-04)
+- [x] Tests: encoding golden tests, route selection with two data sources, lifecycle updates from provider events, permission checks. (2026-09-04; route selection is tested through the availability reasons: disabled source, missing downlink capability)
+- [x] Docs: `docs/devices/device-control.md`, `docs/devices/opencollar.md` control section. ADR: control action schema versioning. (2026-09-04, ADR 0013)
 
 **Exit criteria.** RESET issued from the UI appears in the ChirpStack downlink queue, the lifecycle shows SUBMITTED, QUEUED and TRANSMITTED from ChirpStack events, and the same action fired by an automation follows the identical path.
 
@@ -751,4 +755,16 @@ Listed by the phase where they are first needed.
 - Not done on purpose: NEAR, DWELL, CROSSED, baseline, correlation and event chaining (phase 13, reserved in the schema); a data source health signal for system alerts (phase 7); rule state for the `any` branch keeps geofence memory for every branch evaluated, which is intended. Late samples older than the last firing are evaluated normally; the automation freshness bound is the guard against stale notifications.
 - Verification: 157 python tests, 5 frontend tests, ruff, mypy strict, eslint and tsc clean, docs strict, OpenAPI regenerated, compose stack rebuilt with the two new services running, screenshot sweep clean on 34 routes at three viewports against the rebuilt stack. The sweep account `sweep@example.org` (server admin, local development stack only) was created directly in the development database because the environment has no sweep credentials; delete it or set `SWEEP_EMAIL` and `SWEEP_PASSWORD` in `.env` for the next sweep.
 - Committed as f119a80 and pushed on Tim's instruction. The v0.3.0 tag is pending Tim's review.
-- Decisions to ask Tim when phase 6 starts: how action definitions are versioned (open decision, proposed dataclasses with a `schema_version` and Pydantic parameter models), whether the ChirpStack command connector uses the REST API or gRPC (proposed REST, already used by the management connector), whether commands wait for a device response before CONFIRMED_BY_DEVICE (proposed: the driver interprets the next matching uplink), and where the OpenCollar encoders get their port and payload table (the protocol research document has RESET and REQUEST_STATUS).
+- Decisions asked at the start of phase 6, see the next entry. Earlier list: how action definitions are versioned (open decision, proposed dataclasses with a `schema_version` and Pydantic parameter models), whether the ChirpStack command connector uses the REST API or gRPC (proposed REST, already used by the management connector), whether commands wait for a device response before CONFIRMED_BY_DEVICE (proposed: the driver interprets the next matching uplink), and where the OpenCollar encoders get their port and payload table (the protocol research document has RESET and REQUEST_STATUS).
+
+### 2026-09-04, release v0.3.0 and phase 6 (Claude)
+
+- CI green on the phase 5 commits; tagged v0.3.0 on Tim's instruction (a662b21).
+- Tim decided D49 (action definitions as versioned driver code with Pydantic parameters), D50 (ChirpStack downlinks over the REST API queue), D51 (the driver's interpreter confirms a command from later uplinks). Claude recorded D52 (routing, failed submissions stay in the history, audit-class traces, expiry).
+- Built `shared/control` (action contract, the command path with route selection, provider signals, device interpretation, expiry), OpenCollar actions `REQUEST_STATUS`, `REQUEST_POSITION`, `SET_GNSS_INTERVAL`, `RESET` with encoders from protocol research section 4 and interpreters, the ChirpStack command connector (queue post, read, flush), migration 0006, the decoder hooks, expiry in the rules ticker, the automation `command` action, the control API, `command.updated` on the WebSocket.
+- Frontend: Actions menu with disabled reasons, parameter form from the JSON schema, confirmation for confirm and privileged policies, command history with the lifecycle timeline and trace link, the platform queue with flush, the Commands page under Control, command actions in the automation editor.
+- Not done on purpose: a `SCHEDULED` stage is never reached with ChirpStack (it reports no scheduling); `SET_GNSS_INTERVAL` has no interpreter because a settings write returns a confirmation only for settings with an action; the guard test that no provider code lives outside the adapters arrives in phase 7 as planned.
+- Verification: 185 python tests, 5 frontend tests, ruff, mypy strict, eslint and tsc clean, docs strict, OpenAPI regenerated, compose stack rebuilt, screenshot sweep clean on 35 routes at three viewports. Live exit criterion on the local ChirpStack: `REQUEST_STATUS` and `RESET` issued through the API for the demo collar were queued with payloads `a400` and `a100` on port 32, both visible in the ChirpStack device queue, the timeline shows created, encoded, submitted, accepted by network and queued, the queue was flushed afterwards. The simulator does not transmit downlinks, so transmitted and confirmed stages were verified with the fixture tests, not live.
+- The demo collar in this development database still had the pre-v0.2.0 generic JSON type; it now has an OpenCollar Edge type (created through the API), which is what the current bootstrap creates on a fresh stack.
+- Not committed. Tim reviews and commits, then tags v0.4.0.
+- Decisions to ask Tim when phase 7 starts: KPN/ThingPark integration style (proposed: HTTP push from ThingPark to the webhook endpoint with the per-source bearer token, downlinks through the ThingPark REST API), LORIOT integration style (proposed: the LORIOT websocket application output with the downlink API), which accounts and devices exist for live tests, and whether the dev VM is provisioned by Ansible from this repository from the first run (proposed: yes, DigitalOcean Ubuntu 24.04).

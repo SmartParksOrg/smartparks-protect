@@ -161,6 +161,8 @@ class ActionSpec(BaseModel):
     target_id: uuid.UUID | None = None
     url: str | None = Field(default=None, max_length=2000)
     secret: str | None = Field(default=None, max_length=200)
+    action_key: str | None = Field(default=None, max_length=64, description="Command actions")
+    parameters: dict[str, Any] | None = Field(default=None, description="Command parameters")
 
 
 class AutomationCreate(BaseModel):

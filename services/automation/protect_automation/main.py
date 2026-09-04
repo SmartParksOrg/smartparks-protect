@@ -2,6 +2,7 @@
 delivers notifications; polls the Telegram bot for chat registrations."""
 
 import asyncio
+from typing import Any
 
 from protect_automation.actions import handle_event, retry_error
 from protect_automation.telegram_poller import poll_forever
@@ -17,8 +18,11 @@ def build_worker() -> Worker:
     worker = Worker("automation")
 
     async def on_event(message: Message) -> None:
+        outgoing: list[tuple[str, dict[str, Any]]] = []
         async with session_scope() as session:
-            retry = await handle_event(session, message.payload)
+            retry = await handle_event(session, message.payload, outgoing)
+        for topic, payload in outgoing:
+            await worker.bus.publish(topic, payload)
         if retry:
             raise retry_error(str(message.payload.get("event_id")))
 

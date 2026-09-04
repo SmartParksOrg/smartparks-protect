@@ -82,7 +82,7 @@ export const projectSections: NavSection[] = [
   },
   {
     label: "Control",
-    items: [{ label: "Commands", icon: SlidersHorizontal, phase: 6 }],
+    items: [{ label: "Commands", icon: SlidersHorizontal, to: "control/commands" }],
   },
   {
     label: "Project admin",

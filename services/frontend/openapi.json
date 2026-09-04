@@ -10322,6 +10322,429 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/actions": {
+   "get": {
+    "tags": [
+     "control"
+    ],
+    "summary": "List Actions",
+    "description": "What the device can do now: each action with why it is unavailable, so the UI explains\ninstead of hiding (architecture 17.3).",
+    "operationId": "list_actions_api_v1_devices__device_id__actions_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ActionAvailability"
+         },
+         "title": "Response List Actions Api V1 Devices  Device Id  Actions Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/commands": {
+   "post": {
+    "tags": [
+     "control"
+    ],
+    "summary": "Create Command",
+    "description": "Issue a command. The response carries the lifecycle so far; a command the platform\nrefused is returned as failed with the reason, and stays in the history.",
+    "operationId": "create_command_api_v1_devices__device_id__commands_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CommandCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CommandRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "control"
+    ],
+    "summary": "List Device Commands",
+    "operationId": "list_device_commands_api_v1_devices__device_id__commands_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/CommandRead"
+         },
+         "title": "Response List Device Commands Api V1 Devices  Device Id  Commands Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/commands/{command_id}": {
+   "get": {
+    "tags": [
+     "control"
+    ],
+    "summary": "Get Command",
+    "operationId": "get_command_api_v1_commands__command_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "command_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Command Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CommandDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/commands": {
+   "get": {
+    "tags": [
+     "control"
+    ],
+    "summary": "List Project Commands",
+    "description": "Newest first; the cursor is the created time of the last item.",
+    "operationId": "list_project_commands_api_v1_projects__project_id__commands_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_CommandRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/downlink-queue": {
+   "get": {
+    "tags": [
+     "control"
+    ],
+    "summary": "Downlink Queue",
+    "description": "The platform's queue for the device, when the adapter can read it.",
+    "operationId": "downlink_queue_api_v1_devices__device_id__downlink_queue_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/QueueState"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "control"
+    ],
+    "summary": "Flush Downlink Queue",
+    "description": "Drop every queued downlink on the platform. High impact: pending commands never reach\nthe device and expire.",
+    "operationId": "flush_downlink_queue_api_v1_devices__device_id__downlink_queue_delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/version": {
    "get": {
     "tags": [
@@ -10346,6 +10769,81 @@
  },
  "components": {
   "schemas": {
+   "ActionAvailability": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "description": {
+      "type": "string",
+      "title": "Description"
+     },
+     "parameters_schema": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Parameters Schema"
+     },
+     "permission": {
+      "type": "string",
+      "title": "Permission"
+     },
+     "confirmation": {
+      "type": "string",
+      "title": "Confirmation"
+     },
+     "required_capability": {
+      "type": "string",
+      "title": "Required Capability"
+     },
+     "confirms": {
+      "type": "boolean",
+      "title": "Confirms"
+     },
+     "schema_version": {
+      "type": "integer",
+      "title": "Schema Version"
+     },
+     "available": {
+      "type": "boolean",
+      "title": "Available"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "permitted": {
+      "type": "boolean",
+      "title": "Permitted",
+      "default": true
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "description",
+     "parameters_schema",
+     "permission",
+     "confirmation",
+     "required_capability",
+     "confirms",
+     "schema_version",
+     "available"
+    ],
+    "title": "ActionAvailability"
+   },
    "ActionDeliveryRead": {
     "properties": {
      "id": {
@@ -10553,6 +11051,32 @@
        }
       ],
       "title": "Secret"
+     },
+     "action_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 64
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action Key",
+      "description": "Command actions"
+     },
+     "parameters": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parameters",
+      "description": "Command parameters"
      }
     },
     "type": "object",
@@ -11401,6 +11925,414 @@
      "new_password"
     ],
     "title": "ChangePasswordRequest"
+   },
+   "CommandCreate": {
+    "properties": {
+     "action_key": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Action Key"
+     },
+     "parameters": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Parameters"
+     },
+     "confirmed": {
+      "type": "boolean",
+      "title": "Confirmed",
+      "description": "The user confirmed an action whose policy asks for it",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "action_key"
+    ],
+    "title": "CommandCreate"
+   },
+   "CommandDetail": {
+    "properties": {
+     "command": {
+      "$ref": "#/components/schemas/CommandRead"
+     },
+     "executions": {
+      "items": {
+       "$ref": "#/components/schemas/CommandExecutionRead"
+      },
+      "type": "array",
+      "title": "Executions"
+     }
+    },
+    "type": "object",
+    "required": [
+     "command",
+     "executions"
+    ],
+    "title": "CommandDetail"
+   },
+   "CommandExecutionRead": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "command_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Command Id"
+     },
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "detail": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "command_id",
+     "time",
+     "status",
+     "source",
+     "detail"
+    ],
+    "title": "CommandExecutionRead"
+   },
+   "CommandRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "action_key": {
+      "type": "string",
+      "title": "Action Key"
+     },
+     "driver_key": {
+      "type": "string",
+      "title": "Driver Key"
+     },
+     "schema_version": {
+      "type": "integer",
+      "title": "Schema Version"
+     },
+     "parameters": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Parameters"
+     },
+     "payload_hex": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Payload Hex"
+     },
+     "f_port": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "F Port"
+     },
+     "confirmed_downlink": {
+      "type": "boolean",
+      "title": "Confirmed Downlink"
+     },
+     "data_source_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Source Id"
+     },
+     "external_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Id"
+     },
+     "route": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Route"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "provider_ref": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Provider Ref"
+     },
+     "provider_response": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Provider Response"
+     },
+     "result": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Result"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     },
+     "actor": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Actor"
+     },
+     "requested_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Requested By User Id"
+     },
+     "automation_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Automation Id"
+     },
+     "event_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Id"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     },
+     "submitted_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Submitted At"
+     },
+     "transmitted_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Transmitted At"
+     },
+     "acknowledged_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Acknowledged At"
+     },
+     "confirmed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confirmed At"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_id",
+     "project_id",
+     "entity_id",
+     "action_key",
+     "driver_key",
+     "schema_version",
+     "parameters",
+     "payload_hex",
+     "f_port",
+     "confirmed_downlink",
+     "data_source_id",
+     "external_id",
+     "route",
+     "status",
+     "provider_ref",
+     "provider_response",
+     "result",
+     "error_code",
+     "error_message",
+     "actor",
+     "requested_by_user_id",
+     "automation_id",
+     "event_id",
+     "trace_id",
+     "submitted_at",
+     "transmitted_at",
+     "acknowledged_at",
+     "confirmed_at",
+     "expires_at",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "CommandRead"
    },
    "CreateDeviceForIdentity": {
     "properties": {
@@ -15082,6 +16014,33 @@
     ],
     "title": "PageResponse[AutomationRead]"
    },
+   "PageResponse_CommandRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/CommandRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[CommandRead]"
+   },
    "PageResponse_DataSourceRead_": {
     "properties": {
      "items": {
@@ -16175,6 +17134,124 @@
      "role"
     ],
     "title": "ProjectWithRole"
+   },
+   "QueueItem": {
+    "properties": {
+     "id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "f_port": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "F Port"
+     },
+     "confirmed": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confirmed"
+     },
+     "is_pending": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Pending"
+     },
+     "f_cnt_down": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "F Cnt Down"
+     },
+     "data_hex": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Hex"
+     }
+    },
+    "type": "object",
+    "title": "QueueItem"
+   },
+   "QueueState": {
+    "properties": {
+     "data_source_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Source Id"
+     },
+     "external_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Id"
+     },
+     "supported": {
+      "type": "boolean",
+      "title": "Supported"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/QueueItem"
+      },
+      "type": "array",
+      "title": "Items"
+     }
+    },
+    "type": "object",
+    "required": [
+     "data_source_id",
+     "external_id",
+     "supported",
+     "items"
+    ],
+    "title": "QueueState"
    },
    "ReceptionRead": {
     "properties": {

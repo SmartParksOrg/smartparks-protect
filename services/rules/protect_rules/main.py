@@ -13,6 +13,8 @@ from protect_rules.engine import (
 from protect_rules.system_checks import run_system_checks
 from shared.bus import Message, Topic
 from shared.config import get_settings
+from shared.control.commands import expire_commands
+from shared.database import session_scope
 from shared.logger import get_logger
 from shared.worker import Worker
 
@@ -42,6 +44,11 @@ def build_worker() -> Worker:
         while not worker.bus._stop.is_set():
             try:
                 await scheduler.tick()
+                async with session_scope() as session:
+                    expired = await expire_commands(session)
+                    await session.commit()
+                for topic, payload in expired:
+                    await worker.bus.publish(topic, payload)
                 now = loop.time()
                 if now - last_system_check >= settings.system_check_interval_seconds:
                     last_system_check = now
