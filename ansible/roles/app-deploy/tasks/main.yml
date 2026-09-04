@@ -13,6 +13,7 @@
   command: git rev-parse --short HEAD
   args:
     chdir: "{{ app_directory }}"
+  become_user: "{{ app_user }}"
   register: deployed_commit
   changed_when: false
   tags: [env-refresh]
