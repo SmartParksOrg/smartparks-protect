@@ -52,7 +52,7 @@ curl -s -m 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/ | grep -q 200
 REDIS_PASSWORD="$(env_get REDIS_PASSWORD)"
 stale_minutes="$(env_get HEARTBEAT_STALE_MINUTES)"; stale_minutes="${stale_minutes:-15}"
 now=$(date -u +%s)
-for worker in ingest decoder export rules automation; do
+for worker in ingest decoder export rules automation integration; do
   stamp="$(docker compose exec -T redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning GET "heartbeat:$worker" 2>/dev/null </dev/null | tr -d '"')"
   if [ -z "$stamp" ]; then fail "worker $worker" "no heartbeat"; else
     age=$(( now - $(date -u -d "$stamp" +%s 2>/dev/null || echo 0) ))

@@ -27,6 +27,7 @@ export function TraceSteps({ traceId }: { traceId: string }) {
         <span className="text-muted-foreground">{formatTime(t.started_at)}</span>
         {t.compact && <Badge variant="secondary">compact</Badge>}
       </div>
+      <TraceTimeline trace={t} />
       <ol className="space-y-1">
         {t.steps.map((step) => (
           <li key={step.sequence} className="rounded-md border px-3 py-2 text-sm">
@@ -48,6 +49,37 @@ export function TraceSteps({ traceId }: { traceId: string }) {
         ))}
       </ol>
       {t.error && !t.steps.some((s) => s.error) && <div className="rounded bg-destructive/10 p-2 text-xs text-destructive">{t.error.error_code as string}: {t.error.message as string}</div>}
+    </div>
+  );
+}
+
+const stepTone: Record<string, string> = { success: "bg-primary", duplicate: "bg-brand-blue", skipped: "bg-muted-foreground/40", failed: "bg-destructive", dead_letter: "bg-destructive", retrying: "bg-brand-sand", processing: "bg-brand-green-light", pending: "bg-muted-foreground/40" };
+
+/** The trace as a timeline (architecture 26.3): one bar per step, placed and sized by its start and
+ * duration against the whole trace. Steps without a start are drawn at their sequence position. */
+export function TraceTimeline({ trace }: { trace: Trace }) {
+  const steps = trace.steps;
+  if (steps.length === 0) return null;
+  const start = new Date(trace.started_at).getTime();
+  const ends = steps.map((s) => (s.completed_at ? new Date(s.completed_at).getTime() : s.started_at ? new Date(s.started_at).getTime() + (s.duration_ms ?? 0) : start));
+  const total = Math.max(1, (trace.completed_at ? new Date(trace.completed_at).getTime() : Math.max(...ends)) - start);
+  return (
+    <div className="rounded-md border px-3 py-2">
+      <div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>0 ms</span><span>{total} ms</span></div>
+      <ol className="space-y-0.5">
+        {steps.map((step, index) => {
+          const left = step.started_at ? Math.min(100, Math.max(0, ((new Date(step.started_at).getTime() - start) / total) * 100)) : (index / steps.length) * 100;
+          const width = Math.max(0.8, Math.min(100 - left, ((step.duration_ms ?? 0) / total) * 100));
+          return (
+            <li key={step.sequence} className="flex items-center gap-2 text-xs">
+              <span className="w-40 shrink-0 truncate text-muted-foreground" title={`${step.component} ${step.operation}`}>{step.sequence}. {step.operation}</span>
+              <span className="relative h-2.5 flex-1 overflow-hidden rounded bg-muted">
+                <span className={`absolute top-0 h-full rounded ${stepTone[step.status] ?? "bg-primary"}`} style={{ left: `${left}%`, width: `${width}%` }} title={`${step.status}${step.duration_ms != null ? `, ${step.duration_ms} ms` : ""}`} />
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

@@ -97,6 +97,9 @@ nav:
   - Operations:
       - operations/index.md
       - Update guide: operations/update-guide.md
+      - Backup and recovery: operations/backup-and-recovery.md
+      - Restore guide: operations/restore-guide.md
+      - Observability: operations/observability.md
       - Benchmarks: operations/benchmarks.md
   - Troubleshooting: troubleshooting/index.md
   - API: api/index.md
@@ -118,3 +121,4 @@ nav:
       - adr/0013-control-action-schema.md
       - adr/0014-integration-deliveries.md
       - adr/0015-mcp-security-boundary.md
+      - adr/0016-backup-and-observability.md

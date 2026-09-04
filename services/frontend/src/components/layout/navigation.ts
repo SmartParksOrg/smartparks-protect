@@ -8,6 +8,7 @@ import {
   ChartLine,
   Cpu,
   Database,
+  DatabaseBackup,
   FileClock,
   GitBranch,
   Layers,
@@ -101,6 +102,7 @@ export const serverSections: NavSection[] = [
     items: [
       { label: "Needs attention", icon: TriangleAlert, to: "/admin/attention", serverAdminOnly: true },
       { label: "System health", icon: Shield, to: "/admin/health", serverAdminOnly: true },
+      { label: "Backup and recovery", icon: DatabaseBackup, to: "/admin/backups", serverAdminOnly: true },
       { label: "System alerts", icon: Bell, to: "/admin/alerts", serverAdminOnly: true },
       { label: "Automations", icon: Workflow, to: "/admin/automations", serverAdminOnly: true },
       { label: "Notifications", icon: Send, to: "/admin/notifications", serverAdminOnly: true },

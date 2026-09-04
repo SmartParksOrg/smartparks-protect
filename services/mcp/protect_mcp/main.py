@@ -12,6 +12,7 @@ from protect_mcp.server import build_server
 from shared.config import get_settings
 from shared.logger import configure_logging, get_logger
 from shared.oauth import READ_SCOPES, issuer_url, mcp_resource_url
+from shared.telemetry import configure_telemetry
 from shared.version import __version__
 
 log = get_logger("protect_mcp")
@@ -21,6 +22,7 @@ def create_app(api: ProtectApi | None = None) -> Starlette:
     """The ASGI app. Tests pass an API client bound to the API app in process."""
     settings = get_settings()
     configure_logging("mcp", level=settings.log_level, log_format=settings.log_format)
+    configure_telemetry("mcp")
     server = build_server(api or ProtectApi())
     log.info("mcp configured", version=__version__, resource=mcp_resource_url())
     # nginx terminates TLS and checks the Host header; the SDK's DNS rebinding guard would

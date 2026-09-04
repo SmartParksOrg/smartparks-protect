@@ -35,6 +35,68 @@
   delay: 5
   tags: [env-refresh, sync-config]
 
+- name: Log directory for the scheduled jobs
+  file:
+    path: "{{ app_directory }}/logs"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: "0750"
+  tags: [backup, sync-config, env-refresh]
+
+# Backups (architecture 28): hourly incremental, weekly full, daily object mirror and
+# integrity check, weekly restore test. The scripts exit at once while BACKUP_ENABLED is false.
+- name: Hourly incremental database backup
+  cron:
+    name: "smartparks-protect database backup (incremental)"
+    minute: "15"
+    user: "{{ app_user }}"
+    job: "cd {{ app_directory }} && bash scripts/backup.sh database incr >> logs/backup.log 2>&1"
+    state: "{{ 'present' if backup_enabled | default(false) else 'absent' }}"
+  tags: [backup, sync-config, env-refresh]
+
+- name: Weekly full database backup, Sunday 02:00
+  cron:
+    name: "smartparks-protect database backup (full)"
+    minute: "0"
+    hour: "2"
+    weekday: "0"
+    user: "{{ app_user }}"
+    job: "cd {{ app_directory }} && bash scripts/backup.sh database full >> logs/backup.log 2>&1"
+    state: "{{ 'present' if backup_enabled | default(false) else 'absent' }}"
+  tags: [backup, sync-config, env-refresh]
+
+- name: Daily object mirror at 02:45
+  cron:
+    name: "smartparks-protect object mirror"
+    minute: "45"
+    hour: "2"
+    user: "{{ app_user }}"
+    job: "cd {{ app_directory }} && bash scripts/backup.sh objects >> logs/backup.log 2>&1"
+    state: "{{ 'present' if backup_enabled | default(false) else 'absent' }}"
+  tags: [backup, sync-config, env-refresh]
+
+- name: Daily integrity check at 03:15
+  cron:
+    name: "smartparks-protect backup integrity check"
+    minute: "15"
+    hour: "3"
+    user: "{{ app_user }}"
+    job: "cd {{ app_directory }} && bash scripts/backup.sh check >> logs/backup.log 2>&1"
+    state: "{{ 'present' if backup_enabled | default(false) else 'absent' }}"
+  tags: [backup, sync-config, env-refresh]
+
+- name: Weekly restore test, Monday 03:30
+  cron:
+    name: "smartparks-protect restore test"
+    minute: "30"
+    hour: "3"
+    weekday: "1"
+    user: "{{ app_user }}"
+    job: "cd {{ app_directory }} && bash scripts/restore-verify.sh >> logs/restore-verify.log 2>&1"
+    state: "{{ 'present' if backup_enabled | default(false) else 'absent' }}"
+  tags: [backup, sync-config, env-refresh]
+
 - name: Daily security status at 02:30
   cron:
     name: "smartparks-protect security status"

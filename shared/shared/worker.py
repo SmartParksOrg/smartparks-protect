@@ -8,6 +8,7 @@ from typing import Any
 from shared.bus import Handler, RedisStreamsBus
 from shared.config import get_settings
 from shared.logger import configure_logging, get_logger
+from shared.telemetry import configure_telemetry
 
 log = get_logger("worker")
 
@@ -15,6 +16,7 @@ log = get_logger("worker")
 class Worker:
     def __init__(self, name: str) -> None:
         self.name = name
+        configure_telemetry(name)  # before any client is created, so they are instrumented
         self.bus = RedisStreamsBus()
         self._subscriptions: list[tuple[str, Handler]] = []
         self._background: list[Callable[[], Awaitable[None]]] = []

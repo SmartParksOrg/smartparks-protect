@@ -16,6 +16,7 @@ from protect_api.realtime import broadcaster
 from protect_api.routers import v1_router
 from shared.config import get_settings
 from shared.logger import configure_logging, get_logger
+from shared.telemetry import configure_telemetry
 from shared.version import __version__
 
 log = get_logger("protect_api")
@@ -29,6 +30,7 @@ class VersionResponse(BaseModel):
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging("api", level=settings.log_level, log_format=settings.log_format)
+    telemetry = configure_telemetry("api")
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -56,6 +58,10 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(v1_router, prefix="/api/v1")
     install_oauth_routes(app)
+    if telemetry:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app, excluded_urls="api/health,api/version")
 
     @app.get("/api/version", response_model=VersionResponse, tags=["health"])
     async def version() -> VersionResponse:

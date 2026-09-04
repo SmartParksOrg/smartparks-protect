@@ -6,12 +6,13 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.bus import get_bus
 from protect_api.deps import ProjectContext, require_permission, require_server_admin
+from protect_api.health_areas import AreaHealth, area_health
 from shared.bus import RedisStreamsBus, Topic, is_stale
 from shared.database import get_session
 from shared.enums import ProcessingStatus, TraceStatus
@@ -106,6 +107,7 @@ class SourceHealth(BaseModel):
 class SystemHealth(BaseModel):
     status: str
     workers: list[WorkerHealth]
+    areas: list[AreaHealth] = Field(default_factory=list)
     events_per_minute: float
     failed_last_hour: int
     unassigned_last_hour: int
@@ -371,10 +373,16 @@ async def system_health(
                 last_event_at=last,
             )
         )
-    degraded = any(w.stale for w in workers) or any(dead.values())
+    areas = await area_health(session)
+    degraded = (
+        any(w.stale for w in workers)
+        or any(dead.values())
+        or any(a.status == "critical" for a in areas)
+    )
     return SystemHealth(
         status="degraded" if degraded else "ok",
         workers=workers,
+        areas=areas,
         events_per_minute=round(int(events_last_hour) / 60, 2),
         failed_last_hour=int(failed),
         unassigned_last_hour=int(unassigned),

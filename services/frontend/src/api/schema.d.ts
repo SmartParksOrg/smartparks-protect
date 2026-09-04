@@ -2616,6 +2616,43 @@ export interface paths {
         patch: operations["update_gateway_api_v1_admin_gateways__gateway_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/backups/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Backup Status */
+        get: operations["backup_status_api_v1_admin_backups_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/backups/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Backup Runs
+         * @description Newest first.
+         */
+        get: operations["backup_runs_api_v1_admin_backups_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/version": {
         parameters: {
             query?: never;
@@ -2806,6 +2843,31 @@ export interface components {
             /** Time */
             time?: string | null;
         };
+        /** AreaHealth */
+        AreaHealth: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Status */
+            status: string;
+            /** Indicators */
+            indicators: components["schemas"]["AreaIndicator"][];
+        };
+        /** AreaIndicator */
+        AreaIndicator: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+            /**
+             * Status
+             * @default ok
+             */
+            status: string;
+            /** Link */
+            link?: string | null;
+        };
         /** AssignmentEnd */
         AssignmentEnd: {
             /**
@@ -2971,6 +3033,78 @@ export interface components {
              * Format: date-time
              */
             time_to: string;
+        };
+        /** BackupItem */
+        BackupItem: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Status */
+            status: string;
+            /** Detail */
+            detail: string;
+            /** At */
+            at: string | null;
+        };
+        /** BackupRunRead */
+        BackupRunRead: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Finished At
+             * Format: date-time
+             */
+            finished_at: string;
+            /** Duration Seconds */
+            duration_seconds: number;
+            /** Size Bytes */
+            size_bytes: number | null;
+            /** Label */
+            label: string | null;
+            /** Host */
+            host: string | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Error */
+            error: string | null;
+        };
+        /**
+         * BackupStatusRead
+         * @description The Backup and recovery status of architecture 28.11.
+         */
+        BackupStatusRead: {
+            /** Enabled */
+            enabled: boolean;
+            /** Overall */
+            overall: string;
+            /** Items */
+            items: components["schemas"]["BackupItem"][];
+            /** Recovery Point Seconds */
+            recovery_point_seconds: number | null;
+            /** Rpo Seconds */
+            rpo_seconds: number;
+            /** Rto Seconds */
+            rto_seconds: number;
+            /** Wal */
+            wal: {
+                [key: string]: unknown;
+            };
+            /** Latest */
+            latest: {
+                [key: string]: components["schemas"]["BackupRunRead"];
+            };
         };
         /** BearerResponse */
         BearerResponse: {
@@ -5994,6 +6128,8 @@ export interface components {
             status: string;
             /** Workers */
             workers: components["schemas"]["WorkerHealth"][];
+            /** Areas */
+            areas?: components["schemas"]["AreaHealth"][];
             /** Events Per Minute */
             events_per_minute: number;
             /** Failed Last Hour */
@@ -12795,6 +12931,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GatewayRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    backup_status_api_v1_admin_backups_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupStatusRead"];
+                };
+            };
+        };
+    };
+    backup_runs_api_v1_admin_backups_runs_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupRunRead"][];
                 };
             };
             /** @description Validation Error */

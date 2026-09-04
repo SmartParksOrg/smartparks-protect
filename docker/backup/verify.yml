@@ -1,0 +1,65 @@
+# Overrides for the isolated restore-verification stack (architecture 28.10), used by
+# scripts/restore-verify.sh as a second compose project next to the running one:
+#   docker compose -p smartparks-protect-verify -f docker-compose.yml -f docker/backup/verify.yml ...
+# A different project name gives separate named volumes; this file gives the stack its own
+# network and container names (compose fixes both in docker-compose.yml), drops every host port
+# so the two stacks never collide, and points the API at nothing public.
+networks:
+  default:
+    name: protect-verify-network
+
+services:
+  postgres:
+    container_name: protect-verify-postgres
+    ports: !reset []
+    environment:
+      # The verification cluster must never archive into the production repository.
+      BACKUP_ENABLED: "false"
+      # A local (posix) repository lives in the production stack's state volume; the restore
+      # test reads it there. With an S3 repository the value is the same as in production.
+      PGBACKREST_REPO1_PATH: ${VERIFY_REPO_PATH:-${BACKUP_REPO_PATH:-/smartparks-protect/pgbackrest}}
+    volumes:
+      - production-backup-state:/mnt/production-backup:ro
+  redis:
+    container_name: protect-verify-redis
+    ports: !reset []
+  minio:
+    container_name: protect-verify-minio
+    ports: !reset []
+  minio-init:
+    container_name: protect-verify-minio-init
+  migrate:
+    container_name: protect-verify-migrate
+  api:
+    container_name: protect-verify-api
+    ports: !reset []
+    environment:
+      PUBLIC_URL: http://verify.invalid
+  mcp:
+    container_name: protect-verify-mcp
+    ports: !reset []
+  frontend:
+    container_name: protect-verify-frontend
+    ports: !reset []
+  ingest:
+    container_name: protect-verify-ingest
+  decoder:
+    container_name: protect-verify-decoder
+  export:
+    container_name: protect-verify-export
+  rules:
+    container_name: protect-verify-rules
+  automation:
+    container_name: protect-verify-automation
+  integration:
+    container_name: protect-verify-integration
+  object-mirror:
+    container_name: protect-verify-object-mirror
+  lgtm:
+    container_name: protect-verify-lgtm
+    ports: !reset []
+
+volumes:
+  production-backup-state:
+    external: true
+    name: ${PRODUCTION_COMPOSE_PROJECT:-smartparks-protect}_pgbackrest-state

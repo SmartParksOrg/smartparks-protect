@@ -4,6 +4,20 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+Observability, System Health, backup and disaster recovery (phase 10), exercised on the local stack; the clean-server recovery on a throwaway VM and an S3 provider wait for the dev server.
+
+### Added
+
+- Backups (architecture 28, ADR 0016): pgBackRest in the database container with continuous WAL archiving and a weekly full plus hourly incremental backup to an encrypted S3-compatible repository; `mc mirror` of the MinIO buckets to the backup bucket; the `backup_runs` table (migration 0010) recorded by `scripts/backup.sh` through `protect_api.backup`; an integrity check of referenced objects; `scripts/restore-verify.sh`, a weekly restore into an isolated compose project with health and row checks; `scripts/restore.sh` for clean-server and point-in-time recovery; the Backup and recovery page for server admins; `SYSTEM_BACKUP` alerts for failed or stale backups, WAL archiving and restore tests; the Ansible schedule and host variables; guides for backup and recovery and for restore.
+- Technical telemetry (architecture 26.8): OpenTelemetry traces and metrics from every service over OTLP/HTTP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (FastAPI, SQLAlchemy, httpx, redis, one span and two metrics per bus message, the processing trace id on spans); the compose profile `observability` with Grafana, Tempo, Prometheus and Loki in one container; an observability guide.
+- System Health per area (architecture 26.2): ingestion, decoding (failures by error code, duplicate rate), rules and automation, integrations, device control, exports, backup and recovery, each with indicators and drill-down links.
+- Trace explorer timeline (architecture 26.3) and a trace link on Data Explorer rows; trace retention per class (architecture 26.9) applied daily by the rules service with `TRACE_RETENTION_*`.
+- Troubleshooting guide.
+
+### Fixed
+
+- `scripts/verify-server.sh` checks the integration worker's heartbeat as well.
+
 ## v0.6.0, 2026-09-04
 
 Production LoRaWAN networks and the dev server (phase 7), integrations, Traccar, AddaxAI Connect and gateways (phase 8), and the MCP server for AI clients (phase 9), built from documentation and the local stack; live verification pending.

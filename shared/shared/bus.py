@@ -15,6 +15,7 @@ consumer that sees a version it does not know dead-letters the message.
 
 import asyncio
 import json
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -27,6 +28,7 @@ from redis.exceptions import ResponseError
 from shared.config import get_settings
 from shared.enums import ErrorCode
 from shared.logger import get_logger, trace_id_var
+from shared.telemetry import bus_handler_duration, bus_messages, tracer
 from shared.timeutil import utc_now
 from shared.trace import ApplicationError
 
@@ -259,6 +261,31 @@ class RedisStreamsBus:
         return handled
 
     async def _handle(self, topic: str, group: str, message: Message, handler: Handler) -> None:
+        """One message: a span and two metrics around the handler (architecture 26.8), the
+        retry and dead-letter rules of the module docstring inside."""
+        started = time.perf_counter()
+        outcome = "ok"
+        with tracer.start_as_current_span(
+            f"bus {topic}",
+            attributes={
+                "messaging.system": "redis",
+                "messaging.destination.name": topic,
+                "messaging.consumer.group.name": group,
+                "protect.delivery_count": message.delivery_count,
+                "protect.trace_id": message.trace_id or "",
+            },
+        ):
+            try:
+                outcome = await self._handle_message(topic, group, message, handler)
+            finally:
+                labels = {"topic": topic, "worker": group}
+                bus_messages.add(1, {**labels, "outcome": outcome})
+                bus_handler_duration.record(time.perf_counter() - started, labels)
+
+    async def _handle_message(
+        self, topic: str, group: str, message: Message, handler: Handler
+    ) -> str:
+        """Returns the outcome: ok, retry, dead_letter or crashed."""
         assert message.id is not None
         token = trace_id_var.set(message.trace_id)
         try:
@@ -270,7 +297,7 @@ class RedisStreamsBus:
                     ErrorCode.SCHEMA_VERSION_UNSUPPORTED,
                     f"schema_version {message.schema_version} is newer than {SCHEMA_VERSION}",
                 )
-                return
+                return "dead_letter"
             try:
                 await handler(message)
             except ApplicationError as error:
@@ -282,9 +309,9 @@ class RedisStreamsBus:
                         attempt=message.delivery_count,
                         error=str(error),
                     )
-                    return
+                    return "retry"
                 await self._dead_letter(topic, group, message, error.code, str(error))
-                return
+                return "dead_letter"
             except Exception as exc:
                 if message.delivery_count < self.settings.bus_max_attempts:
                     log.error(
@@ -294,12 +321,13 @@ class RedisStreamsBus:
                         attempt=message.delivery_count,
                         exc_info=True,
                     )
-                    return
+                    return "crashed"
                 await self._dead_letter(
                     topic, group, message, ErrorCode.INTERNAL_ERROR, f"{type(exc).__name__}: {exc}"
                 )
-                return
+                return "dead_letter"
             await self.redis.xack(topic, group, message.id)
+            return "ok"
         finally:
             trace_id_var.reset(token)
 

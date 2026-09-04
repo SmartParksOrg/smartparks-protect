@@ -82,6 +82,26 @@ class Settings(BaseSettings):
         description="Default freshness bound of a new automation (architecture 25.8)",
     )
 
+    backup_enabled: bool = Field(
+        default=False, description="Backups are scheduled and their health is checked"
+    )
+    backup_repo_type: str = Field(default="s3", description="pgBackRest repository type")
+    backup_s3_endpoint: str | None = None
+    backup_s3_secure: bool = True
+    backup_s3_bucket: str | None = None
+    backup_s3_region: str = "us-east-1"
+    backup_s3_key: str | None = None
+    backup_s3_key_secret: str | None = None
+    backup_object_prefix: str = "objects"
+    backup_stale_hours: int = Field(default=26, ge=1)
+    restore_test_stale_days: int = Field(default=8, ge=1)
+    wal_archive_stale_minutes: int = Field(default=120, ge=5)
+
+    trace_retention_routine_days: int = Field(default=30, ge=1)
+    trace_retention_failed_days: int = Field(default=180, ge=1)
+    trace_retention_command_days: int = Field(default=365, ge=1)
+    trace_retention_audit_days: int = Field(default=730, ge=1)
+
     bus_maxlen: int = Field(default=100_000, description="Approximate entries kept per topic")
     bus_dead_maxlen: int = Field(default=10_000, description="Entries kept per dead-letter stream")
     bus_max_attempts: int = Field(

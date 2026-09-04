@@ -249,3 +249,19 @@ class BackfillStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+
+
+class BackupKind(StrEnum):
+    """A scheduled backup or recovery job (architecture 28)."""
+
+    DATABASE_FULL = "database_full"
+    DATABASE_INCR = "database_incr"
+    OBJECT_MIRROR = "object_mirror"
+    INTEGRITY_CHECK = "integrity_check"
+    RESTORE_TEST = "restore_test"
+
+
+class BackupStatus(StrEnum):
+    OK = "ok"
+    FAILED = "failed"
+    SKIPPED = "skipped"

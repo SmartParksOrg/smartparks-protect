@@ -9,6 +9,7 @@ from shared.models.access import (
     User,
 )
 from shared.models.analytics import ExportJob, SavedView
+from shared.models.backup import BackupRun
 from shared.models.base import Base
 from shared.models.control import Command, CommandExecution
 from shared.models.domain import (
@@ -58,6 +59,7 @@ __all__ = [
     "ApplicationError",
     "AuditLog",
     "Automation",
+    "BackupRun",
     "Base",
     "Command",
     "CommandExecution",

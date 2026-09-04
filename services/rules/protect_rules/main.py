@@ -10,6 +10,7 @@ from protect_rules.engine import (
     handle_position,
     handle_state,
 )
+from protect_rules.retention import apply_trace_retention
 from protect_rules.system_checks import run_system_checks
 from shared.bus import Message, Topic
 from shared.config import get_settings
@@ -21,6 +22,7 @@ from shared.worker import Worker
 log = get_logger("rules")
 
 TICK_SECONDS = 60
+RETENTION_SECONDS = 86_400
 
 
 def build_worker() -> Worker:
@@ -40,6 +42,7 @@ def build_worker() -> Worker:
     async def ticker() -> None:
         settings = get_settings()
         last_system_check = 0.0
+        last_retention = float("-inf")  # the first tick applies retention at once
         loop = asyncio.get_running_loop()
         while not worker.bus._stop.is_set():
             try:
@@ -53,6 +56,10 @@ def build_worker() -> Worker:
                 if now - last_system_check >= settings.system_check_interval_seconds:
                     last_system_check = now
                     await run_system_checks(worker.bus)
+                if now - last_retention >= RETENTION_SECONDS:
+                    last_retention = now
+                    async with session_scope() as session:
+                        await apply_trace_retention(session)
             except asyncio.CancelledError:
                 raise
             except Exception:

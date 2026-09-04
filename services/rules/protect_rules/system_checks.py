@@ -9,7 +9,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.backup import assess as assess_backups
 from shared.bus import RedisStreamsBus, Topic, is_stale
+from shared.config import get_settings
 from shared.database import session_scope
 from shared.enums import AlertStatus, Severity
 from shared.logger import get_logger
@@ -41,6 +43,8 @@ DEAD_LETTER_THRESHOLD = 1
 EVENT_WORKER_STALE = "SYSTEM_WORKER_STALE"
 EVENT_DEAD_LETTERS = "SYSTEM_DEAD_LETTERS"
 EVENT_STREAM_LAG = "SYSTEM_STREAM_LAG"
+EVENT_BACKUP = "SYSTEM_BACKUP"
+SYSTEM_EVENT_TYPES = (EVENT_WORKER_STALE, EVENT_DEAD_LETTERS, EVENT_STREAM_LAG, EVENT_BACKUP)
 
 
 @dataclass(slots=True)
@@ -99,6 +103,35 @@ async def collect(bus: RedisStreamsBus) -> tuple[list[Finding], set[tuple[str, s
                         {"topic": topic, "group": group, "lag": lag},
                     )
                 )
+    findings_b, known_b = await backup_findings()
+    findings.extend(findings_b)
+    known.update(known_b)
+    return findings, known
+
+
+async def backup_findings() -> tuple[list[Finding], set[tuple[str, str]]]:
+    """Backup alerts (architecture 28.12): a failed or stale database backup, WAL archive,
+    object mirror, integrity check or restore test, only on servers with backups enabled."""
+    if not get_settings().backup_enabled:
+        return [], set()
+    async with session_scope() as session:
+        health = await assess_backups(session)
+    findings: list[Finding] = []
+    known: set[tuple[str, str]] = set()
+    for item in health.items:
+        known.add((EVENT_BACKUP, item.key))
+        if item.status not in ("failed", "stale"):
+            continue
+        critical = item.status == "failed" and item.key in ("database", "wal")
+        findings.append(
+            Finding(
+                EVENT_BACKUP,
+                item.key,
+                Severity.CRITICAL if critical else Severity.WARNING,
+                f"{item.label}: {item.detail}",
+                {"item": item.key, "status": item.status, "detail": item.detail},
+            )
+        )
     return findings, known
 
 
@@ -109,7 +142,7 @@ async def _open_alerts(session: AsyncSession) -> dict[tuple[str, str], Alert]:
         .where(
             Event.project_id.is_(None),
             Alert.status != AlertStatus.RESOLVED,
-            Event.event_type.in_((EVENT_WORKER_STALE, EVENT_DEAD_LETTERS, EVENT_STREAM_LAG)),
+            Event.event_type.in_(SYSTEM_EVENT_TYPES),
         )
     )
     result: dict[tuple[str, str], Alert] = {}

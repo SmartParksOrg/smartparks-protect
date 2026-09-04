@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.enums import ErrorCode, ErrorSeverity, TraceClass, TraceStatus
 from shared.models import ApplicationError as ApplicationErrorRow
 from shared.models import ProcessingStep, ProcessingTrace
+from shared.telemetry import annotate_span
 from shared.timeutil import utc_now
 
 
@@ -100,6 +101,12 @@ class Tracer:
         self.trace.started_at = utc_now()
         self.session.add(self.trace)
         await self.session.flush()
+        annotate_span(
+            **{
+                "protect.trace_id": self.trace.id,
+                "protect.root_object": f"{self.trace.root_object_type}:{self.trace.root_object_id}",
+            }
+        )
         return self.trace
 
     @classmethod

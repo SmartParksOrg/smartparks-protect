@@ -66,6 +66,8 @@ export type DeviceConnectivity = Schemas["DeviceConnectivity"];
 export type ConsentInfo = Schemas["ConsentInfo"];
 export type ConsentDecision = Schemas["ConsentDecision"];
 export type Connection = Schemas["ConnectionRead"];
+export type BackupStatus = Schemas["BackupStatusRead"];
+export type BackupRun = Schemas["BackupRunRead"];
 
 export interface Page<T> {
   items: T[];

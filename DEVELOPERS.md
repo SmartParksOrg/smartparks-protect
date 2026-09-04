@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: v0.4.0 released; phases 7 and 8 (production LoRaWAN adapters, deployment automation, integrations, Traccar, AddaxAI Connect, gateways) and phase 9 (the MCP server for AI clients) are built and wait for live verification. Phases 0 to 6 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters, drivers, the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, the React frontend, the Data Explorer and exports, rules, events, alerts, automations, notifications, and device control. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
+Status: v0.6.0 released (phases 7, 8 and 9: production LoRaWAN adapters, deployment automation, integrations, Traccar, AddaxAI Connect, gateways, the MCP server for AI clients), live verification pending; phase 10 (backups and recovery, observability, System Health per area, trace retention) is built and exercised locally. Phases 0 to 6 are done: workspace, compose stack, CI, docs, schema and migrations, authentication and RBAC, trace contract, admin API, the Redis Streams event bus, adapters, drivers, the ingest and decoder services, Needs Attention, live map data, WebSocket updates, LoRaWAN traffic, trace search, system health, the React frontend, the Data Explorer and exports, rules, events, alerts, automations, notifications, and device control. Sections marked "planned" describe agreed design that is not implemented; they are rewritten as the code lands.
 
 ## Project overview
 
@@ -63,8 +63,10 @@ smartparks-protect/
 ├── docs/                    # MkDocs site, docs/adr/ holds the ADRs
 ├── docker/python.Dockerfile # one image for every Python service; compose sets the command per service
 ├── docker/chirpstack/       # ChirpStack, gateway bridge and Mosquitto config for the compose profile
+├── docker/postgres/         # pgBackRest config and the protect-pgbackrest wrapper
+├── docker/backup/           # object mirror script, compose overrides of the restore-test stack
 ├── examples/                # adapter, driver and payload skeletons to copy from
-├── scripts/dev.sh           # daily commands
+├── scripts/dev.sh           # daily commands; backup.sh, restore.sh, restore-verify.sh, verify-server.sh for servers
 ├── .githooks/commit-msg     # strips assistant trailers (D28), installed with scripts/dev.sh hooks
 ├── .github/workflows/ci.yml
 ├── docker-compose.yml
@@ -239,6 +241,16 @@ Locally: `docker compose up -d` starts `protect-mcp`; the MCP inspector connects
 Platforms whose data arrives decoded (Traccar positions, AddaxAI Connect detections) deliver the generic JSON shape (`time`, `lat`, `lon`, `speed` in m/s, `measurements`, `state`, `events` with optional `lat`, `lon`, `description`) with the original record under `raw`, and their devices use the Generic JSON driver, whose `decodable_event_types` include `position`, `event`, `state` and `detection`. That keeps adapters ignorant of devices and drivers ignorant of networks. The driver also declares `PLATFORM_COMMAND` (`type` plus `attributes` encoded as JSON), which a command connector such as Traccar's maps to the platform's command API.
 
 Polling connectors keep their position in `data_source_cursors` through `DataSourceContext.cursors` (`DatabaseCursorStore` in production, `MemoryCursorStore` in tests). `POST /data-sources/{id}/cursor` writes `{"since": ...}`, which the connector honours at its next poll and then replaces with its own state. The AddaxAI Connect connector pages `GET /api/images` newest first from `captured_after`, rescans an overlap window daily, and logs in again on 401 (the JWT lives an hour).
+
+## Backups and recovery
+
+Architecture 28, decisions D72 to D75, `docs/operations/backup-and-recovery.md` and `restore-guide.md`. pgBackRest runs inside the database container (the TimescaleDB image ships it): `docker/postgres/pgbackrest.conf` holds the stanza and the container paths, everything per deployment arrives as `PGBACKREST_*` environment variables from compose (`BACKUP_*` in `.env`). `docker/postgres/pgbackrest-wrapper.sh` is mounted as `protect-pgbackrest` and is the only way pgBackRest is called: it drops an archive-push while `BACKUP_ENABLED` is false, removes options compose had to leave empty and S3 options for a non-S3 repository (pgBackRest refuses both), creates the log and spool directories in the `pgbackrest-state` volume, and is the `cmd` pgBackRest writes into a restored cluster's `restore_command`. PostgreSQL always runs with `archive_mode=on` and `archive_timeout=900`; the wrapper decides whether a segment goes anywhere.
+
+`scripts/backup.sh database full|incr`, `objects` (the `object-mirror` compose service in the backup profile: `mc mirror` of every bucket to the backup bucket, never deleting on the remote, `MIRROR_DIRECTION=restore` for the way back) and `check` record every run through `python -m protect_api.backup record` (`backup_runs`, migration 0010; a pgBackRest info document on stdin is summarised) or `integrity` (the newest 500 referenced objects per store against the backup bucket with the MinIO client). `scripts/restore-verify.sh` restores the newest backup into a second compose project (`docker/backup/verify.yml`: own network, container names and volumes, no ports, archiving off, a local repository read from the production state volume), replays WAL, migrates, starts the API, checks health, row counts and object references, records a `restore_test` run and removes the project. `scripts/restore.sh` is the clean-server recovery. `shared/backup.py` assesses the state (runs plus `pg_stat_archiver`) for the Backup and recovery page (`routers/backups.py`) and for the `SYSTEM_BACKUP` findings of the rules service's system checks. Ansible installs the schedule as cron jobs when `backup_enabled` is set.
+
+## Observability
+
+Architecture 26.8, `docs/operations/observability.md`. `shared/telemetry.py` installs the OpenTelemetry SDK when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`configure_telemetry(service)` in `Worker.__init__`, the API and the MCP app): OTLP/HTTP exporters, SQLAlchemy, httpx and redis instrumentation, FastAPI in the API. `RedisStreamsBus._handle` wraps every message in a span with `protect.trace_id` and records `protect.bus.messages` and `protect.bus.handler.duration`; `Tracer.start` puts the processing trace id on the current span. The compose profile `observability` runs `grafana/otel-lgtm`. `protect_api/health_areas.py` computes the per-area System Health (architecture 26.2) that `GET /system/health` returns as `areas`; `protect_rules/retention.py` applies the per-class trace retention daily from the rules ticker.
 
 ## Deployment
 

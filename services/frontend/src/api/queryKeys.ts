@@ -35,6 +35,8 @@ export const queryKeys = {
   deadLetters: (topic: string) => ["attention", "dead-letters", topic] as const,
   failedSourceEvents: (status: string) => ["attention", "source-events", status] as const,
   systemHealth: ["system", "health"] as const,
+  backupStatus: ["admin", "backups", "status"] as const,
+  backupRuns: ["admin", "backups", "runs"] as const,
   analyticsSeries: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "analytics", "series", params] as const,
   analyticsRows: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "analytics", "rows", params] as const,
   analyticsMetrics: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "analytics", "metrics", params] as const,

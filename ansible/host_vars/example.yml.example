@@ -27,3 +27,18 @@ chirpstack_api_secret: "CHANGE_ME"   # only with the chirpstack profile
 # mail_password: ""
 # mail_from: "protect@example.org"
 # telegram_bot_token: ""
+
+# Backups (docs/operations/backup-and-recovery.md). A bucket at another provider than the
+# server, credentials with access to that bucket only, and a cipher passphrase that encrypts
+# every backup. Keep this file (vault-encrypted) and the passphrase in your password manager:
+# they are what a clean-server recovery needs besides the bucket.
+# backup_enabled: true
+# backup_s3_endpoint: "s3.eu-central-003.backblazeb2.com"
+# backup_s3_region: "eu-central-003"
+# backup_s3_bucket: "smartparks-protect-backups"
+# backup_s3_key: ""
+# backup_s3_key_secret: ""
+# backup_cipher_pass: ""             # openssl rand -base64 48
+# backup_retention_full: 4
+# backup_object_prefix: "{{ inventory_hostname }}"
+# otel_exporter_otlp_endpoint: ""    # http://lgtm:4318 with compose_profiles: "observability"

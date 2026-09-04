@@ -21,6 +21,7 @@ const MembersPage = lazy(() => import("@/pages/project/MembersPage").then((m) =>
 const FeaturesPage = lazy(() => import("@/pages/project/FeaturesPage").then((m) => ({ default: m.FeaturesPage })));
 const ProjectSettingsPage = lazy(() => import("@/pages/project/ProjectSettingsPage").then((m) => ({ default: m.ProjectSettingsPage })));
 const AttentionPage = lazy(() => import("@/pages/admin/AttentionPage").then((m) => ({ default: m.AttentionPage })));
+const BackupsPage = lazy(() => import("@/pages/admin/BackupsPage").then((m) => ({ default: m.BackupsPage })));
 const HealthPage = lazy(() => import("@/pages/admin/HealthPage").then((m) => ({ default: m.HealthPage })));
 const AdminProjectsPage = lazy(() => import("@/pages/admin/AdminProjectsPage").then((m) => ({ default: m.AdminProjectsPage })));
 const UsersPage = lazy(() => import("@/pages/admin/UsersPage").then((m) => ({ default: m.UsersPage })));
@@ -88,6 +89,7 @@ export default function App() {
               <Route index element={<Navigate to="attention" replace />} />
               <Route path="attention" element={<AttentionPage />} />
               <Route path="health" element={<HealthPage />} />
+              <Route path="backups" element={<BackupsPage />} />
               <Route path="alerts" element={<AdminAlertsPage />} />
               <Route path="automations" element={<AdminAutomationsPage />} />
               <Route path="notifications" element={<AdminNotificationsPage />} />

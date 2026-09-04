@@ -11,14 +11,48 @@ services:
     container_name: protect-postgres
     image: timescale/timescaledb-ha:pg17.10-ts2.29.2
     restart: unless-stopped
+    # WAL archiving is always on; the wrapper drops segments until BACKUP_ENABLED is true, then
+    # pushes them to the pgBackRest repository (architecture 28.4). archive_timeout forces a
+    # segment every 15 minutes on a quiet server so the recovery point stays under an hour.
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=/usr/local/bin/protect-pgbackrest --stanza=protect archive-push %p
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_timeout=900
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-false}
+      # pgBackRest reads its options from the environment (PGBACKREST_<OPTION>); the stanza and
+      # container paths are in docker/postgres/pgbackrest.conf.
+      PGBACKREST_STANZA: protect
+      PGBACKREST_PG1_USER: ${POSTGRES_USER}
+      PGBACKREST_PG1_DATABASE: ${POSTGRES_DB}
+      PGBACKREST_REPO1_TYPE: ${BACKUP_REPO_TYPE:-s3}
+      PGBACKREST_REPO1_PATH: ${BACKUP_REPO_PATH:-/smartparks-protect/pgbackrest}
+      PGBACKREST_REPO1_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-backup.invalid}
+      PGBACKREST_REPO1_S3_BUCKET: ${BACKUP_S3_BUCKET:-unset}
+      PGBACKREST_REPO1_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      PGBACKREST_REPO1_S3_KEY: ${BACKUP_S3_KEY:-unset}
+      PGBACKREST_REPO1_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:-unset}
+      PGBACKREST_REPO1_S3_URI_STYLE: ${BACKUP_S3_URI_STYLE:-path}
+      PGBACKREST_REPO1_CIPHER_TYPE: ${BACKUP_CIPHER_PASS:+aes-256-cbc}
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_CIPHER_PASS:-}
+      PGBACKREST_REPO1_RETENTION_FULL: ${BACKUP_RETENTION_FULL:-4}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/home/postgres/pgdata/data
+      - pgbackrest-state:/home/postgres/pgdata/backup
+      - ./docker/postgres/pgbackrest.conf:/home/postgres/pgdata/backup/pgbackrest.conf:ro
+      - ./docker/postgres/pgbackrest-wrapper.sh:/usr/local/bin/protect-pgbackrest:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -122,6 +156,16 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       RULES_RELOAD_SECONDS: ${RULES_RELOAD_SECONDS:-10}
       SYSTEM_CHECK_INTERVAL_SECONDS: ${SYSTEM_CHECK_INTERVAL_SECONDS:-300}
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-false}
+      BACKUP_REPO_TYPE: ${BACKUP_REPO_TYPE:-s3}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_SECURE: ${BACKUP_S3_SECURE:-true}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      BACKUP_S3_KEY: ${BACKUP_S3_KEY:-}
+      BACKUP_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:-}
+      BACKUP_OBJECT_PREFIX: ${BACKUP_OBJECT_PREFIX:-objects}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 
   api:
     container_name: protect-api
@@ -245,6 +289,43 @@ services:
       timeout: 5s
       retries: 5
 
+  # Backup profile: mirrors the MinIO buckets to the remote backup bucket (architecture 28.5).
+  # One-shot, started by scripts/backup.sh: docker compose --profile backup run --rm object-mirror
+  object-mirror:
+    container_name: protect-object-mirror
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    profiles: [backup]
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_SECURE: ${BACKUP_S3_SECURE:-true}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_KEY: ${BACKUP_S3_KEY:-}
+      BACKUP_S3_KEY_SECRET: ${BACKUP_S3_KEY_SECRET:-}
+      BACKUP_OBJECT_PREFIX: ${BACKUP_OBJECT_PREFIX:-objects}
+      MIRROR_BUCKETS: ${MINIO_BUCKET_UPLOADS:-uploads} ${MINIO_BUCKET_EXPORTS:-exports} ${MINIO_BUCKET_LOG_FILES:-device-log-files}
+    volumes:
+      - ./docker/backup/mirror.sh:/mirror.sh:ro
+    entrypoint: ["/bin/sh", "/mirror.sh"]
+
+  # Observability profile: Grafana with an OpenTelemetry collector, Prometheus, Tempo and Loki in
+  # one container (architecture 26.8). Set OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318 in .env.
+  lgtm:
+    container_name: protect-lgtm
+    image: grafana/otel-lgtm:0.32.1
+    profiles: [observability]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LGTM_GRAFANA_PORT:-3001}:3000"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - lgtm-data:/data
+
   frontend:
     container_name: protect-frontend
     build:
@@ -354,6 +435,8 @@ networks:
 
 volumes:
   postgres-data:
+  pgbackrest-state:
+  lgtm-data:
   redis-data:
   minio-data:
   chirpstack-postgres-data:

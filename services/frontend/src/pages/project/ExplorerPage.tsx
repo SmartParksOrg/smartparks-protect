@@ -15,7 +15,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
-import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
+import { SourceEventDialog, TraceDialog } from "@/components/devices/ProvenancePanel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -218,6 +218,7 @@ function formatNumber(value: number | null | undefined): string {
 /** The normalized rows behind one bucket, each linking to its source event. */
 function DrillDownDialog({ projectId, row, bucketSeconds, timezone, onClose }: { projectId: string; row: LongRow | null; bucketSeconds: number; timezone: string; onClose: () => void }) {
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(null);
+  const [trace, setTrace] = useState<string | null>(null);
   const from = row?.time;
   const to = row ? new Date(new Date(row.time).getTime() + Math.max(bucketSeconds, 1) * 1000).toISOString() : undefined;
   const rows = useQuery({
@@ -230,6 +231,7 @@ function DrillDownDialog({ projectId, row, bucketSeconds, timezone, onClose }: {
     { header: "Value", accessorKey: "value", cell: ({ getValue }) => { const v = getValue<unknown>(); return typeof v === "number" ? formatNumber(v) : JSON.stringify(v); } },
     { header: "Device", accessorKey: "device_id", cell: ({ getValue }) => getValue<string>().slice(0, 8) },
     { header: "Source event", accessorKey: "source_event_id", cell: ({ row: r }) => (r.original.source_event_id ? <Button variant="link" size="sm" className="h-auto p-0" onClick={(e) => { e.stopPropagation(); setEvent({ id: r.original.source_event_id!, ingestedAt: r.original.source_event_ingested_at! }); }}>open</Button> : "") },
+    { header: "Trace", accessorKey: "trace_id", cell: ({ row: r }) => (r.original.trace_id ? <Button variant="link" size="sm" className="h-auto p-0" onClick={(e) => { e.stopPropagation(); setTrace(r.original.trace_id!); }}>view</Button> : "") },
   ];
   return (
     <>
@@ -243,6 +245,7 @@ function DrillDownDialog({ projectId, row, bucketSeconds, timezone, onClose }: {
         </DialogContent>
       </Dialog>
       <SourceEventDialog id={event?.id ?? null} ingestedAt={event?.ingestedAt ?? null} onClose={() => setEvent(null)} />
+      <TraceDialog traceId={trace} onClose={() => setTrace(null)} />
     </>
   );
 }

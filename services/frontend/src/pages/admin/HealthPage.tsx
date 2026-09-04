@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -14,7 +15,7 @@ export function HealthPage() {
   const h = health.data;
   return (
     <>
-      <PageHeader title="System health" description="Pipeline state: workers, throughput, failures, data sources" actions={h && <StatusBadge value={h.status} />} />
+      <PageHeader title="System health" description="Pipeline state per area, workers, throughput, failures, data sources" actions={h && <StatusBadge value={h.status} />} />
       <Page>
         {health.isError && <Callout kind="error">{health.error.message}</Callout>}
         {h && (
@@ -24,6 +25,28 @@ export function HealthPage() {
               <Card><CardContent className="pt-4"><div className="text-xs text-muted-foreground">Failed, last hour</div><div className="text-2xl font-semibold">{h.failed_last_hour}</div></CardContent></Card>
               <Card><CardContent className="pt-4"><div className="text-xs text-muted-foreground">Unassigned, last hour</div><div className="text-2xl font-semibold">{h.unassigned_last_hour}</div></CardContent></Card>
               <Card><CardContent className="pt-4"><div className="text-xs text-muted-foreground">Unknown identities</div><div className="text-2xl font-semibold">{h.unknown_identities}</div></CardContent></Card>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {(h.areas ?? []).map((area) => (
+                <Card key={area.key} className={area.status === "critical" ? "border-destructive/60" : area.status === "warning" ? "border-brand-sand" : undefined}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-base">{area.label}</CardTitle>
+                    <StatusBadge value={area.status} />
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="space-y-1 text-sm">
+                      {area.indicators.map((i) => (
+                        <div key={i.label} className="flex items-baseline justify-between gap-3">
+                          <dt className={i.label.startsWith("  ") ? "pl-3 text-xs text-muted-foreground" : "text-muted-foreground"}>{i.label.trim()}</dt>
+                          <dd className={i.status === "critical" ? "text-right font-medium text-destructive" : i.status === "warning" ? "text-right font-medium" : "text-right"}>
+                            {i.link ? <Link className="underline" to={i.link}>{i.value}</Link> : i.value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
             <Card>
               <CardHeader><CardTitle>Workers</CardTitle></CardHeader>

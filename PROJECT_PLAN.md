@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 9, MCP read-only proof of concept (built and tested locally; the Claude and ChatGPT verification waits for the dev server) |
-| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9, built from documentation and the local stack (D67); v1.0.0 waits for the live demonstration |
+| Active phase | Phase 10, observability, System Health, backup and disaster recovery (built and exercised locally; the clean-server recovery on a VM is the open item) |
+| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phase 10 unreleased |
 | Last session | 2026-09-04 |
-| Next item | The dev server (VM and domain) closes the phase 9 exit criterion and the phase 7 and 8 live items in one batch; phase 10 (observability, backup, disaster recovery) is the next buildable phase without accounts |
-| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, no dev VM, no domain (also needed for Claude and ChatGPT to reach the MCP server); deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live |
+| Next item | The dev server: run the Ansible playbook on a throwaway VM, configure an S3 backup bucket, time the clean-server recovery (phase 10), then the phase 9 exit criterion and the phase 7 and 8 live items; phase 11 (WebBLE, raw log files, Cloudloop) is the next buildable phase without accounts |
+| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, no dev VM, no domain, no S3 backup bucket; deep link paths for Netmore, akenza, Traccar and AddaxAI Connect are guesses until seen live |
 
 ## What we are building
 
@@ -112,6 +112,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D69 | MCP client registration | Client id metadata documents (fetched from the client id URL, self-referential, redirect URIs on the client's host or loopback) and dynamic registration (HTTPS or loopback redirect URIs); loopback URIs match with the port ignored | Claude and ChatGPT prefer metadata documents and fall back to dynamic registration; Claude Code and the inspector use loopback ports. Recorded by Claude on 2026-09-04. |
 | D70 | MCP access tokens | JWTs signed with `JWT_SECRET`, audience the MCP URL, subject the user, `client_id` and `scope` claims, one hour; refresh tokens hashed and rotated, thirty days; the MCP service verifies locally and calls the API with the same bearer, which the API admits read-only within the scopes and audits per request | Stateless and no introspection round trip; the API is the issuer, so admitting its own audience under a stricter policy is deliberate, not token passthrough. Decided by Tim on 2026-09-04. |
 | D71 | MCP tool set of the proof of concept | The eight tools of the plan plus `list_metrics` and `search_traces` (needed by the prompts), ChatGPT's `search` and `fetch`, `smartparks://` resources for projects, entities, events, devices and traces, two prompts; entities and events carry the project in their URI | ChatGPT deep research requires `search` and `fetch`; the API is project scoped. Decided by Tim on 2026-09-04. |
+| D72 | Database backups | pgBackRest inside the database container (shipped by the TimescaleDB image): continuous WAL archiving, weekly full and hourly incremental backups to an encrypted S3-compatible repository at another provider, retention in full generations; a wrapper handles the empty options compose cannot omit and the disabled state | Point-in-time recovery from the first production server, nothing to install. ADR 0016. Decided by Tim on 2026-09-04. |
+| D73 | Object backups | `mc mirror` of every MinIO bucket to the backup bucket, incremental, never deleting on the remote, plus a daily check of referenced objects | Works with any S3-compatible provider; MinIO replication would need MinIO on both ends. Decided by Tim on 2026-09-04. |
+| D74 | Backup jobs and status | Host cron from Ansible runs `scripts/backup.sh` and `scripts/restore-verify.sh`; every run is a `backup_runs` row; the Backup and recovery page and `SYSTEM_BACKUP` alerts derive from the rows and `pg_stat_archiver`; the restore test restores into a second compose project on the same host | No container with the Docker socket; a job that never ran is as visible as one that failed. Decided by Tim on 2026-09-04. |
+| D75 | Technical telemetry | OpenTelemetry in every service, exporting over OTLP/HTTP only when an endpoint is configured; the `observability` compose profile runs Grafana with a collector; spans carry the processing trace id | One standard, off by default, joins with the application traces. Decided by Tim on 2026-09-04. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -544,17 +548,17 @@ Release:
 
 **Deliverables.**
 
-- [ ] OpenTelemetry evaluation and, if accepted, instrumentation of API and workers with correlation to ProcessingTrace ids; metrics for throughput, stream lag, latency and error rates; a documented way to ship them to an external stack (optional Prometheus and Grafana compose profile).
-- [ ] System Health full: every area from 26.2 with drill-down into affected traces; Trace Explorer complete with visual timeline; object-level "View processing trace" on positions, measurements, events, alerts, commands, deliveries and log files.
-- [ ] Trace retention policies per trace class (26.9) as scheduled jobs.
-- [ ] PostgreSQL backups with pgBackRest or WAL-G: base backups plus continuous WAL archiving to S3-compatible off-server storage, encrypted, PITR documented and tested.
-- [ ] MinIO replication or versioned backup to remote S3-compatible storage; database-to-object integrity check.
-- [ ] Secrets and configuration recovery procedure, separate from the repository.
-- [ ] Automated restore verification job in an isolated compose project: restore, migrate, start, health check, record result.
-- [ ] Backup and Recovery health page for server admins (28.11 example) integrated with System Health; backup failures raise system alerts through the notification framework.
-- [ ] Full clean-server recovery executed once on a throwaway VM and timed against the 4 hour RTO; RPO under 1 hour verified.
-- [ ] Security review of the deployment: credentials storage, backup encryption, least privilege, audit of restore access.
-- [ ] Docs: `docs/operations/backup-and-recovery.md`, `docs/operations/restore-guide.md`, `docs/operations/observability.md`, `docs/troubleshooting/`.
+- [x] OpenTelemetry evaluation and, if accepted, instrumentation of API and workers with correlation to ProcessingTrace ids; metrics for throughput, stream lag, latency and error rates; a documented way to ship them to an external stack (optional Prometheus and Grafana compose profile). (2026-09-04, D75: `shared/telemetry.py`, spans and metrics per bus message, the `observability` profile with `grafana/otel-lgtm`; stream lag and dead letters stay on System Health rather than as OTLP metrics)
+- [x] System Health full: every area from 26.2 with drill-down into affected traces; Trace Explorer complete with visual timeline; object-level "View processing trace" on positions, measurements, events, alerts, commands, deliveries and log files. (2026-09-04, `protect_api/health_areas.py`, the timeline in the trace dialog, a trace link on Data Explorer rows; log files arrive in phase 11)
+- [x] Trace retention policies per trace class (26.9) as scheduled jobs. (2026-09-04, `protect_rules/retention.py`, daily, `TRACE_RETENTION_*`)
+- [x] PostgreSQL backups with pgBackRest or WAL-G: base backups plus continuous WAL archiving to S3-compatible off-server storage, encrypted, PITR documented and tested. (2026-09-04, D72; exercised locally against a posix repository: full backup of the 6.6 GB benchmark database in 79 s, incremental, WAL archiving healthy; PITR documented in the restore guide; the S3 provider and a point-in-time restore on a server wait for the VM)
+- [x] MinIO replication or versioned backup to remote S3-compatible storage; database-to-object integrity check. (2026-09-04, D73, exercised against the local MinIO as the target)
+- [x] Secrets and configuration recovery procedure, separate from the repository. (2026-09-04, the vaulted host vars, the cipher passphrase and the bucket credentials in a password manager; in the backup guide)
+- [x] Automated restore verification job in an isolated compose project: restore, migrate, start, health check, record result. (2026-09-04, `scripts/restore-verify.sh`, passed locally in 54 s with 22.4 million positions and 89.7 million measurements restored)
+- [x] Backup and Recovery health page for server admins (28.11 example) integrated with System Health; backup failures raise system alerts through the notification framework. (2026-09-04)
+- [ ] Full clean-server recovery executed once on a throwaway VM and timed against the 4 hour RTO; RPO under 1 hour verified. (needs the VM; `scripts/restore.sh` and the restore guide are written)
+- [x] Security review of the deployment: credentials storage, backup encryption, least privilege, audit of restore access. (2026-09-04, recorded in the backup guide's security section; the restore is an audited manual action; MCP scopes and rate limits were reviewed in phase 9)
+- [x] Docs: `docs/operations/backup-and-recovery.md`, `docs/operations/restore-guide.md`, `docs/operations/observability.md`, `docs/troubleshooting/`. (2026-09-04)
 
 **Exit criteria.** A recorded clean-server rebuild from off-server backups, restore verification running on a schedule, backup health visible in the UI.
 
@@ -676,6 +680,7 @@ Listed by the phase where they are first needed.
 - [ ] Phase 3: recorded OpenCollar uplinks (ChirpStack, KPN or LORIOT exports) and links to the public Smart Parks decoder and protocol repositories.
 - [ ] Phase 3: confirmation which EarthRanger icons may be reused and under which licence.
 - [ ] Phase 7: KPN/ThingPark, LORIOT, Netmore (portal.blink.services, LoRaWAN Portal) and akenza test accounts, a dev VM (Ubuntu 24.04) and a domain. Device deep link paths for Netmore and akenza are guesses until seen live.
+- [ ] Phase 10: an S3-compatible bucket for backups (Backblaze B2, Wasabi, Hetzner, Spaces) with its credentials, and a throwaway VM for the timed clean-server recovery.
 - [ ] Phase 9: the dev VM and domain (the phase 7 input) so Claude and ChatGPT can reach the MCP server; a Claude and a ChatGPT account able to add a custom connector.
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work.
@@ -830,3 +835,11 @@ Listed by the phase where they are first needed.
 ### 2026-09-04, release v0.6.0 (Claude)
 
 - CI green on the phase 9 commit (6186e2f); the phase 8 commit had failed CI on `ruff format`, fixed by the same commit. Tagged v0.6.0 per D67 on Tim's "continue". Phase 10 starts next.
+
+### 2026-09-04, phase 10 (Claude)
+
+- Decisions D72 to D75 asked and accepted as recommended: pgBackRest in the database container, `mc mirror` for objects, host cron with a `backup_runs` table, OpenTelemetry with an optional Grafana profile. Facts checked first: the TimescaleDB image ships pgBackRest 2.59.1, WAL archiving was off, AddaxAI Connect uses a host cron with status in Redis.
+- Built: `docker/postgres/pgbackrest.conf` and the `protect-pgbackrest` wrapper, `archive_mode=on` with `archive_timeout=900` in compose, the `object-mirror` and `lgtm` profiles, `BACKUP_*`, `TRACE_RETENTION_*` and `OTEL_*` settings, `backup_runs` (migration 0010), `shared/backup.py`, `protect_api/backup.py` (record, integrity), the backups router and page, `SYSTEM_BACKUP` findings, `protect_rules/retention.py`, `shared/telemetry.py` with the bus, tracer, worker, API and MCP hooks, `protect_api/health_areas.py` and the System Health areas on the page, the trace timeline and the explorer trace link, `scripts/backup.sh`, `scripts/restore.sh`, `scripts/restore-verify.sh` with `docker/backup/verify.yml`, the Ansible schedule and variables, ADR 0016 and four guides.
+- Exercised on the local stack with a posix repository and the local MinIO as the mirror target: stanza, check (WAL push through the async spool), full backup (79 s, 2.9 GB), incremental, object mirror, integrity check, the status page, and the restore test end to end (54 s: restore, WAL replay to the last transaction, promote, migrate, API healthy, 22.4 million positions, referenced objects present). Found on the way: pgBackRest refuses empty options and needs the word pgbackrest in `archive_command` (hence the wrapper as the archive command), the generated `restore_command` needs the wrapper as `cmd`, and a second compose project needs its own network and container names because compose fixes both.
+- Verification: ruff, mypy strict, 286 Python tests, eslint, tsc, vitest, vite build, mkdocs strict, both compose configurations, screenshot sweep clean on 40 routes. Not committed.
+- Open: the clean-server recovery on a VM with an S3 bucket, timed against the RTO.

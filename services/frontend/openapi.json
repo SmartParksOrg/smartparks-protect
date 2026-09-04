@@ -12297,6 +12297,103 @@
     }
    }
   },
+  "/api/v1/admin/backups/status": {
+   "get": {
+    "tags": [
+     "backups"
+    ],
+    "summary": "Backup Status",
+    "operationId": "backup_status_api_v1_admin_backups_status_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BackupStatusRead"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/admin/backups/runs": {
+   "get": {
+    "tags": [
+     "backups"
+    ],
+    "summary": "Backup Runs",
+    "description": "Newest first.",
+    "operationId": "backup_runs_api_v1_admin_backups_runs_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/BackupRunRead"
+         },
+         "title": "Response Backup Runs Api V1 Admin Backups Runs Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/version": {
    "get": {
     "tags": [
@@ -12839,6 +12936,71 @@
     ],
     "title": "AlertRead"
    },
+   "AreaHealth": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "indicators": {
+      "items": {
+       "$ref": "#/components/schemas/AreaIndicator"
+      },
+      "type": "array",
+      "title": "Indicators"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "status",
+     "indicators"
+    ],
+    "title": "AreaHealth"
+   },
+   "AreaIndicator": {
+    "properties": {
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "value": {
+      "type": "string",
+      "title": "Value"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "default": "ok"
+     },
+     "link": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Link"
+     }
+    },
+    "type": "object",
+    "required": [
+     "label",
+     "value"
+    ],
+    "title": "AreaIndicator"
+   },
    "AssignmentEnd": {
     "properties": {
      "valid_to": {
@@ -13354,6 +13516,204 @@
      "time_to"
     ],
     "title": "BackfillRequest"
+   },
+   "BackupItem": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     },
+     "at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "status",
+     "detail",
+     "at"
+    ],
+    "title": "BackupItem"
+   },
+   "BackupRunRead": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Started At"
+     },
+     "finished_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Finished At"
+     },
+     "duration_seconds": {
+      "type": "integer",
+      "title": "Duration Seconds"
+     },
+     "size_bytes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Size Bytes"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "host": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Host"
+     },
+     "details": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Details"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "status",
+     "started_at",
+     "finished_at",
+     "duration_seconds",
+     "size_bytes",
+     "label",
+     "host",
+     "details",
+     "error"
+    ],
+    "title": "BackupRunRead"
+   },
+   "BackupStatusRead": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "overall": {
+      "type": "string",
+      "title": "Overall"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/BackupItem"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "recovery_point_seconds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Recovery Point Seconds"
+     },
+     "rpo_seconds": {
+      "type": "integer",
+      "title": "Rpo Seconds"
+     },
+     "rto_seconds": {
+      "type": "integer",
+      "title": "Rto Seconds"
+     },
+     "wal": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Wal"
+     },
+     "latest": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/BackupRunRead"
+      },
+      "type": "object",
+      "title": "Latest"
+     }
+    },
+    "type": "object",
+    "required": [
+     "enabled",
+     "overall",
+     "items",
+     "recovery_point_seconds",
+     "rpo_seconds",
+     "rto_seconds",
+     "wal",
+     "latest"
+    ],
+    "title": "BackupStatusRead",
+    "description": "The Backup and recovery status of architecture 28.11."
    },
    "BearerResponse": {
     "properties": {
@@ -22121,6 +22481,13 @@
       },
       "type": "array",
       "title": "Workers"
+     },
+     "areas": {
+      "items": {
+       "$ref": "#/components/schemas/AreaHealth"
+      },
+      "type": "array",
+      "title": "Areas"
      },
      "events_per_minute": {
       "type": "number",

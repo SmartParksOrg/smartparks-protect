@@ -52,3 +52,38 @@ async def test_stale_worker_opens_then_resolves(db, bus):
     assert await _stale_alerts(db) == []
     await db.refresh(alert)
     assert alert.status == AlertStatus.RESOLVED and "automatically" in (alert.note or "")
+
+
+async def test_backup_findings_follow_the_health_assessment(db, bus, monkeypatch):
+    import shared.backup as backup_health
+    from protect_rules import system_checks
+    from shared.config import get_settings
+
+    settings = get_settings().model_copy(update={"backup_enabled": True})
+    monkeypatch.setattr(system_checks, "get_settings", lambda: settings)
+    monkeypatch.setattr(backup_health, "get_settings", lambda: settings)
+
+    async def failing(session):
+        return {
+            "archive_mode": "on",
+            "archived_count": 0,
+            "last_archived_wal": None,
+            "last_archived_time": None,
+            "failed_count": 3,
+            "last_failed_wal": "x",
+            "last_failed_time": datetime.now(UTC),
+        }
+
+    monkeypatch.setattr(backup_health, "wal_archiver", failing)
+    from sqlalchemy import delete
+
+    from shared.models import BackupRun
+
+    await db.execute(delete(BackupRun))  # runs recorded by other tests in this session
+    await db.commit()
+    findings, known = await system_checks.backup_findings()
+    assert (system_checks.EVENT_BACKUP, "wal") in known
+    by_key = {f.subject: f for f in findings}
+    assert by_key["wal"].severity == "critical"
+    assert by_key["database"].severity == "warning"  # no backup recorded yet: stale
+    assert "restore_test" in by_key
