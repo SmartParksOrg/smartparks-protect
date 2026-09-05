@@ -81,7 +81,7 @@ function CatalogPage<T extends FieldValues, R>({ title, description, path, query
   return (
     <>
       <PageHeader title={title} description={description} actions={<Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> {t("New")}</Button>} />
-      <Page><DataTable columns={allColumns} data={rows.data?.items} isLoading={rows.isPending} onRowClick={(r) => { setEditing(r); setOpen(true); }} /></Page>
+      <Page><DataTable columns={allColumns} data={rows.data?.items} searchable isLoading={rows.isPending} onRowClick={(r) => { setEditing(r); setOpen(true); }} /></Page>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editing ? `Edit ${title.toLowerCase().replace(/s$/, "")}` : `New ${title.toLowerCase().replace(/s$/, "")}`}</DialogTitle></DialogHeader>

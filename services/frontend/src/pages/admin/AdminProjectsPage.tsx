@@ -74,7 +74,7 @@ export function AdminProjectsPage() {
             </SelectContent>
           </Select>
         </div>
-        <DataTable columns={columns} data={visible} isLoading={projects.isPending} onRowClick={(p) => navigate(`/projects/${p.id}/admin/settings`)} />
+        <DataTable columns={columns} data={visible} searchable isLoading={projects.isPending} onRowClick={(p) => navigate(`/projects/${p.id}/admin/settings`)} />
         <OrganizationsCard organizations={organizations.data ?? []} />
       </Page>
       <Dialog open={open} onOpenChange={setOpen}>

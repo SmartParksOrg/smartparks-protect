@@ -82,7 +82,7 @@ export function NotificationsPage({ scope: scopeProp }: { scope?: Scope } = {}) 
         {caps.data && !caps.data.mail_configured && <Callout kind="warning">{t("Mail is not configured on this server (MAIL_SERVER and friends in the environment). Email notifications are logged, not sent.")}</Callout>}
         {caps.data && !caps.data.telegram_configured && <Callout kind="info">{t("Telegram is not configured (TELEGRAM_BOT_TOKEN). Telegram targets can be created but cannot be linked or reached.")}</Callout>}
         {targets.error && <Callout kind="error">{targets.error.message}</Callout>}
-        <DataTable columns={columns} data={targets.data?.items} isLoading={targets.isPending} emptyMessage={t("No targets yet. Add an email address or a Telegram chat, then use it in an automation.")} onRowClick={(t) => { setEditing(t); setOpen(true); }} />
+        <DataTable columns={columns} data={targets.data?.items} searchable isLoading={targets.isPending} emptyMessage={t("No targets yet. Add an email address or a Telegram chat, then use it in an automation.")} onRowClick={(t) => { setEditing(t); setOpen(true); }} />
       </Page>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

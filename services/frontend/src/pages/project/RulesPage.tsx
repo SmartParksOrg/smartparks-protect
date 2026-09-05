@@ -59,7 +59,7 @@ export function RulesPage() {
       <PageHeader title={t("Rules")} description={t("Versioned rules turn positions, measurements and silence into events and alerts")} actions={admin && <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> {t("New rule")}</Button>} />
       <Page>
         {rules.error && <Callout kind="error">{rules.error.message}</Callout>}
-        <DataTable columns={columns} data={rules.data?.items} isLoading={rules.isPending} emptyMessage={t("No rules yet. Start from a template: geofence exit, speed limit, no data, battery low.")} onRowClick={(r) => { setEditing(r); setOpen(true); }} />
+        <DataTable columns={columns} data={rules.data?.items} searchable isLoading={rules.isPending} emptyMessage={t("No rules yet. Start from a template: geofence exit, speed limit, no data, battery low.")} onRowClick={(r) => { setEditing(r); setOpen(true); }} />
       </Page>
       <RuleEditor projectId={projectId} rule={editing} open={open} onOpenChange={setOpen} />
       <ConfirmDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={`Delete rule ${removing?.name ?? ""}?`} description={t("Events created by this rule keep their reference to it, but the rule and its versions are gone.")} confirmLabel={t("Delete")} pending={remove.isPending} onConfirm={() => removing && remove.mutate(removing)} />

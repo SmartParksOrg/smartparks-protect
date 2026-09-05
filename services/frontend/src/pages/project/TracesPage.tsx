@@ -55,7 +55,7 @@ export function TracesPage() {
         </>}
       />
       <Page>
-        <DataTable columns={columns} data={traces.data} isLoading={traces.isPending} emptyMessage={t("No traces in this window.")} onRowClick={(t) => setSelected(t.id)} rowClassName={(t) => (t.status === "failed" || t.status === "dead_letter" ? "bg-destructive/5" : undefined)} />
+        <DataTable columns={columns} data={traces.data} searchable isLoading={traces.isPending} emptyMessage={t("No traces in this window.")} onRowClick={(t) => setSelected(t.id)} rowClassName={(t) => (t.status === "failed" || t.status === "dead_letter" ? "bg-destructive/5" : undefined)} />
       </Page>
       <TraceDialog traceId={selected} onClose={() => setSelected(null)} />
     </>

@@ -113,11 +113,11 @@ export function AttentionPage() {
         </div>
         <Tabs defaultValue="identities">
           <TabsList><TabsTrigger value="identities">{t("Unknown identities")}</TabsTrigger><TabsTrigger value="failed">{t("Failed source events")}</TabsTrigger><TabsTrigger value="dead">{t("Dead letters")}</TabsTrigger></TabsList>
-          <TabsContent value="identities"><DataTable columns={identityColumns} data={identities.data?.items} isLoading={identities.isPending} emptyMessage={t("Every identity is linked to a device.")} /></TabsContent>
-          <TabsContent value="failed"><DataTable columns={failedColumns} data={failed.data} isLoading={failed.isPending} emptyMessage={t("No failed source events.")} /></TabsContent>
+          <TabsContent value="identities"><DataTable columns={identityColumns} data={identities.data?.items} searchable isLoading={identities.isPending} emptyMessage={t("Every identity is linked to a device.")} /></TabsContent>
+          <TabsContent value="failed"><DataTable columns={failedColumns} data={failed.data} searchable isLoading={failed.isPending} emptyMessage={t("No failed source events.")} /></TabsContent>
           <TabsContent value="dead" className="space-y-3">
             <Select value={topic} onValueChange={setTopic}><SelectTrigger className="w-72"><SelectValue /></SelectTrigger><SelectContent>{DEAD_TOPICS.map((t) => <SelectItem key={t} value={t}>{t} {s?.dead_letters[t] ? `(${s.dead_letters[t]})` : ""}</SelectItem>)}</SelectContent></Select>
-            <DataTable columns={deadColumns} data={dead.data} isLoading={dead.isPending} emptyMessage={t("No dead letters on this topic.")} />
+            <DataTable columns={deadColumns} data={dead.data} searchable isLoading={dead.isPending} emptyMessage={t("No dead letters on this topic.")} />
           </TabsContent>
         </Tabs>
       </Page>

@@ -54,7 +54,7 @@ export function AlertsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
           <TabsList>{STATUSES.map((s) => <TabsTrigger key={s} value={s}>{s}</TabsTrigger>)}</TabsList>
         </Tabs>
         {alerts.error && <Callout kind="error">{alerts.error.message}</Callout>}
-        <DataTable columns={columns} data={alerts.data?.items} isLoading={alerts.isPending} emptyMessage={status === "open" ? "No open alerts." : `No ${status} alerts.`} onRowClick={(a) => setParams((p) => { p.set("event", a.event_id); return p; }, { replace: true })} footer={alerts.data && `${alerts.data.items.length} alerts`} />
+        <DataTable columns={columns} data={alerts.data?.items} searchable isLoading={alerts.isPending} emptyMessage={status === "open" ? "No open alerts." : `No ${status} alerts.`} onRowClick={(a) => setParams((p) => { p.set("event", a.event_id); return p; }, { replace: true })} footer={alerts.data && `${alerts.data.items.length} alerts`} />
       </Page>
       <Dialog open={acting !== null} onOpenChange={(o) => !o && setActing(null)}>
         <DialogContent>

@@ -67,7 +67,7 @@ export function DataSourceTrafficPage() {
         </>}
       />
       <Page>
-        <DataTable columns={columns} data={traffic.data} isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window. The platform's own log says whether it posted.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
+        <DataTable columns={columns} data={traffic.data} searchable isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window. The platform's own log says whether it posted.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
       </Page>
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>

@@ -41,7 +41,7 @@ export function ConnectionsPage() {
     <>
       <PageHeader title={t("Connected AI clients")} description={t("Assistants that may read your data through the MCP server. They act as you, read only, and every request is in the audit log.")} />
       <Page>
-        <DataTable columns={columns} data={connections.data} isLoading={connections.isPending} emptyMessage={t("No AI client is connected.")} />
+        <DataTable columns={columns} data={connections.data} searchable isLoading={connections.isPending} emptyMessage={t("No AI client is connected.")} />
       </Page>
       <ConfirmDialog
         open={revoking !== null}

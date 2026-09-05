@@ -127,9 +127,9 @@ export function AutomationsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
         </div>
         {(automations.error ?? deliveries.error) && <Callout kind="error">{(automations.error ?? deliveries.error)?.message}</Callout>}
         {tab === "automations" ? (
-          <DataTable columns={columns} data={automations.data?.items} isLoading={automations.isPending} emptyMessage={t("No automations yet. Create a notification target first, then bind events to it here.")} onRowClick={(a) => { setEditing(a); setOpen(true); }} />
+          <DataTable columns={columns} data={automations.data?.items} searchable isLoading={automations.isPending} emptyMessage={t("No automations yet. Create a notification target first, then bind events to it here.")} onRowClick={(a) => { setEditing(a); setOpen(true); }} />
         ) : (
-          <DataTable columns={deliveryColumns} data={deliveries.data?.items} isLoading={deliveries.isPending} emptyMessage={t("No deliveries yet.")} footer={deliveries.data && `${deliveries.data.items.length} deliveries`} />
+          <DataTable columns={deliveryColumns} data={deliveries.data?.items} searchable isLoading={deliveries.isPending} emptyMessage={t("No deliveries yet.")} footer={deliveries.data && `${deliveries.data.items.length} deliveries`} />
         )}
       </Page>
       <Dialog open={open} onOpenChange={setOpen}>

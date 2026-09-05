@@ -25,7 +25,8 @@ export function EntitiesPage() {
   const navigate = useNavigate();
   const [editing, setEditing] = useState<Entity | null>(null);
   const [open, setOpen] = useState(false);
-  const entities = useQuery({ queryKey: queryKeys.entities(projectId), queryFn: () => api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, { query: { limit: 500 } }) });
+  const [q, setQ] = useState("");
+  const entities = useQuery({ queryKey: [...queryKeys.entities(projectId), q], queryFn: () => api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, { query: { q: q || undefined, limit: 500 } }), placeholderData: (previous) => previous });
   const types = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<PageType<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
   const state = useQuery({ queryKey: queryKeys.currentState(projectId), queryFn: () => api.get<CurrentState>(`/api/v1/projects/${projectId}/map/current`) });
   const typeById = useMemo(() => new Map(types.data?.items.map((t) => [t.id, t])), [types.data]);
@@ -43,7 +44,7 @@ export function EntitiesPage() {
     <>
       <PageHeader title={t("Entities")} description={t("Animals, people, vehicles, gates and other monitored objects")} actions={canAdmin(role) && <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> {t("New entity")}</Button>} />
       <Page>
-        <DataTable columns={columns} data={entities.data?.items} isLoading={entities.isPending} emptyMessage={t("No entities yet.")} onRowClick={(e) => {
+        <DataTable columns={columns} data={entities.data?.items} searchable onSearchChange={setQ} footer={entities.data?.next_cursor ? t("Only the first 500 rows are shown. Search to find the rest.") : undefined} isLoading={entities.isPending} emptyMessage={t("No entities yet.")} onRowClick={(e) => {
             if (canAdmin(role)) {
               setEditing(e);
               setOpen(true);

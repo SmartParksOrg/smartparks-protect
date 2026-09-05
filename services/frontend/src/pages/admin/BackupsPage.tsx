@@ -86,7 +86,7 @@ export function BackupsPage() {
         <Card>
           <CardHeader><CardTitle>{t("Runs")}</CardTitle></CardHeader>
           <CardContent>
-            <DataTable columns={columns} data={runs.data} isLoading={runs.isPending} emptyMessage={t("No backup run recorded yet.")} />
+            <DataTable columns={columns} data={runs.data} searchable isLoading={runs.isPending} emptyMessage={t("No backup run recorded yet.")} />
           </CardContent>
         </Card>
       </Page>

@@ -62,9 +62,9 @@ export function UsersPage() {
             <p className="mt-2 text-xs text-muted-foreground">{t("Project members are invited by project admins under the project's Members page.")}</p>
           </CardContent>
         </Card>
-        <DataTable columns={userColumns} data={users.data?.items} isLoading={users.isPending} />
+        <DataTable columns={userColumns} data={users.data?.items} searchable isLoading={users.isPending} />
         <h2 className="text-base font-medium">{t("Invitations")}</h2>
-        <DataTable columns={invitationColumns} data={invitations.data?.items} isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
+        <DataTable columns={invitationColumns} data={invitations.data?.items} searchable isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
       </Page>
     </>
   );

@@ -69,9 +69,9 @@ export function GatewaysPage() {
         </div>
         {(gateways.error ?? connectivity.error) && <Callout kind="error">{(gateways.error ?? connectivity.error)?.message}</Callout>}
         {tab === "gateways" ? (
-          <DataTable columns={columns} data={gateways.data} isLoading={gateways.isPending} emptyMessage={t("No gateway received this project's devices in the window. Gateways appear from the receptions a network reports; the platform's gateway list can be synced under Server admin, Data sources.")} onRowClick={(g) => setSelected(g)} footer={gateways.data && `${gateways.data.length} gateways, busiest first`} />
+          <DataTable columns={columns} data={gateways.data} searchable isLoading={gateways.isPending} emptyMessage={t("No gateway received this project's devices in the window. Gateways appear from the receptions a network reports; the platform's gateway list can be synced under Server admin, Data sources.")} onRowClick={(g) => setSelected(g)} footer={gateways.data && `${gateways.data.length} gateways, busiest first`} />
         ) : (
-          <DataTable columns={deviceColumns} data={connectivity.data} isLoading={connectivity.isPending} emptyMessage={t("No receptions in the window.")} footer={connectivity.data && `${connectivity.data.length} devices, least covered first`} />
+          <DataTable columns={deviceColumns} data={connectivity.data} searchable isLoading={connectivity.isPending} emptyMessage={t("No receptions in the window.")} footer={connectivity.data && `${connectivity.data.length} devices, least covered first`} />
         )}
       </Page>
       <Dialog open={selected !== null} onOpenChange={(o) => !o && setSelected(null)}>

@@ -79,7 +79,7 @@ export function DataSourcesPage() {
   return (
     <>
       <PageHeader title={t("Data sources")} description={t("External platform accounts: network servers, brokers, webhooks")} actions={<Button onClick={() => { setEditing(null); setFormKey((k) => k + 1); setOpen(true); }}><Plus className="size-4" /> {t("New data source")}</Button>} />
-      <Page><DataTable columns={columns} data={sources.data?.items} isLoading={sources.isPending} onRowClick={(s) => { setEditing(s); setFormKey((k) => k + 1); setOpen(true); }} /></Page>
+      <Page><DataTable columns={columns} data={sources.data?.items} searchable isLoading={sources.isPending} onRowClick={(s) => { setEditing(s); setFormKey((k) => k + 1); setOpen(true); }} /></Page>
       <DataSourceForm key={`${editing?.id ?? "new"}-${formKey}`} open={open} onOpenChange={setOpen} editing={editing} adapters={ADAPTERS} projects={projects.data?.items ?? []} onSaved={(source) => { if (source.webhook_token) setToken({ token: source.webhook_token, url: source.webhook_url ?? null }); }} />
       <Dialog open={rescanning != null} onOpenChange={(o) => !o && setRescanning(null)}>
         <DialogContent>

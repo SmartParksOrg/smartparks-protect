@@ -107,7 +107,8 @@ export function AdminDevicesPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const managing = params.get("device");
-  const devices = useQuery({ queryKey: queryKeys.devices({}), queryFn: () => api.get<PageType<Device>>("/api/v1/devices", { query: { limit: 500 } }) });
+  const [q, setQ] = useState("");
+  const devices = useQuery({ queryKey: queryKeys.devices({ q }), queryFn: () => api.get<PageType<Device>>("/api/v1/devices", { query: { q: q || undefined, limit: 500 } }), placeholderData: (previous) => previous });
   const types = useQuery({ queryKey: queryKeys.deviceTypes, queryFn: () => api.get<PageType<DeviceType>>("/api/v1/device-types", { query: { limit: 500 } }) });
   const typeById = new Map(types.data?.items.map((t) => [t.id, t]));
   const [open, setOpen] = useState(false);
@@ -142,7 +143,7 @@ export function AdminDevicesPage() {
       </>} />
       <Page>
         <Callout kind="info">{t("CSV columns: device_name, external_identifier, device_type, datasource, project, effective_from (ISO 8601 with offset), entity (optional). All rows or none.")}</Callout>
-        <DataTable columns={columns} data={devices.data?.items} isLoading={devices.isPending} onRowClick={(d) => setParams({ device: d.id })} />
+        <DataTable columns={columns} data={devices.data?.items} searchable onSearchChange={setQ} footer={devices.data?.next_cursor ? t("Only the first 500 rows are shown. Search to find the rest.") : undefined} isLoading={devices.isPending} onRowClick={(d) => setParams({ device: d.id })} />
       </Page>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

@@ -64,6 +64,21 @@ def _translate(error: grpc.aio.AioRpcError, what: str) -> ApplicationError:
             component=COMPONENT,
             retryable=True,
         )
+    if "http2 header with status" in detail:
+        # A proxy in front of ChirpStack answered with a plain HTTP status instead of gRPC:
+        # the request reached nginx but not a `grpc_pass` location (missing, in another
+        # server block, or not reloaded), so ChirpStack received it over HTTP/1.1.
+        status = detail.rsplit(" ", 1)[-1]
+        return ApplicationError(
+            code=ErrorCode.CONNECTIVITY_UNAVAILABLE,
+            message=(
+                f"The proxy at api_url answered HTTP {status} instead of gRPC: the gRPC "
+                "location (grpc_pass to ChirpStack's port 8080, matching /api.) is missing "
+                "or not reloaded in that nginx"
+            ),
+            component=COMPONENT,
+            user_actionable=True,
+        )
     return ApplicationError(
         code=ErrorCode.COMMAND_REJECTED,
         message=f"ChirpStack rejected {what} ({code.name}): {detail}",

@@ -42,6 +42,18 @@ The connection fails before the consent page: the client could not discover the 
 
 `docker compose logs -f <service>` follows one service. Every line is JSON with `service`, `trace_id` and `request_id`; the request id of an API call is in the `X-Request-ID` response header, so an error a user reports can be found with `docker compose logs api | grep <request id>`. `scripts/verify-server.sh` is the read-only pass or fail check after an update or a restore.
 
+## ChirpStack's Test connection answers "HTTP 400 instead of gRPC"
+
+The call reached the nginx in front of ChirpStack, but a plain `proxy_pass` location handed
+it to ChirpStack over HTTP/1.1, which answers an empty 400 to gRPC framing. The `grpc_pass`
+location from the [ChirpStack page](../integrations/chirpstack/index.md#connecting-an-existing-chirpstack)
+is missing, sits in another server block (port 80 instead of 443), or nginx was not
+reloaded after adding it (`nginx -t && systemctl reload nginx`). A quick check from the
+Protect server: `curl -sk --http2 -X POST -H "content-type: application/grpc" https://<host>/api.TenantService/List -D -`
+answers `content-type: application/grpc` with a `grpc-status` header once the location
+works, and an empty `HTTP/2 400` while it does not; a `403` means the location works but
+its `allow` line does not name the Protect server's address.
+
 ## A platform is connected but nothing shows
 
 Server admin, Traffic (or Data sources, Traffic for one source) lists every message received in the last hours, linked to a device or not, with the raw payload and the processing status. Empty means the platform never posted: check its own integration log. Rows with an unknown identity mean the DevEUI is not linked yet: accept it from Needs attention.

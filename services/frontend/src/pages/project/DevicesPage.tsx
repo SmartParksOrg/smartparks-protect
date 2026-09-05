@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { api } from "@/api/client";
@@ -16,7 +17,8 @@ export function DevicesPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
-  const devices = useQuery({ queryKey: queryKeys.devices({ projectId }), queryFn: () => api.get<PageType<Device>>("/api/v1/devices", { query: { project_id: projectId, limit: 500 } }) });
+  const [q, setQ] = useState("");
+  const devices = useQuery({ queryKey: queryKeys.devices({ projectId, q }), queryFn: () => api.get<PageType<Device>>("/api/v1/devices", { query: { project_id: projectId, q: q || undefined, limit: 500 } }), placeholderData: (previous) => previous });
   const types = useQuery({ queryKey: queryKeys.deviceTypes, queryFn: () => api.get<PageType<DeviceType>>("/api/v1/device-types", { query: { limit: 500 } }) });
   const typeById = new Map(types.data?.items.map((t) => [t.id, t]));
   const columns: ColumnDef<Device, unknown>[] = [
@@ -31,7 +33,7 @@ export function DevicesPage() {
     <>
       <PageHeader title={t("Devices")} description={t("Hardware currently assigned to this project")} />
       <Page>
-        <DataTable columns={columns} data={devices.data?.items} isLoading={devices.isPending} emptyMessage={t("No devices are assigned to this project.")} onRowClick={(d) => navigate(`/projects/${projectId}/devices/${d.id}`)} />
+        <DataTable columns={columns} data={devices.data?.items} searchable onSearchChange={setQ} footer={devices.data?.next_cursor ? t("Only the first 500 rows are shown. Search to find the rest.") : undefined} isLoading={devices.isPending} emptyMessage={t("No devices are assigned to this project.")} onRowClick={(d) => navigate(`/projects/${projectId}/devices/${d.id}`)} />
       </Page>
     </>
   );

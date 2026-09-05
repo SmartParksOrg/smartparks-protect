@@ -43,6 +43,7 @@ class FakeChannel:
 class Recorder:
     calls: ClassVar[list[tuple[str, object, object]]] = []
     fail: ClassVar[grpc.StatusCode | None] = None
+    fail_detail: ClassVar[str | None] = None
 
 
 class FakeDeviceService:
@@ -110,7 +111,7 @@ class FakeRpcError(grpc.aio.AioRpcError):
         return self._fake_code
 
     def details(self):
-        return "fake"
+        return Recorder.fail_detail or "fake"
 
 
 @pytest.fixture(autouse=True)
@@ -180,3 +181,18 @@ async def test_grpc_errors_become_platform_errors():
             await commands.submit("0016C001F01192A0", b"\x00", {"f_port": 1})
         assert excinfo.value.code == expected
     assert chirpstack.ChirpStackAdapter.config_example["api_url"].startswith("grpcs://")
+
+
+async def test_proxy_without_grpc_location_is_explained():
+    """nginx without a `grpc_pass` location hands the call to ChirpStack over HTTP/1.1,
+    which answers an empty 400; grpc reports that as INTERNAL with the HTTP status."""
+    commands = ChirpStackCommands(source("grpcs://cs.example:443"))
+    Recorder.fail = grpc.StatusCode.INTERNAL
+    Recorder.fail_detail = "Received http2 header with status: 400"
+    try:
+        with pytest.raises(ApplicationError) as excinfo:
+            await commands.submit("0016C001F01192A0", b"\x00", {"f_port": 1})
+    finally:
+        Recorder.fail_detail = None
+    assert excinfo.value.code == ErrorCode.CONNECTIVITY_UNAVAILABLE
+    assert "HTTP 400" in excinfo.value.message and "grpc_pass" in excinfo.value.message

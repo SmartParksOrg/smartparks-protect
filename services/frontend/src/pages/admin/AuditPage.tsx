@@ -24,7 +24,7 @@ export function AuditPage() {
   return (
     <>
       <PageHeader title={t("Audit log")} description={t("Newest 200 changes across the server")} />
-      <Page><DataTable columns={columns} data={audit.data} isLoading={audit.isPending} /></Page>
+      <Page><DataTable columns={columns} data={audit.data} searchable isLoading={audit.isPending} /></Page>
     </>
   );
 }

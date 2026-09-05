@@ -94,6 +94,7 @@ def test_webhook_uses_event_header():
     adapter = ChirpStackAdapter()
     body = json.loads((FIXTURES / "join.json").read_text())
     messages = adapter.parse_webhook(source(), body, {"x-event": "join"})
+    assert messages[0].ingestion_method == IngestionMethod.WEBHOOK
     assert messages[0].event_type == "join"
     assert adapter.default_capabilities.downlink is True
     assert "OPEN_DEVICE" in adapter.default_link_templates

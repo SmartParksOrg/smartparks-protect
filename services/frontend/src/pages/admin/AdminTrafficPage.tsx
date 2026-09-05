@@ -105,7 +105,7 @@ function InboundTab({ params, set }: TabProps) {
         <Button variant="outline" size="icon" onClick={() => traffic.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
       </div>
       {traffic.error && <Callout kind="error">{traffic.error.message}</Callout>}
-      <DataTable columns={columns} data={traffic.data} isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
+      <DataTable columns={columns} data={traffic.data} searchable isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>
   );
@@ -142,7 +142,7 @@ function OutboundTab({ params, set }: TabProps) {
         <Button variant="outline" size="icon" onClick={() => deliveries.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
       </div>
       {deliveries.error && <Callout kind="error">{deliveries.error.message}</Callout>}
-      <DataTable columns={columns} data={deliveries.data?.items} isLoading={deliveries.isPending} emptyMessage={t("No deliveries in this view.")} onRowClick={(d) => setDetail(d)} footer={deliveries.data && t("{{count}} deliveries, newest first", { count: deliveries.data.items.length })} />
+      <DataTable columns={columns} data={deliveries.data?.items} searchable isLoading={deliveries.isPending} emptyMessage={t("No deliveries in this view.")} onRowClick={(d) => setDetail(d)} footer={deliveries.data && t("{{count}} deliveries, newest first", { count: deliveries.data.items.length })} />
       <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>{t("Delivery of {{type}} {{id}}", { type: detail?.object_type, id: detail?.object_type === "event" ? detail?.object_id.slice(0, 8) : detail?.object_id })}</DialogTitle><DialogDescription>{detail && t("{{integration}} in {{project}}, {{origin}}, {{count}} attempts", { integration: detail.integration_name, project: detail.project_name, origin: detail.origin, count: detail.attempts })}</DialogDescription></DialogHeader>
@@ -188,7 +188,7 @@ function CommandsTab({ params, set }: TabProps) {
         <Button variant="outline" size="icon" onClick={() => commands.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
       </div>
       {commands.error && <Callout kind="error">{commands.error.message}</Callout>}
-      <DataTable columns={columns} data={commands.data?.items} isLoading={commands.isPending} emptyMessage={t("No commands in this view.")} onRowClick={(c) => set("command", c.id)} footer={commands.data && t("{{count}} commands, newest first", { count: commands.data.items.length })} />
+      <DataTable columns={columns} data={commands.data?.items} searchable isLoading={commands.isPending} emptyMessage={t("No commands in this view.")} onRowClick={(c) => set("command", c.id)} footer={commands.data && t("{{count}} commands, newest first", { count: commands.data.items.length })} />
       <CommandDetailDialog commandId={selected} onClose={() => set("command", "")} />
     </>
   );

@@ -18,7 +18,7 @@ You need: the dev server (`https://dev-protect.smartparks.org`), a server admin 
 one OpenCollar Edge with a known DevEUI, charged and outdoors or on a window sill.
 
 1. `bash scripts/verify-server.sh` on the server: every check passes.
-2. Server admin, Device types: an OpenCollar type exists (the demo bootstrap made one).
+2. Server admin, Device types: an OpenCollar type exists. A server that never ran the demo bootstrap has none: create one with key `opencollar_edge`, label `OpenCollar Edge`, driver `opencollar`, manufacturer Smart Parks. A device created from Needs attention without a project appears under Server admin, Devices only; assign it to a project (and an entity) there before looking for it on the project's Devices page.
 3. Create the device for the collar under Server admin, Devices, with its DevEUI as the name,
    and an entity in the project it will track; assign the device to the entity from now.
 

@@ -527,4 +527,6 @@ class ChirpStackAdapter:
         name comes from the query string, which the caller passes as the `x-event` header."""
         event_name = headers.get("x-event") or headers.get("X-Event") or "up"
         payload = json.dumps(body).encode()
-        return [parse_event(source, f"application/-/device/-/event/{event_name}", payload)]
+        message = parse_event(source, f"application/-/device/-/event/{event_name}", payload)
+        message.ingestion_method = IngestionMethod.WEBHOOK  # so the HTTP channel counts it
+        return [message]

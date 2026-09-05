@@ -80,7 +80,7 @@ export function ExportsPage() {
       />
       <Page>
         {jobs.error && <Callout kind="error">{jobs.error.message}</Callout>}
-        <DataTable columns={columns} data={sorted} isLoading={jobs.isPending} emptyMessage={t("No exports yet. Small selections download at once from the Data explorer, larger ones become jobs here.")} onRowClick={setSelected} footer={jobs.data && `${jobs.data.items.length} exports`} />
+        <DataTable columns={columns} data={sorted} searchable isLoading={jobs.isPending} emptyMessage={t("No exports yet. Small selections download at once from the Data explorer, larger ones become jobs here.")} onRowClick={setSelected} footer={jobs.data && `${jobs.data.items.length} exports`} />
       </Page>
       <ExportDialog projectId={projectId} open={open} onOpenChange={setOpen} />
       <Dialog open={selected !== null} onOpenChange={(o) => !o && setSelected(null)}>

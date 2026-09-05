@@ -62,7 +62,7 @@ export function TrafficPage() {
         </>}
       />
       <Page>
-        <DataTable columns={columns} data={traffic.data} isLoading={traffic.isPending} emptyMessage={t("No traffic in this window.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && `${traffic.data.length} messages, last ${hours} hours`} />
+        <DataTable columns={columns} data={traffic.data} searchable isLoading={traffic.isPending} emptyMessage={t("No traffic in this window.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && `${traffic.data.length} messages, last ${hours} hours`} />
       </Page>
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>

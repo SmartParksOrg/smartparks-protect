@@ -127,7 +127,7 @@ export function EventsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
           </Select>
         </div>
         {events.error && <Callout kind="error">{events.error.message}</Callout>}
-        <DataTable columns={columns} data={items} isLoading={events.isPending && pages.length === 0} emptyMessage={t("No events yet. Enable a rule, or wait for a device event.")} onRowClick={(e) => setParams((p) => { p.set("event", e.id); return p; }, { replace: true })} footer={events.data?.next_cursor ? <Button variant="outline" size="sm" onClick={() => { setPages(items); setCursor(events.data?.next_cursor ?? null); }}>{t("Load older")}</Button> : `${items.length} events`} />
+        <DataTable columns={columns} data={items} searchable isLoading={events.isPending && pages.length === 0} emptyMessage={t("No events yet. Enable a rule, or wait for a device event.")} onRowClick={(e) => setParams((p) => { p.set("event", e.id); return p; }, { replace: true })} footer={events.data?.next_cursor ? <Button variant="outline" size="sm" onClick={() => { setPages(items); setCursor(events.data?.next_cursor ?? null); }}>{t("Load older")}</Button> : `${items.length} events`} />
       </Page>
       <EventDetailDialog scope={scope} eventId={selected} onClose={() => setParams((p) => { p.delete("event"); return p; }, { replace: true })} />
     </>

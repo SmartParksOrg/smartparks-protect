@@ -192,9 +192,9 @@ export function IntegrationsPage() {
         </div>
         {(integrations.error ?? deliveries.error ?? connectors.error) && <Callout kind="error">{(integrations.error ?? deliveries.error ?? connectors.error)?.message}</Callout>}
         {tab === "integrations" ? (
-          <DataTable columns={columns} data={integrations.data?.items} isLoading={integrations.isPending} emptyMessage={t("No integrations yet. Create one to forward this project's positions and events to an external system.")} onRowClick={(i) => setInspecting(i)} />
+          <DataTable columns={columns} data={integrations.data?.items} searchable isLoading={integrations.isPending} emptyMessage={t("No integrations yet. Create one to forward this project's positions and events to an external system.")} onRowClick={(i) => setInspecting(i)} />
         ) : (
-          <DataTable columns={deliveryColumns} data={deliveries.data?.items} isLoading={deliveries.isPending} emptyMessage={t("No deliveries yet.")} onRowClick={(d) => setDeliveryDetail(d)} footer={deliveries.data && `${deliveries.data.items.length} deliveries, newest first`} />
+          <DataTable columns={deliveryColumns} data={deliveries.data?.items} searchable isLoading={deliveries.isPending} emptyMessage={t("No deliveries yet.")} onRowClick={(d) => setDeliveryDetail(d)} footer={deliveries.data && `${deliveries.data.items.length} deliveries, newest first`} />
         )}
       </Page>
 

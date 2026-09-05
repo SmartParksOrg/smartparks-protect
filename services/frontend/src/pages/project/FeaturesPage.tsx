@@ -97,7 +97,7 @@ export function FeaturesPage() {
   return (
     <>
       <PageHeader title={t("Features")} description={t("Sites, zones, geofences and routes drawn on the map")} actions={<Button onClick={() => setOpen(true)}><Plus className="size-4" /> {t("New feature")}</Button>} />
-      <Page><DataTable columns={columns} data={features.data?.items} isLoading={features.isPending} emptyMessage={t("No features yet.")} /></Page>
+      <Page><DataTable columns={columns} data={features.data?.items} searchable isLoading={features.isPending} emptyMessage={t("No features yet.")} /></Page>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader><DialogTitle>{t("New feature")}</DialogTitle><DialogDescription>{t("Draw the geometry on the map")}</DialogDescription></DialogHeader>

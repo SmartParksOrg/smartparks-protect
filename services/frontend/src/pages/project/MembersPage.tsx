@@ -90,9 +90,9 @@ export function MembersPage() {
             {lastLink && <Callout kind="warning" className="mt-3">{lastLink}</Callout>}
           </CardContent>
         </Card>
-        <DataTable columns={memberColumns} data={members.data?.items} isLoading={members.isPending} emptyMessage={t("No members yet.")} />
+        <DataTable columns={memberColumns} data={members.data?.items} searchable isLoading={members.isPending} emptyMessage={t("No members yet.")} />
         <h2 className="text-base font-medium">{t("Open invitations")}</h2>
-        <DataTable columns={invitationColumns} data={invitations.data?.items} isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
+        <DataTable columns={invitationColumns} data={invitations.data?.items} searchable isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
       </Page>
       <ConfirmDialog open={removing != null} onOpenChange={(o) => !o && setRemoving(null)} title={t("Remove member")} description={`${removing?.email} loses access to this project.`} confirmLabel={t("Remove")} onConfirm={() => removing && remove.mutate(removing.id)} pending={remove.isPending} />
     </>
