@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.bus import get_bus
 from shared.bus import RedisStreamsBus
+from shared.connectivity.channels import channel_enabled, webhook_channel_key
 from shared.connectivity.registry import ADAPTERS
 from shared.connectivity.transports.http import bearer_token, token_matches
 from shared.database import get_session
@@ -53,6 +54,8 @@ async def ingest_http(
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unknown adapter {source.adapter_key}"
         )
+    if not channel_enabled(source.channels, webhook_channel_key(source.adapter_key)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The HTTP channel of this source is off")
     token = bearer_token(dict(request.headers))
     if token is None and getattr(adapter, "webhook_token_in_query", False):
         # Platforms that cannot set a header (Cloudloop) carry the token in the URL (D78).

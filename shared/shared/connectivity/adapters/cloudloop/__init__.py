@@ -369,6 +369,7 @@ class CloudloopAdapter:
             "direction": "out",
             "purpose": "Commands as SBD messages and the thing list",
             "config_keys": [],
+            "optional_keys": ["api_url"],
             "credential_keys": ["token"],
             "capabilities": ["downlink", "device_management"],
         },

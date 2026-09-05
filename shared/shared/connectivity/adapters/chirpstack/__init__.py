@@ -414,13 +414,17 @@ class ChirpStackAdapter:
         "api_url": "grpcs://chirpstack.example.org:443",
         "tenant_id": "",
     }
-    credentials_schema: ClassVar[dict[str, str]] = {"api_token": "ChirpStack API key"}
+    credentials_schema: ClassVar[dict[str, str]] = {
+        "api_token": "ChirpStack API key (tenant or global) for the gRPC API",
+        "mqtt_username": "Broker login, when the broker asks for one",
+        "mqtt_password": "Broker password",
+    }
     setup_hint: ClassVar[str] = (
-        "For an existing ChirpStack: point the application's HTTP integration (JSON) at this "
-        "source's webhook URL with an `Authorization` header holding `Bearer <token>`, and leave "
-        "`mqtt_host` empty. Set `mqtt_host` only when the broker ChirpStack publishes to is "
-        "reachable from this server. `api_url` (the REST API gateway) and the `api_token` "
-        "credential enable downlinks and the device and gateway sync."
+        "Point the application's HTTP integration (JSON) at this source's webhook URL with an "
+        "`Authorization` header holding `Bearer <token>`. Switch the MQTT channel on only when "
+        "the broker ChirpStack publishes to is reachable from this server. The gRPC API "
+        "channel (grpcs://host:443 through a proxy, or grpc://host:8080) with a tenant API key "
+        "enables downlinks and the device and gateway sync."
     )
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(
         uplink=True,
@@ -453,9 +457,10 @@ class ChirpStackAdapter:
             "purpose": "The ingest service subscribes to ChirpStack's broker for the same "
             "events plus gateway statistics; needs the broker reachable from this server",
             "config_keys": ["mqtt_host"],
+            "optional_keys": ["mqtt_port", "mqtt_tls", "topic_prefix"],
             "credential_keys": [],
-            "hint": "mqtt_host, mqtt_port, mqtt_tls; mqtt_username and mqtt_password when the "
-            "broker asks for them",
+            "optional_credential_keys": ["mqtt_username", "mqtt_password"],
+            "hint": "mqtt_username and mqtt_password only when the broker asks for them",
         },
         {
             "key": "api",

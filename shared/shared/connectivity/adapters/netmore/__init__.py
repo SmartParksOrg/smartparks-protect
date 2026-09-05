@@ -506,6 +506,37 @@ class NetmoreAdapter:
         gateway_status=False,
         statistics=False,
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "http",
+            "label": "HTTP push",
+            "direction": "in",
+            "purpose": "The export config posts to the webhook URL",
+            "config_keys": [],
+            "credential_keys": [],
+        },
+        {
+            "key": "mqtt",
+            "label": "MQTT broker",
+            "direction": "in",
+            "purpose": "The ingest service subscribes to the Netmore broker",
+            "config_keys": ["mqtt_host"],
+            "optional_keys": ["mqtt_port", "mqtt_tls", "topics"],
+            "credential_keys": ["username", "password"],
+        },
+        {
+            "key": "api",
+            "label": "Platform API",
+            "direction": "out",
+            "purpose": "Downlinks through the LoRaWAN Portal or Netmore Connect",
+            "config_keys": [],
+            "optional_keys": ["platform", "api_url"],
+            "credential_keys": [],
+            "optional_credential_keys": ["username", "password", "api_key"],
+            "capabilities": ["downlink"],
+            "hint": "lorawan_portal: username and password; connect: api_key",
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/devices/{external_id}",
     }

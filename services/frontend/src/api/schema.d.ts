@@ -4364,6 +4364,11 @@ export interface components {
             purpose: string;
             /** Hint */
             hint?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
             /** Configured */
             configured: boolean;
             /** Missing */
@@ -4872,6 +4877,13 @@ export interface components {
             retention_days?: number | null;
             /** Project Ids */
             project_ids?: string[];
+            /**
+             * Channels
+             * @description Channel key to on/off; a missing key means on
+             */
+            channels?: {
+                [key: string]: boolean;
+            };
         };
         /** DataSourceRead */
         DataSourceRead: {
@@ -4922,6 +4934,10 @@ export interface components {
             /** Capabilities */
             capabilities: {
                 [key: string]: unknown;
+            };
+            /** Channels */
+            channels?: {
+                [key: string]: boolean;
             };
             /** Link Templates */
             link_templates: {
@@ -4985,6 +5001,10 @@ export interface components {
             retention_days?: number | null;
             /** Project Ids */
             project_ids?: string[] | null;
+            /** Channels */
+            channels?: {
+                [key: string]: boolean;
+            } | null;
         };
         /** DeadLetter */
         DeadLetter: {

@@ -26,6 +26,7 @@ from protect_api.schemas.domain import (
 )
 from protect_api.schemas.integrations import CursorReset, GatewaySyncResult
 from shared.config import get_settings
+from shared.connectivity.channels import api_channel_key, channel_enabled
 from shared.connectivity.registry import ADAPTERS, channels_of, describe_adapter
 from shared.connectivity.state import read_api_test, read_connector, report_api_test
 from shared.connectivity.transports.http import hash_token, new_webhook_token
@@ -251,6 +252,7 @@ class ChannelStatus(BaseModel):
     direction: str
     purpose: str
     hint: str | None = None
+    enabled: bool = True
     configured: bool
     missing: list[str] = Field(default_factory=list)
     state: str  # off, waiting, ok, connected, reconnecting, error, stopped, untested
@@ -295,8 +297,13 @@ async def data_source_status(
         ]
         missing += [k for k in channel.get("credential_keys", []) if not credentials.get(k)]
         configured = not missing
+        enabled = channel_enabled(source.channels, str(channel["key"]))
         state, detail, last_at, count = "off", None, None, 0
-        if configured and channel["direction"] == "in":
+        if not enabled:
+            state, detail = "disabled", "switched off on this source"
+            if configured:
+                limited.update(channel.get("capabilities", []))
+        elif configured and channel["direction"] == "in":
             methods = CHANNEL_METHODS.get(str(channel["key"]), ())
             if methods:
                 row = (
@@ -329,7 +336,7 @@ async def data_source_status(
                 state = "ok" if test.get("ok") else "error"
                 detail = str(test.get("detail") or "")
                 last_at = datetime.fromisoformat(str(test["at"])) if test.get("at") else None
-        else:
+        elif not configured:
             detail = "needs " + ", ".join(missing)
             limited.update(channel.get("capabilities", []))
         channels.append(
@@ -339,6 +346,7 @@ async def data_source_status(
                 direction=str(channel["direction"]),
                 purpose=str(channel.get("purpose") or ""),
                 hint=channel.get("hint"),
+                enabled=enabled,
                 configured=configured,
                 missing=missing,
                 state=state,
@@ -364,6 +372,8 @@ async def test_connection(
     """Call the platform's API with the stored credentials. A push-only source has nothing to
     call: it receives on its webhook."""
     source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    if not channel_enabled(source.channels, api_channel_key(source.adapter_key)):
+        return ConnectionTestResult(ok=False, detail="The API channel of this source is off.")
     connector = _management(source)
     tester = getattr(connector, "test_connection", None)
     if tester is None:
@@ -393,6 +403,8 @@ async def sync_devices(
     """Read the platform's device list into the source's external identities: new ones appear
     under Needs attention to be linked, known ones get their attributes refreshed."""
     source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    if not channel_enabled(source.channels, api_channel_key(source.adapter_key)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The API channel of this source is off")
     lister = getattr(_management(source), "list_devices", None)
     if lister is None:
         raise HTTPException(

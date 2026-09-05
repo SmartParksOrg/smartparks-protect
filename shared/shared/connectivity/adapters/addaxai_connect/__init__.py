@@ -472,6 +472,26 @@ class AddaxAiConnectAdapter:
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(
         uplink=True, device_management=True
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "poll",
+            "label": "API polling",
+            "direction": "in",
+            "purpose": "The ingest service polls the server for new detections",
+            "config_keys": ["url"],
+            "optional_keys": [
+                "project_ids",
+                "poll_interval_seconds",
+                "overlap_days",
+                "rescan_interval_hours",
+                "min_confidence",
+                "species",
+                "categories",
+                "verified_only",
+            ],
+            "credential_keys": ["email", "password"],
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/projects/{addaxai_project_id}/cameras",
         "OPEN_APPLICATION": "{web_url}/projects/{addaxai_project_id}/images",

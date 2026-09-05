@@ -18394,6 +18394,11 @@
       ],
       "title": "Hint"
      },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "default": true
+     },
      "configured": {
       "type": "boolean",
       "title": "Configured"
@@ -19889,6 +19894,14 @@
       },
       "type": "array",
       "title": "Project Ids"
+     },
+     "channels": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "type": "object",
+      "title": "Channels",
+      "description": "Channel key to on/off; a missing key means on"
      }
     },
     "type": "object",
@@ -19971,6 +19984,13 @@
       "additionalProperties": true,
       "type": "object",
       "title": "Capabilities"
+     },
+     "channels": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "type": "object",
+      "title": "Channels"
      },
      "link_templates": {
       "additionalProperties": true,
@@ -20155,6 +20175,20 @@
        }
       ],
       "title": "Project Ids"
+     },
+     "channels": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "boolean"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Channels"
      }
     },
     "type": "object",

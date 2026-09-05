@@ -16,7 +16,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 14 complete except the v2.0.0 release (everything committed through fe0000f, CI green). Live verification started on 2026-09-05 with Tim's ChirpStack (chirpstack-dev4): uplinks of collar SP051307 flow over the HTTP integration; the gRPC API direction waits for a `grpc_pass` location on that nginx and a tenant API key |
+| Active phase | Phase 14 complete except the v2.0.0 release (everything committed through 5ede00a, CI green; the data source form per channel with switches, migration 0015, is built and awaits commit). Live verification started on 2026-09-05 with Tim's ChirpStack (chirpstack-dev4): uplinks of collar SP051307 flow over the HTTP integration; the gRPC API direction waits for a `grpc_pass` location on that nginx and a tenant API key |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-05 |
 | Next item | Finish the ChirpStack live check (nginx `grpc_pass`, tenant API key, `api_url` grpcs://chirpstack-dev4.smartparks.org:443, then Test connection, Sync devices, Request status on SP051307), then v2.0.0 on Tim's word (a docs-only deployment lands on v0.6.0 and fails the security check until 2.0 is tagged); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
@@ -937,3 +937,9 @@ Listed by the phase where they are first needed.
 - Tim's ruling: ChirpStack v4 is gRPC only. The adapter uses the `chirpstack-api` client (`api_url` grpcs://host:443 through an nginx `grpc_pass` location, or grpc://host:8080); the REST gateway path and compose service are gone; the local bootstrap talks gRPC and was proven against the local stack (Test connection, Sync devices, Status all good).
 - Open on Tim's side: the `grpc_pass` location on his nginx, a tenant API key, the source's `api_url` and `api_token`; then Request status proves the downlink path. The ChirpStack API secret was pasted into the chat and should be rotated.
 
+
+### 2026-09-05, data source form per channel (Claude)
+
+- Tim found the JSON configuration field of the data source form unclear: which value goes where, and no way to switch a channel off. The form now generates proper fields from the adapter's schema (switches, numbers, choices, lists, text with the schema's description as help) and groups them per channel: the channel's required fields starred, its optional settings beneath, its credentials as password fields; keys no channel names sit under General settings.
+- Each channel has an on/off switch stored on the source (`DataSource.channels`, migration 0015) and enforced in the ingest runner, the webhook, command routing, Test connection and the syncs. A new source starts with the channels that still need input off; a switched-off channel hides its fields.
+- Every adapter declares per channel its `config_keys`, `optional_keys`, `credential_keys` and `optional_credential_keys`; a test checks each named key exists in the adapter's schemas (which found the ChirpStack MQTT login missing from the credentials schema). Verified with screenshots of the new and edit forms on the rebuilt local stack.

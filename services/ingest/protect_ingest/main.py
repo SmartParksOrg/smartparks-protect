@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from shared.bus import RedisStreamsBus
 from shared.connectivity.base import InboundMessage
+from shared.connectivity.channels import channel_enabled, stream_channel_key
 from shared.connectivity.registry import ADAPTERS
 from shared.connectivity.state import report_connector
 from shared.database import session_scope
@@ -56,6 +57,8 @@ class ConnectorRunner:
                         adapter=source.adapter_key,
                     )
                     continue
+                if not channel_enabled(source.channels, stream_channel_key(source.adapter_key)):
+                    continue  # the source's streaming channel is switched off
                 if adapter.event_connector(data_source_context(source)) is not None:
                     wanted[source.id] = source
             session.expunge_all()

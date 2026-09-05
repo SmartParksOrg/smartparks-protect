@@ -435,7 +435,9 @@ class CraIotAdapter:
             "direction": "out",
             "purpose": "Downlinks and the device sync with a single sign-on token",
             "config_keys": [],
+            "optional_keys": ["api_url", "sso_url", "client_id"],
             "credential_keys": ["username", "password"],
+            "optional_credential_keys": ["client_secret"],
             "capabilities": ["downlink", "device_management"],
         },
     ]

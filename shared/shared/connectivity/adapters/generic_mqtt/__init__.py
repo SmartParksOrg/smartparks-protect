@@ -113,6 +113,27 @@ class GenericMqttAdapter:
     setup_hint: ClassVar[str] = "The ingest service subscribes to the topics within a minute."
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(uplink=True)
     default_link_templates: ClassVar[dict[str, str]] = {}
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "stream",
+            "label": "MQTT broker",
+            "direction": "in",
+            "purpose": "The ingest service subscribes to the broker's topics",
+            "config_keys": ["host"],
+            "optional_keys": [
+                "port",
+                "tls",
+                "topics",
+                "external_id_from",
+                "topic_template",
+                "external_id_field",
+                "event_type_field",
+                "time_field",
+            ],
+            "credential_keys": [],
+            "optional_credential_keys": ["username", "password"],
+        },
+    ]
     config_schema: ClassVar[dict[str, Any]] = {
         "type": "object",
         "required": ["host"],

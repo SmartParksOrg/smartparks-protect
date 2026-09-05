@@ -250,6 +250,9 @@ class DataSourceCreate(BaseModel):
     link_templates: dict[str, Any] = Field(default_factory=dict)
     retention_days: int | None = Field(default=None, ge=1)
     project_ids: list[uuid.UUID] = Field(default_factory=list)
+    channels: dict[str, bool] = Field(
+        default_factory=dict, description="Channel key to on/off; a missing key means on"
+    )
 
 
 class DataSourceUpdate(BaseModel):
@@ -261,6 +264,7 @@ class DataSourceUpdate(BaseModel):
     link_templates: dict[str, Any] | None = None
     retention_days: int | None = Field(default=None, ge=1)
     project_ids: list[uuid.UUID] | None = None
+    channels: dict[str, bool] | None = None
 
 
 class DataSourceRead(ORMModel):
@@ -280,6 +284,7 @@ class DataSourceRead(ORMModel):
     )
     builtin: bool = Field(default=False, description="A channel source that cannot be deleted")
     capabilities: dict[str, Any]
+    channels: dict[str, bool] = Field(default_factory=dict)
     link_templates: dict[str, Any]
     retention_days: int | None
     project_ids: list[uuid.UUID] = Field(default_factory=list)

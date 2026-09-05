@@ -481,6 +481,7 @@ class TtsAdapter:
             "direction": "out",
             "purpose": "Downlinks, device sync and gateway sync",
             "config_keys": ["application_id"],
+            "optional_keys": ["api_url"],
             "credential_keys": ["api_key"],
             "capabilities": [
                 "downlink",

@@ -222,6 +222,26 @@ class AkenzaAdapter:
         gateway_status=False,
         statistics=False,
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "http",
+            "label": "Webhook output connector",
+            "direction": "in",
+            "purpose": "The data flow's webhook output posts to the webhook URL",
+            "config_keys": [],
+            "credential_keys": [],
+        },
+        {
+            "key": "api",
+            "label": "akenza API",
+            "direction": "out",
+            "purpose": "Downlinks with an organization API key",
+            "config_keys": [],
+            "optional_keys": ["api_url"],
+            "credential_keys": ["api_key"],
+            "capabilities": ["downlink"],
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/#/{workspace_id}/devices/{external_id}",
     }

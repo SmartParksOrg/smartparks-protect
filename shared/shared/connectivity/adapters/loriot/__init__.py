@@ -240,6 +240,7 @@ class LoriotAdapter:
             "purpose": "The ingest service connects to the application's websocket output; "
             "downlinks go over the same connection",
             "config_keys": ["server"],
+            "optional_keys": ["app_id"],
             "credential_keys": ["token"],
             "capabilities": ["downlink"],
         },

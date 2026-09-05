@@ -527,6 +527,27 @@ class TraccarAdapter:
         device_management=True,
         statistics=False,
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "stream",
+            "label": "Traccar websocket",
+            "direction": "in",
+            "purpose": "The ingest service follows the server's live positions and events",
+            "config_keys": ["url"],
+            "credential_keys": [],
+            "optional_credential_keys": ["email", "password", "token"],
+            "hint": "email and password, or token",
+        },
+        {
+            "key": "api",
+            "label": "Traccar API",
+            "direction": "out",
+            "purpose": "Device list and commands",
+            "config_keys": ["url"],
+            "credential_keys": [],
+            "capabilities": ["downlink", "device_management"],
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/settings/device/{external_id}",
     }

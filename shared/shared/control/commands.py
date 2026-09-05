@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import Topic
 from shared.connectivity.base import CommandConnector, DataSourceContext
+from shared.connectivity.channels import api_channel_key, channel_enabled
 from shared.connectivity.registry import ADAPTERS
 from shared.control.actions import ControlAction, ResponseContext, actions_of
 from shared.device_drivers.base import DecodedRecords
@@ -154,6 +155,8 @@ def _route_of(
     context = data_source_context(source)
     if not getattr(context.capabilities, capability, False):
         return None, f"{source.name} has no {capability} capability"
+    if not channel_enabled(source.channels, api_channel_key(source.adapter_key)):
+        return None, f"{source.name}: the API channel is switched off"
     connector = command_connector_for(context)
     if connector is None:
         return None, f"{source.name} ({source.adapter_key}) cannot send commands"

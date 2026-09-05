@@ -214,6 +214,12 @@ class DataSource(UuidPrimaryKeyMixin, TimestampMixin, Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb"), comment="OPEN_DEVICE and so on"
     )
     retention_days: Mapped[int | None] = mapped_column(comment="Raw event retention override")
+    channels: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        comment="Per-channel on/off switches (channel key to bool); absent means on",
+    )
     webhook_token_hash: Mapped[str | None] = mapped_column(
         String(64), index=True, comment="SHA-256 of the bearer token for HTTP push sources (D34)"
     )

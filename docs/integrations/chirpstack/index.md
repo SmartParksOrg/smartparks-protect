@@ -54,10 +54,13 @@ the settings switch on and whether each works:
 | MQTT subscription | in | `mqtt_host` (and `mqtt_username`, `mqtt_password` when the broker asks) | the same events plus gateway statistics | the ingest service reports its connection as connected |
 | gRPC API | out | `api_url` (`grpcs://host:443` or `grpc://host:8080`) and the `api_token` credential | downlinks, device sync, gateway sync, Test connection | the last Test connection answered |
 
-Capabilities an unconfigured channel would provide are held back: with no API channel the
-source shows no downlink capability, whatever its declared capabilities say. Server admin,
-Data sources, Status lists the channels with their state; the form lists them with what each
-still needs while you type.
+Each channel has its own switch on the source. A new source starts with the MQTT and API
+channels off, since both need input; turn one on once its fields are filled in. Off means the webhook answers 409, the ingest
+service runs no connector, or commands and syncs are refused, without touching the other
+channels. Capabilities an unconfigured or switched-off channel would provide are held back:
+with no API channel the source shows no downlink capability, whatever its declared
+capabilities say. The form groups the settings per channel with the fields each needs (no
+JSON), and Server admin, Data sources, Status lists the channels with their state.
 
 ## Connecting an existing ChirpStack
 

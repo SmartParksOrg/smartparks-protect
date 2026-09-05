@@ -205,3 +205,22 @@ def test_chirpstack_without_a_broker_runs_no_connector():
     adapter = ADAPTERS["chirpstack"]
     assert adapter.event_connector(source({"web_url": "https://cs.example"})) is None
     assert adapter.event_connector(source({"mqtt_host": "mq.example"})) is not None
+
+
+def test_channel_keys_per_adapter():
+    from shared.connectivity.channels import (
+        api_channel_key,
+        channel_enabled,
+        stream_channel_key,
+        webhook_channel_key,
+    )
+
+    assert (
+        stream_channel_key("chirpstack") == "mqtt" and webhook_channel_key("chirpstack") == "http"
+    )
+    assert api_channel_key("chirpstack") == "api" and stream_channel_key("generic_http") is None
+    assert (
+        stream_channel_key("loriot") == "stream" and stream_channel_key("addaxai_connect") == "poll"
+    )
+    assert channel_enabled({}, "http") and channel_enabled(None, None)
+    assert not channel_enabled({"http": False}, "http") and channel_enabled({"http": False}, "api")
