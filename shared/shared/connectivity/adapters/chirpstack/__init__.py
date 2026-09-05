@@ -5,7 +5,8 @@ Events arrive over the ChirpStack MQTT integration (JSON marshaler) on
 ChirpStack REST API (`chirpstack-rest-api`) with an API token (decision D50): a command becomes
 a device queue item, `txack` and `ack` events carry its `queueItemId` back.
 
-Config keys: `mqtt_host`, `mqtt_port` (1883), `mqtt_tls` (false), `api_url` (REST API base, for
+Config keys: `mqtt_host` (empty for the HTTP integration), `mqtt_port` (1883), `mqtt_tls`
+(false), `api_url` (REST API base, for
 example `http://chirpstack-rest-api:8090`), `web_url` (the ChirpStack web UI, for deep links),
 `tenant_id`, `topic_prefix` (empty by default; ChirpStack can prefix integration topics).
 Credentials: `api_token`, optional `mqtt_username` and `mqtt_password`.
@@ -463,9 +464,12 @@ class ChirpStackAdapter:
     }
     config_schema: ClassVar[dict[str, Any]] = {
         "type": "object",
-        "required": ["mqtt_host"],
         "properties": {
-            "mqtt_host": {"type": "string"},
+            "mqtt_host": {
+                "type": "string",
+                "description": "The broker ChirpStack publishes to; leave empty to receive "
+                "events through ChirpStack's HTTP integration on the webhook URL instead",
+            },
             "mqtt_port": {"type": "integer", "default": 1883},
             "mqtt_tls": {"type": "boolean", "default": False},
             "topic_prefix": {"type": "string", "default": ""},
@@ -476,6 +480,10 @@ class ChirpStackAdapter:
     }
 
     def event_connector(self, source: DataSourceContext) -> EventConnector | None:
+        """The MQTT subscription when a broker is configured; without one the events arrive
+        through the HTTP integration (`parse_webhook`) and no connector runs."""
+        if not str(source.config.get("mqtt_host") or "").strip():
+            return None
         return ChirpStackConnector(source)
 
     def command_connector(self, source: DataSourceContext) -> ChirpStackCommands:

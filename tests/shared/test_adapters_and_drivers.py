@@ -184,3 +184,24 @@ def test_lorawan_frame_extraction():
     assert lorawan_frame(payload, {"f_port": 7}) == (b"\x01\x02", 7)
     assert lorawan_frame({}, {"frame_hex": "0a0b", "f_port": 2}) == (b"\x0a\x0b", 2)
     assert lorawan_frame({"data": "not base64!!"}, {}) == (None, None)
+
+
+def test_chirpstack_without_a_broker_runs_no_connector():
+    """An existing ChirpStack can deliver through its HTTP integration alone."""
+    import uuid
+
+    from shared.connectivity.base import AdapterCapabilities, DataSourceContext
+
+    def source(config: dict) -> DataSourceContext:
+        return DataSourceContext(
+            id=uuid.uuid4(),
+            name="cs",
+            adapter_key="chirpstack",
+            config=config,
+            credentials={},
+            capabilities=AdapterCapabilities(uplink=True),
+        )
+
+    adapter = ADAPTERS["chirpstack"]
+    assert adapter.event_connector(source({"web_url": "https://cs.example"})) is None
+    assert adapter.event_connector(source({"mqtt_host": "mq.example"})) is not None

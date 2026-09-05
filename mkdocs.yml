@@ -112,6 +112,7 @@ nav:
       - Update guide: operations/update-guide.md
       - Release process: operations/release-process.md
       - Security: operations/security.md
+      - Live verification: operations/live-verification.md
       - Backup and recovery: operations/backup-and-recovery.md
       - Restore guide: operations/restore-guide.md
       - Observability: operations/observability.md

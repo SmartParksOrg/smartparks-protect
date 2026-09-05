@@ -43,6 +43,31 @@ scripts/dev.sh simulate --dev-eui 70B3D57ED0001234 --application-id <id printed 
 
 The simulator publishes uplinks on the same broker and topics a real ChirpStack uses, so everything from the ingest service onwards runs as in production. The radio path (gateway bridge, join, deduplication) is not simulated; a real gateway on UDP port 1700 exercises it.
 
+## Connecting an existing ChirpStack
+
+A ChirpStack v4 that already serves gateways and collars connects in one of two ways:
+
+- **HTTP integration (no broker exposure).** Server admin, Data sources, New data source,
+  adapter ChirpStack, with `mqtt_host` left empty, `web_url` the ChirpStack web UI and
+  `tenant_id` the tenant. Copy the webhook URL and the bearer token shown once. In ChirpStack,
+  open the application, Integrations, HTTP: payload encoding JSON, the webhook URL as the
+  event endpoint URL, and a header `Authorization` with `Bearer <token>`. ChirpStack appends
+  `?event=up`, `?event=join` and so on, which the webhook understands. Save; the next uplink
+  appears under Network, Traffic.
+- **MQTT.** When the broker ChirpStack publishes to is reachable from the server (a TLS
+  listener with a user for this purpose), set `mqtt_host`, `mqtt_port`, `mqtt_tls` and the
+  `mqtt_username` and `mqtt_password` credentials; the ingest service subscribes to the
+  application and gateway topics and no HTTP integration is needed.
+
+Downlinks, device sync and gateway sync use ChirpStack's REST API: `api_url` must point at a
+`chirpstack-rest-api` gateway (the optional component that fronts the gRPC API, port 8090 in
+the compose stack) and `api_token` must be an API key of the tenant. Without a REST gateway
+the uplink path works and commands are refused with `CONNECTIVITY_AUTH_FAILED` or a
+connection error until one is added.
+
+The DevEUI is the identity: register the collars' DevEUIs on the data source, or accept them
+from Needs attention as their first uplinks arrive.
+
 ## Timestamps
 
 `time` on a ChirpStack event is when the network server processed the uplink. It is stored as `network_received_at` on the source event and is never the canonical time of a record unless the driver declares network time semantics for a record type (devices without a clock).
