@@ -95,3 +95,9 @@ async def stream_object(bucket: str, key: str, chunk_size: int = 1 << 20) -> Asy
     finally:
         response.close()
         response.release_conn()
+
+
+async def remove_object(bucket: str, key: str) -> None:
+    """Delete one object; a missing object is not an error (the cleanup is idempotent)."""
+    client = get_client()
+    await asyncio.to_thread(client.remove_object, bucket, key)

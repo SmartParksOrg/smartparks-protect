@@ -5,7 +5,7 @@ A production or development server is one Ubuntu 24.04 machine with Docker, set 
 ## Prerequisites
 
 - An Ubuntu 24.04 server reachable over SSH as root with your key, 4 GB of memory or more, 40 GB of disk to start.
-- A domain with an A record pointing at the server before the first run (the playbook checks and refuses otherwise).
+- A domain with an A record pointing at the server before the first run (the playbook checks and refuses otherwise). For a throwaway server, a name from a wildcard DNS service such as `<ip-with-dashes>.sslip.io` satisfies the check and gets a real certificate.
 - Ansible 2.16 or newer on your machine.
 
 ## First deployment
@@ -19,7 +19,9 @@ ansible-vault encrypt ansible/host_vars/myserver.yml
 ansible-playbook -i ansible/inventory.yml ansible/playbook.yml --limit myserver --ask-vault-pass
 ```
 
-The playbook hardens the server (firewall with SSH, HTTP and HTTPS only; SSH keys only with a drift check; security updates with a reboot at 04:30 only when needed; fail2ban on SSH), installs Docker and nginx, obtains the certificate, checks out the newest release tag (or `git_version`), writes `.env` from your host vars, builds and starts the stack, waits for the API, and runs the security check. Servers run tagged releases, never `main`; a dev server sets `git_version: main` in its host vars.
+The playbook hardens the server (firewall with SSH, HTTP and HTTPS only; SSH keys only with a drift check; security updates with a reboot at 04:30 only when needed; fail2ban on SSH), installs Docker and nginx, obtains the certificate, checks out the newest release tag (or `git_version`), writes `.env` from your host vars, builds and starts the stack, waits for the API, and runs the security check. Servers run tagged releases, never `main`; a dev server sets `git_version: main` in its host vars. The final security check is strict: a release whose compose file predates a check fails the run with the finding named, and the fix comes with the next release (the update guide).
+
+Measured on 2026-09-04 against a fresh 2 vCPU droplet: the first run took under eight minutes, the update to another version under four.
 
 Then on the server:
 

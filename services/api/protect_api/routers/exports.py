@@ -174,6 +174,10 @@ async def download_export(
     """The finished file, streamed from MinIO through the API (the browser never talks to
     MinIO)."""
     job = await _project_job(session, context, job_id)
+    if job.status == ExportStatus.EXPIRED:
+        raise HTTPException(
+            status.HTTP_410_GONE, "Export file was removed after its retention; reproduce the job"
+        )
     if job.status != ExportStatus.DONE or job.object_key is None:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Export is {job.status}, not done")
     params = ExportParameters.model_validate(job.parameters)

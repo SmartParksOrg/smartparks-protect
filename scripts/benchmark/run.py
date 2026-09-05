@@ -42,12 +42,18 @@ BUDGETS_MS = {
 
 
 class Bench:
-    def __init__(self, api: str, token: str) -> None:
+    def __init__(self, api: str, token: str, relogin: Any = None) -> None:
         self.client = httpx.Client(
             base_url=api, headers={"Authorization": f"Bearer {token}"}, timeout=600
         )
         self.results: list[dict[str, Any]] = []
         self.notes: list[str] = []
+        self.relogin = relogin
+
+    def refresh_token(self) -> None:
+        """Access tokens outlive no long export: log in again when the API answers 401."""
+        if self.relogin is not None:
+            self.client.headers["Authorization"] = f"Bearer {self.relogin()}"
 
     def timed(
         self, name: str, method: str, url: str, repeats: int = 5, **kwargs: Any
@@ -132,6 +138,11 @@ async def main() -> None:
     parser.add_argument("--ingest-events", type=int, default=2_000)
     parser.add_argument("--export-container", default="protect-export")
     parser.add_argument(
+        "--where",
+        default="the development machine",
+        help="where the stack ran, named in the report (for example 'the dev server, 4 vCPU 8 GB')",
+    )
+    parser.add_argument(
         "--only",
         nargs="*",
         choices=["map", "tracks", "explorer", "exports", "ingest"],
@@ -144,7 +155,11 @@ async def main() -> None:
         "postgresql+asyncpg://protect:protect-dev-password@localhost:5432/smartparks_protect",
     ).replace("postgresql+asyncpg://", "postgresql://")
     db = await asyncpg.connect(dsn)
-    bench = Bench(args.api + "/api/v1", login_token(args.api, args.email, args.password))
+    bench = Bench(
+        args.api + "/api/v1",
+        login_token(args.api, args.email, args.password),
+        relogin=lambda: login_token(args.api, args.email, args.password),
+    )
     project = await db.fetchrow("SELECT id, name FROM projects WHERE slug = $1", args.project)
     if project is None:
         raise SystemExit(f"no project with slug {args.project}; run generate.py first")
@@ -280,18 +295,36 @@ async def main() -> None:
             None, container_peak_memory, args.export_container, stop
         )
         started = time.perf_counter()
-        job = bench.client.post(
-            f"/projects/{pid}/exports",
-            json={
-                "dataset": "measurements",
-                "format": "csv",
-                "time_from": (now - timedelta(days=365)).isoformat(),
-                "time_to": now.isoformat(),
-            },
-        ).json()
-        while job["status"] in ("queued", "running"):
-            await asyncio.sleep(2)
-            job = bench.client.get(f"/projects/{pid}/exports/{job['id']}").json()
+        try:
+            created = bench.client.post(
+                f"/projects/{pid}/exports",
+                json={
+                    "dataset": "measurements",
+                    "format": "csv",
+                    "time_from": (now - timedelta(days=365)).isoformat(),
+                    "time_to": now.isoformat(),
+                },
+            )
+            if created.status_code >= 300:
+                raise SystemExit(f"export job refused: {created.status_code} {created.text[:300]}")
+            job = created.json()
+            job_id = job["id"]
+            while job["status"] in ("queued", "running"):
+                await asyncio.sleep(2)
+                try:
+                    polled = bench.client.get(f"/projects/{pid}/exports/{job_id}")
+                except httpx.HTTPError as exc:  # a resolver or connection hiccup; ask again
+                    bench.notes.append(f"poll retried after {type(exc).__name__}")
+                    await asyncio.sleep(10)
+                    continue
+                if polled.status_code == 401:  # the token expired during a long export
+                    bench.refresh_token()
+                    continue
+                if polled.status_code >= 300:  # a proxy timeout or a throttle; ask again
+                    continue
+                job = polled.json()
+        finally:
+            stop.set()
         elapsed = (time.perf_counter() - started) * 1000
         stop.set()
         peaks = await memory_task
@@ -309,6 +342,7 @@ async def main() -> None:
 
     # ingest burst through the webhook
     if wanted("ingest"):
+        bench.refresh_token()
         tokens = json.loads(args.manifest.read_text())["webhook_tokens"] if args.manifest else {}
         if tokens:
             source_id, token = next(iter(tokens.items()))
@@ -401,17 +435,22 @@ async def main() -> None:
             bench.notes.append("No manifest given, the ingest burst was skipped.")
 
     await db.close()
-    write_report(args.output, project["name"], dict(totals), dict(counts), bench)
+    write_report(args.output, project["name"], dict(totals), dict(counts), bench, args.where)
     sys.stdout.write(f"report written to {args.output}\n")
 
 
 def write_report(
-    path: Path, project_name: str, totals: dict[str, Any], counts: dict[str, Any], bench: Bench
+    path: Path,
+    project_name: str,
+    totals: dict[str, Any],
+    counts: dict[str, Any],
+    bench: Bench,
+    where: str = "the development machine",
 ) -> None:
     lines = [
         "# Benchmarks",
         "",
-        "Results of `scripts/benchmark/run.py` against `scripts/benchmark/generate.py` data on the development machine. "
+        f"Results of `scripts/benchmark/run.py` against `scripts/benchmark/generate.py` data on {where}. "
         "Budgets come from architecture 13.7 and 13.8; they are development budgets, not service levels. "
         "Rerun both scripts to refresh this page.",
         "",

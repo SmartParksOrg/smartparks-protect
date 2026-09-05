@@ -247,6 +247,7 @@ class ExportStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+    EXPIRED = "expired"  # the file was removed after its retention (architecture 14)
 
 
 class NotificationChannel(StrEnum):

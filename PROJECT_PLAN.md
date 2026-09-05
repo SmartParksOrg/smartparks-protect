@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 14 (production hardening and 2.0) built on the local stack except the benchmark run, whose scale 0.2 generation is running on the dev server; decisions D91 to D94; awaiting commit; live checks of the phase 13 adapters and connectors pending |
+| Active phase | Phase 14 (production hardening and 2.0) complete except the release: security audit, docs checks, organizations, translation layer, release process, both exit criteria checked, benchmark at 0.2 on the dev server; the exit criteria work and the benchmark await commit; live checks of the phase 13 adapters and connectors pending |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
-| Last session | 2026-09-04 |
-| Next item | Commit phase 14 on Tim's word; when the generation on the dev server finishes, run `scripts/benchmark/run.py` there and record the results; then v2.0.0 on Tim's word; the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
+| Last session | 2026-09-05 |
+| Next item | Commit the exit criteria work and the benchmark on Tim's word, then v2.0.0 on Tim's word (the deployment drill showed a docs-only deployment lands on v0.6.0 and fails the security check until 2.0 is tagged); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -655,7 +655,7 @@ Release:
 
 **Deliverables.**
 
-- [ ] Benchmark at the full reference envelope (13.9) on a representative server; performance budgets met or documented. (D91: scale 0.2 on the dev server; the time-ordered generator with `--compress` was proven at scale 0.005 there on 2026-09-04 and the 0.2 generation started at 20:47 UTC, about six hours; the benchmark run and the results page follow)
+- [x] Benchmark at the full reference envelope (13.9) on a representative server; performance budgets met or documented. (2026-09-05, D91: scale 0.2 on the dev server, 44 million positions and 177 million measurements generated in 4.1 hours with compression behind the write frontier; every interactive read path within budget; over budget and documented: the direct positions export at 10.3 s against 10 s, and the decoder path under a burst at 77 s p95 from webhook to canonical row, 15 uplinks per second on 4 vCPU; the export job streamed 22.6 million rows in 73 minutes within 129 MiB. `docs/operations/benchmarks.md` and the scalability page carry the reading; the full envelope stays extrapolated.)
 - [x] Documentation Definition of Done audit over the whole site; link check, OpenAPI freshness check and diagram validation in CI (28.8). (2026-09-04: `scripts/docs_check.py` for links, anchors, Mermaid fences and the MCP tool reference in the docs CI job next to the OpenAPI freshness job; the audit walked the navigation against the feature list and fixed what was stale: the getting-started page became the quick start with the language note, the deployment and update guides lost their pre-phase-10 wording, phase numbers left the OpenCollar, adapter interface, ChirpStack, MCP and rules pages, and new pages cover security, the release process and organizations)
 - [x] Security audit: RBAC on every endpoint tested, credential handling, MCP scopes, rate limits, dependency audit. (2026-09-04, D94: `tests/api/test_access_matrix.py`, application-level throttling, `pip-audit` and `npm audit` in CI, `docs/operations/security.md` with the findings; one fix: curation permissions moved into route dependencies)
 - [x] Organization tenancy decision revisited (D21). (2026-09-04, D92: organizations as a grouping; `/admin/organizations`, `organization_id` on projects, filter and column on the Projects page, `docs/administration/organizations.md`)
@@ -663,7 +663,7 @@ Release:
 - [x] Release process documented: version, changelog, upgrade notes, migration and rollback guidance (28.9). (2026-09-04, `docs/operations/release-process.md`; the update and deployment guides lost their pre-phase-10 wording)
 - [ ] `VERSION` v2.0.0.
 
-**Exit criteria.** A new operator deploys production from the docs alone; a new developer adds a driver from the extension docs alone.
+**Exit criteria.** A new operator deploys production from the docs alone; a new developer adds a driver from the extension docs alone. (Developer half checked on 2026-09-04 by writing a throwaway driver for a vendor GPS tracker from the guide and its public manual alone; the guide gained what the check missed: how a LoRaWAN frame reaches the driver, metric seeds through a migration, control actions, fixtures, the docs page and the device type. The driver itself was removed at Tim's request on 2026-09-05: the product focuses on OpenCollar. Operator half checked the same day: a throwaway droplet deployed from the deployment guide alone in 7 minutes 41 seconds; the run ended on the security check's finding that v0.6.0, the newest tag the playbook chooses, binds the frontend to every interface, which the unreleased deployment fix resolves; `bootstrap-admin` and `verify-server.sh` passed; the update guide's `env-refresh` to `main` took 3 minutes 39 seconds and all seventeen checks passed. The droplet was destroyed afterwards. Two doc additions came out of it: the wildcard DNS tip for throwaway servers and the note on the strict final check.)
 
 ---
 
@@ -916,4 +916,17 @@ Listed by the phase where they are first needed.
 - Benchmark generator rewritten to write in time order with a barrier between workers and `--compress`; proven at scale 0.005 on the dev server (all but one chunk compressed while loading); the reset lifts TimescaleDB's decompression limit; the 0.2 generation is running there.
 - Verified: ruff, mypy, 337 backend tests, frontend lint, typecheck, catalogue check, tests and build, strict docs build, docs check, the rebuilt stack (throttle headers, organizations) and a clean UI sweep.
 - Open: the benchmark run and results page; `VERSION` v2.0.0 on Tim's word; the live checks of earlier phases.
+
+### 2026-09-04, phase 14 exit criteria (Claude, while Tim slept)
+
+- Developer criterion: a throwaway driver for a vendor GPS tracker written from `docs/devices/driver-interface.md` and its public manual alone (three payload layouts, positions, measurements, state, events, six downlink actions, golden tests over the manual's examples). Gaps the check found and closed in the guide: how a LoRaWAN frame reaches `event.frame`, that metric keys need a migration with `seed_sql()`, how control actions are declared, the fixture README rule, the docs page and navigation, and creating the device type. Removed on 2026-09-05 at Tim's request: the product focuses on OpenCollar, the guide keeps what the check taught.
+- Operator criterion: the deployment drill above. Finding for the 2.0 release: until it is tagged, a docs-only deployment lands on v0.6.0 and fails the final security check on the frontend port; the changelog's Unreleased section already carries the fix.
+- Benchmark generation on the dev server restarted at 21:27 UTC after the first run wrote into chunks compressed by the smoke test (the generator now decompresses the window first and recompresses chunks behind the frontier); about 2 million positions per 13 minutes with a flat disk footprint.
+
+### 2026-09-05, phase 14 benchmark (Claude)
+
+- Generation finished at 01:33 UTC: 44.2 million positions, 176.9 million measurements, 4.1 hours, 2.6 GB and 7.3 GB compressed, 52 of 53 chunks compressed during the load.
+- The runner needed three fixes found on the server: a refused export answer crashed it, the login token expired during the 65 minute export job (re-login on 401), and a transient resolver failure on the droplet killed a poll (retry on network errors). Each cost one export job; the complete run then took 78 minutes (08:08 to 09:26 UTC).
+- Results in `docs/operations/benchmarks.md` with the reading; scalability page updated. The dataset stays on the dev server (20 GB used of 154) until Tim decides; `generate.py --reset` removes it in minutes.
+- The benchmark exports showed that finished export files were never removed (three of 4.9 GB on the dev server): the export service now sweeps expired files hourly, jobs become `expired`, migration 0014. The dev server's disk (43 GB used) frees itself a week after those jobs once the server runs this code.
 

@@ -59,6 +59,7 @@ PARKS = [
 INTERVALS = [(300, 0.35), (600, 0.25), (900, 0.15), (1800, 0.15), (3600, 0.10)]  # seconds, weight
 METRICS = ("battery_voltage", "device_temperature", "activity", "gnss_satellites")
 BATCH_ROWS = 200_000
+BLOCK_MARGIN_DAYS = 7  # a chunk this far behind the frontier gets no more rows
 
 
 def database_dsn() -> str:
@@ -315,6 +316,34 @@ async def load_devices(
         await conn.close()
 
 
+async def decompress_window(dsn: str, since: datetime, until: datetime) -> None:
+    """Chunks of the load window that are compressed (from an earlier run) are decompressed
+    first, so the COPY writes plain rows and `compress_behind` compresses each chunk once."""
+    conn = await asyncpg.connect(dsn)
+    try:
+        await conn.execute("SET timescaledb.max_tuples_decompressed_per_dml_transaction = 0")
+        for table in ("positions", "measurements"):
+            chunks = await conn.fetch(
+                """
+                SELECT format('%I.%I', chunk_schema, chunk_name) AS chunk
+                FROM timescaledb_information.chunks
+                WHERE hypertable_name = $1 AND is_compressed
+                  AND range_end > $2 AND range_start < $3
+                """,
+                table,
+                since,
+                until + timedelta(days=1),
+            )
+            for row in chunks:
+                await conn.execute(
+                    f"SELECT decompress_chunk('{row['chunk']}', if_compressed => true)"
+                )
+            if chunks:
+                sys.stderr.write(f"  decompressed {len(chunks)} {table} chunks before the load\n")
+    finally:
+        await conn.close()
+
+
 async def compress_behind(
     dsn: str, blocks: list[datetime], barrier: asyncio.Barrier, progress: dict
 ) -> None:
@@ -325,14 +354,18 @@ async def compress_behind(
         for block_end in blocks:
             await barrier.wait()
             for table in ("positions", "measurements"):
+                # Every chunk behind the frontier, compressed ones included: rows written into
+                # an already compressed chunk sit uncompressed until it is compressed again.
                 chunks = await conn.fetch(
                     """
                     SELECT format('%I.%I', chunk_schema, chunk_name) AS chunk
                     FROM timescaledb_information.chunks
-                    WHERE hypertable_name = $1 AND NOT is_compressed AND range_end <= $2
+                    WHERE hypertable_name = $1 AND range_end <= $2
+                      AND (NOT is_compressed OR range_end > $3)
                     """,
                     table,
                     block_end - timedelta(days=1),
+                    block_end - timedelta(days=2 * BLOCK_MARGIN_DAYS),
                 )
                 for row in chunks:
                     await conn.execute(
@@ -480,6 +513,8 @@ async def main() -> None:
         cursor = min(cursor + timedelta(days=args.block_days), until)
         blocks.append(cursor)
     blocks[-1] = until + timedelta(days=1)  # the last block takes every remaining sample
+    if args.compress:
+        await decompress_window(dsn, since, until)
     parties = len(shards) + (1 if args.compress else 0)
     barrier = asyncio.Barrier(parties)
     tasks = [

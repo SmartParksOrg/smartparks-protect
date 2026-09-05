@@ -59,6 +59,7 @@ Until one of them lands, the realtime budget (p95 under 2 seconds from commit) h
 
 ## What still needs proving
 
-- The benchmark ran at one tenth of the envelope on a laptop. The generator scales further (`--scale 1` is about 6 hours and 700 GB uncompressed); that run belongs on the development server.
-- Compression was measured by compressing old chunks by hand; the policy job itself (every twelve hours, chunks older than seven days) has not been watched over a full cycle on a long-running stack.
+- The benchmark ran at one tenth of the envelope on a laptop and at one fifth on the dev server (decision D91, [benchmarks](../operations/benchmarks.md)): every read path within budget, the decoder path the bottleneck under a burst (15 uplinks per second end to end on 4 vCPU), a direct export at the edge of its budget. The full envelope is extrapolated until a production-sized server exists; the generator writes in time order and compresses behind the write frontier, so the disk holds compressed history plus one block (scale 0.2 took 4.1 hours and 10 GB on disk).
+- Compression was measured by compressing old chunks by hand and, since the 0.2 run, by the generator's `--compress`; the policy job itself (every twelve hours, chunks older than seven days) has not been watched over a full cycle on a long-running stack.
+- The per-event cost of the decoder path needs profiling before the full envelope is claimed; more decoder replicas are the known remedy.
 - Rules with rolling windows and geofences (phase 5) add the first read path that scans recent history per event; the benchmark gets a case for it then.

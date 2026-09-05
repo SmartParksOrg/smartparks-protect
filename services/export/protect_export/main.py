@@ -7,12 +7,14 @@ import uuid
 from shared.bus import Message, Topic
 from shared.curation.jobs import run_job
 from shared.database import session_scope
+from shared.exports.cleanup import expire_exports
 from shared.exports.runner import run_export
 from shared.logger import get_logger
 from shared.models import ExportJob
 from shared.worker import Worker
 
 log = get_logger("export")
+CLEANUP_INTERVAL_SECONDS = 3600
 
 
 def build_worker() -> Worker:
@@ -31,8 +33,21 @@ def build_worker() -> Worker:
     async def on_curation(message: Message) -> None:
         await run_job(worker.bus, message.payload)
 
+    async def cleanup_loop() -> None:
+        """Every hour: remove the files of exports past their retention (architecture 14)."""
+        while not worker.bus._stop.is_set():
+            try:
+                async with session_scope() as session:
+                    expired = await expire_exports(session)
+                if expired:
+                    log.info("expired export files removed", count=expired)
+            except Exception as exc:
+                log.warning("export cleanup failed", error=str(exc))
+            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+
     worker.subscribe(Topic.EXPORT_REQUESTED, handle)
     worker.subscribe(Topic.CURATION_JOB_REQUESTED, on_curation)
+    worker.background(cleanup_loop)
     return worker
 
 

@@ -34,7 +34,7 @@ Streams the file. The row count is checked first; above 100,000 rows the answer 
 
 The export service consumes `export.requested`, reads rows with a server-side cursor in batches of 2,000, writes them through a streaming writer into a temporary file, uploads the file to the `exports` bucket and records size and hash. Progress is written every 10,000 rows. A failure is stored on the job with its message; it is not retried, the same parameters would fail again.
 
-Files are kept for seven days (`expires_at`). Cleanup of expired objects is a later operations task.
+Files are kept for seven days (`expires_at`); the export service removes expired files once an hour and marks the job `expired`. The job's parameters and metadata stay, `download` answers 410, and `reproduce` makes the file again.
 
 ## Formats
 

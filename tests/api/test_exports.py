@@ -8,10 +8,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from geoalchemy2 import WKTElement
+from minio.error import S3Error
 
+from shared.config import get_settings
 from shared.exports import runner
+from shared.exports.cleanup import expire_exports
 from shared.exports.runner import run_export
 from shared.models import ExportJob, Measurement, Position
+from shared.storage import get_object
 from tests.api.test_network_and_map import _setup
 
 pytestmark = pytest.mark.asyncio
@@ -101,6 +105,19 @@ async def test_job_runs_to_minio_and_downloads(client, db, monkeypatch):
     assert reproduced.status_code == 201
     assert reproduced.json()["source_job_id"] == job["id"]
     assert reproduced.json()["parameters"] == job["parameters"]
+
+    # retention: the export service's hourly sweep removes the file and marks the job expired
+    row = await db.get(ExportJob, uuid.UUID(job["id"]))
+    row.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    await db.commit()
+    assert await expire_exports(db) == 1
+    assert await expire_exports(db) == 0  # idempotent: nothing left to remove
+    gone = await client.get(f"{base}/{job['id']}/download", headers=admin.headers)
+    assert gone.status_code == 410
+    expired = (await client.get(f"{base}/{job['id']}", headers=admin.headers)).json()
+    assert expired["status"] == "expired" and expired["parameters"] == job["parameters"]
+    with pytest.raises(S3Error):  # the object is gone from the bucket
+        await get_object(get_settings().minio_bucket_exports, str(row.object_key))
 
 
 async def test_direct_exports_every_dataset(client, db):
