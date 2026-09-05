@@ -41,3 +41,7 @@ The connection fails before the consent page: the client could not discover the 
 ## Reading the logs
 
 `docker compose logs -f <service>` follows one service. Every line is JSON with `service`, `trace_id` and `request_id`; the request id of an API call is in the `X-Request-ID` response header, so an error a user reports can be found with `docker compose logs api | grep <request id>`. `scripts/verify-server.sh` is the read-only pass or fail check after an update or a restore.
+
+## A platform is connected but nothing shows
+
+Server admin, Data sources, Traffic on the source lists every message it received in the last hours, linked to a device or not, with the raw payload and the processing status. Empty means the platform never posted: check its own integration log. Rows with an unknown identity mean the DevEUI is not linked yet: accept it from Needs attention.

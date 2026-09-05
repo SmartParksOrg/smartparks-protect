@@ -31,6 +31,7 @@ const AdminProjectsPage = lazy(() => import("@/pages/admin/AdminProjectsPage").t
 const UsersPage = lazy(() => import("@/pages/admin/UsersPage").then((m) => ({ default: m.UsersPage })));
 const AdminDevicesPage = lazy(() => import("@/pages/admin/AdminDevicesPage").then((m) => ({ default: m.AdminDevicesPage })));
 const DataSourcesPage = lazy(() => import("@/pages/admin/DataSourcesPage").then((m) => ({ default: m.DataSourcesPage })));
+const DataSourceTrafficPage = lazy(() => import("@/pages/admin/DataSourceTrafficPage").then((m) => ({ default: m.DataSourceTrafficPage })));
 const DeviceTypesPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.DeviceTypesPage })));
 const EntityTypesPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.EntityTypesPage })));
 const MetricsPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.MetricsPage })));
@@ -105,6 +106,7 @@ export default function App() {
               <Route path="devices" element={<AdminDevicesPage />} />
               <Route path="devices/:deviceId" element={<DevicePage />} />
               <Route path="data-sources" element={<DataSourcesPage />} />
+              <Route path="data-sources/:sourceId/traffic" element={<DataSourceTrafficPage />} />
               <Route path="device-types" element={<DeviceTypesPage />} />
               <Route path="entity-types" element={<EntityTypesPage />} />
               <Route path="metrics" element={<MetricsPage />} />

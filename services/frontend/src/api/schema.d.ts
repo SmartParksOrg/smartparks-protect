@@ -1377,6 +1377,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data-sources/{data_source_id}/traffic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data Source Traffic
+         * @description Everything one data source received, newest first, linked to a device or not: what an
+         *     administrator watches while connecting a platform, before any device exists.
+         */
+        get: operations["data_source_traffic_api_v1_data_sources__data_source_id__traffic_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/traces": {
         parameters: {
             query?: never;
@@ -11606,6 +11627,44 @@ export interface operations {
             header?: never;
             path: {
                 project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    data_source_traffic_api_v1_data_sources__data_source_id__traffic_get: {
+        parameters: {
+            query?: {
+                external_id?: string | null;
+                event_type?: string | null;
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+                include_payload?: boolean;
+            };
+            header?: never;
+            path: {
+                data_source_id: string;
             };
             cookie?: never;
         };

@@ -44,17 +44,19 @@ const projects = (await json("/api/v1/projects?limit=5", { headers })).items;
 const project = projects[0];
 if (!project) throw new Error("The sweep account needs at least one project");
 const devices = (await json(`/api/v1/devices?project_id=${project.id}&limit=1`, { headers })).items;
+const sources = me.is_superuser ? (await json("/api/v1/data-sources?limit=1", { headers })).items : [];
 
 const routerSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const paths = [...routerSource.matchAll(/path="([^"*]+)"/g)].map((m) => m[1]).filter((p) => !p.startsWith("/login") && !["register", "forgot-password", "reset-password"].some((s) => p.includes(s)));
 const routes = new Set(["/login"]);
 let current = "";
-const fill = (p) => p.replace(":projectId", project.id).replace(":deviceId", devices[0]?.id ?? "");
+const fill = (p) => p.replace(":projectId", project.id).replace(":deviceId", devices[0]?.id ?? "").replace(":sourceId", sources[0]?.id ?? "");
 for (const p of paths) {
   if (p.startsWith("/")) { current = p; if (!p.includes(":")) routes.add(p); continue; }
   const full = fill(`${current}/${p}`);
   if (full.endsWith("/")) continue;
   if (full.includes("/devices/") && !devices[0]) continue;
+  if (full.includes("/data-sources/") && !sources[0]) continue;
   if (full.startsWith("/admin") && !me.is_superuser) continue;
   routes.add(full);
 }

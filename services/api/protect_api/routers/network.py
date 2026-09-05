@@ -2,10 +2,11 @@
 (26.2, basic). Traffic and traces are read per project; health is server admin."""
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -165,6 +166,51 @@ async def traffic(
     rows = (
         await session.execute(statement.order_by(SourceEvent.ingested_at.desc()).limit(limit))
     ).all()
+    return await _traffic_rows(session, rows, include_payload)
+
+
+@router.get("/data-sources/{data_source_id}/traffic", response_model=list[TrafficRow])
+async def data_source_traffic(
+    data_source_id: uuid.UUID,
+    external_id: str | None = None,
+    event_type: str | None = None,
+    time_from: datetime | None = Query(None, alias="from"),
+    time_to: datetime | None = Query(None, alias="to"),
+    limit: int = Query(100, ge=1, le=MAX_ROWS),
+    include_payload: bool = False,
+    _: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[TrafficRow]:
+    """Everything one data source received, newest first, linked to a device or not: what an
+    administrator watches while connecting a platform, before any device exists."""
+    source = await session.get(DataSource, data_source_id)
+    if source is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Data source not found")
+    time_to = require_aware(time_to) if time_to else utc_now()
+    time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
+    statement = (
+        select(SourceEvent, Device.name, DataSource.name)
+        .outerjoin(Device, Device.id == SourceEvent.device_id)
+        .join(DataSource, DataSource.id == SourceEvent.data_source_id)
+        .where(
+            SourceEvent.data_source_id == data_source_id,
+            SourceEvent.ingested_at >= time_from,
+            SourceEvent.ingested_at < time_to,
+        )
+    )
+    if event_type is not None:
+        statement = statement.where(SourceEvent.event_type == event_type)
+    if external_id:
+        statement = statement.where(SourceEvent.external_id.ilike(f"%{external_id}%"))
+    rows = (
+        await session.execute(statement.order_by(SourceEvent.ingested_at.desc()).limit(limit))
+    ).all()
+    return await _traffic_rows(session, rows, include_payload)
+
+
+async def _traffic_rows(
+    session: AsyncSession, rows: Sequence[Any], include_payload: bool
+) -> list[TrafficRow]:
     event_ids = [r[0].id for r in rows]
     receptions: dict[int, list[GatewayReception]] = {}
     if event_ids:

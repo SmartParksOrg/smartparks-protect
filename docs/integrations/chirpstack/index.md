@@ -66,7 +66,9 @@ the uplink path works and commands are refused with `CONNECTIVITY_AUTH_FAILED` o
 connection error until one is added.
 
 The DevEUI is the identity: register the collars' DevEUIs on the data source, or accept them
-from Needs attention as their first uplinks arrive.
+from Needs attention as their first uplinks arrive. While connecting, Server admin, Data
+sources, Traffic shows every message the source receives, linked to a device or not, with
+the raw payload; it refreshes every five seconds.
 
 ## Timestamps
 

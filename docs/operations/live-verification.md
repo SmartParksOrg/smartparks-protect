@@ -37,7 +37,7 @@ Pick the network the collar is registered on. Each has a runbook with the exact 
    `Authorization: Bearer <token>` header, as the runbook says.
 3. Register the collar's DevEUI as an external identity on the data source, or wait for the
    first uplink and accept it from Server admin, Needs attention, linking it to the device.
-4. Watch, in this order: Network, Traffic (the uplink with its hex frame and gateways);
+4. Watch, in this order: Server admin, Data sources, Traffic on the new source (every message it receives, linked or not, refreshing every five seconds); Network, Traffic (the uplink with its hex frame and gateways);
    Network, Trace explorer (ingest to canonical rows, every step green); the entity on the
    Live map; Data explorer with battery voltage over the last hour.
 5. Device page: "Open in <network>" opens the right page in the portal. Deep links were built

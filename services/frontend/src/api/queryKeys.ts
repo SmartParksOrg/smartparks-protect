@@ -16,6 +16,7 @@ export const queryKeys = {
   track: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "track", params] as const,
   positions: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "positions", params] as const,
   traffic: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "traffic", params] as const,
+  sourceTraffic: (sourceId: string, params: Record<string, unknown>) => ["data-sources", sourceId, "traffic", params] as const,
   traces: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "traces", params] as const,
   trace: (id: string) => ["traces", id] as const,
   sourceEvent: (id: number, ingestedAt: string) => ["source-events", id, ingestedAt] as const,

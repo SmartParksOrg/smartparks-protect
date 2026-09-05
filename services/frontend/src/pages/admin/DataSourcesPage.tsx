@@ -2,8 +2,9 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Copy, KeyRound, Plus, RefreshCw, Trash2, Waypoints } from "lucide-react";
+import { Copy, KeyRound, Plus, Radio, RefreshCw, Trash2, Waypoints } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -73,6 +74,7 @@ export function DataSourcesPage() {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<{ token: string; url: string | null } | null>(null);
   const [removing, setRemoving] = useState<DataSource | null>(null);
+  const navigate = useNavigate();
   const remove = useMutationToast({
     mutationFn: (s: DataSource) => api.delete(`/api/v1/data-sources/${s.id}`),
     invalidate: [queryKeys.dataSources],
@@ -115,6 +117,7 @@ export function DataSourcesPage() {
       {(row.original.has_webhook_token || ADAPTERS.find((x) => x.key === row.original.adapter_key)?.push) && <Button variant="ghost" size="sm" onClick={() => rotate.mutate(row.original.id)}><KeyRound className="size-4" /> {row.original.has_webhook_token ? t("New token") : t("Create webhook token")}</Button>}
       {a?.polling && <Button variant="ghost" size="sm" onClick={() => { setSince(""); setRescanning(row.original); }}><RefreshCw className="size-4" /> {t("Rescan")}</Button>}
       {a?.can_manage && caps.gateway_management && <Button variant="ghost" size="sm" disabled={syncGateways.isPending} onClick={() => syncGateways.mutate(row.original)}><Waypoints className="size-4" /> {t("Sync gateways")}</Button>}
+      <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/data-sources/${row.original.id}/traffic`)}><Radio className="size-4" /> {t("Traffic")}</Button>
       {!a?.builtin && <Button variant="ghost" size="sm" aria-label={t("Delete data source")} onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button>}
     </span>; } },
   ];
