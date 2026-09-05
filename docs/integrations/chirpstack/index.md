@@ -84,20 +84,63 @@ proxy or `grpc://host:8080` straight to ChirpStack on a private network, and `ap
 API key of the tenant. Without an API channel the uplink path works and commands are held
 back until one is configured.
 
-Exposing the gRPC API through an existing nginx that fronts ChirpStack on 443 takes one
-location before `location /`, restricted to this server:
+Exposing the gRPC API through an existing nginx that fronts ChirpStack on 443 needs care:
+ChirpStack's own web UI calls the same `/api.` paths as grpc-web over HTTP/1.1, so a
+location that sends every `/api.` request to `grpc_pass` locks everyone out of the web UI.
+Route on the content type instead: native gRPC (`application/grpc`) from this server goes to
+`grpc_pass`, everything else keeps going to ChirpStack as before. A `map` outside the server
+block and one location before `location /`:
 
 ```nginx
-location ~ ^/api\. {
-    allow <this server's address>;
-    deny all;
-    grpc_pass grpc://127.0.0.1:8080;
+map "$http_content_type:$remote_addr" $chirpstack_api_route {
+    "~^application/grpc(\+[^:]+)?:<this server's address>$"  grpc;
+    "~^application/grpc(\+[^:]+)?:"                          deny;
+    default                                                  web;
+}
+
+server {
+    listen 443 ssl http2;
+    # ... certificate and the existing settings ...
+
+    location ~ ^/api\. {
+        if ($chirpstack_api_route = deny) { return 403; }
+        if ($chirpstack_api_route = web) { proxy_pass http://localhost:8080; }
+        grpc_pass grpc://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        # unchanged
+    }
 }
 ```
 
-ChirpStack's gRPC services live under paths such as `/api.DeviceService/Enqueue`, which is
-what the regular expression matches; the server block must carry `http2`. Then `api_url` is
-`grpcs://<host>:443`. In ChirpStack, Tenant, API keys: create a key and store it as the
+Escape the dots of the address in the map (`178\.62\.201\.128`); to admit more clients, add a
+line per address. The regular expression matches the gRPC protocol's content type
+(`application/grpc`, optionally with a `+proto` or other suffix) and not grpc-web's
+`application/grpc-web...`, which is how the browser is told apart. ChirpStack's gRPC services
+live under paths such as `/api.DeviceService/Enqueue`, which is what the regular expression
+matches; the server block must carry `http2`. Then `api_url` is `grpcs://<host>:443`. This
+was checked against nginx 1.18 and ChirpStack 4.19.1: the web UI's login (grpc-web) and
+pages keep working, native gRPC from the listed address reaches ChirpStack, and from any
+other address answers 403.
+
+Other setups:
+
+- ChirpStack's `[api] bind` port (8080 in the standard docker-compose deployment) serves the
+  web UI, grpc-web and native gRPC together and has no TLS option. On a private network or
+  VPN, `api_url` can be `grpc://<host>:8080` with no proxy at all; over the internet that
+  sends the API key in the clear, so use a TLS proxy or a firewall rule for this server's
+  address.
+- A separate TLS server block for gRPC only (for example port 8443 with `location / {
+  grpc_pass grpc://127.0.0.1:8080; }` plus `allow`/`deny`) avoids the content-type routing
+  and leaves the 443 block untouched; `api_url` is then `grpcs://<host>:8443`.
+- Caddy speaks HTTP/2 to backends: `reverse_proxy h2c://chirpstack:8080` carries the web UI,
+  grpc-web and native gRPC alike, so no special location is needed (Caddy's `versions`
+  transport option documents `h2c`). In ChirpStack, Tenant, API keys: create a key and store it as the
 `api_token` credential. "Test connection" on the data source calls the API with it; "Sync
 devices" turns the tenant's devices into identities to link; "Sync gateways" fills the
 gateway registry.

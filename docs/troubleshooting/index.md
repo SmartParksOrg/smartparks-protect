@@ -54,6 +54,14 @@ answers `content-type: application/grpc` with a `grpc-status` header once the lo
 works, and an empty `HTTP/2 400` while it does not; a `403` means the location works but
 its `allow` line does not name the Protect server's address.
 
+## Nobody can log in to ChirpStack's web UI after adding the gRPC location
+
+The web UI talks grpc-web to the same `/api.` paths. A location that hands every `/api.`
+request to `grpc_pass`, or that allows only the Protect server, answers the browser's login
+call with 403 or a broken response. Use the content-type routed location from the
+[ChirpStack page](../integrations/chirpstack/index.md#connecting-an-existing-chirpstack),
+which keeps grpc-web on the plain proxy and sends only native gRPC to `grpc_pass`.
+
 ## A platform is connected but nothing shows
 
 Server admin, Traffic (or Data sources, Traffic for one source) lists every message received in the last hours, linked to a device or not, with the raw payload and the processing status. Empty means the platform never posted: check its own integration log. Rows with an unknown identity mean the DevEUI is not linked yet: accept it from Needs attention.
