@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Copy, KeyRound, Plus, RefreshCw, Waypoints } from "lucide-react";
+import { Copy, KeyRound, Plus, RefreshCw, Trash2, Waypoints } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { DataSource, Page as PageType, ProjectWithRole } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
@@ -71,6 +72,13 @@ export function DataSourcesPage() {
   const [editing, setEditing] = useState<DataSource | null>(null);
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<{ token: string; url: string | null } | null>(null);
+  const [removing, setRemoving] = useState<DataSource | null>(null);
+  const remove = useMutationToast({
+    mutationFn: (s: DataSource) => api.delete(`/api/v1/data-sources/${s.id}`),
+    invalidate: [queryKeys.dataSources],
+    success: "Data source deleted",
+    onSuccess: () => setRemoving(null),
+  });
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", adapter_key: "", enabled: true, config: "{}", credentials: "{}", project_ids: [] } });
   const adapterKey = form.watch("adapter_key");
   useEffect(() => {
@@ -107,6 +115,7 @@ export function DataSourcesPage() {
       {(row.original.has_webhook_token || ADAPTERS.find((x) => x.key === row.original.adapter_key)?.push) && <Button variant="ghost" size="sm" onClick={() => rotate.mutate(row.original.id)}><KeyRound className="size-4" /> {row.original.has_webhook_token ? t("New token") : t("Create webhook token")}</Button>}
       {a?.polling && <Button variant="ghost" size="sm" onClick={() => { setSince(""); setRescanning(row.original); }}><RefreshCw className="size-4" /> {t("Rescan")}</Button>}
       {a?.can_manage && caps.gateway_management && <Button variant="ghost" size="sm" disabled={syncGateways.isPending} onClick={() => syncGateways.mutate(row.original)}><Waypoints className="size-4" /> {t("Sync gateways")}</Button>}
+      {!a?.builtin && <Button variant="ghost" size="sm" aria-label={t("Delete data source")} onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button>}
     </span>; } },
   ];
   return (
@@ -157,6 +166,7 @@ export function DataSourcesPage() {
           <DialogFooter><Button onClick={() => setToken(null)}>{t("Done")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog open={removing !== null} onOpenChange={(open) => { if (!open) setRemoving(null); }} title={t("Delete data source")} description={removing ? t("{{name}} is removed with its webhook token and its external identities; devices and their data stay.", { name: removing.name }) : ""} confirmLabel={t("Delete")} onConfirm={() => { if (removing) remove.mutate(removing); }} />
     </>
   );
 }

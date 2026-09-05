@@ -292,3 +292,39 @@ def test_catalog_lists_the_protocol_tables():
     assert commands["cmd_flash_get_all"]["id"] == 0xBB
     assert commands["cmd_flash_get_from_head"]["argument_length"] == 12
     assert catalog["firmware"] == "7.3.0"
+
+
+def test_live_chirpstack_status_uplink_matches_chirpstacks_decoder():
+    """The first recorded live uplink (collar SP051307 over chirpstack-dev4, 2026-09-05): our
+    driver and ChirpStack's JavaScript decoder read the same frame the same way."""
+    import base64
+
+    from shared.connectivity.adapters.chirpstack import parse_event
+
+    fixture = FIXTURES.parent.parent / "chirpstack" / "up_opencollar_status_live.json"
+    payload = json.loads(fixture.read_text())
+    from shared.connectivity.base import AdapterCapabilities, DataSourceContext
+
+    source = DataSourceContext(
+        id=uuid.uuid4(),
+        name="chirpstack-dev4",
+        adapter_key="chirpstack",
+        config={},
+        credentials={},
+        capabilities=AdapterCapabilities(uplink=True),
+    )
+    message = parse_event(source, "application/-/device/-/event/up", json.dumps(payload).encode())
+    assert message.external_id == "0016C001F01192A0" and message.event_type == "uplink"
+    assert message.provider_metadata["f_port"] == 4 and message.gateway_receptions[0].rssi == -82
+    frame = base64.b64decode(payload["data"])
+    records = driver.decode(event(4, frame.hex()))
+    theirs = payload["object"]
+    metrics = {m.metric_key: m.value for m in records.measurements}
+    assert metrics["battery_voltage"] == pytest.approx(theirs["bat"] / 1000)
+    assert metrics["device_temperature"] == pytest.approx(theirs["temp"], abs=0.01)
+    assert metrics["acceleration_z"] == pytest.approx(theirs["acc_z"], abs=0.01)
+    assert metrics["uptime"] == theirs["uptime"] * 86400  # days in the firmware
+    state = records.states[0].state
+    assert state["firmware_version"] == "7.2" and state["hardware_version"] == "1.8"
+    assert state["reset_reason"]["software"] is True  # ChirpStack's reset 4
+    assert not any(state["errors"].values())

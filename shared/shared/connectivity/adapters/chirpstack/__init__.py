@@ -435,16 +435,17 @@ class ChirpStackAdapter:
     )
     acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.LORAWAN
     config_example: ClassVar[dict[str, Any]] = {
-        "mqtt_host": "chirpstack-mosquitto",
-        "mqtt_port": 1883,
-        "api_url": "http://chirpstack-rest-api:8090",
-        "web_url": "http://localhost:8080",
+        "web_url": "https://chirpstack.example.org",
+        "api_url": "https://chirpstack.example.org:8090",
         "tenant_id": "",
     }
     credentials_schema: ClassVar[dict[str, str]] = {"api_token": "ChirpStack API key"}
     setup_hint: ClassVar[str] = (
-        "Enable the MQTT integration with the JSON marshaler; the ingest service subscribes "
-        "within a minute."
+        "For an existing ChirpStack: point the application's HTTP integration (JSON) at this "
+        "source's webhook URL with an `Authorization` header holding `Bearer <token>`, and leave "
+        "`mqtt_host` empty. Set `mqtt_host` only when the broker ChirpStack publishes to is "
+        "reachable from this server. `api_url` (the REST API gateway) and the `api_token` "
+        "credential enable downlinks and the device and gateway sync."
     )
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(
         uplink=True,

@@ -29,8 +29,11 @@ async def subscribe_forever(
     callback: MqttCallback,
     *,
     reconnect_seconds: float = 5.0,
+    max_reconnect_seconds: float = 60.0,
 ) -> None:
-    """Subscribe and call `callback(topic, payload)` per message. Reconnects on any error."""
+    """Subscribe and call `callback(topic, payload)` per message. Reconnects on any error,
+    doubling the delay up to `max_reconnect_seconds` while the broker stays away."""
+    delay = reconnect_seconds
     while True:
         try:
             async with aiomqtt.Client(
@@ -44,6 +47,7 @@ async def subscribe_forever(
                 for topic in topics:
                     await client.subscribe(topic)
                 log.info("mqtt subscribed", host=settings.host, topics=topics)
+                delay = reconnect_seconds
                 async for message in client.messages:
                     payload = (
                         message.payload
@@ -58,6 +62,7 @@ async def subscribe_forever(
                 "mqtt connection lost, reconnecting",
                 host=settings.host,
                 error=str(exc),
-                delay=reconnect_seconds,
+                delay=delay,
             )
-            await asyncio.sleep(reconnect_seconds)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, max_reconnect_seconds)

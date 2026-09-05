@@ -34,7 +34,7 @@ Observability, System Health, backup and disaster recovery (phase 10), proven on
 
 ### Fixed
 
-- ChirpStack and LORIOT data sources get a webhook token, so ChirpStack's HTTP integration and LORIOT's HTTP output work without a broker or websocket; an existing source without a token gets one with "Create webhook token". The data source form explains its Enabled switch.
+- ChirpStack and LORIOT data sources get a webhook token, so ChirpStack's HTTP integration and LORIOT's HTTP output work without a broker or websocket; an existing source without a token gets one with "Create webhook token". The data source form explains its Enabled switch, and the Data sources page can delete a source (the API always could). The ChirpStack example configuration no longer carries the local broker, so a new source for an existing ChirpStack does not try to reach `chirpstack-mosquitto`; MQTT reconnects back off up to a minute. The first recorded live uplink (an OpenCollar status message over ChirpStack) is a fixture with a golden test against ChirpStack's decoder.
 
 - From the first playbook runs on a server: the sshd drift check accepts `sshd -T`'s `without-password`; the frontend port binds to localhost (Docker bypasses ufw); the security check counts passes and no longer fails its ssh test under `pipefail`; pending handlers run before the final check; the deployed commit reaches the image build.
 - The database container runs an init process as PID 1: with PostgreSQL as PID 1, pgBackRest's asynchronous archive process was reparented to the postmaster and its exit restarted the cluster every ten seconds.
