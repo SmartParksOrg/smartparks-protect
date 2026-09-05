@@ -104,7 +104,7 @@ export function DataSourcesPage() {
     { header: t("Projects"), accessorFn: (s) => (s.project_ids ?? []).length || "all" },
     { header: t("Updated"), accessorKey: "updated_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
     { id: "token", header: "", cell: ({ row }) => { const a = ADAPTERS.find((x) => x.key === row.original.adapter_key); const caps = row.original.capabilities as Record<string, boolean>; return <span className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-      {row.original.has_webhook_token && <Button variant="ghost" size="sm" onClick={() => rotate.mutate(row.original.id)}><KeyRound className="size-4" /> {t("New token")}</Button>}
+      {(row.original.has_webhook_token || ADAPTERS.find((x) => x.key === row.original.adapter_key)?.push) && <Button variant="ghost" size="sm" onClick={() => rotate.mutate(row.original.id)}><KeyRound className="size-4" /> {row.original.has_webhook_token ? t("New token") : t("Create webhook token")}</Button>}
       {a?.polling && <Button variant="ghost" size="sm" onClick={() => { setSince(""); setRescanning(row.original); }}><RefreshCw className="size-4" /> {t("Rescan")}</Button>}
       {a?.can_manage && caps.gateway_management && <Button variant="ghost" size="sm" disabled={syncGateways.isPending} onClick={() => syncGateways.mutate(row.original)}><Waypoints className="size-4" /> {t("Sync gateways")}</Button>}
     </span>; } },
@@ -125,7 +125,7 @@ export function DataSourcesPage() {
               </Select>
             </Field>
             {(() => { const a = ADAPTERS.find((x) => x.key === adapterKey); return a?.setup_hint ? <Callout kind="info">{a.setup_hint}{a.push ? (a.webhook_token_in_query ? " The webhook URL with its token is shown after saving; the platform posts to that URL as is." : " The webhook URL and its bearer token are shown after saving.") : ""}</Callout> : null; })()}
-            <div className="flex items-center gap-2"><Switch id="ds-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="ds-enabled" className="text-sm">{t("Enabled")}</label></div>
+            <div className="flex items-start gap-2"><Switch id="ds-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="ds-enabled" className="text-sm">{t("Enabled")}<span className="block text-xs text-muted-foreground">{t("Receives events: the webhook answers and the connector runs. Switch off to pause the source without deleting it.")}</span></label></div>
             <Field label={t("Configuration (JSON)")} htmlFor="ds-config" error={form.formState.errors.config?.message}><Textarea id="ds-config" rows={6} className="font-mono text-xs" {...form.register("config")} /></Field>
             <Field label={t("Credentials (JSON)")} htmlFor="ds-credentials" hint={editing ? "Leave empty to keep the stored credentials" : undefined} error={form.formState.errors.credentials?.message}><Textarea id="ds-credentials" rows={3} className="font-mono text-xs" {...form.register("credentials")} /></Field>
             <Field label={t("Project scope")} htmlFor="ds-projects" hint={t("Optional. Leave empty for all projects.")}>

@@ -430,7 +430,9 @@ class ChirpStackCommands(ChirpStackManagement):
 class ChirpStackAdapter:
     key: ClassVar[str] = "chirpstack"
     label: ClassVar[str] = "ChirpStack"
-    push: ClassVar[bool] = False
+    push: ClassVar[bool] = (
+        True  # the HTTP integration posts to the webhook; MQTT/websocket is optional
+    )
     acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.LORAWAN
     config_example: ClassVar[dict[str, Any]] = {
         "mqtt_host": "chirpstack-mosquitto",

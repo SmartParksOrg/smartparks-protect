@@ -216,7 +216,9 @@ class LoriotCommands:
 class LoriotAdapter:
     key: ClassVar[str] = "loriot"
     label: ClassVar[str] = "LORIOT"
-    push: ClassVar[bool] = False
+    push: ClassVar[bool] = (
+        True  # the HTTP integration posts to the webhook; MQTT/websocket is optional
+    )
     acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.LORAWAN
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(
         uplink=True,
