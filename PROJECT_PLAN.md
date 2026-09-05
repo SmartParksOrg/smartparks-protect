@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 14 (production hardening and 2.0) complete except the release: security audit, docs checks, organizations, translation layer, release process, both exit criteria checked, benchmark at 0.2 on the dev server; the exit criteria work and the benchmark await commit; live checks of the phase 13 adapters and connectors pending |
+| Active phase | Phase 14 complete except the v2.0.0 release (everything committed through fe0000f, CI green). Live verification started on 2026-09-05 with Tim's ChirpStack (chirpstack-dev4): uplinks of collar SP051307 flow over the HTTP integration; the gRPC API direction waits for a `grpc_pass` location on that nginx and a tenant API key |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-05 |
-| Next item | Commit the exit criteria work and the benchmark on Tim's word, then v2.0.0 on Tim's word (the deployment drill showed a docs-only deployment lands on v0.6.0 and fails the security check until 2.0 is tagged); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
+| Next item | Finish the ChirpStack live check (nginx `grpc_pass`, tenant API key, `api_url` grpcs://chirpstack-dev4.smartparks.org:443, then Test connection, Sync devices, Request status on SP051307), then v2.0.0 on Tim's word (a docs-only deployment lands on v0.6.0 and fails the security check until 2.0 is tagged); the ChatGPT half of the phase 9 check waits for a Pro or Business account; the live items of phases 7, 8, 11 and 13 follow the accounts, a collar with BLE, a The Things Stack application, a ThingPark deployment and an EarthRanger site |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -929,4 +929,11 @@ Listed by the phase where they are first needed.
 - The runner needed three fixes found on the server: a refused export answer crashed it, the login token expired during the 65 minute export job (re-login on 401), and a transient resolver failure on the droplet killed a poll (retry on network errors). Each cost one export job; the complete run then took 78 minutes (08:08 to 09:26 UTC).
 - Results in `docs/operations/benchmarks.md` with the reading; scalability page updated. The dataset stays on the dev server (20 GB used of 154) until Tim decides; `generate.py --reset` removes it in minutes.
 - The benchmark exports showed that finished export files were never removed (three of 4.9 GB on the dev server): the export service now sweeps expired files hourly, jobs become `expired`, migration 0014. The dev server's disk (43 GB used) frees itself a week after those jobs once the server runs this code.
+
+### 2026-09-05, ChirpStack live check and what it taught (Claude)
+
+- The first real network: Tim's ChirpStack v4 (chirpstack-dev4.smartparks.org) posts collar SP051307's uplinks to the dev server over its HTTP integration; the first live status uplink is a fixture with a golden test against ChirpStack's decoder. Found on the way: the adapter minted no webhook token (it counted as a pull source), the example config carried the local broker, the device link used an upper-case DevEUI, a data source could not be deleted from the page, and there was no place to watch what a source receives before a device exists.
+- Built from those findings: Data sources, Traffic (per source) and Server admin, Traffic (inbound, outbound, commands, hourly summary); Test connection and Sync devices; delete; a source modelled as its channels with the form's guidance and a per-channel Status (messages received, the ingest connector state in Redis, the last API answer, capabilities held back until their channel is configured); MQTT reconnects with backoff.
+- Tim's ruling: ChirpStack v4 is gRPC only. The adapter uses the `chirpstack-api` client (`api_url` grpcs://host:443 through an nginx `grpc_pass` location, or grpc://host:8080); the REST gateway path and compose service are gone; the local bootstrap talks gRPC and was proven against the local stack (Test connection, Sync devices, Status all good).
+- Open on Tim's side: the `grpc_pass` location on his nginx, a tenant API key, the source's `api_url` and `api_token`; then Request status proves the downlink path. The ChirpStack API secret was pasted into the chat and should be rotated.
 
