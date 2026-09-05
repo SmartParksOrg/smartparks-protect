@@ -8,10 +8,10 @@ ChirpStack v4 is the reference LoRaWAN network server of Smart Parks Protect: it
 - Records every gateway reception of an uplink with RSSI, SNR and frequency, and the best RSSI and SNR, spreading factor, port and frame counter as provider metadata.
 - Keeps the ChirpStack receive time as `network_received_at`; the device time comes from the driver.
 - Merges tenant, application and device profile ids and names into the external identity, so "Open in ChirpStack" links can be built.
-- Lists applications, devices and gateways through the ChirpStack REST API (management connector) and tests the connection.
+- Lists applications, devices and gateways through ChirpStack's gRPC API (management connector) and tests the connection.
 - Accepts the same events over the ChirpStack HTTP integration at `POST /api/v1/ingest/http/{data_source_id}?event=up` with the source's bearer token.
 
-Downlinks go through the REST API device queue, see [device control](../../devices/device-control.md).
+Downlinks go through the gRPC device queue, see [device control](../../devices/device-control.md).
 
 ## Data source configuration
 
@@ -19,7 +19,7 @@ Downlinks go through the REST API device queue, see [device control](../../devic
 | --- | --- |
 | `mqtt_host`, `mqtt_port`, `mqtt_tls` | The broker ChirpStack publishes to (`chirpstack-mosquitto`, 1883 in compose) |
 | `topic_prefix` | Only when ChirpStack is configured with an integration topic prefix |
-| `api_url` | ChirpStack REST API (`http://chirpstack-rest-api:8090` in compose) |
+| `api_url` | ChirpStack's gRPC API: `grpc://chirpstack:8080` in compose, `grpcs://host:443` through a TLS proxy |
 | `web_url` | ChirpStack web UI, used in deep links (`http://localhost:8080`) |
 | `tenant_id` | Tenant whose applications and gateways are listed |
 
@@ -43,6 +43,22 @@ scripts/dev.sh simulate --dev-eui 70B3D57ED0001234 --application-id <id printed 
 
 The simulator publishes uplinks on the same broker and topics a real ChirpStack uses, so everything from the ingest service onwards runs as in production. The radio path (gateway bridge, join, deduplication) is not simulated; a real gateway on UDP port 1700 exercises it.
 
+## Channels
+
+A ChirpStack source is three channels, and the source's form and its Status show which ones
+the settings switch on and whether each works:
+
+| Channel | Direction | Needs | Enables | Working when |
+| --- | --- | --- | --- | --- |
+| HTTP integration | in | nothing, the webhook token is issued on save | uplinks, joins, downlink acknowledgements | messages arrive on the webhook |
+| MQTT subscription | in | `mqtt_host` (and `mqtt_username`, `mqtt_password` when the broker asks) | the same events plus gateway statistics | the ingest service reports its connection as connected |
+| gRPC API | out | `api_url` (`grpcs://host:443` or `grpc://host:8080`) and the `api_token` credential | downlinks, device sync, gateway sync, Test connection | the last Test connection answered |
+
+Capabilities an unconfigured channel would provide are held back: with no API channel the
+source shows no downlink capability, whatever its declared capabilities say. Server admin,
+Data sources, Status lists the channels with their state; the form lists them with what each
+still needs while you type.
+
 ## Connecting an existing ChirpStack
 
 A ChirpStack v4 that already serves gateways and collars connects in one of two ways:
@@ -59,11 +75,29 @@ A ChirpStack v4 that already serves gateways and collars connects in one of two 
   `mqtt_username` and `mqtt_password` credentials; the ingest service subscribes to the
   application and gateway topics and no HTTP integration is needed.
 
-Downlinks, device sync and gateway sync use ChirpStack's REST API: `api_url` must point at a
-`chirpstack-rest-api` gateway (the optional component that fronts the gRPC API, port 8090 in
-the compose stack) and `api_token` must be an API key of the tenant. Without a REST gateway
-the uplink path works and commands are refused with `CONNECTIVITY_AUTH_FAILED` or a
-connection error until one is added.
+Downlinks, device sync and gateway sync use ChirpStack's gRPC API, the only API of
+ChirpStack v4 (the REST gateway is not used): `api_url` is `grpcs://host:443` through a TLS
+proxy or `grpc://host:8080` straight to ChirpStack on a private network, and `api_token` is an
+API key of the tenant. Without an API channel the uplink path works and commands are held
+back until one is configured.
+
+Exposing the gRPC API through an existing nginx that fronts ChirpStack on 443 takes one
+location before `location /`, restricted to this server:
+
+```nginx
+location ~ ^/api\. {
+    allow <this server's address>;
+    deny all;
+    grpc_pass grpc://127.0.0.1:8080;
+}
+```
+
+ChirpStack's gRPC services live under paths such as `/api.DeviceService/Enqueue`, which is
+what the regular expression matches; the server block must carry `http2`. Then `api_url` is
+`grpcs://<host>:443`. In ChirpStack, Tenant, API keys: create a key and store it as the
+`api_token` credential. "Test connection" on the data source calls the API with it; "Sync
+devices" turns the tenant's devices into identities to link; "Sync gateways" fills the
+gateway registry.
 
 The DevEUI is the identity: register the collars' DevEUIs on the data source, or accept them
 from Needs attention as their first uplinks arrive. While connecting, Server admin, Data

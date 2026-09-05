@@ -1,11 +1,13 @@
 """MQTT subscription with reconnect. Adapters give topics and a message callback."""
 
 import asyncio
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import aiomqtt
 
+from shared.connectivity.state import report_connector
 from shared.logger import get_logger
 
 log = get_logger("transport.mqtt")
@@ -21,6 +23,7 @@ class MqttSettings:
     password: str | None = None
     tls: bool = False
     client_id: str | None = None
+    source_id: uuid.UUID | None = None  # for the connection state shown per data source
 
 
 async def subscribe_forever(
@@ -48,6 +51,9 @@ async def subscribe_forever(
                     await client.subscribe(topic)
                 log.info("mqtt subscribed", host=settings.host, topics=topics)
                 delay = reconnect_seconds
+                await report_connector(
+                    settings.source_id, "connected", f"subscribed to {settings.host}"
+                )
                 async for message in client.messages:
                     payload = (
                         message.payload
@@ -64,5 +70,6 @@ async def subscribe_forever(
                 error=str(exc),
                 delay=delay,
             )
+            await report_connector(settings.source_id, "reconnecting", f"{settings.host}: {exc}")
             await asyncio.sleep(delay)
             delay = min(delay * 2, max_reconnect_seconds)

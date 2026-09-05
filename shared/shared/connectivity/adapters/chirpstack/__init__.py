@@ -6,19 +6,17 @@ ChirpStack REST API (`chirpstack-rest-api`) with an API token (decision D50): a 
 a device queue item, `txack` and `ack` events carry its `queueItemId` back.
 
 Config keys: `mqtt_host` (empty for the HTTP integration), `mqtt_port` (1883), `mqtt_tls`
-(false), `api_url` (REST API base, for
+(false), `api_url` (the gRPC API, grpcs://host:443 or grpc://host:8080, for
 example `http://chirpstack-rest-api:8090`), `web_url` (the ChirpStack web UI, for deep links),
 `tenant_id`, `topic_prefix` (empty by default; ChirpStack can prefix integration topics).
 Credentials: `api_token`, optional `mqtt_username` and `mqtt_password`.
 """
 
-import base64
 import json
 from datetime import datetime
 from typing import Any, ClassVar
 
-import httpx
-
+from shared.connectivity.adapters.chirpstack.grpc_api import ChirpStackGrpc, is_grpc_url
 from shared.connectivity.base import (
     AdapterCapabilities,
     DataSourceContext,
@@ -267,6 +265,7 @@ class ChirpStackConnector:
             password=credentials.get("mqtt_password"),
             tls=bool(config.get("mqtt_tls", False)),
             client_id=f"protect-ingest-{self.source.id.hex[:8]}",
+            source_id=self.source.id,
         )
         prefix = str(config.get("topic_prefix", "")).strip("/")
         head = f"{prefix}/" if prefix else ""
@@ -296,60 +295,81 @@ class ChirpStackConnector:
 
 
 class ChirpStackManagement:
-    """Read-only control plane through the REST API."""
+    """Control plane through ChirpStack's gRPC API, the only API of ChirpStack v4 (its REST
+    gateway is not used): `api_url` is `grpcs://host:443` or `grpc://host:8080`."""
 
     def __init__(self, source: DataSourceContext) -> None:
-        self.base = str(source.config.get("api_url", "")).rstrip("/")
-        self.token = source.credentials.get("api_token", "")
-        self.tenant_id = source.config.get("tenant_id")
+        self.base = str(source.config.get("api_url", "")).strip()
+        self.token = str(source.credentials.get("api_token", "") or "")
+        self.tenant_id = str(source.config.get("tenant_id") or "")
+        self._grpc: ChirpStackGrpc | None = None
 
-    def _client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(
-            base_url=self.base,
-            headers={"Grpc-Metadata-Authorization": f"Bearer {self.token}"},
-            timeout=15,
-        )
-
-    async def _list(self, path: str, key: str, params: dict[str, Any]) -> list[dict[str, Any]]:
-        items: list[dict[str, Any]] = []
-        offset = 0
-        async with self._client() as client:
-            while True:
-                response = await client.get(path, params={**params, "limit": 100, "offset": offset})
-                if response.status_code in (401, 403):
-                    raise ApplicationError(
-                        code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
-                        message=f"ChirpStack API refused the token ({response.status_code})",
-                        component="adapter.chirpstack",
-                        user_actionable=True,
-                    )
-                response.raise_for_status()
-                body = response.json()
-                items.extend(body.get(key) or [])
-                offset += 100
-                if offset >= int(body.get("totalCount") or 0):
-                    return items
+    @property
+    def grpc(self) -> ChirpStackGrpc:
+        """The client, checked on first use so a source without an API channel fails the
+        call that needs it, with the reason, not the ingest of its uplinks."""
+        if self._grpc is not None:
+            return self._grpc
+        if not self.base:
+            raise ApplicationError(
+                code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
+                message="the data source needs `api_url` (grpcs://host:443 or grpc://host:8080)",
+                component="adapter.chirpstack",
+                user_actionable=True,
+            )
+        if not is_grpc_url(self.base):
+            raise ApplicationError(
+                code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
+                message=(
+                    f"api_url {self.base!r} is not a gRPC address: ChirpStack v4 speaks gRPC, "
+                    "use grpcs://host:443 (through a TLS proxy) or grpc://host:8080"
+                ),
+                component="adapter.chirpstack",
+                user_actionable=True,
+            )
+        if not self.token:
+            raise ApplicationError(
+                code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
+                message="the data source needs the `api_token` credential (a tenant API key)",
+                component="adapter.chirpstack",
+                user_actionable=True,
+            )
+        self._grpc = ChirpStackGrpc(self.base, self.token)
+        return self._grpc
 
     async def list_applications(self) -> list[dict[str, Any]]:
-        return await self._list("/api/applications", "result", {"tenantId": self.tenant_id})
+        return await self.grpc.list_applications(self.tenant_id)
 
     async def list_devices(self) -> list[dict[str, Any]]:
         devices: list[dict[str, Any]] = []
         for application in await self.list_applications():
-            for device in await self._list(
-                "/api/devices", "result", {"applicationId": application["id"]}
-            ):
+            for device in await self.grpc.list_devices(str(application["id"])):
+                dev_eui = str(device.get("devEui") or "").upper()
+                if not dev_eui:
+                    continue
                 devices.append(
                     {
-                        **device,
-                        "applicationId": application["id"],
-                        "applicationName": application.get("name"),
+                        "external_id": dev_eui,
+                        "identity_type": "dev_eui",
+                        "name": device.get("name") or dev_eui,
+                        "attributes": {
+                            k: v
+                            for k, v in {
+                                "application_id": application["id"],
+                                "application_name": application.get("name"),
+                                "device_profile_id": device.get("deviceProfileId"),
+                                "device_profile_name": device.get("deviceProfileName"),
+                                "last_seen_at": device.get("lastSeenAt"),
+                                "description": device.get("description"),
+                            }.items()
+                            if v
+                        },
                     }
                 )
         return devices
 
     async def list_gateways(self) -> list[dict[str, Any]]:
-        return await self._list("/api/gateways", "result", {"tenantId": self.tenant_id})
+        return await self.grpc.list_gateways(self.tenant_id)
 
     async def list_gateway_updates(self) -> list[GatewayUpdate]:
         return gateway_updates_from_listing(await self.list_gateways())
@@ -360,54 +380,15 @@ class ChirpStackManagement:
 
 
 class ChirpStackCommands(ChirpStackManagement):
-    """Command connector: the device queue of the REST API."""
+    """Command connector: the device queue over gRPC."""
 
     async def submit(
         self, external_id: str, payload: bytes, options: dict[str, Any]
     ) -> dict[str, Any]:
         dev_eui = external_id.lower()
-        body = {
-            "queueItem": {
-                "devEui": dev_eui,
-                "confirmed": bool(options.get("confirmed", False)),
-                "data": base64.b64encode(payload).decode(),
-                "fPort": int(options["f_port"]),
-            }
-        }
-        async with self._client() as client:
-            response = await client.post(f"/api/devices/{dev_eui}/queue", json=body)
-        if response.status_code in (401, 403):
-            raise ApplicationError(
-                code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
-                message=f"ChirpStack API refused the token ({response.status_code})",
-                component="adapter.chirpstack",
-                user_actionable=True,
-            )
-        if response.status_code == 404:
-            raise ApplicationError(
-                code=ErrorCode.DEVICE_NOT_FOUND,
-                message=f"ChirpStack does not know device {dev_eui}",
-                component="adapter.chirpstack",
-                user_actionable=True,
-            )
-        if response.status_code >= 500:
-            raise ApplicationError(
-                code=ErrorCode.CONNECTIVITY_UNAVAILABLE,
-                message=f"ChirpStack answered {response.status_code}: {response.text[:200]}",
-                component="adapter.chirpstack",
-                retryable=True,
-            )
-        if response.status_code >= 400:
-            raise ApplicationError(
-                code=ErrorCode.COMMAND_REJECTED,
-                message=(
-                    f"ChirpStack rejected the downlink ({response.status_code}): "
-                    f"{response.text[:200]}"
-                ),
-                component="adapter.chirpstack",
-                user_actionable=True,
-            )
-        item_id = str(response.json().get("id") or "")
+        item_id = await self.grpc.enqueue(
+            dev_eui, payload, int(options["f_port"]), bool(options.get("confirmed", False))
+        )
         return {
             "provider_ref": item_id,
             "statuses": ["accepted_by_network", "queued"],
@@ -415,16 +396,10 @@ class ChirpStackCommands(ChirpStackManagement):
         }
 
     async def queue(self, external_id: str) -> list[dict[str, Any]]:
-        async with self._client() as client:
-            response = await client.get(f"/api/devices/{external_id.lower()}/queue")
-        response.raise_for_status()
-        items: list[dict[str, Any]] = response.json().get("result") or []
-        return items
+        return await self.grpc.queue(external_id.lower())
 
     async def flush(self, external_id: str) -> None:
-        async with self._client() as client:
-            response = await client.delete(f"/api/devices/{external_id.lower()}/queue")
-        response.raise_for_status()
+        await self.grpc.flush(external_id.lower())
 
 
 class ChirpStackAdapter:
@@ -436,7 +411,7 @@ class ChirpStackAdapter:
     acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.LORAWAN
     config_example: ClassVar[dict[str, Any]] = {
         "web_url": "https://chirpstack.example.org",
-        "api_url": "https://chirpstack.example.org:8090",
+        "api_url": "grpcs://chirpstack.example.org:443",
         "tenant_id": "",
     }
     credentials_schema: ClassVar[dict[str, str]] = {"api_token": "ChirpStack API key"}
@@ -459,9 +434,50 @@ class ChirpStackAdapter:
         gateway_status=True,
         statistics=True,
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "http",
+            "label": "HTTP integration",
+            "direction": "in",
+            "purpose": "ChirpStack posts every event to the webhook URL; enough for uplinks, "
+            "joins and downlink acknowledgements",
+            "config_keys": [],
+            "credential_keys": [],
+            "hint": "Application, Integrations, HTTP: JSON, the webhook URL, header "
+            "Authorization with Bearer <token>",
+        },
+        {
+            "key": "mqtt",
+            "label": "MQTT subscription",
+            "direction": "in",
+            "purpose": "The ingest service subscribes to ChirpStack's broker for the same "
+            "events plus gateway statistics; needs the broker reachable from this server",
+            "config_keys": ["mqtt_host"],
+            "credential_keys": [],
+            "hint": "mqtt_host, mqtt_port, mqtt_tls; mqtt_username and mqtt_password when the "
+            "broker asks for them",
+        },
+        {
+            "key": "api",
+            "label": "gRPC API",
+            "direction": "out",
+            "purpose": "Downlinks, device sync, gateway sync and Test connection over "
+            "ChirpStack's gRPC API",
+            "config_keys": ["api_url"],
+            "credential_keys": ["api_token"],
+            "hint": "api_url is grpcs://host:443 (a TLS proxy with grpc_pass) or "
+            "grpc://host:8080; api_token a tenant API key",
+            "capabilities": [
+                "downlink",
+                "device_management",
+                "gateway_management",
+                "gateway_status",
+            ],
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         ""
-        "OPEN_DEVICE": "{web_url}/#/tenants/{tenant_id}/applications/{application_id}/devices/{external_id}",  # noqa: E501
+        "OPEN_DEVICE": "{web_url}/#/tenants/{tenant_id}/applications/{application_id}/devices/{external_id_lower}",  # noqa: E501
         "OPEN_APPLICATION": "{web_url}/#/tenants/{tenant_id}/applications/{application_id}",
         "OPEN_GATEWAY": "{web_url}/#/tenants/{tenant_id}/gateways/{gateway_id}",
     }
@@ -476,7 +492,11 @@ class ChirpStackAdapter:
             "mqtt_port": {"type": "integer", "default": 1883},
             "mqtt_tls": {"type": "boolean", "default": False},
             "topic_prefix": {"type": "string", "default": ""},
-            "api_url": {"type": "string", "description": "ChirpStack REST API base URL"},
+            "api_url": {
+                "type": "string",
+                "description": "ChirpStack's gRPC API: grpcs://host:443 through a TLS proxy, "
+                "or grpc://host:8080 on a private network",
+            },
             "web_url": {"type": "string", "description": "ChirpStack web UI, for deep links"},
             "tenant_id": {"type": "string"},
         },

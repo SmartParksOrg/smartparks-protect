@@ -466,6 +466,30 @@ class TtsAdapter:
         gateway_status=True,
         statistics=True,
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "http",
+            "label": "Webhook",
+            "direction": "in",
+            "purpose": "The Things Stack posts every message type to the webhook URL",
+            "config_keys": [],
+            "credential_keys": [],
+        },
+        {
+            "key": "api",
+            "label": "Application API",
+            "direction": "out",
+            "purpose": "Downlinks, device sync and gateway sync",
+            "config_keys": ["application_id"],
+            "credential_keys": ["api_key"],
+            "capabilities": [
+                "downlink",
+                "device_management",
+                "gateway_management",
+                "gateway_status",
+            ],
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/applications/{application_id}/devices/{device_id}",
         "OPEN_APPLICATION": "{web_url}/applications/{application_id}",

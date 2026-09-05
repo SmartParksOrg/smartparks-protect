@@ -354,6 +354,25 @@ class CloudloopAdapter:
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(
         uplink=True, downlink=True, device_management=True
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "http",
+            "label": "Webhook",
+            "direction": "in",
+            "purpose": "Cloudloop Data posts messages to the webhook URL with the token in it",
+            "config_keys": [],
+            "credential_keys": [],
+        },
+        {
+            "key": "api",
+            "label": "Cloudloop API",
+            "direction": "out",
+            "purpose": "Commands as SBD messages and the thing list",
+            "config_keys": [],
+            "credential_keys": ["token"],
+            "capabilities": ["downlink", "device_management"],
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/things/{thing_id}",
     }

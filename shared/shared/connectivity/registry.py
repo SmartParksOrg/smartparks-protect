@@ -41,9 +41,65 @@ ADAPTERS: dict[str, Adapter] = {
 }
 
 
+def channels_of(adapter: Adapter) -> list[dict[str, Any]]:
+    """The ways a source of this adapter talks to its platform, each with what it needs in
+    the config and credentials and what it enables. Adapters declare `channels`; the rest is
+    derived from their flags so every source has at least its receiving channel."""
+    declared = getattr(adapter, "channels", None)
+    if declared:
+        return [dict(c) for c in declared]
+    channels: list[dict[str, Any]] = []
+    if getattr(adapter, "push", False):
+        channels.append(
+            {
+                "key": "http",
+                "label": "HTTP push",
+                "direction": "in",
+                "purpose": "The platform posts events to the webhook URL with the bearer token",
+                "config_keys": [],
+                "credential_keys": [],
+            }
+        )
+    if getattr(adapter, "polling", False):
+        channels.append(
+            {
+                "key": "poll",
+                "label": "API polling",
+                "direction": "in",
+                "purpose": "The ingest service asks the platform for new records on a schedule",
+                "config_keys": [],
+                "credential_keys": list(getattr(adapter, "credentials_schema", {}) or {}),
+            }
+        )
+    elif not getattr(adapter, "push", False) and not getattr(adapter, "builtin", False):
+        channels.append(
+            {
+                "key": "stream",
+                "label": "Live connection",
+                "direction": "in",
+                "purpose": "The ingest service keeps a connection to the platform open",
+                "config_keys": [],
+                "credential_keys": [],
+            }
+        )
+    if hasattr(adapter, "command_connector") or hasattr(adapter, "management_connector"):
+        channels.append(
+            {
+                "key": "api",
+                "label": "Platform API",
+                "direction": "out",
+                "purpose": "Downlinks and the device and gateway sync",
+                "config_keys": [],
+                "credential_keys": list(getattr(adapter, "credentials_schema", {}) or {}),
+            }
+        )
+    return channels
+
+
 def describe_adapter(adapter: Adapter) -> dict[str, Any]:
     """Registry metadata for the API and the frontend, so no screen names a provider."""
     return {
+        "channels": channels_of(adapter),
         "key": adapter.key,
         "label": adapter.label,
         "push": bool(getattr(adapter, "push", False)),

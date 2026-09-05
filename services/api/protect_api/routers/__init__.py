@@ -6,6 +6,7 @@ from protect_api.auth.routes import router as auth_router
 from protect_api.oauth.routes import router as oauth_router
 from protect_api.realtime import router as realtime_router
 from protect_api.routers.admin import router as admin_router
+from protect_api.routers.admin_traffic import router as admin_traffic_router
 from protect_api.routers.analytics import router as analytics_router
 from protect_api.routers.attention import router as attention_router
 from protect_api.routers.automations import admin_router as admin_automations_router
@@ -66,6 +67,7 @@ for router in (
     platform_router,
     mcp_actions_router,
     admin_ai_policy_router,
+    admin_traffic_router,
     realtime_router,
 ):
     v1_router.include_router(router)

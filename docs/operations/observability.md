@@ -36,3 +36,21 @@ On a server the ports of the collector are bound to localhost only; reach Grafan
 ## Logs
 
 Every service writes one JSON line per event to stdout with `service`, `trace_id` and `request_id`; `docker compose logs -f <service>` follows them and Loki in the observability profile can collect them from Docker. The scheduled backup jobs log to `logs/` in the application directory.
+
+## Traffic
+
+Server admin, Traffic puts the three directions of the server side by side, each with its
+own columns because the rows mean different things:
+
+- **Inbound**: every source event across all data sources, newest first, linked to a device
+  or not, with the raw payload and the trace per row; filters on data source, identity,
+  event type and window. The per-source view under Data sources, Traffic is the focused
+  version of the same list.
+- **Outbound**: every integration delivery across all projects with its status, attempts,
+  the object it carries, the target's answer and the retry and resend actions.
+- **Commands**: every command across all devices with its stage, actor and route, opening the
+  command's timeline.
+
+A row of counts over the last hour heads the page: events received, failed and from unknown
+devices, deliveries and commands per status. Every list is bounded by a window and a row
+limit (architecture 13.10); the refresh is five to fifteen seconds.

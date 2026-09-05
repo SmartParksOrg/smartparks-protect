@@ -868,6 +868,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data-sources/{data_source_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data Source Status
+         * @description Per channel: configured or not (and what is missing), and whether it works, from the
+         *     messages received, the connector's connection state and the last API answer.
+         */
+        get: operations["data_source_status_api_v1_data_sources__data_source_id__status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-sources/{data_source_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Connection
+         * @description Call the platform's API with the stored credentials. A push-only source has nothing to
+         *     call: it receives on its webhook.
+         */
+        post: operations["test_connection_api_v1_data_sources__data_source_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-sources/{data_source_id}/sync-devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Devices
+         * @description Read the platform's device list into the source's external identities: new ones appear
+         *     under Needs attention to be linked, known ones get their attributes refreshed.
+         */
+        post: operations["sync_devices_api_v1_data_sources__data_source_id__sync_devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/data-sources/{data_source_id}/sync-gateways": {
         parameters: {
             query?: never;
@@ -3343,6 +3406,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/traffic/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Traffic Summary */
+        get: operations["traffic_summary_api_v1_admin_traffic_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/traffic/inbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inbound
+         * @description Every source event across all data sources, newest first, linked to a device or not.
+         */
+        get: operations["inbound_api_v1_admin_traffic_inbound_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/traffic/outbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Outbound
+         * @description Every integration delivery across all projects, newest first.
+         */
+        get: operations["outbound_api_v1_admin_traffic_outbound_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/traffic/outbound/{delivery_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Outbound Detail */
+        get: operations["outbound_detail_api_v1_admin_traffic_outbound__delivery_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/traffic/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Commands
+         * @description Every command across all devices, newest first.
+         */
+        get: operations["commands_api_v1_admin_traffic_commands_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/version": {
         parameters: {
             query?: never;
@@ -3473,6 +3630,241 @@ export interface components {
          * @enum {string}
          */
         ActionType: "notify" | "webhook" | "integration" | "command";
+        /** AdminCommandRead */
+        AdminCommandRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Action Key */
+            action_key: string;
+            /** Driver Key */
+            driver_key: string;
+            /** Schema Version */
+            schema_version: number;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Payload Hex */
+            payload_hex: string | null;
+            /** F Port */
+            f_port: number | null;
+            /** Confirmed Downlink */
+            confirmed_downlink: boolean;
+            /** Data Source Id */
+            data_source_id: string | null;
+            /** External Id */
+            external_id: string | null;
+            /** Route */
+            route: string | null;
+            /** Status */
+            status: string;
+            /** Provider Ref */
+            provider_ref: string | null;
+            /** Provider Response */
+            provider_response: {
+                [key: string]: unknown;
+            };
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Actor */
+            actor: {
+                [key: string]: unknown;
+            };
+            /** Requested By User Id */
+            requested_by_user_id: string | null;
+            /** Automation Id */
+            automation_id: string | null;
+            /** Event Id */
+            event_id: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /** Submitted At */
+            submitted_at: string | null;
+            /** Transmitted At */
+            transmitted_at: string | null;
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Confirmed At */
+            confirmed_at: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Project Name */
+            project_name?: string | null;
+            /** Device Name */
+            device_name?: string | null;
+        };
+        /** AdminDeliveryDetail */
+        AdminDeliveryDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Integration Id
+             * Format: uuid
+             */
+            integration_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Object Type */
+            object_type: string;
+            /** Object Id */
+            object_id: string;
+            /** Object Version */
+            object_version: number;
+            /**
+             * Object Time
+             * Format: date-time
+             */
+            object_time: string;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Device Id */
+            device_id: string | null;
+            /** Origin */
+            origin: string;
+            /** Status */
+            status: string;
+            /** Attempts */
+            attempts: number;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /** Last Attempt At */
+            last_attempt_at: string | null;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** External Id */
+            external_id: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Stale At */
+            stale_at?: string | null;
+            /** Stale Reason */
+            stale_reason?: string | null;
+            /** Request */
+            request: {
+                [key: string]: unknown;
+            } | null;
+            /** Response */
+            response: {
+                [key: string]: unknown;
+            };
+            /** Integration Name */
+            integration_name?: string | null;
+            /** Connector Key */
+            connector_key?: string | null;
+            /** Project Name */
+            project_name?: string | null;
+        };
+        /** AdminDeliveryRead */
+        AdminDeliveryRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Integration Id
+             * Format: uuid
+             */
+            integration_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Object Type */
+            object_type: string;
+            /** Object Id */
+            object_id: string;
+            /** Object Version */
+            object_version: number;
+            /**
+             * Object Time
+             * Format: date-time
+             */
+            object_time: string;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Device Id */
+            device_id: string | null;
+            /** Origin */
+            origin: string;
+            /** Status */
+            status: string;
+            /** Attempts */
+            attempts: number;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /** Last Attempt At */
+            last_attempt_at: string | null;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** External Id */
+            external_id: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Stale At */
+            stale_at?: string | null;
+            /** Stale Reason */
+            stale_reason?: string | null;
+            /** Integration Name */
+            integration_name?: string | null;
+            /** Connector Key */
+            connector_key?: string | null;
+            /** Project Name */
+            project_name?: string | null;
+        };
         /**
          * Aggregate
          * @enum {string}
@@ -3960,6 +4352,34 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** ChannelStatus */
+        ChannelStatus: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Direction */
+            direction: string;
+            /** Purpose */
+            purpose: string;
+            /** Hint */
+            hint?: string | null;
+            /** Configured */
+            configured: boolean;
+            /** Missing */
+            missing?: string[];
+            /** State */
+            state: string;
+            /** Detail */
+            detail?: string | null;
+            /** Last At */
+            last_at?: string | null;
+            /**
+             * Count 24H
+             * @default 0
+             */
+            count_24h: number;
+        };
         /** CommandCreate */
         CommandCreate: {
             /** Action Key */
@@ -4124,6 +4544,17 @@ export interface components {
         ConnectionRevoke: {
             /** Client Id */
             client_id: string;
+        };
+        /** ConnectionTestResult */
+        ConnectionTestResult: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            };
         };
         /** ConsentDecision */
         ConsentDecision: {
@@ -4511,6 +4942,20 @@ export interface components {
              */
             updated_at: string;
         };
+        /** DataSourceStatus */
+        DataSourceStatus: {
+            /** Channels */
+            channels: components["schemas"]["ChannelStatus"][];
+            /** Effective Capabilities */
+            effective_capabilities: {
+                [key: string]: boolean;
+            };
+            /**
+             * Limited Capabilities
+             * @description Declared capabilities an unconfigured channel holds back
+             */
+            limited_capabilities?: string[];
+        };
         /** DataSourceUpdate */
         DataSourceUpdate: {
             /** Name */
@@ -4821,6 +5266,15 @@ export interface components {
          * @enum {string}
          */
         DeviceStatus: "active" | "inventory" | "repair" | "retired";
+        /** DeviceSyncResult */
+        DeviceSyncResult: {
+            /** Listed */
+            listed: number;
+            /** Created */
+            created: number;
+            /** Updated */
+            updated: number;
+        };
         /** DeviceTypeCreate */
         DeviceTypeCreate: {
             /** Key */
@@ -6614,6 +7068,20 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PageResponse[AdminCommandRead] */
+        PageResponse_AdminCommandRead_: {
+            /** Items */
+            items: components["schemas"]["AdminCommandRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** PageResponse[AdminDeliveryRead] */
+        PageResponse_AdminDeliveryRead_: {
+            /** Items */
+            items: components["schemas"]["AdminDeliveryRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** PageResponse[AlertRead] */
         PageResponse_AlertRead_: {
             /** Items */
@@ -7861,6 +8329,41 @@ export interface components {
             } | null;
             /** Receptions */
             receptions: components["schemas"]["ReceptionRead"][];
+        };
+        /**
+         * TrafficSummary
+         * @description Counts over the last hour, so a glance says whether the server receives, delivers and
+         *     controls.
+         */
+        TrafficSummary: {
+            /**
+             * Window Hours
+             * @default 1
+             */
+            window_hours: number;
+            /**
+             * Inbound Events
+             * @default 0
+             */
+            inbound_events: number;
+            /**
+             * Inbound Failed
+             * @default 0
+             */
+            inbound_failed: number;
+            /**
+             * Inbound Unassigned
+             * @default 0
+             */
+            inbound_unassigned: number;
+            /** Outbound By Status */
+            outbound_by_status?: {
+                [key: string]: number;
+            };
+            /** Commands By Status */
+            commands_by_status?: {
+                [key: string]: number;
+            };
         };
         /** TransformationIn */
         TransformationIn: {
@@ -10547,6 +11050,99 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    data_source_status_api_v1_data_sources__data_source_id__status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSourceStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_connection_api_v1_data_sources__data_source_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTestResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_devices_api_v1_data_sources__data_source_id__sync_devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSyncResult"];
                 };
             };
             /** @description Validation Error */
@@ -16046,6 +16642,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiPolicyRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    traffic_summary_api_v1_admin_traffic_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficSummary"];
+                };
+            };
+        };
+    };
+    inbound_api_v1_admin_traffic_inbound_get: {
+        parameters: {
+            query?: {
+                data_source_id?: string | null;
+                external_id?: string | null;
+                event_type?: string | null;
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+                include_payload?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    outbound_api_v1_admin_traffic_outbound_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+                integration_id?: string | null;
+                status?: components["schemas"]["DeliveryStatus"] | null;
+                object_type?: string | null;
+                stale?: boolean | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_AdminDeliveryRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    outbound_detail_api_v1_admin_traffic_outbound__delivery_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                delivery_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeliveryDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commands_api_v1_admin_traffic_commands_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+                status?: string | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_AdminCommandRead_"];
                 };
             };
             /** @description Validation Error */

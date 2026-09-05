@@ -220,6 +220,7 @@ class NetmoreMqttConnector:
             password=credentials.get("password") or credentials.get("mqtt_password"),
             tls=bool(config.get("mqtt_tls", True)),
             client_id=f"{user}-protect-{self.source.id.hex[:8]}",
+            source_id=self.source.id,
         )
         topics = [str(t) for t in (config.get("topics") or DEFAULT_TOPICS)]
 

@@ -74,7 +74,7 @@ packages = ["shared", "protect_api", "protect_ingest", "protect_decoder", "prote
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["shapely.*"]
+module = ["shapely.*", "chirpstack_api.*", "google.protobuf.*", "grpc", "grpc.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

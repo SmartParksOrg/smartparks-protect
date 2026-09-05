@@ -28,7 +28,7 @@ def test_chirpstack_links_from_identity_attributes():
     links = {link["key"]: link for link in resolve_links(source, identity)}
     assert (
         links["OPEN_DEVICE"]["url"]
-        == "http://localhost:8080/#/tenants/t1/applications/a1/devices/70B3D57ED0001234"
+        == "http://localhost:8080/#/tenants/t1/applications/a1/devices/70b3d57ed0001234"
     )
     assert links["OPEN_APPLICATION"]["url"].endswith("/applications/a1")
     assert links["OPEN_DEVICE"]["label"] == "Open device in ChirpStack"

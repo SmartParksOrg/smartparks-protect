@@ -13,6 +13,7 @@ from sqlalchemy import select
 from shared.bus import RedisStreamsBus
 from shared.connectivity.base import InboundMessage
 from shared.connectivity.registry import ADAPTERS
+from shared.connectivity.state import report_connector
 from shared.database import session_scope
 from shared.ingest import commit_and_publish, data_source_context, store_inbound
 from shared.logger import get_logger
@@ -85,14 +86,18 @@ class ConnectorRunner:
             connector = adapter.event_connector(context)
             assert connector is not None
             try:
+                await report_connector(source.id, "starting", None)
                 await connector.run(emit)
                 log.warning(
                     "connector ended, restarting", data_source=source.name, delay=RESTART_SECONDS
                 )
+                await report_connector(source.id, "reconnecting", "connector ended")
             except asyncio.CancelledError:
+                await report_connector(source.id, "stopped", "connector stopped")
                 raise
-            except Exception:
+            except Exception as exc:
                 log.error("connector crashed, restarting", data_source=source.name, exc_info=True)
+                await report_connector(source.id, "error", f"{type(exc).__name__}: {exc}")
             await asyncio.sleep(RESTART_SECONDS)
 
 

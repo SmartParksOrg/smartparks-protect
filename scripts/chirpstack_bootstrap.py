@@ -24,9 +24,12 @@ import uuid
 import warnings
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
+import grpc
 import httpx
 import jwt
+from chirpstack_api import api, common
 
 TENANT_NAME = "Smart Parks (dev)"
 APPLICATION_NAME = "OpenCollar"
@@ -37,105 +40,125 @@ DATA_SOURCE_NAME = "ChirpStack (local)"
 
 
 class ChirpStack:
-    def __init__(self, url: str, key: str) -> None:
-        self.client = httpx.Client(
-            base_url=url, headers={"Grpc-Metadata-Authorization": f"Bearer {key}"}, timeout=15
-        )
+    """The local ChirpStack over its gRPC API (`grpc://localhost:8080` from the host)."""
 
-    def _find(self, path: str, name: str, params: dict[str, Any]) -> dict[str, Any] | None:
-        result = self.client.get(path, params={**params, "limit": 100}).raise_for_status().json()
-        return next((r for r in result.get("result", []) if r.get("name") == name), None)
+    def __init__(self, url: str, key: str) -> None:
+        parts = urlsplit(url)
+        host = parts.hostname or "localhost"
+        port = parts.port or 8080
+        self.channel = grpc.insecure_channel(f"{host}:{port}")
+        self.metadata = (("authorization", f"Bearer {key}"),)
+
+    def _call(self, method: Any, request: Any) -> Any:
+        return method(request, metadata=self.metadata, timeout=15)
 
     def tenant(self) -> str:
-        existing = self._find("/api/tenants", TENANT_NAME, {})
+        stub = api.TenantServiceStub(self.channel)
+        listed = self._call(stub.List, api.ListTenantsRequest(limit=100))
+        existing = next((t for t in listed.result if t.name == TENANT_NAME), None)
         if existing:
-            return str(existing["id"])
-        body = {
-            "tenant": {
-                "name": TENANT_NAME,
-                "canHaveGateways": True,
-                "maxGatewayCount": 0,
-                "maxDeviceCount": 0,
-            }
-        }
-        return str(self.client.post("/api/tenants", json=body).raise_for_status().json()["id"])
+            return str(existing.id)
+        created = self._call(
+            stub.Create,
+            api.CreateTenantRequest(
+                tenant=api.Tenant(
+                    name=TENANT_NAME,
+                    can_have_gateways=True,
+                    max_gateway_count=0,
+                    max_device_count=0,
+                )
+            ),
+        )
+        return str(created.id)
 
     def application(self, tenant_id: str) -> str:
-        existing = self._find("/api/applications", APPLICATION_NAME, {"tenantId": tenant_id})
+        stub = api.ApplicationServiceStub(self.channel)
+        listed = self._call(stub.List, api.ListApplicationsRequest(tenant_id=tenant_id, limit=100))
+        existing = next((a for a in listed.result if a.name == APPLICATION_NAME), None)
         if existing:
-            return str(existing["id"])
-        body = {
-            "application": {
-                "name": APPLICATION_NAME,
-                "tenantId": tenant_id,
-                "description": "Smart Parks Protect development",
-            }
-        }
-        return str(self.client.post("/api/applications", json=body).raise_for_status().json()["id"])
+            return str(existing.id)
+        created = self._call(
+            stub.Create,
+            api.CreateApplicationRequest(
+                application=api.Application(
+                    name=APPLICATION_NAME,
+                    tenant_id=tenant_id,
+                    description="Smart Parks Protect development",
+                )
+            ),
+        )
+        return str(created.id)
 
     def device_profile(self, tenant_id: str, codec: str | None) -> str:
-        existing = self._find("/api/device-profiles", PROFILE_NAME, {"tenantId": tenant_id})
-        profile = {
-            "name": PROFILE_NAME,
-            "tenantId": tenant_id,
-            "region": "EU868",
-            "macVersion": "LORAWAN_1_0_3",
-            "regParamsRevision": "A",
-            "adrAlgorithmId": "default",
-            "supportsOtaa": True,
-            "supportsClassB": False,
-            "supportsClassC": False,
-            "uplinkInterval": 3600,
-            "flushQueueOnActivate": True,
-            "payloadCodecRuntime": "JS" if codec else "NONE",
-            "payloadCodecScript": codec or "",
-        }
-        if existing:
-            self.client.put(
-                f"/api/device-profiles/{existing['id']}",
-                json={"deviceProfile": {**profile, "id": existing["id"]}},
-            ).raise_for_status()
-            return str(existing["id"])
-        return str(
-            self.client.post("/api/device-profiles", json={"deviceProfile": profile})
-            .raise_for_status()
-            .json()["id"]
+        stub = api.DeviceProfileServiceStub(self.channel)
+        listed = self._call(
+            stub.List, api.ListDeviceProfilesRequest(tenant_id=tenant_id, limit=100)
         )
+        existing = next((p for p in listed.result if p.name == PROFILE_NAME), None)
+        profile = api.DeviceProfile(
+            name=PROFILE_NAME,
+            tenant_id=tenant_id,
+            region=common.EU868,
+            mac_version=common.LORAWAN_1_0_3,
+            reg_params_revision=common.A,
+            adr_algorithm_id="default",
+            supports_otaa=True,
+            supports_class_b=False,
+            supports_class_c=False,
+            uplink_interval=3600,
+            flush_queue_on_activate=True,
+            payload_codec_runtime=api.JS if codec else api.NONE,
+            payload_codec_script=codec or "",
+        )
+        if existing:
+            profile.id = existing.id
+            self._call(stub.Update, api.UpdateDeviceProfileRequest(device_profile=profile))
+            return str(existing.id)
+        created = self._call(stub.Create, api.CreateDeviceProfileRequest(device_profile=profile))
+        return str(created.id)
 
     def gateway(self, tenant_id: str) -> None:
-        response = self.client.get(f"/api/gateways/{GATEWAY_ID}")
-        if response.status_code == 200:
+        stub = api.GatewayServiceStub(self.channel)
+        try:
+            self._call(stub.Get, api.GetGatewayRequest(gateway_id=GATEWAY_ID))
             return
-        body = {
-            "gateway": {
-                "gatewayId": GATEWAY_ID,
-                "name": "Simulated gateway",
-                "tenantId": tenant_id,
-                "statsInterval": 30,
-                "location": {"latitude": -24.9, "longitude": 31.5},
-            }
-        }
-        self.client.post("/api/gateways", json=body).raise_for_status()
+        except grpc.RpcError as error:
+            if error.code() != grpc.StatusCode.NOT_FOUND:  # type: ignore[attr-defined]
+                raise
+        gateway = api.Gateway(
+            gateway_id=GATEWAY_ID, name="Simulated gateway", tenant_id=tenant_id, stats_interval=30
+        )
+        gateway.location.latitude = -24.9
+        gateway.location.longitude = 31.5
+        self._call(stub.Create, api.CreateGatewayRequest(gateway=gateway))
 
     def device(self, application_id: str, profile_id: str) -> None:
-        response = self.client.get(f"/api/devices/{DEVICE_EUI}")
-        if response.status_code == 200:
+        stub = api.DeviceServiceStub(self.channel)
+        try:
+            self._call(stub.Get, api.GetDeviceRequest(dev_eui=DEVICE_EUI))
             return
-        body = {
-            "device": {
-                "devEui": DEVICE_EUI,
-                "name": "SP05-sim",
-                "applicationId": application_id,
-                "deviceProfileId": profile_id,
-                "description": "Simulated OpenCollar",
-            }
-        }
-        self.client.post("/api/devices", json=body).raise_for_status()
+        except grpc.RpcError as error:
+            if error.code() != grpc.StatusCode.NOT_FOUND:  # type: ignore[attr-defined]
+                raise
+        self._call(
+            stub.Create,
+            api.CreateDeviceRequest(
+                device=api.Device(
+                    dev_eui=DEVICE_EUI,
+                    name="SP05-sim",
+                    application_id=application_id,
+                    device_profile_id=profile_id,
+                    description="Simulated OpenCollar",
+                )
+            ),
+        )
         key = secrets.token_hex(16)
-        self.client.post(
-            f"/api/devices/{DEVICE_EUI}/keys",
-            json={"deviceKeys": {"devEui": DEVICE_EUI, "nwkKey": key, "appKey": key}},
-        ).raise_for_status()
+        self._call(
+            stub.CreateKeys,
+            api.CreateDeviceKeysRequest(
+                device_keys=api.DeviceKeys(dev_eui=DEVICE_EUI, nwk_key=key, app_key=key)
+            ),
+        )
 
 
 def mint_key(env_file: Path, container: str = "protect-chirpstack-postgres") -> str:
@@ -198,7 +221,7 @@ def register_data_source(
         "config": {
             "mqtt_host": "chirpstack-mosquitto",
             "mqtt_port": 1883,
-            "api_url": "http://chirpstack-rest-api:8090",
+            "api_url": "grpc://chirpstack:8080",
             "web_url": "http://localhost:8080",
             "tenant_id": tenant_id,
             "application_id": application_id,
@@ -320,7 +343,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--chirpstack-url", default="http://localhost:8090")
+    parser.add_argument("--chirpstack-url", default="grpc://localhost:8080")
     parser.add_argument("--chirpstack-api-key", help="global API key made in the ChirpStack web UI")
     parser.add_argument(
         "--mint-key", action="store_true", help="mint a key for the local compose stack"

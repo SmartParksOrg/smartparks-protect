@@ -31,6 +31,7 @@ const AdminProjectsPage = lazy(() => import("@/pages/admin/AdminProjectsPage").t
 const UsersPage = lazy(() => import("@/pages/admin/UsersPage").then((m) => ({ default: m.UsersPage })));
 const AdminDevicesPage = lazy(() => import("@/pages/admin/AdminDevicesPage").then((m) => ({ default: m.AdminDevicesPage })));
 const DataSourcesPage = lazy(() => import("@/pages/admin/DataSourcesPage").then((m) => ({ default: m.DataSourcesPage })));
+const AdminTrafficPage = lazy(() => import("@/pages/admin/AdminTrafficPage").then((m) => ({ default: m.AdminTrafficPage })));
 const DataSourceTrafficPage = lazy(() => import("@/pages/admin/DataSourceTrafficPage").then((m) => ({ default: m.DataSourceTrafficPage })));
 const DeviceTypesPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.DeviceTypesPage })));
 const EntityTypesPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.EntityTypesPage })));
@@ -97,6 +98,7 @@ export default function App() {
               <Route index element={<Navigate to="attention" replace />} />
               <Route path="attention" element={<AttentionPage />} />
               <Route path="health" element={<HealthPage />} />
+              <Route path="traffic" element={<AdminTrafficPage />} />
               <Route path="backups" element={<BackupsPage />} />
               <Route path="alerts" element={<AdminAlertsPage />} />
               <Route path="automations" element={<AdminAutomationsPage />} />

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Copy, KeyRound, Plus, Radio, RefreshCw, Trash2, Waypoints } from "lucide-react";
+import { Activity, Copy, Cpu, KeyRound, Plug, Plus, Radio, RefreshCw, Trash2, Waypoints } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
@@ -13,6 +13,7 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { DataSource, Page as PageType, ProjectWithRole } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
+import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -24,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { formatTime } from "@/lib/format";
+import { formatAgo, formatTime } from "@/lib/format";
 
 interface AdapterInfo {
   key: string;
@@ -33,6 +34,7 @@ interface AdapterInfo {
   can_send_commands: boolean;
   acquisition_channel: string;
   default_capabilities: Record<string, boolean>;
+  channels: { key: string; label: string; direction: string; purpose: string; hint?: string | null; config_keys: string[]; credential_keys: string[]; capabilities?: string[] }[];
   config_schema: Record<string, unknown>;
   config_example: Record<string, unknown>;
   credentials_schema: Record<string, string>;
@@ -74,6 +76,7 @@ export function DataSourcesPage() {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<{ token: string; url: string | null } | null>(null);
   const [removing, setRemoving] = useState<DataSource | null>(null);
+  const [statusOf, setStatusOf] = useState<DataSource | null>(null);
   const navigate = useNavigate();
   const remove = useMutationToast({
     mutationFn: (s: DataSource) => api.delete(`/api/v1/data-sources/${s.id}`),
@@ -103,6 +106,8 @@ export function DataSourcesPage() {
   const [rescanning, setRescanning] = useState<DataSource | null>(null);
   const [since, setSince] = useState("");
   const rescan = useMutationToast({ mutationFn: (s: DataSource) => api.post<Record<string, unknown>>(`/api/v1/data-sources/${s.id}/cursor`, { body: { since: since ? new Date(since).toISOString() : null } }), invalidate: [queryKeys.dataSources], success: t("Cursor reset; the connector rescans at its next poll"), onSuccess: () => setRescanning(null) });
+  const testConnection = useMutationToast({ mutationFn: (s: DataSource) => api.post<{ ok: boolean; detail: string }>(`/api/v1/data-sources/${s.id}/test`), success: (r) => (r.ok ? `Connection ok: ${r.detail}` : `Connection failed: ${r.detail}`) });
+  const syncDevices = useMutationToast({ mutationFn: (s: DataSource) => api.post<{ listed: number; created: number; updated: number }>(`/api/v1/data-sources/${s.id}/sync-devices`), invalidate: [queryKeys.dataSources], success: (r) => `${r.listed} devices listed, ${r.created} new identities (see Needs attention), ${r.updated} refreshed` });
   const syncGateways = useMutationToast({ mutationFn: (s: DataSource) => api.post<{ synced: number }>(`/api/v1/data-sources/${s.id}/sync-gateways`), invalidate: [queryKeys.dataSources], success: (r) => `${r.synced} gateways synced` });
   const rotate = useMutationToast({ mutationFn: (id: string) => api.post<DataSource>(`/api/v1/data-sources/${id}/webhook-token`), invalidate: [queryKeys.dataSources], onSuccess: (source) => source.webhook_token && setToken({ token: source.webhook_token, url: source.webhook_url ?? null }) });
   const columns: ColumnDef<DataSource, unknown>[] = [
@@ -116,7 +121,10 @@ export function DataSourcesPage() {
     { id: "token", header: "", cell: ({ row }) => { const a = ADAPTERS.find((x) => x.key === row.original.adapter_key); const caps = row.original.capabilities as Record<string, boolean>; return <span className="flex gap-1" onClick={(e) => e.stopPropagation()}>
       {(row.original.has_webhook_token || ADAPTERS.find((x) => x.key === row.original.adapter_key)?.push) && <Button variant="ghost" size="sm" onClick={() => rotate.mutate(row.original.id)}><KeyRound className="size-4" /> {row.original.has_webhook_token ? t("New token") : t("Create webhook token")}</Button>}
       {a?.polling && <Button variant="ghost" size="sm" onClick={() => { setSince(""); setRescanning(row.original); }}><RefreshCw className="size-4" /> {t("Rescan")}</Button>}
+      {a?.can_manage && <Button variant="ghost" size="sm" disabled={testConnection.isPending} onClick={() => testConnection.mutate(row.original)}><Plug className="size-4" /> {t("Test connection")}</Button>}
+      {a?.can_manage && caps.device_management && <Button variant="ghost" size="sm" disabled={syncDevices.isPending} onClick={() => syncDevices.mutate(row.original)}><Cpu className="size-4" /> {t("Sync devices")}</Button>}
       {a?.can_manage && caps.gateway_management && <Button variant="ghost" size="sm" disabled={syncGateways.isPending} onClick={() => syncGateways.mutate(row.original)}><Waypoints className="size-4" /> {t("Sync gateways")}</Button>}
+      <Button variant="ghost" size="sm" onClick={() => setStatusOf(row.original)}><Activity className="size-4" /> {t("Status")}</Button>
       <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/data-sources/${row.original.id}/traffic`)}><Radio className="size-4" /> {t("Traffic")}</Button>
       {!a?.builtin && <Button variant="ghost" size="sm" aria-label={t("Delete data source")} onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button>}
     </span>; } },
@@ -137,6 +145,7 @@ export function DataSourcesPage() {
               </Select>
             </Field>
             {(() => { const a = ADAPTERS.find((x) => x.key === adapterKey); return a?.setup_hint ? <Callout kind="info">{a.setup_hint}{a.push ? (a.webhook_token_in_query ? " The webhook URL with its token is shown after saving; the platform posts to that URL as is." : " The webhook URL and its bearer token are shown after saving.") : ""}</Callout> : null; })()}
+            <ChannelsGuide adapter={ADAPTERS.find((x) => x.key === adapterKey)} config={form.watch("config")} credentials={form.watch("credentials")} editing={editing} />
             <div className="flex items-start gap-2"><Switch id="ds-enabled" checked={form.watch("enabled")} onCheckedChange={(v) => form.setValue("enabled", v)} /><label htmlFor="ds-enabled" className="text-sm">{t("Enabled")}<span className="block text-xs text-muted-foreground">{t("Receives events: the webhook answers and the connector runs. Switch off to pause the source without deleting it.")}</span></label></div>
             <Field label={t("Configuration (JSON)")} htmlFor="ds-config" error={form.formState.errors.config?.message}><Textarea id="ds-config" rows={6} className="font-mono text-xs" {...form.register("config")} /></Field>
             <Field label={t("Credentials (JSON)")} htmlFor="ds-credentials" hint={editing ? "Leave empty to keep the stored credentials" : undefined} error={form.formState.errors.credentials?.message}><Textarea id="ds-credentials" rows={3} className="font-mono text-xs" {...form.register("credentials")} /></Field>
@@ -169,7 +178,84 @@ export function DataSourcesPage() {
           <DialogFooter><Button onClick={() => setToken(null)}>{t("Done")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+      <StatusDialog source={statusOf} onClose={() => setStatusOf(null)} />
       <ConfirmDialog open={removing !== null} onOpenChange={(open) => { if (!open) setRemoving(null); }} title={t("Delete data source")} description={removing ? t("{{name}} is removed with its webhook token and its external identities; devices and their data stay.", { name: removing.name }) : ""} confirmLabel={t("Delete")} onConfirm={() => { if (removing) remove.mutate(removing); }} />
     </>
+  );
+}
+
+type Channel = AdapterInfo["channels"][number];
+
+function parseJson(text: string): Record<string, unknown> {
+  try { const v: unknown = JSON.parse(text || "{}"); return v && typeof v === "object" ? (v as Record<string, unknown>) : {}; } catch { return {}; }
+}
+
+/** What the current settings switch on (decision: a source is its channels). */
+function ChannelsGuide({ adapter, config, credentials, editing }: { adapter: AdapterInfo | undefined; config: string; credentials: string; editing: DataSource | null }) {
+  const { t } = useTranslation();
+  if (!adapter || adapter.channels.length === 0) return null;
+  const cfg = parseJson(config);
+  const creds = parseJson(credentials);
+  const filled = (v: unknown) => v !== undefined && v !== null && String(v).trim() !== "";
+  return (
+    <div className="rounded-md border">
+      <div className="border-b px-3 py-2 text-xs font-medium uppercase text-muted-foreground">{t("Channels")}</div>
+      <ul className="divide-y">
+        {adapter.channels.map((c: Channel) => {
+          const missingConfig = c.config_keys.filter((k) => !filled(cfg[k]));
+          // stored credentials stay hidden while editing: an empty credentials box keeps them
+          const missingCreds = c.credential_keys.filter((k) => !filled(creds[k]) && !(editing?.has_credentials && credentials.trim() === ""));
+          const on = missingConfig.length === 0 && missingCreds.length === 0;
+          return (
+            <li key={c.key} className="flex items-start gap-3 px-3 py-2 text-sm">
+              <StatusBadge value={on ? "enabled" : "off"} />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{c.label} <span className="text-xs font-normal text-muted-foreground">{c.direction === "in" ? t("inbound") : t("outbound")}</span></div>
+                <div className="text-xs text-muted-foreground">{c.purpose}</div>
+                {!on && <div className="text-xs">{t("Needs {{keys}}", { keys: [...missingConfig, ...missingCreds].join(", ") })}{c.hint ? ` · ${c.hint}` : ""}</div>}
+                {on && c.hint && <div className="text-xs text-muted-foreground">{c.hint}</div>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+type ChannelStatus = { key: string; label: string; direction: string; purpose: string; hint?: string | null; configured: boolean; missing: string[]; state: string; detail?: string | null; last_at?: string | null; count_24h: number };
+type SourceStatus = { channels: ChannelStatus[]; effective_capabilities: Record<string, boolean>; limited_capabilities: string[] };
+
+/** Per channel: configured or not, and working or not, refreshed every five seconds. */
+function StatusDialog({ source, onClose }: { source: DataSource | null; onClose: () => void }) {
+  const { t } = useTranslation();
+  const status = useQuery({ queryKey: queryKeys.dataSourceStatus(source?.id ?? ""), queryFn: () => api.get<SourceStatus>(`/api/v1/data-sources/${source?.id}/status`), enabled: source !== null, refetchInterval: source ? 5_000 : false });
+  return (
+    <Dialog open={source !== null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader><DialogTitle>{source ? t("Status of {{name}}", { name: source.name }) : t("Status")}</DialogTitle><DialogDescription>{t("Each channel of this source: whether it is configured and whether it works, from what arrived, the live connection and the last API answer.")}</DialogDescription></DialogHeader>
+        {status.error && <Callout kind="error">{status.error.message}</Callout>}
+        {status.data && (
+          <div className="space-y-3 text-sm">
+            <ul className="divide-y rounded-md border">
+              {status.data.channels.map((c) => (
+                <li key={c.key} className="flex items-start gap-3 px-3 py-2">
+                  <StatusBadge value={c.state} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">{c.label} <span className="text-xs font-normal text-muted-foreground">{c.direction === "in" ? t("inbound") : t("outbound")}</span></div>
+                    <div className="text-xs text-muted-foreground">{c.purpose}</div>
+                    {c.detail && <div className="text-xs">{c.detail}</div>}
+                    {c.last_at && <div className="text-xs text-muted-foreground">{t("last {{ago}}", { ago: formatAgo(c.last_at) })}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {status.data.limited_capabilities.length > 0 && <Callout kind="warning">{t("Held back until their channel is configured: {{list}}", { list: status.data.limited_capabilities.join(", ") })}</Callout>}
+            <div className="text-xs text-muted-foreground">{t("Effective capabilities: {{list}}", { list: Object.entries(status.data.effective_capabilities).filter(([, v]) => v).map(([k]) => k).join(", ") || t("none") })}</div>
+          </div>
+        )}
+        <DialogFooter><Button variant="outline" onClick={onClose}>{t("Close")}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

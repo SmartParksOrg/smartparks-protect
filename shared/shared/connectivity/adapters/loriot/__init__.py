@@ -142,7 +142,7 @@ def parse_frame(source: DataSourceContext, frame: str | bytes) -> InboundMessage
 
 class LoriotConnector(WebsocketConnector):
     def __init__(self, source: DataSourceContext) -> None:
-        super().__init__(ws_url(source))
+        super().__init__(ws_url(source), source_id=source.id)
         self.source = source
 
     async def on_frame(self, frame: str | bytes, emit: Emit) -> None:
@@ -232,6 +232,26 @@ class LoriotAdapter:
         gateway_status=False,
         statistics=False,
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "stream",
+            "label": "Websocket output",
+            "direction": "in",
+            "purpose": "The ingest service connects to the application's websocket output; "
+            "downlinks go over the same connection",
+            "config_keys": ["server"],
+            "credential_keys": ["token"],
+            "capabilities": ["downlink"],
+        },
+        {
+            "key": "http",
+            "label": "HTTP output",
+            "direction": "in",
+            "purpose": "LORIOT's HTTP output posts the same frames to the webhook URL",
+            "config_keys": [],
+            "credential_keys": [],
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/#/app/{app_id}/device/{external_id}",
         "OPEN_APPLICATION": "{web_url}/#/app/{app_id}",

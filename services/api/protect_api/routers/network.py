@@ -166,7 +166,7 @@ async def traffic(
     rows = (
         await session.execute(statement.order_by(SourceEvent.ingested_at.desc()).limit(limit))
     ).all()
-    return await _traffic_rows(session, rows, include_payload)
+    return await traffic_rows(session, rows, include_payload)
 
 
 @router.get("/data-sources/{data_source_id}/traffic", response_model=list[TrafficRow])
@@ -205,10 +205,10 @@ async def data_source_traffic(
     rows = (
         await session.execute(statement.order_by(SourceEvent.ingested_at.desc()).limit(limit))
     ).all()
-    return await _traffic_rows(session, rows, include_payload)
+    return await traffic_rows(session, rows, include_payload)
 
 
-async def _traffic_rows(
+async def traffic_rows(
     session: AsyncSession, rows: Sequence[Any], include_payload: bool
 ) -> list[TrafficRow]:
     event_ids = [r[0].id for r in rows]

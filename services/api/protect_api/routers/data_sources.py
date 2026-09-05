@@ -2,11 +2,13 @@
 phase 1; credentials are written, never read back."""
 
 import uuid
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +26,8 @@ from protect_api.schemas.domain import (
 )
 from protect_api.schemas.integrations import CursorReset, GatewaySyncResult
 from shared.config import get_settings
-from shared.connectivity.registry import ADAPTERS, describe_adapter
+from shared.connectivity.registry import ADAPTERS, channels_of, describe_adapter
+from shared.connectivity.state import read_api_test, read_connector, report_api_test
 from shared.connectivity.transports.http import hash_token, new_webhook_token
 from shared.database import get_session
 from shared.ingest import apply_gateway_update, data_source_context
@@ -35,6 +38,7 @@ from shared.models import (
     Device,
     ExternalIdentity,
     Project,
+    SourceEvent,
     User,
 )
 from shared.secrets import encrypt_json
@@ -221,6 +225,229 @@ async def reset_cursor(
     )
     await session.commit()
     return state
+
+
+class ConnectionTestResult(BaseModel):
+    ok: bool
+    detail: str
+    result: dict[str, Any] = Field(default_factory=dict)
+
+
+class DeviceSyncResult(BaseModel):
+    listed: int
+    created: int
+    updated: int
+
+
+def _management(source: DataSource) -> Any:
+    adapter = ADAPTERS.get(source.adapter_key)
+    factory = getattr(adapter, "management_connector", None)
+    return factory(data_source_context(source)) if factory else None
+
+
+class ChannelStatus(BaseModel):
+    key: str
+    label: str
+    direction: str
+    purpose: str
+    hint: str | None = None
+    configured: bool
+    missing: list[str] = Field(default_factory=list)
+    state: str  # off, waiting, ok, connected, reconnecting, error, stopped, untested
+    detail: str | None = None
+    last_at: datetime | None = None
+    count_24h: int = 0
+
+
+class DataSourceStatus(BaseModel):
+    channels: list[ChannelStatus]
+    effective_capabilities: dict[str, bool]
+    limited_capabilities: list[str] = Field(
+        default_factory=list, description="Declared capabilities an unconfigured channel holds back"
+    )
+
+
+CHANNEL_METHODS: dict[str, tuple[str, ...]] = {
+    "http": ("webhook",),
+    "mqtt": ("mqtt",),
+    "stream": ("websocket", "mqtt"),
+    "poll": ("polling",),
+}
+
+
+@router.get("/{data_source_id}/status", response_model=DataSourceStatus)
+async def data_source_status(
+    data_source_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> DataSourceStatus:
+    """Per channel: configured or not (and what is missing), and whether it works, from the
+    messages received, the connector's connection state and the last API answer."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    adapter = ADAPTERS.get(source.adapter_key)
+    credentials = data_source_context(source).credentials
+    config = source.config or {}
+    since = utc_now() - timedelta(hours=24)
+    channels: list[ChannelStatus] = []
+    limited: set[str] = set()
+    for channel in channels_of(adapter) if adapter else []:
+        missing = [
+            k for k in channel.get("config_keys", []) if not str(config.get(k) or "").strip()
+        ]
+        missing += [k for k in channel.get("credential_keys", []) if not credentials.get(k)]
+        configured = not missing
+        state, detail, last_at, count = "off", None, None, 0
+        if configured and channel["direction"] == "in":
+            methods = CHANNEL_METHODS.get(str(channel["key"]), ())
+            if methods:
+                row = (
+                    await session.execute(
+                        select(func.count(), func.max(SourceEvent.ingested_at)).where(
+                            SourceEvent.data_source_id == source.id,
+                            SourceEvent.ingested_at >= since,
+                            SourceEvent.ingestion_method.in_(methods),
+                        )
+                    )
+                ).one()
+                count, last_at = int(row[0] or 0), row[1]
+            connection = (
+                await read_connector(source.id) if channel["key"] in ("mqtt", "stream") else None
+            )
+            if connection is not None:
+                state = str(connection.get("status") or "unknown")
+                detail = connection.get("detail")
+            elif count:
+                state, detail = "ok", f"{count} messages in the last 24 hours"
+            else:
+                state, detail = "waiting", "configured, nothing received in the last 24 hours"
+            if connection is not None and count and state == "connected":
+                detail = f"{detail}; {count} messages in the last 24 hours"
+        elif configured:
+            test = await read_api_test(source.id)
+            if test is None:
+                state, detail = "untested", "configured; run Test connection"
+            else:
+                state = "ok" if test.get("ok") else "error"
+                detail = str(test.get("detail") or "")
+                last_at = datetime.fromisoformat(str(test["at"])) if test.get("at") else None
+        else:
+            detail = "needs " + ", ".join(missing)
+            limited.update(channel.get("capabilities", []))
+        channels.append(
+            ChannelStatus(
+                key=str(channel["key"]),
+                label=str(channel["label"]),
+                direction=str(channel["direction"]),
+                purpose=str(channel.get("purpose") or ""),
+                hint=channel.get("hint"),
+                configured=configured,
+                missing=missing,
+                state=state,
+                detail=detail,
+                last_at=last_at,
+                count_24h=count,
+            )
+        )
+    declared = dict(source.capabilities or {})
+    effective = {k: bool(v) and k not in limited for k, v in declared.items()}
+    return DataSourceStatus(
+        channels=channels,
+        effective_capabilities=effective,
+        limited_capabilities=sorted(k for k in limited if declared.get(k)),
+    )
+
+
+@router.post("/{data_source_id}/test", response_model=ConnectionTestResult)
+async def test_connection(
+    data_source_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> ConnectionTestResult:
+    """Call the platform's API with the stored credentials. A push-only source has nothing to
+    call: it receives on its webhook."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    connector = _management(source)
+    tester = getattr(connector, "test_connection", None)
+    if tester is None:
+        return ConnectionTestResult(
+            ok=True, detail="This source receives on its webhook; there is no API to call."
+        )
+    try:
+        result = await tester()
+    except ApplicationError as error:
+        await report_api_test(source.id, False, str(error))
+        return ConnectionTestResult(ok=False, detail=str(error), result={"code": error.code})
+    except httpx.HTTPError as error:
+        await report_api_test(source.id, False, f"platform unreachable: {error}")
+        return ConnectionTestResult(ok=False, detail=f"platform unreachable: {error}")
+    await report_api_test(source.id, True, "The platform answered.")
+    return ConnectionTestResult(
+        ok=True, detail="The platform answered.", result=dict(result) if result else {}
+    )
+
+
+@router.post("/{data_source_id}/sync-devices", response_model=DeviceSyncResult)
+async def sync_devices(
+    data_source_id: uuid.UUID,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceSyncResult:
+    """Read the platform's device list into the source's external identities: new ones appear
+    under Needs attention to be linked, known ones get their attributes refreshed."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    lister = getattr(_management(source), "list_devices", None)
+    if lister is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "this data source's adapter does not list devices",
+        )
+    try:
+        listed = await lister()
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"platform unreachable: {error}"
+        ) from error
+    created = updated = 0
+    for item in listed:
+        external_id = (
+            str(item.get("external_id") or item.get("devEui") or item.get("dev_eui") or "")
+            .strip()
+            .upper()
+        )
+        if not external_id:
+            continue
+        attributes = {**dict(item.get("attributes") or {})}
+        if item.get("name"):
+            attributes["name"] = item["name"]
+        identity = await session.scalar(
+            select(ExternalIdentity).where(
+                ExternalIdentity.data_source_id == source.id,
+                ExternalIdentity.external_id == external_id,
+            )
+        )
+        if identity is None:
+            session.add(
+                ExternalIdentity(
+                    data_source_id=source.id,
+                    external_id=external_id,
+                    identity_type=str(item.get("identity_type") or "dev_eui"),
+                    attributes=attributes,
+                )
+            )
+            created += 1
+        else:
+            identity.attributes = {**(identity.attributes or {}), **attributes}
+            updated += 1
+    await record_audit(
+        session,
+        user=user,
+        action="data_source.devices_synced",
+        object_type="data_source",
+        object_id=str(source.id),
+        details={"listed": len(listed), "created": created, "updated": updated},
+    )
+    await session.commit()
+    return DeviceSyncResult(listed=len(listed), created=created, updated=updated)
 
 
 @router.post("/{data_source_id}/sync-gateways", response_model=GatewaySyncResult)

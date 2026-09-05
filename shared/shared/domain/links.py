@@ -43,6 +43,9 @@ def resolve_links(
     if identity is not None:
         values.update(identity.attributes or {})
         values["external_id"] = identity.external_id
+        # Platforms differ in the case of a DevEUI in their URLs; ChirpStack shows lower case.
+        values["external_id_lower"] = identity.external_id.lower()
+        values["external_id_upper"] = identity.external_id.upper()
     if gateway_id is not None:
         values["gateway_id"] = gateway_id
     links = []

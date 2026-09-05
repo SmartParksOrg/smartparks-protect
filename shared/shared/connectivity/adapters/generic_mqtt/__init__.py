@@ -82,6 +82,7 @@ class GenericMqttConnector:
             password=credentials.get("password"),
             tls=bool(config.get("tls", False)),
             client_id=f"protect-ingest-{self.source.id.hex[:8]}",
+            source_id=self.source.id,
         )
 
         async def callback(topic: str, payload: bytes) -> None:

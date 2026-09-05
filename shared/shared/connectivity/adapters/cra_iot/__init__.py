@@ -420,6 +420,25 @@ class CraIotAdapter:
         gateway_status=False,
         statistics=False,
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "http",
+            "label": "HTTP endpoint",
+            "direction": "in",
+            "purpose": "The platform's HTTP endpoint output posts the envelope to the webhook URL",
+            "config_keys": [],
+            "credential_keys": [],
+        },
+        {
+            "key": "api",
+            "label": "REST API",
+            "direction": "out",
+            "purpose": "Downlinks and the device sync with a single sign-on token",
+            "config_keys": [],
+            "credential_keys": ["username", "password"],
+            "capabilities": ["downlink", "device_management"],
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {"OPEN_APPLICATION": "{web_url}"}
     config_schema: ClassVar[dict[str, Any]] = {
         "type": "object",

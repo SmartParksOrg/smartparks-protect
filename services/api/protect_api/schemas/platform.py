@@ -7,6 +7,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from protect_api.schemas.common import ORMModel
+from protect_api.schemas.control import CommandRead
+from protect_api.schemas.integrations import IntegrationDeliveryDetail, IntegrationDeliveryRead
 
 KEY_PATTERN = r"^[A-Z][A-Z0-9_]{1,63}$"
 
@@ -114,3 +116,35 @@ class DashboardRead(ORMModel):
     created_by_user_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+# Server-wide traffic (Server admin, Traffic): the three directions side by side.
+
+
+class AdminDeliveryRead(IntegrationDeliveryRead):
+    integration_name: str | None = None
+    connector_key: str | None = None
+    project_name: str | None = None
+
+
+class AdminDeliveryDetail(IntegrationDeliveryDetail):
+    integration_name: str | None = None
+    connector_key: str | None = None
+    project_name: str | None = None
+
+
+class AdminCommandRead(CommandRead):
+    project_name: str | None = None
+    device_name: str | None = None
+
+
+class TrafficSummary(BaseModel):
+    """Counts over the last hour, so a glance says whether the server receives, delivers and
+    controls."""
+
+    window_hours: int = 1
+    inbound_events: int = 0
+    inbound_failed: int = 0
+    inbound_unassigned: int = 0
+    outbound_by_status: dict[str, int] = Field(default_factory=dict)
+    commands_by_status: dict[str, int] = Field(default_factory=dict)

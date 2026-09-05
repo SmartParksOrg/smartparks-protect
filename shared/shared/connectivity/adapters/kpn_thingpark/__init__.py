@@ -246,6 +246,26 @@ class KpnThingParkAdapter:
         gateway_status=False,
         statistics=False,
     )
+    channels: ClassVar[list[dict[str, Any]]] = [
+        {
+            "key": "http",
+            "label": "Application server (HTTP)",
+            "direction": "in",
+            "purpose": "ThingPark posts uplinks and downlink events to the webhook URL",
+            "config_keys": [],
+            "credential_keys": [],
+        },
+        {
+            "key": "api",
+            "label": "Downlink API",
+            "direction": "out",
+            "purpose": "Downlinks through the LRC downlink endpoint",
+            "config_keys": ["downlink_url"],
+            "credential_keys": [],
+            "capabilities": ["downlink"],
+            "hint": "auth_mode token needs as_id and the as_key credential; bearer needs api_token",
+        },
+    ]
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/devices/{external_id}",
     }
