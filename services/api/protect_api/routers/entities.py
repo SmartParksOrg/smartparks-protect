@@ -52,7 +52,12 @@ def feature_read(feature: Feature) -> FeatureRead:
     return data
 
 
-def assignment_read(assignment: DeviceEntityAssignment) -> EntityAssignmentRead:
+def assignment_read(
+    assignment: DeviceEntityAssignment,
+    *,
+    device_name: str | None = None,
+    entity_name: str | None = None,
+) -> EntityAssignmentRead:
     valid_from, valid_to = range_bounds(assignment.validity)
     return EntityAssignmentRead(
         id=assignment.id,
@@ -62,6 +67,8 @@ def assignment_read(assignment: DeviceEntityAssignment) -> EntityAssignmentRead:
         valid_to=valid_to,
         reason=assignment.reason,
         created_at=assignment.created_at,
+        device_name=device_name,
+        entity_name=entity_name,
     )
 
 
@@ -299,6 +306,8 @@ async def list_entity_assignments(
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[EntityAssignmentRead]:
+    """The assignments of this project's entities with the device's name,
+    so an entity page can show its history without a device read per row (decision D106)."""
     statement = (
         select(DeviceEntityAssignment)
         .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
@@ -309,7 +318,18 @@ async def list_entity_assignments(
     if device_id is not None:
         statement = statement.where(DeviceEntityAssignment.device_id == device_id)
     rows, next_cursor = await paginate(session, DeviceEntityAssignment.id, statement, page)
-    return PageResponse(items=[assignment_read(r) for r in rows], next_cursor=next_cursor)
+    names = {
+        device_id: name
+        for device_id, name in (
+            await session.execute(
+                select(Device.id, Device.name).where(Device.id.in_({r.device_id for r in rows}))
+            )
+        ).all()
+    }
+    return PageResponse(
+        items=[assignment_read(r, device_name=names.get(r.device_id)) for r in rows],
+        next_cursor=next_cursor,
+    )
 
 
 @router.post(

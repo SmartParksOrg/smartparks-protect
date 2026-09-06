@@ -161,7 +161,7 @@ export function MapPage() {
           <div className="flex items-start gap-2">
             <Icon iconKey={selected.icon_key} className="size-7 text-primary" />
             <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold">{selected.name}</div>
+              <Link className="block truncate font-semibold underline-offset-2 hover:underline" to={`/projects/${projectId}/entities/${selected.entity_id}`}>{selected.name}</Link>
               <div className="text-xs text-muted-foreground">{selected.entity_type}</div>
             </div>
             <Button variant="ghost" size="icon" aria-label={t("Close")} onClick={() => select(null)}><X className="size-4" /></Button>

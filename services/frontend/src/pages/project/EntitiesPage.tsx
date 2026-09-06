@@ -49,12 +49,7 @@ export function EntitiesPage() {
     <>
       <PageHeader title={t("Entities")} description={t("Animals, people, vehicles, gates and other monitored objects")} actions={canAdmin(role) && <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> {t("New entity")}</Button>} />
       <Page>
-        <DataTable columns={columns} data={entities.data?.items} searchable onSearchChange={setQ} footer={entities.data?.next_cursor ? t("Only the first 500 rows are shown. Search to find the rest.") : undefined} isLoading={entities.isPending} emptyMessage={t("No entities yet.")} onRowClick={(e) => {
-            if (canAdmin(role)) {
-              setEditing(e);
-              setOpen(true);
-            } else void navigate(`/projects/${projectId}/map?entity=${e.id}`);
-          }} />
+        <DataTable columns={columns} data={entities.data?.items} searchable onSearchChange={setQ} footer={entities.data?.next_cursor ? t("Only the first 500 rows are shown. Search to find the rest.") : undefined} isLoading={entities.isPending} emptyMessage={t("No entities yet.")} onRowClick={(e) => void navigate(`/projects/${projectId}/entities/${e.id}`)} />
       </Page>
       <EntityDialog projectId={projectId} entity={editing} open={open} onOpenChange={setOpen} />
     </>

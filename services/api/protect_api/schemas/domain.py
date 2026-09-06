@@ -188,6 +188,12 @@ class ProjectAssignmentRead(AssignmentRead):
 
 class EntityAssignmentRead(AssignmentRead):
     entity_id: uuid.UUID
+    device_name: str | None = Field(
+        default=None, description="Filled by the project's assignment list (decision D106)"
+    )
+    entity_name: str | None = Field(
+        default=None, description="Filled by the device read (decision D106)"
+    )
 
 
 class _Validity(BaseModel):

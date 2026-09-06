@@ -499,7 +499,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Entity Assignments */
+        /**
+         * List Entity Assignments
+         * @description The assignments of this project's entities with the device's name,
+         *     so an entity page can show its history without a device read per row (decision D106).
+         */
         get: operations["list_entity_assignments_api_v1_projects__project_id__entity_assignments_get"];
         put?: never;
         /**
@@ -563,7 +567,9 @@ export interface paths {
         /**
          * List Devices
          * @description Server admins see every device. Others see devices currently assigned to their projects.
-         *     `project_id` narrows to devices currently assigned to that project.
+         *     `project_id` narrows to devices currently assigned to that project; `unassigned` to those
+         *     of them without an entity today, the candidates of an entity's "Assign device"
+         *     (decision D106).
          */
         get: operations["list_devices_api_v1_devices_get"];
         put?: never;
@@ -5761,6 +5767,16 @@ export interface components {
              * Format: uuid
              */
             entity_id: string;
+            /**
+             * Device Name
+             * @description Filled by the project's assignment list (decision D106)
+             */
+            device_name?: string | null;
+            /**
+             * Entity Name
+             * @description Filled by the device read (decision D106)
+             */
+            entity_name?: string | null;
             /** Reattributed */
             reattributed: {
                 [key: string]: number;
@@ -5797,6 +5813,16 @@ export interface components {
              * Format: uuid
              */
             entity_id: string;
+            /**
+             * Device Name
+             * @description Filled by the project's assignment list (decision D106)
+             */
+            device_name?: string | null;
+            /**
+             * Entity Name
+             * @description Filled by the device read (decision D106)
+             */
+            entity_name?: string | null;
         };
         /** EntityCreate */
         EntityCreate: {
@@ -10578,6 +10604,8 @@ export interface operations {
                 project_id?: string | null;
                 status_filter?: components["schemas"]["DeviceStatus"] | null;
                 q?: string | null;
+                /** @description Only devices that track no entity right now (needs project_id) */
+                unassigned?: boolean;
                 limit?: number;
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;

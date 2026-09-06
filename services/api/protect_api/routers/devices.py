@@ -6,8 +6,8 @@ import io
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from sqlalchemy import func, or_, select
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,13 +158,27 @@ async def list_devices(
     project_id: uuid.UUID | None = None,
     status_filter: DeviceStatus | None = None,
     q: str | None = None,
+    unassigned: bool = Query(
+        False, description="Only devices that track no entity right now (needs project_id)"
+    ),
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[DeviceRead]:
     """Server admins see every device. Others see devices currently assigned to their projects.
-    `project_id` narrows to devices currently assigned to that project."""
+    `project_id` narrows to devices currently assigned to that project; `unassigned` to those
+    of them without an entity today, the candidates of an entity's "Assign device"
+    (decision D106)."""
     statement = select(Device)
     now = utc_now()
+    if unassigned and project_id is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "unassigned needs project_id")
+    if unassigned:
+        statement = statement.where(
+            ~exists().where(
+                DeviceEntityAssignment.device_id == Device.id,
+                DeviceEntityAssignment.validity.op("@>")(now),
+            )
+        )
     if project_id is not None:
         if not user.is_superuser and project_id not in (
             await accessible_project_ids(user, session) or []
@@ -244,6 +258,16 @@ async def get_device(
     entity_assignments = (
         await session.scalars(ea_statement.order_by(DeviceEntityAssignment.validity))
     ).all()
+    entity_names = {
+        entity_id: name
+        for entity_id, name in (
+            await session.execute(
+                select(Entity.id, Entity.name).where(
+                    Entity.id.in_({a.entity_id for a in entity_assignments})
+                )
+            )
+        ).all()
+    }
     identities = (
         await session.scalars(
             select(ExternalIdentity).where(ExternalIdentity.device_id == device.id)
@@ -265,7 +289,10 @@ async def get_device(
     return DeviceWithAssignments(
         **(await with_state(session, [device]))[0].model_dump(),
         project_assignments=[project_assignment_read(a) for a in project_assignments],
-        entity_assignments=[assignment_read(a) for a in entity_assignments],
+        entity_assignments=[
+            assignment_read(a, entity_name=entity_names.get(a.entity_id))
+            for a in entity_assignments
+        ],
         external_identities=[ExternalIdentityRead.model_validate(i) for i in identities],
         links=links,
     )

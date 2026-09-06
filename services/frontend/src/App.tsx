@@ -12,6 +12,7 @@ import { ProjectsPage } from "@/pages/ProjectsPage";
 
 const MapPage = lazy(() => import("@/pages/project/MapPage").then((m) => ({ default: m.MapPage })));
 const EntitiesPage = lazy(() => import("@/pages/project/EntitiesPage").then((m) => ({ default: m.EntitiesPage })));
+const EntityPage = lazy(() => import("@/pages/project/EntityPage").then((m) => ({ default: m.EntityPage })));
 const DevicesPage = lazy(() => import("@/pages/project/DevicesPage").then((m) => ({ default: m.DevicesPage })));
 const DevicePage = lazy(() => import("@/pages/project/DevicePage").then((m) => ({ default: m.DevicePage })));
 const TrafficPage = lazy(() => import("@/pages/project/TrafficPage").then((m) => ({ default: m.TrafficPage })));
@@ -74,6 +75,7 @@ export default function App() {
               <Route index element={<Navigate to="map" replace />} />
               <Route path="map" element={<MapPage />} />
               <Route path="entities" element={<EntitiesPage />} />
+              <Route path="entities/:entityId" element={<EntityPage />} />
               <Route path="devices" element={<DevicesPage />} />
               <Route path="devices/:deviceId" element={<DevicePage />} />
               <Route path="alerts" element={<AlertsPage />} />

@@ -139,7 +139,7 @@ export function DevicePage() {
             <CardHeader><CardTitle>{t("Entity assignments")}</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
               {d.entity_assignments.length === 0 && <div className="text-muted-foreground">{t("Not assigned to an entity.")}</div>}
-              {d.entity_assignments.map((a) => <div key={a.id}>{t("Entity")} <span className="font-mono">{a.entity_id.slice(0, 8)}</span>, {t("{{from}} to {{to}}", { from: formatTime(a.valid_from), to: a.valid_to ? formatTime(a.valid_to) : t("now") })}</div>)}
+              {d.entity_assignments.map((a) => <div key={a.id}>{projectId ? <Link className="underline" to={`/projects/${projectId}/entities/${a.entity_id}`}>{a.entity_name ?? a.entity_id.slice(0, 8)}</Link> : <span>{a.entity_name ?? a.entity_id.slice(0, 8)}</span>}, {t("{{from}} to {{to}}", { from: formatTime(a.valid_from), to: a.valid_to ? formatTime(a.valid_to) : t("now") })}</div>)}
             </CardContent>
           </Card>
           <div className="lg:col-span-2"><DeviceControl deviceId={d.id} projectId={projectId} canFlush={canAdmin(role) || Boolean(user?.is_superuser)} /></div>
