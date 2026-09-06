@@ -26,6 +26,7 @@ export const queryKeys = {
   audit: (projectId: string | null) => ["audit", projectId ?? "server"] as const,
   devices: (params: Record<string, unknown>) => ["devices", params] as const,
   device: (id: string) => ["devices", id] as const,
+  deviceSpan: (id: string) => ["devices", id, "span"] as const,
   deviceTypes: ["device-types"] as const,
   entityTypes: ["entity-types"] as const,
   metrics: ["metrics"] as const,

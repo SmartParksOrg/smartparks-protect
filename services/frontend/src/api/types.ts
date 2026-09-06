@@ -19,6 +19,7 @@ export type DataSource = Schemas["DataSourceRead"];
 export type ExternalIdentity = Schemas["ExternalIdentityRead"];
 export type Metric = Schemas["MetricRead"];
 export type UnknownIdentity = Schemas["UnknownIdentity"];
+export type DeviceDataSpan = Schemas["DeviceDataSpan"];
 export type BulkCreateResult = Schemas["BulkCreateResult"];
 export type BulkIgnoreResult = Schemas["BulkIgnoreResult"];
 export type AttentionSummary = Schemas["AttentionSummary"];

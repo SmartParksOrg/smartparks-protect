@@ -14,6 +14,17 @@ export function formatAgo(value: string | null | undefined): string {
   return `${Math.round(seconds / 86400)} d ago`;
 }
 
+/** The instant a calendar day starts in a timezone, as ISO: assignment starts are dates for
+ * people and moments for the system (decision D103). */
+export function startOfDayIso(date: string, timeZone: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const guess = Date.UTC(y, m - 1, d);
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(guess));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const wall = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return new Date(guess - (wall - guess)).toISOString();
+}
+
 export function shortId(value: string | null | undefined, length = 8): string {
   return value ? value.slice(0, length) : "";
 }

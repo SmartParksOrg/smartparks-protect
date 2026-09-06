@@ -19,7 +19,9 @@ from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.routers.entities import assignment_read
 from protect_api.schemas.domain import (
     AssignmentEnd,
+    AssignmentStart,
     DeviceCreate,
+    DeviceDataSpan,
     DeviceRead,
     DeviceUpdate,
     DeviceWithAssignments,
@@ -29,19 +31,26 @@ from protect_api.schemas.domain import (
     ImportResult,
     ImportRowResult,
     ProjectAssignmentCreate,
+    ProjectAssignmentExtended,
     ProjectAssignmentRead,
+    RecordCounts,
 )
+from shared.curation.effective import effective_time
 from shared.database import get_session
+from shared.domain.assignments import reattribute
 from shared.domain.links import resolve_links
 from shared.enums import DeviceStatus, Role
 from shared.models import (
     DataSource,
     Device,
     DeviceEntityAssignment,
+    DeviceLogFile,
     DeviceProjectAssignment,
     DeviceType,
     Entity,
     ExternalIdentity,
+    Measurement,
+    Position,
     Project,
     ProjectMembership,
     User,
@@ -275,6 +284,9 @@ async def assign_to_project(
     )
     session.add(assignment)
     await flush_or_409(session, "Project assignment")
+    # Records already decoded inside the range (a raw log, data before onboarding) get the
+    # project now (decision D103); nothing is fabricated for the future.
+    counts = await reattribute(session, device.id, body.valid_from, body.valid_to or utc_now())
     await record_audit(
         session,
         user=user,
@@ -282,10 +294,137 @@ async def assign_to_project(
         object_type="device_project_assignment",
         object_id=str(assignment.id),
         project_id=body.project_id,
-        details={"device_id": str(device.id), "valid_from": body.valid_from.isoformat()},
+        details={
+            "device_id": str(device.id),
+            "valid_from": body.valid_from.isoformat(),
+            "reattributed": counts,
+        },
     )
     await session.commit()
     return project_assignment_read(assignment)
+
+
+async def _record_counts(
+    session: AsyncSession, device_id: uuid.UUID, before: datetime | None
+) -> RecordCounts:
+    if before is None:
+        return RecordCounts()
+    counts = {}
+    for model, name in ((Position, "positions"), (Measurement, "measurements")):
+        when = effective_time(model)
+        counts[name] = int(
+            await session.scalar(
+                select(func.count()).where(model.device_id == device_id, when < before)
+            )
+            or 0
+        )
+    return RecordCounts(**counts)
+
+
+@router.get("/{device_id}/data-span", response_model=DeviceDataSpan)
+async def device_data_span(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceDataSpan:
+    """When the device produced data and how many records sit before its assignments, so the
+    dialogs can offer the right start and the device page can offer the repair (D103)."""
+    device = await _visible_device(session, user, device_id)
+    firsts: list[datetime] = []
+    lasts: list[datetime] = []
+    for model in (Position, Measurement):
+        when = effective_time(model)
+        row = (
+            await session.execute(
+                select(func.min(when), func.max(when)).where(model.device_id == device.id)
+            )
+        ).one()
+        if row[0] is not None:
+            firsts.append(row[0])
+            lasts.append(row[1])
+    first_seen = await session.scalar(
+        select(func.min(ExternalIdentity.first_seen_at)).where(
+            ExternalIdentity.device_id == device.id
+        )
+    )
+    first_log = await session.scalar(
+        select(func.min(DeviceLogFile.period_start)).where(DeviceLogFile.device_id == device.id)
+    )
+    candidates = [t for t in [min(firsts, default=None), first_seen, first_log] if t is not None]
+    project_assignment = (
+        await session.execute(
+            select(DeviceProjectAssignment)
+            .where(DeviceProjectAssignment.device_id == device.id)
+            .order_by(func.lower(DeviceProjectAssignment.validity))
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    entity_assignment = (
+        await session.execute(
+            select(DeviceEntityAssignment)
+            .where(DeviceEntityAssignment.device_id == device.id)
+            .order_by(func.lower(DeviceEntityAssignment.validity))
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    project_from = range_bounds(project_assignment.validity)[0] if project_assignment else None
+    entity_from = range_bounds(entity_assignment.validity)[0] if entity_assignment else None
+    return DeviceDataSpan(
+        first_record_at=min(firsts, default=None),
+        last_record_at=max(lasts, default=None),
+        first_seen_at=first_seen,
+        first_log_at=first_log,
+        first_data_at=min(candidates, default=None),
+        earliest_project_from=project_from,
+        earliest_project_assignment_id=project_assignment.id if project_assignment else None,
+        earliest_entity_from=entity_from,
+        earliest_entity_assignment_id=entity_assignment.id if entity_assignment else None,
+        before_project=await _record_counts(session, device.id, project_from),
+        before_entity=await _record_counts(session, device.id, entity_from),
+    )
+
+
+@router.post(
+    "/{device_id}/project-assignments/{assignment_id}/extend-start",
+    response_model=ProjectAssignmentExtended,
+)
+async def extend_project_assignment_start(
+    device_id: uuid.UUID,
+    assignment_id: uuid.UUID,
+    body: AssignmentStart,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> ProjectAssignmentExtended:
+    """Move the start of a project assignment back and attribute the records in between
+    (decision D103): the repair for data that arrived before the device was assigned."""
+    assignment = await get_or_404(session, DeviceProjectAssignment, assignment_id, "Assignment")
+    if assignment.device_id != device_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
+    await _require_project_admin(session, user, assignment.project_id)
+    old_from, valid_to = range_bounds(assignment.validity)
+    if body.valid_from >= old_from:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "valid_from must be before the current start"
+        )
+    assignment.validity = Range(body.valid_from, valid_to, bounds="[)")
+    await flush_or_409(session, "Project assignment")
+    counts = await reattribute(session, device_id, body.valid_from, old_from)
+    await record_audit(
+        session,
+        user=user,
+        action="project_assignment.start_moved",
+        object_type="device_project_assignment",
+        object_id=str(assignment.id),
+        project_id=assignment.project_id,
+        details={
+            "from": old_from.isoformat(),
+            "to": body.valid_from.isoformat(),
+            "reattributed": counts,
+        },
+    )
+    await session.commit()
+    read = project_assignment_read(assignment)
+    return ProjectAssignmentExtended(**read.model_dump(), reattributed=counts)
 
 
 @router.patch(
@@ -379,6 +518,8 @@ async def handover(
     )
     session.add(new)
     await flush_or_409(session, "Handover")
+    # Records already decoded after the handover moment move with the device (D103).
+    counts = await reattribute(session, device.id, body.effective_at, utc_now())
     await record_audit(
         session,
         user=user,
@@ -391,6 +532,7 @@ async def handover(
             "to_project_id": str(body.project_id),
             "effective_at": body.effective_at.isoformat(),
             "entity_assignment_closed": str(entity_assignment.id) if entity_assignment else None,
+            "reattributed": counts,
         },
     )
     await session.commit()

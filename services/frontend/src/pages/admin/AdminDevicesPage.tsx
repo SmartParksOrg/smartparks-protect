@@ -11,7 +11,7 @@ import { z } from "zod";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { DataSource, Device, DeviceDetail, DeviceType, Entity, Page as PageType, ProjectWithRole } from "@/api/types";
+import type { DataSource, Device, DeviceDataSpan, DeviceDetail, DeviceType, Entity, Page as PageType, ProjectWithRole } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -20,6 +20,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AssignmentStartField } from "@/components/devices/AssignmentStartField";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -41,15 +42,16 @@ function ManageDevice({ deviceId, onClose }: { deviceId: string; onClose: () => 
   const sources = useQuery({ queryKey: queryKeys.dataSources, queryFn: () => api.get<PageType<DataSource>>("/api/v1/data-sources", { query: { limit: 500 } }) });
   const projects = useQuery({ queryKey: queryKeys.projects, queryFn: () => api.get<PageType<ProjectWithRole>>("/api/v1/projects", { query: { limit: 500 } }) });
   const [identity, setIdentity] = useState({ data_source_id: "", external_id: "" });
-  const [assignment, setAssignment] = useState({ project_id: "", valid_from: nowIso() });
+  const [assignment, setAssignment] = useState({ project_id: "", valid_from: new Date().toISOString() });
+  const span = useQuery({ queryKey: queryKeys.deviceSpan(deviceId), queryFn: () => api.get<DeviceDataSpan>(`/api/v1/devices/${deviceId}/data-span`) });
   const [handover, setHandover] = useState({ project_id: "", effective_at: nowIso(), reason: "" });
-  const [entityAssignment, setEntityAssignment] = useState({ project_id: "", entity_id: "", valid_from: nowIso() });
+  const [entityAssignment, setEntityAssignment] = useState({ project_id: "", entity_id: "", valid_from: new Date().toISOString() });
   const entities = useQuery({ queryKey: queryKeys.entities(entityAssignment.project_id), queryFn: () => api.get<PageType<Entity>>(`/api/v1/projects/${entityAssignment.project_id}/entities`, { query: { limit: 500 } }), enabled: Boolean(entityAssignment.project_id) });
   const invalidate = [queryKeys.device(deviceId), queryKeys.devices({})];
   const addIdentity = useMutationToast({ mutationFn: () => api.post(`/api/v1/devices/${deviceId}/identities`, { body: identity }), invalidate, success: t("Identity linked"), onSuccess: () => setIdentity({ data_source_id: "", external_id: "" }) });
-  const assign = useMutationToast({ mutationFn: () => api.post(`/api/v1/devices/${deviceId}/project-assignments`, { body: { project_id: assignment.project_id, valid_from: new Date(assignment.valid_from).toISOString() } }), invalidate, success: t("Assigned to project") });
+  const assign = useMutationToast({ mutationFn: () => api.post(`/api/v1/devices/${deviceId}/project-assignments`, { body: { project_id: assignment.project_id, valid_from: assignment.valid_from } }), invalidate, success: t("Assigned to project") });
   const doHandover = useMutationToast({ mutationFn: () => api.post(`/api/v1/devices/${deviceId}/handover`, { body: { project_id: handover.project_id, effective_at: new Date(handover.effective_at).toISOString(), reason: handover.reason || null } }), invalidate, success: t("Device handed over") });
-  const assignEntity = useMutationToast({ mutationFn: () => api.post(`/api/v1/projects/${entityAssignment.project_id}/entity-assignments`, { body: { device_id: deviceId, entity_id: entityAssignment.entity_id, valid_from: new Date(entityAssignment.valid_from).toISOString() } }), invalidate: [...invalidate, queryKeys.currentState(entityAssignment.project_id)], success: t("Assigned to entity") });
+  const assignEntity = useMutationToast({ mutationFn: () => api.post(`/api/v1/projects/${entityAssignment.project_id}/entity-assignments`, { body: { device_id: deviceId, entity_id: entityAssignment.entity_id, valid_from: entityAssignment.valid_from } }), invalidate: [...invalidate, queryKeys.currentState(entityAssignment.project_id)], success: t("Assigned to entity") });
   const d = detail.data;
   const currentProject = d?.project_assignments.find((a) => !a.valid_to);
   return (
@@ -80,7 +82,7 @@ function ManageDevice({ deviceId, onClose }: { deviceId: string; onClose: () => 
               ) : (
                 <Card><CardHeader><CardTitle className="text-sm">{t("Assign to a project")}</CardTitle></CardHeader><CardContent className="grid gap-2 sm:grid-cols-3">
                   <Select value={assignment.project_id} onValueChange={(v) => setAssignment({ ...assignment, project_id: v })}><SelectTrigger><SelectValue placeholder={t("Project")} /></SelectTrigger><SelectContent>{projects.data?.items.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
-                  <Input type="datetime-local" value={assignment.valid_from} onChange={(e) => setAssignment({ ...assignment, valid_from: e.target.value })} aria-label={t("Valid from")} />
+                  <AssignmentStartField idPrefix="project" span={span.data} timeZone={projects.data?.items.find((p) => p.id === assignment.project_id)?.timezone ?? "UTC"} onChange={(iso) => setAssignment((a) => ({ ...a, valid_from: iso }))} />
                   <Button disabled={!assignment.project_id || assign.isPending} onClick={() => assign.mutate()}>{t("Assign")}</Button>
                 </CardContent></Card>
               )}
@@ -90,7 +92,7 @@ function ManageDevice({ deviceId, onClose }: { deviceId: string; onClose: () => 
               <div className="grid gap-2 sm:grid-cols-2">
                 <Select value={entityAssignment.project_id} onValueChange={(v) => setEntityAssignment({ ...entityAssignment, project_id: v, entity_id: "" })}><SelectTrigger><SelectValue placeholder={t("Project")} /></SelectTrigger><SelectContent>{d.project_assignments.map((a) => a.project_id).filter((v, i, arr) => arr.indexOf(v) === i).map((pid) => <SelectItem key={pid} value={pid}>{projects.data?.items.find((p) => p.id === pid)?.name ?? pid}</SelectItem>)}</SelectContent></Select>
                 <Select value={entityAssignment.entity_id} onValueChange={(v) => setEntityAssignment({ ...entityAssignment, entity_id: v })} disabled={!entityAssignment.project_id}><SelectTrigger><SelectValue placeholder={t("Entity")} /></SelectTrigger><SelectContent>{entities.data?.items.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent></Select>
-                <Input type="datetime-local" value={entityAssignment.valid_from} onChange={(e) => setEntityAssignment({ ...entityAssignment, valid_from: e.target.value })} aria-label={t("Valid from")} />
+                <AssignmentStartField idPrefix="entity" span={span.data} joinedAt={d?.project_assignments.find((a) => a.project_id === entityAssignment.project_id)?.valid_from ?? null} timeZone={projects.data?.items.find((p) => p.id === entityAssignment.project_id)?.timezone ?? "UTC"} onChange={(iso) => setEntityAssignment((a) => ({ ...a, valid_from: iso }))} />
                 <Button disabled={!entityAssignment.entity_id || assignEntity.isPending} onClick={() => assignEntity.mutate()}>{t("Assign to entity")}</Button>
                 <p className="text-xs text-muted-foreground sm:col-span-2">{t("The device must belong to the project at the start time. An open assignment of this device to another entity is rejected; end it first.")}</p>
               </div>

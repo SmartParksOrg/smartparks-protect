@@ -212,6 +212,58 @@ class AssignmentEnd(BaseModel):
         return require_aware(value)
 
 
+class AssignmentStart(BaseModel):
+    """Move the start of an assignment back (decision D103): records between the new and the
+    old start are attributed again."""
+
+    valid_from: datetime
+
+    @field_validator("valid_from")
+    @classmethod
+    def _aware_start(cls, value: datetime) -> datetime:
+        return require_aware(value)
+
+
+class ProjectAssignmentExtended(ProjectAssignmentRead):
+    reattributed: dict[str, int]
+
+
+class EntityAssignmentExtended(EntityAssignmentRead):
+    reattributed: dict[str, int]
+
+
+class RecordCounts(BaseModel):
+    positions: int = 0
+    measurements: int = 0
+
+    @property
+    def total(self) -> int:
+        return self.positions + self.measurements
+
+
+class DeviceDataSpan(BaseModel):
+    """What the system knows about when a device produced data, for assignment dialogs and
+    the warning about records before an assignment (decision D103)."""
+
+    first_record_at: datetime | None
+    last_record_at: datetime | None
+    first_seen_at: datetime | None = Field(
+        default=None, description="Earliest sighting of any of its identities"
+    )
+    first_log_at: datetime | None = Field(
+        default=None, description="Start of the earliest raw log file or browser sync"
+    )
+    first_data_at: datetime | None = Field(
+        default=None, description="The earliest of the three, the suggested assignment start"
+    )
+    earliest_project_from: datetime | None
+    earliest_project_assignment_id: uuid.UUID | None
+    earliest_entity_from: datetime | None
+    earliest_entity_assignment_id: uuid.UUID | None
+    before_project: RecordCounts
+    before_entity: RecordCounts
+
+
 class HandoverRequest(BaseModel):
     """Move a device to another project from `effective_at` (architecture 28.10)."""
 

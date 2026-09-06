@@ -17,6 +17,10 @@ Both use a half-open range `[start, end)` and a database exclusion constraint, s
 
 Every canonical record (position, measurement, state, event) is attributed to the project and entity that were assigned to the device **at the device-origin time of the record**, not at the moment the record arrived. A raw log uploaded on 20 August that contains a GPS fix from 15 July belongs to the project that owned the device on 15 July. The single function that answers this is `shared.domain.assignments.resolve_attribution`. The resolved ids are stored on the record for fast queries; the assignment tables stay the source of truth for audits and recomputation.
 
+### Assignment dates and records before an assignment
+
+An assignment starts at a moment you choose. The dialogs offer the moments the system knows: the device's first data (its earliest record, sighting or raw log), the day it joined the project, now, or a date; a date means the start of that day in the project's timezone. Records that arrived before the device's earliest assignment have no project or entity and stay invisible to the project (a raw log downloaded weeks after the collar went out is the usual case). The device page says how many such records exist and offers to move the assignment start back to the first data; that rewrites the attribution of the records in between and recomputes the current state. The same repair exists for entity assignments once the project assignment covers the period. Creating an assignment, or handing a device over, attributes the records already inside the new range the same way, so choosing "since the device's first data" at creation needs no repair afterwards.
+
 ## Handover
 
 Moving a device to another project is a handover, not an edit: the current project assignment closes at the effective time, the entity assignment closes at the same time, a new project assignment opens. History is never rewritten. Members of the old project keep access to the records that were attributed to their project; they do not see the new project's data.

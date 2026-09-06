@@ -50,5 +50,6 @@
   "The object was corrected after this delivery (": "The object was corrected after this delivery (",
   "to": "to",
   "uses": "uses",
+  "Valid from": "Valid from",
   "Workers without a heartbeat for 15 minutes:": "Workers without a heartbeat for 15 minutes:"
 }

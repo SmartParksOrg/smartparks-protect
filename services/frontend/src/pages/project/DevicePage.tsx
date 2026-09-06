@@ -6,7 +6,8 @@ import { Link, useParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { DeviceDetail, DeviceType, Page as PageType, Position } from "@/api/types";
+import type { DeviceDataSpan, DeviceDetail, DeviceType, Page as PageType, Position } from "@/api/types";
+import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DeviceControl } from "@/components/control/DeviceControl";
@@ -18,6 +19,7 @@ import { Icon } from "@/components/icons/Icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMutationToast } from "@/hooks/useMutationToast";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
@@ -39,8 +41,26 @@ export function DevicePage() {
     queryFn: () => api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, { query: { device_id: deviceId, limit: 10, from: new Date(Date.now() - 30 * 86400_000).toISOString() } }),
     enabled: Boolean(projectId),
   });
+  const span = useQuery({ queryKey: queryKeys.deviceSpan(deviceId), queryFn: () => api.get<DeviceDataSpan>(`/api/v1/devices/${deviceId}/data-span`) });
+  const repairInvalidate = [queryKeys.device(deviceId), queryKeys.deviceSpan(deviceId), queryKeys.positions(projectId ?? "", { deviceId, recent: true })];
+  const extendProject = useMutationToast({
+    mutationFn: (s: DeviceDataSpan) => api.post(`/api/v1/devices/${deviceId}/project-assignments/${s.earliest_project_assignment_id}/extend-start`, { body: { valid_from: s.first_data_at } }),
+    invalidate: repairInvalidate,
+    success: t("Assignment extended; the earlier records now belong to the project"),
+  });
+  const extendEntity = useMutationToast({
+    mutationFn: (s: DeviceDataSpan) => api.post(`/api/v1/projects/${projectId}/entity-assignments/${s.earliest_entity_assignment_id}/extend-start`, { body: { valid_from: s.first_data_at } }),
+    invalidate: repairInvalidate,
+    success: t("Assignment extended; the earlier records now belong to the entity"),
+  });
   const d = device.data;
   const type = types.data?.items.find((t) => t.id === d?.device_type_id);
+  const sp = span.data;
+  const beforeProject = sp ? sp.before_project.positions + sp.before_project.measurements : 0;
+  const beforeEntity = sp ? sp.before_entity.positions + sp.before_entity.measurements : 0;
+  const mayRepair = Boolean(user?.is_superuser || canAdmin(role));
+  const firstData = sp?.first_data_at ?? null;
+  const projectCovered = Boolean(sp?.earliest_project_from && firstData && new Date(sp.earliest_project_from) <= new Date(firstData));
   if (device.isError) return <Page><div className="text-destructive">{device.error.message}</div></Page>;
   if (!d) return <Page><div className="text-muted-foreground">{t("Loading device…")}</div></Page>;
 
@@ -58,6 +78,18 @@ export function DevicePage() {
         </>}
       />
       <Page>
+        {sp && beforeProject > 0 && sp.earliest_project_assignment_id && (
+          <Callout kind="warning">
+            {t("{{count}} records from before {{date}} belong to no project and stay invisible here.", { count: beforeProject, date: formatTime(sp.earliest_project_from) })}{" "}
+            {mayRepair && firstData && <Button size="sm" variant="outline" className="ml-2" disabled={extendProject.isPending} onClick={() => extendProject.mutate(sp)}>{t("Extend the assignment back to {{date}}", { date: formatTime(firstData) })}</Button>}
+          </Callout>
+        )}
+        {sp && beforeProject === 0 && beforeEntity > 0 && sp.earliest_entity_assignment_id && projectId && (
+          <Callout kind="info">
+            {t("{{count}} records from before {{date}} belong to no entity.", { count: beforeEntity, date: formatTime(sp.earliest_entity_from) })}{" "}
+            {mayRepair && firstData && projectCovered && <Button size="sm" variant="outline" className="ml-2" disabled={extendEntity.isPending} onClick={() => extendEntity.mutate(sp)}>{t("Extend the entity assignment back to {{date}}", { date: formatTime(firstData) })}</Button>}
+          </Callout>
+        )}
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Icon iconKey={type?.icon_key} /> {t("Device")}</CardTitle></CardHeader>

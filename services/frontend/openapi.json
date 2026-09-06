@@ -2494,6 +2494,75 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/entity-assignments/{assignment_id}/extend-start": {
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Extend Entity Assignment Start",
+    "description": "Move the start of an entity assignment back and attribute the records in between\n(decision D103). The device must belong to this project at the new start: extend the\nproject assignment first.",
+    "operationId": "extend_entity_assignment_start_api_v1_projects__project_id__entity_assignments__assignment_id__extend_start_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "assignment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Assignment Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AssignmentStart"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityAssignmentExtended"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/entity-assignments/{assignment_id}": {
    "patch": {
     "tags": [
@@ -2870,6 +2939,124 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/ProjectAssignmentRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/data-span": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Data Span",
+    "description": "When the device produced data and how many records sit before its assignments, so the\ndialogs can offer the right start and the device page can offer the repair (D103).",
+    "operationId": "device_data_span_api_v1_devices__device_id__data_span_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceDataSpan"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/project-assignments/{assignment_id}/extend-start": {
+   "post": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Extend Project Assignment Start",
+    "description": "Move the start of a project assignment back and attribute the records in between\n(decision D103): the repair for data that arrived before the device was assigned.",
+    "operationId": "extend_project_assignment_start_api_v1_devices__device_id__project_assignments__assignment_id__extend_start_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "assignment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Assignment Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AssignmentStart"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectAssignmentExtended"
         }
        }
       }
@@ -17524,6 +17711,21 @@
     ],
     "title": "AssignmentEnd"
    },
+   "AssignmentStart": {
+    "properties": {
+     "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Valid From"
+     }
+    },
+    "type": "object",
+    "required": [
+     "valid_from"
+    ],
+    "title": "AssignmentStart",
+    "description": "Move the start of an assignment back (decision D103): records between the new and the\nold start are attributed again."
+   },
    "AttentionSummary": {
     "properties": {
      "unknown_identities": {
@@ -20934,6 +21136,140 @@
     ],
     "title": "DeviceCreate"
    },
+   "DeviceDataSpan": {
+    "properties": {
+     "first_record_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "First Record At"
+     },
+     "last_record_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Record At"
+     },
+     "first_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "First Seen At",
+      "description": "Earliest sighting of any of its identities"
+     },
+     "first_log_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "First Log At",
+      "description": "Start of the earliest raw log file or browser sync"
+     },
+     "first_data_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "First Data At",
+      "description": "The earliest of the three, the suggested assignment start"
+     },
+     "earliest_project_from": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Earliest Project From"
+     },
+     "earliest_project_assignment_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Earliest Project Assignment Id"
+     },
+     "earliest_entity_from": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Earliest Entity From"
+     },
+     "earliest_entity_assignment_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Earliest Entity Assignment Id"
+     },
+     "before_project": {
+      "$ref": "#/components/schemas/RecordCounts"
+     },
+     "before_entity": {
+      "$ref": "#/components/schemas/RecordCounts"
+     }
+    },
+    "type": "object",
+    "required": [
+     "first_record_at",
+     "last_record_at",
+     "earliest_project_from",
+     "earliest_project_assignment_id",
+     "earliest_entity_from",
+     "earliest_entity_assignment_id",
+     "before_project",
+     "before_entity"
+    ],
+    "title": "DeviceDataSpan",
+    "description": "What the system knows about when a device produced data, for assignment dialogs and\nthe warning about records before an assignment (decision D103)."
+   },
    "DeviceLogFileRead": {
     "properties": {
      "id": {
@@ -21755,6 +22091,77 @@
      "entity_id"
     ],
     "title": "EntityAssignmentCreate"
+   },
+   "EntityAssignmentExtended": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Valid From"
+     },
+     "valid_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid To"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "entity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Entity Id"
+     },
+     "reattributed": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Reattributed"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_id",
+     "valid_from",
+     "valid_to",
+     "reason",
+     "created_at",
+     "entity_id",
+     "reattributed"
+    ],
+    "title": "EntityAssignmentExtended"
    },
    "EntityAssignmentRead": {
     "properties": {
@@ -27472,6 +27879,77 @@
     ],
     "title": "ProjectAssignmentCreate"
    },
+   "ProjectAssignmentExtended": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Valid From"
+     },
+     "valid_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid To"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "reattributed": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Reattributed"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_id",
+     "valid_from",
+     "valid_to",
+     "reason",
+     "created_at",
+     "project_id",
+     "reattributed"
+    ],
+    "title": "ProjectAssignmentExtended"
+   },
    "ProjectAssignmentRead": {
     "properties": {
      "id": {
@@ -28111,6 +28589,22 @@
      "channel"
     ],
     "title": "ReceptionRead"
+   },
+   "RecordCounts": {
+    "properties": {
+     "positions": {
+      "type": "integer",
+      "title": "Positions",
+      "default": 0
+     },
+     "measurements": {
+      "type": "integer",
+      "title": "Measurements",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "title": "RecordCounts"
    },
    "RecordHistory": {
     "properties": {

@@ -514,6 +514,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/entity-assignments/{assignment_id}/extend-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend Entity Assignment Start
+         * @description Move the start of an entity assignment back and attribute the records in between
+         *     (decision D103). The device must belong to this project at the new start: extend the
+         *     project assignment first.
+         */
+        post: operations["extend_entity_assignment_start_api_v1_projects__project_id__entity_assignments__assignment_id__extend_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/entity-assignments/{assignment_id}": {
         parameters: {
             query?: never;
@@ -586,6 +608,48 @@ export interface paths {
          *     endpoint to move a device that is assigned elsewhere.
          */
         post: operations["assign_to_project_api_v1_devices__device_id__project_assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/data-span": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Data Span
+         * @description When the device produced data and how many records sit before its assignments, so the
+         *     dialogs can offer the right start and the device page can offer the repair (D103).
+         */
+        get: operations["device_data_span_api_v1_devices__device_id__data_span_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/project-assignments/{assignment_id}/extend-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend Project Assignment Start
+         * @description Move the start of a project assignment back and attribute the records in between
+         *     (decision D103): the repair for data that arrived before the device was assigned.
+         */
+        post: operations["extend_project_assignment_start_api_v1_devices__device_id__project_assignments__assignment_id__extend_start_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4057,6 +4121,18 @@ export interface components {
              */
             valid_to: string;
         };
+        /**
+         * AssignmentStart
+         * @description Move the start of an assignment back (decision D103): records between the new and the
+         *     old start are attributed again.
+         */
+        AssignmentStart: {
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+        };
         /** AttentionSummary */
         AttentionSummary: {
             /** Unknown Identities */
@@ -5266,6 +5342,42 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /**
+         * DeviceDataSpan
+         * @description What the system knows about when a device produced data, for assignment dialogs and
+         *     the warning about records before an assignment (decision D103).
+         */
+        DeviceDataSpan: {
+            /** First Record At */
+            first_record_at: string | null;
+            /** Last Record At */
+            last_record_at: string | null;
+            /**
+             * First Seen At
+             * @description Earliest sighting of any of its identities
+             */
+            first_seen_at?: string | null;
+            /**
+             * First Log At
+             * @description Start of the earliest raw log file or browser sync
+             */
+            first_log_at?: string | null;
+            /**
+             * First Data At
+             * @description The earliest of the three, the suggested assignment start
+             */
+            first_data_at?: string | null;
+            /** Earliest Project From */
+            earliest_project_from: string | null;
+            /** Earliest Project Assignment Id */
+            earliest_project_assignment_id: string | null;
+            /** Earliest Entity From */
+            earliest_entity_from: string | null;
+            /** Earliest Entity Assignment Id */
+            earliest_entity_assignment_id: string | null;
+            before_project: components["schemas"]["RecordCounts"];
+            before_entity: components["schemas"]["RecordCounts"];
+        };
         /** DeviceLogFileRead */
         DeviceLogFileRead: {
             /**
@@ -5563,6 +5675,42 @@ export interface components {
              * Format: uuid
              */
             entity_id: string;
+        };
+        /** EntityAssignmentExtended */
+        EntityAssignmentExtended: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Reattributed */
+            reattributed: {
+                [key: string]: number;
+            };
         };
         /** EntityAssignmentRead */
         EntityAssignmentRead: {
@@ -7505,6 +7653,42 @@ export interface components {
              */
             project_id: string;
         };
+        /** ProjectAssignmentExtended */
+        ProjectAssignmentExtended: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Reattributed */
+            reattributed: {
+                [key: string]: number;
+            };
+        };
         /** ProjectAssignmentRead */
         ProjectAssignmentRead: {
             /**
@@ -7722,6 +7906,19 @@ export interface components {
             frequency_hz: number | null;
             /** Channel */
             channel: number | null;
+        };
+        /** RecordCounts */
+        RecordCounts: {
+            /**
+             * Positions
+             * @default 0
+             */
+            positions: number;
+            /**
+             * Measurements
+             * @default 0
+             */
+            measurements: number;
         };
         /**
          * RecordHistory
@@ -10167,6 +10364,42 @@ export interface operations {
             };
         };
     };
+    extend_entity_assignment_start_api_v1_projects__project_id__entity_assignments__assignment_id__extend_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityAssignmentExtended"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     end_entity_assignment_api_v1_projects__project_id__entity_assignments__assignment_id__patch: {
         parameters: {
             query?: never;
@@ -10360,6 +10593,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectAssignmentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_data_span_api_v1_devices__device_id__data_span_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceDataSpan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extend_project_assignment_start_api_v1_devices__device_id__project_assignments__assignment_id__extend_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectAssignmentExtended"];
                 };
             };
             /** @description Validation Error */

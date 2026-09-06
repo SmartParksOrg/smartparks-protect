@@ -20,7 +20,9 @@ from protect_api.deps import ProjectContext, require_permission
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.domain import (
     AssignmentEnd,
+    AssignmentStart,
     EntityAssignmentCreate,
+    EntityAssignmentExtended,
     EntityAssignmentRead,
     EntityCreate,
     EntityRead,
@@ -30,9 +32,10 @@ from protect_api.schemas.domain import (
     FeatureUpdate,
 )
 from shared.database import get_session
-from shared.domain.assignments import resolve_attribution
+from shared.domain.assignments import reattribute, resolve_attribution
 from shared.models import Device, DeviceEntityAssignment, Entity, EntityType, Feature
 from shared.permissions import Permission
+from shared.timeutil import utc_now
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["entities"])
 
@@ -339,6 +342,10 @@ async def create_entity_assignment(
     )
     session.add(assignment)
     await flush_or_409(session, "Entity assignment")
+    # Records already decoded inside the range get the entity now (decision D103).
+    reattributed = await reattribute(
+        session, body.device_id, body.valid_from, body.valid_to or utc_now()
+    )
     await record_audit(
         session,
         user=context.user,
@@ -350,10 +357,58 @@ async def create_entity_assignment(
             "device_id": str(body.device_id),
             "entity_id": str(body.entity_id),
             "valid_from": body.valid_from.isoformat(),
+            "reattributed": reattributed,
         },
     )
     await session.commit()
     return assignment_read(assignment)
+
+
+@router.post(
+    "/entity-assignments/{assignment_id}/extend-start", response_model=EntityAssignmentExtended
+)
+async def extend_entity_assignment_start(
+    assignment_id: uuid.UUID,
+    body: AssignmentStart,
+    context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> EntityAssignmentExtended:
+    """Move the start of an entity assignment back and attribute the records in between
+    (decision D103). The device must belong to this project at the new start: extend the
+    project assignment first."""
+    assignment = await get_or_404(session, DeviceEntityAssignment, assignment_id, "Assignment")
+    await _project_entity(session, context, assignment.entity_id)
+    old_from, valid_to = range_bounds(assignment.validity)
+    if body.valid_from >= old_from:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "valid_from must be before the current start"
+        )
+    attribution = await resolve_attribution(session, assignment.device_id, body.valid_from)
+    if attribution.project_id != context.project.id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Device is not assigned to this project at valid_from; extend the project "
+            "assignment first",
+        )
+    assignment.validity = Range(body.valid_from, valid_to, bounds="[)")
+    await flush_or_409(session, "Entity assignment")
+    counts = await reattribute(session, assignment.device_id, body.valid_from, old_from)
+    await record_audit(
+        session,
+        user=context.user,
+        action="entity_assignment.start_moved",
+        object_type="device_entity_assignment",
+        object_id=str(assignment.id),
+        project_id=context.project.id,
+        details={
+            "from": old_from.isoformat(),
+            "to": body.valid_from.isoformat(),
+            "reattributed": counts,
+        },
+    )
+    await session.commit()
+    read = assignment_read(assignment)
+    return EntityAssignmentExtended(**read.model_dump(), reattributed=counts)
 
 
 @router.patch("/entity-assignments/{assignment_id}", response_model=EntityAssignmentRead)
