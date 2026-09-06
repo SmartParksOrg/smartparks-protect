@@ -14,6 +14,7 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CommandDetailDialog } from "@/components/control/DeviceControl";
 import { DataTable } from "@/components/data/DataTable";
+import { TrafficTable } from "@/components/network/TrafficTable";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -78,17 +79,6 @@ function InboundTab({ params, set }: TabProps) {
   const sources = useQuery({ queryKey: queryKeys.dataSources, queryFn: () => api.get<PageType<DataSource>>("/api/v1/data-sources", { query: { limit: 200 } }) });
   const query = { data_source_id: sourceId || undefined, event_type: eventType || undefined, external_id: identity || undefined, hours, limit: 200 };
   const traffic = useQuery({ queryKey: queryKeys.adminTraffic("inbound", query), queryFn: () => api.get<TrafficRow[]>("/api/v1/admin/traffic/inbound", { query: { ...query, hours: undefined, from: new Date(Date.now() - hours * 3600_000).toISOString() } }), refetchInterval: 5_000 });
-  const columns: ColumnDef<TrafficRow, unknown>[] = [
-    { header: t("Received"), accessorKey: "ingested_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { header: t("Source"), accessorKey: "data_source_name" },
-    { header: t("Identity"), accessorKey: "external_id", cell: ({ row }) => <span className="font-mono text-xs">{row.original.external_id ?? ""}</span> },
-    { header: t("Device"), accessorKey: "device_name", cell: ({ row }) => row.original.device_name ?? <span className="text-muted-foreground">{t("not linked")}</span> },
-    { header: t("Type"), accessorKey: "event_type" },
-    { header: t("Port"), accessorKey: "f_port" },
-    { header: t("RSSI"), accessorKey: "best_rssi", cell: ({ getValue }) => getValue<number | null>()?.toFixed(0) ?? "" },
-    { header: t("Gateways"), accessorKey: "gateway_count" },
-    { header: t("Status"), accessorKey: "processing_status", cell: ({ row }) => <span className="inline-flex items-center gap-1"><StatusBadge value={row.original.processing_status} />{row.original.error_code && <span className="text-xs text-destructive">{row.original.error_code}</span>}</span> },
-  ];
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -105,7 +95,7 @@ function InboundTab({ params, set }: TabProps) {
         <Button variant="outline" size="icon" onClick={() => traffic.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
       </div>
       {traffic.error && <Callout kind="error">{traffic.error.message}</Callout>}
-      <DataTable columns={columns} data={traffic.data} searchable isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
+      <TrafficTable showSource showIdentity rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window.")} onSelect={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>
   );

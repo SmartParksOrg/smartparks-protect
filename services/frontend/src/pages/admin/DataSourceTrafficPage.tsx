@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -9,13 +8,11 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { DataSource, TrafficRow } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
-import { StatusBadge } from "@/components/common/StatusBadge";
-import { DataTable } from "@/components/data/DataTable";
+import { TrafficTable } from "@/components/network/TrafficTable";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatTime } from "@/lib/format";
 
 const EVENT_TYPES = ["uplink", "join", "status", "downlink_ack", "downlink_transmitted", "log", "location", "gateway_receptions"];
 
@@ -36,19 +33,6 @@ export function DataSourceTrafficPage() {
     refetchInterval: 5_000,
   });
 
-  const columns: ColumnDef<TrafficRow, unknown>[] = [
-    { header: t("Received"), accessorKey: "ingested_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { header: t("Identity"), accessorKey: "external_id", cell: ({ row }) => <span className="font-mono text-xs">{row.original.external_id ?? ""}</span> },
-    { header: t("Device"), accessorKey: "device_name", cell: ({ row }) => row.original.device_name ?? <span className="text-muted-foreground">{t("not linked")}</span> },
-    { header: t("Type"), accessorKey: "event_type" },
-    { header: t("Port"), accessorKey: "f_port" },
-    { header: t("FCnt"), accessorKey: "f_cnt" },
-    { header: t("SF"), accessorKey: "spreading_factor" },
-    { header: t("RSSI"), accessorKey: "best_rssi", cell: ({ getValue }) => getValue<number | null>()?.toFixed(0) ?? "" },
-    { header: t("SNR"), accessorKey: "best_snr", cell: ({ getValue }) => getValue<number | null>()?.toFixed(1) ?? "" },
-    { header: t("Gateways"), accessorKey: "gateway_count" },
-    { header: t("Status"), accessorKey: "processing_status", cell: ({ row }) => <span className="inline-flex items-center gap-1"><StatusBadge value={row.original.processing_status} />{row.original.error_code && <span className="text-xs text-destructive">{row.original.error_code}</span>}</span> },
-  ];
 
   return (
     <>
@@ -67,7 +51,7 @@ export function DataSourceTrafficPage() {
         </>}
       />
       <Page>
-        <DataTable columns={columns} data={traffic.data} searchable isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window. The platform's own log says whether it posted.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
+        <TrafficTable showIdentity rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window. The platform's own log says whether it posted.")} onSelect={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
       </Page>
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>

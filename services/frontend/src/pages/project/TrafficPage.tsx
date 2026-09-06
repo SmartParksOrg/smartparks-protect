@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router";
@@ -9,13 +8,11 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { TrafficRow } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
-import { StatusBadge } from "@/components/common/StatusBadge";
-import { DataTable } from "@/components/data/DataTable";
+import { TrafficTable } from "@/components/network/TrafficTable";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatTime } from "@/lib/format";
 
 const EVENT_TYPES = ["uplink", "join", "status", "downlink_ack", "downlink_transmitted", "log", "location"];
 
@@ -33,25 +30,12 @@ export function TrafficPage() {
     refetchInterval: 15_000,
   });
 
-  const columns: ColumnDef<TrafficRow, unknown>[] = [
-    { header: t("Time"), accessorKey: "ingested_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { header: t("Device"), accessorKey: "device_name", cell: ({ row }) => <span title={row.original.external_id ?? ""}>{row.original.device_name}</span> },
-    { header: t("Type"), accessorKey: "event_type" },
-    { header: t("Port"), accessorKey: "f_port" },
-    { header: t("FCnt"), accessorKey: "f_cnt" },
-    { header: t("SF"), accessorKey: "spreading_factor" },
-    { header: t("RSSI"), accessorKey: "best_rssi", cell: ({ getValue }) => getValue<number | null>()?.toFixed(0) ?? "" },
-    { header: t("SNR"), accessorKey: "best_snr", cell: ({ getValue }) => getValue<number | null>()?.toFixed(1) ?? "" },
-    { header: t("Gateways"), accessorKey: "gateway_count" },
-    { header: t("Source"), accessorKey: "data_source_name" },
-    { header: t("Status"), accessorKey: "processing_status", cell: ({ row }) => <span className="inline-flex items-center gap-1"><StatusBadge value={row.original.processing_status} />{row.original.error_code && <span className="text-xs text-destructive">{row.original.error_code}</span>}</span> },
-  ];
 
   return (
     <>
       <PageHeader
-        title={t("LoRaWAN traffic")}
-        description={t("Every message received for this project's devices, with raw payload, decode result, gateway receptions and trace")}
+        title={t("Traffic")}
+        description={t("Every message received for this project's devices over any channel, with raw payload, decode result, receptions and trace")}
         actions={<>
           <Select value={eventType || "all"} onValueChange={(v) => setParams((p) => { if (v === "all") p.delete("type"); else p.set("type", v); return p; })}>
             <SelectTrigger className="w-44"><SelectValue placeholder={t("All types")} /></SelectTrigger>
@@ -62,7 +46,7 @@ export function TrafficPage() {
         </>}
       />
       <Page>
-        <DataTable columns={columns} data={traffic.data} searchable isLoading={traffic.isPending} emptyMessage={t("No traffic in this window.")} onRowClick={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && `${traffic.data.length} messages, last ${hours} hours`} />
+        <TrafficTable rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("No traffic in this window.")} onSelect={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && `${traffic.data.length} messages, last ${hours} hours`} />
       </Page>
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>

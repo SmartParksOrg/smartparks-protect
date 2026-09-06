@@ -30726,6 +30726,55 @@
       "type": "string",
       "title": "Event Type"
      },
+     "acquisition_channel": {
+      "type": "string",
+      "title": "Acquisition Channel",
+      "description": "lorawan, webble, log_file, iridium, cellular or api",
+      "default": "lorawan"
+     },
+     "ingestion_method": {
+      "type": "string",
+      "title": "Ingestion Method",
+      "default": "webhook"
+     },
+     "frame_bytes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Frame Bytes",
+      "description": "Length of the device frame"
+     },
+     "delivered_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delivered At",
+      "description": "When the delivery left the device's path: synced over Bluetooth, uploaded as a file or delivered by the satellite service"
+     },
+     "log_file_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Log File Id",
+      "description": "The raw log file or browser sync this frame came from"
+     },
      "f_port": {
       "anyOf": [
        {

@@ -16,7 +16,8 @@ from protect_api.deps import ProjectContext, require_permission, require_server_
 from protect_api.health_areas import AreaHealth, area_health
 from shared.bus import RedisStreamsBus, Topic, is_stale
 from shared.database import get_session
-from shared.enums import ProcessingStatus, TraceStatus
+from shared.device_drivers.base import lorawan_frame, raw_frame
+from shared.enums import AcquisitionChannel, ProcessingStatus, TraceStatus
 from shared.models import (
     DataSource,
     Device,
@@ -61,6 +62,19 @@ class TrafficRow(BaseModel):
     data_source_id: uuid.UUID
     data_source_name: str
     event_type: str
+    acquisition_channel: str = Field(
+        default="lorawan", description="lorawan, webble, log_file, iridium, cellular or api"
+    )
+    ingestion_method: str = Field(default="webhook")
+    frame_bytes: int | None = Field(default=None, description="Length of the device frame")
+    delivered_at: datetime | None = Field(
+        default=None,
+        description="When the delivery left the device's path: synced over Bluetooth, "
+        "uploaded as a file or delivered by the satellite service",
+    )
+    log_file_id: uuid.UUID | None = Field(
+        default=None, description="The raw log file or browser sync this frame came from"
+    )
     f_port: int | None
     f_cnt: int | None
     spreading_factor: int | None
@@ -221,6 +235,13 @@ async def traffic_rows(
     result = []
     for event, device_name, source_name in rows:
         meta = event.provider_metadata or {}
+        frame: bytes | None = None
+        if event.payload is not None:
+            if event.acquisition_channel == AcquisitionChannel.LORAWAN:
+                frame, _port = lorawan_frame(event.payload, meta)
+            else:
+                frame = raw_frame(event.payload, meta)
+        log_file_id = meta.get("log_file_id")
         result.append(
             TrafficRow(
                 source_event_id=event.id,
@@ -232,6 +253,13 @@ async def traffic_rows(
                 data_source_id=event.data_source_id,
                 data_source_name=source_name,
                 event_type=event.event_type,
+                acquisition_channel=event.acquisition_channel,
+                ingestion_method=event.ingestion_method,
+                frame_bytes=len(frame) if frame is not None else None,
+                delivered_at=event.ble_synced_at
+                or event.file_uploaded_at
+                or event.satellite_delivered_at,
+                log_file_id=uuid.UUID(str(log_file_id)) if log_file_id else None,
                 f_port=meta.get("f_port"),
                 f_cnt=meta.get("f_cnt"),
                 spreading_factor=meta.get("spreading_factor"),

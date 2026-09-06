@@ -298,3 +298,44 @@ async def test_current_state_tiles_and_track(client, db, bus):
     assert (
         await client.get(f"/api/v1/projects/{project.id}/tracks", headers=admin.headers)
     ).status_code == 422
+
+
+async def test_traffic_rows_carry_the_channel_and_frame_details(client, db, bus):
+    """A Bluetooth frame and a LoRaWAN uplink of the same device: the rows say which channel
+    delivered them and carry the frame length and delivery time, so the tables can show
+    LoRaWAN columns only where they apply (phase 15)."""
+    from shared.connectivity.base import InboundMessage
+    from shared.enums import IngestionMethod
+    from shared.ingest import commit_and_publish, store_inbound
+    from shared.models import DataSource
+
+    admin, project, _entity, source, device, external_id = await _setup(client, db)
+    when = datetime(2026, 6, 1, 8, tzinfo=UTC)
+    await _feed(db, bus, source["id"], external_id, when, -24.9, 31.5)
+    source_row = await db.get(DataSource, uuid.UUID(source["id"]))
+    frame = InboundMessage(
+        external_id=external_id,
+        event_type="uplink",
+        payload={"data_hex": "0e940500a7100000"},
+        acquisition_channel=AcquisitionChannel.WEBBLE,
+        ingestion_method=IngestionMethod.BROWSER_SYNC,
+        provider_metadata={"log_file_id": str(uuid.uuid4())},
+        ble_synced_at=when + timedelta(hours=2),
+        device_id=uuid.UUID(device["id"]),
+    )
+    stored = await store_inbound(db, source_row, frame)
+    await commit_and_publish(db, bus, [stored])
+    rows = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/traffic",
+            params={"from": (when - timedelta(hours=1)).isoformat()},
+            headers=admin.headers,
+        )
+    ).json()
+    by_channel = {r["acquisition_channel"]: r for r in rows if r["device_id"] == device["id"]}
+    lorawan, ble = by_channel["lorawan"], by_channel["webble"]
+    assert lorawan["ingestion_method"] == "mqtt" and lorawan["f_port"] == 13
+    assert lorawan["delivered_at"] is None and lorawan["log_file_id"] is None
+    assert ble["ingestion_method"] == "browser_sync" and ble["frame_bytes"] == 8
+    assert ble["delivered_at"].startswith("2026-06-01T10:00") and ble["log_file_id"]
+    assert ble["f_port"] is None and ble["gateway_count"] == 0

@@ -8668,6 +8668,32 @@ export interface components {
             data_source_name: string;
             /** Event Type */
             event_type: string;
+            /**
+             * Acquisition Channel
+             * @description lorawan, webble, log_file, iridium, cellular or api
+             * @default lorawan
+             */
+            acquisition_channel: string;
+            /**
+             * Ingestion Method
+             * @default webhook
+             */
+            ingestion_method: string;
+            /**
+             * Frame Bytes
+             * @description Length of the device frame
+             */
+            frame_bytes?: number | null;
+            /**
+             * Delivered At
+             * @description When the delivery left the device's path: synced over Bluetooth, uploaded as a file or delivered by the satellite service
+             */
+            delivered_at?: string | null;
+            /**
+             * Log File Id
+             * @description The raw log file or browser sync this frame came from
+             */
+            log_file_id?: string | null;
             /** F Port */
             f_port: number | null;
             /** F Cnt */
