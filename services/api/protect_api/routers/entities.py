@@ -20,6 +20,7 @@ from protect_api.crud import (
 from protect_api.deps import ProjectContext, require_permission
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.domain import (
+    AssignmentChange,
     AssignmentEnd,
     AssignmentStart,
     EntityAssignmentCreate,
@@ -505,29 +506,65 @@ async def extend_entity_assignment_start(
 
 
 @router.patch("/entity-assignments/{assignment_id}", response_model=EntityAssignmentRead)
-async def end_entity_assignment(
+async def change_entity_assignment(
     assignment_id: uuid.UUID,
-    body: AssignmentEnd,
+    body: AssignmentChange | AssignmentEnd,
     context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> EntityAssignmentRead:
+    """Change when a device tracked this entity: end it (`valid_to`), move its start, or move
+    both. The device must belong to the project at the new start; records between the old
+    and the new bounds are attributed again, so history follows the change."""
     assignment = await get_or_404(session, DeviceEntityAssignment, assignment_id, "Assignment")
     await _project_entity(session, context, assignment.entity_id)
-    valid_from, _ = range_bounds(assignment.validity)
-    if body.valid_to <= valid_from:
+    old_from, old_to = range_bounds(assignment.validity)
+    change = (
+        body if isinstance(body, AssignmentChange) else AssignmentChange(valid_to=body.valid_to)
+    )
+    new_from = change.valid_from if change.valid_from is not None else old_from
+    new_to = (
+        change.valid_to
+        if "valid_to" in change.model_fields_set or isinstance(body, AssignmentEnd)
+        else old_to
+    )
+    if new_to is not None and new_to <= new_from:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "valid_to must be after valid_from"
         )
-    assignment.validity = Range(valid_from, body.valid_to, bounds="[)")
+    if new_from != old_from:
+        attribution = await resolve_attribution(session, assignment.device_id, new_from)
+        if attribution.project_id != context.project.id:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Device is not assigned to this project at valid_from; extend the project "
+                "assignment first",
+            )
+    assignment.validity = Range(new_from, new_to, bounds="[)")
+    if change.reason is not None:
+        assignment.reason = change.reason
     await flush_or_409(session, "Entity assignment")
+    # Records between the old and the new bounds change hands; recompute that span only.
+    now = utc_now()
+    starts = [old_from, new_from]
+    ends = [old_to or now, new_to or now]
+    counts = {"positions": 0, "measurements": 0}
+    if new_from != old_from:
+        counts = await reattribute(session, assignment.device_id, min(starts), max(starts))
+    if (old_to or now) != (new_to or now):
+        more = await reattribute(session, assignment.device_id, min(ends), max(ends))
+        counts = {k: counts[k] + more[k] for k in counts}
     await record_audit(
         session,
         user=context.user,
-        action="entity_assignment.ended",
+        action="entity_assignment.changed",
         object_type="device_entity_assignment",
         object_id=str(assignment.id),
         project_id=context.project.id,
-        details={"valid_to": body.valid_to.isoformat()},
+        details={
+            "from": [old_from.isoformat(), new_from.isoformat()],
+            "to": [old_to.isoformat() if old_to else None, new_to.isoformat() if new_to else None],
+            "reattributed": counts,
+        },
     )
     await session.commit()
     return assignment_read(assignment)

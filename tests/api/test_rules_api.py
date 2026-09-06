@@ -148,7 +148,9 @@ async def test_events_alerts_and_map_layer(client, db):
     viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
     h = admin.headers
     now = datetime.now(UTC)
-    db.add(
+    # the assignment in _setup already gave the entity its current-state row (the repair
+    # creates it); merge sets the alert count on it
+    await db.merge(
         EntityCurrentState(
             entity_id=uuid.UUID(entity["id"]), project_id=project.id, active_alert_count=1
         )

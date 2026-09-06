@@ -153,3 +153,96 @@ async def test_assign_from_the_entity_and_end_it(client, db):
         headers=viewer.headers,
     )
     assert refused.status_code == 403
+
+
+async def test_change_assignment_moves_start_and_end(client, db):
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    h = admin.headers
+    device_type = (
+        await client.post(
+            "/api/v1/device-types",
+            json={
+                "key": unique_name("gj").replace("-", "_"),
+                "label": "Generic",
+                "driver_key": "generic_json",
+            },
+            headers=h,
+        )
+    ).json()
+    entity_type = (
+        await client.post(
+            "/api/v1/entity-types",
+            json={
+                "key": unique_name("et").replace("-", "_"),
+                "label": "Animal",
+                "group_key": "tracked",
+                "icon_key": "wildlife.generic",
+            },
+            headers=h,
+        )
+    ).json()
+    device = (
+        await client.post(
+            "/api/v1/devices",
+            json={
+                "device_type_id": device_type["id"],
+                "name": unique_name("SP"),
+                "status": "active",
+            },
+            headers=h,
+        )
+    ).json()
+    await client.post(
+        f"/api/v1/devices/{device['id']}/project-assignments",
+        json={"project_id": project.id.hex, "valid_from": "2026-06-01T00:00:00+00:00"},
+        headers=h,
+    )
+    entity = (
+        await client.post(
+            f"/api/v1/projects/{project.id}/entities",
+            json={"entity_type_id": entity_type["id"], "name": "Hyena 7"},
+            headers=h,
+        )
+    ).json()
+    base = f"/api/v1/projects/{project.id}/entity-assignments"
+    created = (
+        await client.post(
+            base,
+            json={
+                "device_id": device["id"],
+                "entity_id": entity["id"],
+                "valid_from": "2026-06-10T00:00:00+00:00",
+            },
+            headers=h,
+        )
+    ).json()
+    # back to June 2, forward to June 5, end on June 20, reopen; the project must cover the start
+    moved = await client.patch(
+        f"{base}/{created['id']}", json={"valid_from": "2026-06-02T00:00:00+00:00"}, headers=h
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["valid_from"].startswith("2026-06-02")
+    later = await client.patch(
+        f"{base}/{created['id']}",
+        json={"valid_from": "2026-06-05T00:00:00+00:00", "reason": "collar swapped"},
+        headers=h,
+    )
+    assert later.status_code == 200 and later.json()["valid_from"].startswith("2026-06-05")
+    assert later.json()["reason"] == "collar swapped"
+    ended = await client.patch(
+        f"{base}/{created['id']}", json={"valid_to": "2026-06-20T00:00:00+00:00"}, headers=h
+    )
+    assert ended.status_code == 200 and ended.json()["valid_to"].startswith("2026-06-20")
+    reopened = await client.patch(f"{base}/{created['id']}", json={"valid_to": None}, headers=h)
+    assert reopened.status_code == 200 and reopened.json()["valid_to"] is None
+    too_early = await client.patch(
+        f"{base}/{created['id']}", json={"valid_from": "2026-05-01T00:00:00+00:00"}, headers=h
+    )
+    assert too_early.status_code == 409
+    inverted = await client.patch(
+        f"{base}/{created['id']}",
+        json={"valid_from": "2026-07-01T00:00:00+00:00", "valid_to": "2026-06-30T00:00:00+00:00"},
+        headers=h,
+    )
+    assert inverted.status_code == 422

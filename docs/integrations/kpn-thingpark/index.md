@@ -8,6 +8,8 @@ ThingPark signs every push itself. The URL it posts to carries `LrnDevEui`, `Lrn
 
 Where the portal offers custom headers, `Authorization: Bearer <webhook token>` works as well; the webhook accepts either.
 
+ThingPark's `DevEUI_notification` report is a `join` event when its `Type` is join, so a collar that joins the network shows as such in the traffic view and in the device's connectivity; other notification types stay platform log lines.
+
 ## Setup
 
 1. In the KPN ThingPark Device Manager (`kpn-lora.com/deviceManager`), open Application servers. Smart Parks has one HTTP application server per subscriber already, with its uplink/downlink security active: note the AS ID shown there and have its tunnel interface authentication key at hand. A new application server gets the same: type HTTP, content type JSON, then Activate under uplink/downlink security with an AS ID and a 32-character hexadecimal key (`python3 -c "import secrets; print(secrets.token_hex(16))"`; ThingPark checks its entropy). Do not enable forwarding of the AppSKey; the payload stays encrypted end to end without it and the key would land in the stored source events.

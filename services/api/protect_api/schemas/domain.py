@@ -284,6 +284,20 @@ class AssignmentEnd(BaseModel):
         return require_aware(value)
 
 
+class AssignmentChange(BaseModel):
+    """Move the start or the end of an assignment (or both). Records between the old and the
+    new bounds are attributed again; `valid_to` null reopens an ended assignment."""
+
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    reason: str | None = None
+
+    @field_validator("valid_from", "valid_to")
+    @classmethod
+    def _aware_change(cls, value: datetime | None) -> datetime | None:
+        return require_aware(value) if value is not None else None
+
+
 class AssignmentStart(BaseModel):
     """Move the start of an assignment back (decision D103): records between the new and the
     old start are attributed again."""

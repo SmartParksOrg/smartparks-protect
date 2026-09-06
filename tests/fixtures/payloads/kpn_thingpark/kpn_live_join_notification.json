@@ -1,0 +1,23 @@
+{
+  "DevEUI_notification": {
+    "Time": "2026-09-06T18:52:54.690+02:00",
+    "Type": "join",
+    "Var1": "",
+    "Lrcid": "0059AC01",
+    "DevEUI": "0016C001F016D281",
+    "FCntDn": 0,
+    "DevAddr": "14718A79",
+    "ModelCfg": "0",
+    "CustomerID": "100006684",
+    "CustomerData": {
+      "alr": {
+        "pro": "Static",
+        "ver": "1"
+      },
+      "loc": null,
+      "doms": [],
+      "name": "SP051440",
+      "tags": []
+    }
+  }
+}

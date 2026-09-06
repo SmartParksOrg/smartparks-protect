@@ -13,8 +13,14 @@ From Tim's first hour with v2.0.0 on the dev server.
 - The sidebar hides on desktop too: a button in its header folds it to a slim rail with a button to bring it back; the choice is kept per browser.
 - Several tracks at once on the live map (`?tracks=` and `?track=` hours): the track button in the layers panel fills when a track is on, each track has its own colour, and the selection panel's track choice adds or removes the selected entity.
 
+- An entity assignment can be changed instead of only ended: `PATCH /projects/{id}/entity-assignments/{id}` takes `valid_from`, `valid_to` (null reopens) and `reason`; records between the old and the new bounds are attributed again. The entity page has "Change…" on the current device and on every history row, with the guided start choices and an end as a date or open.
+- KPN LoRa: ThingPark's `DevEUI_notification` report with `Type` join is a `join` event (it was a log line), so the traffic view, the connectivity state and the source event say the collar joined; recorded from the live join of SP051440.
+
 ### Fixed
 
+- The guided start field never reported its default: a form that opened on "since the device's first data" and was submitted without a click kept "from now" instead, which is how an entity assigned with all its history ended up starting at the moment of the click. The field reports its first choice as well.
+- The entity page's traffic section shows the tracked device's messages from the assignment start, not before it.
+- An entity assigned to a device with history stayed off the map and without last seen after the repair: the attribution recompute skipped entities that had no current-state row yet, so only the next record would have created one. The recompute now creates the row with the latest position, device and last seen. The entity page says how many of the device's records sit before the assignment and offers the same repair as the device page, and the assign dialog says what a later start means.
 - In the layers panel, ticking a row under a switched-off parent (a gateway under Gateways, a feature under its type, an entity under a hidden group) switches the parent on and hides the other rows instead of doing nothing; no checkbox is greyed out any more.
 - The entity details panel on the map moves right of the layers panel while that is open instead of hiding under it.
 

@@ -194,7 +194,13 @@ function AssignDeviceForm({
           ))}
         </div>
         {deviceId && (
-          <Field label={t("Tracking since")} htmlFor="entity-choice">
+          <Field
+            label={t("Tracking since")}
+            htmlFor="entity-choice"
+            hint={t(
+              "Records before the chosen start stay without entity; the entity appears on the map with its first record from the start on. The entity page can extend the start later.",
+            )}
+          >
             {span.isPending || detail.isPending ? (
               <div className="text-sm text-muted-foreground">
                 {t("Looking up the device's data…")}

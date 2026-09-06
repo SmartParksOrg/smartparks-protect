@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type {
   CurrentState,
   Device,
+  DeviceDataSpan,
   Entity,
   EntityAssignment,
   EntityType,
@@ -17,6 +18,7 @@ import type {
   Position,
   TrafficRow,
 } from "@/api/types";
+import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { TechnicalDetails } from "@/components/common/TechnicalDetails";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
@@ -24,6 +26,7 @@ import { TrafficTable } from "@/components/network/TrafficTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { HealthCard } from "@/components/devices/HealthCard";
 import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
+import { ChangeAssignmentDialog } from "@/components/entities/ChangeAssignmentDialog";
 import { EntityDialog } from "@/components/entities/EntityDialog";
 import { Icon } from "@/components/icons/Icon";
 import type { EntityFeatureProperties } from "@/components/map/layers";
@@ -52,6 +55,7 @@ export function EntityPage() {
   const now = useNow();
   const [editing, setEditing] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [changing, setChanging] = useState<EntityAssignment | null>(null);
   const [since30d] = useState(() =>
     new Date(Date.now() - 30 * 86400_000).toISOString(),
   );
@@ -136,12 +140,55 @@ export function EntityPage() {
         query: {
           device_id: current?.device_id,
           limit: 20,
-          from: since7d,
+          from:
+            current && current.valid_from > since7d
+              ? current.valid_from
+              : since7d,
+          to: current?.valid_to ?? undefined,
         },
       }),
     enabled: Boolean(current),
     refetchInterval: 15_000,
   });
+  const span = useQuery({
+    queryKey: queryKeys.deviceSpan(current?.device_id ?? ""),
+    queryFn: () =>
+      api.get<DeviceDataSpan>(
+        `/api/v1/devices/${current?.device_id}/data-span`,
+      ),
+    enabled: Boolean(current),
+  });
+  const extend = useMutationToast({
+    mutationFn: (s: DeviceDataSpan) =>
+      api.post(
+        `/api/v1/projects/${projectId}/entity-assignments/${current?.id}/extend-start`,
+        { body: { valid_from: s.first_data_at } },
+      ),
+    invalidate: [
+      queryKeys.entityAssignments(projectId),
+      queryKeys.currentState(projectId),
+      queryKeys.positions(projectId, { entityId, recent: true }),
+      ...(current
+        ? [
+            queryKeys.deviceSpan(current.device_id),
+            queryKeys.device(current.device_id),
+          ]
+        : []),
+    ],
+    success: t(
+      "Assignment extended; the earlier records now belong to this entity",
+    ),
+  });
+  const sp = span.data;
+  const beforeEntity =
+    sp && current && sp.earliest_entity_assignment_id === current.id
+      ? sp.before_entity.positions + sp.before_entity.measurements
+      : 0;
+  const projectCovered = Boolean(
+    sp?.earliest_project_from &&
+    sp?.first_data_at &&
+    new Date(sp.earliest_project_from) <= new Date(sp.first_data_at),
+  );
   const release = useMutationToast({
     mutationFn: (assignmentId: string) =>
       api.patch(
@@ -208,6 +255,38 @@ export function EntityPage() {
         }
       />
       <Page>
+        {current && sp && beforeEntity > 0 && (
+          <Callout kind="info">
+            {t(
+              "{{count}} records of {{device}} from before {{date}} belong to no entity, so they are not on this page or the map.",
+              {
+                count: beforeEntity,
+                device: current.device_name ?? t("the device"),
+                date: formatTime(current.valid_from),
+              },
+            )}{" "}
+            {admin && sp.first_data_at && projectCovered && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-2"
+                disabled={extend.isPending}
+                onClick={() => extend.mutate(sp)}
+              >
+                {t("Extend the assignment back to {{date}}", {
+                  date: formatTime(sp.first_data_at),
+                })}
+              </Button>
+            )}
+            {admin && sp.first_data_at && !projectCovered && (
+              <span className="ml-2 text-xs">
+                {t(
+                  "The device joined the project later than its first data; extend the project assignment on the device page first.",
+                )}
+              </span>
+            )}
+          </Callout>
+        )}
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
@@ -310,6 +389,15 @@ export function EntityPage() {
                       variant="outline"
                       size="sm"
                       className="ml-auto"
+                      onClick={() => setChanging(current)}
+                    >
+                      {t("Change…")}
+                    </Button>
+                  )}
+                  {admin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
                       disabled={release.isPending}
                       onClick={() => release.mutate(current.id)}
                     >
@@ -349,6 +437,7 @@ export function EntityPage() {
                       <TableHead>{t("From")}</TableHead>
                       <TableHead>{t("To")}</TableHead>
                       <TableHead>{t("Reason")}</TableHead>
+                      <TableHead className="w-24" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -368,6 +457,18 @@ export function EntityPage() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {a.reason ?? ""}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {admin && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setChanging(a)}
+                            >
+                              {t("Change…")}
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -513,6 +614,14 @@ export function EntityPage() {
         ingestedAt={event?.ingestedAt ?? null}
         onClose={() => setEvent(null)}
       />
+      {changing && (
+        <ChangeAssignmentDialog
+          projectId={projectId}
+          assignment={changing}
+          open
+          onOpenChange={(o) => !o && setChanging(null)}
+        />
+      )}
     </>
   );
 }

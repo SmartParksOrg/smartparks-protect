@@ -351,3 +351,13 @@ def test_live_kpn_pushes_decode_with_the_opencollar_driver(name, port, kind):
         )
     )
     assert getattr(records, kind), records
+
+
+def test_live_join_notification_is_a_join_event():
+    message = parse_event(source(), example("kpn_live_join_notification.json"))
+    assert message.event_type == "join"
+    assert message.external_id == "0016C001F016D281"
+    assert message.provider_metadata["notification_type"] == "join"
+    assert message.provider_metadata["dev_addr"] == "14718A79"
+    assert message.network_received_at is not None
+    assert message.gateway_receptions == []

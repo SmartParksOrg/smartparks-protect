@@ -15,7 +15,7 @@ from typing import Any
 
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import Point
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.curation.effective import effective_time, visible
@@ -30,6 +30,7 @@ from shared.enums import (
 from shared.models import (
     DataCorrection,
     DeviceCurrentState,
+    Entity,
     EntityCurrentState,
     IntegrationDelivery,
     Measurement,
@@ -318,6 +319,8 @@ async def recompute_current_state(
             device_state.latest_position = latest[1] if latest[1] is not None else latest[0]
             device_state.latest_position_time = latest[2]
         device_state.updated_at = utc_now()
+    # rows added earlier in this transaction (the decoder's) must be visible to `get`
+    await session.flush()
     for entity_id in entity_ids:
         if entity_id is None:
             continue
@@ -336,7 +339,13 @@ async def recompute_current_state(
         ).first()
         entity_state = await session.get(EntityCurrentState, entity_id)
         if entity_state is None:
-            continue
+            # An entity that never received a record while assigned has no row yet; the
+            # repair that gives it history must also give it a place on the map.
+            entity = await session.get(Entity, entity_id)
+            if entity is None:
+                continue
+            entity_state = EntityCurrentState(entity_id=entity_id, project_id=entity.project_id)
+            session.add(entity_state)
         if row is None:
             entity_state.latest_position = None
             entity_state.latest_position_time = None
@@ -344,5 +353,10 @@ async def recompute_current_state(
             entity_state.latest_position = row[1] if row[1] is not None else row[0]
             entity_state.latest_position_time = row[2]
             entity_state.device_id = row[3]
+        last_measurement = await session.scalar(
+            select(func.max(Measurement.time)).where(Measurement.entity_id == entity_id)
+        )
+        seen = [t for t in (row[2] if row else None, last_measurement) if t is not None]
+        entity_state.last_seen_at = max(seen) if seen else None
         entity_state.updated_at = utc_now()
     await session.flush()

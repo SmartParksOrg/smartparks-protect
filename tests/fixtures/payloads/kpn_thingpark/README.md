@@ -21,3 +21,4 @@ Shapes follow the ThingPark tunnel interface documentation (`DevEUI_uplink`,
   query with the Token is not stored, so these test parsing and decoding, not the token.
 
 The invented files stay until every report type has a recorded example.
+- `kpn_live_join_notification.json`: the `DevEUI_notification` report with `Type` join that KPN posted when SP051440 (DevEUI 0016C001F016D281) joined on 2026-09-06 (source event 5121 on the dev server); the adapter maps it to a `join` event.

@@ -2,7 +2,8 @@
 
 Events: ThingPark's HTTP application server pushes one JSON document per report to the source's
 webhook URL: `DevEUI_uplink` (uplink), `DevEUI_downlink_Sent` (downlink status),
-`DevEUI_location` (network geolocation) and `DevEUI_notification`. Each reception by an LRR
+`DevEUI_location` (network geolocation) and `DevEUI_notification` (a join when its `Type`
+is join). Each reception by an LRR
 (gateway) is listed under `Lrrs`. ThingPark authenticates every push itself: the URL query
 carries `LrnDevEui`, `LrnFPort`, `LrnInfos`, `AS_ID`, `Time` and a `Token`, the SHA-256 of body
 elements that depend on the report type, the query parameters in that order and the tunnel
@@ -220,6 +221,13 @@ def parse_event(source: DataSourceContext, body: Any) -> InboundMessage:
     if frequency:
         metadata["frequency_hz"] = round(frequency * 1_000_000)
     event_type = EVENT_TYPES[kind]
+    if kind == "DevEUI_notification":
+        # ThingPark's notification report carries `Type`; "join" is the device joining the
+        # network (seen live on KPN, 2026-09-06), other types stay platform log lines.
+        notification = str(data.get("Type") or "").lower()
+        metadata["notification_type"] = notification or None
+        if notification == "join":
+            event_type = "join"
     if kind == "DevEUI_downlink_Sent":
         status = data.get("DeliveryStatus")
         metadata["delivery_status"] = int(status) if status not in (None, "") else None
@@ -441,7 +449,7 @@ class KpnThingParkAdapter:
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(
         uplink=True,
         downlink=True,
-        join_events=False,
+        join_events=True,
         downlink_status=True,
         mac_events=False,
         device_management=False,

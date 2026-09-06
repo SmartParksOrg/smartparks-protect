@@ -191,6 +191,13 @@ async def test_records_before_the_assignment_are_repaired_by_moving_the_start(cl
     assert len(listed) == 3 and {p["entity_id"] for p in listed} == {entity["id"]}
     span = (await client.get(f"/api/v1/devices/{device['id']}/data-span", headers=h)).json()
     assert span["before_entity"] == {"positions": 0, "measurements": 0}
+    # the entity had no current state before the repair (no record arrived while assigned);
+    # the repair gives it one, so it is on the map with last seen at once
+    current = (await client.get(f"/api/v1/projects/{project.id}/map/current", headers=h)).json()
+    feature = next(f for f in current["features"] if f["properties"]["entity_id"] == entity["id"])
+    assert feature["properties"]["last_seen_at"].startswith("2026-05-05")
+    assert feature["properties"]["position_time"].startswith("2026-05-05")
+    assert feature["properties"]["device_id"] == device["id"]
     audit = (await client.get("/api/v1/admin/audit?limit=30", headers=h)).json()
     assert {e["action"] for e in audit} >= {
         "project_assignment.start_moved",

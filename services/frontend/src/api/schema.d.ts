@@ -574,8 +574,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** End Entity Assignment */
-        patch: operations["end_entity_assignment_api_v1_projects__project_id__entity_assignments__assignment_id__patch"];
+        /**
+         * Change Entity Assignment
+         * @description Change when a device tracked this entity: end it (`valid_to`), move its start, or move
+         *     both. The device must belong to the project at the new start; records between the old
+         *     and the new bounds are attributed again, so history follows the change.
+         */
+        patch: operations["change_entity_assignment_api_v1_projects__project_id__entity_assignments__assignment_id__patch"];
         trace?: never;
     };
     "/api/v1/projects/{project_id}/groups": {
@@ -4246,6 +4251,19 @@ export interface components {
             status: string;
             /** Link */
             link?: string | null;
+        };
+        /**
+         * AssignmentChange
+         * @description Move the start or the end of an assignment (or both). Records between the old and the
+         *     new bounds are attributed again; `valid_to` null reopens an ended assignment.
+         */
+        AssignmentChange: {
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** AssignmentEnd */
         AssignmentEnd: {
@@ -11017,7 +11035,7 @@ export interface operations {
             };
         };
     };
-    end_entity_assignment_api_v1_projects__project_id__entity_assignments__assignment_id__patch: {
+    change_entity_assignment_api_v1_projects__project_id__entity_assignments__assignment_id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -11029,7 +11047,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AssignmentEnd"];
+                "application/json": components["schemas"]["AssignmentChange"] | components["schemas"]["AssignmentEnd"];
             };
         };
         responses: {

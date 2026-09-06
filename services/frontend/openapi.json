@@ -2659,8 +2659,9 @@
     "tags": [
      "entities"
     ],
-    "summary": "End Entity Assignment",
-    "operationId": "end_entity_assignment_api_v1_projects__project_id__entity_assignments__assignment_id__patch",
+    "summary": "Change Entity Assignment",
+    "description": "Change when a device tracked this entity: end it (`valid_to`), move its start, or move\nboth. The device must belong to the project at the new start; records between the old\nand the new bounds are attributed again, so history follows the change.",
+    "operationId": "change_entity_assignment_api_v1_projects__project_id__entity_assignments__assignment_id__patch",
     "security": [
      {
       "OAuth2PasswordBearer": []
@@ -2693,7 +2694,15 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/AssignmentEnd"
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/AssignmentChange"
+         },
+         {
+          "$ref": "#/components/schemas/AssignmentEnd"
+         }
+        ],
+        "title": "Body"
        }
       }
      }
@@ -18270,6 +18279,48 @@
      "value"
     ],
     "title": "AreaIndicator"
+   },
+   "AssignmentChange": {
+    "properties": {
+     "valid_from": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid From"
+     },
+     "valid_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid To"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "title": "AssignmentChange",
+    "description": "Move the start or the end of an assignment (or both). Records between the old and the\nnew bounds are attributed again; `valid_to` null reopens an ended assignment."
    },
    "AssignmentEnd": {
     "properties": {
