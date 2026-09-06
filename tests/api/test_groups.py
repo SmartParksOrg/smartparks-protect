@@ -1,4 +1,4 @@
-"""Entity groups (decision D98, ADR 0020): folders two levels deep, an entity in at most one,
+"""Entity groups (decision D98, ADR 0020): folders nested as deep as needed, an entity in at most one,
 filters that include subgroups, devices grouped through their entity, and the map feature
 carrying the group."""
 
@@ -58,15 +58,27 @@ async def test_groups_two_levels_filters_and_devices(client, db):
     ).json()
     south = (await client.post(f"{base}/groups", json={"name": "South"}, headers=h)).json()
 
-    # two levels: a subgroup cannot be a parent, a parent with subgroups cannot become a subgroup
-    too_deep = await client.post(
-        f"{base}/groups", json={"name": "Deeper", "parent_id": herd["id"]}, headers=h
+    # any depth, but a tree: a group cannot move into itself or below itself
+    family = (
+        await client.post(
+            f"{base}/groups", json={"name": "Family", "parent_id": herd["id"]}, headers=h
+        )
+    ).json()
+    assert family["parent_id"] == herd["id"]
+    into_itself = await client.patch(
+        f"{base}/groups/{north['id']}", json={"parent_id": north["id"]}, headers=h
     )
-    assert too_deep.status_code == 422
-    no_nesting = await client.patch(
-        f"{base}/groups/{north['id']}", json={"parent_id": south["id"]}, headers=h
+    assert into_itself.status_code == 422
+    into_own_subgroup = await client.patch(
+        f"{base}/groups/{north['id']}", json={"parent_id": family["id"]}, headers=h
     )
-    assert no_nesting.status_code == 422
+    assert into_own_subgroup.status_code == 422
+    moved = await client.patch(
+        f"{base}/groups/{south['id']}", json={"parent_id": family["id"]}, headers=h
+    )
+    assert moved.status_code == 200, moved.text
+    back = await client.patch(f"{base}/groups/{south['id']}", json={"parent_id": None}, headers=h)
+    assert back.status_code == 200 and back.json()["parent_id"] is None
     same_name = await client.post(f"{base}/groups", json={"name": "North"}, headers=h)
     assert same_name.status_code == 409
     bad_colour = await client.post(
@@ -86,6 +98,7 @@ async def test_groups_two_levels_filters_and_devices(client, db):
 
     rhino = await entity("Rhino 14", herd["id"])
     ranger = await entity("Ranger 1", north["id"])
+    calf = await entity("Calf", family["id"])
     loose = await entity("Loose")
     assert rhino["group_id"] == herd["id"] and loose["group_id"] is None
     other_project = await create_project(db)
@@ -102,19 +115,20 @@ async def test_groups_two_levels_filters_and_devices(client, db):
     assert refused.status_code == 404
 
     listed = (await client.get(f"{base}/groups", headers=h)).json()
-    assert [(g["name"], g["parent_id"], g["entity_count"]) for g in listed] == [
+    assert {(g["name"], g["parent_id"], g["entity_count"]) for g in listed} == {
         ("North", None, 1),
         ("South", None, 0),
         ("Herd A", north["id"], 1),
-    ]
+        ("Family", herd["id"], 1),
+    }
     in_north = (
         await client.get(f"{base}/entities", params={"group_id": north["id"]}, headers=h)
     ).json()
-    assert {e["name"] for e in in_north["items"]} == {"Rhino 14", "Ranger 1"}
+    assert {e["name"] for e in in_north["items"]} == {"Rhino 14", "Ranger 1", "Calf"}
     in_herd = (
         await client.get(f"{base}/entities", params={"group_id": herd["id"]}, headers=h)
     ).json()
-    assert [e["name"] for e in in_herd["items"]] == ["Rhino 14"]
+    assert {e["name"] for e in in_herd["items"]} == {"Rhino 14", "Calf"}
     ungrouped = (
         await client.get(f"{base}/entities", params={"ungrouped": "true"}, headers=h)
     ).json()
@@ -166,16 +180,16 @@ async def test_groups_two_levels_filters_and_devices(client, db):
     ).json()["items"]
     assert none_in_south == []
 
-    # deleting the parent removes the subgroup and ungroups both entities
+    # deleting the top group removes everything below it and ungroups the three entities
     deleted = await client.delete(f"{base}/groups/{north['id']}", headers=h)
     assert deleted.status_code == 204
     assert [g["name"] for g in (await client.get(f"{base}/groups", headers=h)).json()] == ["South"]
-    for e in (rhino, ranger):
+    for e in (rhino, ranger, calf):
         read = (await client.get(f"{base}/entities/{e['id']}", headers=h)).json()
         assert read["group_id"] is None
     audit = (await client.get("/api/v1/admin/audit?limit=40", headers=admin.headers)).json()
     deletion = next(e for e in audit if e["action"] == "entity_group.deleted")
-    assert deletion["details"] == {"name": "North", "subgroups": 1, "entities_ungrouped": 2}
+    assert deletion["details"] == {"name": "North", "subgroups": 2, "entities_ungrouped": 3}
 
     # a viewer reads groups and cannot write them
     viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)

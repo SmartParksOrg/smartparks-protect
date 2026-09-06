@@ -3,9 +3,10 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from protect_api.audit import record_audit
 from protect_api.crud import (
@@ -80,8 +81,12 @@ def assignment_read(
 
 
 def group_and_subgroups(group_id: uuid.UUID) -> Select[tuple[uuid.UUID]]:
-    """The group's id and its subgroups' ids, for filters on a parent group."""
-    return select(Group.id).where(or_(Group.id == group_id, Group.parent_id == group_id))
+    """The group's id and the ids of every group below it, however deep, for filters on a
+    parent group (a recursive query)."""
+    tree = select(Group.id).where(Group.id == group_id).cte("group_tree", recursive=True)
+    below = aliased(Group)
+    tree = tree.union_all(select(below.id).where(below.parent_id == tree.c.id))
+    return select(tree.c.id)
 
 
 async def check_group(

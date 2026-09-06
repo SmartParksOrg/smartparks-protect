@@ -45,8 +45,8 @@ COLOR_PATTERN = "^#[0-9a-fA-F]{6}$"
 
 
 class EntityGroupCreate(BaseModel):
-    """A folder of entities (decision D98). `parent_id` names a top-level group of the same
-    project; groups are two levels deep."""
+    """A folder of entities (decision D98). `parent_id` names another group of the same
+    project; groups nest as deep as needed."""
 
     name: str = Field(min_length=1, max_length=200)
     parent_id: uuid.UUID | None = None

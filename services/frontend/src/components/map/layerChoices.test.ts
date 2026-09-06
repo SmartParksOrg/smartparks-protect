@@ -24,7 +24,12 @@ const group = (id: string, parent_id: string | null = null): EntityGroup => ({
   updated_at: "",
   entity_count: 0,
 });
-const groups = [group("north"), group("herd", "north"), group("south")];
+const groups = [
+  group("north"),
+  group("herd", "north"),
+  group("family", "herd"),
+  group("south"),
+];
 const feature = (
   entity_id: string,
   group_id: string | null,
@@ -42,6 +47,7 @@ const feature = (
   active_alert_count: 0,
 });
 const rhino = feature("rhino", "herd");
+const calf = feature("calf", "family");
 const ranger = feature("ranger", "north");
 const loose = feature("loose", null);
 
@@ -53,7 +59,8 @@ describe("layer choices", () => {
 
   it("hiding a parent hides its subgroups and showing it brings them back", () => {
     const hidden = toggleGroup(DEFAULT_LAYERS, "north", false, groups);
-    expect(hidden.hidden_groups.sort()).toEqual(["herd", "north"]);
+    expect(hidden.hidden_groups.sort()).toEqual(["family", "herd", "north"]);
+    expect(isVisible(calf, hidden, groups)).toBe(false);
     expect(isVisible(rhino, hidden, groups)).toBe(false);
     expect(isVisible(loose, hidden, groups)).toBe(true);
     expect(toggleGroup(hidden, "north", true, groups).hidden_groups).toEqual(
@@ -63,6 +70,14 @@ describe("layer choices", () => {
 
   it("showing a subgroup under a hidden parent shows the parent and hides the siblings", () => {
     const withSibling = [...groups, group("team", "north")];
+    const deep = toggleGroup(
+      toggleGroup(DEFAULT_LAYERS, "north", false, withSibling),
+      "family",
+      true,
+      withSibling,
+    );
+    expect(deep.hidden_groups.sort()).toEqual(["team"]);
+    expect(isVisible(calf, deep, withSibling)).toBe(true);
     const hidden = toggleGroup(DEFAULT_LAYERS, "north", false, withSibling);
     const shown = toggleGroup(hidden, "herd", true, withSibling);
     expect(shown.hidden_groups.sort()).toEqual(["team"]);
@@ -77,12 +92,13 @@ describe("layer choices", () => {
       groups,
     );
     expect(only.hidden_groups.sort()).toEqual(["south", UNGROUPED_LAYER]);
+    expect(isVisible(calf, only, groups)).toBe(true);
     expect(only.hidden_entities).toEqual([]);
     expect(isVisible(rhino, only, groups)).toBe(true);
     expect(isVisible(loose, only, groups)).toBe(false);
     expect(
       onlyGroup(DEFAULT_LAYERS, UNGROUPED_LAYER, groups).hidden_groups.sort(),
-    ).toEqual(["herd", "north", "south"]);
+    ).toEqual(["family", "herd", "north", "south"]);
   });
 
   it("hides and shows one entity", () => {

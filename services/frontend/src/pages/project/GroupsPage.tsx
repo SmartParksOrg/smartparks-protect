@@ -38,7 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { groupTree, useGroups } from "@/hooks/useGroups";
+import { descendantIds, groupTree, useGroups } from "@/hooks/useGroups";
 import { useMutationToast } from "@/hooks/useMutationToast";
 
 const schema = z.object({
@@ -65,11 +65,11 @@ function GroupDialog({
 }) {
   const { t } = useTranslation();
   const groups = useGroups(projectId);
-  const parents = (groups.data ?? []).filter(
-    (g) => !g.parent_id && g.id !== group?.id,
-  );
-  const hasChildren = Boolean(
-    group && groups.data?.some((g) => g.parent_id === group.id),
+  const blocked = group
+    ? [group.id, ...descendantIds(groups.data, group.id)]
+    : [];
+  const parents = groupTree(groups.data).filter(
+    (r) => !blocked.includes(r.group.id),
   );
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -136,29 +136,22 @@ function GroupDialog({
           <Field
             label={t("Inside")}
             htmlFor="group-parent"
-            hint={
-              hasChildren
-                ? t("This group has subgroups, so it stays at the top level")
-                : t(
-                    "Groups are two levels deep: a subgroup sits inside a top-level group",
-                  )
-            }
+            hint={t("A group can hold groups, as deep as the project needs")}
           >
             <Select
               value={form.watch("parent_id") || "none"}
               onValueChange={(v) =>
                 form.setValue("parent_id", v === "none" ? "" : v)
               }
-              disabled={hasChildren}
             >
               <SelectTrigger id="group-parent">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">{t("Top level")}</SelectItem>
-                {parents.map((g) => (
+                {parents.map(({ group: g, depth }) => (
                   <SelectItem key={g.id} value={g.id}>
-                    {g.name}
+                    <span style={{ paddingLeft: depth * 12 }}>{g.name}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -235,8 +228,8 @@ function GroupDialog({
   );
 }
 
-/** Folders of entities, two levels deep (decision D98): the lists filter by them and the map
- * shows and hides per group. */
+/** Folders of entities, nested as deep as needed (decision D98): the lists filter by them and
+ * the map shows and hides per group. */
 export function GroupsPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
@@ -263,7 +256,7 @@ export function GroupsPage() {
       <PageHeader
         title={t("Groups")}
         description={t(
-          "Folders of entities: a herd, a team, a region. Two levels deep.",
+          "Folders of entities: a region, a herd inside it, a family inside that.",
         )}
         actions={
           <Button onClick={() => setEditing({ group: null, parentId: null })}>
@@ -310,7 +303,7 @@ export function GroupsPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {depth === 0 && subgroupsOf(group).length > 0
+                    {subgroupsOf(group).length > 0
                       ? t("{{direct}} here, {{total}} in all", {
                           direct: group.entity_count,
                           total: totalOf(group),
@@ -321,7 +314,7 @@ export function GroupsPage() {
                     {group.description ?? ""}
                   </TableCell>
                   <TableCell className="text-right">
-                    {depth === 0 && (
+                    {
                       <Button
                         variant="ghost"
                         size="icon"
@@ -333,7 +326,7 @@ export function GroupsPage() {
                       >
                         <Plus className="size-4" />
                       </Button>
-                    )}
+                    }
                     <Button
                       variant="ghost"
                       size="icon"

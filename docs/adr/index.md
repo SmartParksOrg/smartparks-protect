@@ -25,5 +25,5 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0017 frames as deliveries, built-in channel sources, the browser as a route](0017-multi-path-acquisition.md)
 - [0018 immutable source data and layered interpretation](0018-immutable-source-layered-interpretation.md)
 - [0019 AI clients write through one policy-gated endpoint](0019-ai-writes-through-one-policy.md)
-- [0020 Entity groups as two-level folders](0020-entity-groups.md)
+- [0020 Entity groups as nested folders](0020-entity-groups.md)
 - [0021 Firmware-aware device driver layouts](0021-firmware-aware-driver.md)

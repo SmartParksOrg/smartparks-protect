@@ -2669,7 +2669,7 @@
      "entities"
     ],
     "summary": "List Groups",
-    "description": "Every group of the project with the number of entities directly in it, parents first,\nthen by sort order and name. Small enough to never page.",
+    "description": "Every group of the project with the number of entities directly in it, by sort order\nand name; the reader builds the tree from `parent_id`. Small enough to never page.",
     "operationId": "list_groups_api_v1_projects__project_id__groups_get",
     "security": [
      {
@@ -2844,7 +2844,7 @@
      "entities"
     ],
     "summary": "Delete Group",
-    "description": "Deleting a group leaves its entities ungrouped and removes its subgroups the same way;\nthe entities themselves stay.",
+    "description": "Deleting a group leaves its entities ungrouped and removes every group below it the\nsame way; the entities themselves stay.",
     "operationId": "delete_group_api_v1_projects__project_id__groups__group_id__delete",
     "security": [
      {
@@ -22932,7 +22932,7 @@
      "name"
     ],
     "title": "EntityGroupCreate",
-    "description": "A folder of entities (decision D98). `parent_id` names a top-level group of the same\nproject; groups are two levels deep."
+    "description": "A folder of entities (decision D98). `parent_id` names another group of the same\nproject; groups nest as deep as needed."
    },
    "EntityGroupRead": {
     "properties": {

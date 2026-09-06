@@ -566,8 +566,8 @@ export interface paths {
         };
         /**
          * List Groups
-         * @description Every group of the project with the number of entities directly in it, parents first,
-         *     then by sort order and name. Small enough to never page.
+         * @description Every group of the project with the number of entities directly in it, by sort order
+         *     and name; the reader builds the tree from `parent_id`. Small enough to never page.
          */
         get: operations["list_groups_api_v1_projects__project_id__groups_get"];
         put?: never;
@@ -591,8 +591,8 @@ export interface paths {
         post?: never;
         /**
          * Delete Group
-         * @description Deleting a group leaves its entities ungrouped and removes its subgroups the same way;
-         *     the entities themselves stay.
+         * @description Deleting a group leaves its entities ungrouped and removes every group below it the
+         *     same way; the entities themselves stay.
          */
         delete: operations["delete_group_api_v1_projects__project_id__groups__group_id__delete"];
         options?: never;
@@ -5927,8 +5927,8 @@ export interface components {
         EntityGroup: "tracked" | "infrastructure" | "environmental" | "equipment" | "site";
         /**
          * EntityGroupCreate
-         * @description A folder of entities (decision D98). `parent_id` names a top-level group of the same
-         *     project; groups are two levels deep.
+         * @description A folder of entities (decision D98). `parent_id` names another group of the same
+         *     project; groups nest as deep as needed.
          */
         EntityGroupCreate: {
             /** Name */

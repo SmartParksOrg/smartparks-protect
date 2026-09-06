@@ -1,8 +1,8 @@
-# 0020. Entity groups as two-level folders
+# 0020. Entity groups as nested folders
 
 Date: 2026-09-06
 
-Status: accepted
+Status: accepted, amended on 2026-09-06 (any depth instead of two levels)
 
 ## Context
 
@@ -18,9 +18,11 @@ but make "hide the north" ambiguous when an entity carries two tags.
 
 ## Decision
 
-Groups are folders, two levels deep, per project (decision D98): `entity_groups` with a name,
-an optional parent that must itself be top-level, a sort order, a colour for the map and an
-optional icon and description. An entity sits in at most one group (`entities.group_id`,
+Groups are folders per project, nested as deep as the project needs (decision D98, amended
+the same day after Tim tried the two-level version against EarthRanger's subject groups):
+`entity_groups` with a name, an optional parent, a sort order, a colour for the map and an
+optional icon and description. The only rule is that the tree stays a tree: a group cannot
+move into itself or below itself. Filters and deletions walk the tree with a recursive query. An entity sits in at most one group (`entities.group_id`,
 set to null when the group goes). Devices are not grouped on their own: a device belongs to
 the group of the entity it tracks today, which every device read carries, so the devices list
 filters by group without a second model. Filtering by a parent includes its subgroups. Bulk
@@ -31,8 +33,8 @@ feature and shows or hides per group.
 
 - Tags: kept possible for later, on top of folders, for ad hoc filtering; not first because
   the map panel and the counts need one place per entity.
-- Unlimited nesting: nothing in the requests needed a third level and every consumer
-  (filters, the layer panel, the bulk dialog) is simpler with a known depth.
+- Two levels only: the first version. Simpler consumers, but the first live use asked for
+  a region holding a herd holding a family, which is how EarthRanger's groups nest too.
 - Grouping devices directly: a collar moves between animals; a device group would drift
   from the animal group it was meant to mirror.
 
@@ -40,5 +42,5 @@ feature and shows or hides per group.
 
 Lists and the map gain one filter dimension that is cheap to query (one indexed column).
 Deleting a group ungroups its entities and removes its subgroups, recorded in the audit
-log with the counts. A deeper hierarchy or tags later mean a new decision, not a rewrite:
-the column and the table stay.
+log with the counts. Tags later mean a new decision, not a rewrite: the column and the
+table stay.

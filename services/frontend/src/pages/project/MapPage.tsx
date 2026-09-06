@@ -8,16 +8,50 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { CurrentState, Feature, Page as PageType, Track } from "@/api/types";
+import type {
+  CurrentState,
+  Feature,
+  Page as PageType,
+  Track,
+} from "@/api/types";
 import { Icon } from "@/components/icons/Icon";
-import { type BasemapKey, BASEMAPS, loadBasemap, saveBasemap } from "@/components/map/basemap";
-import { type EntityFeatureProperties, ensureEntityLayers, ensureEventLayers, ensureFeatureLayers, ensureTrackLayers, setEntities, setEvents, setFeatures, setTrack, SOURCES } from "@/components/map/layers";
-import { DEFAULT_LAYERS, type LayerChoices, isVisible } from "@/components/map/layerChoices";
+import {
+  type BasemapKey,
+  BASEMAPS,
+  loadBasemap,
+  saveBasemap,
+} from "@/components/map/basemap";
+import {
+  type EntityFeatureProperties,
+  ensureEntityLayers,
+  ensureEventLayers,
+  ensureFeatureLayers,
+  ensureTrackLayers,
+  type EventFeatureProperties,
+  setEntities,
+  setEvents,
+  setFeatures,
+  setTrack,
+  SOURCES,
+} from "@/components/map/layers";
+import {
+  DEFAULT_LAYERS,
+  isEventVisible,
+  isFeatureVisible,
+  isVisible,
+  type LayerChoices,
+} from "@/components/map/layerChoices";
 import { LayerPanel } from "@/components/map/LayerPanel";
 import { useMap } from "@/components/map/useMap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useGroups } from "@/hooks/useGroups";
 import { usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
@@ -26,6 +60,29 @@ import { formatAgo, formatTime } from "@/lib/format";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
 import { useProjectStore } from "@/stores/project";
 
+/** Fly to a feature: a point gets a close zoom, everything else fits its bounds. */
+function fitGeometry(
+  map: maplibregl.Map | null,
+  geometry: GeoJSON.Geometry,
+): void {
+  if (!map) return;
+  if (geometry.type === "Point") {
+    map.easeTo({
+      center: geometry.coordinates as [number, number],
+      zoom: Math.max(map.getZoom(), 13),
+    });
+    return;
+  }
+  const bounds = new maplibregl.LngLatBounds();
+  const walk = (c: unknown): void => {
+    if (Array.isArray(c) && typeof c[0] === "number")
+      bounds.extend(c as [number, number]);
+    else if (Array.isArray(c)) c.forEach(walk);
+  };
+  if ("coordinates" in geometry) walk(geometry.coordinates);
+  if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+}
+
 interface CurrentFeature {
   type: "Feature";
   id: string;
@@ -33,7 +90,12 @@ interface CurrentFeature {
   properties: EntityFeatureProperties;
 }
 
-const TRACK_PERIODS = [{ label: i18n.t("6 hours"), hours: 6 }, { label: i18n.t("24 hours"), hours: 24 }, { label: i18n.t("7 days"), hours: 168 }, { label: i18n.t("30 days"), hours: 720 }];
+const TRACK_PERIODS = [
+  { label: i18n.t("6 hours"), hours: 6 },
+  { label: i18n.t("24 hours"), hours: 24 },
+  { label: i18n.t("7 days"), hours: 168 },
+  { label: i18n.t("30 days"), hours: 720 },
+];
 
 /**
  * Live map (architecture 11 and 13). Entities come from the current-state endpoint (bounded),
@@ -56,20 +118,64 @@ export function MapPage() {
   const setLast = useProjectStore((s) => s.setLastProjectId);
   useEffect(() => setLast(projectId), [projectId, setLast]);
 
-  const current = useQuery({ queryKey: queryKeys.currentState(projectId), queryFn: () => api.get<CurrentState>(`/api/v1/projects/${projectId}/map/current`), refetchInterval: 60_000 });
-  const currentFeatures = current.data?.features as unknown as CurrentFeature[] | undefined;
+  const current = useQuery({
+    queryKey: queryKeys.currentState(projectId),
+    queryFn: () =>
+      api.get<CurrentState>(`/api/v1/projects/${projectId}/map/current`),
+    refetchInterval: 60_000,
+  });
+  const currentFeatures = current.data?.features as unknown as
+    CurrentFeature[] | undefined;
   const groups = useGroups(projectId);
-  const [allLayers, setAllLayers] = usePreference<Record<string, Partial<LayerChoices>>>("map_layers", {});
-  const layers = useMemo<LayerChoices>(() => ({ ...DEFAULT_LAYERS, ...allLayers[projectId] }), [allLayers, projectId]);
-  const setLayers = useCallback((next: LayerChoices) => setAllLayers({ ...allLayers, [projectId]: next }), [allLayers, projectId, setAllLayers]);
+  const [allLayers, setAllLayers] = usePreference<
+    Record<string, Partial<LayerChoices>>
+  >("map_layers", {});
+  const layers = useMemo<LayerChoices>(
+    () => ({ ...DEFAULT_LAYERS, ...allLayers[projectId] }),
+    [allLayers, projectId],
+  );
+  const setLayers = useCallback(
+    (next: LayerChoices) => setAllLayers({ ...allLayers, [projectId]: next }),
+    [allLayers, projectId, setAllLayers],
+  );
   const [panelOpen, setPanelOpen] = useState(false);
-  const visibleFeatures = useMemo(() => currentFeatures?.filter((f) => isVisible(f.properties, layers, groups.data)), [currentFeatures, layers, groups.data]);
-  const features = useQuery({ queryKey: queryKeys.features(projectId), queryFn: () => api.get<PageType<Feature>>(`/api/v1/projects/${projectId}/features`, { query: { limit: 500 } }) });
-  const events = useQuery({ queryKey: queryKeys.mapEvents(projectId, 24), queryFn: () => api.get<GeoJSON.FeatureCollection>(`/api/v1/projects/${projectId}/map/events`, { query: { hours: 24, limit: 500 } }), refetchInterval: 120_000 });
-  const trackQuery = useMemo(() => ({ entity_id: selectedId, hours: trackHours, max_points: 5000 }), [selectedId, trackHours]);
+  const visibleFeatures = useMemo(
+    () =>
+      currentFeatures?.filter((f) =>
+        isVisible(f.properties, layers, groups.data),
+      ),
+    [currentFeatures, layers, groups.data],
+  );
+  const features = useQuery({
+    queryKey: queryKeys.features(projectId),
+    queryFn: () =>
+      api.get<PageType<Feature>>(`/api/v1/projects/${projectId}/features`, {
+        query: { limit: 500 },
+      }),
+  });
+  const events = useQuery({
+    queryKey: queryKeys.mapEvents(projectId, 24),
+    queryFn: () =>
+      api.get<GeoJSON.FeatureCollection>(
+        `/api/v1/projects/${projectId}/map/events`,
+        { query: { hours: 24, limit: 500 } },
+      ),
+    refetchInterval: 120_000,
+  });
+  const trackQuery = useMemo(
+    () => ({ entity_id: selectedId, hours: trackHours, max_points: 5000 }),
+    [selectedId, trackHours],
+  );
   const track = useQuery({
     queryKey: queryKeys.track(projectId, trackQuery),
-    queryFn: () => api.get<Track>(`/api/v1/projects/${projectId}/tracks`, { query: { entity_id: selectedId, max_points: 5000, from: new Date(Date.now() - trackHours * 3600_000).toISOString() } }),
+    queryFn: () =>
+      api.get<Track>(`/api/v1/projects/${projectId}/tracks`, {
+        query: {
+          entity_id: selectedId,
+          max_points: 5000,
+          from: new Date(Date.now() - trackHours * 3600_000).toISOString(),
+        },
+      }),
     enabled: Boolean(selectedId && trackHours > 0),
   });
 
@@ -92,19 +198,55 @@ export function MapPage() {
   // live updates: patch the cached current state and refetch tracks
   useProjectStream(projectId, (message) => {
     if (message.topic === "position.created") {
-      client.setQueryData<CurrentState>(queryKeys.currentState(projectId), (old) => {
-        if (!old) return old;
-        const entityId = message.entity_id as string | null;
-        if (!entityId) return old;
-        const time = message.time as string;
-        const features = (old.features as unknown as CurrentFeature[]).map((f) => (f.properties.entity_id === entityId ? { ...f, geometry: { type: "Point" as const, coordinates: [message.longitude as number, message.latitude as number] }, properties: { ...f.properties, last_seen_at: time, position_time: time, device_id: message.device_id as string | null } } : f));
-        return { ...old, features: features as unknown as CurrentState["features"] };
-      });
-      if (message.entity_id === selectedId) void client.invalidateQueries({ queryKey: queryKeys.track(projectId, trackQuery) });
+      client.setQueryData<CurrentState>(
+        queryKeys.currentState(projectId),
+        (old) => {
+          if (!old) return old;
+          const entityId = message.entity_id as string | null;
+          if (!entityId) return old;
+          const time = message.time as string;
+          const features = (old.features as unknown as CurrentFeature[]).map(
+            (f) =>
+              f.properties.entity_id === entityId
+                ? {
+                    ...f,
+                    geometry: {
+                      type: "Point" as const,
+                      coordinates: [
+                        message.longitude as number,
+                        message.latitude as number,
+                      ],
+                    },
+                    properties: {
+                      ...f.properties,
+                      last_seen_at: time,
+                      position_time: time,
+                      device_id: message.device_id as string | null,
+                    },
+                  }
+                : f,
+          );
+          return {
+            ...old,
+            features: features as unknown as CurrentState["features"],
+          };
+        },
+      );
+      if (message.entity_id === selectedId)
+        void client.invalidateQueries({
+          queryKey: queryKeys.track(projectId, trackQuery),
+        });
     }
-    if (message.topic === "event.created" || message.topic === "alert.created") {
-      void client.invalidateQueries({ queryKey: queryKeys.mapEvents(projectId, 24) });
-      void client.invalidateQueries({ queryKey: queryKeys.currentState(projectId) });
+    if (
+      message.topic === "event.created" ||
+      message.topic === "alert.created"
+    ) {
+      void client.invalidateQueries({
+        queryKey: queryKeys.mapEvents(projectId, 24),
+      });
+      void client.invalidateQueries({
+        queryKey: queryKeys.currentState(projectId),
+      });
     }
   });
 
@@ -112,101 +254,324 @@ export function MapPage() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    ensureEntityLayers(map, (props) => select(props.entity_id), (lngLat, clusterId) => {
-      const source = map.getSource(SOURCES.entities) as maplibregl.GeoJSONSource;
-      void source.getClusterExpansionZoom(clusterId).then((zoom) => map.easeTo({ center: lngLat, zoom }));
-    });
+    ensureEntityLayers(
+      map,
+      (props) => select(props.entity_id),
+      (lngLat, clusterId) => {
+        const source = map.getSource(
+          SOURCES.entities,
+        ) as maplibregl.GeoJSONSource;
+        void source
+          .getClusterExpansionZoom(clusterId)
+          .then((zoom) => map.easeTo({ center: lngLat, zoom }));
+      },
+    );
     ensureFeatureLayers(map);
     ensureTrackLayers(map);
-    ensureEventLayers(map, (props) => setParams((p) => { p.set("event", props.event_id); return p; }, { replace: true }));
+    ensureEventLayers(map, (props) =>
+      setParams(
+        (p) => {
+          p.set("event", props.event_id);
+          return p;
+        },
+        { replace: true },
+      ),
+    );
   }, [mapRef, ready, select, setParams]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !events.data) return;
-    void setEvents(map, events.data.features);
-  }, [mapRef, ready, events.data]);
+    void setEvents(
+      map,
+      events.data.features.filter((f) =>
+        isEventVisible(
+          f.properties as unknown as EventFeatureProperties,
+          layers,
+        ),
+      ),
+    );
+  }, [mapRef, ready, events.data, layers]);
 
   const fitted = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !currentFeatures || !visibleFeatures) return;
-    void setEntities(map, visibleFeatures as unknown as GeoJSON.Feature[], selectedId);
+    void setEntities(
+      map,
+      visibleFeatures as unknown as GeoJSON.Feature[],
+      selectedId,
+    );
     if (!fitted.current && currentFeatures.length > 0) {
       const bounds = new maplibregl.LngLatBounds();
-      for (const f of currentFeatures) bounds.extend(f.geometry.coordinates as [number, number]);
+      for (const f of currentFeatures)
+        bounds.extend(f.geometry.coordinates as [number, number]);
       map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 0 });
       fitted.current = true;
     }
   }, [mapRef, ready, currentFeatures, visibleFeatures, selectedId]);
 
-  // features and events layers follow the panel's switches
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !ready) return;
-    for (const [layer, on] of [["features-fill", layers.features], ["features-line", layers.features], ["features-label", layers.features], ["event-markers", layers.events]] as const) {
-      if (map.getLayer(layer)) map.setLayoutProperty(layer, "visibility", on ? "visible" : "none");
-    }
-  }, [mapRef, ready, layers.features, layers.events]);
-
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !features.data) return;
-    setFeatures(map, features.data.items.filter((f) => f.geometry).map((f) => ({ type: "Feature", geometry: f.geometry as unknown as GeoJSON.Geometry, properties: { name: f.name, feature_type: f.feature_type } })));
-  }, [mapRef, ready, features.data]);
+    setFeatures(
+      map,
+      features.data.items
+        .filter((f) => f.geometry && isFeatureVisible(f, layers))
+        .map((f) => ({
+          type: "Feature",
+          geometry: f.geometry as unknown as GeoJSON.Geometry,
+          properties: { id: f.id, name: f.name, feature_type: f.feature_type },
+        })),
+    );
+  }, [mapRef, ready, features.data, layers]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    if (track.data && selectedId && trackHours > 0) setTrack(map, track.data.geometry as unknown as GeoJSON.Geometry, track.data.times);
+    if (track.data && selectedId && trackHours > 0)
+      setTrack(
+        map,
+        track.data.geometry as unknown as GeoJSON.Geometry,
+        track.data.times,
+      );
     else setTrack(map, null, []);
   }, [mapRef, ready, track.data, selectedId, trackHours]);
 
-  const selected = currentFeatures?.find((f) => f.properties.entity_id === selectedId)?.properties;
+  const selected = currentFeatures?.find(
+    (f) => f.properties.entity_id === selectedId,
+  )?.properties;
 
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={container} className="absolute! inset-0 z-0" />
-      <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
-        <Select value={basemap} onValueChange={(v) => { setBasemap(v as BasemapKey); saveBasemap(v as BasemapKey); }}>
-          <SelectTrigger className="h-9 w-32 bg-card"><Layers className="size-4" /><SelectValue /></SelectTrigger>
-          <SelectContent>{Object.entries(BASEMAPS).map(([key, b]) => <SelectItem key={key} value={key}>{b.label}</SelectItem>)}</SelectContent>
+      <div
+        className={`absolute top-3 z-10 flex items-center gap-2 ${panelOpen ? "left-[23rem]" : "left-3"}`}
+      >
+        <Select
+          value={basemap}
+          onValueChange={(v) => {
+            setBasemap(v as BasemapKey);
+            saveBasemap(v as BasemapKey);
+          }}
+        >
+          <SelectTrigger className="h-9 w-32 bg-card">
+            <Layers className="size-4" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(BASEMAPS).map(([key, b]) => (
+              <SelectItem key={key} value={key}>
+                {b.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
-        <Button variant={panelOpen ? "default" : "outline"} size="sm" className={panelOpen ? "" : "bg-card"} aria-pressed={panelOpen} onClick={() => setPanelOpen((o) => !o)}><ListTree className="size-4" /> {t("Layers")}</Button>
-        {current.data && <Badge variant="secondary" className="bg-card">{visibleFeatures && visibleFeatures.length !== currentFeatures?.length ? `${visibleFeatures.length} / ` : ""}{current.data.total} {t("entities")}{current.data.use_tiles ? ", tiles" : ""}</Badge>}
-        {events.data && events.data.features.length > 0 && <Badge variant="secondary" className="bg-card cursor-pointer" onClick={() => void navigate(`/projects/${projectId}/rules/events`)}>{events.data.features.length} {t("events, 24 h")}</Badge>}
+        <Button
+          variant={panelOpen ? "default" : "outline"}
+          size="sm"
+          className={panelOpen ? "" : "bg-card"}
+          aria-pressed={panelOpen}
+          onClick={() => setPanelOpen((o) => !o)}
+        >
+          <ListTree className="size-4" /> {t("Layers")}
+        </Button>
+        {current.data && (
+          <Badge variant="secondary" className="bg-card">
+            {visibleFeatures &&
+            visibleFeatures.length !== currentFeatures?.length
+              ? `${visibleFeatures.length} / `
+              : ""}
+            {current.data.total} {t("entities")}
+            {current.data.use_tiles ? ", tiles" : ""}
+          </Badge>
+        )}
+        {events.data && events.data.features.length > 0 && (
+          <Badge
+            variant="secondary"
+            className="bg-card cursor-pointer"
+            onClick={() => void navigate(`/projects/${projectId}/rules/events`)}
+          >
+            {events.data.features.length} {t("events, 24 h")}
+          </Badge>
+        )}
       </div>
       {panelOpen && currentFeatures && (
-        <LayerPanel features={currentFeatures.map((f) => f.properties)} groups={groups.data} choices={layers} onChange={setLayers} onClose={() => setPanelOpen(false)} onPick={(id) => { select(id); const f = currentFeatures.find((x) => x.properties.entity_id === id); if (f) mapRef.current?.easeTo({ center: f.geometry.coordinates as [number, number], zoom: Math.max(mapRef.current.getZoom(), 12) }); }} />
+        <LayerPanel
+          entities={currentFeatures.map((f) => f.properties)}
+          groups={groups.data}
+          features={features.data?.items ?? []}
+          events={(events.data?.features ?? []).map(
+            (f) => f.properties as unknown as EventFeatureProperties,
+          )}
+          choices={layers}
+          onChange={setLayers}
+          onClose={() => setPanelOpen(false)}
+          onPickEntity={(id) => {
+            select(id);
+            const f = currentFeatures.find(
+              (x) => x.properties.entity_id === id,
+            );
+            if (f)
+              mapRef.current?.easeTo({
+                center: f.geometry.coordinates as [number, number],
+                zoom: Math.max(mapRef.current.getZoom(), 12),
+              });
+          }}
+          onPickFeature={(id) => {
+            const f = features.data?.items.find((x) => x.id === id);
+            if (f?.geometry)
+              fitGeometry(
+                mapRef.current,
+                f.geometry as unknown as GeoJSON.Geometry,
+              );
+          }}
+          onPickEvent={(id) => {
+            const f = events.data?.features.find(
+              (x) =>
+                (x.properties as unknown as EventFeatureProperties).event_id ===
+                id,
+            );
+            if (f?.geometry.type === "Point")
+              mapRef.current?.easeTo({
+                center: f.geometry.coordinates as [number, number],
+                zoom: Math.max(mapRef.current.getZoom(), 12),
+              });
+          }}
+        />
       )}
       {selected && (
         <aside className="absolute bottom-3 left-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80">
           <div className="flex items-start gap-2">
             <Icon iconKey={selected.icon_key} className="size-7 text-primary" />
             <div className="min-w-0 flex-1">
-              <Link className="block truncate font-semibold underline-offset-2 hover:underline" to={`/projects/${projectId}/entities/${selected.entity_id}`}>{selected.name}</Link>
-              <div className="text-xs text-muted-foreground">{selected.entity_type}</div>
+              <Link
+                className="block truncate font-semibold underline-offset-2 hover:underline"
+                to={`/projects/${projectId}/entities/${selected.entity_id}`}
+              >
+                {selected.name}
+              </Link>
+              <div className="text-xs text-muted-foreground">
+                {selected.entity_type}
+              </div>
             </div>
-            <Button variant="ghost" size="icon" aria-label={t("Close")} onClick={() => select(null)}><X className="size-4" /></Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("Close")}
+              onClick={() => select(null)}
+            >
+              <X className="size-4" />
+            </Button>
           </div>
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">{t("Last seen")}</dt><dd title={formatTime(selected.last_seen_at)}>{formatAgo(selected.last_seen_at, now)}</dd>
-            <dt className="text-muted-foreground">{t("Position")}</dt><dd>{formatTime(selected.position_time)}</dd>
-            {selected.battery_voltage != null && <><dt className="text-muted-foreground">{t("Battery")}</dt><dd className={selected.health_level === "critical" ? "text-destructive" : selected.health_level === "warn" ? "text-brand-sand" : ""}>{selected.battery_voltage.toFixed(2)} V</dd></>}
-            {selected.last_status_at && <><dt className="text-muted-foreground">{t("Last status")}</dt><dd title={formatTime(selected.last_status_at)}>{formatAgo(selected.last_status_at, now)}</dd></>}
-            <dt className="text-muted-foreground">{t("Device")}</dt><dd>{selected.device_id ? <Link className="underline" to={`/projects/${projectId}/devices/${selected.device_id}`}>{t("open device")}</Link> : "none"}</dd>
-            <dt className="text-muted-foreground">{t("Alerts")}</dt><dd>{selected.active_alert_count > 0 ? <Link className="underline" to={`/projects/${projectId}/alerts`}>{selected.active_alert_count} {t("open")}</Link> : "none"}</dd>
+            <dt className="text-muted-foreground">{t("Last seen")}</dt>
+            <dd title={formatTime(selected.last_seen_at)}>
+              {formatAgo(selected.last_seen_at, now)}
+            </dd>
+            <dt className="text-muted-foreground">{t("Position")}</dt>
+            <dd>{formatTime(selected.position_time)}</dd>
+            {selected.battery_voltage != null && (
+              <>
+                <dt className="text-muted-foreground">{t("Battery")}</dt>
+                <dd
+                  className={
+                    selected.health_level === "critical"
+                      ? "text-destructive"
+                      : selected.health_level === "warn"
+                        ? "text-brand-sand"
+                        : ""
+                  }
+                >
+                  {selected.battery_voltage.toFixed(2)} V
+                </dd>
+              </>
+            )}
+            {selected.last_status_at && (
+              <>
+                <dt className="text-muted-foreground">{t("Last status")}</dt>
+                <dd title={formatTime(selected.last_status_at)}>
+                  {formatAgo(selected.last_status_at, now)}
+                </dd>
+              </>
+            )}
+            <dt className="text-muted-foreground">{t("Device")}</dt>
+            <dd>
+              {selected.device_id ? (
+                <Link
+                  className="underline"
+                  to={`/projects/${projectId}/devices/${selected.device_id}`}
+                >
+                  {t("open device")}
+                </Link>
+              ) : (
+                "none"
+              )}
+            </dd>
+            <dt className="text-muted-foreground">{t("Alerts")}</dt>
+            <dd>
+              {selected.active_alert_count > 0 ? (
+                <Link
+                  className="underline"
+                  to={`/projects/${projectId}/alerts`}
+                >
+                  {selected.active_alert_count} {t("open")}
+                </Link>
+              ) : (
+                "none"
+              )}
+            </dd>
           </dl>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Select value={String(trackHours)} onValueChange={(v) => setParams((p) => { if (v === "0") p.delete("track"); else p.set("track", v); return p; }, { replace: true })}>
-              <SelectTrigger className="h-8 w-36"><SelectValue placeholder={t("Track")} /></SelectTrigger>
-              <SelectContent><SelectItem value="0">{t("No track")}</SelectItem>{TRACK_PERIODS.map((p) => <SelectItem key={p.hours} value={String(p.hours)}>{t("Track")} {p.label}</SelectItem>)}</SelectContent>
+            <Select
+              value={String(trackHours)}
+              onValueChange={(v) =>
+                setParams(
+                  (p) => {
+                    if (v === "0") p.delete("track");
+                    else p.set("track", v);
+                    return p;
+                  },
+                  { replace: true },
+                )
+              }
+            >
+              <SelectTrigger className="h-8 w-36">
+                <SelectValue placeholder={t("Track")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">{t("No track")}</SelectItem>
+                {TRACK_PERIODS.map((p) => (
+                  <SelectItem key={p.hours} value={String(p.hours)}>
+                    {t("Track")} {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-            {track.data && <span className="text-xs text-muted-foreground">{t("{{returned}} of {{total}} points", { returned: track.data.returned_points, total: track.data.total_points })}</span>}
+            {track.data && (
+              <span className="text-xs text-muted-foreground">
+                {t("{{returned}} of {{total}} points", {
+                  returned: track.data.returned_points,
+                  total: track.data.total_points,
+                })}
+              </span>
+            )}
           </div>
         </aside>
       )}
-      <EventDetailDialog scope={projectId} eventId={selectedEvent} onClose={() => setParams((p) => { p.delete("event"); return p; }, { replace: true })} />
+      <EventDetailDialog
+        scope={projectId}
+        eventId={selectedEvent}
+        onClose={() =>
+          setParams(
+            (p) => {
+              p.delete("event");
+              return p;
+            },
+            { replace: true },
+          )
+        }
+      />
     </div>
   );
 }

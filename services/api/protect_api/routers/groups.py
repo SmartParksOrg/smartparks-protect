@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from protect_api.audit import record_audit
 from protect_api.crud import apply_patch, flush_or_409, get_or_404
 from protect_api.deps import ProjectContext, require_permission
+from protect_api.routers.entities import group_and_subgroups
 from protect_api.schemas.domain import EntityGroupCreate, EntityGroupRead, EntityGroupUpdate
 from shared.database import get_session
 from shared.models import Entity, Group
@@ -32,29 +33,19 @@ async def check_parent(
     parent_id: uuid.UUID | None,
     group: Group | None,
 ) -> None:
-    """Two levels (decision D98): a parent is a top-level group of this project, and a group
-    that has subgroups cannot become a subgroup itself."""
+    """Groups nest as deep as needed (decision D98, amended): the parent is a group of this
+    project and not the group itself or one below it, so the tree stays a tree."""
     if parent_id is None:
         return
-    if group is not None and parent_id == group.id:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, "A group cannot be its own parent"
-        )
-    parent = await project_group(session, context, parent_id)
-    if parent.parent_id is not None:
+    await project_group(session, context, parent_id)
+    if group is None:
+        return
+    below = set((await session.scalars(group_and_subgroups(group.id))).all())
+    if parent_id in below:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "Groups are two levels deep: the parent must be a top-level group",
+            "A group cannot move into itself or into one of its own subgroups",
         )
-    if group is not None:
-        children = await session.scalar(
-            select(func.count()).select_from(Group).where(Group.parent_id == group.id)
-        )
-        if children:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT,
-                "A group with subgroups cannot become a subgroup; move its subgroups first",
-            )
 
 
 def group_read(group: Group, entity_count: int = 0) -> EntityGroupRead:
@@ -68,8 +59,8 @@ async def list_groups(
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> list[EntityGroupRead]:
-    """Every group of the project with the number of entities directly in it, parents first,
-    then by sort order and name. Small enough to never page."""
+    """Every group of the project with the number of entities directly in it, by sort order
+    and name; the reader builds the tree from `parent_id`. Small enough to never page."""
     counts = {
         group_id: count
         for group_id, count in (
@@ -84,7 +75,7 @@ async def list_groups(
         await session.scalars(
             select(Group)
             .where(Group.project_id == context.project.id)
-            .order_by(Group.parent_id.is_not(None), Group.sort_order, Group.name)
+            .order_by(Group.sort_order, Group.name)
         )
     ).all()
     return [group_read(g, int(counts.get(g.id, 0))) for g in groups]
@@ -147,11 +138,13 @@ async def delete_group(
     context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    """Deleting a group leaves its entities ungrouped and removes its subgroups the same way;
-    the entities themselves stay."""
+    """Deleting a group leaves its entities ungrouped and removes every group below it the
+    same way; the entities themselves stay."""
     group = await project_group(session, context, group_id)
-    subgroup_ids = list(
-        (await session.scalars(select(Group.id).where(Group.parent_id == group.id))).all()
+    tree = list((await session.scalars(group_and_subgroups(group.id))).all())
+    subgroup_ids = [g for g in tree if g != group.id]
+    ungrouped = await session.scalar(
+        select(func.count()).select_from(Entity).where(Entity.group_id.in_(tree))
     )
     ungrouped = await session.scalar(
         select(func.count())

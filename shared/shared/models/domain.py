@@ -42,9 +42,10 @@ class EntityType(UuidPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class Group(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    """A folder of entities inside a project, two levels deep (decision D98, ADR 0020): a
-    herd, a ranger team, a region. An entity sits in at most one group; devices are grouped
-    through the entity they track. The map shows and hides per group."""
+    """A folder of entities inside a project, nested as deep as needed (decision D98,
+    ADR 0020): a region holding a herd holding a family. An entity sits in at most one
+    group; devices are grouped through the entity they track. The map shows and hides per
+    group."""
 
     __tablename__ = "entity_groups"
     __table_args__ = (
@@ -64,7 +65,7 @@ class Group(UuidPrimaryKeyMixin, TimestampMixin, Base):
         Uuid,
         ForeignKey("entity_groups.id", ondelete="CASCADE"),
         index=True,
-        comment="A top-level group has none; a subgroup's parent is a top-level group",
+        comment="A top-level group has none; any group may hold groups",
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
