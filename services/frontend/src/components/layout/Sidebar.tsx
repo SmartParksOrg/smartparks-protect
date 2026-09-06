@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Languages, LogOut, Plug, Search } from "lucide-react";
+import { Languages, LogOut, PanelLeftClose, Plug, Search } from "lucide-react";
 import { Link, NavLink, useParams } from "react-router";
 
 import LogoWide from "@/assets/brand/logo-wide.svg?react";
@@ -64,7 +64,15 @@ function Item({
   );
 }
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({
+  onNavigate,
+  collapsible = false,
+  onCollapse,
+}: {
+  onNavigate?: () => void;
+  collapsible?: boolean;
+  onCollapse?: () => void;
+}) {
   const { t } = useTranslation();
   const { projectId } = useParams();
   const user = useAuthStore((s) => s.user);
@@ -76,6 +84,18 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col">
       <div className="flex items-center px-4 py-4">
         <LogoWide className="h-8 w-auto text-primary" />
+        {collapsible && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto text-muted-foreground"
+            aria-label={t("Hide navigation")}
+            title={t("Hide navigation")}
+            onClick={onCollapse}
+          >
+            <PanelLeftClose className="size-5" />
+          </Button>
+        )}
       </div>
       <div className="px-3 pb-3">
         <ProjectSwitcher />

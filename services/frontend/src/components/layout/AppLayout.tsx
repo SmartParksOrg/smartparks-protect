@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Menu } from "lucide-react";
+import { Menu, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Outlet, useParams } from "react-router";
 
@@ -9,6 +9,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIconStore } from "@/stores/icons";
+import { useLayoutStore } from "@/stores/layout";
 
 /**
  * Fixed sidebar from 1024 px, a drawer below. The shell is exactly one viewport high and the main
@@ -20,17 +21,34 @@ export function AppLayout() {
   const [open, setOpen] = useState(false);
   const { projectId } = useParams();
   const loadIcons = useIconStore((s) => s.load);
+  const sidebarHidden = useLayoutStore((s) => s.sidebarHidden);
+  const setSidebarHidden = useLayoutStore((s) => s.setSidebarHidden);
   useEffect(() => {
     void loadIcons(projectId ?? null);
   }, [projectId, loadIcons]);
   return (
     <div className="flex h-screen">
       <CommandPalette />
-      <aside className="hidden w-64 shrink-0 border-r bg-card lg:block">
+      <aside
+        className={`hidden w-64 shrink-0 border-r bg-card ${sidebarHidden ? "" : "lg:block"}`}
+      >
         <div className="h-full">
-          <Sidebar />
+          <Sidebar collapsible onCollapse={() => setSidebarHidden(true)} />
         </div>
       </aside>
+      {sidebarHidden && (
+        <div className="hidden w-10 shrink-0 flex-col items-center border-r bg-card py-2 lg:flex">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t("Show navigation")}
+            title={t("Show navigation")}
+            onClick={() => setSidebarHidden(false)}
+          >
+            <PanelLeftOpen className="size-5" />
+          </Button>
+        </div>
+      )}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-72 p-0">
           <SheetTitle className="sr-only">{t("Navigation")}</SheetTitle>

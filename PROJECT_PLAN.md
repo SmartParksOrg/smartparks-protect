@@ -1088,6 +1088,7 @@ Listed by the phase where they are first needed.
 ### 2026-09-06, Tim's first hour with v2.0.0 (Claude)
 
 - Five observations from the dev server, all built: the track button shows its state and several tracks run at once with their own colours (`?tracks=`); a row under a switched-off parent switches the parent on and hides the rest, on every tab; the source event dialog opens on a Decoded tab with the records a delivery became (`records` on the read); the map's entity panel moves aside while the layers panel is open; the entity page shows recent events, recent positions with a track link and the tracked device's traffic under Technical details.
+- Tim also asked to hide and show the left navigation on desktop: a header button folds the sidebar to a slim rail with the reopen button, kept per browser (`stores/layout.ts`); the rail keeps the map's controls from being covered.
 - Where to continue: plan the next phase with Tim from the open items; these fixes go out as v2.0.1 when he says so.
 
 ### 2026-09-06, map layers reworked on Tim's feedback (Claude)

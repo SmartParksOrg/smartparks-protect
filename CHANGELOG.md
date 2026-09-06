@@ -10,6 +10,7 @@ From Tim's first hour with v2.0.0 on the dev server.
 
 - The source event dialog opens on a Decoded tab that lists what the delivery became: positions with coordinates, measurements with their values, device state and events, or the reason nothing came out; the read carries `records`. Asked because a Bluetooth row in the traffic view did not say what it meant.
 - The entity page shows the entity's recent events, its recent positions with a "Track on the map" link, and, under Technical details, the traffic of the device tracking it.
+- The sidebar hides on desktop too: a button in its header folds it to a slim rail with a button to bring it back; the choice is kept per browser.
 - Several tracks at once on the live map (`?tracks=` and `?track=` hours): the track button in the layers panel fills when a track is on, each track has its own colour, and the selection panel's track choice adds or removes the selected entity.
 
 ### Fixed
