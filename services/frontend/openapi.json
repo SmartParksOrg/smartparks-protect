@@ -1718,6 +1718,37 @@
       "description": "Name contains, case-insensitive"
      },
      {
+      "name": "group_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "In this group or one of its subgroups (decision D98)",
+       "title": "Group Id"
+      },
+      "description": "In this group or one of its subgroups (decision D98)"
+     },
+     {
+      "name": "ungrouped",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Only entities in no group",
+       "default": false,
+       "title": "Ungrouped"
+      },
+      "description": "Only entities in no group"
+     },
+     {
       "name": "limit",
       "in": "query",
       "required": false,
@@ -2632,6 +2663,233 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/groups": {
+   "get": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "List Groups",
+    "description": "Every group of the project with the number of entities directly in it, parents first,\nthen by sort order and name. Small enough to never page.",
+    "operationId": "list_groups_api_v1_projects__project_id__groups_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/EntityGroupRead"
+         },
+         "title": "Response List Groups Api V1 Projects  Project Id  Groups Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Create Group",
+    "operationId": "create_group_api_v1_projects__project_id__groups_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EntityGroupCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityGroupRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/groups/{group_id}": {
+   "patch": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Update Group",
+    "operationId": "update_group_api_v1_projects__project_id__groups__group_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "group_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Group Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EntityGroupUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityGroupRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Delete Group",
+    "description": "Deleting a group leaves its entities ungrouped and removes its subgroups the same way;\nthe entities themselves stay.",
+    "operationId": "delete_group_api_v1_projects__project_id__groups__group_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "group_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Group Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices": {
    "get": {
     "tags": [
@@ -2706,6 +2964,25 @@
        "title": "Unassigned"
       },
       "description": "Only devices that track no entity right now (needs project_id)"
+     },
+     {
+      "name": "group_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only devices whose entity today is in this group or its subgroups (needs project_id, decision D98)",
+       "title": "Group Id"
+      },
+      "description": "Only devices whose entity today is in this group or its subgroups (needs project_id, decision D98)"
      },
      {
       "name": "limit",
@@ -18726,6 +19003,19 @@
       ],
       "title": "Entity Type Id"
      },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id",
+      "description": "The group the new entities go into (decision D98)"
+     },
      "reprocess": {
       "type": "boolean",
       "title": "Reprocess",
@@ -21694,6 +21984,43 @@
        }
       ],
       "description": "What the driver declares as health, from the current state"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id",
+      "description": "The entity it tracks today"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id",
+      "description": "The group of that entity (decision D98)"
      }
     },
     "type": "object",
@@ -22119,6 +22446,43 @@
       ],
       "description": "What the driver declares as health, from the current state"
      },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id",
+      "description": "The entity it tracks today"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id",
+      "description": "The group of that entity (decision D98)"
+     },
      "project_assignments": {
       "items": {
        "$ref": "#/components/schemas/ProjectAssignmentRead"
@@ -22445,6 +22809,18 @@
       ],
       "title": "Icon Key"
      },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     },
      "geometry": {
       "anyOf": [
        {
@@ -22490,6 +22866,248 @@
     ],
     "title": "EntityGroup"
    },
+   "EntityGroupCreate": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "parent_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Id"
+     },
+     "sort_order": {
+      "type": "integer",
+      "title": "Sort Order",
+      "default": 0
+     },
+     "color": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^#[0-9a-fA-F]{6}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Color"
+     },
+     "icon_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Icon Key"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "EntityGroupCreate",
+    "description": "A folder of entities (decision D98). `parent_id` names a top-level group of the same\nproject; groups are two levels deep."
+   },
+   "EntityGroupRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "parent_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "sort_order": {
+      "type": "integer",
+      "title": "Sort Order"
+     },
+     "color": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Color"
+     },
+     "icon_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Icon Key"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     },
+     "entity_count": {
+      "type": "integer",
+      "title": "Entity Count",
+      "description": "Entities directly in this group",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "parent_id",
+     "name",
+     "sort_order",
+     "color",
+     "icon_key",
+     "description",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "EntityGroupRead"
+   },
+   "EntityGroupUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "parent_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Id"
+     },
+     "sort_order": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sort Order"
+     },
+     "color": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^#[0-9a-fA-F]{6}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Color"
+     },
+     "icon_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Icon Key"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "title": "EntityGroupUpdate"
+   },
    "EntityRead": {
     "properties": {
      "id": {
@@ -22506,6 +23124,18 @@
       "type": "string",
       "format": "uuid",
       "title": "Entity Type Id"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
      },
      "name": {
       "type": "string",
@@ -22806,6 +23436,18 @@
        }
       ],
       "title": "Icon Key"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
      },
      "geometry": {
       "anyOf": [

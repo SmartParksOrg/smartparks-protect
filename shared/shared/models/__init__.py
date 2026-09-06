@@ -24,6 +24,7 @@ from shared.models.domain import (
     EntityType,
     ExternalIdentity,
     Feature,
+    Group,
     Metric,
 )
 from shared.models.events import (
@@ -89,6 +90,7 @@ __all__ = [
     "Feature",
     "Gateway",
     "GatewayReception",
+    "Group",
     "Integration",
     "IntegrationDelivery",
     "Invitation",

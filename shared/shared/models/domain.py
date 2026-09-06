@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     String,
     Text,
@@ -40,6 +41,38 @@ class EntityType(UuidPrimaryKeyMixin, TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
 
 
+class Group(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """A folder of entities inside a project, two levels deep (decision D98, ADR 0020): a
+    herd, a ranger team, a region. An entity sits in at most one group; devices are grouped
+    through the entity they track. The map shows and hides per group."""
+
+    __tablename__ = "entity_groups"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "parent_id",
+            "name",
+            name="uq_entity_groups_parent_name",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("entity_groups.id", ondelete="CASCADE"),
+        index=True,
+        comment="A top-level group has none; a subgroup's parent is a top-level group",
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    color: Mapped[str | None] = mapped_column(String(7), comment="#rrggbb, for the map layer")
+    icon_key: Mapped[str | None] = mapped_column(String(128))
+    description: Mapped[str | None] = mapped_column(Text)
+
+
 class Entity(UuidPrimaryKeyMixin, TimestampMixin, Base):
     """The real-world object being monitored. Devices are linked through assignments."""
 
@@ -54,6 +87,12 @@ class Entity(UuidPrimaryKeyMixin, TimestampMixin, Base):
     )
     entity_type_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("entity_types.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("entity_groups.id", ondelete="SET NULL"),
+        index=True,
+        comment="At most one group (decision D98); a deleted group leaves it ungrouped",
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")

@@ -557,6 +557,50 @@ export interface paths {
         patch: operations["end_entity_assignment_api_v1_projects__project_id__entity_assignments__assignment_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Groups
+         * @description Every group of the project with the number of entities directly in it, parents first,
+         *     then by sort order and name. Small enough to never page.
+         */
+        get: operations["list_groups_api_v1_projects__project_id__groups_get"];
+        put?: never;
+        /** Create Group */
+        post: operations["create_group_api_v1_projects__project_id__groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Group
+         * @description Deleting a group leaves its entities ungrouped and removes its subgroups the same way;
+         *     the entities themselves stay.
+         */
+        delete: operations["delete_group_api_v1_projects__project_id__groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Group */
+        patch: operations["update_group_api_v1_projects__project_id__groups__group_id__patch"];
+        trace?: never;
+    };
     "/api/v1/devices": {
         parameters: {
             query?: never;
@@ -4512,6 +4556,11 @@ export interface components {
             /** Entity Type Id */
             entity_type_id?: string | null;
             /**
+             * Group Id
+             * @description The group the new entities go into (decision D98)
+             */
+            group_id?: string | null;
+            /**
              * Reprocess
              * @default true
              */
@@ -5546,6 +5595,18 @@ export interface components {
             last_seen_at?: string | null;
             /** @description What the driver declares as health, from the current state */
             health?: components["schemas"]["DeviceHealth"] | null;
+            /**
+             * Entity Id
+             * @description The entity it tracks today
+             */
+            entity_id?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /**
+             * Group Id
+             * @description The group of that entity (decision D98)
+             */
+            group_id?: string | null;
         };
         /**
          * DeviceStatus
@@ -5696,6 +5757,18 @@ export interface components {
             last_seen_at?: string | null;
             /** @description What the driver declares as health, from the current state */
             health?: components["schemas"]["DeviceHealth"] | null;
+            /**
+             * Entity Id
+             * @description The entity it tracks today
+             */
+            entity_id?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /**
+             * Group Id
+             * @description The group of that entity (decision D98)
+             */
+            group_id?: string | null;
             /** Project Assignments */
             project_assignments: components["schemas"]["ProjectAssignmentRead"][];
             /** Entity Assignments */
@@ -5837,6 +5910,8 @@ export interface components {
             status: components["schemas"]["EntityStatus"];
             /** Icon Key */
             icon_key?: string | null;
+            /** Group Id */
+            group_id?: string | null;
             geometry?: components["schemas"]["GeoJSONGeometry"] | null;
             /** Attributes */
             attributes?: {
@@ -5850,6 +5925,84 @@ export interface components {
          * @enum {string}
          */
         EntityGroup: "tracked" | "infrastructure" | "environmental" | "equipment" | "site";
+        /**
+         * EntityGroupCreate
+         * @description A folder of entities (decision D98). `parent_id` names a top-level group of the same
+         *     project; groups are two levels deep.
+         */
+        EntityGroupCreate: {
+            /** Name */
+            name: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+            /** Color */
+            color?: string | null;
+            /** Icon Key */
+            icon_key?: string | null;
+            /** Description */
+            description?: string | null;
+        };
+        /** EntityGroupRead */
+        EntityGroupRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Name */
+            name: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Color */
+            color: string | null;
+            /** Icon Key */
+            icon_key: string | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Entity Count
+             * @description Entities directly in this group
+             * @default 0
+             */
+            entity_count: number;
+        };
+        /** EntityGroupUpdate */
+        EntityGroupUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            /** Color */
+            color?: string | null;
+            /** Icon Key */
+            icon_key?: string | null;
+            /** Description */
+            description?: string | null;
+        };
         /** EntityRead */
         EntityRead: {
             /**
@@ -5867,6 +6020,8 @@ export interface components {
              * Format: uuid
              */
             entity_type_id: string;
+            /** Group Id */
+            group_id?: string | null;
             /** Name */
             name: string;
             /** Status */
@@ -5965,6 +6120,8 @@ export interface components {
             status?: components["schemas"]["EntityStatus"] | null;
             /** Icon Key */
             icon_key?: string | null;
+            /** Group Id */
+            group_id?: string | null;
             geometry?: components["schemas"]["GeoJSONGeometry"] | null;
             /** Attributes */
             attributes?: {
@@ -10120,6 +10277,10 @@ export interface operations {
                 status_filter?: string | null;
                 /** @description Name contains, case-insensitive */
                 q?: string | null;
+                /** @description In this group or one of its subgroups (decision D98) */
+                group_id?: string | null;
+                /** @description Only entities in no group */
+                ungrouped?: boolean;
                 limit?: number;
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
@@ -10598,6 +10759,138 @@ export interface operations {
             };
         };
     };
+    list_groups_api_v1_projects__project_id__groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityGroupRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_group_api_v1_projects__project_id__groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityGroupCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityGroupRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_group_api_v1_projects__project_id__groups__group_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_group_api_v1_projects__project_id__groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityGroupUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityGroupRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_devices_api_v1_devices_get: {
         parameters: {
             query?: {
@@ -10606,6 +10899,8 @@ export interface operations {
                 q?: string | null;
                 /** @description Only devices that track no entity right now (needs project_id) */
                 unassigned?: boolean;
+                /** @description Only devices whose entity today is in this group or its subgroups (needs project_id, decision D98) */
+                group_id?: string | null;
                 limit?: number;
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;

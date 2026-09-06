@@ -12,6 +12,7 @@ export type Invitation = Schemas["InvitationRead"];
 export type EntityType = Schemas["EntityTypeRead"];
 export type Entity = Schemas["EntityRead"];
 export type EntityAssignment = Schemas["EntityAssignmentRead"];
+export type EntityGroup = Schemas["EntityGroupRead"];
 export type Feature = Schemas["FeatureRead"];
 export type DeviceType = Schemas["DeviceTypeRead"];
 export type Device = Schemas["DeviceRead"];

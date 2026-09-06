@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
+import { useGroups } from "@/hooks/useGroups";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
 
@@ -46,6 +47,10 @@ export function EntityPage() {
   });
   const e = entity.data;
   const type = types.data?.items.find((x) => x.id === e?.entity_type_id);
+  const groups = useGroups(projectId);
+  const group = groups.data?.find((g) => g.id === e?.group_id);
+  const parent = groups.data?.find((g) => g.id === group?.parent_id);
+  const groupPath = group ? (parent ? `${parent.name} / ${group.name}` : group.name) : "";
   const admin = canAdmin(role);
   const point = e?.geometry?.type === "Point" ? (e.geometry.coordinates as number[]) : null;
   if (entity.isError) return <Page><div className="text-destructive">{entity.error.message}</div></Page>;
@@ -70,6 +75,7 @@ export function EntityPage() {
             <CardContent>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 <dt className="text-muted-foreground">{t("Type")}</dt><dd>{type?.label ?? ""}</dd>
+                {e.group_id && <><dt className="text-muted-foreground">{t("Group")}</dt><dd>{groupPath}</dd></>}
                 <dt className="text-muted-foreground">{t("Last seen")}</dt><dd title={formatTime(live?.last_seen_at)}>{live?.last_seen_at ? formatAgo(live.last_seen_at, now) : t("never")}</dd>
                 <dt className="text-muted-foreground">{t("Last position")}</dt><dd>{live?.position_time ? formatTime(live.position_time) : t("none")}</dd>
                 {point && <><dt className="text-muted-foreground">{t("Static location")}</dt><dd className="font-mono text-xs">{point[1]?.toFixed(5)}, {point[0]?.toFixed(5)}</dd></>}

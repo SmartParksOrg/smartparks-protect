@@ -16,7 +16,7 @@ from protect_api.auth.users import current_active_user
 from protect_api.crud import apply_patch, flush_or_409, get_or_404, range_bounds
 from protect_api.deps import accessible_project_ids, require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
-from protect_api.routers.entities import assignment_read
+from protect_api.routers.entities import assignment_read, group_and_subgroups
 from protect_api.schemas.domain import (
     AssignmentEnd,
     AssignmentStart,
@@ -135,7 +135,23 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
             )
         ).all()
     }
+    now = utc_now()
+    tracking = {
+        device_id: (entity_id, name, group_id)
+        for device_id, entity_id, name, group_id in (
+            await session.execute(
+                select(DeviceEntityAssignment.device_id, Entity.id, Entity.name, Entity.group_id)
+                .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
+                .where(
+                    DeviceEntityAssignment.device_id.in_(ids),
+                    DeviceEntityAssignment.validity.op("@>")(now),
+                )
+            )
+        ).all()
+    }
     for device, read in zip(devices, reads, strict=True):
+        if device.id in tracking:
+            read.entity_id, read.entity_name, read.group_id = tracking[device.id]
         state = states.get(device.id)
         if state is None:
             continue
@@ -161,6 +177,11 @@ async def list_devices(
     unassigned: bool = Query(
         False, description="Only devices that track no entity right now (needs project_id)"
     ),
+    group_id: uuid.UUID | None = Query(
+        None,
+        description="Only devices whose entity today is in this group or its subgroups "
+        "(needs project_id, decision D98)",
+    ),
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[DeviceRead]:
@@ -170,8 +191,19 @@ async def list_devices(
     (decision D106)."""
     statement = select(Device)
     now = utc_now()
-    if unassigned and project_id is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "unassigned needs project_id")
+    if (unassigned or group_id is not None) and project_id is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "unassigned and group_id need project_id"
+        )
+    if group_id is not None:
+        statement = statement.where(
+            exists().where(
+                DeviceEntityAssignment.device_id == Device.id,
+                DeviceEntityAssignment.validity.op("@>")(now),
+                DeviceEntityAssignment.entity_id == Entity.id,
+                Entity.group_id.in_(group_and_subgroups(group_id)),
+            )
+        )
     if unassigned:
         statement = statement.where(
             ~exists().where(

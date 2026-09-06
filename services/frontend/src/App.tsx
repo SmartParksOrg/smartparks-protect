@@ -12,6 +12,7 @@ import { ProjectsPage } from "@/pages/ProjectsPage";
 
 const MapPage = lazy(() => import("@/pages/project/MapPage").then((m) => ({ default: m.MapPage })));
 const EntitiesPage = lazy(() => import("@/pages/project/EntitiesPage").then((m) => ({ default: m.EntitiesPage })));
+const GroupsPage = lazy(() => import("@/pages/project/GroupsPage").then((m) => ({ default: m.GroupsPage })));
 const EntityPage = lazy(() => import("@/pages/project/EntityPage").then((m) => ({ default: m.EntityPage })));
 const DevicesPage = lazy(() => import("@/pages/project/DevicesPage").then((m) => ({ default: m.DevicesPage })));
 const DevicePage = lazy(() => import("@/pages/project/DevicePage").then((m) => ({ default: m.DevicePage })));
@@ -94,6 +95,7 @@ export default function App() {
               <Route path="network/traces" element={<TracesPage />} />
               <Route path="admin/members" element={<MembersPage />} />
               <Route path="admin/features" element={<FeaturesPage />} />
+              <Route path="admin/groups" element={<GroupsPage />} />
               <Route path="admin/settings" element={<ProjectSettingsPage />} />
             </Route>
             <Route path="/admin" element={<RequireServerAdmin />}>

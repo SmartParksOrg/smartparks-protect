@@ -141,4 +141,5 @@ nav:
       - adr/0017-multi-path-acquisition.md
       - adr/0018-immutable-source-layered-interpretation.md
       - adr/0019-ai-writes-through-one-policy.md
+      - adr/0020-entity-groups.md
       - adr/0021-firmware-aware-driver.md

@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +33,14 @@ from protect_api.schemas.domain import (
 )
 from shared.database import get_session
 from shared.domain.assignments import reattribute, resolve_attribution
-from shared.models import Device, DeviceEntityAssignment, Entity, EntityType, Feature
+from shared.models import (
+    Device,
+    DeviceEntityAssignment,
+    Entity,
+    EntityType,
+    Feature,
+    Group,
+)
 from shared.permissions import Permission
 from shared.timeutil import utc_now
 
@@ -72,6 +79,21 @@ def assignment_read(
     )
 
 
+def group_and_subgroups(group_id: uuid.UUID) -> Select[tuple[uuid.UUID]]:
+    """The group's id and its subgroups' ids, for filters on a parent group."""
+    return select(Group.id).where(or_(Group.id == group_id, Group.parent_id == group_id))
+
+
+async def check_group(
+    session: AsyncSession, context: ProjectContext, group_id: uuid.UUID | None
+) -> None:
+    if group_id is None:
+        return
+    group = await get_or_404(session, Group, group_id, "Group")
+    if group.project_id != context.project.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found")
+
+
 # Entities
 
 
@@ -81,12 +103,20 @@ async def list_entities(
     entity_type_id: uuid.UUID | None = None,
     status_filter: str | None = None,
     q: str | None = Query(None, max_length=200, description="Name contains, case-insensitive"),
+    group_id: uuid.UUID | None = Query(
+        None, description="In this group or one of its subgroups (decision D98)"
+    ),
+    ungrouped: bool = Query(False, description="Only entities in no group"),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[EntityRead]:
     statement = select(Entity).where(Entity.project_id == context.project.id)
     if entity_type_id is not None:
         statement = statement.where(Entity.entity_type_id == entity_type_id)
+    if group_id is not None:
+        statement = statement.where(Entity.group_id.in_(group_and_subgroups(group_id)))
+    if ungrouped:
+        statement = statement.where(Entity.group_id.is_(None))
     if status_filter is not None:
         statement = statement.where(Entity.status == status_filter)
     if q:
@@ -102,6 +132,7 @@ async def create_entity(
     session: AsyncSession = Depends(get_session),
 ) -> EntityRead:
     await get_or_404(session, EntityType, body.entity_type_id, "Entity type")
+    await check_group(session, context, body.group_id)
     entity = Entity(
         project_id=context.project.id,
         geom=geojson_to_geom(body.geometry.as_dict() if body.geometry else None),
@@ -148,6 +179,8 @@ async def update_entity(
     session: AsyncSession = Depends(get_session),
 ) -> EntityRead:
     entity = await _project_entity(session, context, entity_id)
+    if "group_id" in body.model_fields_set:
+        await check_group(session, context, body.group_id)
     changed = apply_patch(entity, body, exclude={"geometry"})
     if "geometry" in body.model_fields_set:
         entity.geom = geojson_to_geom(body.geometry.as_dict() if body.geometry else None)

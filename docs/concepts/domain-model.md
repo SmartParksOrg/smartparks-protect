@@ -23,6 +23,10 @@ An assignment starts at a moment you choose. The dialogs offer the moments the s
 
 The entity is where most people start, so the entity page carries the device side too: the device tracking it today with its health, the history of every device that tracked it, "Assign device" for project admins (the candidates are the project's devices that track nothing at that moment, `GET /devices?project_id=&unassigned=true`) with the same start choices, and "Release device", which ends the current assignment now. A device already on another entity is released there first; the platform never moves a device between entities silently.
 
+## Groups
+
+Groups are folders of entities inside a project, two levels deep (decision D98, ADR 0020): a herd, a ranger team, a region. An entity sits in at most one group; a device belongs to the group of the entity it tracks today, so the devices list filters by group as the entities list does, and filtering by a top-level group includes its subgroups. Project admins manage groups under Project admin, Groups, with a colour for the map; the entity dialog and the bulk onboarding from Needs attention place entities in a group. Deleting a group leaves its entities in place and ungrouped.
+
 ## Handover
 
 Moving a device to another project is a handover, not an edit: the current project assignment closes at the effective time, the entity assignment closes at the same time, a new project assignment opens. History is never rewritten. Members of the old project keep access to the records that were attributed to their project; they do not see the new project's data.

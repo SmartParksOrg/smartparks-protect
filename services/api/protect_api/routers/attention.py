@@ -32,6 +32,7 @@ from shared.models import (
     Entity,
     EntityType,
     ExternalIdentity,
+    Group,
     Metric,
     Project,
     SourceEvent,
@@ -118,6 +119,9 @@ class BulkCreateDevices(BulkIdentityIds):
     device_type_id: uuid.UUID
     project_id: uuid.UUID | None = None
     entity_type_id: uuid.UUID | None = None
+    group_id: uuid.UUID | None = Field(
+        default=None, description="The group the new entities go into (decision D98)"
+    )
     reprocess: bool = True
 
 
@@ -430,6 +434,14 @@ async def bulk_create_devices(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, "An entity needs a project: set project_id"
             )
         await get_or_404(session, EntityType, body.entity_type_id, "Entity type")
+    if body.group_id is not None:
+        if body.entity_type_id is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "A group needs entities: set entity_type_id"
+            )
+        group = await get_or_404(session, Group, body.group_id, "Group")
+        if group.project_id != body.project_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found in this project")
     identities, skipped = await _identities_for_bulk(session, body.identity_ids)
     wanted = {_platform_name(i) for i in identities} | {i.external_id for i in identities}
     taken_devices = set(
@@ -482,7 +494,10 @@ async def bulk_create_devices(
             )
             if body.entity_type_id is not None and name not in taken_entities:
                 entity = Entity(
-                    project_id=body.project_id, entity_type_id=body.entity_type_id, name=name
+                    project_id=body.project_id,
+                    entity_type_id=body.entity_type_id,
+                    group_id=body.group_id,
+                    name=name,
                 )
                 session.add(entity)
                 await session.flush()

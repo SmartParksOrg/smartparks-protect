@@ -24,6 +24,7 @@ from protect_api.routers.events import router as events_router
 from protect_api.routers.exports import router as exports_router
 from protect_api.routers.gateways import admin_router as admin_gateways_router
 from protect_api.routers.gateways import router as gateways_router
+from protect_api.routers.groups import router as groups_router
 from protect_api.routers.ingest import router as ingest_router
 from protect_api.routers.integrations import router as integrations_router
 from protect_api.routers.log_files import router as log_files_router
@@ -41,6 +42,7 @@ for router in (
     oauth_router,
     projects_router,
     entities_router,
+    groups_router,
     devices_router,
     catalog_router,
     data_sources_router,

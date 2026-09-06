@@ -41,11 +41,50 @@ class EntityTypeRead(ORMModel):
     created_at: datetime
 
 
+COLOR_PATTERN = "^#[0-9a-fA-F]{6}$"
+
+
+class EntityGroupCreate(BaseModel):
+    """A folder of entities (decision D98). `parent_id` names a top-level group of the same
+    project; groups are two levels deep."""
+
+    name: str = Field(min_length=1, max_length=200)
+    parent_id: uuid.UUID | None = None
+    sort_order: int = 0
+    color: str | None = Field(default=None, pattern=COLOR_PATTERN)
+    icon_key: str | None = Field(default=None, pattern=ICON_PATTERN)
+    description: str | None = None
+
+
+class EntityGroupUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    parent_id: uuid.UUID | None = None
+    sort_order: int | None = None
+    color: str | None = Field(default=None, pattern=COLOR_PATTERN)
+    icon_key: str | None = Field(default=None, pattern=ICON_PATTERN)
+    description: str | None = None
+
+
+class EntityGroupRead(ORMModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    parent_id: uuid.UUID | None
+    name: str
+    sort_order: int
+    color: str | None
+    icon_key: str | None
+    description: str | None
+    created_at: datetime
+    updated_at: datetime
+    entity_count: int = Field(default=0, description="Entities directly in this group")
+
+
 class EntityCreate(BaseModel):
     entity_type_id: uuid.UUID
     name: str = Field(min_length=1, max_length=200)
     status: EntityStatus = EntityStatus.ACTIVE
     icon_key: str | None = Field(default=None, pattern=ICON_PATTERN)
+    group_id: uuid.UUID | None = None
     geometry: GeoJSONGeometry | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
     notes: str | None = None
@@ -56,6 +95,7 @@ class EntityUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     status: EntityStatus | None = None
     icon_key: str | None = Field(default=None, pattern=ICON_PATTERN)
+    group_id: uuid.UUID | None = None
     geometry: GeoJSONGeometry | None = None
     attributes: dict[str, Any] | None = None
     notes: str | None = None
@@ -65,6 +105,7 @@ class EntityRead(ORMModel):
     id: uuid.UUID
     project_id: uuid.UUID
     entity_type_id: uuid.UUID
+    group_id: uuid.UUID | None = None
     name: str
     status: str
     icon_key: str | None
@@ -170,6 +211,11 @@ class DeviceRead(ORMModel):
     )
     health: DeviceHealth | None = Field(
         default=None, description="What the driver declares as health, from the current state"
+    )
+    entity_id: uuid.UUID | None = Field(default=None, description="The entity it tracks today")
+    entity_name: str | None = None
+    group_id: uuid.UUID | None = Field(
+        default=None, description="The group of that entity (decision D98)"
     )
 
 

@@ -10,6 +10,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type { Entity, EntityType, Page } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
+import { GroupSelect } from "@/components/entities/GroupSelect";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,6 +23,7 @@ const schema = z.object({
   name: z.string().min(1, "Give the entity a name").max(200),
   entity_type_id: z.string().min(1, "Choose a type"),
   status: z.enum(["active", "inactive", "archived"]),
+  group_id: z.string(),
   latitude: z.string().optional(),
   longitude: z.string().optional(),
   notes: z.string().optional(),
@@ -31,7 +33,7 @@ type Values = z.infer<typeof schema>;
 export function EntityDialog({ projectId, entity, open, onOpenChange }: { projectId: string; entity: Entity | null; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { t } = useTranslation();
   const types = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<Page<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", entity_type_id: "", status: "active", latitude: "", longitude: "", notes: "" } });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", entity_type_id: "", status: "active", group_id: "", latitude: "", longitude: "", notes: "" } });
 
   useEffect(() => {
     if (!open) return;
@@ -40,6 +42,7 @@ export function EntityDialog({ projectId, entity, open, onOpenChange }: { projec
       name: entity?.name ?? "",
       entity_type_id: entity?.entity_type_id ?? "",
       status: (entity?.status as Values["status"]) ?? "active",
+      group_id: entity?.group_id ?? "",
       latitude: point ? String(point[1]) : "",
       longitude: point ? String(point[0]) : "",
       notes: entity?.notes ?? "",
@@ -49,7 +52,7 @@ export function EntityDialog({ projectId, entity, open, onOpenChange }: { projec
   const save = useMutationToast({
     mutationFn: (values: Values) => {
       const geometry = values.latitude && values.longitude ? { type: "Point", coordinates: [Number(values.longitude), Number(values.latitude)] } : null;
-      const body = { name: values.name, entity_type_id: values.entity_type_id, status: values.status, notes: values.notes || null, geometry };
+      const body = { name: values.name, entity_type_id: values.entity_type_id, status: values.status, group_id: values.group_id || null, notes: values.notes || null, geometry };
       return entity ? api.patch<Entity>(`/api/v1/projects/${projectId}/entities/${entity.id}`, { body }) : api.post<Entity>(`/api/v1/projects/${projectId}/entities`, { body });
     },
     invalidate: [queryKeys.entities(projectId), queryKeys.currentState(projectId)],
@@ -85,6 +88,9 @@ export function EntityDialog({ projectId, entity, open, onOpenChange }: { projec
                 <SelectItem value="archived">{t("archived")}</SelectItem>
               </SelectContent>
             </Select>
+          </Field>
+          <Field label={t("Group")} htmlFor="entity-group">
+            <GroupSelect id="entity-group" projectId={projectId} mode="choice" value={form.watch("group_id")} onChange={(v) => form.setValue("group_id", v)} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("Latitude")} htmlFor="latitude" hint={t("Static location, for infrastructure")}>

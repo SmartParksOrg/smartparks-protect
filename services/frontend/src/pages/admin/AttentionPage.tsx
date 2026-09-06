@@ -10,6 +10,7 @@ import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { GroupSelect } from "@/components/entities/GroupSelect";
 import { SourceEventDialog, TraceDialog } from "@/components/devices/ProvenancePanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -71,9 +72,10 @@ function BulkCreateDialog({ identities, onClose, onDone }: { identities: Unknown
   const [typeId, setTypeId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [entityTypeId, setEntityTypeId] = useState("");
+  const [groupId, setGroupId] = useState("");
   const [result, setResult] = useState<BulkCreateResult | null>(null);
   const create = useMutationToast({
-    mutationFn: () => api.post<BulkCreateResult>("/api/v1/attention/identities/bulk-create-devices", { body: { identity_ids: identities.map((i) => i.id), device_type_id: typeId, project_id: projectId || null, entity_type_id: entityTypeId || null } }),
+    mutationFn: () => api.post<BulkCreateResult>("/api/v1/attention/identities/bulk-create-devices", { body: { identity_ids: identities.map((i) => i.id), device_type_id: typeId, project_id: projectId || null, entity_type_id: entityTypeId || null, group_id: entityTypeId && groupId ? groupId : null } }),
     invalidate: [queryKeys.unknownIdentities, queryKeys.attentionSummary, queryKeys.devices({})],
     success: t("Devices created; retained events are being processed"),
     onSuccess: (data: BulkCreateResult) => { setResult(data); onDone(); if (data.skipped.length === 0) onClose(); },
@@ -96,11 +98,16 @@ function BulkCreateDialog({ identities, onClose, onDone }: { identities: Unknown
               <Select value={typeId} onValueChange={setTypeId}><SelectTrigger id="bulk-device-type"><SelectValue placeholder={t("Choose")} /></SelectTrigger><SelectContent>{types.data?.items.map((dt) => <SelectItem key={dt.id} value={dt.id}>{dt.label} ({dt.driver_key})</SelectItem>)}</SelectContent></Select>
             </Field>
             <Field label={t("Assign to project")} htmlFor="bulk-device-project" hint={t("From the first time each identity was seen")}>
-              <Select value={projectId || "none"} onValueChange={(v) => { setProjectId(v === "none" ? "" : v); if (v === "none") setEntityTypeId(""); }}><SelectTrigger id="bulk-device-project"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t("No project yet")}</SelectItem>{projects.data?.items.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
+              <Select value={projectId || "none"} onValueChange={(v) => { setProjectId(v === "none" ? "" : v); setGroupId(""); if (v === "none") setEntityTypeId(""); }}><SelectTrigger id="bulk-device-project"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t("No project yet")}</SelectItem>{projects.data?.items.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
             </Field>
             <Field label={t("Also create an entity per device")} htmlFor="bulk-entity-type" hint={projectId ? t("Each device gets an entity of this type with the same name, assigned from the same time, so it shows on the map at once") : t("Needs a project")}>
               <Select value={entityTypeId || "none"} onValueChange={(v) => setEntityTypeId(v === "none" ? "" : v)} disabled={!projectId}><SelectTrigger id="bulk-entity-type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t("No entity")}</SelectItem>{entityTypes.data?.items.map((et) => <SelectItem key={et.id} value={et.id}>{et.label}</SelectItem>)}</SelectContent></Select>
             </Field>
+            {projectId && entityTypeId && (
+              <Field label={t("Put the entities in a group")} htmlFor="bulk-group">
+                <GroupSelect id="bulk-group" projectId={projectId} mode="choice" value={groupId} onChange={setGroupId} />
+              </Field>
+            )}
           </div>
         )}
         <DialogFooter>

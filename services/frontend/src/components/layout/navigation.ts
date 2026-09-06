@@ -1,36 +1,7 @@
 /** Sidebar sections from architecture 28 (application navigation). Items without a route yet
  * render as disabled with the phase they arrive in. */
 import type { LucideIcon } from "lucide-react";
-import {
-  Activity,
-  Bell,
-  Bot,
-  Boxes,
-  ChartLine,
-  Cpu,
-  Database,
-  DatabaseBackup,
-  FileClock,
-  GitBranch,
-  LayoutDashboard,
-  Layers,
-  ListTree,
-  Map as MapIcon,
-  PawPrint,
-  PenLine,
-  Plug,
-  Radio,
-  Ruler,
-  ScrollText,
-  Send,
-  Settings2,
-  Shield,
-  SlidersHorizontal,
-  TriangleAlert,
-  Users,
-  Waypoints,
-  Workflow,
-} from "lucide-react";
+import { Activity, Bell, Bot, Boxes, ChartLine, Cpu, Database, DatabaseBackup, FileClock, FolderTree, GitBranch, Layers, LayoutDashboard, ListTree, Map as MapIcon, PawPrint, PenLine, Plug, Radio, Ruler, ScrollText, Send, Settings2, Shield, SlidersHorizontal, TriangleAlert, Users, Waypoints, Workflow } from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -95,6 +66,7 @@ export const projectSections: NavSection[] = [
     items: [
       { label: "Members", icon: Users, to: "admin/members", adminOnly: true },
       { label: "Features", icon: Layers, to: "admin/features", adminOnly: true },
+      { label: "Groups", icon: FolderTree, to: "admin/groups", adminOnly: true },
       { label: "Notifications", icon: Send, to: "admin/notifications", adminOnly: true },
       { label: "Settings", icon: Settings2, to: "admin/settings", adminOnly: true },
     ],

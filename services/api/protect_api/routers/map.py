@@ -97,6 +97,7 @@ async def current_state(
             EntityType.key,
             EntityType.icon_key,
             EntityType.group_key,
+            Entity.group_id,
             func.ST_AsGeoJSON(EntityCurrentState.latest_position),
         )
         .join(Entity, Entity.id == EntityCurrentState.entity_id)
@@ -143,7 +144,9 @@ async def current_state(
             ).all()
         }
     features = []
-    for state, name, entity_status, icon_override, type_key, type_icon, group_key, geojson in rows:
+    for row in rows:
+        state, name, entity_status, icon_override, type_key, type_icon, group_key = row[:7]
+        group_id, geojson = row[7], row[8]
         import json
 
         device_state = device_states.get(state.device_id) if state.device_id else None
@@ -169,6 +172,7 @@ async def current_state(
                     "status": entity_status,
                     "entity_type": type_key,
                     "group": group_key,
+                    "group_id": str(group_id) if group_id else None,
                     "icon_key": icon_override or type_icon,
                     "device_id": str(state.device_id) if state.device_id else None,
                     "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
@@ -214,6 +218,7 @@ async def current_state_tile(
                        AS geom,
                    s.entity_id::text AS entity_id, e.name, e.status,
                    et.key AS entity_type, et.group_key AS "group",
+                   e.group_id::text AS group_id,
                    COALESCE(e.icon_key, et.icon_key) AS icon_key,
                    s.device_id::text AS device_id,
                    to_char(s.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
