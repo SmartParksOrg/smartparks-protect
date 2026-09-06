@@ -73,6 +73,9 @@ def test_best_gateway_gets_the_coordinates_thingpark_gives():
     }
     assert "location" not in by_id["080e00c8"].attributes
     assert message.provider_metadata["frame_hex"] == "00277c0878fd9b2e000000000000ffff"
+    assert "name" not in message.identity_attributes  # that capture carries no CustomerData.name
+    live = parse_event(source(), example("kpn_live_uplink_port13.json"))
+    assert live.identity_attributes["name"] == "SP051195"
 
 
 def test_numeric_fields_of_newer_thingpark_versions_parse():

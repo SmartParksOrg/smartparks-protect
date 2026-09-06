@@ -5451,6 +5451,99 @@
     }
    }
   },
+  "/api/v1/attention/identities/bulk-create-devices": {
+   "post": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "Bulk Create Devices",
+    "description": "A shared network application posts every device it holds; this turns a selection of\nits unknown identities into devices in one go. A name already taken gets the external id\nappended; an entity name already taken in the project leaves that device without one.",
+    "operationId": "bulk_create_devices_api_v1_attention_identities_bulk_create_devices_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BulkCreateDevices"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BulkCreateResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/attention/identities/bulk-ignore": {
+   "post": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "Bulk Ignore Identities",
+    "operationId": "bulk_ignore_identities_api_v1_attention_identities_bulk_ignore_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BulkIdentityIds"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BulkIgnoreResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/attention/identities/{identity_id}/link": {
    "post": {
     "tags": [
@@ -18344,6 +18437,171 @@
     ],
     "title": "BrowserResult",
     "description": "What the browser reports after executing a WebBLE command."
+   },
+   "BulkCreateDevices": {
+    "properties": {
+     "identity_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Identity Ids"
+     },
+     "device_type_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Type Id"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "entity_type_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Type Id"
+     },
+     "reprocess": {
+      "type": "boolean",
+      "title": "Reprocess",
+      "default": true
+     }
+    },
+    "type": "object",
+    "required": [
+     "identity_ids",
+     "device_type_id"
+    ],
+    "title": "BulkCreateDevices",
+    "description": "Devices for many unknown identities at once (decision D96): one type, optionally one\nproject (assigned from the identity's first sighting) and one entity type, in which case\nevery device gets an entity of that type with the same name, assigned from the same time.\nNames come from the platform (`name` in the identity attributes) or the external id."
+   },
+   "BulkCreateResult": {
+    "properties": {
+     "created": {
+      "type": "integer",
+      "title": "Created"
+     },
+     "entities": {
+      "type": "integer",
+      "title": "Entities"
+     },
+     "republished": {
+      "type": "integer",
+      "title": "Republished"
+     },
+     "device_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "title": "Device Ids"
+     },
+     "skipped": {
+      "items": {
+       "$ref": "#/components/schemas/BulkSkipped"
+      },
+      "type": "array",
+      "title": "Skipped"
+     }
+    },
+    "type": "object",
+    "required": [
+     "created",
+     "entities",
+     "republished",
+     "device_ids",
+     "skipped"
+    ],
+    "title": "BulkCreateResult"
+   },
+   "BulkIdentityIds": {
+    "properties": {
+     "identity_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Identity Ids"
+     }
+    },
+    "type": "object",
+    "required": [
+     "identity_ids"
+    ],
+    "title": "BulkIdentityIds"
+   },
+   "BulkIgnoreResult": {
+    "properties": {
+     "ignored": {
+      "type": "integer",
+      "title": "Ignored"
+     },
+     "skipped": {
+      "items": {
+       "$ref": "#/components/schemas/BulkSkipped"
+      },
+      "type": "array",
+      "title": "Skipped"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ignored",
+     "skipped"
+    ],
+    "title": "BulkIgnoreResult"
+   },
+   "BulkSkipped": {
+    "properties": {
+     "identity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Identity Id"
+     },
+     "external_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Id"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "identity_id",
+     "reason"
+    ],
+    "title": "BulkSkipped"
    },
    "ChangePasswordRequest": {
     "properties": {

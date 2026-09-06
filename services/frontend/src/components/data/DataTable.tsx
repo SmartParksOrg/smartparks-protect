@@ -1,6 +1,6 @@
 import { type ColumnDef, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, type SortingState, useReactTable } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Input } from "@/components/ui/input";
@@ -21,20 +21,44 @@ interface Props<T> {
   searchable?: boolean;
   /** Called (debounced) with the search text, for pages that also filter on the server. */
   onSearchChange?: (term: string) => void;
+  /** A checkbox column: the header box selects every row of the current filter. */
+  selection?: { selected: Set<string>; onChange: (next: Set<string>) => void; rowId: (row: T) => string };
 }
 
 /** Below this many rows a search box is noise; it still appears once a term is typed. */
 const SEARCH_FROM_ROWS = 6;
 
 /** Wide tables scroll inside this container; the page never scrolls horizontally. */
-export function DataTable<T>({ columns, data, isLoading, emptyMessage = "Nothing here yet.", onRowClick, rowClassName, footer, searchable, onSearchChange }: Props<T>) {
+export function DataTable<T>({ columns, data, isLoading, emptyMessage = "Nothing here yet.", onRowClick, rowClassName, footer, searchable, onSearchChange, selection }: Props<T>) {
   const { t } = useTranslation();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [search, setSearch] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allColumns = useMemo<ColumnDef<T, unknown>[]>(() => {
+    if (!selection) return columns;
+    const toggle = (ids: string[], on: boolean) => {
+      const next = new Set(selection.selected);
+      for (const id of ids) if (on) next.add(id); else next.delete(id);
+      selection.onChange(next);
+    };
+    const box: ColumnDef<T, unknown> = {
+      id: "select",
+      enableSorting: false,
+      header: ({ table }) => {
+        const ids = table.getRowModel().rows.map((r) => selection.rowId(r.original));
+        const all = ids.length > 0 && ids.every((id) => selection.selected.has(id));
+        return <input type="checkbox" className="size-4 accent-primary" aria-label={t("Select all rows shown")} checked={all} onChange={(e) => toggle(ids, e.target.checked)} />;
+      },
+      cell: ({ row }) => {
+        const id = selection.rowId(row.original);
+        return <input type="checkbox" className="size-4 accent-primary" aria-label={t("Select row")} checked={selection.selected.has(id)} onClick={(e) => e.stopPropagation()} onChange={(e) => toggle([id], e.target.checked)} />;
+      },
+    };
+    return [box, ...columns];
+  }, [columns, selection, t]);
   const table = useReactTable({
     data: data ?? [],
-    columns,
+    columns: allColumns,
     state: { sorting, globalFilter: search },
     onSortingChange: setSorting,
     onGlobalFilterChange: setSearch,
@@ -86,13 +110,13 @@ export function DataTable<T>({ columns, data, isLoading, emptyMessage = "Nothing
             {isLoading &&
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={`s${i}`}>
-                  {columns.map((_, j) => (
+                  {allColumns.map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))}
             {!isLoading && table.getRowModel().rows.length === 0 && (
-              <TableRow><TableCell colSpan={columns.length} className="py-8 text-center text-muted-foreground">{search !== "" && total > 0 ? t("Nothing matches the search.") : emptyMessage}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={allColumns.length} className="py-8 text-center text-muted-foreground">{search !== "" && total > 0 ? t("Nothing matches the search.") : emptyMessage}</TableCell></TableRow>
             )}
             {!isLoading &&
               table.getRowModel().rows.map((row) => (

@@ -24,14 +24,17 @@ from shared.ingest import republish_source_event
 from shared.models import (
     DataSource,
     Device,
+    DeviceEntityAssignment,
     DeviceProjectAssignment,
     DeviceType,
+    Entity,
+    EntityType,
     ExternalIdentity,
     Project,
     SourceEvent,
     User,
 )
-from shared.timeutil import require_aware
+from shared.timeutil import require_aware, utc_now
 
 router = APIRouter(
     prefix="/attention", tags=["needs attention"], dependencies=[Depends(require_server_admin)]
@@ -74,6 +77,44 @@ class CreateDeviceForIdentity(BaseModel):
 class LinkIdentity(BaseModel):
     device_id: uuid.UUID
     reprocess: bool = True
+
+
+BULK_MAX = 500
+
+
+class BulkIdentityIds(BaseModel):
+    identity_ids: list[uuid.UUID] = Field(min_length=1, max_length=BULK_MAX)
+
+
+class BulkCreateDevices(BulkIdentityIds):
+    """Devices for many unknown identities at once (decision D96): one type, optionally one
+    project (assigned from the identity's first sighting) and one entity type, in which case
+    every device gets an entity of that type with the same name, assigned from the same time.
+    Names come from the platform (`name` in the identity attributes) or the external id."""
+
+    device_type_id: uuid.UUID
+    project_id: uuid.UUID | None = None
+    entity_type_id: uuid.UUID | None = None
+    reprocess: bool = True
+
+
+class BulkSkipped(BaseModel):
+    identity_id: uuid.UUID
+    external_id: str | None = None
+    reason: str
+
+
+class BulkCreateResult(BaseModel):
+    created: int
+    entities: int
+    republished: int
+    device_ids: list[uuid.UUID]
+    skipped: list[BulkSkipped]
+
+
+class BulkIgnoreResult(BaseModel):
+    ignored: int
+    skipped: list[BulkSkipped]
 
 
 class ReprocessResult(BaseModel):
@@ -239,6 +280,185 @@ async def create_device_for_identity(
     if body.reprocess:
         await _reprocess_identity(session, bus, identity)
     return device
+
+
+async def _identities_for_bulk(
+    session: AsyncSession, ids: list[uuid.UUID]
+) -> tuple[list[ExternalIdentity], list[BulkSkipped]]:
+    """The unlinked, not ignored identities among `ids`, and why the others are left out."""
+    rows = (
+        await session.scalars(select(ExternalIdentity).where(ExternalIdentity.id.in_(set(ids))))
+    ).all()
+    by_id = {r.id: r for r in rows}
+    usable: list[ExternalIdentity] = []
+    skipped: list[BulkSkipped] = []
+    for identity_id in dict.fromkeys(ids):  # in the caller's order, once each
+        identity = by_id.get(identity_id)
+        if identity is None:
+            skipped.append(BulkSkipped(identity_id=identity_id, reason="not found"))
+        elif identity.device_id is not None:
+            skipped.append(
+                BulkSkipped(
+                    identity_id=identity_id,
+                    external_id=identity.external_id,
+                    reason="already linked to a device",
+                )
+            )
+        elif identity.ignored:
+            skipped.append(
+                BulkSkipped(
+                    identity_id=identity_id, external_id=identity.external_id, reason="ignored"
+                )
+            )
+        else:
+            usable.append(identity)
+    return usable, skipped
+
+
+def _platform_name(identity: ExternalIdentity) -> str:
+    """The name the platform knows the device by, else its external id."""
+    name = str((identity.attributes or {}).get("name") or "").strip()
+    return name[:200] if name else identity.external_id
+
+
+@router.post(
+    "/identities/bulk-create-devices",
+    response_model=BulkCreateResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def bulk_create_devices(
+    body: BulkCreateDevices,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> BulkCreateResult:
+    """A shared network application posts every device it holds; this turns a selection of
+    its unknown identities into devices in one go. A name already taken gets the external id
+    appended; an entity name already taken in the project leaves that device without one."""
+    await get_or_404(session, DeviceType, body.device_type_id, "Device type")
+    if body.project_id is not None:
+        await get_or_404(session, Project, body.project_id, "Project")
+    if body.entity_type_id is not None:
+        if body.project_id is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "An entity needs a project: set project_id"
+            )
+        await get_or_404(session, EntityType, body.entity_type_id, "Entity type")
+    identities, skipped = await _identities_for_bulk(session, body.identity_ids)
+    wanted = {_platform_name(i) for i in identities} | {i.external_id for i in identities}
+    taken_devices = set(
+        (await session.scalars(select(Device.name).where(Device.name.in_(wanted)))).all()
+    )
+    taken_entities: set[str] = set()
+    if body.entity_type_id is not None:
+        taken_entities = set(
+            (
+                await session.scalars(
+                    select(Entity.name).where(
+                        Entity.project_id == body.project_id, Entity.name.in_(wanted)
+                    )
+                )
+            ).all()
+        )
+    created: list[Device] = []
+    linked: list[ExternalIdentity] = []
+    entities = 0
+    now = utc_now()
+    for identity in identities:
+        name = _platform_name(identity)
+        if name in taken_devices:
+            name = f"{name} {identity.external_id}"[:200]
+        if name in taken_devices:
+            skipped.append(
+                BulkSkipped(
+                    identity_id=identity.id,
+                    external_id=identity.external_id,
+                    reason=f"a device named {name!r} exists",
+                )
+            )
+            continue
+        taken_devices.add(name)
+        device = Device(name=name, device_type_id=body.device_type_id, status=DeviceStatus.ACTIVE)
+        session.add(device)
+        await session.flush()
+        identity.device_id = device.id
+        valid_from = identity.first_seen_at or now
+        if body.project_id is not None:
+            session.add(
+                DeviceProjectAssignment(
+                    device_id=device.id,
+                    project_id=body.project_id,
+                    validity=Range(valid_from, None, bounds="[)"),
+                    reason="created from Needs Attention",
+                    created_by_user_id=user.id,
+                )
+            )
+            if body.entity_type_id is not None and name not in taken_entities:
+                entity = Entity(
+                    project_id=body.project_id, entity_type_id=body.entity_type_id, name=name
+                )
+                session.add(entity)
+                await session.flush()
+                session.add(
+                    DeviceEntityAssignment(
+                        device_id=device.id,
+                        entity_id=entity.id,
+                        validity=Range(valid_from, None, bounds="[)"),
+                        reason="created from Needs Attention",
+                        created_by_user_id=user.id,
+                    )
+                )
+                taken_entities.add(name)
+                entities += 1
+        await record_audit(
+            session,
+            user=user,
+            action="attention.device_created",
+            object_type="external_identity",
+            object_id=str(identity.id),
+            project_id=body.project_id,
+            details={
+                "device_id": str(device.id),
+                "external_id": identity.external_id,
+                "bulk": True,
+            },
+        )
+        created.append(device)
+        linked.append(identity)
+    await flush_or_409(session, "Bulk create")
+    await session.commit()
+    republished = 0
+    if body.reprocess:
+        for identity in linked:
+            republished += await _reprocess_identity(session, bus, identity)
+    return BulkCreateResult(
+        created=len(created),
+        entities=entities,
+        republished=republished,
+        device_ids=[d.id for d in created],
+        skipped=skipped,
+    )
+
+
+@router.post("/identities/bulk-ignore", response_model=BulkIgnoreResult)
+async def bulk_ignore_identities(
+    body: BulkIdentityIds,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> BulkIgnoreResult:
+    identities, skipped = await _identities_for_bulk(session, body.identity_ids)
+    for identity in identities:
+        identity.ignored = True
+        await record_audit(
+            session,
+            user=user,
+            action="attention.identity_ignored",
+            object_type="external_identity",
+            object_id=str(identity.id),
+            details={"bulk": True},
+        )
+    await session.commit()
+    return BulkIgnoreResult(ignored=len(identities), skipped=skipped)
 
 
 @router.post("/identities/{identity_id}/link", response_model=ReprocessResult)

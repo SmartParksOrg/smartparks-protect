@@ -1201,6 +1201,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attention/identities/bulk-create-devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Create Devices
+         * @description A shared network application posts every device it holds; this turns a selection of
+         *     its unknown identities into devices in one go. A name already taken gets the external id
+         *     appended; an entity name already taken in the project leaves that device without one.
+         */
+        post: operations["bulk_create_devices_api_v1_attention_identities_bulk_create_devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attention/identities/bulk-ignore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Ignore Identities */
+        post: operations["bulk_ignore_identities_api_v1_attention_identities_bulk_ignore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attention/identities/{identity_id}/link": {
         parameters: {
             query?: never;
@@ -4344,6 +4383,68 @@ export interface components {
             };
             /** Error Message */
             error_message?: string | null;
+        };
+        /**
+         * BulkCreateDevices
+         * @description Devices for many unknown identities at once (decision D96): one type, optionally one
+         *     project (assigned from the identity's first sighting) and one entity type, in which case
+         *     every device gets an entity of that type with the same name, assigned from the same time.
+         *     Names come from the platform (`name` in the identity attributes) or the external id.
+         */
+        BulkCreateDevices: {
+            /** Identity Ids */
+            identity_ids: string[];
+            /**
+             * Device Type Id
+             * Format: uuid
+             */
+            device_type_id: string;
+            /** Project Id */
+            project_id?: string | null;
+            /** Entity Type Id */
+            entity_type_id?: string | null;
+            /**
+             * Reprocess
+             * @default true
+             */
+            reprocess: boolean;
+        };
+        /** BulkCreateResult */
+        BulkCreateResult: {
+            /** Created */
+            created: number;
+            /** Entities */
+            entities: number;
+            /** Republished */
+            republished: number;
+            /** Device Ids */
+            device_ids: string[];
+            /** Skipped */
+            skipped: components["schemas"]["BulkSkipped"][];
+        };
+        /** BulkIdentityIds */
+        BulkIdentityIds: {
+            /** Identity Ids */
+            identity_ids: string[];
+        };
+        /** BulkIgnoreResult */
+        BulkIgnoreResult: {
+            /** Ignored */
+            ignored: number;
+            /** Skipped */
+            skipped: components["schemas"]["BulkSkipped"][];
+        };
+        /** BulkSkipped */
+        BulkSkipped: {
+            /**
+             * Identity Id
+             * Format: uuid
+             */
+            identity_id: string;
+            /** External Id */
+            external_id?: string | null;
+            /** Reason */
+            reason: string;
         };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
@@ -11827,6 +11928,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_create_devices_api_v1_attention_identities_bulk_create_devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCreateDevices"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkCreateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_ignore_identities_api_v1_attention_identities_bulk_ignore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkIdentityIds"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkIgnoreResult"];
                 };
             };
             /** @description Validation Error */

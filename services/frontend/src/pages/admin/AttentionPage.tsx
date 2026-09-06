@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { AttentionSummary, DeadLetter, DeviceType, Page as PageType, ProjectWithRole, SourceEventSummary, UnknownIdentity } from "@/api/types";
+import type { AttentionSummary, BulkCreateResult, BulkIgnoreResult, DeadLetter, DeviceType, EntityType, Page as PageType, ProjectWithRole, SourceEventSummary, UnknownIdentity } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -60,6 +60,57 @@ function CreateDeviceDialog({ identity, onClose }: { identity: UnknownIdentity |
   );
 }
 
+/** The name the platform knows an identity by, or its external id: what a bulk create names the device. */
+const platformName = (identity: UnknownIdentity) => (typeof identity.attributes?.name === "string" && identity.attributes.name.trim()) || identity.external_id;
+
+function BulkCreateDialog({ identities, onClose, onDone }: { identities: UnknownIdentity[]; onClose: () => void; onDone: () => void }) {
+  const { t } = useTranslation();
+  const types = useQuery({ queryKey: queryKeys.deviceTypes, queryFn: () => api.get<PageType<DeviceType>>("/api/v1/device-types", { query: { limit: 500 } }) });
+  const projects = useQuery({ queryKey: queryKeys.projects, queryFn: () => api.get<PageType<ProjectWithRole>>("/api/v1/projects", { query: { limit: 500 } }) });
+  const entityTypes = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<PageType<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
+  const [typeId, setTypeId] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [entityTypeId, setEntityTypeId] = useState("");
+  const [result, setResult] = useState<BulkCreateResult | null>(null);
+  const create = useMutationToast({
+    mutationFn: () => api.post<BulkCreateResult>("/api/v1/attention/identities/bulk-create-devices", { body: { identity_ids: identities.map((i) => i.id), device_type_id: typeId, project_id: projectId || null, entity_type_id: entityTypeId || null } }),
+    invalidate: [queryKeys.unknownIdentities, queryKeys.attentionSummary, queryKeys.devices({})],
+    success: t("Devices created; retained events are being processed"),
+    onSuccess: (data: BulkCreateResult) => { setResult(data); onDone(); if (data.skipped.length === 0) onClose(); },
+  });
+  const names = identities.map(platformName);
+  const open = identities.length > 0;
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t("Create {{count}} devices", { count: identities.length })}</DialogTitle></DialogHeader>
+        {result ? (
+          <div className="space-y-2 text-sm">
+            <Callout kind="info">{t("{{created}} devices and {{entities}} entities created, {{republished}} retained events reprocessed.", { created: result.created, entities: result.entities, republished: result.republished })}</Callout>
+            {result.skipped.length > 0 && <ul className="list-disc space-y-1 pl-5 text-xs">{result.skipped.map((s) => <li key={s.identity_id}><span className="font-mono">{s.external_id ?? s.identity_id}</span>: {s.reason}</li>)}</ul>}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">{t("Names come from the platform where it sends one, else the external id:")} <span className="font-mono">{names.slice(0, 5).join(", ")}{names.length > 5 ? ` … (+${names.length - 5})` : ""}</span></p>
+            <Field label={t("Device type")} htmlFor="bulk-device-type">
+              <Select value={typeId} onValueChange={setTypeId}><SelectTrigger id="bulk-device-type"><SelectValue placeholder={t("Choose")} /></SelectTrigger><SelectContent>{types.data?.items.map((dt) => <SelectItem key={dt.id} value={dt.id}>{dt.label} ({dt.driver_key})</SelectItem>)}</SelectContent></Select>
+            </Field>
+            <Field label={t("Assign to project")} htmlFor="bulk-device-project" hint={t("From the first time each identity was seen")}>
+              <Select value={projectId || "none"} onValueChange={(v) => { setProjectId(v === "none" ? "" : v); if (v === "none") setEntityTypeId(""); }}><SelectTrigger id="bulk-device-project"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t("No project yet")}</SelectItem>{projects.data?.items.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
+            </Field>
+            <Field label={t("Also create an entity per device")} htmlFor="bulk-entity-type" hint={projectId ? t("Each device gets an entity of this type with the same name, assigned from the same time, so it shows on the map at once") : t("Needs a project")}>
+              <Select value={entityTypeId || "none"} onValueChange={(v) => setEntityTypeId(v === "none" ? "" : v)} disabled={!projectId}><SelectTrigger id="bulk-entity-type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t("No entity")}</SelectItem>{entityTypes.data?.items.map((et) => <SelectItem key={et.id} value={et.id}>{et.label}</SelectItem>)}</SelectContent></Select>
+            </Field>
+          </div>
+        )}
+        <DialogFooter>
+          {result ? <Button onClick={onClose}>{t("Close")}</Button> : <><Button variant="outline" onClick={onClose}>{t("Cancel")}</Button><Button disabled={!typeId || create.isPending} onClick={() => create.mutate()}>{t("Create and reprocess")}</Button></>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AttentionPage() {
   const { t } = useTranslation();
   const summary = useQuery({ queryKey: queryKeys.attentionSummary, queryFn: () => api.get<AttentionSummary>("/api/v1/attention/summary"), refetchInterval: 30_000 });
@@ -68,16 +119,21 @@ export function AttentionPage() {
   const [topic, setTopic] = useState(DEAD_TOPICS[0]);
   const dead = useQuery({ queryKey: queryKeys.deadLetters(topic), queryFn: () => api.get<DeadLetter[]>("/api/v1/attention/dead-letters", { query: { topic, limit: 200 } }) });
   const [creating, setCreating] = useState<UnknownIdentity | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulk, setBulk] = useState<UnknownIdentity[]>([]);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(null);
   const [trace, setTrace] = useState<string | null>(null);
   const invalidateAll = [queryKeys.unknownIdentities, queryKeys.attentionSummary, queryKeys.failedSourceEvents("failed"), queryKeys.deadLetters(topic)];
   const ignore = useMutationToast({ mutationFn: (id: string) => api.post(`/api/v1/attention/identities/${id}/ignore`), invalidate: invalidateAll, success: t("Identity ignored") });
+  const ignoreMany = useMutationToast({ mutationFn: (ids: string[]) => api.post<BulkIgnoreResult>("/api/v1/attention/identities/bulk-ignore", { body: { identity_ids: ids } }), invalidate: invalidateAll, success: t("Identities ignored"), onSuccess: () => setSelected(new Set()) });
+  const selectedIdentities = (identities.data?.items ?? []).filter((i) => selected.has(i.id));
   const reprocess = useMutationToast({ mutationFn: (e: SourceEventSummary) => api.post(`/api/v1/attention/source-events/${e.id}/reprocess`, { query: { ingested_at: e.ingested_at } }), invalidate: invalidateAll, success: t("Source event put back on the bus") });
   const retry = useMutationToast({ mutationFn: (d: DeadLetter) => api.post(`/api/v1/attention/dead-letters/${d.topic}/${d.id}/retry`), invalidate: invalidateAll, success: t("Message republished") });
   const resolve = useMutationToast({ mutationFn: (d: DeadLetter) => api.post(`/api/v1/attention/dead-letters/${d.topic}/${d.id}/resolve`), invalidate: invalidateAll, success: t("Dead letter resolved") });
 
   const identityColumns: ColumnDef<UnknownIdentity, unknown>[] = [
     { header: t("External id"), accessorKey: "external_id", cell: ({ getValue }) => <span className="font-mono">{getValue<string>()}</span> },
+    { header: t("Name"), id: "name", accessorFn: (row) => (typeof row.attributes?.name === "string" ? row.attributes.name : ""), cell: ({ getValue }) => getValue<string>() || <span className="text-muted-foreground">{t("none")}</span> },
     { header: t("Data source"), accessorKey: "data_source_name" },
     { header: t("Type"), accessorKey: "identity_type" },
     { header: t("First seen"), accessorKey: "first_seen_at", cell: ({ getValue }) => formatTime(getValue<string | null>()) },
@@ -113,7 +169,17 @@ export function AttentionPage() {
         </div>
         <Tabs defaultValue="identities">
           <TabsList><TabsTrigger value="identities">{t("Unknown identities")}</TabsTrigger><TabsTrigger value="failed">{t("Failed source events")}</TabsTrigger><TabsTrigger value="dead">{t("Dead letters")}</TabsTrigger></TabsList>
-          <TabsContent value="identities"><DataTable columns={identityColumns} data={identities.data?.items} searchable isLoading={identities.isPending} emptyMessage={t("Every identity is linked to a device.")} /></TabsContent>
+          <TabsContent value="identities" className="space-y-2">
+            {selected.size > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                <span>{t("{{count}} selected", { count: selected.size })}</span>
+                <Button size="sm" onClick={() => setBulk(selectedIdentities)}>{t("Create devices")}</Button>
+                <Button size="sm" variant="outline" disabled={ignoreMany.isPending} onClick={() => ignoreMany.mutate([...selected])}>{t("Ignore")}</Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t("Clear selection")}</Button>
+              </div>
+            )}
+            <DataTable columns={identityColumns} data={identities.data?.items} searchable isLoading={identities.isPending} emptyMessage={t("Every identity is linked to a device.")} selection={{ selected, onChange: setSelected, rowId: (row) => row.id }} />
+          </TabsContent>
           <TabsContent value="failed"><DataTable columns={failedColumns} data={failed.data} searchable isLoading={failed.isPending} emptyMessage={t("No failed source events.")} /></TabsContent>
           <TabsContent value="dead" className="space-y-3">
             <Select value={topic} onValueChange={setTopic}><SelectTrigger className="w-72"><SelectValue /></SelectTrigger><SelectContent>{DEAD_TOPICS.map((t) => <SelectItem key={t} value={t}>{t} {s?.dead_letters[t] ? `(${s.dead_letters[t]})` : ""}</SelectItem>)}</SelectContent></Select>
@@ -122,6 +188,7 @@ export function AttentionPage() {
         </Tabs>
       </Page>
       <CreateDeviceDialog identity={creating} onClose={() => setCreating(null)} />
+      <BulkCreateDialog identities={bulk} onClose={() => setBulk([])} onDone={() => setSelected(new Set())} />
       <SourceEventDialog id={event?.id ?? null} ingestedAt={event?.ingestedAt ?? null} onClose={() => setEvent(null)} />
       <TraceDialog traceId={trace} onClose={() => setTrace(null)} />
     </>

@@ -259,6 +259,10 @@ def parse_event(source: DataSourceContext, body: Any) -> InboundMessage:
                 "customer_id": data.get("CustomerID"),
                 "dev_addr": data.get("DevAddr"),
                 "model_cfg": data.get("ModelCfg"),
+                # The name ThingPark knows the device by, for onboarding from Needs attention.
+                "name": (data.get("CustomerData") or {}).get("name")
+                if isinstance(data.get("CustomerData"), dict)
+                else None,
             }.items()
             if v not in (None, "")
         },
