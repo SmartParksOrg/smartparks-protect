@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import secrets
 from typing import Any
+from urllib.parse import unquote
 
 from shared.enums import ErrorCode
 from shared.trace import ApplicationError
@@ -27,6 +28,19 @@ def bearer_token(headers: dict[str, str]) -> str | None:
     value = headers.get("authorization") or headers.get("Authorization") or ""
     scheme, _, token = value.partition(" ")
     return token.strip() if scheme.lower() == "bearer" and token else None
+
+
+def raw_query_params(query: str) -> dict[str, str]:
+    """The query string as the platform sent it, percent-decoded but with `+` kept: a signed
+    push (ThingPark's Token over `Time=...+02:00`) must be verified on the original text, and
+    the usual parsers turn `+` into a space. The last value wins for a repeated key."""
+    params: dict[str, str] = {}
+    for part in query.split("&"):
+        if not part:
+            continue
+        key, _, value = part.partition("=")
+        params[unquote(key)] = unquote(value)
+    return params
 
 
 def require_object(body: Any, adapter: str) -> dict[str, Any]:

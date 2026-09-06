@@ -1,0 +1,50 @@
+{
+  "origin": "iotacademy/LoRaPayloadSimulator, 1_KPN_LoRa_Example.md: a KPN LoRa (ThingPark) push captured with hookbin on 2016-07-05, published with its LRC-AS key. The AppSKey field is part of the capture: ThingPark can forward the session key when the application server is configured to receive it; do not enable that.",
+  "as_key": "00112233445566778899aabbccddeeff",
+  "query": {
+    "LrnDevEui": "0059AC000010020D",
+    "LrnFPort": "2",
+    "LrnInfos": "TWA_100006246.167.AS-1-1361149",
+    "AS_ID": "hookbin",
+    "Time": "2016-07-05T08:58:26.911+02:00",
+    "Token": "18f44bb294f9dd33b5168eeb92a0c7f9fa807914097dc9bb2ed5a789a65fad33"
+  },
+  "headers": {
+    "Content-Type": "application/json",
+    "User-Agent": "ACTILITY-LRCLRN-DEVICE-AGENT/1.0"
+  },
+  "body": {
+    "DevEUI_uplink": {
+      "Time": "2016-07-05T08:58:26.654+02:00",
+      "DevEUI": "0059AC000010020D",
+      "FPort": "2",
+      "FCntUp": "3",
+      "ADRbit": "1",
+      "MType": "4",
+      "FCntDn": "3",
+      "payload_hex": "00277c0878fd9b2e000000000000ffff",
+      "mic_hex": "5f95a77a",
+      "Lrcid": "0059AC01",
+      "LrrRSSI": "-100.000000",
+      "LrrSNR": "5.750000",
+      "SpFact": "12",
+      "SubBand": "G0",
+      "Channel": "LC7",
+      "DevLrrCnt": "4",
+      "Lrrid": "080603DB",
+      "LrrLAT": "52.069241",
+      "LrrLON": "4.349416",
+      "Lrrs": {
+        "Lrr": [
+          {"Lrrid": "080603DB", "Chain": "0", "LrrRSSI": "-100.000000", "LrrSNR": "5.750000", "LrrESP": "-101.024590"},
+          {"Lrrid": "080E00C8", "Chain": "0", "LrrRSSI": "-118.000000", "LrrSNR": "-4.000000", "LrrESP": "-123.455406"},
+          {"Lrrid": "080602C9", "Chain": "0", "LrrRSSI": "-119.000000", "LrrSNR": "-9.500000", "LrrESP": "-128.961838"}
+        ]
+      },
+      "CustomerID": "100006246",
+      "CustomerData": {"alr": {"pro": "SMTC/LoRaMote", "ver": "1"}},
+      "ModelCfg": "0",
+      "AppSKey": "34216a533ceb98b5c811a9acf72e6822"
+    }
+  }
+}

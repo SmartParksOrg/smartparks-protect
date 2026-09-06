@@ -167,3 +167,7 @@ class Adapter(Protocol):
     ) -> list[InboundMessage]:
         """Turn one HTTP push into messages. Raises `ApplicationError` on a malformed body."""
         ...
+
+    # Optional: `verify_webhook(source, body, headers, query) -> bool` for platforms that sign
+    # their pushes themselves (ThingPark's Token, decision D95). The webhook endpoint calls it
+    # when the request carries no valid bearer token; `query` is the raw, `+`-preserving query.

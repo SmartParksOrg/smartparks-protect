@@ -1,6 +1,7 @@
 """Inbound HTTP push: `POST /api/v1/ingest/http/{data_source_id}` with the source's bearer token,
-or `?token=` for adapters whose platform cannot set a header; optionally limited to the
-platform's source addresses (`allowed_source_ips` in the source config)."""
+or `?token=` for adapters whose platform cannot set a header, or the platform's own signature
+verified by the adapter (`verify_webhook`, ThingPark's Token, decision D95); optionally limited
+to the platform's source addresses (`allowed_source_ips` in the source config)."""
 
 import uuid
 from typing import Any
@@ -13,7 +14,7 @@ from protect_api.bus import get_bus
 from shared.bus import RedisStreamsBus
 from shared.connectivity.channels import channel_enabled, webhook_channel_key
 from shared.connectivity.registry import ADAPTERS
-from shared.connectivity.transports.http import bearer_token, token_matches
+from shared.connectivity.transports.http import bearer_token, raw_query_params, token_matches
 from shared.database import get_session
 from shared.ingest import commit_and_publish, data_source_context, store_inbound
 from shared.models import DataSource
@@ -60,7 +61,9 @@ async def ingest_http(
     if token is None and getattr(adapter, "webhook_token_in_query", False):
         # Platforms that cannot set a header (Cloudloop) carry the token in the URL (D78).
         token = request.query_params.get("token")
-    if token is None or not token_matches(token, source.webhook_token_hash):
+    authenticated = token is not None and token_matches(token, source.webhook_token_hash)
+    verify = getattr(adapter, "verify_webhook", None)
+    if not authenticated and verify is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing bearer token")
     allowed = source.config.get("allowed_source_ips") if isinstance(source.config, dict) else None
     if allowed:
@@ -77,6 +80,17 @@ async def ingest_http(
         ) from None
     context = data_source_context(source)
     headers = dict(request.headers)
+    # Without a valid bearer, a platform that signed the push itself is checked by the adapter
+    # with the source's credentials (ThingPark hashes the unencoded query, hence the raw parser).
+    if (
+        not authenticated
+        and verify is not None
+        and not verify(context, body, headers, raw_query_params(request.url.query))
+    ):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid or missing bearer token, and the platform's own token did not verify",
+        )
     if "event" in request.query_params:  # ChirpStack HTTP integration style
         headers["x-event"] = request.query_params["event"]
     try:

@@ -21,8 +21,9 @@ class ActilityThingParkAdapter(KpnThingParkAdapter):
         "web_url": "https://community.thingpark.io/wlogger",
     }
     setup_hint: ClassVar[str] = (
-        "In ThingPark create an application server of type HTTP pointing at the webhook URL of "
-        "this data source with the bearer token as Authorization header (`Authorization: "
-        "Bearer <token>` in the custom headers), and route the devices' routing profile to "
-        "it. Downlinks use the LRC downlink API with the AS key (token mode) or a bearer."
+        "In ThingPark create an application server (or connection) of type HTTP pointing at the "
+        "webhook URL of this data source, and route the devices to it. Store the tunnel "
+        "interface authentication key as as_key: ThingPark's own Token then authenticates "
+        "every push; a custom header `Authorization: Bearer <webhook token>` works as well. "
+        "Downlinks use the LRC downlink API with the AS key (token mode) or a bearer."
     )

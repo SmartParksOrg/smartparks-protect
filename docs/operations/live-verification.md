@@ -34,7 +34,9 @@ Pick the network the collar is registered on. Each has a runbook with the exact 
    URL and the bearer token shown once (LORIOT connects outward instead and needs the
    application's websocket token).
 2. In the network's portal, point the application's HTTP output at the webhook URL with the
-   `Authorization: Bearer <token>` header, as the runbook says.
+   `Authorization: Bearer <token>` header, as the runbook says. KPN's ThingPark signs its
+   pushes itself instead: activate the application server's security there and store the
+   tunnel interface authentication key as `as_key` on the source (the KPN runbook).
 3. Register the collar's DevEUI as an external identity on the data source, or wait for the
    first uplink and accept it from Server admin, Needs attention, linking it to the device.
 4. Watch, in this order: Server admin, Data sources, Traffic on the new source (every message it receives, linked or not, refreshing every five seconds); Network, Traffic (the uplink with its hex frame and gateways);
