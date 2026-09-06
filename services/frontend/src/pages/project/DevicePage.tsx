@@ -1,12 +1,12 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, MapPin } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { DeviceDataSpan, DeviceDetail, DeviceType, Page as PageType, Position } from "@/api/types";
+import type { DeviceDataSpan, DeviceDetail, DeviceType, Page as PageType, Position, TrafficRow } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -14,6 +14,7 @@ import { DeviceControl } from "@/components/control/DeviceControl";
 import { CuratedBadge, CurateDialog, RecordHistoryDialog } from "@/components/curation/CurationDialogs";
 import { HealthCard } from "@/components/devices/HealthCard";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
+import { TrafficTable } from "@/components/network/TrafficTable";
 import { RecordDeliveriesDialog, SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { WebBleCard } from "@/components/devices/WebBleCard";
 import { Icon } from "@/components/icons/Icon";
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { useNow } from "@/hooks/useNow";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
@@ -43,6 +45,13 @@ export function DevicePage() {
     enabled: Boolean(projectId),
   });
   const span = useQuery({ queryKey: queryKeys.deviceSpan(deviceId), queryFn: () => api.get<DeviceDataSpan>(`/api/v1/devices/${deviceId}/data-span`) });
+  const traffic = useQuery({
+    queryKey: queryKeys.traffic(projectId ?? "", { deviceId, recent: true }),
+    queryFn: () => api.get<TrafficRow[]>(`/api/v1/projects/${projectId}/traffic`, { query: { device_id: deviceId, limit: 20, from: new Date(Date.now() - 7 * 86400_000).toISOString() } }),
+    enabled: Boolean(projectId),
+    refetchInterval: 15_000,
+  });
+  const now = useNow();
   const repairInvalidate = [queryKeys.device(deviceId), queryKeys.deviceSpan(deviceId), queryKeys.positions(projectId ?? "", { deviceId, recent: true })];
   const extendProject = useMutationToast({
     mutationFn: (s: DeviceDataSpan) => api.post(`/api/v1/devices/${deviceId}/project-assignments/${s.earliest_project_assignment_id}/extend-start`, { body: { valid_from: s.first_data_at } }),
@@ -62,6 +71,7 @@ export function DevicePage() {
   const mayRepair = Boolean(user?.is_superuser || canAdmin(role));
   const firstData = sp?.first_data_at ?? null;
   const projectCovered = Boolean(sp?.earliest_project_from && firstData && new Date(sp.earliest_project_from) <= new Date(firstData));
+  const currentEntityId = d?.entity_assignments.find((a) => !a.valid_to)?.entity_id ?? null;
   if (device.isError) return <Page><div className="text-destructive">{device.error.message}</div></Page>;
   if (!d) return <Page><div className="text-muted-foreground">{t("Loading device…")}</div></Page>;
 
@@ -75,6 +85,7 @@ export function DevicePage() {
           {(d.links ?? []).map((link) => (
             <Button key={link.key} asChild variant="outline" size="sm"><a href={link.url} target="_blank" rel="noreferrer"><ExternalLink className="size-4" /> {link.label}</a></Button>
           ))}
+          {projectId && currentEntityId && <Button asChild variant="outline" size="sm"><Link to={`/projects/${projectId}/map?entity=${currentEntityId}`}><MapPin className="size-4" /> {t("Show on map")}</Link></Button>}
           {user?.is_superuser && <Button asChild variant="outline" size="sm"><Link to={`/admin/devices?device=${d.id}`}>{t("Manage")}</Link></Button>}
         </>}
       />
@@ -112,7 +123,7 @@ export function DevicePage() {
                 <div key={i.id} className="flex flex-wrap items-center gap-2">
                   <span className="font-mono">{i.external_id}</span>
                   <Badge variant="outline">{i.identity_type}</Badge>
-                  <span className="text-muted-foreground">{i.event_count} {t("events, last")} {formatAgo(i.last_seen_at)}</span>
+                  <span className="text-muted-foreground">{i.event_count} {t("events, last")} {formatAgo(i.last_seen_at, now)}</span>
                 </div>
               ))}
             </CardContent>
@@ -134,6 +145,14 @@ export function DevicePage() {
           <div className="lg:col-span-2"><DeviceControl deviceId={d.id} projectId={projectId} canFlush={canAdmin(role) || Boolean(user?.is_superuser)} /></div>
           <WebBleCard deviceId={d.id} deviceName={d.name} driverKey={type?.driver_key} canWrite={canAdmin(role) || Boolean(user?.is_superuser)} />
           <LogFilesCard deviceId={d.id} canWrite={canAdmin(role) || Boolean(user?.is_superuser)} />
+          {projectId && (
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between"><CardTitle>{t("Traffic")}</CardTitle><Button asChild variant="link" size="sm" className="h-auto p-0"><Link to={`/projects/${projectId}/network/traffic?device=${d.id}`}>{t("All traffic of this device")}</Link></Button></CardHeader>
+              <CardContent>
+                <TrafficTable rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("No messages in the last 7 days.")} onSelect={(r) => setEvent({ id: r.source_event_id, ingestedAt: r.ingested_at })} />
+              </CardContent>
+            </Card>
+          )}
           {projectId && (
             <Card className="lg:col-span-2">
               <CardHeader><CardTitle>{t("Recent positions")}</CardTitle></CardHeader>

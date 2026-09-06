@@ -17,6 +17,7 @@ from protect_api.crud import flush_or_409, get_or_404
 from protect_api.deps import require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.domain import DeviceRead, ExternalIdentityRead
+from protect_api.serial import fill_serial_from_identity
 from shared.bus import RedisStreamsBus, Topic, is_stale
 from shared.database import get_session
 from shared.enums import DeviceStatus, ProcessingStatus
@@ -334,6 +335,7 @@ async def create_device_for_identity(
     session.add(device)
     await flush_or_409(session, "Device")
     identity.device_id = device.id
+    await fill_serial_from_identity(session, device, identity)  # D101
     if body.project_id is not None:
         await get_or_404(session, Project, body.project_id, "Project")
         valid_from = (
@@ -466,6 +468,7 @@ async def bulk_create_devices(
         session.add(device)
         await session.flush()
         identity.device_id = device.id
+        await fill_serial_from_identity(session, device, identity)  # D101
         valid_from = identity.first_seen_at or now
         if body.project_id is not None:
             session.add(
@@ -554,9 +557,10 @@ async def link_identity(
     bus: RedisStreamsBus = Depends(get_bus),
 ) -> ReprocessResult:
     identity = await get_or_404(session, ExternalIdentity, identity_id, "External identity")
-    await get_or_404(session, Device, body.device_id, "Device")
+    device = await get_or_404(session, Device, body.device_id, "Device")
     identity.device_id = body.device_id
     identity.ignored = False
+    await fill_serial_from_identity(session, device, identity)  # D101
     await record_audit(
         session,
         user=user,

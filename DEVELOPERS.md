@@ -194,6 +194,7 @@ How the app is put together:
 
 - `src/api/client.ts`: the one fetch wrapper. Attaches the bearer token, turns errors into `ApiError`, calls `useAuthStore.expire()` on a 401 so the router shows the login page with a return path. No `window.location` anywhere.
 - `src/api/schema.d.ts` is generated from the API's OpenAPI document with `scripts/dev.sh openapi` (also `npm run generate:api` after the JSON is dumped); `src/api/types.ts` aliases the schemas the pages use. CI fails when the committed schema is stale.
+- `src/hooks/useNow.ts` is the clock behind live "ago" values: a page calls `useNow()` and passes the result to `formatAgo(value, now)`, so the text moves every 30 seconds without refetching.
 - `src/api/queryKeys.ts` is the only place query keys are defined; `useMutationToast` invalidates by these keys and toasts the outcome.
 - Stores: `useAuthStore` (token persisted in localStorage, user, status), `useProjectStore` (last opened project). Filters and selection live in the URL.
 - Routing in `src/App.tsx`: `/projects/:projectId/...` behind `RequireAuth`, `/admin/...` behind `RequireServerAdmin`; pages are lazy loaded. Sidebar sections in `src/components/layout/navigation.ts`, items without a route show the phase they arrive in.
@@ -311,6 +312,7 @@ Dependencies in `protect_api/deps.py`: `require_server_admin`, `get_project_cont
 - Geometry goes in and out as GeoJSON (`geometry` field); the helpers in `protect_api/crud.py` convert with shapely.
 - Constraint violations become 409 with the constraint name in the message (`flush_or_409`).
 - Credentials of data sources are encrypted with Fernet (`shared/secrets.py`, key from `CREDENTIALS_KEY`) and never returned.
+- A device's `serial_number` is the manufacturer's serial; `protect_api/serial.py` fills an empty one from the first identity when the driver says both are the same (OpenCollar: the DevEUI), on identity creation, linking and onboarding from Needs attention (D101).
 
 ## Testing
 

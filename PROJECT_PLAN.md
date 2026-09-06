@@ -701,10 +701,10 @@ Correctness and visibility:
 
 Getting around:
 
-- [ ] Device page: a Traffic section (the device's last messages across sources with the per-channel columns and a link to the full traffic view filtered on the device) and "Show on map" (the live map centred on the device's entity with the selection open); "Show on map" also on the entity page and in the entities and devices lists.
-- [ ] Entities and devices (D106): the entities list shows the assigned device with a link; the entity page gains an Assignments section with the history and "Assign device" from the project's unassigned devices through the guided dialog.
-- [ ] Live map: a "My location" button (browser geolocation, centre and a marker, permission refusal explained) and "ago" values that re-render every 30 seconds without refetching (a shared `useNow` tick behind `formatAgo` on every page).
-- [ ] Serial number (D101): the manufacturer's serial; for OpenCollar the DevEUI, filled from the first LoRaWAN identity when empty (single and bulk create, identity link), shown on the device page, explained in the form.
+- [x] (2026-09-06) Device page: a Traffic section (the device's last messages across sources with the per-channel columns and a link to the full traffic view filtered on the device) and "Show on map" (the live map centred on the device's entity with the selection open); "Show on map" also on the entity page and in the entities and devices lists.
+- [ ] Entities and devices (D106) (the list shows the device by name with a link and a Map link since 2026-09-06; the entity page with Assign device follows): the entities list shows the assigned device with a link; the entity page gains an Assignments section with the history and "Assign device" from the project's unassigned devices through the guided dialog.
+- [x] (2026-09-06, MapLibre's GeolocateControl, `useNow` behind `formatAgo` on the map, the device and entity lists and the health card) Live map: a "My location" button (browser geolocation, centre and a marker, permission refusal explained) and "ago" values that re-render every 30 seconds without refetching (a shared `useNow` tick behind `formatAgo` on every page).
+- [x] Serial number (D101) (2026-09-06, `protect_api/serial.py` on identity creation, linking and onboarding): the manufacturer's serial; for OpenCollar the DevEUI, filled from the first LoRaWAN identity when empty (single and bulk create, identity link), shown on the device page, explained in the form.
 
 Organising:
 

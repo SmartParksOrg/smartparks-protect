@@ -5,9 +5,9 @@ export function formatTime(value: string | null | undefined): string {
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 }
 
-export function formatAgo(value: string | null | undefined): string {
+export function formatAgo(value: string | null | undefined, now: number = Date.now()): string {
   if (!value) return "never";
-  const seconds = Math.round((Date.now() - new Date(value).getTime()) / 1000);
+  const seconds = Math.round((now - new Date(value).getTime()) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
   if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;

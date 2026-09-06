@@ -35,6 +35,7 @@ from protect_api.schemas.domain import (
     ProjectAssignmentRead,
     RecordCounts,
 )
+from protect_api.serial import fill_serial_from_identity
 from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
@@ -600,6 +601,7 @@ async def add_identity(
     identity = ExternalIdentity(device_id=device.id, **body.model_dump())
     session.add(identity)
     await flush_or_409(session, "External identity")
+    await fill_serial_from_identity(session, device, identity)  # D101
     await record_audit(
         session,
         user=user,

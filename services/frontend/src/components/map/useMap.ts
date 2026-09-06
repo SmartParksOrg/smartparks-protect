@@ -38,6 +38,9 @@ export function useMap(container: RefObject<HTMLDivElement | null>, basemap: Bas
       }) as RequestTransformFunction,
     });
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
+    // "My location": the browser's geolocation, centred once with a marker; the control
+    // explains a refused permission itself (phase 15).
+    map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false, showUserLocation: true }), "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
     map.on("load", () => setReady(true));
     mapRef.current = map;

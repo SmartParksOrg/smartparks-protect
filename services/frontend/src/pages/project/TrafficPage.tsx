@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -23,10 +23,11 @@ export function TrafficPage() {
   const [params, setParams] = useSearchParams();
   const eventType = params.get("type") ?? "";
   const hours = Number(params.get("hours") ?? 24);
+  const deviceId = params.get("device") ?? "";
   const [selected, setSelected] = useState<{ id: number; ingestedAt: string } | null>(null);
   const traffic = useQuery({
-    queryKey: queryKeys.traffic(projectId, { eventType, hours }),
-    queryFn: () => api.get<TrafficRow[]>(`/api/v1/projects/${projectId}/traffic`, { query: { event_type: eventType || undefined, from: new Date(Date.now() - hours * 3600_000).toISOString(), limit: 200 } }),
+    queryKey: queryKeys.traffic(projectId, { eventType, hours, deviceId }),
+    queryFn: () => api.get<TrafficRow[]>(`/api/v1/projects/${projectId}/traffic`, { query: { event_type: eventType || undefined, device_id: deviceId || undefined, from: new Date(Date.now() - hours * 3600_000).toISOString(), limit: 200 } }),
     refetchInterval: 15_000,
   });
 
@@ -37,6 +38,7 @@ export function TrafficPage() {
         title={t("Traffic")}
         description={t("Every message received for this project's devices over any channel, with raw payload, decode result, receptions and trace")}
         actions={<>
+          {deviceId && <Button variant="outline" size="sm" onClick={() => setParams((p) => { p.delete("device"); return p; })}>{t("One device")} <X className="size-3" /></Button>}
           <Select value={eventType || "all"} onValueChange={(v) => setParams((p) => { if (v === "all") p.delete("type"); else p.set("type", v); return p; })}>
             <SelectTrigger className="w-44"><SelectValue placeholder={t("All types")} /></SelectTrigger>
             <SelectContent><SelectItem value="all">{t("All types")}</SelectItem>{EVENT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>

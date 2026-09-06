@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { DeviceHealth, HealthValue } from "@/api/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNow } from "@/hooks/useNow";
 import { formatAgo, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -21,14 +22,15 @@ function valueText(v: HealthValue): string {
  * its level, the time of the last status and last seen. */
 export function HealthCard({ health, className }: { health: DeviceHealth | null | undefined; className?: string }) {
   const { t } = useTranslation();
+  const now = useNow();
   if (!health) return null;
   return (
     <Card className={className}>
       <CardHeader><CardTitle className="flex items-center gap-2">{t("Health")} <HealthDot level={health.level} /></CardTitle></CardHeader>
       <CardContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="text-muted-foreground">{t("Last seen")}</dt><dd title={formatTime(health.last_seen_at)}>{formatAgo(health.last_seen_at)}</dd>
-          {health.last_status_at && <><dt className="text-muted-foreground">{t("Last status")}</dt><dd title={formatTime(health.last_status_at)}>{formatAgo(health.last_status_at)}</dd></>}
+          <dt className="text-muted-foreground">{t("Last seen")}</dt><dd title={formatTime(health.last_seen_at)}>{formatAgo(health.last_seen_at, now)}</dd>
+          {health.last_status_at && <><dt className="text-muted-foreground">{t("Last status")}</dt><dd title={formatTime(health.last_status_at)}>{formatAgo(health.last_status_at, now)}</dd></>}
           {health.fields.map((f) => (
             <FieldRow key={f.key} field={f} />
           ))}
