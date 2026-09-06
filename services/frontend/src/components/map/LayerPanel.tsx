@@ -11,7 +11,12 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
-import type { EntityGroup, Feature, Gateway } from "@/api/types";
+import type {
+  CoverageResponse,
+  EntityGroup,
+  Feature,
+  Gateway,
+} from "@/api/types";
 import { Icon } from "@/components/icons/Icon";
 import {
   DEFAULT_LAYERS,
@@ -31,6 +36,13 @@ import type {
 } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { groupTree } from "@/hooks/useGroups";
 import { useNow } from "@/hooks/useNow";
@@ -116,6 +128,7 @@ export function LayerPanel({
   features,
   events,
   gateways,
+  coverage,
   choices,
   trackedId,
   onChange,
@@ -131,6 +144,7 @@ export function LayerPanel({
   features: Feature[];
   events: EventFeatureProperties[];
   gateways: Gateway[];
+  coverage: CoverageResponse | undefined;
   choices: LayerChoices;
   trackedId: string | null;
   onChange: (next: LayerChoices) => void;
@@ -652,6 +666,14 @@ export function LayerPanel({
   const placed = gateways
     .filter((g) => g.geometry)
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  const PERIODS = [24, 168, 720, 2160];
+  const periodLabel = (hours: number) =>
+    hours < 48
+      ? t("{{count}} hours", { count: hours })
+      : t("{{count}} days", { count: Math.round(hours / 24) });
+  const heardBy = new Map(
+    (coverage?.gateways ?? []).map((g) => [g.gateway_id ?? g.external_id, g]),
+  );
   const coverageTab = (
     <>
       <div className="flex items-center gap-1.5 px-1 pb-2">
@@ -664,6 +686,68 @@ export function LayerPanel({
         />
       </div>
       <div className="flex-1 overflow-y-auto">
+        <Row depth={0} header>
+          <Check
+            checked={choices.coverage}
+            label={t("Heard positions")}
+            onChange={(v) => onChange({ ...choices, coverage: v })}
+          />
+          <span className="min-w-0 flex-1 truncate font-semibold">
+            {t("Heard positions")}
+          </span>
+          <Select
+            value={String(choices.coverage_hours)}
+            onValueChange={(v) =>
+              onChange({ ...choices, coverage_hours: Number(v) })
+            }
+          >
+            <SelectTrigger
+              className="h-7 w-24 text-xs"
+              aria-label={t("Period")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIODS.map((hours) => (
+                <SelectItem key={hours} value={String(hours)}>
+                  {periodLabel(hours)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Row>
+        {choices.coverage && (
+          <div className="space-y-1 px-2 py-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span>{t("-120 dBm")}</span>
+              <span
+                className="h-2 flex-1 rounded"
+                style={{
+                  background:
+                    "linear-gradient(90deg, #b91c1c, #f59e0b, #a3c14a, #15803d)",
+                }}
+              />
+              <span>{t("-80 dBm")}</span>
+            </div>
+            <div>
+              {coverage
+                ? coverage.mode === "hexagons"
+                  ? t(
+                      "{{count}} heard positions in view, as hexagons of about {{size}} m",
+                      { count: coverage.total, size: coverage.hexagon_m ?? 0 },
+                    )
+                  : t("{{count}} heard positions in view", {
+                      count: coverage.total,
+                    })
+                : t("Loading…")}
+            </div>
+            <div>
+              {t(
+                "Only where collars were: a blank area may still have coverage.",
+              )}
+            </div>
+          </div>
+        )}
         <Row depth={0} header>
           <Check
             checked={choices.gateways}
@@ -687,6 +771,7 @@ export function LayerPanel({
           .map((g) => {
             const on =
               choices.gateways && !choices.hidden_gateways.includes(g.id);
+            const heard = heardBy.get(g.id);
             return (
               <Row key={g.id} depth={1}>
                 <Check
@@ -714,12 +799,21 @@ export function LayerPanel({
                 >
                   {g.display_name}
                 </button>
-                <span
-                  className="shrink-0 text-[11px] text-muted-foreground"
-                  title={formatTime(g.last_seen_at)}
-                >
-                  {formatAgo(g.last_seen_at, now)}
-                </span>
+                {choices.coverage && heard ? (
+                  <span
+                    className="shrink-0 text-[11px] text-muted-foreground"
+                    title={t("Heard positions and share")}
+                  >
+                    {heard.heard} · {Math.round(heard.share * 100)}%
+                  </span>
+                ) : (
+                  <span
+                    className="shrink-0 text-[11px] text-muted-foreground"
+                    title={formatTime(g.last_seen_at)}
+                  >
+                    {formatAgo(g.last_seen_at, now)}
+                  </span>
+                )}
                 <Locate
                   label={t("Show on map")}
                   onClick={() => onPickGateway(g.id)}
@@ -734,11 +828,6 @@ export function LayerPanel({
             })}
           </div>
         )}
-        <div className="px-2 py-2 text-xs text-muted-foreground">
-          {t(
-            "Coverage from receptions comes later; for now this tab shows where the gateways are.",
-          )}
-        </div>
       </div>
     </>
   );

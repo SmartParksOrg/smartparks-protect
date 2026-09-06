@@ -14,6 +14,7 @@ from protect_api.routers.automations import router as automations_router
 from protect_api.routers.backups import router as backups_router
 from protect_api.routers.catalog import router as catalog_router
 from protect_api.routers.control import router as control_router
+from protect_api.routers.coverage import router as coverage_router
 from protect_api.routers.curation import router as curation_router
 from protect_api.routers.data import router as data_router
 from protect_api.routers.data_sources import router as data_sources_router
@@ -66,6 +67,7 @@ for router in (
     integrations_router,
     gateways_router,
     admin_gateways_router,
+    coverage_router,
     backups_router,
     platform_router,
     mcp_actions_router,

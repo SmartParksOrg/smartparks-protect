@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
+  CoverageResponse,
   CurrentState,
   Feature,
   Gateway,
@@ -27,9 +28,11 @@ import {
   ensureEntityLayers,
   ensureEventLayers,
   ensureFeatureLayers,
+  ensureCoverageLayers,
   ensureGatewayLayers,
   ensureTrackLayers,
   type EventFeatureProperties,
+  setCoverage,
   setEntities,
   setEvents,
   setFeatures,
@@ -157,12 +160,44 @@ export function MapPage() {
         query: { limit: 500 },
       }),
   });
+  const [viewport, setViewport] = useState<{
+    bbox: string;
+    zoom: number;
+  } | null>(null);
   const gateways = useQuery({
     queryKey: queryKeys.gateways(projectId, 168),
     queryFn: () =>
       api.get<Gateway[]>(`/api/v1/projects/${projectId}/gateways`, {
         query: { hours: 168, limit: 500 },
       }),
+    refetchInterval: 120_000,
+  });
+  const coverageGateways = useMemo(
+    () =>
+      layers.hidden_gateways.length > 0 && gateways.data
+        ? gateways.data
+            .filter((g) => !layers.hidden_gateways.includes(g.id))
+            .map((g) => g.id)
+        : undefined,
+    [layers.hidden_gateways, gateways.data],
+  );
+  const coverageParams = useMemo(
+    () => ({
+      bbox: viewport?.bbox,
+      zoom: viewport?.zoom ?? 8,
+      hours: layers.coverage_hours,
+      gateway_id: coverageGateways,
+    }),
+    [viewport, layers.coverage_hours, coverageGateways],
+  );
+  const coverage = useQuery({
+    queryKey: queryKeys.coverage(projectId, coverageParams),
+    queryFn: () =>
+      api.get<CoverageResponse>(`/api/v1/projects/${projectId}/coverage`, {
+        query: coverageParams,
+      }),
+    enabled: layers.coverage && viewport !== null,
+    placeholderData: (previous) => previous,
     refetchInterval: 120_000,
   });
   const events = useQuery({
@@ -280,6 +315,7 @@ export function MapPage() {
     );
     ensureFeatureLayers(map);
     ensureGatewayLayers(map);
+    ensureCoverageLayers(map);
     ensureTrackLayers(map);
     ensureEventLayers(map, (props) =>
       setParams(
@@ -291,6 +327,42 @@ export function MapPage() {
       ),
     );
   }, [mapRef, ready, select, setParams]);
+
+  // the viewport for the coverage query, settled a moment after the map stops moving
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const update = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const b = map.getBounds();
+        setViewport({
+          bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
+            .map((v) => v.toFixed(5))
+            .join(","),
+          zoom: Math.round(map.getZoom()),
+        });
+      }, 400);
+    };
+    update();
+    map.on("moveend", update);
+    return () => {
+      map.off("moveend", update);
+      if (timer) clearTimeout(timer);
+    };
+  }, [mapRef, ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setCoverage(
+      map,
+      layers.coverage && coverage.data
+        ? (coverage.data.features as unknown as GeoJSON.Feature[])
+        : [],
+    );
+  }, [mapRef, ready, layers.coverage, coverage.data]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -456,6 +528,7 @@ export function MapPage() {
             (f) => f.properties as unknown as EventFeatureProperties,
           )}
           gateways={gateways.data ?? []}
+          coverage={layers.coverage ? coverage.data : undefined}
           choices={layers}
           trackedId={selectedId && trackHours > 0 ? selectedId : null}
           onChange={setLayers}

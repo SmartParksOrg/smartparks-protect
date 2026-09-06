@@ -3395,6 +3395,27 @@ export interface paths {
         patch: operations["update_gateway_api_v1_admin_gateways__gateway_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Coverage
+         * @description Heard positions of the project in the window and viewport, as points from zoom 13 and
+         *     as hexagons with the count and best signal below, plus the share per gateway.
+         */
+        get: operations["coverage_api_v1_projects__project_id__coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/backups/status": {
         parameters: {
             query?: never;
@@ -4997,6 +5018,63 @@ export interface components {
         CorrectionRevert: {
             /** Comment */
             comment?: string | null;
+        };
+        /** CoverageGateway */
+        CoverageGateway: {
+            /**
+             * Gateway Id
+             * @description Registry id when known
+             */
+            gateway_id?: string | null;
+            /** External Id */
+            external_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Data Source Id
+             * Format: uuid
+             */
+            data_source_id: string;
+            /**
+             * Heard
+             * @description Positions this gateway heard in the window and view
+             */
+            heard: number;
+            /**
+             * Share
+             * @description Of every heard position, 0 to 1
+             */
+            share: number;
+            /** Best Rssi */
+            best_rssi: number | null;
+            /** Mean Rssi */
+            mean_rssi: number | null;
+        };
+        /** CoverageResponse */
+        CoverageResponse: {
+            /** Hours */
+            hours: number;
+            /**
+             * Mode
+             * @description points or hexagons
+             */
+            mode: string;
+            /**
+             * Hexagon M
+             * @description Hexagon size in metres, if any
+             */
+            hexagon_m?: number | null;
+            /**
+             * Total
+             * @description Positions heard by at least one gateway in the window and view
+             */
+            total: number;
+            /** Features */
+            features: {
+                [key: string]: unknown;
+            }[];
+            /** Gateways */
+            gateways: components["schemas"]["CoverageGateway"][];
         };
         /** CreateDeviceForIdentity */
         CreateDeviceForIdentity: {
@@ -17270,6 +17348,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GatewayRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coverage_api_v1_projects__project_id__coverage_get: {
+        parameters: {
+            query?: {
+                /** @description west,south,east,north in WGS84 */
+                bbox?: string | null;
+                zoom?: number;
+                hours?: number;
+                /** @description Only receptions by these registry gateways */
+                gateway_id?: string[] | null;
+                /** @description Force a mode; without it points from zoom 13 or up to 500 positions */
+                mode?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageResponse"];
                 };
             };
             /** @description Validation Error */

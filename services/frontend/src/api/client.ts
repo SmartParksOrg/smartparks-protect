@@ -40,7 +40,7 @@ async function errorDetail(response: Response): Promise<unknown> {
   }
 }
 
-type Query = Record<string, string | number | boolean | null | undefined>;
+type Query = Record<string, string | number | boolean | string[] | null | undefined>;
 
 export interface RequestOptions {
   query?: Query;
@@ -56,7 +56,8 @@ function buildUrl(path: string, query?: Query): string {
   const url = new URL(BASE + path, window.location.origin);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+      if (Array.isArray(value)) for (const item of value) url.searchParams.append(key, item);
+      else if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
     }
   }
   return url.toString();

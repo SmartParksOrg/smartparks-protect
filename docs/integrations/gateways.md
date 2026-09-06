@@ -35,8 +35,13 @@ connected, or connected well while reporting internal faults.
 
 The registry keeps one position per gateway with its source and time. A platform's gateway list or gateway event places it (`platform`); coordinates that a platform sends on an uplink for the receiving gateway place it as well (`reception`; ChirpStack, The Things Stack and LORIOT send them per gateway, KPN's ThingPark for the best receiving gateway only); a position set by an administrator on the gateway (`admin`) is kept whatever the platform sends afterwards. Every reception keeps the platform's gateway fields as they came, so nothing is lost for a later network map or coverage analysis.
 
+## Coverage
+
+The live map's Coverage tab (decision D107) shows where the project's collars were heard. Every position is joined to the receptions of the same uplink, so a heard position carries the best RSSI among the gateways that heard it. Switch on "Heard positions", pick a period (a day to 90 days) and, if wanted, untick gateways to see the footprint of the rest. Zoomed in, the positions themselves show as dots coloured from red (weak, about -120 dBm) to green (strong, -80 dBm and better); zoomed out, the viewport is tiled into hexagons aggregated in the database with the count and the best signal per cell. Each gateway row shows how many heard positions it received and its share of all heard positions in view. The layer shows only where collars were: a blank area may still have coverage, and a spot with no dot may never have been walked. Positions that reached the platform without a LoRaWAN reception, such as a Bluetooth log, are not part of it.
+
 ## API
 
 `GET /projects/{id}/gateways?hours=`, `GET /projects/{id}/gateways/{gateway_id}`,
 `GET /projects/{id}/connectivity?hours=`, `GET /admin/gateways`, `PATCH /admin/gateways/{id}`,
 `POST /data-sources/{id}/sync-gateways`.
+- `GET /projects/{id}/coverage?bbox=&zoom=&hours=&gateway_id=`: heard positions in the window and viewport as points (from zoom 13 or up to 500 positions) or hexagons, with the share per gateway; `mode` forces one of the two.

@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 15 (correctness and usability from the first live days, v2.0.0 at its end; D97 to D108 decided on 2026-09-06). Phase 14 complete; KPN LoRa live in both directions since 2026-09-06; bulk onboarding from Needs attention shipped (5be635c) |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-06 |
-| Next item | Phase 15, coverage (D107): Network, Coverage with the gateway map and the coverage layer from receptions joined to positions; then v2.0.0 with the changelog and the release process. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
+| Next item | Phase 15: v2.0.0 with the changelog and the release process, the last item of the phase. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -720,7 +720,7 @@ Presentation:
 
 Network tool:
 
-- [ ] Coverage (D107) (the map's Coverage tab shows the gateways with a position since 2026-09-06 and says the analysis comes later; revisit here): Network, Coverage: the gateway registry on a map (location, last seen, receptions in the period) and a coverage layer from `gateway_receptions` joined to positions: heard points coloured by best RSSI, filter per gateway, period, points or hexagons aggregated server-side per viewport, count and share per gateway; a note that it shows only where collars were.
+- [x] Coverage (D107) (2026-09-06, `routers/coverage.py` joining positions to the receptions of the same source event, hexagons through `ST_HexagonGrid` sized by zoom, points from zoom 13 or up to 500 positions, the share per gateway; the layer, the period and the legend in the map's Coverage tab next to the gateways, so the map is the coverage page rather than a separate Network, Coverage screen): Network, Coverage: the gateway registry on a map (location, last seen, receptions in the period) and a coverage layer from `gateway_receptions` joined to positions: heard points coloured by best RSSI, filter per gateway, period, points or hexagons aggregated server-side per viewport, count and share per gateway; a note that it shows only where collars were.
 
 Release:
 
@@ -1075,6 +1075,11 @@ Listed by the phase where they are first needed.
 - Column picker on the shared table, kept per user in the preference document; the admin devices list hides Created by default. Wording: Time instead of When, Status instead of State. Empty states now say what to do next on the project lists. The screenshot sweep ran against the local stack as the check: every route clean at the three widths, once the sweep learned to fill the entity route with a real entity (its only finding was its own placeholder hitting the API).
 - Where to continue: coverage (D107), then v2.0.0.
 
+### 2026-09-06, coverage (Claude)
+
+- Tim chose to build coverage before the release. Built D107 in the map's Coverage tab rather than as a separate page: heard positions (positions joined to the receptions of their own source event, best RSSI) as dots zoomed in and as hexagons aggregated by PostGIS zoomed out, a period from a day to 90 days, the gateway checkboxes as the filter, the share per gateway on its row, a legend and the note that it shows only where collars were. `mode` on the endpoint forces points or hexagons for checks. The API client now sends repeated query parameters for lists.
+- Where to continue: v2.0.0.
+
 ### 2026-09-06, map layers reworked on Tim's feedback (Claude)
 
 - Tim tried the panel on the dev server against EarthRanger's Map Layers and asked for four changes: groups of any depth (D98 amended, ADR 0020 amended, no migration needed: the parent column already pointed at the table; filters and deletions now walk a recursive query, a group cannot move into itself or below itself), a cleaner panel with the entity icons, clearer levels and a minimal last seen, tabs for Entities, Features and Events like EarthRanger's Subjects, Features, Analyzers and Events, and search plus sort with a grouped or flat view. All four built: the panel is a full-height drawer with the three tabs, the top controls move aside while it is open, features hide per type and per feature, events per type, and every row has a locate button.
@@ -1100,3 +1105,8 @@ Listed by the phase where they are first needed.
 
 - Column picker on the shared table, kept per user in the preference document; the admin devices list hides Created by default. Wording: Time instead of When, Status instead of State. Empty states now say what to do next on the project lists. The screenshot sweep ran against the local stack as the check: every route clean at the three widths, once the sweep learned to fill the entity route with a real entity (its only finding was its own placeholder hitting the API).
 - Where to continue: coverage (D107), then v2.0.0.
+
+### 2026-09-06, coverage (Claude)
+
+- Tim chose to build coverage before the release. Built D107 in the map's Coverage tab rather than as a separate page: heard positions (positions joined to the receptions of their own source event, best RSSI) as dots zoomed in and as hexagons aggregated by PostGIS zoomed out, a period from a day to 90 days, the gateway checkboxes as the filter, the share per gateway on its row, a legend and the note that it shows only where collars were. `mode` on the endpoint forces points or hexagons for checks. The API client now sends repeated query parameters for lists.
+- Where to continue: v2.0.0.

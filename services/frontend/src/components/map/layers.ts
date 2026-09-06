@@ -1,4 +1,8 @@
-import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import type {
+  ExpressionSpecification,
+  GeoJSONSource,
+  Map as MapLibreMap,
+} from "maplibre-gl";
 
 import {
   ensureMarkerImage,
@@ -11,6 +15,7 @@ export const SOURCES = {
   features: "features",
   events: "events",
   gateways: "gateways",
+  coverage: "coverage",
 } as const;
 
 /** Glyphs the OpenFreeMap styles serve; the MapLibre default (Open Sans) is not among them. */
@@ -418,5 +423,81 @@ export function setGateways(
   features: GeoJSON.Feature[],
 ): void {
   const source = map.getSource(SOURCES.gateways) as GeoJSONSource | undefined;
+  source?.setData({ type: "FeatureCollection", features });
+}
+
+/** Signal colour: red at -120 dBm, amber around -105, green from -80 (a ttnmapper-like scale). */
+const RSSI_COLOR: ExpressionSpecification = [
+  "interpolate",
+  ["linear"],
+  ["coalesce", ["get", "best_rssi"], -125],
+  -125,
+  "#b91c1c",
+  -110,
+  "#f59e0b",
+  -95,
+  "#a3c14a",
+  -80,
+  "#15803d",
+];
+
+/** Where collars were heard (decision D107): hexagons with the count and best signal when zoomed
+ * out, the heard positions themselves when zoomed in. Under the gateways and entities. */
+export function ensureCoverageLayers(map: MapLibreMap): void {
+  if (map.getSource(SOURCES.coverage)) return;
+  map.addSource(SOURCES.coverage, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  const before = map.getLayer("gateway-markers")
+    ? "gateway-markers"
+    : "entity-clusters";
+  map.addLayer(
+    {
+      id: "coverage-hex",
+      type: "fill",
+      source: SOURCES.coverage,
+      filter: ["==", ["geometry-type"], "Polygon"],
+      paint: { "fill-color": RSSI_COLOR, "fill-opacity": 0.45 },
+    },
+    before,
+  );
+  map.addLayer(
+    {
+      id: "coverage-hex-line",
+      type: "line",
+      source: SOURCES.coverage,
+      filter: ["==", ["geometry-type"], "Polygon"],
+      paint: {
+        "line-color": "#ffffff",
+        "line-width": 0.5,
+        "line-opacity": 0.6,
+      },
+    },
+    before,
+  );
+  map.addLayer(
+    {
+      id: "coverage-points",
+      type: "circle",
+      source: SOURCES.coverage,
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius": 4,
+        "circle-color": RSSI_COLOR,
+        "circle-opacity": 0.85,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 0.5,
+      },
+    },
+    before,
+  );
+}
+
+export function setCoverage(
+  map: MapLibreMap,
+  features: GeoJSON.Feature[],
+): void {
+  const source = map.getSource(SOURCES.coverage) as GeoJSONSource | undefined;
   source?.setData({ type: "FeatureCollection", features });
 }

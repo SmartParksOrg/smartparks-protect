@@ -15178,6 +15178,138 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/coverage": {
+   "get": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "Coverage",
+    "description": "Heard positions of the project in the window and viewport, as points from zoom 13 and\nas hexagons with the count and best signal below, plus the share per gateway.",
+    "operationId": "coverage_api_v1_projects__project_id__coverage_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "bbox",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "west,south,east,north in WGS84",
+       "title": "Bbox"
+      },
+      "description": "west,south,east,north in WGS84"
+     },
+     {
+      "name": "zoom",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 22,
+       "minimum": 0,
+       "default": 8,
+       "title": "Zoom"
+      }
+     },
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 2160,
+       "minimum": 1,
+       "default": 168,
+       "title": "Hours"
+      }
+     },
+     {
+      "name": "gateway_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only receptions by these registry gateways",
+       "title": "Gateway Id"
+      },
+      "description": "Only receptions by these registry gateways"
+     },
+     {
+      "name": "mode",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^(points|hexagons)$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Force a mode; without it points from zoom 13 or up to 500 positions",
+       "title": "Mode"
+      },
+      "description": "Force a mode; without it points from zoom 13 or up to 500 positions"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CoverageResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/admin/backups/status": {
    "get": {
     "tags": [
@@ -20356,6 +20488,133 @@
     },
     "type": "object",
     "title": "CorrectionRevert"
+   },
+   "CoverageGateway": {
+    "properties": {
+     "gateway_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gateway Id",
+      "description": "Registry id when known"
+     },
+     "external_id": {
+      "type": "string",
+      "title": "External Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "data_source_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Data Source Id"
+     },
+     "heard": {
+      "type": "integer",
+      "title": "Heard",
+      "description": "Positions this gateway heard in the window and view"
+     },
+     "share": {
+      "type": "number",
+      "title": "Share",
+      "description": "Of every heard position, 0 to 1"
+     },
+     "best_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Best Rssi"
+     },
+     "mean_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Rssi"
+     }
+    },
+    "type": "object",
+    "required": [
+     "external_id",
+     "name",
+     "data_source_id",
+     "heard",
+     "share",
+     "best_rssi",
+     "mean_rssi"
+    ],
+    "title": "CoverageGateway"
+   },
+   "CoverageResponse": {
+    "properties": {
+     "hours": {
+      "type": "integer",
+      "title": "Hours"
+     },
+     "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "points or hexagons"
+     },
+     "hexagon_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hexagon M",
+      "description": "Hexagon size in metres, if any"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total",
+      "description": "Positions heard by at least one gateway in the window and view"
+     },
+     "features": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Features"
+     },
+     "gateways": {
+      "items": {
+       "$ref": "#/components/schemas/CoverageGateway"
+      },
+      "type": "array",
+      "title": "Gateways"
+     }
+    },
+    "type": "object",
+    "required": [
+     "hours",
+     "mode",
+     "total",
+     "features",
+     "gateways"
+    ],
+    "title": "CoverageResponse"
    },
    "CreateDeviceForIdentity": {
     "properties": {

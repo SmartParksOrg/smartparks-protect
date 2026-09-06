@@ -15,10 +15,12 @@ export interface LayerChoices {
   hidden_event_types: string[];
   gateways: boolean;
   hidden_gateways: string[];
+  coverage: boolean;
+  coverage_hours: number;
 }
 
 export const UNGROUPED_LAYER = "ungrouped";
-export const DEFAULT_LAYERS: LayerChoices = { hidden_groups: [], hidden_entities: [], features: true, hidden_feature_types: [], hidden_features: [], events: true, hidden_event_types: [], gateways: true, hidden_gateways: [] };
+export const DEFAULT_LAYERS: LayerChoices = { hidden_groups: [], hidden_entities: [], features: true, hidden_feature_types: [], hidden_features: [], events: true, hidden_event_types: [], gateways: true, hidden_gateways: [], coverage: false, coverage_hours: 168 };
 
 export const layerOf = (props: EntityFeatureProperties): string => props.group_id ?? UNGROUPED_LAYER;
 
