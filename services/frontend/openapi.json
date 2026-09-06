@@ -1859,6 +1859,65 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/entities/bulk-move": {
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Bulk Move Entities",
+    "description": "Put the listed entities of this project into `group_id` (or into no group). Ids of\nother projects are refused as a whole, so nothing moves by accident.",
+    "operationId": "bulk_move_entities_api_v1_projects__project_id__entities_bulk_move_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EntityBulkMove"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityBulkMoveResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/entities/{entity_id}": {
    "get": {
     "tags": [
@@ -22779,6 +22838,64 @@
      "entity_id"
     ],
     "title": "EntityAssignmentRead"
+   },
+   "EntityBulkMove": {
+    "properties": {
+     "entity_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Entity Ids"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "entity_ids"
+    ],
+    "title": "EntityBulkMove",
+    "description": "Move many entities of the project into one group, or out of every group (decision\nD98): the organizing page's \"Move to\"."
+   },
+   "EntityBulkMoveResult": {
+    "properties": {
+     "moved": {
+      "type": "integer",
+      "title": "Moved"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "moved",
+     "group_id"
+    ],
+    "title": "EntityBulkMoveResult"
    },
    "EntityCreate": {
     "properties": {

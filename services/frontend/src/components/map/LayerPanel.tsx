@@ -5,11 +5,13 @@ import {
   ChevronDown,
   ChevronRight,
   LocateFixed,
+  RadioTower,
+  Route,
   X,
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
-import type { EntityGroup, Feature } from "@/api/types";
+import type { EntityGroup, Feature, Gateway } from "@/api/types";
 import { Icon } from "@/components/icons/Icon";
 import {
   DEFAULT_LAYERS,
@@ -35,7 +37,7 @@ import { useNow } from "@/hooks/useNow";
 import { formatAgo, formatTime } from "@/lib/format";
 
 type Sort = "name" | "recent";
-type Tab = "entities" | "features" | "events";
+type Tab = "entities" | "features" | "events" | "coverage";
 
 interface GroupRow {
   id: string;
@@ -113,23 +115,31 @@ export function LayerPanel({
   groups,
   features,
   events,
+  gateways,
   choices,
+  trackedId,
   onChange,
   onClose,
   onPickEntity,
+  onToggleTrack,
   onPickFeature,
   onPickEvent,
+  onPickGateway,
 }: {
   entities: EntityFeatureProperties[];
   groups: EntityGroup[] | undefined;
   features: Feature[];
   events: EventFeatureProperties[];
+  gateways: Gateway[];
   choices: LayerChoices;
+  trackedId: string | null;
   onChange: (next: LayerChoices) => void;
   onClose: () => void;
   onPickEntity: (entityId: string) => void;
+  onToggleTrack: (entityId: string) => void;
   onPickFeature: (featureId: string) => void;
   onPickEvent: (eventId: string) => void;
+  onPickGateway: (gatewayId: string) => void;
 }) {
   const { t } = useTranslation();
   const now = useNow();
@@ -223,6 +233,25 @@ export function LayerPanel({
         >
           {formatAgo(m.last_seen_at, now)}
         </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`size-7 shrink-0 ${trackedId === m.entity_id ? "text-primary" : "text-muted-foreground"}`}
+          aria-pressed={trackedId === m.entity_id}
+          aria-label={
+            trackedId === m.entity_id
+              ? t("Hide the track")
+              : t("Show the track")
+          }
+          title={
+            trackedId === m.entity_id
+              ? t("Hide the track")
+              : t("Show the track, 24 hours")
+          }
+          onClick={() => onToggleTrack(m.entity_id)}
+        >
+          <Route className="size-4" />
+        </Button>
         <Locate
           label={t("Show on map")}
           onClick={() => onPickEntity(m.entity_id)}
@@ -620,6 +649,100 @@ export function LayerPanel({
     </>
   );
 
+  const placed = gateways
+    .filter((g) => g.geometry)
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  const coverageTab = (
+    <>
+      <div className="flex items-center gap-1.5 px-1 pb-2">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={t("Search…")}
+          className="h-8"
+          aria-label={t("Search gateways")}
+        />
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <Row depth={0} header>
+          <Check
+            checked={choices.gateways}
+            label={t("Gateways")}
+            onChange={(v) => onChange({ ...choices, gateways: v })}
+          />
+          <span className="min-w-0 flex-1 truncate font-semibold">
+            {t("Gateways")}
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            {placed.length}
+          </span>
+        </Row>
+        {placed.length === 0 && (
+          <div className="px-2 py-3 text-xs text-muted-foreground">
+            {t("No gateway with a position yet.")}
+          </div>
+        )}
+        {placed
+          .filter((g) => matches(g.display_name, term))
+          .map((g) => {
+            const on =
+              choices.gateways && !choices.hidden_gateways.includes(g.id);
+            return (
+              <Row key={g.id} depth={1}>
+                <Check
+                  checked={on}
+                  disabled={!choices.gateways}
+                  label={g.display_name}
+                  onChange={(v) =>
+                    onChange({
+                      ...choices,
+                      hidden_gateways: toggleInList(
+                        choices.hidden_gateways,
+                        g.id,
+                        v,
+                      ),
+                    })
+                  }
+                />
+                <RadioTower
+                  className={`size-4 shrink-0 ${on ? "text-primary" : "text-muted-foreground"}`}
+                />
+                <button
+                  type="button"
+                  className={`min-w-0 flex-1 truncate text-left ${on ? "" : "text-muted-foreground"}`}
+                  onClick={() => onPickGateway(g.id)}
+                >
+                  {g.display_name}
+                </button>
+                <span
+                  className="shrink-0 text-[11px] text-muted-foreground"
+                  title={formatTime(g.last_seen_at)}
+                >
+                  {formatAgo(g.last_seen_at, now)}
+                </span>
+                <Locate
+                  label={t("Show on map")}
+                  onClick={() => onPickGateway(g.id)}
+                />
+              </Row>
+            );
+          })}
+        {gateways.length > placed.length && (
+          <div className="px-2 py-2 text-xs text-muted-foreground">
+            {t("{{count}} gateways without a position are not on the map.", {
+              count: gateways.length - placed.length,
+            })}
+          </div>
+        )}
+        <div className="px-2 py-2 text-xs text-muted-foreground">
+          {t(
+            "Coverage from receptions comes later; for now this tab shows where the gateways are.",
+          )}
+        </div>
+      </div>
+    </>
+  );
+
   const customised = JSON.stringify(choices) !== JSON.stringify(DEFAULT_LAYERS);
   return (
     <aside
@@ -668,12 +791,16 @@ export function LayerPanel({
           <TabsTrigger value="events" className="flex-1">
             {t("Events")}
           </TabsTrigger>
+          <TabsTrigger value="coverage" className="flex-1">
+            {t("Coverage")}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       <div className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2">
         {tab === "entities" && entitiesTab}
         {tab === "features" && featuresTab}
         {tab === "events" && eventsTab}
+        {tab === "coverage" && coverageTab}
       </div>
     </aside>
   );

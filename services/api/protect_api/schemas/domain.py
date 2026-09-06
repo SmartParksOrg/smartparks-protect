@@ -79,6 +79,19 @@ class EntityGroupRead(ORMModel):
     entity_count: int = Field(default=0, description="Entities directly in this group")
 
 
+class EntityBulkMove(BaseModel):
+    """Move many entities of the project into one group, or out of every group (decision
+    D98): the organizing page's "Move to"."""
+
+    entity_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    group_id: uuid.UUID | None = None
+
+
+class EntityBulkMoveResult(BaseModel):
+    moved: int
+    group_id: uuid.UUID | None
+
+
 class EntityCreate(BaseModel):
     entity_type_id: uuid.UUID
     name: str = Field(min_length=1, max_length=200)

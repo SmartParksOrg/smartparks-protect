@@ -25,6 +25,8 @@ from protect_api.schemas.domain import (
     EntityAssignmentCreate,
     EntityAssignmentExtended,
     EntityAssignmentRead,
+    EntityBulkMove,
+    EntityBulkMoveResult,
     EntityCreate,
     EntityRead,
     EntityUpdate,
@@ -156,6 +158,39 @@ async def create_entity(
     )
     await session.commit()
     return entity_read(entity)
+
+
+@router.post("/entities/bulk-move", response_model=EntityBulkMoveResult)
+async def bulk_move_entities(
+    body: EntityBulkMove,
+    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> EntityBulkMoveResult:
+    """Put the listed entities of this project into `group_id` (or into no group). Ids of
+    other projects are refused as a whole, so nothing moves by accident."""
+    await check_group(session, context, body.group_id)
+    wanted = set(body.entity_ids)
+    entities = (
+        await session.scalars(
+            select(Entity).where(Entity.id.in_(wanted), Entity.project_id == context.project.id)
+        )
+    ).all()
+    if len(entities) != len(wanted):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Some entities are not in this project")
+    for entity in entities:
+        entity.group_id = body.group_id
+    await flush_or_409(session, "Entity")
+    await record_audit(
+        session,
+        user=context.user,
+        action="entity.moved",
+        object_type="entity_group",
+        object_id=str(body.group_id) if body.group_id else "none",
+        project_id=context.project.id,
+        details={"count": len(entities), "entity_ids": [str(e.id) for e in entities][:50]},
+    )
+    await session.commit()
+    return EntityBulkMoveResult(moved=len(entities), group_id=body.group_id)
 
 
 async def _project_entity(

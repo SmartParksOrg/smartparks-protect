@@ -13,10 +13,12 @@ export interface LayerChoices {
   hidden_features: string[];
   events: boolean;
   hidden_event_types: string[];
+  gateways: boolean;
+  hidden_gateways: string[];
 }
 
 export const UNGROUPED_LAYER = "ungrouped";
-export const DEFAULT_LAYERS: LayerChoices = { hidden_groups: [], hidden_entities: [], features: true, hidden_feature_types: [], hidden_features: [], events: true, hidden_event_types: [] };
+export const DEFAULT_LAYERS: LayerChoices = { hidden_groups: [], hidden_entities: [], features: true, hidden_feature_types: [], hidden_features: [], events: true, hidden_event_types: [], gateways: true, hidden_gateways: [] };
 
 export const layerOf = (props: EntityFeatureProperties): string => props.group_id ?? UNGROUPED_LAYER;
 
@@ -34,6 +36,10 @@ export function isVisible(props: EntityFeatureProperties, choices: LayerChoices,
 
 export function isFeatureVisible(feature: { id: string; feature_type: string }, choices: LayerChoices): boolean {
   return choices.features && !choices.hidden_feature_types.includes(feature.feature_type) && !choices.hidden_features.includes(feature.id);
+}
+
+export function isGatewayVisible(gatewayId: string, choices: LayerChoices): boolean {
+  return choices.gateways && !choices.hidden_gateways.includes(gatewayId);
 }
 
 export function isEventVisible(props: EventFeatureProperties, choices: LayerChoices): boolean {

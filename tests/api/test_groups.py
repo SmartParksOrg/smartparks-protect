@@ -242,3 +242,46 @@ async def test_bulk_onboarding_puts_entities_in_a_group(client, db):
     assert len(in_herd["items"]) == 2
     listed = (await client.get(f"/api/v1/projects/{project.id}/groups", headers=h)).json()
     assert listed[0]["entity_count"] == 2
+
+
+async def test_bulk_move_puts_many_entities_in_a_group(client, db):
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    h = admin.headers
+    base = f"/api/v1/projects/{project.id}"
+    _device_type, entity_type = await _catalogue(client, h)
+    wildlife = (await client.post(f"{base}/groups", json={"name": "Wildlife"}, headers=h)).json()
+    ids = []
+    for name in ("Hyena 1", "Hyena 2", "Hyena 3"):
+        created = await client.post(
+            f"{base}/entities", json={"entity_type_id": entity_type["id"], "name": name}, headers=h
+        )
+        ids.append(created.json()["id"])
+    moved = await client.post(
+        f"{base}/entities/bulk-move",
+        json={"entity_ids": ids, "group_id": wildlife["id"]},
+        headers=h,
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json() == {"moved": 3, "group_id": wildlife["id"]}
+    listed = (await client.get(f"{base}/groups", headers=h)).json()
+    assert listed[0]["entity_count"] == 3
+    out = await client.post(
+        f"{base}/entities/bulk-move", json={"entity_ids": ids[:1], "group_id": None}, headers=h
+    )
+    assert out.status_code == 200 and out.json()["moved"] == 1
+    other = await create_project(db)
+    foreign = (
+        await client.post(
+            f"/api/v1/projects/{other.id}/entities",
+            json={"entity_type_id": entity_type["id"], "name": "Elsewhere"},
+            headers=h,
+        )
+    ).json()
+    refused = await client.post(
+        f"{base}/entities/bulk-move",
+        json={"entity_ids": [ids[1], foreign["id"]], "group_id": wildlife["id"]},
+        headers=h,
+    )
+    assert refused.status_code == 404
+    assert (await client.get(f"{base}/groups", headers=h)).json()[0]["entity_count"] == 2

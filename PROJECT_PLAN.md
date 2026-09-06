@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 15 (correctness and usability from the first live days, v2.0.0 at its end; D97 to D108 decided on 2026-09-06). Phase 14 complete; KPN LoRa live in both directions since 2026-09-06; bulk onboarding from Needs attention shipped (5be635c) |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-06 |
-| Next item | Phase 15, organising: site-wide search (D99); then presentation (D105, the detail-level preference and the style pass); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
+| Next item | Phase 15, organising: site-wide search (D99) after Tim's look at the organizing page; then presentation (D105, the detail-level preference and the style pass); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -710,7 +710,7 @@ Organising:
 
 - [x] Groups (D98, ADR 0020, migration 0019) (2026-09-06, `Group` model on `entity_groups`, `entities.group_id`, `/projects/{id}/groups`, `group_id` and `ungrouped` filters on entities and `group_id` on devices through the entity tracked today, `entity_id`, `entity_name` and `group_id` on device reads, `group_id` on map features, `GroupsPage`, `GroupSelect`, the entity dialog and the bulk dialog; the icon stays API-only until an icon picker exists): `entity_groups` per project (name, optional parent, order, colour, icon), `entities.group_id`; API and a Groups page under the project's admin section; group column and filter in the entities and devices lists; bulk onboarding can put new entities in a group.
 - [x] Live map layers (2026-09-06, `LayerPanel`, `layerChoices.ts` with unit tests, `usePreference` over `users.preferences` with migration 0020 and the bounded `UserUpdate.preferences`; `group_id` on the map features): a layer panel with the groups (and subgroups) and their counts, show and hide per group and per entity, "only this group", ungrouped as its own layer, features as a layer; remembered per user and project.
-- [ ] Organizing entities into groups (asked by Tim on 2026-09-06, decisions pending: where it lives, one group or several, drag and drop; recommendation given: the Groups page becomes the organizing page with the tree left and a filterable entity list with selection and "Move to…" right, plus "Move to group" on the Entities list selection, one group per entity, a bounded bulk move endpoint).
+- [x] Organizing entities into groups (2026-09-06, asked by Tim and built on the recommendations he accepted: `POST /projects/{id}/entities/bulk-move` bounded at 500 with one audit entry, the Groups page as the organizing page with the tree left (counts, subgroup, edit, delete, drop targets) and the entity list right (search, type filter, selection, "Move to…" with a new group created on the spot, rows draggable onto the tree), "Move to group…" on the Entities list selection, one group per entity; tags stay a later decision).
 - [ ] Site-wide search (D99): `GET /search?q=` bounded at 50 per type over what the user may see; the palette on Ctrl+K and from the header, with recent items; every list keeps its own search box.
 
 Presentation:
@@ -720,7 +720,7 @@ Presentation:
 
 Network tool:
 
-- [ ] Coverage (D107): Network, Coverage: the gateway registry on a map (location, last seen, receptions in the period) and a coverage layer from `gateway_receptions` joined to positions: heard points coloured by best RSSI, filter per gateway, period, points or hexagons aggregated server-side per viewport, count and share per gateway; a note that it shows only where collars were.
+- [ ] Coverage (D107) (the map's Coverage tab shows the gateways with a position since 2026-09-06 and says the analysis comes later; revisit here): Network, Coverage: the gateway registry on a map (location, last seen, receptions in the period) and a coverage layer from `gateway_receptions` joined to positions: heard points coloured by best RSSI, filter per gateway, period, points or hexagons aggregated server-side per viewport, count and share per gateway; a note that it shows only where collars were.
 
 Release:
 
@@ -1065,3 +1065,8 @@ Listed by the phase where they are first needed.
 - Tim tried the panel on the dev server against EarthRanger's Map Layers and asked for four changes: groups of any depth (D98 amended, ADR 0020 amended, no migration needed: the parent column already pointed at the table; filters and deletions now walk a recursive query, a group cannot move into itself or below itself), a cleaner panel with the entity icons, clearer levels and a minimal last seen, tabs for Entities, Features and Events like EarthRanger's Subjects, Features, Analyzers and Events, and search plus sort with a grouped or flat view. All four built: the panel is a full-height drawer with the three tabs, the top controls move aside while it is open, features hide per type and per feature, events per type, and every row has a locate button.
 - Tim also asked for a page to organize entities into groups (move all hyenas to Wildlife, one hyena to a new subgroup, maybe several groups). Recommendation given, decision pending; recorded as an item under Organising.
 - Where to continue: Tim's answer on the organizing page, then site-wide search (D99).
+
+### 2026-09-06, organizing page, Coverage tab and track toggle (Claude)
+
+- Tim accepted the organizing recommendations and asked for a Coverage tab (gateways only for now, the analysis stays under D107) and a track toggle next to the locate button in the layers panel. Built: the bulk move endpoint, the Groups page as the organizing page with drag and drop onto the tree, "Move to group…" on the Entities list, the Coverage tab with a gateway layer on the map (positions from the gateway registry, per-gateway show and hide), and the track toggle (24 hours on the entity, off again on the second click).
+- Where to continue: site-wide search (D99), then presentation (D105).

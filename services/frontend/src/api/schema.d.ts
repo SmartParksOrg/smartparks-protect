@@ -433,6 +433,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/entities/bulk-move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Move Entities
+         * @description Put the listed entities of this project into `group_id` (or into no group). Ids of
+         *     other projects are refused as a whole, so nothing moves by accident.
+         */
+        post: operations["bulk_move_entities_api_v1_projects__project_id__entities_bulk_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/entities/{entity_id}": {
         parameters: {
             query?: never;
@@ -5897,6 +5918,24 @@ export interface components {
              */
             entity_name?: string | null;
         };
+        /**
+         * EntityBulkMove
+         * @description Move many entities of the project into one group, or out of every group (decision
+         *     D98): the organizing page's "Move to".
+         */
+        EntityBulkMove: {
+            /** Entity Ids */
+            entity_ids: string[];
+            /** Group Id */
+            group_id?: string | null;
+        };
+        /** EntityBulkMoveResult */
+        EntityBulkMoveResult: {
+            /** Moved */
+            moved: number;
+            /** Group Id */
+            group_id: string | null;
+        };
         /** EntityCreate */
         EntityCreate: {
             /**
@@ -10349,6 +10388,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntityRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_move_entities_api_v1_projects__project_id__entities_bulk_move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityBulkMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityBulkMoveResult"];
                 };
             };
             /** @description Validation Error */

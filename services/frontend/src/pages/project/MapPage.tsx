@@ -11,6 +11,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type {
   CurrentState,
   Feature,
+  Gateway,
   Page as PageType,
   Track,
 } from "@/api/types";
@@ -26,11 +27,13 @@ import {
   ensureEntityLayers,
   ensureEventLayers,
   ensureFeatureLayers,
+  ensureGatewayLayers,
   ensureTrackLayers,
   type EventFeatureProperties,
   setEntities,
   setEvents,
   setFeatures,
+  setGateways,
   setTrack,
   SOURCES,
 } from "@/components/map/layers";
@@ -38,6 +41,7 @@ import {
   DEFAULT_LAYERS,
   isEventVisible,
   isFeatureVisible,
+  isGatewayVisible,
   isVisible,
   type LayerChoices,
 } from "@/components/map/layerChoices";
@@ -153,6 +157,14 @@ export function MapPage() {
         query: { limit: 500 },
       }),
   });
+  const gateways = useQuery({
+    queryKey: queryKeys.gateways(projectId, 168),
+    queryFn: () =>
+      api.get<Gateway[]>(`/api/v1/projects/${projectId}/gateways`, {
+        query: { hours: 168, limit: 500 },
+      }),
+    refetchInterval: 120_000,
+  });
   const events = useQuery({
     queryKey: queryKeys.mapEvents(projectId, 24),
     queryFn: () =>
@@ -267,6 +279,7 @@ export function MapPage() {
       },
     );
     ensureFeatureLayers(map);
+    ensureGatewayLayers(map);
     ensureTrackLayers(map);
     ensureEventLayers(map, (props) =>
       setParams(
@@ -278,6 +291,25 @@ export function MapPage() {
       ),
     );
   }, [mapRef, ready, select, setParams]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !gateways.data) return;
+    setGateways(
+      map,
+      gateways.data
+        .filter((g) => g.geometry && isGatewayVisible(g.id, layers))
+        .map((g) => ({
+          type: "Feature",
+          geometry: g.geometry as unknown as GeoJSON.Geometry,
+          properties: {
+            gateway_id: g.id,
+            name: g.display_name,
+            last_seen_at: g.last_seen_at,
+          },
+        })),
+    );
+  }, [mapRef, ready, gateways.data, layers]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -404,9 +436,33 @@ export function MapPage() {
           events={(events.data?.features ?? []).map(
             (f) => f.properties as unknown as EventFeatureProperties,
           )}
+          gateways={gateways.data ?? []}
           choices={layers}
+          trackedId={selectedId && trackHours > 0 ? selectedId : null}
           onChange={setLayers}
           onClose={() => setPanelOpen(false)}
+          onToggleTrack={(id) =>
+            setParams(
+              (p) => {
+                if (p.get("entity") === id && Number(p.get("track") ?? 0) > 0)
+                  p.delete("track");
+                else {
+                  p.set("entity", id);
+                  p.set("track", "24");
+                }
+                return p;
+              },
+              { replace: true },
+            )
+          }
+          onPickGateway={(id) => {
+            const g = gateways.data?.find((x) => x.id === id);
+            if (g?.geometry)
+              fitGeometry(
+                mapRef.current,
+                g.geometry as unknown as GeoJSON.Geometry,
+              );
+          }}
           onPickEntity={(id) => {
             select(id);
             const f = currentFeatures.find(
