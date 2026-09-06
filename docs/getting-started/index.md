@@ -52,6 +52,10 @@ MinIO console <http://localhost:9001>.
 - AI clients over MCP: [MCP](../mcp/index.md).
 - The [demonstration](demonstration.md) script walks the whole platform end to end.
 
+## Finding things
+
+Ctrl+K (Cmd+K on a Mac) or the Search button in the sidebar opens one search box over everything you may see: entities, devices by name, serial or DevEUI, features, gateways, projects and the pages of the current project. Server admins also find data sources. Recent picks are listed when the box is empty. Every list keeps its own search box for narrowing what is on the page.
+
 ## Interface language
 
 The interface follows the browser's language when a catalogue for it exists and falls back

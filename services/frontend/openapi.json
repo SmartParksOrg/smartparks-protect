@@ -16456,6 +16456,72 @@
     }
    }
   },
+  "/api/v1/search": {
+   "get": {
+    "tags": [
+     "search"
+    ],
+    "summary": "Search",
+    "description": "Entities, devices (by name, serial or external id), features, gateways, data sources\n(server admins) and projects whose name contains `q`, inside what the caller may see.",
+    "operationId": "search_api_v1_search_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "description": "Name contains, case-insensitive",
+       "title": "Q"
+      },
+      "description": "Name contains, case-insensitive"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "description": "Per kind",
+       "default": 10,
+       "title": "Limit"
+      },
+      "description": "Per kind"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SearchResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/version": {
    "get": {
     "tags": [
@@ -30496,6 +30562,110 @@
      "description"
     ],
     "title": "ScopeInfo"
+   },
+   "SearchHit": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "subtitle": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subtitle"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id",
+      "description": "The project the hit belongs to, for the link"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name"
+    ],
+    "title": "SearchHit"
+   },
+   "SearchResponse": {
+    "properties": {
+     "query": {
+      "type": "string",
+      "title": "Query"
+     },
+     "entities": {
+      "items": {
+       "$ref": "#/components/schemas/SearchHit"
+      },
+      "type": "array",
+      "title": "Entities"
+     },
+     "devices": {
+      "items": {
+       "$ref": "#/components/schemas/SearchHit"
+      },
+      "type": "array",
+      "title": "Devices"
+     },
+     "features": {
+      "items": {
+       "$ref": "#/components/schemas/SearchHit"
+      },
+      "type": "array",
+      "title": "Features"
+     },
+     "gateways": {
+      "items": {
+       "$ref": "#/components/schemas/SearchHit"
+      },
+      "type": "array",
+      "title": "Gateways"
+     },
+     "data_sources": {
+      "items": {
+       "$ref": "#/components/schemas/SearchHit"
+      },
+      "type": "array",
+      "title": "Data Sources",
+      "description": "Server admins only; empty for everyone else"
+     },
+     "projects": {
+      "items": {
+       "$ref": "#/components/schemas/SearchHit"
+      },
+      "type": "array",
+      "title": "Projects"
+     }
+    },
+    "type": "object",
+    "required": [
+     "query",
+     "entities",
+     "devices",
+     "features",
+     "gateways",
+     "projects"
+    ],
+    "title": "SearchResponse"
    },
    "Series": {
     "properties": {

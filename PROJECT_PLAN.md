@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 15 (correctness and usability from the first live days, v2.0.0 at its end; D97 to D108 decided on 2026-09-06). Phase 14 complete; KPN LoRa live in both directions since 2026-09-06; bulk onboarding from Needs attention shipped (5be635c) |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-06 |
-| Next item | Phase 15, organising: site-wide search (D99) after Tim's look at the organizing page; then presentation (D105, the detail-level preference and the style pass); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
+| Next item | Phase 15, presentation (D105): the operational view first with the per-user detail-level preference, then the style pass with a column picker and the page inventory per role; then presentation (D105, the detail-level preference and the style pass); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -711,7 +711,7 @@ Organising:
 - [x] Groups (D98, ADR 0020, migration 0019) (2026-09-06, `Group` model on `entity_groups`, `entities.group_id`, `/projects/{id}/groups`, `group_id` and `ungrouped` filters on entities and `group_id` on devices through the entity tracked today, `entity_id`, `entity_name` and `group_id` on device reads, `group_id` on map features, `GroupsPage`, `GroupSelect`, the entity dialog and the bulk dialog; the icon stays API-only until an icon picker exists): `entity_groups` per project (name, optional parent, order, colour, icon), `entities.group_id`; API and a Groups page under the project's admin section; group column and filter in the entities and devices lists; bulk onboarding can put new entities in a group.
 - [x] Live map layers (2026-09-06, `LayerPanel`, `layerChoices.ts` with unit tests, `usePreference` over `users.preferences` with migration 0020 and the bounded `UserUpdate.preferences`; `group_id` on the map features): a layer panel with the groups (and subgroups) and their counts, show and hide per group and per entity, "only this group", ungrouped as its own layer, features as a layer; remembered per user and project.
 - [x] Organizing entities into groups (2026-09-06, asked by Tim and built on the recommendations he accepted: `POST /projects/{id}/entities/bulk-move` bounded at 500 with one audit entry, the Groups page as the organizing page with the tree left (counts, subgroup, edit, delete, drop targets) and the entity list right (search, type filter, selection, "Move to…" with a new group created on the spot, rows draggable onto the tree), "Move to group…" on the Entities list selection, one group per entity; tags stay a later decision).
-- [ ] Site-wide search (D99): `GET /search?q=` bounded at 50 per type over what the user may see; the palette on Ctrl+K and from the header, with recent items; every list keeps its own search box.
+- [x] Site-wide search (D99) (2026-09-06, `routers/search.py` over accessible projects with devices matched on name, serial or external id and data sources for server admins only, `CommandPalette` on Ctrl+K and the sidebar's Search button, pages of the current project and the server admin area, recent items in the browser, `?feature=` on the map to land on a feature): `GET /search?q=` bounded at 50 per type over what the user may see; the palette on Ctrl+K and from the header, with recent items; every list keeps its own search box.
 
 Presentation:
 
@@ -1060,6 +1060,11 @@ Listed by the phase where they are first needed.
 - Built the Layers panel on the live map: groups and subgroups with counts, show and hide per group and per entity, "only", ungrouped as a layer, features and events switches. Hidden sets rather than shown sets, so new groups and entities appear until hidden. The choices live in a new per-user preference document (`users.preferences`, migration 0020) through `PATCH /users/me`, saved a moment after the last change; the same store serves D105's detail-level preference next.
 - Where to continue: site-wide search (D99), then presentation (D105).
 
+### 2026-09-06, site-wide search (Claude)
+
+- Built D99: one bounded search endpoint (at most 50 per kind) over entities, devices (name, serial or an external id such as a DevEUI), features, gateways (through the data sources scoped to the caller's projects), data sources (server admins) and projects, inside what the caller may see; the command palette on Ctrl+K or Cmd+K and from the sidebar, with the pages of the current project, recent picks kept in the browser, and results grouped by kind with the project as subtitle. A feature opens the map on itself (`?feature=`); gateways and data sources open their lists because they have no page of their own.
+- Where to continue: presentation (D105).
+
 ### 2026-09-06, map layers reworked on Tim's feedback (Claude)
 
 - Tim tried the panel on the dev server against EarthRanger's Map Layers and asked for four changes: groups of any depth (D98 amended, ADR 0020 amended, no migration needed: the parent column already pointed at the table; filters and deletions now walk a recursive query, a group cannot move into itself or below itself), a cleaner panel with the entity icons, clearer levels and a minimal last seen, tabs for Entities, Features and Events like EarthRanger's Subjects, Features, Analyzers and Events, and search plus sort with a grouped or flat view. All four built: the panel is a full-height drawer with the three tabs, the top controls move aside while it is open, features hide per type and per feature, events per type, and every row has a locate button.
@@ -1070,3 +1075,8 @@ Listed by the phase where they are first needed.
 
 - Tim accepted the organizing recommendations and asked for a Coverage tab (gateways only for now, the analysis stays under D107) and a track toggle next to the locate button in the layers panel. Built: the bulk move endpoint, the Groups page as the organizing page with drag and drop onto the tree, "Move to group…" on the Entities list, the Coverage tab with a gateway layer on the map (positions from the gateway registry, per-gateway show and hide), and the track toggle (24 hours on the entity, off again on the second click).
 - Where to continue: site-wide search (D99), then presentation (D105).
+
+### 2026-09-06, site-wide search (Claude)
+
+- Built D99: one bounded search endpoint (at most 50 per kind) over entities, devices (name, serial or an external id such as a DevEUI), features, gateways (through the data sources scoped to the caller's projects), data sources (server admins) and projects, inside what the caller may see; the command palette on Ctrl+K or Cmd+K and from the sidebar, with the pages of the current project, recent picks kept in the browser, and results grouped by kind with the project as subtitle. A feature opens the map on itself (`?feature=`); gateways and data sources open their lists because they have no page of their own.
+- Where to continue: presentation (D105).

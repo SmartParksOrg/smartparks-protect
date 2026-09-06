@@ -35,6 +35,7 @@ from protect_api.routers.network import router as network_router
 from protect_api.routers.platform import router as platform_router
 from protect_api.routers.projects import router as projects_router
 from protect_api.routers.rules import router as rules_router
+from protect_api.routers.search import router as search_router
 
 v1_router = APIRouter()
 for router in (
@@ -71,5 +72,6 @@ for router in (
     admin_ai_policy_router,
     admin_traffic_router,
     realtime_router,
+    search_router,
 ):
     v1_router.include_router(router)

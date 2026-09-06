@@ -1,17 +1,29 @@
 import { useTranslation } from "react-i18next";
-import { Languages, LogOut, Plug } from "lucide-react";
+import { Languages, LogOut, Plug, Search } from "lucide-react";
 import { Link, NavLink, useParams } from "react-router";
 
 import LogoWide from "@/assets/brand/logo-wide.svg?react";
 import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
-import { projectSections, serverSections, type NavItem } from "@/components/layout/navigation";
+import {
+  projectSections,
+  serverSections,
+  type NavItem,
+} from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import i18n, { LANGUAGES } from "@/i18n";
 
-function Item({ item, projectId, onNavigate }: { item: NavItem; projectId?: string; onNavigate?: () => void }) {
+function Item({
+  item,
+  projectId,
+  onNavigate,
+}: {
+  item: NavItem;
+  projectId?: string;
+  onNavigate?: () => void;
+}) {
   const { t } = useTranslation();
   const Icon = item.icon;
   if (!item.to) {
@@ -22,11 +34,15 @@ function Item({ item, projectId, onNavigate }: { item: NavItem; projectId?: stri
       >
         <Icon className="size-4" />
         <span className="flex-1">{item.label}</span>
-        <span className="text-[10px] uppercase tracking-wide">{t("phase")} {item.phase}</span>
+        <span className="text-[10px] uppercase tracking-wide">
+          {t("phase")} {item.phase}
+        </span>
       </span>
     );
   }
-  const to = item.to.startsWith("/") ? item.to : `/projects/${projectId}/${item.to}`;
+  const to = item.to.startsWith("/")
+    ? item.to
+    : `/projects/${projectId}/${item.to}`;
   return (
     <NavLink
       to={to}
@@ -34,7 +50,9 @@ function Item({ item, projectId, onNavigate }: { item: NavItem; projectId?: stri
       className={({ isActive }) =>
         cn(
           "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent",
-          isActive ? "bg-primary text-primary-foreground hover:bg-primary" : "text-foreground",
+          isActive
+            ? "bg-primary text-primary-foreground hover:bg-primary"
+            : "text-foreground",
         )
       }
     >
@@ -59,17 +77,39 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="px-3 pb-3">
         <ProjectSwitcher />
       </div>
+      <div className="px-3 pb-3">
+        <Button
+          variant="outline"
+          className="w-full justify-start gap-2 text-muted-foreground"
+          onClick={() => window.dispatchEvent(new Event("protect:open-search"))}
+        >
+          <Search className="size-4" />
+          <span className="flex-1 text-left">{t("Search…")}</span>
+          <kbd className="rounded border bg-muted px-1.5 text-[10px] font-medium">
+            {t("Ctrl K")}
+          </kbd>
+        </Button>
+      </div>
       <nav className="flex-1 space-y-4 overflow-y-auto px-2 pb-4">
         {projectId &&
           projectSections.map((section) => {
-            const items = section.items.filter((item) => !item.adminOnly || canAdmin(role));
+            const items = section.items.filter(
+              (item) => !item.adminOnly || canAdmin(role),
+            );
             if (items.length === 0) return null;
             return (
               <div key={section.label}>
-                <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{section.label}</div>
+                <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {section.label}
+                </div>
                 <div className="space-y-0.5">
                   {items.map((item) => (
-                    <Item key={item.label} item={item} projectId={projectId} onNavigate={onNavigate} />
+                    <Item
+                      key={item.label}
+                      item={item}
+                      projectId={projectId}
+                      onNavigate={onNavigate}
+                    />
                   ))}
                 </div>
               </div>
@@ -78,7 +118,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         {user?.is_superuser &&
           serverSections.map((section) => (
             <div key={section.label}>
-              <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{section.label}</div>
+              <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {section.label}
+              </div>
               <div className="space-y-0.5">
                 {section.items.map((item) => (
                   <Item key={item.label} item={item} onNavigate={onNavigate} />
@@ -88,15 +130,28 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           ))}
       </nav>
       <div className="border-t px-3 py-3">
-        <div className="truncate px-3 text-xs text-muted-foreground" title={user?.email}>
+        <div
+          className="truncate px-3 text-xs text-muted-foreground"
+          title={user?.email}
+        >
           {user?.full_name || user?.email}
         </div>
-        <Button asChild variant="ghost" size="sm" className="mt-1 w-full justify-start">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="mt-1 w-full justify-start"
+        >
           <Link to="/account/connections" onClick={onNavigate}>
             <Plug className="size-4" /> {t("Connected AI clients")}
           </Link>
         </Button>
-        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={logout}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={logout}
+        >
           <LogOut className="size-4" /> {t("Sign out")}
         </Button>
         <label className="mt-1 flex items-center gap-2 px-3 text-xs text-muted-foreground">
@@ -107,7 +162,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             value={i18n.resolvedLanguage ?? "en"}
             onChange={(event) => void i18n.changeLanguage(event.target.value)}
           >
-            {Object.entries(LANGUAGES).map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+            {Object.entries(LANGUAGES).map(([code, name]) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
           </select>
         </label>
       </div>

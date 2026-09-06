@@ -13,6 +13,7 @@ export const queryKeys = {
   entity: (projectId: string, entityId: string) => ["projects", projectId, "entities", entityId] as const,
   features: (projectId: string) => ["projects", projectId, "features"] as const,
   groups: (projectId: string) => ["projects", projectId, "groups"] as const,
+  search: (q: string) => ["search", q] as const,
   entityAssignments: (projectId: string, params: Record<string, unknown> = {}) => ["projects", projectId, "entity-assignments", params] as const,
   currentState: (projectId: string) => ["projects", projectId, "map", "current"] as const,
   track: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "track", params] as const,

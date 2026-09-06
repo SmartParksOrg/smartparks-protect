@@ -325,6 +325,25 @@ export function MapPage() {
     );
   }, [mapRef, ready, events.data, layers]);
 
+  const featureParam = params.get("feature");
+  const fittedFeature = useRef<string | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (
+      !map ||
+      !ready ||
+      !featureParam ||
+      !features.data ||
+      fittedFeature.current === featureParam
+    )
+      return;
+    const f = features.data.items.find((x) => x.id === featureParam);
+    if (f?.geometry) {
+      fitGeometry(map, f.geometry as unknown as GeoJSON.Geometry);
+      fittedFeature.current = featureParam;
+    }
+  }, [mapRef, ready, featureParam, features.data]);
+
   const fitted = useRef(false);
   useEffect(() => {
     const map = mapRef.current;

@@ -3695,6 +3695,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description Entities, devices (by name, serial or external id), features, gateways, data sources
+         *     (server admins) and projects whose name contains `q`, inside what the caller may see.
+         */
+        get: operations["search_api_v1_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/version": {
         parameters: {
             query?: never;
@@ -8572,6 +8593,43 @@ export interface components {
             key: string;
             /** Description */
             description: string;
+        };
+        /** SearchHit */
+        SearchHit: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Subtitle */
+            subtitle?: string | null;
+            /**
+             * Project Id
+             * @description The project the hit belongs to, for the link
+             */
+            project_id?: string | null;
+        };
+        /** SearchResponse */
+        SearchResponse: {
+            /** Query */
+            query: string;
+            /** Entities */
+            entities: components["schemas"]["SearchHit"][];
+            /** Devices */
+            devices: components["schemas"]["SearchHit"][];
+            /** Features */
+            features: components["schemas"]["SearchHit"][];
+            /** Gateways */
+            gateways: components["schemas"]["SearchHit"][];
+            /**
+             * Data Sources
+             * @description Server admins only; empty for everyone else
+             */
+            data_sources?: components["schemas"]["SearchHit"][];
+            /** Projects */
+            projects: components["schemas"]["SearchHit"][];
         };
         /** Series */
         Series: {
@@ -17857,6 +17915,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PageResponse_AdminCommandRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_v1_search_get: {
+        parameters: {
+            query: {
+                /** @description Name contains, case-insensitive */
+                q: string;
+                /** @description Per kind */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
                 };
             };
             /** @description Validation Error */
