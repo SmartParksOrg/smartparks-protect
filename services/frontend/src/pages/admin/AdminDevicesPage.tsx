@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { formatTime } from "@/lib/format";
+import { formatAgo, formatTime } from "@/lib/format";
 
 const deviceSchema = z.object({ name: z.string().min(1).max(200), device_type_id: z.string().min(1, "Choose a type"), serial_number: z.string().optional(), status: z.enum(["active", "inventory", "repair", "retired"]), firmware_version: z.string().optional() });
 type DeviceValues = z.infer<typeof deviceSchema>;
@@ -134,6 +134,7 @@ export function AdminDevicesPage() {
     { header: t("Type"), accessorFn: (d) => typeById.get(d.device_type_id)?.label ?? "" },
     { header: t("Status"), accessorKey: "status", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
     { header: t("Serial"), accessorKey: "serial_number" },
+    { header: t("Last seen"), accessorKey: "last_seen_at", cell: ({ getValue }) => formatAgo(getValue<string | null>()) },
     { header: t("Created"), accessorKey: "created_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
     { id: "actions", header: "", cell: ({ row }) => <div className="flex gap-1"><Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setParams({ device: row.original.id }); }}>{t("Manage")}</Button><Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void navigate(`/admin/devices/${row.original.id}`); }}>{t("Details")}</Button></div> },
   ];

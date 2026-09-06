@@ -647,6 +647,24 @@ async def _update_current_state(
         )
     if latest_state is not None:
         current.latest_state = {**(current.latest_state or {}), **latest_state.state}
+        if current.latest_state_time is None or latest_state.time > current.latest_state_time:
+            current.latest_state_time = latest_state.time
+        firmware = latest_state.state.get("firmware_version")
+        if firmware is not None and str(firmware) != (device.firmware_version or ""):
+            device.firmware_version = str(firmware)
+    # The newest value per metric, for the health card and the lists (decision D104).
+    kept = dict(current.latest_measurements or {})
+    for key, measurement in latest_measurements.items():
+        previous = kept.get(key)
+        previous_time = (
+            datetime.fromisoformat(str(previous["time"]))
+            if isinstance(previous, dict) and previous.get("time")
+            else None
+        )
+        if previous_time is None or measurement.time > previous_time:
+            kept[key] = {"value": measurement.value, "time": measurement.time.isoformat()}
+    if kept != (current.latest_measurements or {}):
+        current.latest_measurements = kept
     if "battery_voltage" in latest_measurements and isinstance(
         latest_measurements["battery_voltage"].value, int | float
     ):

@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 from protect_api.schemas.common import GeoJSONGeometry, ORMModel
+from shared.domain.health import DeviceHealth
 from shared.enums import DeviceStatus, EntityGroup, EntityStatus, FeatureType, ValueType
 from shared.timeutil import require_aware
 
@@ -164,6 +165,12 @@ class DeviceRead(ORMModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
+    last_seen_at: datetime | None = Field(
+        default=None, description="Newest record of any kind (decision D104)"
+    )
+    health: DeviceHealth | None = Field(
+        default=None, description="What the driver declares as health, from the current state"
+    )
 
 
 class AssignmentRead(ORMModel):

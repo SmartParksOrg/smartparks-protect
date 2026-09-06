@@ -21,7 +21,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from protect_api.deps import ProjectContext, require_permission
 from shared.curation.effective import effective_geom, effective_time, in_window, visible
 from shared.database import get_session
-from shared.models import Entity, EntityCurrentState, EntityType, Position
+from shared.device_drivers.registry import DRIVERS
+from shared.domain.health import device_health
+from shared.models import (
+    Device,
+    DeviceCurrentState,
+    DeviceType,
+    Entity,
+    EntityCurrentState,
+    EntityType,
+    Position,
+)
 from shared.permissions import Permission
 from shared.timeutil import require_aware, utc_now
 
@@ -110,9 +120,43 @@ async def current_state(
             func.ST_Intersects(EntityCurrentState.latest_position, func.ST_MakeEnvelope(*box, 4326))
         )
     rows = (await session.execute(base.order_by(EntityCurrentState.entity_id).limit(limit))).all()
+    device_ids = {row[0].device_id for row in rows if row[0].device_id}
+    device_states: dict[uuid.UUID, DeviceCurrentState] = {}
+    drivers_by_device: dict[uuid.UUID, str | None] = {}
+    if device_ids:
+        device_states = {
+            s.device_id: s
+            for s in (
+                await session.scalars(
+                    select(DeviceCurrentState).where(DeviceCurrentState.device_id.in_(device_ids))
+                )
+            ).all()
+        }
+        drivers_by_device = {
+            row[0]: row[1]
+            for row in (
+                await session.execute(
+                    select(Device.id, DeviceType.driver_key)
+                    .join(DeviceType, DeviceType.id == Device.device_type_id)
+                    .where(Device.id.in_(device_ids))
+                )
+            ).all()
+        }
     features = []
     for state, name, entity_status, icon_override, type_key, type_icon, group_key, geojson in rows:
         import json
+
+        device_state = device_states.get(state.device_id) if state.device_id else None
+        health = None
+        if device_state is not None:
+            driver = DRIVERS.get(drivers_by_device.get(state.device_id) or "")
+            health = device_health(
+                getattr(driver, "health", None),
+                latest_measurements=device_state.latest_measurements,
+                latest_state=device_state.latest_state,
+                latest_state_time=device_state.latest_state_time,
+                last_seen_at=device_state.last_seen_at,
+            )
 
         features.append(
             {
@@ -132,6 +176,14 @@ async def current_state(
                     if state.latest_position_time
                     else None,
                     "active_alert_count": state.active_alert_count,
+                    "health_level": health.level if health else None,
+                    "battery_voltage": device_state.battery_voltage if device_state else None,
+                    "last_status_at": health.last_status_at.isoformat()
+                    if health and health.last_status_at
+                    else None,
+                    "device_last_seen_at": device_state.last_seen_at.isoformat()
+                    if device_state and device_state.last_seen_at
+                    else None,
                 },
             }
         )

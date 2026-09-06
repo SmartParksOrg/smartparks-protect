@@ -52,6 +52,10 @@ Downlinks are settings on FPort 3 (`id len value`) and commands on FPort 32; `cm
 
 `tests/shared/test_opencollar_driver.py` runs golden tests over `tests/fixtures/payloads/opencollar/uplinks.jsonl`, the wiki examples with the values the public decoder produces. Recorded uplinks from live collars are added to the same file with their origin noted in the README next to it. The ChirpStack device profile codec for the local setup is the public decoder, `shared/device_drivers/opencollar/codec.js`, passed to `scripts/dev.sh chirpstack-bootstrap --codec`.
 
+## Health
+
+The status message on port 4 is the collar's heartbeat: every status interval it reports the battery, charging, temperature, uptime, reset reason, error flags, firmware and hardware version and the LoRa satellite count. Protect keeps the newest of each on the device's current state and shows them as the Health card on the device page, as a compact line in the devices list and as a level on the map (decision D104): battery under 3.6 V warns and under 3.45 V is critical, temperature above 50 °C warns, any error flag warns, a fix with an accuracy above 30 m or more than two minutes to fix warns, flash use above 80 percent warns. The firmware version from the status is written on the device.
+
 ## Control actions
 
 Downlinks follow protocol research section 4: commands on FPort 32 as `cmd_id length argument`, settings on FPort 3 as `id length value`. See [device control](device-control.md) for the path and the lifecycle.

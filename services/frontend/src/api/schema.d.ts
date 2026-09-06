@@ -5378,6 +5378,20 @@ export interface components {
             before_project: components["schemas"]["RecordCounts"];
             before_entity: components["schemas"]["RecordCounts"];
         };
+        /** DeviceHealth */
+        DeviceHealth: {
+            /** Level */
+            level?: string | null;
+            /** Last Seen At */
+            last_seen_at?: string | null;
+            /** Last Status At */
+            last_status_at?: string | null;
+            /**
+             * Fields
+             * @default []
+             */
+            fields: components["schemas"]["HealthValue"][];
+        };
         /** DeviceLogFileRead */
         DeviceLogFileRead: {
             /**
@@ -5493,6 +5507,13 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Last Seen At
+             * @description Newest record of any kind (decision D104)
+             */
+            last_seen_at?: string | null;
+            /** @description What the driver declares as health, from the current state */
+            health?: components["schemas"]["DeviceHealth"] | null;
         };
         /**
          * DeviceStatus
@@ -5636,6 +5657,13 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Last Seen At
+             * @description Newest record of any kind (decision D104)
+             */
+            last_seen_at?: string | null;
+            /** @description What the driver declares as health, from the current state */
+            health?: components["schemas"]["DeviceHealth"] | null;
             /** Project Assignments */
             project_assignments: components["schemas"]["ProjectAssignmentRead"][];
             /** Entity Assignments */
@@ -6449,6 +6477,25 @@ export interface components {
             checks: {
                 [key: string]: components["schemas"]["DependencyStatus"];
             };
+        };
+        /** HealthValue */
+        HealthValue: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /** Unit */
+            unit?: string | null;
+            /** Value */
+            value?: unknown;
+            /** Text */
+            text?: string | null;
+            /** Level */
+            level?: string | null;
+            /** At */
+            at?: string | null;
         };
         /** ImportResult */
         ImportResult: {

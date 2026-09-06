@@ -389,3 +389,39 @@ async def test_port_zero_uplink_is_alive_but_holds_nothing(db, bus, world):
         d.get("source_event_id") != stored.source_event.id
         for d in await bus.list_dead(Topic.SOURCE_EVENT_RECEIVED)
     )
+
+
+async def test_status_message_updates_health_state_and_firmware(db, bus, world):
+    """A status uplink (no position) moves last seen, keeps the newest value per metric and the
+    state time on the current state, and writes the firmware on the device (decision D104)."""
+    from shared.models import Device
+
+    first = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {
+            "time": "2026-05-03T08:00:00+00:00",
+            "measurements": {"battery_voltage": 3.9, "device_temperature": 20.0},
+            "state": {"firmware_version": "7.2", "errors": {"flash": False}},
+        },
+    )
+    assert first[1].status == ProcessingStatus.PROCESSED
+    older = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {"time": "2026-05-02T08:00:00+00:00", "measurements": {"battery_voltage": 4.0}},
+    )
+    assert older[1].status == ProcessingStatus.PROCESSED
+    await db.rollback()
+    current = await db.get(DeviceCurrentState, world.device.id)
+    await db.refresh(current)
+    assert current.last_seen_at == datetime(2026, 5, 3, 8, tzinfo=UTC)
+    assert current.latest_measurements["battery_voltage"]["value"] == 3.9  # the newer one stays
+    assert current.latest_measurements["device_temperature"]["value"] == 20.0
+    assert current.latest_state_time == datetime(2026, 5, 3, 8, tzinfo=UTC)
+    assert current.latest_state["firmware_version"] == "7.2"
+    device = await db.get(Device, world.device.id)
+    await db.refresh(device)
+    assert device.firmware_version == "7.2"

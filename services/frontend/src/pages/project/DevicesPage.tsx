@@ -10,6 +10,7 @@ import type { Device, DeviceType, Page as PageType } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
+import { HealthLine } from "@/components/devices/HealthCard";
 import { Icon } from "@/components/icons/Icon";
 import { formatAgo } from "@/lib/format";
 
@@ -27,7 +28,8 @@ export function DevicesPage() {
     { header: t("Driver"), accessorFn: (d) => typeById.get(d.device_type_id)?.driver_key ?? "" },
     { header: t("Status"), accessorKey: "status", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
     { header: t("Serial"), accessorKey: "serial_number" },
-    { header: t("Updated"), accessorKey: "updated_at", cell: ({ getValue }) => formatAgo(getValue<string>()) },
+    { header: t("Last seen"), accessorKey: "last_seen_at", cell: ({ getValue }) => formatAgo(getValue<string | null>()) },
+    { header: t("Health"), id: "health", accessorFn: (d) => d.health?.level ?? "", cell: ({ row }) => <HealthLine health={row.original.health} /> },
   ];
   return (
     <>

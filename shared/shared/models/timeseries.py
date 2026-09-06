@@ -327,6 +327,15 @@ class DeviceCurrentState(Base):
     latest_state: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
+    latest_state_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="Canonical time of the newest state record"
+    )
+    latest_measurements: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        comment="metric key to {value, time} of the newest measurement per metric",
+    )
     battery_voltage: Mapped[float | None] = mapped_column(Float)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")

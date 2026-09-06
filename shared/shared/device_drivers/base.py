@@ -112,6 +112,25 @@ class SourceEventData:
 DEFAULT_DECODABLE_EVENT_TYPES: frozenset[str] = frozenset({"uplink"})
 
 
+@dataclass(frozen=True, slots=True)
+class HealthField:
+    """One line of a device's health (decision D104): a metric or a state key the driver
+    wants people to see, with how to show it and when it is worrying. `kind` is `number`,
+    `duration` (seconds shown as days and hours), `text`, `bool` or `flags` (a dict of
+    booleans whose true keys are listed). Thresholds apply to numbers."""
+
+    key: str
+    label: str
+    source: str = "measurement"  # or "state"
+    kind: str = "number"
+    unit: str | None = None
+    warn_below: float | None = None
+    critical_below: float | None = None
+    warn_above: float | None = None
+    critical_above: float | None = None
+    flags_are_problems: bool = False  # a `flags` field whose true keys mean trouble
+
+
 class DeviceDriver(Protocol):
     key: ClassVar[str]
     label: ClassVar[str]
@@ -120,6 +139,8 @@ class DeviceDriver(Protocol):
     decodable_event_types: ClassVar[frozenset[str]]
     # Optional: `control_actions: ClassVar[dict[str, ControlAction]]` (shared.control.actions).
     # Drivers without it accept no commands.
+    # Optional: `health: ClassVar[tuple[HealthField, ...]]`, the lines of the device's health
+    # card and the compact health line (decision D104). Drivers without it show last seen only.
 
     def decode(self, event: SourceEventData) -> DecodedRecords: ...
 

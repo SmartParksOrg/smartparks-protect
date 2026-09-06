@@ -12,6 +12,7 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DeviceControl } from "@/components/control/DeviceControl";
 import { CuratedBadge, CurateDialog, RecordHistoryDialog } from "@/components/curation/CurationDialogs";
+import { HealthCard } from "@/components/devices/HealthCard";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
 import { RecordDeliveriesDialog, SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { WebBleCard } from "@/components/devices/WebBleCard";
@@ -102,6 +103,7 @@ export function DevicePage() {
               </dl>
             </CardContent>
           </Card>
+          <HealthCard health={d.health} />
           <Card>
             <CardHeader><CardTitle>{t("External identities")}</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">

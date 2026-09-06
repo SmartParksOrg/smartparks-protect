@@ -18,6 +18,10 @@ export interface EntityFeatureProperties {
   last_seen_at: string | null;
   position_time: string | null;
   active_alert_count: number;
+  health_level?: string | null;
+  battery_voltage?: number | null;
+  last_status_at?: string | null;
+  device_last_seen_at?: string | null;
 }
 
 const OFFLINE_AFTER_MS = 24 * 3600_000;

@@ -21270,6 +21270,55 @@
     "title": "DeviceDataSpan",
     "description": "What the system knows about when a device produced data, for assignment dialogs and\nthe warning about records before an assignment (decision D103)."
    },
+   "DeviceHealth": {
+    "properties": {
+     "level": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Level"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At"
+     },
+     "last_status_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Status At"
+     },
+     "fields": {
+      "items": {
+       "$ref": "#/components/schemas/HealthValue"
+      },
+      "type": "array",
+      "title": "Fields",
+      "default": []
+     }
+    },
+    "type": "object",
+    "title": "DeviceHealth"
+   },
    "DeviceLogFileRead": {
     "properties": {
      "id": {
@@ -21576,6 +21625,30 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At",
+      "description": "Newest record of any kind (decision D104)"
+     },
+     "health": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeviceHealth"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What the driver declares as health, from the current state"
      }
     },
     "type": "object",
@@ -21976,6 +22049,30 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At",
+      "description": "Newest record of any kind (decision D104)"
+     },
+     "health": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeviceHealth"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What the driver declares as health, from the current state"
      },
      "project_assignments": {
       "items": {
@@ -24234,6 +24331,77 @@
      "checks"
     ],
     "title": "HealthResponse"
+   },
+   "HealthValue": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "value": {
+      "title": "Value"
+     },
+     "text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text"
+     },
+     "level": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Level"
+     },
+     "at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "kind"
+    ],
+    "title": "HealthValue"
    },
    "ImportResult": {
     "properties": {

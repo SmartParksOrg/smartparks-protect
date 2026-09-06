@@ -37,12 +37,15 @@ from protect_api.schemas.domain import (
 )
 from shared.curation.effective import effective_time
 from shared.database import get_session
+from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import reattribute
+from shared.domain.health import device_health
 from shared.domain.links import resolve_links
 from shared.enums import DeviceStatus, Role
 from shared.models import (
     DataSource,
     Device,
+    DeviceCurrentState,
     DeviceEntityAssignment,
     DeviceLogFile,
     DeviceProjectAssignment,
@@ -109,6 +112,45 @@ async def _visible_device(session: AsyncSession, user: User, device_id: uuid.UUI
     return device
 
 
+async def with_state(session: AsyncSession, devices: list[Device]) -> list[DeviceRead]:
+    """Device reads with last seen and health from the current state, one query for all."""
+    reads = [DeviceRead.model_validate(d) for d in devices]
+    if not devices:
+        return reads
+    ids = [d.id for d in devices]
+    states = {
+        s.device_id: s
+        for s in (
+            await session.scalars(
+                select(DeviceCurrentState).where(DeviceCurrentState.device_id.in_(ids))
+            )
+        ).all()
+    }
+    types = {
+        t.id: t
+        for t in (
+            await session.scalars(
+                select(DeviceType).where(DeviceType.id.in_({d.device_type_id for d in devices}))
+            )
+        ).all()
+    }
+    for device, read in zip(devices, reads, strict=True):
+        state = states.get(device.id)
+        if state is None:
+            continue
+        device_type = types.get(device.device_type_id)
+        driver = DRIVERS.get(device_type.driver_key) if device_type else None
+        read.last_seen_at = state.last_seen_at
+        read.health = device_health(
+            getattr(driver, "health", None),
+            latest_measurements=state.latest_measurements,
+            latest_state=state.latest_state,
+            latest_state_time=state.latest_state_time,
+            last_seen_at=state.last_seen_at,
+        )
+    return reads
+
+
 @router.get("", response_model=PageResponse[DeviceRead])
 async def list_devices(
     page: Page = Depends(page),
@@ -151,7 +193,7 @@ async def list_devices(
             or_(Device.name.ilike(pattern), Device.serial_number.ilike(pattern))
         )
     rows, next_cursor = await paginate(session, Device.id, statement, page)
-    return PageResponse(items=[DeviceRead.model_validate(r) for r in rows], next_cursor=next_cursor)
+    return PageResponse(items=await with_state(session, list(rows)), next_cursor=next_cursor)
 
 
 @router.post("", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)
@@ -220,7 +262,7 @@ async def get_device(
         for link in resolve_links(sources[identity.data_source_id], identity)
     ]
     return DeviceWithAssignments(
-        **DeviceRead.model_validate(device).model_dump(),
+        **(await with_state(session, [device]))[0].model_dump(),
         project_assignments=[project_assignment_read(a) for a in project_assignments],
         entity_assignments=[assignment_read(a) for a in entity_assignments],
         external_identities=[ExternalIdentityRead.model_validate(i) for i in identities],

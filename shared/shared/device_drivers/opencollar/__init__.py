@@ -29,6 +29,7 @@ from shared.device_drivers.base import (
     DecodedPosition,
     DecodedRecords,
     DecodedState,
+    HealthField,
     SourceEventData,
     TimestampSemantics,
 )
@@ -153,9 +154,30 @@ def _unix(value: int) -> datetime | None:
     return datetime.fromtimestamp(value, tz=UTC)
 
 
+# The device's health (decision D104): the port 4 status message every collar sends on its
+# interval, plus the last fix. Battery thresholds follow the firmware's own low battery
+# behaviour (research 3.4); GNSS accuracy above 30 m is a poor fix.
+OPENCOLLAR_HEALTH: tuple[HealthField, ...] = (
+    HealthField("battery_voltage", "Battery", unit="V", warn_below=3.6, critical_below=3.45),
+    HealthField("charging_voltage", "Charging", unit="V"),
+    HealthField("device_temperature", "Temperature", unit="°C", warn_above=50, critical_above=60),
+    HealthField("uptime", "Uptime", kind="duration"),
+    HealthField("errors", "Errors", source="state", kind="flags", flags_are_problems=True),
+    HealthField("reset_reason", "Last reset", source="state", kind="flags"),
+    HealthField("firmware_version", "Firmware", source="state", kind="text"),
+    HealthField("hardware_version", "Hardware", source="state", kind="text"),
+    HealthField("gnss_satellites", "Satellites of the last fix"),
+    HealthField("gnss_accuracy", "Accuracy of the last fix", unit="m", warn_above=30),
+    HealthField("gnss_time_to_fix", "Time to the last fix", unit="s", warn_above=120),
+    HealthField("lr_satellites", "LoRa satellites"),
+    HealthField("flash_used_percent", "Flash used", unit="%", warn_above=80, critical_above=95),
+)
+
+
 class OpenCollarDriver:
     key: ClassVar[str] = "opencollar"
     label: ClassVar[str] = "OpenCollar Edge"
+    health: ClassVar[tuple[HealthField, ...]] = OPENCOLLAR_HEALTH
     capabilities: ClassVar[frozenset[str]] = frozenset(
         {
             "gnss",

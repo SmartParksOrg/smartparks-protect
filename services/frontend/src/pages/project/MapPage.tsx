@@ -167,6 +167,8 @@ export function MapPage() {
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
             <dt className="text-muted-foreground">{t("Last seen")}</dt><dd title={formatTime(selected.last_seen_at)}>{formatAgo(selected.last_seen_at)}</dd>
             <dt className="text-muted-foreground">{t("Position")}</dt><dd>{formatTime(selected.position_time)}</dd>
+            {selected.battery_voltage != null && <><dt className="text-muted-foreground">{t("Battery")}</dt><dd className={selected.health_level === "critical" ? "text-destructive" : selected.health_level === "warn" ? "text-brand-sand" : ""}>{selected.battery_voltage.toFixed(2)} V</dd></>}
+            {selected.last_status_at && <><dt className="text-muted-foreground">{t("Last status")}</dt><dd title={formatTime(selected.last_status_at)}>{formatAgo(selected.last_status_at)}</dd></>}
             <dt className="text-muted-foreground">{t("Device")}</dt><dd>{selected.device_id ? <Link className="underline" to={`/projects/${projectId}/devices/${selected.device_id}`}>{t("open device")}</Link> : "none"}</dd>
             <dt className="text-muted-foreground">{t("Alerts")}</dt><dd>{selected.active_alert_count > 0 ? <Link className="underline" to={`/projects/${projectId}/alerts`}>{selected.active_alert_count} {t("open")}</Link> : "none"}</dd>
           </dl>
