@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.users import current_active_user
@@ -89,6 +89,41 @@ class DeliveryDetail(BaseModel):
     trace_id: uuid.UUID | None
 
 
+class DecodedPositionRead(BaseModel):
+    time: datetime
+    latitude: float
+    longitude: float
+    altitude_m: float | None = None
+    accuracy_m: float | None = None
+
+
+class DecodedMeasurementRead(BaseModel):
+    time: datetime
+    metric_key: str
+    value: Any
+
+
+class DecodedStateRead(BaseModel):
+    time: datetime
+    state: dict[str, Any]
+
+
+class DecodedEventRead(BaseModel):
+    time: datetime
+    event_type: str
+    title: str
+    severity: str
+
+
+class DecodedRecordsRead(BaseModel):
+    """What one delivery became after decoding: the canonical rows that carry its id."""
+
+    positions: list[DecodedPositionRead]
+    measurements: list[DecodedMeasurementRead]
+    states: list[DecodedStateRead]
+    events: list[DecodedEventRead]
+
+
 class SourceEventRead(BaseModel):
     id: int
     ingested_at: datetime
@@ -113,6 +148,9 @@ class SourceEventRead(BaseModel):
     deliveries: list[DeliveryRead]
     links: list[dict[str, str]] = []
     data_source_name: str | None = None
+    records: DecodedRecordsRead | None = Field(
+        default=None, description="The canonical rows decoded from this event"
+    )
 
 
 class StepRead(BaseModel):
@@ -253,12 +291,82 @@ async def get_source_event(
         if event.external_identity_id
         else None
     )
-    skip = {"deliveries", "links", "data_source_name"}
+    skip = {"deliveries", "links", "data_source_name", "records"}
     return SourceEventRead(
         **{c: getattr(event, c) for c in SourceEventRead.model_fields if c not in skip},
         deliveries=[DeliveryRead.model_validate(d, from_attributes=True) for d in deliveries],
         links=resolve_links(source, identity) if source else [],
         data_source_name=source.name if source else None,
+        records=await _decoded_records(session, event.id),
+    )
+
+
+async def _decoded_records(session: AsyncSession, source_event_id: int) -> DecodedRecordsRead:
+    """The positions, measurements, states and events that carry this source event's id, so
+    the traffic view can show what a delivery meant without opening the data explorer."""
+    from shared.models import DeviceStateHistory, Event, Measurement, Position
+
+    positions = (
+        await session.execute(
+            select(
+                Position.time,
+                func.ST_Y(Position.geom),
+                func.ST_X(Position.geom),
+                Position.altitude_m,
+                Position.accuracy_m,
+            )
+            .where(Position.source_event_id == source_event_id)
+            .order_by(Position.time)
+            .limit(200)
+        )
+    ).all()
+    measurements = (
+        await session.scalars(
+            select(Measurement)
+            .where(Measurement.source_event_id == source_event_id)
+            .order_by(Measurement.time, Measurement.metric_key)
+            .limit(500)
+        )
+    ).all()
+    states = (
+        await session.scalars(
+            select(DeviceStateHistory)
+            .where(DeviceStateHistory.source_event_id == source_event_id)
+            .order_by(DeviceStateHistory.time)
+            .limit(50)
+        )
+    ).all()
+    events = (
+        await session.scalars(
+            select(Event)
+            .where(Event.source_event_id == source_event_id)
+            .order_by(Event.time)
+            .limit(50)
+        )
+    ).all()
+
+    def value_of(m: Measurement) -> Any:
+        for v in (m.value_num, m.value_bool, m.value_text, m.value_json):
+            if v is not None:
+                return v
+        return None
+
+    return DecodedRecordsRead(
+        positions=[
+            DecodedPositionRead(time=t, latitude=lat, longitude=lon, altitude_m=alt, accuracy_m=acc)
+            for t, lat, lon, alt, acc in positions
+        ],
+        measurements=[
+            DecodedMeasurementRead(time=m.time, metric_key=m.metric_key, value=value_of(m))
+            for m in measurements
+        ],
+        states=[DecodedStateRead(time=st.time, state=st.state) for st in states],
+        events=[
+            DecodedEventRead(
+                time=e.time, event_type=e.event_type, title=e.title, severity=e.severity
+            )
+            for e in events
+        ],
     )
 
 

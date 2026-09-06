@@ -4,7 +4,18 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
-Nothing yet.
+From Tim's first hour with v2.0.0 on the dev server.
+
+### Added
+
+- The source event dialog opens on a Decoded tab that lists what the delivery became: positions with coordinates, measurements with their values, device state and events, or the reason nothing came out; the read carries `records`. Asked because a Bluetooth row in the traffic view did not say what it meant.
+- The entity page shows the entity's recent events, its recent positions with a "Track on the map" link, and, under Technical details, the traffic of the device tracking it.
+- Several tracks at once on the live map (`?tracks=` and `?track=` hours): the track button in the layers panel fills when a track is on, each track has its own colour, and the selection panel's track choice adds or removes the selected entity.
+
+### Fixed
+
+- In the layers panel, ticking a row under a switched-off parent (a gateway under Gateways, a feature under its type, an entity under a hidden group) switches the parent on and hides the other rows instead of doing nothing; no checkbox is greyed out any more.
+- The entity details panel on the map moves right of the layers panel while that is open instead of hiding under it.
 
 ## v2.0.0, 2026-09-06
 

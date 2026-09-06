@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Layers, ListTree, X } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -37,7 +37,7 @@ import {
   setEvents,
   setFeatures,
   setGateways,
-  setTrack,
+  setTracks,
   SOURCES,
 } from "@/components/map/layers";
 import {
@@ -115,7 +115,11 @@ export function MapPage() {
   const [params, setParams] = useSearchParams();
   const now = useNow();
   const selectedId = params.get("entity");
-  const trackHours = Number(params.get("track") ?? 0);
+  const trackHours = Number(params.get("track") ?? 0) || 24;
+  const trackedIds = useMemo(
+    () => (params.get("tracks") ?? "").split(",").filter(Boolean),
+    [params],
+  );
   const [basemap, setBasemap] = useState<BasemapKey>(loadBasemap);
   const container = useRef<HTMLDivElement | null>(null);
   const { mapRef, ready } = useMap(container, basemap, [31.5, -24.9], 6);
@@ -209,32 +213,46 @@ export function MapPage() {
       ),
     refetchInterval: 120_000,
   });
-  const trackQuery = useMemo(
-    () => ({ entity_id: selectedId, hours: trackHours, max_points: 5000 }),
-    [selectedId, trackHours],
-  );
-  const track = useQuery({
-    queryKey: queryKeys.track(projectId, trackQuery),
-    queryFn: () =>
-      api.get<Track>(`/api/v1/projects/${projectId}/tracks`, {
-        query: {
-          entity_id: selectedId,
-          max_points: 5000,
-          from: new Date(Date.now() - trackHours * 3600_000).toISOString(),
-        },
+  const tracks = useQueries({
+    queries: trackedIds.map((entityId) => ({
+      queryKey: queryKeys.track(projectId, {
+        entity_id: entityId,
+        hours: trackHours,
+        max_points: 5000,
       }),
-    enabled: Boolean(selectedId && trackHours > 0),
+      queryFn: () =>
+        api.get<Track>(`/api/v1/projects/${projectId}/tracks`, {
+          query: {
+            entity_id: entityId,
+            max_points: 5000,
+            from: new Date(Date.now() - trackHours * 3600_000).toISOString(),
+          },
+        }),
+    })),
   });
+  const selectedTrack = selectedId
+    ? tracks[trackedIds.indexOf(selectedId)]?.data
+    : undefined;
+  const setTracked = useCallback(
+    (ids: string[], hours?: number) =>
+      setParams(
+        (p) => {
+          if (ids.length > 0) p.set("tracks", ids.join(","));
+          else p.delete("tracks");
+          if (hours) p.set("track", String(hours));
+          return p;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
 
   const select = useCallback(
     (id: string | null) =>
       setParams(
         (p) => {
           if (id) p.set("entity", id);
-          else {
-            p.delete("entity");
-            p.delete("track");
-          }
+          else p.delete("entity");
           return p;
         },
         { replace: true },
@@ -279,9 +297,12 @@ export function MapPage() {
           };
         },
       );
-      if (message.entity_id === selectedId)
+      if (
+        typeof message.entity_id === "string" &&
+        trackedIds.includes(message.entity_id)
+      )
         void client.invalidateQueries({
-          queryKey: queryKeys.track(projectId, trackQuery),
+          queryKey: ["projects", projectId, "track"],
         });
     }
     if (
@@ -449,17 +470,27 @@ export function MapPage() {
     );
   }, [mapRef, ready, features.data, layers]);
 
+  const trackData = tracks.map((q) => q.data);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    if (track.data && selectedId && trackHours > 0)
-      setTrack(
-        map,
-        track.data.geometry as unknown as GeoJSON.Geometry,
-        track.data.times,
-      );
-    else setTrack(map, null, []);
-  }, [mapRef, ready, track.data, selectedId, trackHours]);
+    setTracks(
+      map,
+      trackedIds.flatMap((entityId, i) => {
+        const data = trackData[i];
+        return data
+          ? [
+              {
+                entityId,
+                geometry: data.geometry as unknown as GeoJSON.Geometry,
+                times: data.times,
+              },
+            ]
+          : [];
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapRef, ready, trackedIds, ...trackData]);
 
   const selected = currentFeatures?.find(
     (f) => f.properties.entity_id === selectedId,
@@ -530,21 +561,15 @@ export function MapPage() {
           gateways={gateways.data ?? []}
           coverage={layers.coverage ? coverage.data : undefined}
           choices={layers}
-          trackedId={selectedId && trackHours > 0 ? selectedId : null}
+          trackedIds={trackedIds}
           onChange={setLayers}
           onClose={() => setPanelOpen(false)}
           onToggleTrack={(id) =>
-            setParams(
-              (p) => {
-                if (p.get("entity") === id && Number(p.get("track") ?? 0) > 0)
-                  p.delete("track");
-                else {
-                  p.set("entity", id);
-                  p.set("track", "24");
-                }
-                return p;
-              },
-              { replace: true },
+            setTracked(
+              trackedIds.includes(id)
+                ? trackedIds.filter((x) => x !== id)
+                : [...trackedIds, id],
+              trackHours,
             )
           }
           onPickGateway={(id) => {
@@ -589,7 +614,9 @@ export function MapPage() {
         />
       )}
       {selected && (
-        <aside className="absolute bottom-3 left-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80">
+        <aside
+          className={`absolute bottom-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80 ${panelOpen ? "left-[23rem]" : "left-3"}`}
+        >
           <div className="flex items-start gap-2">
             <Icon iconKey={selected.icon_key} className="size-7 text-primary" />
             <div className="min-w-0 flex-1">
@@ -672,15 +699,17 @@ export function MapPage() {
           </dl>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Select
-              value={String(trackHours)}
+              value={
+                trackedIds.includes(selected.entity_id)
+                  ? String(trackHours)
+                  : "0"
+              }
               onValueChange={(v) =>
-                setParams(
-                  (p) => {
-                    if (v === "0") p.delete("track");
-                    else p.set("track", v);
-                    return p;
-                  },
-                  { replace: true },
+                setTracked(
+                  v === "0"
+                    ? trackedIds.filter((x) => x !== selected.entity_id)
+                    : [...new Set([...trackedIds, selected.entity_id])],
+                  v === "0" ? undefined : Number(v),
                 )
               }
             >
@@ -696,11 +725,11 @@ export function MapPage() {
                 ))}
               </SelectContent>
             </Select>
-            {track.data && (
+            {selectedTrack && (
               <span className="text-xs text-muted-foreground">
                 {t("{{returned}} of {{total}} points", {
-                  returned: track.data.returned_points,
-                  total: track.data.total_points,
+                  returned: selectedTrack.returned_points,
+                  total: selectedTrack.total_points,
                 })}
               </span>
             )}

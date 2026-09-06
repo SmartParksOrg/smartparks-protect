@@ -5405,6 +5405,74 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** DecodedEventRead */
+        DecodedEventRead: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Event Type */
+            event_type: string;
+            /** Title */
+            title: string;
+            /** Severity */
+            severity: string;
+        };
+        /** DecodedMeasurementRead */
+        DecodedMeasurementRead: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Metric Key */
+            metric_key: string;
+            /** Value */
+            value: unknown;
+        };
+        /** DecodedPositionRead */
+        DecodedPositionRead: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude M */
+            altitude_m?: number | null;
+            /** Accuracy M */
+            accuracy_m?: number | null;
+        };
+        /**
+         * DecodedRecordsRead
+         * @description What one delivery became after decoding: the canonical rows that carry its id.
+         */
+        DecodedRecordsRead: {
+            /** Positions */
+            positions: components["schemas"]["DecodedPositionRead"][];
+            /** Measurements */
+            measurements: components["schemas"]["DecodedMeasurementRead"][];
+            /** States */
+            states: components["schemas"]["DecodedStateRead"][];
+            /** Events */
+            events: components["schemas"]["DecodedEventRead"][];
+        };
+        /** DecodedStateRead */
+        DecodedStateRead: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** State */
+            state: {
+                [key: string]: unknown;
+            };
+        };
         /**
          * DeliveryDetail
          * @description One delivery of a canonical record with the source event that carried it (architecture
@@ -8841,6 +8909,8 @@ export interface components {
             }[];
             /** Data Source Name */
             data_source_name?: string | null;
+            /** @description The canonical rows decoded from this event */
+            records?: components["schemas"]["DecodedRecordsRead"] | null;
         };
         /** SourceEventSummary */
         SourceEventSummary: {

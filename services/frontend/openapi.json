@@ -21452,6 +21452,165 @@
     ],
     "title": "DeadLetter"
    },
+   "DecodedEventRead": {
+    "properties": {
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "event_type": {
+      "type": "string",
+      "title": "Event Type"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "severity": {
+      "type": "string",
+      "title": "Severity"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time",
+     "event_type",
+     "title",
+     "severity"
+    ],
+    "title": "DecodedEventRead"
+   },
+   "DecodedMeasurementRead": {
+    "properties": {
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "metric_key": {
+      "type": "string",
+      "title": "Metric Key"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time",
+     "metric_key",
+     "value"
+    ],
+    "title": "DecodedMeasurementRead"
+   },
+   "DecodedPositionRead": {
+    "properties": {
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "latitude": {
+      "type": "number",
+      "title": "Latitude"
+     },
+     "longitude": {
+      "type": "number",
+      "title": "Longitude"
+     },
+     "altitude_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Altitude M"
+     },
+     "accuracy_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Accuracy M"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time",
+     "latitude",
+     "longitude"
+    ],
+    "title": "DecodedPositionRead"
+   },
+   "DecodedRecordsRead": {
+    "properties": {
+     "positions": {
+      "items": {
+       "$ref": "#/components/schemas/DecodedPositionRead"
+      },
+      "type": "array",
+      "title": "Positions"
+     },
+     "measurements": {
+      "items": {
+       "$ref": "#/components/schemas/DecodedMeasurementRead"
+      },
+      "type": "array",
+      "title": "Measurements"
+     },
+     "states": {
+      "items": {
+       "$ref": "#/components/schemas/DecodedStateRead"
+      },
+      "type": "array",
+      "title": "States"
+     },
+     "events": {
+      "items": {
+       "$ref": "#/components/schemas/DecodedEventRead"
+      },
+      "type": "array",
+      "title": "Events"
+     }
+    },
+    "type": "object",
+    "required": [
+     "positions",
+     "measurements",
+     "states",
+     "events"
+    ],
+    "title": "DecodedRecordsRead",
+    "description": "What one delivery became after decoding: the canonical rows that carry its id."
+   },
+   "DecodedStateRead": {
+    "properties": {
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "state": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "State"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time",
+     "state"
+    ],
+    "title": "DecodedStateRead"
+   },
    "DeliveryDetail": {
     "properties": {
      "source_event_id": {
@@ -31343,6 +31502,17 @@
        }
       ],
       "title": "Data Source Name"
+     },
+     "records": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DecodedRecordsRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The canonical rows decoded from this event"
      }
     },
     "type": "object",

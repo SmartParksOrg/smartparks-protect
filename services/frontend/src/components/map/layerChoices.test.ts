@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { EntityGroup } from "@/api/types";
 import {
   DEFAULT_LAYERS,
+  hideAllEntities,
   isVisible,
   onlyGroup,
+  showEntity,
+  showFeature,
+  showGateway,
   toggleEntity,
   toggleGroup,
   UNGROUPED_LAYER,
@@ -107,5 +111,32 @@ describe("layer choices", () => {
     expect(isVisible(rhino, toggleEntity(hidden, "rhino", true), groups)).toBe(
       true,
     );
+  });
+
+  it("showing a child under a switched-off parent switches the parent on and hides the rest", () => {
+    const off = { ...DEFAULT_LAYERS, gateways: false };
+    const one = showGateway(off, "g1", ["g1", "g2", "g3"]);
+    expect(one.gateways).toBe(true);
+    expect(one.hidden_gateways.sort()).toEqual(["g2", "g3"]);
+    const two = showGateway(one, "g2", ["g1", "g2", "g3"]);
+    expect(two.hidden_gateways).toEqual(["g3"]);
+    const feature = showFeature(
+      { ...DEFAULT_LAYERS, features: false },
+      { id: "f1", feature_type: "zone" },
+      ["f1", "f2"],
+      ["zone", "site"],
+    );
+    expect(feature.features).toBe(true);
+    expect(feature.hidden_feature_types).toEqual(["site"]);
+    expect(feature.hidden_features).toEqual(["f2"]);
+  });
+
+  it("showing one entity after hide all shows its group chain and keeps the others hidden", () => {
+    const none = hideAllEntities(DEFAULT_LAYERS, groups);
+    expect(isVisible(rhino, none, groups)).toBe(false);
+    const one = showEntity(none, rhino, groups, ["calf-in-herd"]);
+    expect(isVisible(rhino, one, groups)).toBe(true);
+    expect(one.hidden_entities).toEqual(["calf-in-herd"]);
+    expect(isVisible(loose, one, groups)).toBe(false);
   });
 });

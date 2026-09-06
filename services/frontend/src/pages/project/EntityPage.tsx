@@ -12,9 +12,15 @@ import type {
   Entity,
   EntityAssignment,
   EntityType,
+  EventItem,
   Page as PageType,
+  Position,
+  TrafficRow,
 } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
+import { TechnicalDetails } from "@/components/common/TechnicalDetails";
+import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
+import { TrafficTable } from "@/components/network/TrafficTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { HealthCard } from "@/components/devices/HealthCard";
 import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
@@ -46,6 +52,15 @@ export function EntityPage() {
   const now = useNow();
   const [editing, setEditing] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [since30d] = useState(() =>
+    new Date(Date.now() - 30 * 86400_000).toISOString(),
+  );
+  const [since7d] = useState(() =>
+    new Date(Date.now() - 7 * 86400_000).toISOString(),
+  );
+  const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
+    null,
+  );
   const entity = useQuery({
     queryKey: queryKeys.entity(projectId, entityId),
     queryFn: () =>
@@ -92,6 +107,41 @@ export function EntityPage() {
       )?.find((f) => f.properties.entity_id === entityId)?.properties ?? null,
     [state.data, entityId],
   );
+  const events = useQuery({
+    queryKey: queryKeys.events(projectId, { entity_id: entityId, limit: 10 }),
+    queryFn: () =>
+      api.get<PageType<EventItem>>(`/api/v1/projects/${projectId}/events`, {
+        query: { entity_id: entityId, limit: 10 },
+      }),
+    refetchInterval: 60_000,
+  });
+  const positions = useQuery({
+    queryKey: queryKeys.positions(projectId, { entityId, recent: true }),
+    queryFn: () =>
+      api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, {
+        query: {
+          entity_id: entityId,
+          limit: 10,
+          from: since30d,
+        },
+      }),
+  });
+  const traffic = useQuery({
+    queryKey: queryKeys.traffic(projectId, {
+      deviceId: current?.device_id ?? "",
+      recent: true,
+    }),
+    queryFn: () =>
+      api.get<TrafficRow[]>(`/api/v1/projects/${projectId}/traffic`, {
+        query: {
+          device_id: current?.device_id,
+          limit: 20,
+          from: since7d,
+        },
+      }),
+    enabled: Boolean(current),
+    refetchInterval: 15_000,
+  });
   const release = useMutationToast({
     mutationFn: (assignmentId: string) =>
       api.patch(
@@ -326,6 +376,123 @@ export function EntityPage() {
               )}
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{t("Recent events")}</CardTitle>
+              <Button asChild variant="link" size="sm" className="h-auto p-0">
+                <Link to={`/projects/${projectId}/rules/events`}>
+                  {t("All events")}
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {events.data && events.data.items.length === 0 && (
+                <div className="text-sm text-muted-foreground">
+                  {t("No events for this entity yet.")}
+                </div>
+              )}
+              <ul className="divide-y text-sm">
+                {events.data?.items.map((ev) => (
+                  <li
+                    key={ev.id}
+                    className="flex flex-wrap items-center gap-2 py-1.5"
+                  >
+                    <StatusBadge value={ev.severity} />
+                    <Link
+                      className="font-medium hover:underline"
+                      to={`/projects/${projectId}/rules/events?event=${ev.id}`}
+                    >
+                      {ev.title}
+                    </Link>
+                    <span
+                      className="ml-auto text-xs text-muted-foreground"
+                      title={formatTime(ev.time)}
+                    >
+                      {formatAgo(ev.time, now)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{t("Recent positions")}</CardTitle>
+              {live?.position_time && (
+                <Button asChild variant="link" size="sm" className="h-auto p-0">
+                  <Link
+                    to={`/projects/${projectId}/map?entity=${e.id}&tracks=${e.id}&track=24`}
+                  >
+                    {t("Track on the map")}
+                  </Link>
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {positions.data?.length === 0 && (
+                <div className="text-sm text-muted-foreground">
+                  {t("No positions in the last 30 days.")}
+                </div>
+              )}
+              <ul className="divide-y text-sm">
+                {positions.data?.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex flex-wrap items-center gap-3 py-1.5"
+                  >
+                    <span>{formatTime(p.time)}</span>
+                    <span className="font-mono text-xs">
+                      {(p.geometry?.coordinates as number[])?.[1]?.toFixed(5)},{" "}
+                      {(p.geometry?.coordinates as number[])?.[0]?.toFixed(5)}
+                    </span>
+                    {p.accuracy_m != null && (
+                      <span className="text-muted-foreground">
+                        {t("±{{value}} m", { value: p.accuracy_m })}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+          {current && (
+            <TechnicalDetails className="lg:col-span-2">
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>
+                    {t("Traffic of {{device}}", {
+                      device: current.device_name ?? t("the device"),
+                    })}
+                  </CardTitle>
+                  <Button
+                    asChild
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0"
+                  >
+                    <Link
+                      to={`/projects/${projectId}/network/traffic?device=${current.device_id}`}
+                    >
+                      {t("All traffic")}
+                    </Link>
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <TrafficTable
+                    rows={traffic.data}
+                    isLoading={traffic.isPending}
+                    emptyMessage={t("No messages in the last 7 days.")}
+                    onSelect={(r) =>
+                      setEvent({
+                        id: r.source_event_id,
+                        ingestedAt: r.ingested_at,
+                      })
+                    }
+                  />
+                </CardContent>
+              </Card>
+            </TechnicalDetails>
+          )}
         </div>
       </Page>
       <EntityDialog
@@ -340,6 +507,11 @@ export function EntityPage() {
         entityName={e.name}
         open={assigning}
         onOpenChange={setAssigning}
+      />
+      <SourceEventDialog
+        id={event?.id ?? null}
+        ingestedAt={event?.ingestedAt ?? null}
+        onClose={() => setEvent(null)}
       />
     </>
   );

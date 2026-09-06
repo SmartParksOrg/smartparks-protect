@@ -160,6 +160,24 @@ export async function setEntities(
   source.setData({ type: "FeatureCollection", features: withMarkers });
 }
 
+const TRACK_COLORS = [
+  "#2F4A3A",
+  "#b45309",
+  "#1d4ed8",
+  "#be185d",
+  "#0f766e",
+  "#6d28d9",
+  "#a16207",
+  "#374151",
+];
+
+/** A steady colour per entity, so two tracks on the map stay apart. */
+export function trackColor(entityId: string): string {
+  let hash = 0;
+  for (const c of entityId) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+  return TRACK_COLORS[hash % TRACK_COLORS.length];
+}
+
 export function ensureTrackLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.track)) return;
   map.addSource(SOURCES.track, {
@@ -172,7 +190,11 @@ export function ensureTrackLayers(map: MapLibreMap): void {
       type: "line",
       source: SOURCES.track,
       filter: ["==", ["geometry-type"], "LineString"],
-      paint: { "line-color": "#2F4A3A", "line-width": 3, "line-opacity": 0.85 },
+      paint: {
+        "line-color": ["coalesce", ["get", "color"], "#2F4A3A"],
+        "line-width": 3,
+        "line-opacity": 0.85,
+      },
     },
     "entity-clusters",
   );
@@ -185,7 +207,7 @@ export function ensureTrackLayers(map: MapLibreMap): void {
       paint: {
         "circle-radius": 3,
         "circle-color": "#ffffff",
-        "circle-stroke-color": "#2F4A3A",
+        "circle-stroke-color": ["coalesce", ["get", "color"], "#2F4A3A"],
         "circle-stroke-width": 1.5,
       },
     },
@@ -193,33 +215,38 @@ export function ensureTrackLayers(map: MapLibreMap): void {
   );
 }
 
-export function setTrack(
-  map: MapLibreMap,
-  geometry: GeoJSON.Geometry | null,
-  times: string[],
-): void {
+export interface TrackLayer {
+  entityId: string;
+  geometry: GeoJSON.Geometry;
+  times: string[];
+}
+
+/** Every track shown at once, each in its entity's colour. */
+export function setTracks(map: MapLibreMap, tracks: TrackLayer[]): void {
   const source = map.getSource(SOURCES.track) as GeoJSONSource | undefined;
   if (!source) return;
-  if (!geometry) {
-    source.setData({ type: "FeatureCollection", features: [] });
-    return;
-  }
-  const features: GeoJSON.Feature[] = [
-    { type: "Feature", geometry, properties: {} },
-  ];
-  const coordinates =
-    geometry.type === "LineString"
-      ? geometry.coordinates
-      : geometry.type === "MultiPoint"
-        ? geometry.coordinates
-        : [];
-  coordinates.forEach((c, i) =>
+  const features: GeoJSON.Feature[] = [];
+  for (const track of tracks) {
+    const color = trackColor(track.entityId);
     features.push({
       type: "Feature",
-      geometry: { type: "Point", coordinates: c },
-      properties: { time: times[i] },
-    }),
-  );
+      geometry: track.geometry,
+      properties: { color, entity_id: track.entityId },
+    });
+    const coordinates =
+      track.geometry.type === "LineString"
+        ? track.geometry.coordinates
+        : track.geometry.type === "MultiPoint"
+          ? track.geometry.coordinates
+          : [];
+    coordinates.forEach((c, i) =>
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: c },
+        properties: { color, time: track.times[i] },
+      }),
+    );
+  }
   source.setData({ type: "FeatureCollection", features });
 }
 

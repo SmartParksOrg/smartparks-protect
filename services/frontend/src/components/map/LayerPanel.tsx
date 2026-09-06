@@ -22,12 +22,17 @@ import {
   DEFAULT_LAYERS,
   hideAllEntities,
   isGroupShown,
-  type LayerChoices,
   layerOf,
   onlyGroup,
+  showEntity,
+  showEventType,
+  showFeature,
+  showFeatureType,
+  showGateway,
   toggleEntity,
   toggleGroup,
   toggleInList,
+  type LayerChoices,
   UNGROUPED_LAYER,
 } from "@/components/map/layerChoices";
 import type {
@@ -130,7 +135,7 @@ export function LayerPanel({
   gateways,
   coverage,
   choices,
-  trackedId,
+  trackedIds,
   onChange,
   onClose,
   onPickEntity,
@@ -146,7 +151,7 @@ export function LayerPanel({
   gateways: Gateway[];
   coverage: CoverageResponse | undefined;
   choices: LayerChoices;
-  trackedId: string | null;
+  trackedIds: string[];
   onChange: (next: LayerChoices) => void;
   onClose: () => void;
   onPickEntity: (entityId: string) => void;
@@ -216,6 +221,10 @@ export function LayerPanel({
       !choices.hidden_entities.includes(f.entity_id),
   ).length;
 
+  const siblingsOf = (m: EntityFeatureProperties) =>
+    entities
+      .filter((e) => layerOf(e) === layerOf(m) && e.entity_id !== m.entity_id)
+      .map((e) => e.entity_id);
   const entityRow = (
     m: EntityFeatureProperties,
     depth: number,
@@ -226,9 +235,14 @@ export function LayerPanel({
       <Row key={m.entity_id} depth={depth}>
         <Check
           checked={on}
-          disabled={!groupShown}
           label={m.name}
-          onChange={(v) => onChange(toggleEntity(choices, m.entity_id, v))}
+          onChange={(v) =>
+            onChange(
+              v
+                ? showEntity(choices, m, groups, siblingsOf(m))
+                : toggleEntity(choices, m.entity_id, false),
+            )
+          }
         />
         <Icon
           iconKey={m.icon_key}
@@ -248,17 +262,17 @@ export function LayerPanel({
           {formatAgo(m.last_seen_at, now)}
         </span>
         <Button
-          variant="ghost"
+          variant={trackedIds.includes(m.entity_id) ? "default" : "ghost"}
           size="icon"
-          className={`size-7 shrink-0 ${trackedId === m.entity_id ? "text-primary" : "text-muted-foreground"}`}
-          aria-pressed={trackedId === m.entity_id}
+          className={`size-7 shrink-0 ${trackedIds.includes(m.entity_id) ? "" : "text-muted-foreground"}`}
+          aria-pressed={trackedIds.includes(m.entity_id)}
           aria-label={
-            trackedId === m.entity_id
+            trackedIds.includes(m.entity_id)
               ? t("Hide the track")
               : t("Show the track")
           }
           title={
-            trackedId === m.entity_id
+            trackedIds.includes(m.entity_id)
               ? t("Hide the track")
               : t("Show the track, 24 hours")
           }
@@ -485,17 +499,20 @@ export function LayerPanel({
                 </Button>
                 <Check
                   checked={typeOn}
-                  disabled={!choices.features}
                   label={t(type)}
                   onChange={(v) =>
-                    onChange({
-                      ...choices,
-                      hidden_feature_types: toggleInList(
-                        choices.hidden_feature_types,
-                        type,
-                        v,
-                      ),
-                    })
+                    onChange(
+                      v
+                        ? showFeatureType(choices, type, featureTypes)
+                        : {
+                            ...choices,
+                            hidden_feature_types: toggleInList(
+                              choices.hidden_feature_types,
+                              type,
+                              false,
+                            ),
+                          },
+                    )
                   }
                 />
                 <span
@@ -514,17 +531,29 @@ export function LayerPanel({
                     <Row key={f.id} depth={2}>
                       <Check
                         checked={on}
-                        disabled={!typeOn}
                         label={f.name}
                         onChange={(v) =>
-                          onChange({
-                            ...choices,
-                            hidden_features: toggleInList(
-                              choices.hidden_features,
-                              f.id,
-                              v,
-                            ),
-                          })
+                          onChange(
+                            v
+                              ? showFeature(
+                                  choices,
+                                  f,
+                                  features
+                                    .filter(
+                                      (x) => x.feature_type === f.feature_type,
+                                    )
+                                    .map((x) => x.id),
+                                  featureTypes,
+                                )
+                              : {
+                                  ...choices,
+                                  hidden_features: toggleInList(
+                                    choices.hidden_features,
+                                    f.id,
+                                    false,
+                                  ),
+                                },
+                          )
                         }
                       />
                       <button
@@ -605,17 +634,20 @@ export function LayerPanel({
                 </Button>
                 <Check
                   checked={typeOn}
-                  disabled={!choices.events}
                   label={type}
                   onChange={(v) =>
-                    onChange({
-                      ...choices,
-                      hidden_event_types: toggleInList(
-                        choices.hidden_event_types,
-                        type,
-                        v,
-                      ),
-                    })
+                    onChange(
+                      v
+                        ? showEventType(choices, type, eventTypes)
+                        : {
+                            ...choices,
+                            hidden_event_types: toggleInList(
+                              choices.hidden_event_types,
+                              type,
+                              false,
+                            ),
+                          },
+                    )
                   }
                 />
                 <span
@@ -776,17 +808,24 @@ export function LayerPanel({
               <Row key={g.id} depth={1}>
                 <Check
                   checked={on}
-                  disabled={!choices.gateways}
                   label={g.display_name}
                   onChange={(v) =>
-                    onChange({
-                      ...choices,
-                      hidden_gateways: toggleInList(
-                        choices.hidden_gateways,
-                        g.id,
-                        v,
-                      ),
-                    })
+                    onChange(
+                      v
+                        ? showGateway(
+                            choices,
+                            g.id,
+                            placed.map((x) => x.id),
+                          )
+                        : {
+                            ...choices,
+                            hidden_gateways: toggleInList(
+                              choices.hidden_gateways,
+                              g.id,
+                              false,
+                            ),
+                          },
+                    )
                   }
                 />
                 <RadioTower
