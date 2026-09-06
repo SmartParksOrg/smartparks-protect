@@ -4,7 +4,17 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
-Observability, System Health, backup and disaster recovery (phase 10), proven on the dev server; multi-path OpenCollar acquisition (phase 11): Web Bluetooth, raw log files and Cloudloop/Iridium, built from documentation and the local stack; data curation and corrections (phase 12); platform expansion (phase 13): The Things Stack, Actility, CRA IoT, EarthRanger direct, WildlifeNL, FerusTracker, Movebank exports, icons, dashboards and MCP write tools; production hardening (phase 14): security audit with application-level throttling, organizations as grouping, translation-ready frontend, release process, docs and dependency checks in CI.
+Nothing yet.
+
+## v2.0.0, 2026-09-06
+
+The production milestone (decision D97). Observability, System Health, backup and disaster recovery (phase 10), proven on the dev server; multi-path OpenCollar acquisition (phase 11): Web Bluetooth, raw log files and Cloudloop/Iridium, built from documentation and the local stack; data curation and corrections (phase 12); platform expansion (phase 13): The Things Stack, Actility, CRA IoT, EarthRanger direct, WildlifeNL, FerusTracker, Movebank exports, icons, dashboards and MCP write tools; production hardening (phase 14): security audit with application-level throttling, organizations as grouping, translation-ready frontend, release process, docs and dependency checks in CI. Then phase 15, correctness and usability from the first live days with KPN LoRa live in both directions: assignment dates from the data and the attribution repair, device health and last seen, per-channel traffic columns, gateway positions with their origin, the firmware-aware OpenCollar driver with golden tests, the metrics review, the entity page and device assignment, groups nested as deep as needed with the organizing page, the live map's layers panel with Entities, Features, Events and Coverage tabs, site-wide search, the technical details preference, the style pass and the coverage layer.
+
+### Breaking
+
+- KPN LoRa (ThingPark) data sources verify ThingPark's own push Token and need the tunnel interface authentication key as `as_key`; the bearer downlink mode is gone, so a source with `auth_mode` or `api_token` in its config must be edited to the one-key form before uplinks are accepted again.
+- ChirpStack data sources talk to the server over gRPC only: `api_url` is `grpcs://host:443` or `grpc://host:8080`, the REST gateway path is gone, and a ChirpStack behind nginx needs the documented `grpc_pass` location for the API before downlinks, syncs and Test connection work again.
+- Major version because 2.0 is the production milestone after fourteen unreleased phases of change since v0.6.0: new tables, six migrations, new pages, and the entity-first navigation; every migration downgrades (below).
 
 ### Configuration
 
@@ -71,6 +81,8 @@ Observability, System Health, backup and disaster recovery (phase 10), proven on
 ### Migrations
 
 - 0013 (platform expansion tables, Movebank datasets) and 0014 (export status `expired`): both downgrade completely; 0014's downgrade turns expired jobs into failed ones.
+- 0015 (`data_sources.channels`), 0016 (`device_current_state.latest_measurements` and `latest_state_time`), 0017 (`gateways.location_source` and `location_at`), 0019 (`entity_groups` and `entities.group_id`), 0020 (`users.preferences`): all downgrade completely by dropping what they added; the values are rebuilt from the next records or chosen again.
+- 0018 (air quality metric seeds for the OpenCollar port 21 message): the downgrade deletes the seeded keys; measurements already stored under them stay and register the metric again on the next arrival.
 
 ## v0.6.0, 2026-09-04
 

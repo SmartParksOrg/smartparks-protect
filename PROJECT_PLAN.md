@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 15 (correctness and usability from the first live days, v2.0.0 at its end; D97 to D108 decided on 2026-09-06). Phase 14 complete; KPN LoRa live in both directions since 2026-09-06; bulk onboarding from Needs attention shipped (5be635c) |
-| Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
+| Active phase | Phase 15 complete with v2.0.0 on 2026-09-06; the next phase is planned with Tim from the open items (the live verification stages that wait for accounts, Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack) |
+| Latest release | v2.0.0 (2026-09-06): phases 10 to 15 and the deployment fixes |
 | Last session | 2026-09-06 |
-| Next item | Phase 15: v2.0.0 with the changelog and the release process, the last item of the phase. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
-| Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
+| Next item | Plan the next phase with Tim. Open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live verification stages that wait for other accounts |
+| Blockers | Live verification: KPN LoRa is live; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
 
@@ -676,7 +676,7 @@ Release:
 - [x] Organization tenancy decision revisited (D21). (2026-09-04, D92: organizations as a grouping; `/admin/organizations`, `organization_id` on projects, filter and column on the Projects page, `docs/administration/organizations.md`)
 - [x] Multi-language UI decision. (2026-09-04, D93: translation-ready with i18next, the English catalogue extracted from every component, the lint rule, the catalogue check in CI, a language switch; English only)
 - [x] Release process documented: version, changelog, upgrade notes, migration and rollback guidance (28.9). (2026-09-04, `docs/operations/release-process.md`; the update and deployment guides lost their pre-phase-10 wording)
-- [ ] `VERSION` v2.0.0. (Moved to phase 15 on 2026-09-06, D97.)
+- [x] `VERSION` v2.0.0. (Moved to phase 15 on 2026-09-06, D97; released 2026-09-06.)
 
 **Exit criteria.** A new operator deploys production from the docs alone; a new developer adds a driver from the extension docs alone. (Developer half checked on 2026-09-04 by writing a throwaway driver for a vendor GPS tracker from the guide and its public manual alone; the guide gained what the check missed: how a LoRaWAN frame reaches the driver, metric seeds through a migration, control actions, fixtures, the docs page and the device type. The driver itself was removed at Tim's request on 2026-09-05: the product focuses on OpenCollar. Operator half checked the same day: a throwaway droplet deployed from the deployment guide alone in 7 minutes 41 seconds; the run ended on the security check's finding that v0.6.0, the newest tag the playbook chooses, binds the frontend to every interface, which the unreleased deployment fix resolves; `bootstrap-admin` and `verify-server.sh` passed; the update guide's `env-refresh` to `main` took 3 minutes 39 seconds and all seventeen checks passed. The droplet was destroyed afterwards. Two doc additions came out of it: the wildcard DNS tip for throwaway servers and the note on the strict final check.)
 
@@ -724,7 +724,7 @@ Network tool:
 
 Release:
 
-- [ ] `VERSION` v2.0.0 with the changelog and the release process.
+- [x] `VERSION` v2.0.0 with the changelog and the release process (2026-09-06, the Unreleased section became the v2.0.0 section with Breaking and Migrations, annotated tag on the release commit).
 
 **Exit criteria.** SP051307's log records are visible in project Smart Parks after the repair; the device page shows battery, temperature and uptime from its last status and last seen moves with it; a Bluetooth row in the traffic views carries no LoRaWAN columns; an older collar's log (firmware 6.15) decodes into the same records the raw log decoder gives; a ranger opening the map sees groups, hides one, finds an entity with Ctrl+K and opens it; the coverage map shows the KPN gateways that heard SP051307 today.
 
@@ -1080,33 +1080,8 @@ Listed by the phase where they are first needed.
 - Tim chose to build coverage before the release. Built D107 in the map's Coverage tab rather than as a separate page: heard positions (positions joined to the receptions of their own source event, best RSSI) as dots zoomed in and as hexagons aggregated by PostGIS zoomed out, a period from a day to 90 days, the gateway checkboxes as the filter, the share per gateway on its row, a legend and the note that it shows only where collars were. `mode` on the endpoint forces points or hexagons for checks. The API client now sends repeated query parameters for lists.
 - Where to continue: v2.0.0.
 
-### 2026-09-06, map layers reworked on Tim's feedback (Claude)
+### 2026-09-06, release v2.0.0 (Claude)
 
-- Tim tried the panel on the dev server against EarthRanger's Map Layers and asked for four changes: groups of any depth (D98 amended, ADR 0020 amended, no migration needed: the parent column already pointed at the table; filters and deletions now walk a recursive query, a group cannot move into itself or below itself), a cleaner panel with the entity icons, clearer levels and a minimal last seen, tabs for Entities, Features and Events like EarthRanger's Subjects, Features, Analyzers and Events, and search plus sort with a grouped or flat view. All four built: the panel is a full-height drawer with the three tabs, the top controls move aside while it is open, features hide per type and per feature, events per type, and every row has a locate button.
-- Tim also asked for a page to organize entities into groups (move all hyenas to Wildlife, one hyena to a new subgroup, maybe several groups). Recommendation given, decision pending; recorded as an item under Organising.
-- Where to continue: Tim's answer on the organizing page, then site-wide search (D99).
+- Prepared the release on Tim's word: `VERSION` v2.0.0, the changelog's Unreleased section became v2.0.0 with the phase 15 summary, a Breaking section (the KPN source config's one-key form, the major for the production milestone) and every migration from 0013 to 0020 with its downgrade, the plan's status block. The tag `v2.0.0` goes on the release commit; the dev server follows `main`, which is that commit.
+- Phase 15 is complete. Where to continue: plan the next phase with Tim from the open items.
 
-### 2026-09-06, organizing page, Coverage tab and track toggle (Claude)
-
-- Tim accepted the organizing recommendations and asked for a Coverage tab (gateways only for now, the analysis stays under D107) and a track toggle next to the locate button in the layers panel. Built: the bulk move endpoint, the Groups page as the organizing page with drag and drop onto the tree, "Move to group…" on the Entities list, the Coverage tab with a gateway layer on the map (positions from the gateway registry, per-gateway show and hide), and the track toggle (24 hours on the entity, off again on the second click).
-- Where to continue: site-wide search (D99), then presentation (D105).
-
-### 2026-09-06, site-wide search (Claude)
-
-- Built D99: one bounded search endpoint (at most 50 per kind) over entities, devices (name, serial or an external id such as a DevEUI), features, gateways (through the data sources scoped to the caller's projects), data sources (server admins) and projects, inside what the caller may see; the command palette on Ctrl+K or Cmd+K and from the sidebar, with the pages of the current project, recent picks kept in the browser, and results grouped by kind with the project as subtitle. A feature opens the map on itself (`?feature=`); gateways and data sources open their lists because they have no page of their own.
-- Where to continue: presentation (D105).
-
-### 2026-09-06, operational view first (Claude)
-
-- Built D105: the technical details preference on the user's preference document (server admins default on), the sidebar switch, the folded Technical details section (one click opens it for a page, the switch everywhere), the Network section shown only with the preference on, the device page's identities, traffic and provenance links folded, the driver column on the devices list gated. The audit of the other pages found nothing to fold: they show the entity, its state and the next action already. The inventory per role is in the administration docs.
-- Where to continue: the style pass, then coverage (D107), then v2.0.0.
-
-### 2026-09-06, style pass (Claude)
-
-- Column picker on the shared table, kept per user in the preference document; the admin devices list hides Created by default. Wording: Time instead of When, Status instead of State. Empty states now say what to do next on the project lists. The screenshot sweep ran against the local stack as the check: every route clean at the three widths, once the sweep learned to fill the entity route with a real entity (its only finding was its own placeholder hitting the API).
-- Where to continue: coverage (D107), then v2.0.0.
-
-### 2026-09-06, coverage (Claude)
-
-- Tim chose to build coverage before the release. Built D107 in the map's Coverage tab rather than as a separate page: heard positions (positions joined to the receptions of their own source event, best RSSI) as dots zoomed in and as hexagons aggregated by PostGIS zoomed out, a period from a day to 90 days, the gateway checkboxes as the filter, the share per gateway on its row, a legend and the note that it shows only where collars were. `mode` on the endpoint forces points or hexagons for checks. The API client now sends repeated query parameters for lists.
-- Where to continue: v2.0.0.
