@@ -203,6 +203,10 @@ class Tracer:
                     "status": handle.status,
                     "duration_ms": duration_ms,
                     "output_ref": handle.output_ref,
+                    # Why a step was skipped or yielded less than expected survives compaction.
+                    "note": handle.metadata.get("reason")
+                    or "; ".join(handle.metadata.get("notes") or [])
+                    or None,
                 },
             ]
             return

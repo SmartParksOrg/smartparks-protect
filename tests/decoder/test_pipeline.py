@@ -353,3 +353,39 @@ async def test_chirpstack_uplink_and_status_events(db, bus, world):
     await db.refresh(connectivity)
     assert connectivity.last_join_at == datetime(2026, 5, 1, 9, tzinfo=UTC)
     assert outcome.status == ProcessingStatus.PROCESSED
+
+
+async def test_port_zero_uplink_is_alive_but_holds_nothing(db, bus, world):
+    """A MAC-only uplink (port 0, no application payload) is not a decode failure: no rows,
+    the trace notes it, the connectivity state and the device's last seen move."""
+    from shared.enums import IngestionMethod
+    from shared.models import ConnectivityState
+
+    uplink = inbound(
+        world.external_id,
+        {"data": "", "fPort": 0, "fCnt": 9},
+        acquisition_channel=AcquisitionChannel.LORAWAN,
+        ingestion_method=IngestionMethod.WEBHOOK,
+        provider_metadata={"f_port": 0, "best_rssi": -101.0, "gateway_count": 1},
+        network_received_at=datetime(2026, 5, 2, 8, 0, 0, tzinfo=UTC),
+    )
+    stored = await store_inbound(db, world.source, uplink)
+    await commit_and_publish(db, bus, [stored])
+    outcome = await process_source_event(
+        db, stored.source_event.id, stored.source_event.ingested_at
+    )
+    await db.commit()
+    assert outcome.status == ProcessingStatus.PROCESSED
+    assert sum(outcome.created.values()) == 0
+    trace = await db.get(ProcessingTrace, outcome.trace_id)
+    decoded = next(s for s in trace.compact_steps if s["operation"] == "payload decoded")
+    assert decoded["status"] == "skipped"
+    assert decoded["note"] == "no application payload (port 0)"
+    connectivity = await db.get(ConnectivityState, (world.device.id, world.source.id))
+    assert connectivity.last_uplink_at == datetime(2026, 5, 2, 8, 0, 0, tzinfo=UTC)
+    current = await db.get(DeviceCurrentState, world.device.id)
+    assert current.last_seen_at == datetime(2026, 5, 2, 8, 0, 0, tzinfo=UTC)
+    assert not await bus.list_dead(Topic.SOURCE_EVENT_RECEIVED) or all(
+        d.get("source_event_id") != stored.source_event.id
+        for d in await bus.list_dead(Topic.SOURCE_EVENT_RECEIVED)
+    )

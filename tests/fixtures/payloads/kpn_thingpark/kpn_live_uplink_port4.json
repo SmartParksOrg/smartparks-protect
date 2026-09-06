@@ -1,0 +1,55 @@
+{
+  "DevEUI_uplink": {
+    "Late": 0,
+    "Lrrs": {
+      "Lrr": [
+        {
+          "Chain": 0,
+          "Lrrid": "FF010168",
+          "LrrESP": -132.929382,
+          "LrrSNR": -13.75,
+          "LrrRSSI": -119.0
+        }
+      ]
+    },
+    "Time": "2026-09-06T08:44:49.614+02:00",
+    "FPort": 4,
+    "Lrcid": "0059AC01",
+    "Lrrid": "FF010168",
+    "MType": 2,
+    "DevEUI": "0016C001F004A480",
+    "FCntDn": 720,
+    "FCntUp": 41725,
+    "LrrESP": -132.929382,
+    "LrrLAT": 52.041077,
+    "LrrLON": 5.693411,
+    "LrrSNR": -13.75,
+    "SpFact": 12,
+    "Channel": "LC9",
+    "DevAddr": "1556DC96",
+    "LrrRSSI": -119.0,
+    "MeanPER": 0.593496,
+    "NbTrans": 1,
+    "SubBand": "G2",
+    "TxPower": 14.0,
+    "mic_hex": "d1b91290",
+    "ModelCfg": "0",
+    "DevLrrCnt": 1,
+    "Frequency": 865.1,
+    "CustomerID": "100006684",
+    "InstantPER": 0.333333,
+    "payload_hex": "f40e02006f009271838e821644350000",
+    "CustomerData": {
+      "alr": {
+        "pro": "Static",
+        "ver": "1"
+      },
+      "loc": null,
+      "doms": [],
+      "name": "SP051195",
+      "tags": []
+    },
+    "DynamicClass": "A",
+    "LostUplinksAS": 1
+  }
+}

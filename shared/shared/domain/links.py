@@ -7,6 +7,7 @@ config (for example `web_url`), every key of the external identity attributes (`
 cannot all be filled is left out rather than rendered broken.
 """
 
+import re
 import string
 from typing import Any
 
@@ -31,7 +32,9 @@ def render(template: str, values: dict[str, Any]) -> str | None:
     fields = [f for _, f, _, _ in string.Formatter().parse(template) if f]
     if any(values.get(f) in (None, "") for f in fields):
         return None
-    return template.format(**{f: values[f] for f in fields})
+    url = template.format(**{f: values[f] for f in fields})
+    # A `web_url` entered with a trailing slash must not double the one in the template.
+    return re.sub(r"(?<!:)/{2,}", "/", url)
 
 
 def resolve_links(

@@ -62,6 +62,12 @@ PORT_SWITCH_STATUS = 20
 PORT_FLASH_LOG = 29
 PORT_VALUES = 30
 PORT_MESSAGES = 31
+# Ports of older firmware, absent from decoder 7.2.0 (research section 3.23).
+LEGACY_PORTS: dict[int, str] = {
+    8: "is the legacy RF scanner message (firmware 4.x to 6.16, removed in 7.1.0)",
+    17: "is the legacy open sky detection message (firmware 6.x, removed in 7.1.0)",
+    199: "is the legacy Modem-E info message (disabled by default since 6.2.0)",
+}
 
 # msg_id and fixed data length per port; None means variable length.
 KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
@@ -261,7 +267,15 @@ class OpenCollarDriver:
             return
         spec = KNOWN_PORTS.get(port)
         if spec is None:
-            raise _fail(f"unknown OpenCollar port {port}", port=port)
+            # A port the catalogue does not know is data the firmware sends, not a fault of
+            # the delivery: note it on the trace and keep the source event (research 3.23).
+            legacy = LEGACY_PORTS.get(port)
+            records.notes.append(
+                f"port {port} {legacy}"
+                if legacy
+                else f"port {port} is not in the driver's catalogue"
+            )
+            return
         expected_id, fixed_length = spec
         if len(frame) < 2:
             raise _fail("frame shorter than the two byte header", port=port)

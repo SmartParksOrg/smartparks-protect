@@ -222,7 +222,20 @@ async def process_source_event(
                 frame, f_port = lorawan_frame(payload, event.provider_metadata)
             elif event.acquisition_channel in FRAME_CHANNELS:
                 frame = raw_frame(payload, event.provider_metadata)
-            if event.event_type in driver.decodable_event_types:
+            if (
+                event.event_type in driver.decodable_event_types
+                and event.acquisition_channel == AcquisitionChannel.LORAWAN
+                and (f_port == 0 or frame == b"")
+            ):
+                # A MAC-only uplink (port 0) or an explicitly empty payload holds nothing for a
+                # driver; it still proves the device is alive, which the connectivity state
+                # records. A missing frame is left to the driver: not every LoRaWAN source
+                # carries one (a platform that delivers decoded JSON).
+                records = DecodedRecords(decoder_version="none")
+                records.notes.append(
+                    "no application payload" + (" (port 0)" if f_port == 0 else "")
+                )
+            elif event.event_type in driver.decodable_event_types:
                 records = driver.decode(
                     SourceEventData(
                         id=event.id,
@@ -250,8 +263,10 @@ async def process_source_event(
                 decoder_version=records.decoder_version,
             )
             _summarize(outcome, records)
+            if records.notes:
+                step.metadata["notes"] = list(records.notes)
             if records.empty:
-                step.skip("payload holds no records")
+                step.skip("; ".join(records.notes) or "payload holds no records")
 
         async with tracer.step("decoder", "canonical rows written") as step:
             attributions: dict[datetime, Attribution] = {}

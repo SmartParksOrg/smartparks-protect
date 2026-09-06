@@ -14,5 +14,10 @@ Shapes follow the ThingPark tunnel interface documentation (`DevEUI_uplink`,
   2016 and published with its LRC-AS key (github.com/iotacademy/LoRaPayloadSimulator). The
   Dutch time offset (`+02:00`) in the query is why the webhook parses the raw query string.
 
-Recorded events from Smart Parks' own KPN account replace the invented files when the live run
-happens (phase 7 input).
+- `kpn_live_uplink_port13.json`, `kpn_live_uplink_port4.json`: the first live pushes from Smart
+  Parks' KPN application server (`kpn-lora.com`, subscriber Wireless Logic Benelux, AS ID
+  `ASIDsmartparkseu`) to the dev server on 2026-09-06, stored bodies of an OpenCollar GNSS fix
+  (port 13) and a status message (port 4). KPN's ThingPark sends numbers, not strings. The URL
+  query with the Token is not stored, so these test parsing and decoding, not the token.
+
+The invented files stay until every report type has a recorded example.

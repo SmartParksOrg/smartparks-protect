@@ -178,8 +178,17 @@ def test_switch_timestamp_and_command_confirmation():
     assert confirm.states[0].state["last_command"] == {"id": 0xA4, "executed": True}
 
 
+def test_unknown_and_legacy_ports_are_notes_not_failures():
+    """A port the catalogue does not know (research 3.23) keeps the source event and says so
+    on the trace; a KPN collar on firmware 6.x still sends the Modem-E message on port 199."""
+    unknown = driver.decode(event(99, "0102"))
+    assert unknown.empty and unknown.notes == ["port 99 is not in the driver's catalogue"]
+    legacy = driver.decode(event(199, "000a011700038004d904054c00064c00"))
+    assert legacy.empty and legacy.notes[0].startswith("port 199 is the legacy Modem-E info")
+
+
 def test_bad_frames_are_decode_failures():
-    for port, hex_data in ((2, "f21d00"), (4, "f20e" + "00" * 14), (99, "0102"), (2, "f21e0100")):
+    for port, hex_data in ((2, "f21d00"), (4, "f20e" + "00" * 14), (2, "f21e0100")):
         with pytest.raises(ApplicationError) as excinfo:
             driver.decode(event(port, hex_data))
         assert excinfo.value.code == ErrorCode.PAYLOAD_DECODE_FAILED

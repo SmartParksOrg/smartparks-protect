@@ -55,6 +55,16 @@ export function RecordDeliveries({ canonicalType, canonicalId, onOpenEvent }: { 
 }
 
 /** Trace steps with status, timing and the structured error (architecture 26.3). */
+/** Why a step was skipped or decoded less than expected: the compact trace keeps it as `note`,
+ * a full step as `reason` (skipped) or `notes` (the driver's remarks). */
+function stepNote(metadata: Record<string, unknown> | null | undefined): string | undefined {
+  if (!metadata) return undefined;
+  const note = metadata.note ?? metadata.reason;
+  if (typeof note === "string" && note) return note;
+  const notes = metadata.notes;
+  return Array.isArray(notes) && notes.length > 0 ? notes.map(String).join("; ") : undefined;
+}
+
 export function TraceSteps({ traceId }: { traceId: string }) {
   const { t } = useTranslation();
   const trace = useQuery({ queryKey: queryKeys.trace(traceId), queryFn: () => api.get<Trace>(`/api/v1/traces/${traceId}`) });
@@ -81,6 +91,7 @@ export function TraceSteps({ traceId }: { traceId: string }) {
               {step.duration_ms != null && <span className="ml-auto text-xs text-muted-foreground">{t("{{value}} ms", { value: step.duration_ms })}</span>}
             </div>
             {(step.input_ref || step.output_ref) && <div className="mt-1 text-xs text-muted-foreground">{step.input_ref && <span>{t("in {{ref}}", { ref: step.input_ref })} </span>}{step.output_ref && <span>{t("out {{ref}}", { ref: step.output_ref })}</span>}</div>}
+            {stepNote(step.metadata) && <div className="mt-1 text-xs text-muted-foreground">{stepNote(step.metadata)}</div>}
             {step.error && (
               <div className="mt-2 rounded bg-destructive/10 p-2 text-xs">
                 <div className="font-medium text-destructive">{step.error.error_code as string}: {step.error.message as string}</div>

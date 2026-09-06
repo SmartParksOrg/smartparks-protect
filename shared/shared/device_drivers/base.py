@@ -74,6 +74,13 @@ class DecodedRecords:
     states: list[DecodedState] = field(default_factory=list)
     events: list[DecodedEvent] = field(default_factory=list)
     decoder_version: str = "1"
+    notes: list[str] = field(
+        default_factory=list,
+        metadata={
+            "doc": "Why a delivery yielded fewer records than expected (an unknown port, a "
+            "legacy message): shown on the trace, not a failure"
+        },
+    )
 
     @property
     def empty(self) -> bool:

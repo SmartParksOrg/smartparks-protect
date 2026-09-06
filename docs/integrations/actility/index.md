@@ -9,8 +9,8 @@ name: KPN runs on ThingPark, so the application server events, the gateway recep
 
 1. Under Server admin, Data sources: New data source, adapter Actility ThingPark. Config:
    `downlink_url` (the LRC downlink endpoint of the deployment, for example
-   `https://community.thingpark.io/thingpark/lrc/rest/downlink`), `auth_mode` (`token` with
-   `as_id` and the `as_key` credential, or `bearer` with `api_token`), `web_url` for deep links.
+   `https://community.thingpark.io/thingpark/lrc/rest/downlink`), `as_id` and the `as_key`
+   credential (the AS ID and key of the application server's security), `web_url` for deep links.
 2. In ThingPark create an application server (ThingPark Wireless) or an HTTP connection
    (ThingPark Enterprise) pointing at the webhook URL of the data source, and route the
    devices to it. Activate its security and enter the AS ID and a tunnel interface

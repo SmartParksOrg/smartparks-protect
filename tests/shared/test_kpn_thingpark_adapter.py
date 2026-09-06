@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 from shared.connectivity.adapters.kpn_thingpark import (
+    KPN_DOWNLINK_URL,
     KpnThingParkAdapter,
     ThingParkCommands,
     correlation_id,
@@ -86,7 +87,35 @@ def test_downlink_sent_event():
     message = parse_event(source(), example("downlink_sent.json"))
     assert message.event_type == "downlink_transmitted"
     assert message.provider_metadata["queue_ref"] == "5F3E4D2C-0000-1111-2222-333344445555"
-    assert message.provider_metadata["delivery_status"] == "1"
+    assert message.provider_metadata["delivery_status"] == 1
+
+
+def test_live_downlink_sent_report_moves_the_command_and_explains_the_slot():
+    """The report KPN posted for the first downlink through the dev server (2026-09-06): sent
+    (DeliveryStatus 1) on RX2, with C0 on RX1 explaining why."""
+    message = parse_event(source(), example("kpn_live_downlink_sent.json"))
+    meta = message.provider_metadata
+    assert message.event_type == "downlink_transmitted"
+    assert meta["queue_ref"] == "6CF1BF9A3DBD4821" and meta["delivery_status"] == 1
+    assert meta["delivery_causes"] == ["RX1 C0: LRC selected RX2"]
+    assert meta["frequency_hz"] == 869_525_000 and meta["f_cnt_down"] == 5
+    assert message.network_received_at == datetime(2026, 9, 6, 8, 18, 55, 268000, tzinfo=UTC)
+
+
+def test_failed_downlink_report_fails_the_command():
+    report = example("kpn_live_downlink_sent.json")
+    sent = report["DevEUI_downlink_Sent"]
+    sent["DeliveryStatus"] = 0
+    sent["DeliveryFailedCause1"], sent["DeliveryFailedCause2"] = "E3", "DA"
+    message = parse_event(source(), report)
+    meta = message.provider_metadata
+    # `log` with an ERROR level is what the command path turns into a failed command
+    assert message.event_type == "log" and meta["level"] == "ERROR"
+    assert meta["queue_ref"] == "6CF1BF9A3DBD4821" and meta["delivery_status"] == 0
+    assert meta["description"] == (
+        "downlink not sent: RX1 E3: validity time expired; RX2 DA: duty cycle constraint "
+        "detected by LRC"
+    )
 
 
 def test_unknown_document_is_rejected():
@@ -227,30 +256,39 @@ async def test_submit_token_mode(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_submit_bearer_mode_and_errors(monkeypatch):
+async def test_submit_uses_kpn_url_by_default_and_reports_refusals(monkeypatch):
     real = httpx.AsyncClient
     seen: dict[str, str] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = f"{request.url.scheme}://{request.url.host}{request.url.path}"
         seen["auth"] = request.headers.get("Authorization", "")
-        seen["query"] = str(request.url.query)
-        return httpx.Response(403, text="forbidden")
+        return httpx.Response(403, text="Security Check. bad AS_ID")
 
     monkeypatch.setattr(
         httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
     )
-    connector = ThingParkCommands(
-        source({"downlink_url": "https://x/dl", "auth_mode": "bearer"}, {"api_token": "tok"})
-    )
-    with pytest.raises(ApplicationError) as excinfo:
-        await connector.submit("AA", b"\x00", {"f_port": 1, "reference": str(uuid.uuid4())})
-    assert excinfo.value.code == ErrorCode.CONNECTIVITY_AUTH_FAILED and seen["auth"] == "Bearer tok"
-    assert "CorrelationID=" in seen["query"] and "Token=" not in seen["query"]
+    kpn = ADAPTERS["kpn_thingpark"].command_connector(source({"as_id": "ASIDx"}, {"as_key": "k"}))
+    with pytest.raises(ApplicationError) as refused:
+        await kpn.submit("AA", b"\x00", {"f_port": 1, "reference": str(uuid.uuid4())})
+    assert refused.value.code == ErrorCode.CONNECTIVITY_AUTH_FAILED
+    assert seen["url"] == KPN_DOWNLINK_URL and seen["auth"] == ""
+
+
+@pytest.mark.asyncio
+async def test_submit_needs_as_id_key_and_for_actility_the_url():
     with pytest.raises(ApplicationError) as missing:
-        await ThingParkCommands(source({"auth_mode": "bearer"}, {})).submit(
+        await ThingParkCommands(source({"as_id": ""}, {"as_key": ""}), KPN_DOWNLINK_URL).submit(
             "AA", b"\x00", {"f_port": 1}
         )
     assert missing.value.code == ErrorCode.COMMAND_REJECTED
+    assert str(missing.value).endswith("the data source has no as_id and no as_key credential")
+    actility = ADAPTERS["actility_thingpark"].command_connector(
+        source({"as_id": "x"}, {"as_key": "k"})
+    )
+    with pytest.raises(ApplicationError) as no_url:
+        await actility.submit("AA", b"\x00", {"f_port": 1})
+    assert "no downlink_url" in str(no_url.value)
 
 
 def test_registered_and_described():
@@ -260,7 +298,53 @@ def test_registered_and_described():
         described["acquisition_channel"] == "lorawan"
         and "downlink_url" in described["config_schema"]["properties"]
     )
-    assert described["credentials_schema"]["as_key"]
+    assert list(described["credentials_schema"]) == ["as_key"]
     http = next(c for c in described["channels"] if c["key"] == "http")
-    assert http["optional_credential_keys"] == ["as_key"]
-    assert described["config_example"]["downlink_url"].startswith("https://api.kpn-lora.com/")
+    api = next(c for c in described["channels"] if c["key"] == "api")
+    assert http["credential_keys"] == ["as_key"] and api["credential_keys"] == []
+    assert api["config_keys"] == ["as_id"] and "downlink_url" in api["optional_keys"]
+    assert described["config_schema"]["properties"]["downlink_url"]["default"] == KPN_DOWNLINK_URL
+    assert "auth_mode" not in described["config_schema"]["properties"]
+    actility = describe_adapter(ADAPTERS["actility_thingpark"])
+    api = next(c for c in actility["channels"] if c["key"] == "api")
+    assert api["config_keys"] == ["as_id", "downlink_url"]
+    assert "default" not in actility["config_schema"]["properties"]["downlink_url"]
+
+
+@pytest.mark.parametrize(
+    ("name", "port", "kind"),
+    [
+        ("kpn_live_uplink_port13.json", 13, "positions"),
+        ("kpn_live_uplink_port4.json", 4, "measurements"),
+    ],
+)
+def test_live_kpn_pushes_decode_with_the_opencollar_driver(name, port, kind):
+    """The first recorded pushes from Smart Parks' KPN application (2026-09-06): the frame
+    reaches the OpenCollar driver and yields a position (port 13) or a status (port 4)."""
+    from shared.device_drivers.base import SourceEventData
+    from shared.device_drivers.registry import DRIVERS
+
+    message = parse_event(source(), example(name))
+    assert message.event_type == "uplink" and message.provider_metadata["f_port"] == port
+    assert message.gateway_receptions and all(
+        r.rssi is not None and r.snr is not None for r in message.gateway_receptions
+    )
+    assert any("location" in r.attributes for r in message.gateway_receptions)
+    frame, f_port = lorawan_frame(message.payload, message.provider_metadata)
+    assert frame and f_port == port
+    records = DRIVERS["opencollar"].decode(
+        SourceEventData(
+            id=1,
+            event_type="uplink",
+            payload=message.payload,
+            provider_metadata=message.provider_metadata,
+            network_received_at=message.network_received_at,
+            ingested_at=message.network_received_at,
+            device_attributes={},
+            device_type_settings={},
+            frame=frame,
+            f_port=f_port,
+            acquisition_channel="lorawan",
+        )
+    )
+    assert getattr(records, kind), records

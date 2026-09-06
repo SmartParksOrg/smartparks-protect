@@ -370,7 +370,7 @@ async def get_trace(
                 input_ref=None,
                 output_ref=s.get("output_ref"),
                 retry_count=0,
-                metadata={},
+                metadata={"note": s["note"]} if s.get("note") else {},
                 error=None,
             )
             for s in trace.compact_steps

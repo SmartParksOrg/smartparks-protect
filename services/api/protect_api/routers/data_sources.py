@@ -33,6 +33,7 @@ from shared.connectivity.transports.http import hash_token, new_webhook_token
 from shared.database import get_session
 from shared.ingest import apply_gateway_update, data_source_context
 from shared.models import (
+    Command,
     DataSource,
     DataSourceCursor,
     DataSourceProjectScope,
@@ -331,7 +332,22 @@ async def data_source_status(
         elif configured:
             test = await read_api_test(source.id)
             if test is None:
-                state, detail = "untested", "configured; run Test connection"
+                # Adapters without a test call (ThingPark) prove the channel by their downlinks.
+                last_command = await session.scalar(
+                    select(Command)
+                    .where(Command.data_source_id == source.id)
+                    .order_by(Command.created_at.desc())
+                    .limit(1)
+                )
+                if last_command is None:
+                    state, detail = "ready", "configured; no downlink sent through this source yet"
+                else:
+                    failed = last_command.status in ("failed", "expired")
+                    state = "error" if failed else "ok"
+                    detail = f"last downlink {last_command.action_key} {last_command.status}"
+                    if failed and last_command.error_message:
+                        detail = f"{detail}: {last_command.error_message}"
+                    last_at = last_command.updated_at
             else:
                 state = "ok" if test.get("ok") else "error"
                 detail = str(test.get("detail") or "")

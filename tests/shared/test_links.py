@@ -52,3 +52,10 @@ def test_admin_override_wins_and_generic_has_no_links():
         id=uuid.uuid4(), name="G", adapter_key="generic_http", config={}, link_templates={}
     )
     assert resolve_links(generic, identity) == []
+
+
+def test_render_collapses_the_slash_of_a_web_url_ending_with_one():
+    values = {"web_url": "https://x/portal/", "external_id": "A"}
+    assert render("{web_url}/devices/{external_id}", values) == "https://x/portal/devices/A"
+    assert render("{web_url}/d", {"web_url": "https://x"}) == "https://x/d"
+    assert render("{web_url}/d", {"web_url": ""}) is None

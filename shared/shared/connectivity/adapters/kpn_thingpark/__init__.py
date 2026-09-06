@@ -11,17 +11,16 @@ verifies that token, so the push needs no custom header; the source's bearer tok
 accepted as the alternative.
 
 Downlinks go to the ThingPark downlink API: `POST {downlink_url}` with `DevEUI`, `FPort`,
-`Payload` (hex), optional `Confirmed` and `FlushDownlinkQueue`, then in `token` mode `AS_ID`,
-`Time` and a `Token` over the query and the AS key, or in `bearer` mode an `Authorization:
-Bearer` header. Every downlink carries a `CorrelationID` (64 bits of hex) derived from the
-command id; the `DevEUI_downlink_Sent` report echoes it, which is how a command becomes
-`transmitted`. Capabilities differ per subscription (architecture 8.2): a public KPN account
-exposes no gateway management and no statistics.
+`Payload` (hex), optional `Confirmed` and `FlushDownlinkQueue`, then `AS_ID`, `Time`, a
+`CorrelationID` (64 bits of hex derived from the command id) and a `Token` over the query and
+the same AS key. The `DevEUI_downlink_Sent` report echoes the CorrelationID, which is how a
+command becomes `transmitted`. One key, both directions; ThingPark has no other scheme, so the
+adapter offers none. Capabilities differ per subscription (architecture 8.2): a public KPN
+account exposes no gateway management and no statistics.
 
-Config keys: `downlink_url` (KPN: `https://api.kpn-lora.com/thingpark/lrc/rest/downlink`),
-`auth_mode` (`token` or `bearer`), `as_id`, `web_url` (the ThingPark portal, for deep links),
-`flush_downlinks` (default false). Credentials: `as_key` (push verification and token-mode
-downlinks) or `api_token` (bearer mode).
+Config keys: `as_id` (the AS ID entered in ThingPark's security settings), `downlink_url`
+(KPN's endpoint by default), `web_url` (the portal, for deep links), `flush_downlinks`
+(default false). Credential: `as_key`, the tunnel interface authentication key.
 
 Built from the ThingPark tunnel interface documentation and Actility's published examples; the
 live run against a KPN account adds recorded payloads to the fixtures.
@@ -69,6 +68,28 @@ REPORT_BODY_ELEMENTS: dict[str, tuple[str, ...]] = {
 }
 # The query parameters of a push, in the order ThingPark hashes them (Token excluded).
 PUSH_QUERY_ORDER: tuple[str, ...] = ("LrnDevEui", "LrnFPort", "LrnInfos", "AS_ID", "Time")
+KPN_DOWNLINK_URL = "https://api.kpn-lora.com/thingpark/lrc/rest/downlink"
+# `DeliveryStatus` of a downlink sent report: 1 sent by an LRR, 0 not sent. The causes per
+# transmission slot (docs.thingpark.com, Wireless Logger, downlink unicast packets).
+DELIVERY_FAILED_CAUSES: dict[str, str] = {
+    "A0": "radio stopped",
+    "A1": "downlink radio stopped",
+    "A3": "radio busy",
+    "A4": "listen before talk",
+    "A5": "radio board error",
+    "A6": "packet forwarder failure",
+    "B0": "too late for RX1/RX2",
+    "C0": "LRC selected RX2",
+    "D0": "duty cycle constraint detected by LRR",
+    "DA": "duty cycle constraint detected by LRC",
+    "DB": "max dwell time constraint",
+    "DE": "duty cycle not allowed by peering operator",
+    "DF": "wrong NetID",
+    "E1": "queue full",
+    "E2": "invalid FCntDn",
+    "E3": "validity time expired",
+    "E4": "queue reset following rejoin",
+}
 
 
 def parse_thingpark_time(value: Any) -> datetime | None:
@@ -195,17 +216,37 @@ def parse_event(source: DataSourceContext, body: Any) -> InboundMessage:
     }
     if isinstance(payload_hex, str) and payload_hex:
         metadata["frame_hex"] = payload_hex
+    frequency = _number(data.get("Frequency"))  # MHz
+    if frequency:
+        metadata["frequency_hz"] = round(frequency * 1_000_000)
+    event_type = EVENT_TYPES[kind]
     if kind == "DevEUI_downlink_Sent":
-        metadata["delivery_status"] = data.get("DeliveryStatus")
-        for cause in ("DeliveryFailedCause1", "DeliveryFailedCause2", "DeliveryFailedCause3"):
-            if data.get(cause) not in (None, "", "00"):
-                metadata[cause.lower()] = data.get(cause)
+        status = data.get("DeliveryStatus")
+        metadata["delivery_status"] = int(status) if status not in (None, "") else None
+        causes = []
+        for slot, cause in (
+            ("RX1", data.get("DeliveryFailedCause1")),
+            ("RX2", data.get("DeliveryFailedCause2")),
+            ("ping slot", data.get("DeliveryFailedCause3")),
+        ):
+            code = str(cause or "").upper()
+            if code and code != "00":
+                causes.append(f"{slot} {code}: {DELIVERY_FAILED_CAUSES.get(code, 'unknown cause')}")
+        if causes:
+            metadata["delivery_causes"] = causes
         # The CorrelationID we sent with the downlink comes back here; upper case like ours.
         reference = data.get("CorrelationID") or data.get("FlowId")
         metadata["queue_ref"] = str(reference).upper() if reference else None
+        if metadata["delivery_status"] == 0:
+            # Not sent over the air: the command path reads a platform error (level, description).
+            event_type = "log"
+            metadata["level"] = "ERROR"
+            metadata["description"] = "downlink not sent: " + (
+                "; ".join(causes) or "no cause given"
+            )
     return InboundMessage(
         external_id=dev_eui,
-        event_type=EVENT_TYPES[kind],
+        event_type=event_type,
         payload=document,
         acquisition_channel=AcquisitionChannel.LORAWAN,
         ingestion_method=IngestionMethod.WEBHOOK,
@@ -243,24 +284,34 @@ def correlation_id(reference: str) -> str:
 class ThingParkCommands:
     """Command connector: the ThingPark downlink API."""
 
-    def __init__(self, source: DataSourceContext) -> None:
+    def __init__(self, source: DataSourceContext, default_url: str | None = None) -> None:
         self.source = source
-        self.url = str(source.config.get("downlink_url") or "").strip()
-        self.auth_mode = str(source.config.get("auth_mode") or "token")
-        self.as_id = str(source.config.get("as_id") or "")
-        self.as_key = str(source.credentials.get("as_key") or "")
-        self.api_token = str(source.credentials.get("api_token") or "")
+        self.url = str(source.config.get("downlink_url") or default_url or "").strip()
+        self.as_id = str(source.config.get("as_id") or "").strip()
+        self.as_key = str(source.credentials.get("as_key") or "").strip()
+
+    def _require(self) -> None:
+        missing = [
+            name
+            for name, value in (
+                ("downlink_url", self.url),
+                ("as_id", self.as_id),
+                ("as_key credential", self.as_key),
+            )
+            if not value
+        ]
+        if missing:
+            raise ApplicationError(
+                code=ErrorCode.COMMAND_REJECTED,
+                message=f"the data source has no {' and no '.join(missing)}",
+                component="adapter.kpn_thingpark",
+                user_actionable=True,
+            )
 
     async def submit(
         self, external_id: str, payload: bytes, options: dict[str, Any]
     ) -> dict[str, Any]:
-        if not self.url:
-            raise ApplicationError(
-                code=ErrorCode.COMMAND_REJECTED,
-                message="the data source has no downlink_url",
-                component="adapter.kpn_thingpark",
-                user_actionable=True,
-            )
+        self._require()
         reference = str(options.get("reference") or "")
         correlation = correlation_id(reference) if reference else None
         # The order is the one ThingPark hashes: mandatory fields, options, AS_ID and Time,
@@ -277,19 +328,13 @@ class ThingParkCommands:
             "true",
         ):
             query["FlushDownlinkQueue"] = "1"
-        headers: dict[str, str] = {}
-        if self.auth_mode == "bearer":
-            headers["Authorization"] = f"Bearer {self.api_token}"
-            if correlation:
-                query["CorrelationID"] = correlation
-        else:
-            query["AS_ID"] = self.as_id
-            query["Time"] = utc_now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "+00:00"
-            if correlation:
-                query["CorrelationID"] = correlation
-            query["Token"] = downlink_token(query, self.as_key)
+        query["AS_ID"] = self.as_id
+        query["Time"] = utc_now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "+00:00"
+        if correlation:
+            query["CorrelationID"] = correlation
+        query["Token"] = downlink_token(query, self.as_key)
         async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.post(self.url, params=query, headers=headers)
+            response = await client.post(self.url, params=query)
         if response.status_code in (401, 403):
             raise ApplicationError(
                 code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
@@ -326,6 +371,64 @@ class ThingParkCommands:
         }
 
 
+def thingpark_channels(downlink_url_required: bool) -> list[dict[str, Any]]:
+    """The two channels of a ThingPark source. One AS key serves both: it is asked for once,
+    under the channel that receives, and the downlink channel says it uses the same key."""
+    return [
+        {
+            "key": "http",
+            "label": "Application server (HTTP)",
+            "direction": "in",
+            "purpose": "ThingPark posts uplinks and downlink reports to the webhook URL",
+            "config_keys": [],
+            "credential_keys": ["as_key"],
+            "hint": (
+                "The tunnel interface authentication key from the application server's "
+                "uplink/downlink security in ThingPark; it verifies every push"
+            ),
+        },
+        {
+            "key": "api",
+            "label": "Downlink API",
+            "direction": "out",
+            "purpose": "Downlinks through the LRC downlink endpoint, signed with the same AS key",
+            "config_keys": ["as_id", "downlink_url"] if downlink_url_required else ["as_id"],
+            "optional_keys": ["flush_downlinks"]
+            if downlink_url_required
+            else ["downlink_url", "flush_downlinks"],
+            "credential_keys": [],
+            "capabilities": ["downlink"],
+            "hint": "as_id is the AS ID shown under the application server's security status",
+        },
+    ]
+
+
+def thingpark_config_schema(default_downlink_url: str | None) -> dict[str, Any]:
+    downlink_url: dict[str, Any] = {
+        "type": "string",
+        "description": "ThingPark LRC downlink endpoint",
+    }
+    if default_downlink_url:
+        downlink_url["default"] = default_downlink_url
+    return {
+        "type": "object",
+        "properties": {
+            "as_id": {
+                "type": "string",
+                "description": "Application server id, as shown under uplink/downlink security "
+                "of the application server in ThingPark",
+            },
+            "downlink_url": downlink_url,
+            "web_url": {"type": "string", "description": "ThingPark portal, for deep links"},
+            "flush_downlinks": {
+                "type": "boolean",
+                "default": False,
+                "description": "Replace the device's downlink queue with every command",
+            },
+        },
+    }
+
+
 class KpnThingParkAdapter:
     key: ClassVar[str] = "kpn_thingpark"
     label: ClassVar[str] = "KPN LoRa (ThingPark)"
@@ -343,67 +446,24 @@ class KpnThingParkAdapter:
         gateway_status=False,
         statistics=False,
     )
-    channels: ClassVar[list[dict[str, Any]]] = [
-        {
-            "key": "http",
-            "label": "Application server (HTTP)",
-            "direction": "in",
-            "purpose": "ThingPark posts uplinks and downlink events to the webhook URL",
-            "config_keys": [],
-            "credential_keys": [],
-            "optional_credential_keys": ["as_key"],
-            "hint": (
-                "With the AS key stored, ThingPark's own Token in the URL authenticates every "
-                "push; without it, add Authorization: Bearer <webhook token> as a custom header"
-            ),
-        },
-        {
-            "key": "api",
-            "label": "Downlink API",
-            "direction": "out",
-            "purpose": "Downlinks through the LRC downlink endpoint",
-            "config_keys": ["downlink_url"],
-            "optional_keys": ["auth_mode", "as_id", "flush_downlinks"],
-            "credential_keys": [],
-            "optional_credential_keys": ["as_key", "api_token"],
-            "capabilities": ["downlink"],
-            "hint": "auth_mode token needs as_id and the as_key credential; bearer needs api_token",
-        },
-    ]
+    channels: ClassVar[list[dict[str, Any]]] = thingpark_channels(downlink_url_required=False)
     default_link_templates: ClassVar[dict[str, str]] = {
         "OPEN_DEVICE": "{web_url}/devices/{external_id}",
     }
-    config_schema: ClassVar[dict[str, Any]] = {
-        "type": "object",
-        "properties": {
-            "downlink_url": {"type": "string", "description": "ThingPark downlink API endpoint"},
-            "auth_mode": {"type": "string", "enum": ["token", "bearer"], "default": "token"},
-            "as_id": {
-                "type": "string",
-                "description": "Application server id, as entered in the ThingPark security "
-                "settings of the application server (token mode)",
-            },
-            "web_url": {"type": "string", "description": "ThingPark portal, for deep links"},
-            "flush_downlinks": {"type": "boolean", "default": False},
-        },
-    }
-    config_example: ClassVar[dict[str, Any]] = {
-        "downlink_url": "https://api.kpn-lora.com/thingpark/lrc/rest/downlink",
-        "auth_mode": "token",
-        "as_id": "TWA_100000000.1",
-        "web_url": "https://wireless-logger.thingpark.com",
-    }
+    config_schema: ClassVar[dict[str, Any]] = thingpark_config_schema(KPN_DOWNLINK_URL)
+    config_example: ClassVar[dict[str, Any]] = {"web_url": "https://www.kpn-lora.com/portal/web/"}
     credentials_schema: ClassVar[dict[str, str]] = {
-        "as_key": "Tunnel interface authentication key (AS key): verifies pushes, signs downlinks",
-        "api_token": "Bearer token (bearer mode downlinks)",
+        "as_key": "Tunnel interface authentication key of the application server (32 hex "
+        "characters): verifies every push and signs every downlink",
     }
     setup_hint: ClassVar[str] = (
-        "In the KPN ThingPark Device Manager create an HTTP application server with the webhook "
-        "URL as destination, activate its uplink/downlink security with an AS ID and a tunnel "
-        "interface authentication key, and store that key here as as_key: ThingPark's own "
-        "Token then authenticates every push. Where the portal offers custom headers, "
+        "In the KPN ThingPark Device Manager add the webhook URL as a destination of the "
+        "collars' HTTP application server (routing strategy Blast when it has other "
+        "destinations), read the AS ID under its uplink/downlink security and store the key "
+        "of that security here as as_key. Where the portal offers custom headers, "
         "Authorization: Bearer <webhook token> works as well."
     )
+    default_downlink_url: ClassVar[str | None] = KPN_DOWNLINK_URL
 
     def event_connector(self, source: DataSourceContext) -> EventConnector | None:
         return None
@@ -422,10 +482,11 @@ class KpnThingParkAdapter:
         return verify_push(documents, query, str(source.credentials.get("as_key") or ""))
 
     def command_connector(self, source: DataSourceContext) -> ThingParkCommands:
-        return ThingParkCommands(source)
+        return ThingParkCommands(source, default_url=self.default_downlink_url)
 
 
 __all__ = [
+    "KPN_DOWNLINK_URL",
     "KpnThingParkAdapter",
     "ThingParkCommands",
     "correlation_id",
@@ -434,5 +495,7 @@ __all__ = [
     "log",
     "parse_event",
     "push_token",
+    "thingpark_channels",
+    "thingpark_config_schema",
     "verify_push",
 ]
