@@ -16,6 +16,8 @@ export interface NavItem {
 export interface NavSection {
   label: string;
   items: NavItem[];
+  /** Shown only with the technical details preference on (decision D105). */
+  technical?: boolean;
 }
 
 export const projectSections: NavSection[] = [
@@ -39,6 +41,7 @@ export const projectSections: NavSection[] = [
   },
   {
     label: "Network",
+    technical: true,
     items: [
       { label: "Traffic", icon: Radio, to: "network/traffic" },
       { label: "Gateways", icon: Waypoints, to: "network/gateways" },

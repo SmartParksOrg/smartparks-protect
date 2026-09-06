@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 15 (correctness and usability from the first live days, v2.0.0 at its end; D97 to D108 decided on 2026-09-06). Phase 14 complete; KPN LoRa live in both directions since 2026-09-06; bulk onboarding from Needs attention shipped (5be635c) |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-06 |
-| Next item | Phase 15, presentation (D105): the operational view first with the per-user detail-level preference, then the style pass with a column picker and the page inventory per role; then presentation (D105, the detail-level preference and the style pass); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
+| Next item | Phase 15, presentation: the style pass (fewer columns by default with a column picker, consistent wording, empty states with the next action, the screenshot sweep); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -715,7 +715,7 @@ Organising:
 
 Presentation:
 
-- [ ] Operational view first (D105): an audit of every page against "the entity, its state and the next action first; identities, ports, traces and provider fields under Technical details"; a per-user "Show technical details" preference (server admins default on) that expands those sections and shows the Network section to project users; a page inventory per role in `docs/administration/`.
+- [x] Operational view first (D105) (2026-09-06, `useTechnicalDetails` over the preference document with the server admin default, `TechnicalDetails` folded section, the sidebar switch, `technical` on the Network section, the device page and list audited, `docs/administration/pages.md` as the inventory; the other pages carried no technical fields to fold): an audit of every page against "the entity, its state and the next action first; identities, ports, traces and provider fields under Technical details"; a per-user "Show technical details" preference (server admins default on) that expands those sections and shows the Network section to project users; a page inventory per role in `docs/administration/`.
 - [ ] Style pass: fewer columns by default with a column picker, consistent wording ("Last seen", "Health"), empty states with the next action, and the screenshot sweep as the check.
 
 Network tool:
@@ -1065,6 +1065,11 @@ Listed by the phase where they are first needed.
 - Built D99: one bounded search endpoint (at most 50 per kind) over entities, devices (name, serial or an external id such as a DevEUI), features, gateways (through the data sources scoped to the caller's projects), data sources (server admins) and projects, inside what the caller may see; the command palette on Ctrl+K or Cmd+K and from the sidebar, with the pages of the current project, recent picks kept in the browser, and results grouped by kind with the project as subtitle. A feature opens the map on itself (`?feature=`); gateways and data sources open their lists because they have no page of their own.
 - Where to continue: presentation (D105).
 
+### 2026-09-06, operational view first (Claude)
+
+- Built D105: the technical details preference on the user's preference document (server admins default on), the sidebar switch, the folded Technical details section (one click opens it for a page, the switch everywhere), the Network section shown only with the preference on, the device page's identities, traffic and provenance links folded, the driver column on the devices list gated. The audit of the other pages found nothing to fold: they show the entity, its state and the next action already. The inventory per role is in the administration docs.
+- Where to continue: the style pass, then coverage (D107), then v2.0.0.
+
 ### 2026-09-06, map layers reworked on Tim's feedback (Claude)
 
 - Tim tried the panel on the dev server against EarthRanger's Map Layers and asked for four changes: groups of any depth (D98 amended, ADR 0020 amended, no migration needed: the parent column already pointed at the table; filters and deletions now walk a recursive query, a group cannot move into itself or below itself), a cleaner panel with the entity icons, clearer levels and a minimal last seen, tabs for Entities, Features and Events like EarthRanger's Subjects, Features, Analyzers and Events, and search plus sort with a grouped or flat view. All four built: the panel is a full-height drawer with the three tabs, the top controls move aside while it is open, features hide per type and per feature, events per type, and every row has a locate button.
@@ -1080,3 +1085,8 @@ Listed by the phase where they are first needed.
 
 - Built D99: one bounded search endpoint (at most 50 per kind) over entities, devices (name, serial or an external id such as a DevEUI), features, gateways (through the data sources scoped to the caller's projects), data sources (server admins) and projects, inside what the caller may see; the command palette on Ctrl+K or Cmd+K and from the sidebar, with the pages of the current project, recent picks kept in the browser, and results grouped by kind with the project as subtitle. A feature opens the map on itself (`?feature=`); gateways and data sources open their lists because they have no page of their own.
 - Where to continue: presentation (D105).
+
+### 2026-09-06, operational view first (Claude)
+
+- Built D105: the technical details preference on the user's preference document (server admins default on), the sidebar switch, the folded Technical details section (one click opens it for a page, the switch everywhere), the Network section shown only with the preference on, the device page's identities, traffic and provenance links folded, the driver column on the devices list gated. The audit of the other pages found nothing to fold: they show the entity, its state and the next action already. The inventory per role is in the administration docs.
+- Where to continue: the style pass, then coverage (D107), then v2.0.0.

@@ -11,6 +11,8 @@ import {
 } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { useTechnicalDetails } from "@/hooks/useTechnicalDetails";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import i18n, { LANGUAGES } from "@/i18n";
@@ -68,6 +70,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const role = useProjectRole(projectId);
+  const [technical, setTechnical] = useTechnicalDetails();
 
   return (
     <div className="flex h-full flex-col">
@@ -93,6 +96,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex-1 space-y-4 overflow-y-auto px-2 pb-4">
         {projectId &&
           projectSections.map((section) => {
+            if (section.technical && !technical) return null;
             const items = section.items.filter(
               (item) => !item.adminOnly || canAdmin(role),
             );
@@ -129,6 +133,16 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </div>
           ))}
       </nav>
+      <div className="border-t px-3 py-2">
+        <label className="flex items-center justify-between gap-2 px-3 text-xs text-muted-foreground">
+          <span>{t("Technical details")}</span>
+          <Switch
+            checked={technical}
+            onCheckedChange={setTechnical}
+            aria-label={t("Show technical details everywhere")}
+          />
+        </label>
+      </div>
       <div className="border-t px-3 py-3">
         <div
           className="truncate px-3 text-xs text-muted-foreground"
