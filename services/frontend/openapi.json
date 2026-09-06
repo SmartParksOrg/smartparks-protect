@@ -32096,6 +32096,12 @@
        }
       ],
       "title": "Last Login At"
+     },
+     "preferences": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Preferences",
+      "description": "Interface choices the frontend keeps per user (map layers per project)"
      }
     },
     "type": "object",
@@ -32188,6 +32194,19 @@
        }
       ],
       "title": "Timezone"
+     },
+     "preferences": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preferences",
+      "description": "Replaces the whole document; bounded at 32 KB"
      }
     },
     "type": "object",

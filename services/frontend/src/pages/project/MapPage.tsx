@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Layers, X } from "lucide-react";
+import { Layers, ListTree, X } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
@@ -12,10 +12,14 @@ import type { CurrentState, Feature, Page as PageType, Track } from "@/api/types
 import { Icon } from "@/components/icons/Icon";
 import { type BasemapKey, BASEMAPS, loadBasemap, saveBasemap } from "@/components/map/basemap";
 import { type EntityFeatureProperties, ensureEntityLayers, ensureEventLayers, ensureFeatureLayers, ensureTrackLayers, setEntities, setEvents, setFeatures, setTrack, SOURCES } from "@/components/map/layers";
+import { DEFAULT_LAYERS, type LayerChoices, isVisible } from "@/components/map/layerChoices";
+import { LayerPanel } from "@/components/map/LayerPanel";
 import { useMap } from "@/components/map/useMap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useGroups } from "@/hooks/useGroups";
+import { usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { useNow } from "@/hooks/useNow";
 import { formatAgo, formatTime } from "@/lib/format";
@@ -54,6 +58,12 @@ export function MapPage() {
 
   const current = useQuery({ queryKey: queryKeys.currentState(projectId), queryFn: () => api.get<CurrentState>(`/api/v1/projects/${projectId}/map/current`), refetchInterval: 60_000 });
   const currentFeatures = current.data?.features as unknown as CurrentFeature[] | undefined;
+  const groups = useGroups(projectId);
+  const [allLayers, setAllLayers] = usePreference<Record<string, Partial<LayerChoices>>>("map_layers", {});
+  const layers = useMemo<LayerChoices>(() => ({ ...DEFAULT_LAYERS, ...allLayers[projectId] }), [allLayers, projectId]);
+  const setLayers = useCallback((next: LayerChoices) => setAllLayers({ ...allLayers, [projectId]: next }), [allLayers, projectId, setAllLayers]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const visibleFeatures = useMemo(() => currentFeatures?.filter((f) => isVisible(f.properties, layers, groups.data)), [currentFeatures, layers, groups.data]);
   const features = useQuery({ queryKey: queryKeys.features(projectId), queryFn: () => api.get<PageType<Feature>>(`/api/v1/projects/${projectId}/features`, { query: { limit: 500 } }) });
   const events = useQuery({ queryKey: queryKeys.mapEvents(projectId, 24), queryFn: () => api.get<GeoJSON.FeatureCollection>(`/api/v1/projects/${projectId}/map/events`, { query: { hours: 24, limit: 500 } }), refetchInterval: 120_000 });
   const trackQuery = useMemo(() => ({ entity_id: selectedId, hours: trackHours, max_points: 5000 }), [selectedId, trackHours]);
@@ -120,15 +130,24 @@ export function MapPage() {
   const fitted = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !currentFeatures) return;
-    void setEntities(map, currentFeatures as unknown as GeoJSON.Feature[], selectedId);
+    if (!map || !ready || !currentFeatures || !visibleFeatures) return;
+    void setEntities(map, visibleFeatures as unknown as GeoJSON.Feature[], selectedId);
     if (!fitted.current && currentFeatures.length > 0) {
       const bounds = new maplibregl.LngLatBounds();
       for (const f of currentFeatures) bounds.extend(f.geometry.coordinates as [number, number]);
       map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 0 });
       fitted.current = true;
     }
-  }, [mapRef, ready, currentFeatures, selectedId]);
+  }, [mapRef, ready, currentFeatures, visibleFeatures, selectedId]);
+
+  // features and events layers follow the panel's switches
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    for (const [layer, on] of [["features-fill", layers.features], ["features-line", layers.features], ["features-label", layers.features], ["event-markers", layers.events]] as const) {
+      if (map.getLayer(layer)) map.setLayoutProperty(layer, "visibility", on ? "visible" : "none");
+    }
+  }, [mapRef, ready, layers.features, layers.events]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -153,9 +172,13 @@ export function MapPage() {
           <SelectTrigger className="h-9 w-32 bg-card"><Layers className="size-4" /><SelectValue /></SelectTrigger>
           <SelectContent>{Object.entries(BASEMAPS).map(([key, b]) => <SelectItem key={key} value={key}>{b.label}</SelectItem>)}</SelectContent>
         </Select>
-        {current.data && <Badge variant="secondary" className="bg-card">{current.data.total} {t("entities")}{current.data.use_tiles ? ", tiles" : ""}</Badge>}
+        <Button variant={panelOpen ? "default" : "outline"} size="sm" className={panelOpen ? "" : "bg-card"} aria-pressed={panelOpen} onClick={() => setPanelOpen((o) => !o)}><ListTree className="size-4" /> {t("Layers")}</Button>
+        {current.data && <Badge variant="secondary" className="bg-card">{visibleFeatures && visibleFeatures.length !== currentFeatures?.length ? `${visibleFeatures.length} / ` : ""}{current.data.total} {t("entities")}{current.data.use_tiles ? ", tiles" : ""}</Badge>}
         {events.data && events.data.features.length > 0 && <Badge variant="secondary" className="bg-card cursor-pointer" onClick={() => void navigate(`/projects/${projectId}/rules/events`)}>{events.data.features.length} {t("events, 24 h")}</Badge>}
       </div>
+      {panelOpen && currentFeatures && (
+        <LayerPanel features={currentFeatures.map((f) => f.properties)} groups={groups.data} choices={layers} onChange={setLayers} onClose={() => setPanelOpen(false)} onPick={(id) => { select(id); const f = currentFeatures.find((x) => x.properties.entity_id === id); if (f) mapRef.current?.easeTo({ center: f.geometry.coordinates as [number, number], zoom: Math.max(mapRef.current.getZoom(), 12) }); }} />
+      )}
       {selected && (
         <aside className="absolute bottom-3 left-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80">
           <div className="flex items-start gap-2">

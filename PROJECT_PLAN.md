@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 15 (correctness and usability from the first live days, v2.0.0 at its end; D97 to D108 decided on 2026-09-06). Phase 14 complete; KPN LoRa live in both directions since 2026-09-06; bulk onboarding from Needs attention shipped (5be635c) |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-06 |
-| Next item | Phase 15, organising: live map layers per group, then site-wide search (D99); then presentation (D105, the detail-level preference and the style pass); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
+| Next item | Phase 15, organising: site-wide search (D99); then presentation (D105, the detail-level preference and the style pass); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -709,7 +709,7 @@ Getting around:
 Organising:
 
 - [x] Groups (D98, ADR 0020, migration 0019) (2026-09-06, `Group` model on `entity_groups`, `entities.group_id`, `/projects/{id}/groups`, `group_id` and `ungrouped` filters on entities and `group_id` on devices through the entity tracked today, `entity_id`, `entity_name` and `group_id` on device reads, `group_id` on map features, `GroupsPage`, `GroupSelect`, the entity dialog and the bulk dialog; the icon stays API-only until an icon picker exists): `entity_groups` per project (name, optional parent, order, colour, icon), `entities.group_id`; API and a Groups page under the project's admin section; group column and filter in the entities and devices lists; bulk onboarding can put new entities in a group.
-- [ ] Live map layers: a layer panel with the groups (and subgroups) and their counts, show and hide per group and per entity, "only this group", ungrouped as its own layer, features as a layer; remembered per user and project.
+- [x] Live map layers (2026-09-06, `LayerPanel`, `layerChoices.ts` with unit tests, `usePreference` over `users.preferences` with migration 0020 and the bounded `UserUpdate.preferences`; `group_id` on the map features): a layer panel with the groups (and subgroups) and their counts, show and hide per group and per entity, "only this group", ungrouped as its own layer, features as a layer; remembered per user and project.
 - [ ] Site-wide search (D99): `GET /search?q=` bounded at 50 per type over what the user may see; the palette on Ctrl+K and from the header, with recent items; every list keeps its own search box.
 
 Presentation:
@@ -1053,3 +1053,8 @@ Listed by the phase where they are first needed.
 
 - Built groups (D98, ADR 0020, migration 0019): the model, the API with the two-level rule and the audit of deletions, the filters on both lists (a parent includes its subgroups), the group of the tracked entity on every device read, `group_id` on map features, the Groups page with the tree and counts, the group choice in the entity dialog and the bulk onboarding. The model class is `Group` because `EntityGroup` is the name of the entity type grouping enum; the migration needed the `now()` defaults the mixin declares.
 - Where to continue: the live map layer panel per group, then site-wide search (D99).
+
+### 2026-09-06, map layers and user preferences (Claude)
+
+- Built the Layers panel on the live map: groups and subgroups with counts, show and hide per group and per entity, "only", ungrouped as a layer, features and events switches. Hidden sets rather than shown sets, so new groups and entities appear until hidden. The choices live in a new per-user preference document (`users.preferences`, migration 0020) through `PATCH /users/me`, saved a moment after the last change; the same store serves D105's detail-level preference next.
+- Where to continue: site-wide search (D99), then presentation (D105).

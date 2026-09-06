@@ -42,6 +42,13 @@ class User(UuidPrimaryKeyMixin, TimestampMixin, Base):
         DateTime(timezone=True), comment="Tokens issued before this moment are rejected"
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    preferences: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        comment="What the person chose in the interface (map layers per project, detail level); "
+        "the frontend owns the keys",
+    )
 
 
 class Organization(UuidPrimaryKeyMixin, TimestampMixin, Base):

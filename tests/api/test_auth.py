@@ -96,3 +96,24 @@ async def test_wrong_password_and_anonymous(client, db):
     )
     assert bad.status_code == 400
     assert (await client.get("/api/v1/users/me")).status_code == 401
+
+
+async def test_preferences_are_kept_per_user_and_bounded(client, db):
+    from tests.api.conftest import actor
+
+    person = await actor(client, db)
+    h = person.headers
+    saved = await client.patch(
+        "/api/v1/users/me",
+        json={"preferences": {"map_layers": {"p1": {"hidden_groups": ["g1"]}}}},
+        headers=h,
+    )
+    assert saved.status_code == 200, saved.text
+    me = (await client.get("/api/v1/users/me", headers=h)).json()
+    assert me["preferences"] == {"map_layers": {"p1": {"hidden_groups": ["g1"]}}}
+    too_big = await client.patch(
+        "/api/v1/users/me", json={"preferences": {"blob": "x" * 40_000}}, headers=h
+    )
+    assert too_big.status_code == 422
+    other = await actor(client, db)
+    assert (await client.get("/api/v1/users/me", headers=other.headers)).json()["preferences"] == {}

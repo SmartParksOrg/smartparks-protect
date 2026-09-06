@@ -9137,6 +9137,13 @@ export interface components {
             created_at: string;
             /** Last Login At */
             last_login_at: string | null;
+            /**
+             * Preferences
+             * @description Interface choices the frontend keeps per user (map layers per project)
+             */
+            preferences?: {
+                [key: string]: unknown;
+            };
         };
         /** UserUpdate */
         UserUpdate: {
@@ -9154,6 +9161,13 @@ export interface components {
             full_name?: string | null;
             /** Timezone */
             timezone?: string | null;
+            /**
+             * Preferences
+             * @description Replaces the whole document; bounded at 32 KB
+             */
+            preferences?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ValidationError */
         ValidationError: {

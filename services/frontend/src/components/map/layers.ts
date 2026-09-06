@@ -13,6 +13,7 @@ export interface EntityFeatureProperties {
   status: string;
   entity_type: string;
   group: string;
+  group_id?: string | null;
   icon_key: string;
   device_id: string | null;
   last_seen_at: string | null;
