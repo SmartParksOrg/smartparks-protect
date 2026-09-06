@@ -39,6 +39,7 @@ export const queryKeys = {
   serverInvitations: ["admin", "invitations"] as const,
   attentionSummary: ["attention", "summary"] as const,
   unknownIdentities: ["attention", "identities"] as const,
+  newMetrics: ["attention", "metrics"] as const,
   deadLetters: (topic: string) => ["attention", "dead-letters", topic] as const,
   failedSourceEvents: (status: string) => ["attention", "source-events", status] as const,
   systemHealth: ["system", "health"] as const,

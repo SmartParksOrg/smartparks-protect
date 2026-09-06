@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
-from sqlalchemy.dialects.postgresql import Range
+from sqlalchemy.dialects.postgresql import Range, array
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
@@ -24,12 +24,14 @@ from shared.ingest import republish_source_event
 from shared.models import (
     DataSource,
     Device,
+    DeviceCurrentState,
     DeviceEntityAssignment,
     DeviceProjectAssignment,
     DeviceType,
     Entity,
     EntityType,
     ExternalIdentity,
+    Metric,
     Project,
     SourceEvent,
     User,
@@ -58,6 +60,26 @@ class AttentionSummary(BaseModel):
     dead_letters: dict[str, int]
     stale_workers: list[str]
     workers: dict[str, datetime | None]
+    uncategorized_metrics: int = 0
+
+
+class NewMetric(BaseModel):
+    """A metric that registered itself on arrival (category `uncategorized`, decision D102),
+    with how many devices report it and when last, so an administrator can define it."""
+
+    key: str
+    label: str
+    unit: str | None
+    value_type: str
+    created_at: datetime
+    devices: int
+    last_time: datetime | None
+    sample: Any = None
+
+
+class NewMetricsResponse(BaseModel):
+    items: list[NewMetric]
+    categories: list[str]
 
 
 class UnknownIdentity(ExternalIdentityRead):
@@ -165,6 +187,9 @@ async def summary(
     )
     dead = {topic: await bus.dead_count(topic) for topic in DEAD_TOPICS}
     workers = await bus.heartbeats()
+    uncategorized = await session.scalar(
+        select(func.count()).select_from(Metric).where(Metric.category == "uncategorized")
+    )
     return AttentionSummary(
         unknown_identities=int(unknown or 0),
         failed_source_events=int(failed or 0),
@@ -172,6 +197,65 @@ async def summary(
         dead_letters={k: v for k, v in dead.items() if v},
         stale_workers=[w for w, stamp in workers.items() if is_stale(stamp)],
         workers=workers,
+        uncategorized_metrics=int(uncategorized or 0),
+    )
+
+
+@router.get("/metrics", response_model=NewMetricsResponse)
+async def new_metrics(session: AsyncSession = Depends(get_session)) -> NewMetricsResponse:
+    """Metrics that registered themselves and wait for a label, unit and category (D102).
+    Device counts and the last time come from the devices' current state, not the hypertable."""
+    metrics = (
+        await session.scalars(
+            select(Metric).where(Metric.category == "uncategorized").order_by(Metric.key)
+        )
+    ).all()
+    categories = sorted(
+        {
+            str(c)
+            for c in (await session.scalars(select(Metric.category).distinct())).all()
+            if c and c != "uncategorized"
+        }
+    )
+    if not metrics:
+        return NewMetricsResponse(items=[], categories=categories)
+    keys = [m.key for m in metrics]
+    states = (
+        await session.scalars(
+            select(DeviceCurrentState).where(
+                DeviceCurrentState.latest_measurements.has_any(array(keys))
+            )
+        )
+    ).all()
+    devices: dict[str, int] = dict.fromkeys(keys, 0)
+    last: dict[str, datetime | None] = dict.fromkeys(keys)
+    sample: dict[str, Any] = {}
+    for state in states:
+        for key in keys:
+            entry = (state.latest_measurements or {}).get(key)
+            if not isinstance(entry, dict):
+                continue
+            devices[key] += 1
+            when = datetime.fromisoformat(str(entry["time"])) if entry.get("time") else None
+            newest = last[key]
+            if when is not None and (newest is None or when > newest):
+                last[key] = when
+                sample[key] = entry.get("value")
+    return NewMetricsResponse(
+        items=[
+            NewMetric(
+                key=m.key,
+                label=m.label,
+                unit=m.unit,
+                value_type=m.value_type,
+                created_at=m.created_at,
+                devices=devices[m.key],
+                last_time=last[m.key],
+                sample=sample.get(m.key),
+            )
+            for m in metrics
+        ],
+        categories=categories,
     )
 
 

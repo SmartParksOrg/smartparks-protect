@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { AttentionSummary, BulkCreateResult, BulkIgnoreResult, DeadLetter, DeviceType, EntityType, Page as PageType, ProjectWithRole, SourceEventSummary, UnknownIdentity } from "@/api/types";
+import type { AttentionSummary, BulkCreateResult, BulkIgnoreResult, DeadLetter, DeviceType, EntityType, NewMetric, NewMetricsResponse, Page as PageType, ProjectWithRole, SourceEventSummary, UnknownIdentity } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -111,11 +111,35 @@ function BulkCreateDialog({ identities, onClose, onDone }: { identities: Unknown
   );
 }
 
+/** A metric that registered itself: label, unit and category in one row (decision D102). */
+function NewMetricRow({ metric, categories, onDefined }: { metric: NewMetric; categories: string[]; onDefined: () => void }) {
+  const { t } = useTranslation();
+  const [label, setLabel] = useState(metric.label);
+  const [unit, setUnit] = useState(metric.unit ?? "");
+  const [category, setCategory] = useState(categories[0] ?? "");
+  const define = useMutationToast({
+    mutationFn: () => api.patch(`/api/v1/metrics/${metric.key}`, { body: { label, unit: unit || null, category } }),
+    invalidate: [queryKeys.newMetrics, queryKeys.attentionSummary],
+    success: t("Metric defined"),
+    onSuccess: onDefined,
+  });
+  return (
+    <div className="grid items-center gap-2 border-b px-3 py-2 text-sm md:grid-cols-[1fr_1.2fr_6rem_10rem_auto]">
+      <div><span className="font-mono text-xs">{metric.key}</span><div className="text-xs text-muted-foreground">{t("{{count}} devices, last {{when}}", { count: metric.devices, when: formatAgo(metric.last_time) })}{metric.sample != null ? `, ${String(metric.sample)}` : ""}</div></div>
+      <Input value={label} onChange={(e) => setLabel(e.target.value)} aria-label={t("Label")} />
+      <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder={t("unit")} aria-label={t("Unit")} />
+      <Select value={category} onValueChange={setCategory}><SelectTrigger aria-label={t("Category")}><SelectValue placeholder={t("Category")} /></SelectTrigger><SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c.replace(/_/g, " ")}</SelectItem>)}</SelectContent></Select>
+      <Button size="sm" disabled={!label || !category || define.isPending} onClick={() => define.mutate()}>{t("Define")}</Button>
+    </div>
+  );
+}
+
 export function AttentionPage() {
   const { t } = useTranslation();
   const summary = useQuery({ queryKey: queryKeys.attentionSummary, queryFn: () => api.get<AttentionSummary>("/api/v1/attention/summary"), refetchInterval: 30_000 });
   const identities = useQuery({ queryKey: queryKeys.unknownIdentities, queryFn: () => api.get<PageType<UnknownIdentity>>("/api/v1/attention/identities", { query: { limit: 200 } }) });
   const failed = useQuery({ queryKey: queryKeys.failedSourceEvents("failed"), queryFn: () => api.get<SourceEventSummary[]>("/api/v1/attention/source-events", { query: { status: "failed", limit: 200 } }) });
+  const newMetrics = useQuery({ queryKey: queryKeys.newMetrics, queryFn: () => api.get<NewMetricsResponse>("/api/v1/attention/metrics") });
   const [topic, setTopic] = useState(DEAD_TOPICS[0]);
   const dead = useQuery({ queryKey: queryKeys.deadLetters(topic), queryFn: () => api.get<DeadLetter[]>("/api/v1/attention/dead-letters", { query: { topic, limit: 200 } }) });
   const [creating, setCreating] = useState<UnknownIdentity | null>(null);
@@ -161,14 +185,22 @@ export function AttentionPage() {
       <PageHeader title={t("Needs attention")} description={t("Unknown devices, failed messages and dead letters, with the actions to fix them")} />
       <Page>
         {s && s.stale_workers.length > 0 && <Callout kind="error">{t("Workers without a heartbeat for 15 minutes: {{workers}}", { workers: s.stale_workers.join(", ") })}</Callout>}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Stat label={t("Unknown identities")} value={s?.unknown_identities ?? "…"} tone={s?.unknown_identities ? "warn" : undefined} />
           <Stat label={t("Unassigned source events")} value={s?.unassigned_source_events ?? "…"} tone={s?.unassigned_source_events ? "warn" : undefined} />
           <Stat label={t("Failed source events")} value={s?.failed_source_events ?? "…"} tone={s?.failed_source_events ? "bad" : undefined} />
           <Stat label={t("Dead letters")} value={s ? Object.values(s.dead_letters).reduce((a, b) => a + b, 0) : "…"} tone={s && Object.keys(s.dead_letters).length ? "bad" : undefined} />
+          <Stat label={t("New metrics")} value={s?.uncategorized_metrics ?? "…"} tone={s?.uncategorized_metrics ? "warn" : undefined} />
         </div>
         <Tabs defaultValue="identities">
-          <TabsList><TabsTrigger value="identities">{t("Unknown identities")}</TabsTrigger><TabsTrigger value="failed">{t("Failed source events")}</TabsTrigger><TabsTrigger value="dead">{t("Dead letters")}</TabsTrigger></TabsList>
+          <TabsList><TabsTrigger value="identities">{t("Unknown identities")}</TabsTrigger><TabsTrigger value="metrics">{t("New metrics")}</TabsTrigger><TabsTrigger value="failed">{t("Failed source events")}</TabsTrigger><TabsTrigger value="dead">{t("Dead letters")}</TabsTrigger></TabsList>
+          <TabsContent value="metrics">
+            <div className="rounded-md border">
+              <p className="border-b px-3 py-2 text-xs text-muted-foreground">{t("Metrics a device sent that nobody defined yet. They are stored and charted already; give each a label, a unit and a category.")}</p>
+              {(newMetrics.data?.items ?? []).map((m) => <NewMetricRow key={m.key} metric={m} categories={newMetrics.data?.categories ?? []} onDefined={() => undefined} />)}
+              {newMetrics.data && newMetrics.data.items.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("Every metric is defined.")}</p>}
+            </div>
+          </TabsContent>
           <TabsContent value="identities" className="space-y-2">
             {selected.size > 0 && (
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">

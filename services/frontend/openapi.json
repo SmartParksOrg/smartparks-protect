@@ -5512,6 +5512,33 @@
     ]
    }
   },
+  "/api/v1/attention/metrics": {
+   "get": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "New Metrics",
+    "description": "Metrics that registered themselves and wait for a label, unit and category (D102).\nDevice counts and the last time come from the devices' current state, not the hypertable.",
+    "operationId": "new_metrics_api_v1_attention_metrics_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NewMetricsResponse"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/attention/identities": {
    "get": {
     "tags": [
@@ -17768,6 +17795,11 @@
       },
       "type": "object",
       "title": "Workers"
+     },
+     "uncategorized_metrics": {
+      "type": "integer",
+      "title": "Uncategorized Metrics",
+      "default": 0
      }
     },
     "type": "object",
@@ -26618,6 +26650,93 @@
      "last_time"
     ],
     "title": "MetricWithData"
+   },
+   "NewMetric": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "value_type": {
+      "type": "string",
+      "title": "Value Type"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "devices": {
+      "type": "integer",
+      "title": "Devices"
+     },
+     "last_time": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Time"
+     },
+     "sample": {
+      "title": "Sample"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "unit",
+     "value_type",
+     "created_at",
+     "devices",
+     "last_time"
+    ],
+    "title": "NewMetric",
+    "description": "A metric that registered itself on arrival (category `uncategorized`, decision D102),\nwith how many devices report it and when last, so an administrator can define it."
+   },
+   "NewMetricsResponse": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/NewMetric"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "categories": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Categories"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "categories"
+    ],
+    "title": "NewMetricsResponse"
    },
    "NotificationCapabilities": {
     "properties": {

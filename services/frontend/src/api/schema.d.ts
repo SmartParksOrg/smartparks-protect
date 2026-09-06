@@ -1231,6 +1231,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attention/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * New Metrics
+         * @description Metrics that registered themselves and wait for a label, unit and category (D102).
+         *     Device counts and the last time come from the devices' current state, not the hypertable.
+         */
+        get: operations["new_metrics_api_v1_attention_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attention/identities": {
         parameters: {
             query?: never;
@@ -4151,6 +4172,11 @@ export interface components {
             workers: {
                 [key: string]: string | null;
             };
+            /**
+             * Uncategorized Metrics
+             * @default 0
+             */
+            uncategorized_metrics: number;
         };
         /** AuditRead */
         AuditRead: {
@@ -7261,6 +7287,39 @@ export interface components {
              * Format: date-time
              */
             last_time: string;
+        };
+        /**
+         * NewMetric
+         * @description A metric that registered itself on arrival (category `uncategorized`, decision D102),
+         *     with how many devices report it and when last, so an administrator can define it.
+         */
+        NewMetric: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string | null;
+            /** Value Type */
+            value_type: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Devices */
+            devices: number;
+            /** Last Time */
+            last_time: string | null;
+            /** Sample */
+            sample?: unknown;
+        };
+        /** NewMetricsResponse */
+        NewMetricsResponse: {
+            /** Items */
+            items: components["schemas"]["NewMetric"][];
+            /** Categories */
+            categories: string[];
         };
         /** NotificationCapabilities */
         NotificationCapabilities: {
@@ -12246,6 +12305,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttentionSummary"];
+                };
+            };
+        };
+    };
+    new_metrics_api_v1_attention_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewMetricsResponse"];
                 };
             };
         };

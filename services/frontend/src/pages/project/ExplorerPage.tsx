@@ -164,7 +164,7 @@ export function ExplorerPage() {
       <Page>
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           <Field label={t("Metrics")} htmlFor="metrics">
-            <MultiSelect options={(metrics.data ?? []).map((m) => ({ value: m.key, label: m.label, hint: m.unit ?? undefined }))} value={state.metrics} onChange={(v) => update({ metrics: v })} placeholder={t("Choose metrics")} label={t("metrics")} className="w-full" maxSelected={20} />
+            <MultiSelect options={(metrics.data ?? []).map((m) => ({ value: m.key, label: m.category === "uncategorized" ? `${m.label} (${t("not defined yet")})` : m.label, hint: m.unit ?? undefined }))} value={state.metrics} onChange={(v) => update({ metrics: v })} placeholder={t("Choose metrics")} label={t("metrics")} className="w-full" maxSelected={20} />
           </Field>
           <Field label={t("Entities")} htmlFor="entities" hint={state.entities.length === 0 ? "All entities" : undefined}>
             <MultiSelect options={(entities.data?.items ?? []).map((e) => ({ value: e.id, label: e.name }))} value={state.entities} onChange={(v) => update({ entities: v })} placeholder={t("All entities")} label={t("entities")} className="w-full" maxSelected={20} />
