@@ -34,6 +34,14 @@ class Gateway(UuidPrimaryKeyMixin, TimestampMixin, Base):
         Geometry(geometry_type="POINT", srid=4326, spatial_index=True)
     )
     altitude_m: Mapped[float | None] = mapped_column(Float)
+    location_source: Mapped[str | None] = mapped_column(
+        String(16),
+        comment="platform (gateway list or event), reception (coordinates on an uplink) or "
+        "admin (set by hand, kept over platform updates)",
+    )
+    location_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="When the location was last set"
+    )
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="unknown")
     first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime | None] = mapped_column(

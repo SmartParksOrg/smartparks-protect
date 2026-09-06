@@ -133,3 +133,15 @@ async def test_submit_failures(monkeypatch):
     assert (
         unavailable.value.code == ErrorCode.CONNECTIVITY_UNAVAILABLE and unavailable.value.retryable
     )
+
+
+def test_gateway_coordinates_become_the_shared_location():
+    """LORIOT sends lat and lon per gateway; the registry reads `location` (phase 15)."""
+    message = parse_frame(source(), (FIXTURES / "gw.json").read_text())
+    assert message is not None
+    by_id = {r.gateway_id: r for r in message.gateway_receptions}
+    assert by_id["7276ff0039030123"].attributes["location"] == {
+        "latitude": 52.09,
+        "longitude": 5.12,
+    }
+    assert "location" not in by_id["7276ff0039030456"].attributes

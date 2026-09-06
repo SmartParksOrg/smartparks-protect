@@ -130,6 +130,8 @@ class GatewayRead(ORMModel):
     description: str | None
     geometry: dict[str, Any] | None = None
     altitude_m: float | None
+    location_source: str | None = None
+    location_at: datetime | None = None
     status: str
     first_seen_at: datetime | None
     last_seen_at: datetime | None

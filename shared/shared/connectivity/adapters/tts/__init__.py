@@ -184,6 +184,15 @@ def parse_message(source: DataSourceContext, body: Any) -> InboundMessage:
                             "time": rx.get("time"),
                             "latitude": location.get("latitude"),
                             "longitude": location.get("longitude"),
+                            # The shared shape the gateway registry reads (architecture 20).
+                            "location": {
+                                "latitude": location.get("latitude"),
+                                "longitude": location.get("longitude"),
+                                "altitude": location.get("altitude"),
+                            }
+                            if location.get("latitude") is not None
+                            and location.get("longitude") is not None
+                            else None,
                         }.items()
                         if v not in (None, "")
                     },

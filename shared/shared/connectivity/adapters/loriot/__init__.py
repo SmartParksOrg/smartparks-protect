@@ -100,7 +100,15 @@ def parse_frame(source: DataSourceContext, frame: str | bytes) -> InboundMessage
             gateway_id=str(gw.get("gweui") or "").lower(),
             rssi=gw.get("rssi"),
             snr=gw.get("snr"),
-            attributes={k: v for k, v in gw.items() if k in ("ant", "lat", "lon", "ts", "tmms")},
+            attributes={
+                **{k: v for k, v in gw.items() if k in ("ant", "lat", "lon", "ts", "tmms")},
+                # The shared shape the gateway registry reads (architecture 20).
+                **(
+                    {"location": {"latitude": gw["lat"], "longitude": gw["lon"]}}
+                    if gw.get("lat") is not None and gw.get("lon") is not None
+                    else {}
+                ),
+            },
         )
         for gw in data.get("gws") or []
         if isinstance(gw, dict) and gw.get("gweui")

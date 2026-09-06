@@ -100,7 +100,8 @@ async def upsert_gateways(
     now: datetime,
 ) -> None:
     """Every gateway that received something exists in the registry (architecture 20, D66).
-    A reception's `location` attribute (ChirpStack shape) fills the position once."""
+    A reception's `location` attribute (latitude, longitude, optional altitude; every adapter
+    normalises to this shape) places the gateway unless an administrator placed it."""
     for reception in receptions:
         if not reception.gateway_id:
             continue
@@ -144,7 +145,11 @@ async def apply_gateway_update(
         gateway.status = _status(update.status) or ConnectivityStatus.UNKNOWN
     if (update.name and not gateway.name) or (update.name and not from_reception):
         gateway.name = update.name
-    if update.latitude is not None and update.longitude is not None:
+    if (
+        update.latitude is not None
+        and update.longitude is not None
+        and gateway.location_source != "admin"  # a position set by hand is kept
+    ):
         latitude: float | None
         longitude: float | None
         try:
@@ -159,6 +164,8 @@ async def apply_gateway_update(
             and (latitude, longitude) != (0.0, 0.0)
         ):
             gateway.geom = from_shape(Point(longitude, latitude), srid=4326)
+            gateway.location_source = "reception" if from_reception else "platform"
+            gateway.location_at = seen
             if update.altitude_m is not None:
                 gateway.altitude_m = float(update.altitude_m)
     if update.stats:

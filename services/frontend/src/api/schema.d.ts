@@ -6364,6 +6364,10 @@ export interface components {
             } | null;
             /** Altitude M */
             altitude_m: number | null;
+            /** Location Source */
+            location_source?: string | null;
+            /** Location At */
+            location_at?: string | null;
             /** Status */
             status: string;
             /** First Seen At */

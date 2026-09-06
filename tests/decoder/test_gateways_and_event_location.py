@@ -107,3 +107,63 @@ async def test_decoded_event_keeps_its_point(db, bus, world):  # noqa: F811
     assert row is not None and row.description == "One wolf, 94 %"
     point = to_shape(row.geom)
     assert (point.y, point.x) == (-24.88, 31.49)
+
+
+async def test_an_admin_position_survives_platform_updates(db, bus, world):  # noqa: F811
+    """A reception with coordinates places a gateway and says so; once an administrator sets
+    the position, later receptions and gateway events leave it alone (phase 15)."""
+    from geoalchemy2.shape import to_shape
+    from sqlalchemy import select
+
+    from shared.connectivity.base import GatewayReceptionData, GatewayUpdate
+    from shared.ingest import apply_gateway_update, upsert_gateways
+    from shared.models import Gateway
+    from shared.timeutil import utc_now
+
+    now = utc_now()
+    await upsert_gateways(
+        db,
+        world.source.id,
+        [
+            GatewayReceptionData(
+                gateway_id="ff010521",
+                rssi=-100.0,
+                attributes={"location": {"latitude": 52.1477, "longitude": 4.3911}},
+            )
+        ],
+        now,
+    )
+    gateway = await db.scalar(select(Gateway).where(Gateway.external_id == "ff010521"))
+    assert gateway.location_source == "reception" and gateway.location_at == now
+    assert round(to_shape(gateway.geom).x, 4) == 4.3911
+    # the platform's gateway list moves it: platform beats reception
+    await apply_gateway_update(
+        db,
+        world.source.id,
+        GatewayUpdate(gateway_id="ff010521", latitude=52.2, longitude=4.4),
+        now,
+    )
+    await db.refresh(gateway)
+    assert gateway.location_source == "platform" and round(to_shape(gateway.geom).x, 1) == 4.4
+    # an administrator places it: nothing from the platform moves it afterwards
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import Point
+
+    gateway.geom = from_shape(Point(4.5, 52.3), srid=4326)
+    gateway.location_source = "admin"
+    await db.flush()
+    await upsert_gateways(
+        db,
+        world.source.id,
+        [
+            GatewayReceptionData(
+                gateway_id="ff010521", attributes={"location": {"latitude": 52.9, "longitude": 4.9}}
+            )
+        ],
+        now,
+    )
+    await apply_gateway_update(
+        db, world.source.id, GatewayUpdate(gateway_id="ff010521", latitude=52.9, longitude=4.9), now
+    )
+    await db.refresh(gateway)
+    assert gateway.location_source == "admin" and round(to_shape(gateway.geom).x, 1) == 4.5

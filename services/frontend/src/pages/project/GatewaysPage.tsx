@@ -21,6 +21,7 @@ import { formatAgo, formatTime } from "@/lib/format";
 
 const WINDOWS = [{ hours: 1, label: i18n.t("Last hour") }, { hours: 24, label: i18n.t("Last 24 hours") }, { hours: 168, label: i18n.t("Last 7 days") }, { hours: 720, label: i18n.t("Last 30 days") }];
 
+const locationSourceLabel = (source: string, t: (k: string) => string) => (source === "admin" ? t("an administrator") : source === "reception" ? t("the coordinates on an uplink") : t("the platform's gateway list"));
 const coords = (g: Gateway) => { const c = (g.geometry as { coordinates?: number[] } | null)?.coordinates; return c ? `${c[1].toFixed(4)}, ${c[0].toFixed(4)}` : ""; };
 const signal = (rssi: number | null | undefined, snr: number | null | undefined) => (rssi == null && snr == null ? "" : `${rssi ?? "?"} dBm / ${snr ?? "?"} dB`);
 
@@ -45,7 +46,7 @@ export function GatewaysPage() {
     { header: t("Devices"), accessorKey: "devices" },
     { header: t("Mean signal"), id: "signal", cell: ({ row }) => signal(row.original.mean_rssi, row.original.mean_snr) },
     { header: t("Last reception"), accessorKey: "last_reception_at", cell: ({ getValue }) => formatAgo(getValue<string | null>()) },
-    { header: t("Location"), id: "location", cell: ({ row }) => <span className="font-mono text-xs">{coords(row.original)}</span> },
+    { header: t("Location"), id: "location", cell: ({ row }) => <span className="font-mono text-xs" title={row.original.location_source ? t("from {{source}}", { source: locationSourceLabel(row.original.location_source, t) }) : undefined}>{coords(row.original)}{row.original.location_source === "admin" && <span className="ml-1 font-sans text-muted-foreground">{t("(set by hand)")}</span>}</span> },
   ];
   const deviceColumns: ColumnDef<DeviceConnectivity, unknown>[] = [
     { header: t("Device"), accessorKey: "device_name", cell: ({ row }) => <a className="underline" href={`/projects/${projectId}/devices/${row.original.device_id}`} onClick={(e) => e.stopPropagation()}>{row.original.device_name ?? row.original.device_id}</a> },

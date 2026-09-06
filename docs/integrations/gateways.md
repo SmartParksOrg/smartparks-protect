@@ -31,6 +31,10 @@ first. A device heard by one gateway only is at risk: when that gateway fails, t
 silent. Network health and device health stay distinct: a device can be healthy but poorly
 connected, or connected well while reporting internal faults.
 
+## Where a gateway's position comes from
+
+The registry keeps one position per gateway with its source and time. A platform's gateway list or gateway event places it (`platform`); coordinates that a platform sends on an uplink for the receiving gateway place it as well (`reception`; ChirpStack, The Things Stack and LORIOT send them per gateway, KPN's ThingPark for the best receiving gateway only); a position set by an administrator on the gateway (`admin`) is kept whatever the platform sends afterwards. Every reception keeps the platform's gateway fields as they came, so nothing is lost for a later network map or coverage analysis.
+
 ## API
 
 `GET /projects/{id}/gateways?hours=`, `GET /projects/{id}/gateways/{gateway_id}`,

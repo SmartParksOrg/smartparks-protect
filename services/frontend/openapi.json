@@ -24015,6 +24015,29 @@
       ],
       "title": "Altitude M"
      },
+     "location_source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location Source"
+     },
+     "location_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location At"
+     },
      "status": {
       "type": "string",
       "title": "Status"

@@ -369,6 +369,8 @@ async def update_gateway(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, "latitude and longitude go together"
             )
         gateway.geom = from_shape(Point(patch["longitude"], patch["latitude"]), srid=4326)
+        gateway.location_source = "admin"  # platform updates keep their hands off it now
+        gateway.location_at = utc_now()
     await session.commit()
     source = await session.get(DataSource, gateway.data_source_id)
     return gateway_read(gateway, source)
