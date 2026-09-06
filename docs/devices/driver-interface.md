@@ -33,6 +33,10 @@ class DeviceDriver(Protocol):
 - Metric keys are lowercase snake_case and exist in the metric registry with the canonical unit. Convert in the driver, never downstream.
 - Keep provider specifics out: a driver never reads a ChirpStack or KPN field.
 
+## Firmware versions
+
+`SourceEventData.firmware_version` is the device's firmware as last reported (the decoder writes it from a status state with `firmware_version`). A driver whose messages changed across firmware releases keeps a layout per range and picks it from that version; see the OpenCollar driver and ADR 0021.
+
 ## Health
 
 A driver may declare `health`, a tuple of `HealthField` (decision D104): the metric keys and state keys people should see as the device's health, each with a label, a kind (`number`, `duration`, `text`, `bool`, `flags`), a unit and thresholds (`warn_below`, `critical_below`, `warn_above`, `critical_above`; a `flags` field with `flags_are_problems` warns when any flag is set). The decoder keeps the newest value per metric and the time of the newest state on the device's current state; `shared/domain/health.py` turns both into the health card of the device page, the compact line in lists and the level on the map, and last seen moves on every record, not only positions. The OpenCollar driver declares battery, charging, temperature, uptime, errors, the last reset reason, firmware and hardware version, the last fix's satellites, accuracy and time to fix, the LoRa satellites and the flash use.

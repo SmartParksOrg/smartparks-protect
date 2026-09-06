@@ -249,6 +249,7 @@ async def process_source_event(
                         frame=frame,
                         f_port=f_port,
                         acquisition_channel=event.acquisition_channel,
+                        firmware_version=device.firmware_version,
                     )
                 )
             else:

@@ -56,6 +56,10 @@ Downlinks are settings on FPort 3 (`id len value`) and commands on FPort 32; `cm
 
 The status message on port 4 is the collar's heartbeat: every status interval it reports the battery, charging, temperature, uptime, reset reason, error flags, firmware and hardware version and the LoRa satellite count. Protect keeps the newest of each on the device's current state and shows them as the Health card on the device page, as a compact line in the devices list and as a level on the map (decision D104): battery under 3.6 V warns and under 3.45 V is critical, temperature above 50 °C warns, any error flag warns, a fix with an accuracy above 30 m or more than two minutes to fix warns, flash use above 80 percent warns. The firmware version from the status is written on the device.
 
+## Firmware versions
+
+The driver keeps one layout per firmware range, named after the firmware's own reference decoder: `fw7.2.0` (7.1 to 7.3), `fw6.15.1` (6.15 and 6.16), `fw6.11.2` (6.9 to 6.14), `fw6.5.0` (6.1 to 6.8) and `fw4.4.3` (older). It picks the layout from the version the collar last reported in its status message (a status writes the firmware version on the device; 6.16 reports as 6.0 and is read as 6.16), and inside a raw log or Bluetooth download from the status records in the stream. The layout is the `decoder_version` of every record and of a log file. Ports 8 and 17 (RF scanner, open sky detection) decode into state records on firmware up to 6.16, port 21 (air quality, BME690 and BMV080) into measurements from 7.2, and the status message's feature bit 2 is the RF scanner only before 7.1. A message from a port the layout lacks is a note on the trace that says which firmware sends it. `tests/fixtures/payloads/opencollar/golden.json` holds the output of the three reference decoders for every recorded frame; `scripts/opencollar_golden.py` regenerates it (decision D100, ADR 0021).
+
 ## Control actions
 
 Downlinks follow protocol research section 4: commands on FPort 32 as `cmd_id length argument`, settings on FPort 3 as `id length value`. See [device control](device-control.md) for the path and the lifecycle.

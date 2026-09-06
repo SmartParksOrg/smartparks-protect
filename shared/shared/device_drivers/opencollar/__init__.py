@@ -15,7 +15,9 @@ receive time; inside a flash log it is the store timestamp of the record.
 """
 
 import json
+import re
 import struct
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -63,12 +65,6 @@ PORT_SWITCH_STATUS = 20
 PORT_FLASH_LOG = 29
 PORT_VALUES = 30
 PORT_MESSAGES = 31
-# Ports of older firmware, absent from decoder 7.2.0 (research section 3.23).
-LEGACY_PORTS: dict[int, str] = {
-    8: "is the legacy RF scanner message (firmware 4.x to 6.16, removed in 7.1.0)",
-    17: "is the legacy open sky detection message (firmware 6.x, removed in 7.1.0)",
-    199: "is the legacy Modem-E info message (disabled by default since 6.2.0)",
-}
 
 # msg_id and fixed data length per port; None means variable length.
 KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
@@ -93,7 +89,119 @@ KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
     27: (0x91, None),
     28: (0x90, None),
 }
-NOT_CANONICAL_PORTS = {1, 5, 6, 7, 9, 10, 11, 15, 21, 27, 28}
+NOT_CANONICAL_PORTS = {1, 5, 6, 7, 9, 10, 11, 15, 27, 28}
+PORT_RF_SCAN = 8  # firmware 4.x to 6.16, removed in 7.1.0 (research 3.23)
+PORT_OPEN_SKY = 17  # firmware 6.x, removed in 7.1.0; the message has no id byte
+PORT_AIR_QUALITY = 21  # firmware 7.2.0 and later
+
+
+@dataclass(frozen=True, slots=True)
+class Layout:
+    """What one firmware range sends (decision D100): its ports with message id and fixed
+    length, whether status feature bit 2 means the RF scanner, and the CMDQ record length.
+    Named after the reference decoder of the range (research section 5.1)."""
+
+    key: str
+    since: tuple[int, int]
+    ports: dict[int, tuple[int | None, int | None]]
+    rf_scan_bit: bool
+    cmdq_record_length: int | None
+
+
+def _ports(
+    *, legacy: bool, switches: bool, air_quality: bool, cmdq: bool
+) -> dict[int, tuple[int | None, int | None]]:
+    ports: dict[int, tuple[int | None, int | None]] = {
+        k: v for k, v in KNOWN_PORTS.items() if k not in (PORT_AIR_QUALITY, 15, 18, 19, 20)
+    }
+    if legacy:
+        ports[PORT_RF_SCAN] = (0xFB, None)
+        ports[PORT_OPEN_SKY] = (None, None)
+    if switches:
+        ports[PORT_TIMESTAMP] = KNOWN_PORTS[PORT_TIMESTAMP]
+        ports[PORT_SWITCH_CHANGE] = KNOWN_PORTS[PORT_SWITCH_CHANGE]
+        ports[PORT_SWITCH_STATUS] = KNOWN_PORTS[PORT_SWITCH_STATUS]
+    if air_quality:
+        ports[PORT_AIR_QUALITY] = KNOWN_PORTS[PORT_AIR_QUALITY]
+    if cmdq:
+        ports[15] = KNOWN_PORTS[15]
+    return ports
+
+
+# Newest first. The status message carries major.minor only, and a minor of 16 and above
+# appears modulo 16 (research section 3.4), so a reported 6.0 is read as 6.16.
+LAYOUTS: tuple[Layout, ...] = (
+    Layout(
+        "fw7.2.0",
+        (7, 1),
+        _ports(legacy=False, switches=True, air_quality=True, cmdq=True),
+        False,
+        15,
+    ),
+    Layout(
+        "fw6.15.1",
+        (6, 15),
+        _ports(legacy=True, switches=True, air_quality=False, cmdq=True),
+        True,
+        15,
+    ),
+    Layout(
+        "fw6.11.2",
+        (6, 9),
+        _ports(legacy=True, switches=False, air_quality=False, cmdq=True),
+        True,
+        15,
+    ),
+    Layout(
+        "fw6.5.0",
+        (6, 1),
+        _ports(legacy=True, switches=False, air_quality=False, cmdq=True),
+        True,
+        13,
+    ),
+    Layout(
+        "fw4.4.3",
+        (0, 0),
+        _ports(legacy=True, switches=False, air_quality=False, cmdq=False),
+        True,
+        None,
+    ),
+)
+# Where a port a layout lacks comes from, for the trace note.
+PORT_HISTORY: dict[int, str] = {
+    PORT_RF_SCAN: "the legacy RF scanner message of firmware 4.x to 6.16, removed in 7.1.0",
+    PORT_OPEN_SKY: "the legacy open sky detection message of firmware 6.x, removed in 7.1.0",
+    PORT_AIR_QUALITY: "the air quality message of firmware 7.2.0 and later",
+    PORT_TIMESTAMP: "the timestamp message of firmware 6.15.0 and later",
+    PORT_SWITCH_CHANGE: "the external switch message of firmware 6.15.0 and later",
+    PORT_SWITCH_STATUS: "the external switch status of firmware 6.15.0 and later",
+    15: "the Bluetooth CMDQ message of firmware 6.1.0 and later",
+    199: "the legacy Modem-E info message, disabled by default since 6.2.0",
+}
+
+
+def parse_firmware(version: str | None) -> tuple[int, int] | None:
+    if not version:
+        return None
+    match = re.match(r"^v?(\d+)\.(\d+)", str(version).strip())
+    if match is None:
+        return None
+    major, minor = int(match.group(1)), int(match.group(2))
+    if major == 6 and minor == 0:
+        minor = 16  # 6.16 does not fit the nibble and reports as 6.0
+    return major, minor
+
+
+def layout_for(version: str | None) -> Layout:
+    """The layout for a firmware version; unknown means the newest."""
+    parsed = parse_firmware(version)
+    if parsed is None:
+        return LAYOUTS[0]
+    for layout in LAYOUTS:
+        if parsed >= layout.since:
+            return layout
+    return LAYOUTS[-1]
+
 
 HARDWARE_TYPES = {
     1: "rhinoedge",
@@ -214,7 +322,8 @@ class OpenCollarDriver:
         * Iridium: the RockBLOCK send buffer, a record stream in the flash storage format
           (`[port][msg_id][len][data][store timestamp]` repeated, wiki satellite page).
         """
-        records = DecodedRecords(decoder_version=DECODER_VERSION)
+        layout = layout_for(event.firmware_version)
+        records = DecodedRecords(decoder_version=layout.key)
         received = event.network_received_at or event.ingested_at
         channel = event.acquisition_channel or AcquisitionChannel.LORAWAN
         if event.frame is None:
@@ -224,20 +333,125 @@ class OpenCollarDriver:
                 raise _fail("frame shorter than a port byte and a message", channel=channel)
             port, message = event.frame[0], event.frame[1:]
             if port == PORT_FLASH_LOG:
-                self._decode_flash_log(message, records)
+                self._decode_flash_log(message, records, layout)
             else:
-                self._decode_message(port, message, received, records, via=str(channel))
+                self._decode_message(
+                    port, message, received, records, via=str(channel), layout=layout
+                )
             return records
         if channel == AcquisitionChannel.IRIDIUM:
-            self._decode_flash_log(event.frame, records)
+            self._decode_flash_log(event.frame, records, layout)
             return records
         if event.f_port is None:
             raise _fail("uplink carries no LoRaWAN port", event_type=event.event_type)
         if event.f_port == PORT_FLASH_LOG:
-            self._decode_flash_log(event.frame, records)
+            self._decode_flash_log(event.frame, records, layout)
         else:
-            self._decode_message(event.f_port, event.frame, received, records, via="lorawan")
+            self._decode_message(
+                event.f_port, event.frame, received, records, via="lorawan", layout=layout
+            )
         return records
+
+    def _decode_air_quality(self, data: bytes, time: datetime, records: DecodedRecords) -> None:
+        """Port 21 (firmware 7.2.0, decoder 7.2.0 `decodeAirQualityMessage`): BME690 gas sensor
+        values, BMV080 particle values, or both, as little-endian floats; the length says which."""
+        length = len(data)
+        bme: dict[str, float] = {}
+        bmv: dict[str, float | bool] = {}
+        if length == 0:
+            records.notes.append("air quality message without data")
+            return
+        if 0 < length < 25:
+            bme = self._air_bme690(data, 0)
+        elif length == 25:
+            bmv = self._air_bmv080(data, 0)
+        elif 25 < length < 46:
+            bmv = self._air_bmv080(data, 0)
+            bme = self._air_bme690(data, 25)
+        else:
+            raise _fail("air quality message has an invalid length", length=length)
+        for key, value in {**bme, **bmv}.items():
+            records.measurements.append(
+                DecodedMeasurement(
+                    time=time,
+                    metric_key=key,
+                    value=value if isinstance(value, bool) else round(float(value), 3),
+                    record_type="air_quality",
+                )
+            )
+
+    @staticmethod
+    def _air_bme690(data: bytes, offset: int) -> dict[str, float]:
+        if len(data) < offset + 20:
+            raise _fail("BME690 block is truncated", have=len(data) - offset)
+        iaq, temperature, pressure, humidity, raw_gas = struct.unpack_from("<5f", data, offset)
+        return {
+            "air_q_iaq": iaq,
+            "air_q_temperature": temperature,
+            "air_q_pressure": pressure,
+            "air_q_humidity": humidity,
+            "air_q_raw_gas": raw_gas,
+        }
+
+    @staticmethod
+    def _air_bmv080(data: bytes, offset: int) -> dict[str, float | bool]:
+        if len(data) < offset + 25:
+            raise _fail("BMV080 block is truncated", have=len(data) - offset)
+        pm25_mass, pm1_mass, pm10_mass, pm25_num, pm1_num, pm10_num = struct.unpack_from(
+            "<6f", data, offset
+        )
+        return {
+            "air_q_pm2_5_mass": pm25_mass,
+            "air_q_pm1_mass": pm1_mass,
+            "air_q_pm10_mass": pm10_mass,
+            "air_q_pm2_5_number": pm25_num,
+            "air_q_pm1_number": pm1_num,
+            "air_q_pm10_number": pm10_num,
+            "air_q_obstructed": bool(data[offset + 24]),
+        }
+
+    @staticmethod
+    def _decode_rf_scan(data: bytes, time: datetime, records: DecodedRecords) -> None:
+        """Port 8 (decoders up to 6.15.x `decodeRfScannerMessage`): a version and alert byte,
+        then per band start and stop in MHz times ten, a peak count and a negated RSSI."""
+        if len(data) < 2:
+            raise _fail("RF scan message shorter than its header")
+        bands = []
+        for i in range(2, len(data) - 5, 6):
+            start, stop = struct.unpack_from("<HH", data, i)
+            bands.append(
+                {
+                    "start_mhz": start / 10,
+                    "stop_mhz": stop / 10,
+                    "peak_count": data[i + 4],
+                    "max_rssi": -data[i + 5],
+                }
+            )
+        records.states.append(
+            DecodedState(
+                time=time,
+                state={
+                    "rf_scan": {"version": data[0], "should_alert": bool(data[1]), "bands": bands}
+                },
+                record_type="rf_scan",
+            )
+        )
+
+    @staticmethod
+    def _decode_open_sky(payload: bytes, time: datetime, records: DecodedRecords) -> None:
+        """Port 17 (decoders up to 6.15.x `decodeOpenSkyDetection`): the length byte then
+        pairs of negated average and maximum RSSI."""
+        if not payload:
+            raise _fail("open sky message without a length byte")
+        length = payload[0]
+        pairs = payload[1 : 1 + length]
+        results = [
+            {"average_rssi": -pairs[i], "max_rssi": -pairs[i + 1]}
+            for i in range(0, len(pairs) - 1, 2)
+        ]
+        records.states.append(
+            DecodedState(time=time, state={"open_sky": results}, record_type="open_sky")
+        )
 
     @staticmethod
     def catalog() -> dict[str, Any]:
@@ -248,8 +462,9 @@ class OpenCollarDriver:
 
     # Framing
 
-    def _decode_flash_log(self, frame: bytes, records: DecodedRecords) -> None:
-        """Concatenated stored records: port, msg_id, len, data, store timestamp (u32)."""
+    def _decode_flash_log(self, frame: bytes, records: DecodedRecords, layout: Layout) -> None:
+        """Concatenated stored records: port, msg_id, len, data, store timestamp (u32). A status
+        record inside the stream names the firmware; the records after it use its layout."""
         i = 0
         count = 0
         while i + 7 <= len(frame):
@@ -262,20 +477,35 @@ class OpenCollarDriver:
             if port == PORT_FLASH_LOG:
                 i = end + 4
                 continue
+            before = len(records.states)
             self._decode_message(
                 port,
                 message,
                 stored_at or datetime.fromtimestamp(0, tz=UTC),
                 records,
                 via="flash_log",
+                layout=layout,
             )
+            if port == PORT_STATUS and len(records.states) > before:
+                reported = records.states[-1].state.get("firmware_version")
+                learned = layout_for(str(reported)) if reported else layout
+                if learned.key != layout.key:
+                    layout = learned
+                    records.decoder_version = layout.key
             count += 1
             i = end + 4
         if count == 0 and len(frame) > 0:
             raise _fail("flash log holds no complete record", frame_length=len(frame))
 
     def _decode_message(
-        self, port: int, frame: bytes, time: datetime, records: DecodedRecords, *, via: str
+        self,
+        port: int,
+        frame: bytes,
+        time: datetime,
+        records: DecodedRecords,
+        *,
+        via: str,
+        layout: Layout,
     ) -> None:
         if port in (PORT_SETTINGS, PORT_VALUES):
             records.states.append(
@@ -287,22 +517,22 @@ class OpenCollarDriver:
         if port == PORT_MESSAGES:
             self._decode_messages_port(frame, time, records, via)
             return
-        spec = KNOWN_PORTS.get(port)
+        spec = layout.ports.get(port)
         if spec is None:
-            # A port the catalogue does not know is data the firmware sends, not a fault of
-            # the delivery: note it on the trace and keep the source event (research 3.23).
-            legacy = LEGACY_PORTS.get(port)
+            # A port this firmware's catalogue lacks is data, not a fault of the delivery:
+            # note it on the trace and keep the source event (research 3.23, decision D100).
+            history = PORT_HISTORY.get(port)
             records.notes.append(
-                f"port {port} {legacy}"
-                if legacy
-                else f"port {port} is not in the driver's catalogue"
+                f"port {port} is not in the {layout.key} catalogue: {history}"
+                if history
+                else f"port {port} is not in the {layout.key} catalogue"
             )
             return
         expected_id, fixed_length = spec
         if len(frame) < 2:
             raise _fail("frame shorter than the two byte header", port=port)
         msg_id, length = frame[0], frame[1]
-        if msg_id != expected_id:
+        if expected_id is not None and msg_id != expected_id:
             raise _fail(
                 f"message id 0x{msg_id:02X} does not belong on port {port} (expected 0x{expected_id:02X})",
                 port=port,
@@ -324,7 +554,13 @@ class OpenCollarDriver:
         elif port in (PORT_SHORT_POSITION, PORT_RESEND_POSITION):
             self._decode_short_position(data, port, time, records, via)
         elif port == PORT_STATUS:
-            self._decode_status(data, time, records, via)
+            self._decode_status(data, time, records, via, layout)
+        elif port == PORT_AIR_QUALITY:
+            self._decode_air_quality(data, time, records)
+        elif port == PORT_RF_SCAN:
+            self._decode_rf_scan(data, time, records)
+        elif port == PORT_OPEN_SKY:
+            self._decode_open_sky(frame[1:], time, records)
         elif port == PORT_FENCE:
             self._decode_fence(data, time, records)
         elif port == PORT_FLASH_STATUS:
@@ -496,7 +732,7 @@ class OpenCollarDriver:
         )
 
     def _decode_status(
-        self, data: bytes, time: datetime, records: DecodedRecords, via: str
+        self, data: bytes, time: datetime, records: DecodedRecords, via: str, layout: Layout
     ) -> None:
         (
             reset,
@@ -561,6 +797,8 @@ class OpenCollarDriver:
             "fence_enabled": bool(features & 4),
             "satellite_retries": features >> 4,
             "via": via,
+            # Feature bit 2 meant the RF scanner up to firmware 6.16 (decision D100).
+            **({"rf_scan_enabled": bool(features & 2)} if layout.rf_scan_bit else {}),
         }
         records.states.append(DecodedState(time=time, state=state, record_type="status"))
         active_errors = [name for name, on in errors.items() if on]

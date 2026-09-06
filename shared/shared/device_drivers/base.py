@@ -107,6 +107,7 @@ class SourceEventData:
     frame: bytes | None = None
     f_port: int | None = None
     acquisition_channel: str | None = None
+    firmware_version: str | None = None  # the device's, as last reported (decision D100)
 
 
 DEFAULT_DECODABLE_EVENT_TYPES: frozenset[str] = frozenset({"uplink"})

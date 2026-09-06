@@ -19,5 +19,10 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 | [0011](0011-connectivity-adapter-boundary.md) | Connectivity adapter boundary | accepted |
 - [0012 rule representation](0012-rule-representation.md)
 - [0013 control action schema](0013-control-action-schema.md)
+- [0014 integration deliveries are keyed on the object and retried from a table](0014-integration-deliveries.md)
 - [0015 MCP security boundary](0015-mcp-security-boundary.md)
 - [0016 backups and observability](0016-backup-and-observability.md)
+- [0017 frames as deliveries, built-in channel sources, the browser as a route](0017-multi-path-acquisition.md)
+- [0018 immutable source data and layered interpretation](0018-immutable-source-layered-interpretation.md)
+- [0019 AI clients write through one policy-gated endpoint](0019-ai-writes-through-one-policy.md)
+- [0021 Firmware-aware device driver layouts](0021-firmware-aware-driver.md)

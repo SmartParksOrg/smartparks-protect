@@ -93,7 +93,7 @@ async def test_one_record_over_three_paths_is_one_position_with_three_deliveries
     assert (upload.records_found, upload.records_new, upload.records_duplicate) == (3, 2, 1)
     assert upload.period_start == datetime.fromtimestamp(0x6568633C, tz=UTC)
     assert upload.period_end == datetime.fromtimestamp(0x656864BA, tz=UTC)
-    assert upload.decoder_version == "fw7.3.0" and upload.trace_id is not None
+    assert upload.decoder_version == "fw7.2.0" and upload.trace_id is not None
 
     sync = await _file(
         db, bus, world, [bytes.fromhex("1d" + RECORD_2)], AcquisitionChannel.WEBBLE, "sync.txt"

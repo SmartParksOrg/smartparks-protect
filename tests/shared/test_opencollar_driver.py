@@ -182,9 +182,11 @@ def test_unknown_and_legacy_ports_are_notes_not_failures():
     """A port the catalogue does not know (research 3.23) keeps the source event and says so
     on the trace; a KPN collar on firmware 6.x still sends the Modem-E message on port 199."""
     unknown = driver.decode(event(99, "0102"))
-    assert unknown.empty and unknown.notes == ["port 99 is not in the driver's catalogue"]
+    assert unknown.empty and unknown.notes == ["port 99 is not in the fw7.2.0 catalogue"]
     legacy = driver.decode(event(199, "000a011700038004d904054c00064c00"))
-    assert legacy.empty and legacy.notes[0].startswith("port 199 is the legacy Modem-E info")
+    assert legacy.empty and legacy.notes[0].startswith(
+        "port 199 is not in the fw7.2.0 catalogue: the legacy Modem-E info message"
+    )
 
 
 def test_bad_frames_are_decode_failures():
@@ -337,3 +339,101 @@ def test_live_chirpstack_status_uplink_matches_chirpstacks_decoder():
     assert state["firmware_version"] == "7.2" and state["hardware_version"] == "1.8"
     assert state["reset_reason"]["software"] is True  # ChirpStack's reset 4
     assert not any(state["errors"].values())
+
+
+# Firmware layouts (decision D100, ADR 0021)
+
+
+def test_layout_selection_follows_the_reported_firmware():
+    from shared.device_drivers.opencollar import LAYOUTS, layout_for, parse_firmware
+
+    assert layout_for(None).key == "fw7.2.0"
+    assert layout_for("7.3").key == "fw7.2.0" and layout_for("7.1").key == "fw7.2.0"
+    assert layout_for("6.15").key == "fw6.15.1"
+    assert layout_for("6.0").key == "fw6.15.1"  # 6.16 reports as 6.0 (the minor nibble)
+    assert layout_for("6.14").key == "fw6.11.2" and layout_for("6.9").key == "fw6.11.2"
+    assert layout_for("6.8").key == "fw6.5.0" and layout_for("6.1").key == "fw6.5.0"
+    assert layout_for("4.4").key == "fw4.4.3" and layout_for("v5.2").key == "fw4.4.3"
+    assert parse_firmware("garbage") is None and layout_for("garbage").key == "fw7.2.0"
+    by_key = {layout.key: layout for layout in LAYOUTS}
+    assert 21 in by_key["fw7.2.0"].ports and 8 not in by_key["fw7.2.0"].ports
+    assert {8, 17, 18, 19, 20} <= set(by_key["fw6.15.1"].ports) and 21 not in by_key[
+        "fw6.15.1"
+    ].ports
+    assert 18 not in by_key["fw6.11.2"].ports and 15 in by_key["fw6.11.2"].ports
+    assert 15 not in by_key["fw4.4.3"].ports and by_key["fw6.5.0"].cmdq_record_length == 13
+
+
+def firmware_event(port: int, hex_data: str, firmware: str | None) -> SourceEventData:
+    from dataclasses import replace
+
+    return replace(event(port, hex_data), firmware_version=firmware)
+
+
+def test_ports_decode_or_note_per_layout():
+    """Port 21 is air quality from 7.2; up to 6.16 it is not a message. Port 8 is the RF scanner
+    up to 6.16; from 7.1 it is not a message. The note names the layout and the firmware."""
+    # BME690 only: five little-endian floats (IAQ 25, 21.5 °C, 1013.2 hPa, 45 %, 120000 Ω)
+    import struct
+
+    bme = struct.pack("<5f", 25.0, 21.5, 1013.2, 45.0, 120000.0)
+    frame = bytes([0x9A, len(bme)]) + bme
+    new = driver.decode(firmware_event(21, frame.hex(), "7.2"))
+    values = {m.metric_key: m.value for m in new.measurements}
+    assert new.decoder_version == "fw7.2.0"
+    assert values["air_q_iaq"] == 25.0 and values["air_q_pressure"] == 1013.2
+    assert values["air_q_humidity"] == 45.0 and values["air_q_raw_gas"] == 120000.0
+    old = driver.decode(firmware_event(21, frame.hex(), "6.15"))
+    assert old.empty and old.decoder_version == "fw6.15.1"
+    assert old.notes == [
+        "port 21 is not in the fw6.15.1 catalogue: the air quality message of firmware 7.2.0 and later"
+    ]
+    # both sensors: BMV080 (six floats and the obstruction byte) then BME690
+    bmv = struct.pack("<6f", 3.5, 2.0, 5.5, 40.0, 30.0, 45.0) + b"\x01"
+    both = bytes([0x9A, len(bmv + bme)]) + bmv + bme
+    values = {
+        m.metric_key: m.value
+        for m in driver.decode(firmware_event(21, both.hex(), "7.3")).measurements
+    }
+    assert values["air_q_pm2_5_mass"] == 3.5 and values["air_q_obstructed"] is True
+    assert values["air_q_temperature"] == 21.5
+
+    # an RF scan on an old collar: version 1, alert, one band 868.0 to 868.6 MHz, 3 peaks, -95 dBm
+    scan = bytes([0xFB, 8, 1, 1]) + struct.pack("<HH", 8680, 8686) + bytes([3, 95])
+    legacy = driver.decode(firmware_event(8, scan.hex(), "6.15"))
+    assert legacy.decoder_version == "fw6.15.1" and legacy.states[0].record_type == "rf_scan"
+    band = legacy.states[0].state["rf_scan"]["bands"][0]
+    assert band == {"start_mhz": 868.0, "stop_mhz": 868.6, "peak_count": 3, "max_rssi": -95}
+    assert legacy.states[0].state["rf_scan"]["should_alert"] is True
+    modern = driver.decode(firmware_event(8, scan.hex(), "7.2"))
+    assert modern.empty and modern.notes[0].startswith("port 8 is not in the fw7.2.0 catalogue")
+    # open sky detection has no message id byte: length then negated RSSI pairs
+    sky = driver.decode(firmware_event(17, bytes([0x00, 4, 90, 80, 95, 85]).hex(), "6.11"))
+    assert sky.states[0].state["open_sky"] == [
+        {"average_rssi": -90, "max_rssi": -80},
+        {"average_rssi": -95, "max_rssi": -85},
+    ]
+
+
+def test_status_feature_bit_two_is_the_rf_scanner_before_seven():
+    row = load()[4]
+    with_bit = bytearray(bytes.fromhex(row["data_hex"]))
+    with_bit[2 + 13] |= 2  # features byte is the last of the 14 data bytes
+    old = driver.decode(firmware_event(4, with_bit.hex(), "6.15"))
+    assert old.states[0].state["rf_scan_enabled"] is True
+    new = driver.decode(firmware_event(4, with_bit.hex(), "7.2"))
+    assert "rf_scan_enabled" not in new.states[0].state
+
+
+def test_flash_log_learns_the_firmware_from_its_status_records():
+    """A log stream decoded with no known firmware starts on the newest layout; a status record
+    inside it names an older firmware, and the records after it use that layout."""
+    status = load()[4]["data_hex"]  # firmware 4.4 on the wiki collar
+    import struct
+
+    scan = bytes([0xFB, 8, 1, 0]) + struct.pack("<HH", 8680, 8686) + bytes([2, 100])
+    stamp = struct.pack("<I", 1701339971)
+    stream = bytes([4]) + bytes.fromhex(status)[:] + stamp + bytes([8]) + scan + stamp
+    records = driver.decode(channel_event("log_file", (bytes([29]) + stream).hex()))
+    assert records.decoder_version == "fw4.4.3"
+    assert any(s.record_type == "rf_scan" for s in records.states), records.notes

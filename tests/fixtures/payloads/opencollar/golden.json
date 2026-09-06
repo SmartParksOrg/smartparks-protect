@@ -1,0 +1,780 @@
+[
+ {
+  "data_hex": "f21e0100001000e6a40d1f97100e03a0cb000003082f00048c61686500000000",
+  "decoders": {
+   "6.11.2": {
+    "SIV": 8,
+    "active_t": 0,
+    "altitude": 52.128,
+    "cold_retry": 0,
+    "fixType": 3,
+    "fix_timestamp": 1701339532,
+    "h_acc_est": 47,
+    "hot_retry": 0,
+    "latitude": 52.0987878,
+    "longitude": 5.1253399,
+    "pDOP": 4,
+    "success": 1,
+    "ttf": 16
+   },
+   "6.15.1": {
+    "SIV": 8,
+    "active_t": 0,
+    "altitude": 52.128,
+    "cold_retry": 0,
+    "fixType": 3,
+    "fix_timestamp": 1701339532,
+    "h_acc_est": 47,
+    "hot_retry": 0,
+    "latitude": 52.0987878,
+    "longitude": 5.1253399,
+    "pDOP": 4,
+    "success": 1,
+    "ttf": 16
+   },
+   "7.2.0": {
+    "SIV": 8,
+    "active_t": 0,
+    "altitude": 52.128,
+    "cold_retry": 0,
+    "fixType": 3,
+    "fix_timestamp": 1701339532,
+    "h_acc_est": 47,
+    "hot_retry": 0,
+    "latitude": 52.0987878,
+    "longitude": 5.1253399,
+    "pDOP": 4,
+    "success": 1,
+    "ttf": 16
+   }
+  },
+  "port": 2,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
+  "data_hex": "f40e0400a00095007f7f721444550000",
+  "decoders": {
+   "6.11.2": {
+    "acc_x": -0.39215686274509665,
+    "acc_y": -0.39215686274509665,
+    "acc_z": -10.588235294117652,
+    "bat": 4100,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "rf_scan": 0,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 16.862745098039213,
+    "uptime": 0,
+    "ver_fw_major": 4,
+    "ver_fw_minor": 4,
+    "ver_fw_type": 5,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 4,
+    "ver_hw_type": 5
+   },
+   "6.15.1": {
+    "acc_x": -0.39215686274509665,
+    "acc_y": -0.39215686274509665,
+    "acc_z": -10.588235294117652,
+    "bat": 4100,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "rf_scan": 0,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 16.862745098039213,
+    "uptime": 0,
+    "ver_fw_major": 4,
+    "ver_fw_minor": 4,
+    "ver_fw_type": 5,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 4,
+    "ver_hw_type": 5
+   },
+   "7.2.0": {
+    "acc_x": -0.39215686274509665,
+    "acc_y": -0.39215686274509665,
+    "acc_z": -10.588235294117652,
+    "bat": 4100,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 16.862745098039213,
+    "uptime": 0,
+    "ver_fw_major": 4,
+    "ver_fw_minor": 4,
+    "ver_fw_type": 5,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 4,
+    "ver_hw_type": 5,
+    "version": "v4.4"
+   }
+  },
+  "port": 4,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
+  "data_hex": "930ef9636865aba50d1f8e090e031500",
+  "decoders": {
+   "6.11.2": {
+    "fix_timestamp": 1701340153,
+    "h_acc_est": 21,
+    "latitude": 52.0988075,
+    "longitude": 5.1251598
+   },
+   "6.15.1": {
+    "fix_timestamp": 1701340153,
+    "h_acc_est": 21,
+    "latitude": 52.0988075,
+    "longitude": 5.1251598
+   },
+   "7.2.0": {
+    "fix_timestamp": 1701340153,
+    "h_acc_est": 21,
+    "latitude": 52.0988075,
+    "longitude": 5.1251598
+   }
+  },
+  "port": 13,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
+  "data_hex": "94050010000000",
+  "decoders": {
+   "6.11.2": {
+    "n_msg": 16,
+    "percentage": 0
+   },
+   "6.15.1": {
+    "n_msg": 16,
+    "percentage": 0
+   },
+   "7.2.0": {
+    "n_msg": 16,
+    "percentage": 0
+   }
+  },
+  "port": 14,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
+  "data_hex": "9206000000000000",
+  "decoders": {
+   "6.11.2": {
+    "N": 0,
+    "energy": 0,
+    "success": 0,
+    "voltage": 0
+   },
+   "6.15.1": {
+    "N": 0,
+    "energy": 0,
+    "success": 0,
+    "voltage": 0
+   },
+   "7.2.0": {
+    "N": 0,
+    "energy": 0,
+    "success": 0,
+    "voltage": 0
+   }
+  },
+  "port": 12,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
+  "data_hex": "0D930E3C636865FCA10D1F7D160E030C00436368650D930EF9636865ABA50D1F8E090E031500006468650D930EBA64686536A30D1F0D140E031300C26468650D930E7865686561A50D1FE0140E031600816568650D930E37666865C3A40D1FF5120E0311003F6668650D930EF466686599A30D1F81120E031100FC6668650D930EB1676865DFA30D1FCC120E030E00B76768650D930E6D686865DFA40D1F9B110E031000746868650D930E2A69686576A60D1FA20F0E030E00316968650D930EE6696865CEA40D1F8B100E031000ED696865",
+  "decoders": {
+   "6.11.2": {
+    "1": {
+     "data": {
+      "fix_timestamp": 1701339964,
+      "h_acc_est": 12,
+      "latitude": 52.0987132,
+      "longitude": 5.1254909
+     },
+     "port": 13,
+     "timestamp": 1701339971
+    },
+    "10": {
+     "data": {
+      "fix_timestamp": 1701341670,
+      "h_acc_est": 16,
+      "latitude": 52.0987854,
+      "longitude": 5.1253387
+     },
+     "port": 13,
+     "timestamp": 1701341677
+    },
+    "2": {
+     "data": {
+      "fix_timestamp": 1701340153,
+      "h_acc_est": 21,
+      "latitude": 52.0988075,
+      "longitude": 5.1251598
+     },
+     "port": 13,
+     "timestamp": 1701340160
+    },
+    "3": {
+     "data": {
+      "fix_timestamp": 1701340346,
+      "h_acc_est": 19,
+      "latitude": 52.0987446,
+      "longitude": 5.1254285
+     },
+     "port": 13,
+     "timestamp": 1701340354
+    },
+    "4": {
+     "data": {
+      "fix_timestamp": 1701340536,
+      "h_acc_est": 22,
+      "latitude": 52.0988001,
+      "longitude": 5.1254496
+     },
+     "port": 13,
+     "timestamp": 1701340545
+    },
+    "5": {
+     "data": {
+      "fix_timestamp": 1701340727,
+      "h_acc_est": 17,
+      "latitude": 52.0987843,
+      "longitude": 5.1254005
+     },
+     "port": 13,
+     "timestamp": 1701340735
+    },
+    "6": {
+     "data": {
+      "fix_timestamp": 1701340916,
+      "h_acc_est": 17,
+      "latitude": 52.0987545,
+      "longitude": 5.1253889
+     },
+     "port": 13,
+     "timestamp": 1701340924
+    },
+    "7": {
+     "data": {
+      "fix_timestamp": 1701341105,
+      "h_acc_est": 14,
+      "latitude": 52.0987615,
+      "longitude": 5.1253964
+     },
+     "port": 13,
+     "timestamp": 1701341111
+    },
+    "8": {
+     "data": {
+      "fix_timestamp": 1701341293,
+      "h_acc_est": 16,
+      "latitude": 52.0987871,
+      "longitude": 5.1253659
+     },
+     "port": 13,
+     "timestamp": 1701341300
+    },
+    "9": {
+     "data": {
+      "fix_timestamp": 1701341482,
+      "h_acc_est": 14,
+      "latitude": 52.0988278,
+      "longitude": 5.1253154
+     },
+     "port": 13,
+     "timestamp": 1701341489
+    }
+   },
+   "6.15.1": {
+    "1": {
+     "data": {
+      "fix_timestamp": 1701339964,
+      "h_acc_est": 12,
+      "latitude": 52.0987132,
+      "longitude": 5.1254909
+     },
+     "port": 13,
+     "timestamp": 1701339971
+    },
+    "10": {
+     "data": {
+      "fix_timestamp": 1701341670,
+      "h_acc_est": 16,
+      "latitude": 52.0987854,
+      "longitude": 5.1253387
+     },
+     "port": 13,
+     "timestamp": 1701341677
+    },
+    "2": {
+     "data": {
+      "fix_timestamp": 1701340153,
+      "h_acc_est": 21,
+      "latitude": 52.0988075,
+      "longitude": 5.1251598
+     },
+     "port": 13,
+     "timestamp": 1701340160
+    },
+    "3": {
+     "data": {
+      "fix_timestamp": 1701340346,
+      "h_acc_est": 19,
+      "latitude": 52.0987446,
+      "longitude": 5.1254285
+     },
+     "port": 13,
+     "timestamp": 1701340354
+    },
+    "4": {
+     "data": {
+      "fix_timestamp": 1701340536,
+      "h_acc_est": 22,
+      "latitude": 52.0988001,
+      "longitude": 5.1254496
+     },
+     "port": 13,
+     "timestamp": 1701340545
+    },
+    "5": {
+     "data": {
+      "fix_timestamp": 1701340727,
+      "h_acc_est": 17,
+      "latitude": 52.0987843,
+      "longitude": 5.1254005
+     },
+     "port": 13,
+     "timestamp": 1701340735
+    },
+    "6": {
+     "data": {
+      "fix_timestamp": 1701340916,
+      "h_acc_est": 17,
+      "latitude": 52.0987545,
+      "longitude": 5.1253889
+     },
+     "port": 13,
+     "timestamp": 1701340924
+    },
+    "7": {
+     "data": {
+      "fix_timestamp": 1701341105,
+      "h_acc_est": 14,
+      "latitude": 52.0987615,
+      "longitude": 5.1253964
+     },
+     "port": 13,
+     "timestamp": 1701341111
+    },
+    "8": {
+     "data": {
+      "fix_timestamp": 1701341293,
+      "h_acc_est": 16,
+      "latitude": 52.0987871,
+      "longitude": 5.1253659
+     },
+     "port": 13,
+     "timestamp": 1701341300
+    },
+    "9": {
+     "data": {
+      "fix_timestamp": 1701341482,
+      "h_acc_est": 14,
+      "latitude": 52.0988278,
+      "longitude": 5.1253154
+     },
+     "port": 13,
+     "timestamp": 1701341489
+    }
+   },
+   "7.2.0": {
+    "1": {
+     "data": {
+      "fix_timestamp": 1701339964,
+      "h_acc_est": 12,
+      "latitude": 52.0987132,
+      "longitude": 5.1254909
+     },
+     "port": 13,
+     "timestamp": 1701339971
+    },
+    "10": {
+     "data": {
+      "fix_timestamp": 1701341670,
+      "h_acc_est": 16,
+      "latitude": 52.0987854,
+      "longitude": 5.1253387
+     },
+     "port": 13,
+     "timestamp": 1701341677
+    },
+    "2": {
+     "data": {
+      "fix_timestamp": 1701340153,
+      "h_acc_est": 21,
+      "latitude": 52.0988075,
+      "longitude": 5.1251598
+     },
+     "port": 13,
+     "timestamp": 1701340160
+    },
+    "3": {
+     "data": {
+      "fix_timestamp": 1701340346,
+      "h_acc_est": 19,
+      "latitude": 52.0987446,
+      "longitude": 5.1254285
+     },
+     "port": 13,
+     "timestamp": 1701340354
+    },
+    "4": {
+     "data": {
+      "fix_timestamp": 1701340536,
+      "h_acc_est": 22,
+      "latitude": 52.0988001,
+      "longitude": 5.1254496
+     },
+     "port": 13,
+     "timestamp": 1701340545
+    },
+    "5": {
+     "data": {
+      "fix_timestamp": 1701340727,
+      "h_acc_est": 17,
+      "latitude": 52.0987843,
+      "longitude": 5.1254005
+     },
+     "port": 13,
+     "timestamp": 1701340735
+    },
+    "6": {
+     "data": {
+      "fix_timestamp": 1701340916,
+      "h_acc_est": 17,
+      "latitude": 52.0987545,
+      "longitude": 5.1253889
+     },
+     "port": 13,
+     "timestamp": 1701340924
+    },
+    "7": {
+     "data": {
+      "fix_timestamp": 1701341105,
+      "h_acc_est": 14,
+      "latitude": 52.0987615,
+      "longitude": 5.1253964
+     },
+     "port": 13,
+     "timestamp": 1701341111
+    },
+    "8": {
+     "data": {
+      "fix_timestamp": 1701341293,
+      "h_acc_est": 16,
+      "latitude": 52.0987871,
+      "longitude": 5.1253659
+     },
+     "port": 13,
+     "timestamp": 1701341300
+    },
+    "9": {
+     "data": {
+      "fix_timestamp": 1701341482,
+      "h_acc_est": 14,
+      "latitude": 52.0988278,
+      "longitude": 5.1253154
+     },
+     "port": 13,
+     "timestamp": 1701341489
+    }
+   }
+  },
+  "port": 29,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
+  "data_hex": "f50100",
+  "decoders": {
+   "6.11.2": {
+    "N_reported": 0,
+    "N_sat": 0
+   },
+   "6.15.1": {
+    "N_reported": 0,
+    "N_sat": 0
+   },
+   "7.2.0": {
+    "N_reported": 0,
+    "N_sat": 0
+   }
+  },
+  "port": 5,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
+  "data_hex": "930e8a255b75623d081f1d346f031f00",
+  "decoders": {
+   "6.11.2": {
+    "fix_timestamp": 1968907658,
+    "h_acc_est": 31,
+    "latitude": 52.0633698,
+    "longitude": 5.7619485
+   },
+   "6.15.1": {
+    "fix_timestamp": 1968907658,
+    "h_acc_est": 31,
+    "latitude": 52.0633698,
+    "longitude": 5.7619485
+   },
+   "7.2.0": {
+    "fix_timestamp": 1968907658,
+    "h_acc_est": 31,
+    "latitude": 52.0633698,
+    "longitude": 5.7619485
+   }
+  },
+  "port": 13,
+  "source": "kpn_thingpark/kpn_live_uplink_port13.json"
+ },
+ {
+  "data_hex": "f40e02006f009271838e821644350000",
+  "decoders": {
+   "6.11.2": {
+    "acc_x": 2.7450980392156907,
+    "acc_y": 11.372549019607845,
+    "acc_z": 1.9607843137254832,
+    "bat": 3610,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 2,
+    "rf_scan": 0,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 14.509803921568633,
+    "uptime": 113,
+    "ver_fw_major": 4,
+    "ver_fw_minor": 4,
+    "ver_fw_type": 3,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 6,
+    "ver_hw_type": 5
+   },
+   "6.15.1": {
+    "acc_x": 2.7450980392156907,
+    "acc_y": 11.372549019607845,
+    "acc_z": 1.9607843137254832,
+    "bat": 3610,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 2,
+    "rf_scan": 0,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 14.509803921568633,
+    "uptime": 113,
+    "ver_fw_major": 4,
+    "ver_fw_minor": 4,
+    "ver_fw_type": 3,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 6,
+    "ver_hw_type": 5
+   },
+   "7.2.0": {
+    "acc_x": 2.7450980392156907,
+    "acc_y": 11.372549019607845,
+    "acc_z": 1.9607843137254832,
+    "bat": 3610,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 2,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 14.509803921568633,
+    "uptime": 113,
+    "ver_fw_major": 4,
+    "ver_fw_minor": 4,
+    "ver_fw_type": 3,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 6,
+    "ver_hw_type": 5,
+    "version": "v4.4"
+   }
+  },
+  "port": 4,
+  "source": "kpn_thingpark/kpn_live_uplink_port4.json"
+ },
+ {
+  "data_hex": "f40e0400a0009a3c7f7f731872550000",
+  "decoders": {
+   "6.11.2": {
+    "acc_x": -0.39215686274509665,
+    "acc_y": -0.39215686274509665,
+    "acc_z": -9.803921568627445,
+    "bat": 4100,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "rf_scan": 0,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 20.784313725490193,
+    "uptime": 60,
+    "ver_fw_major": 7,
+    "ver_fw_minor": 2,
+    "ver_fw_type": 5,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 8,
+    "ver_hw_type": 5
+   },
+   "6.15.1": {
+    "acc_x": -0.39215686274509665,
+    "acc_y": -0.39215686274509665,
+    "acc_z": -9.803921568627445,
+    "bat": 4100,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "rf_scan": 0,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 20.784313725490193,
+    "uptime": 60,
+    "ver_fw_major": 7,
+    "ver_fw_minor": 2,
+    "ver_fw_type": 5,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 8,
+    "ver_hw_type": 5
+   },
+   "7.2.0": {
+    "acc_x": -0.39215686274509665,
+    "acc_y": -0.39215686274509665,
+    "acc_z": -9.803921568627445,
+    "bat": 4100,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 0,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 20.784313725490193,
+    "uptime": 60,
+    "ver_fw_major": 7,
+    "ver_fw_minor": 2,
+    "ver_fw_type": 5,
+    "ver_hw_major": 1,
+    "ver_hw_minor": 8,
+    "ver_hw_type": 5,
+    "version": "v7.2"
+   }
+  },
+  "port": 4,
+  "source": "chirpstack/up_opencollar_status_live.json"
+ }
+]

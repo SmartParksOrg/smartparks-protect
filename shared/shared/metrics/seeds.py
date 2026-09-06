@@ -25,6 +25,59 @@ N = ValueType.NUMERIC
 B = ValueType.BOOLEAN
 
 METRIC_SEEDS: tuple[MetricSeed, ...] = (
+    # air quality (OpenCollar port 21, firmware 7.2.0 and later)
+    MetricSeed(
+        "air_q_iaq", "Air quality index", None, N, "environment", "BME690 indoor air quality index"
+    ),
+    MetricSeed(
+        "air_q_temperature",
+        "Air temperature (air quality sensor)",
+        "°C",
+        N,
+        "environment",
+        "BME690 temperature",
+    ),
+    MetricSeed("air_q_pressure", "Air pressure", "hPa", N, "environment", "BME690 pressure"),
+    MetricSeed("air_q_humidity", "Air humidity", "%", N, "environment", "BME690 relative humidity"),
+    MetricSeed(
+        "air_q_raw_gas", "Gas resistance", "Ω", N, "environment", "BME690 raw gas resistance"
+    ),
+    MetricSeed(
+        "air_q_pm2_5_mass",
+        "PM2.5 mass",
+        "µg/m³",
+        N,
+        "environment",
+        "BMV080 particulate mass, 2.5 µm",
+    ),
+    MetricSeed(
+        "air_q_pm1_mass", "PM1 mass", "µg/m³", N, "environment", "BMV080 particulate mass, 1 µm"
+    ),
+    MetricSeed(
+        "air_q_pm10_mass", "PM10 mass", "µg/m³", N, "environment", "BMV080 particulate mass, 10 µm"
+    ),
+    MetricSeed(
+        "air_q_pm2_5_number",
+        "PM2.5 count",
+        "1/cm³",
+        N,
+        "environment",
+        "BMV080 particle count, 2.5 µm",
+    ),
+    MetricSeed(
+        "air_q_pm1_number", "PM1 count", "1/cm³", N, "environment", "BMV080 particle count, 1 µm"
+    ),
+    MetricSeed(
+        "air_q_pm10_number", "PM10 count", "1/cm³", N, "environment", "BMV080 particle count, 10 µm"
+    ),
+    MetricSeed(
+        "air_q_obstructed",
+        "Particle sensor obstructed",
+        None,
+        B,
+        "environment",
+        "BMV080 reports an obstruction",
+    ),
     # device health
     MetricSeed(
         "battery_voltage",
