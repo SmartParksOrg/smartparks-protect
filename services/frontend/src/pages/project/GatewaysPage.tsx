@@ -40,7 +40,7 @@ export function GatewaysPage() {
 
   const columns: ColumnDef<Gateway, unknown>[] = [
     { header: t("Gateway"), accessorKey: "display_name", cell: ({ row }) => <span><span className="font-medium">{row.original.display_name}</span>{row.original.display_name !== row.original.external_id && <span className="ml-2 font-mono text-xs text-muted-foreground">{row.original.external_id}</span>}</span> },
-    { header: t("State"), accessorKey: "status", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
+    { header: t("Status"), accessorKey: "status", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
     { header: t("Source"), accessorKey: "data_source_name" },
     { header: t("Receptions"), accessorKey: "receptions" },
     { header: t("Devices"), accessorKey: "devices" },

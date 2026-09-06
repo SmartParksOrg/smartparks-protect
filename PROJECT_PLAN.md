@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 15 (correctness and usability from the first live days, v2.0.0 at its end; D97 to D108 decided on 2026-09-06). Phase 14 complete; KPN LoRa live in both directions since 2026-09-06; bulk onboarding from Needs attention shipped (5be635c) |
 | Latest release | v0.6.0 (2026-09-04): phases 7, 8 and 9; phases 10 to 13 and the deployment fixes unreleased |
 | Last session | 2026-09-06 |
-| Next item | Phase 15, presentation: the style pass (fewer columns by default with a column picker, consistent wording, empty states with the next action, the screenshot sweep); then coverage (D107); then v2.0.0. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
+| Next item | Phase 15, coverage (D107): Network, Coverage with the gateway map and the coverage layer from receptions joined to positions; then v2.0.0 with the changelog and the release process. Also open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live items that wait for other accounts |
 | Blockers | Live verification: no KPN, LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -716,7 +716,7 @@ Organising:
 Presentation:
 
 - [x] Operational view first (D105) (2026-09-06, `useTechnicalDetails` over the preference document with the server admin default, `TechnicalDetails` folded section, the sidebar switch, `technical` on the Network section, the device page and list audited, `docs/administration/pages.md` as the inventory; the other pages carried no technical fields to fold): an audit of every page against "the entity, its state and the next action first; identities, ports, traces and provider fields under Technical details"; a per-user "Show technical details" preference (server admins default on) that expands those sections and shows the Network section to project users; a page inventory per role in `docs/administration/`.
-- [ ] Style pass: fewer columns by default with a column picker, consistent wording ("Last seen", "Health"), empty states with the next action, and the screenshot sweep as the check.
+- [x] Style pass (2026-09-06, `DataTable` column picker with `columnsKey` and `defaultHidden` over the `table_columns` preference, applied to the entities, devices and admin devices lists; "When" became "Time" and the gateways' "State" became "Status"; empty states with the next action on entities, devices, features, members and the explorer; the sweep ran locally as the check): fewer columns by default with a column picker, consistent wording ("Last seen", "Health"), empty states with the next action, and the screenshot sweep as the check.
 
 Network tool:
 
@@ -1070,6 +1070,11 @@ Listed by the phase where they are first needed.
 - Built D105: the technical details preference on the user's preference document (server admins default on), the sidebar switch, the folded Technical details section (one click opens it for a page, the switch everywhere), the Network section shown only with the preference on, the device page's identities, traffic and provenance links folded, the driver column on the devices list gated. The audit of the other pages found nothing to fold: they show the entity, its state and the next action already. The inventory per role is in the administration docs.
 - Where to continue: the style pass, then coverage (D107), then v2.0.0.
 
+### 2026-09-06, style pass (Claude)
+
+- Column picker on the shared table, kept per user in the preference document; the admin devices list hides Created by default. Wording: Time instead of When, Status instead of State. Empty states now say what to do next on the project lists. The screenshot sweep ran against the local stack as the check: every route clean at the three widths, once the sweep learned to fill the entity route with a real entity (its only finding was its own placeholder hitting the API).
+- Where to continue: coverage (D107), then v2.0.0.
+
 ### 2026-09-06, map layers reworked on Tim's feedback (Claude)
 
 - Tim tried the panel on the dev server against EarthRanger's Map Layers and asked for four changes: groups of any depth (D98 amended, ADR 0020 amended, no migration needed: the parent column already pointed at the table; filters and deletions now walk a recursive query, a group cannot move into itself or below itself), a cleaner panel with the entity icons, clearer levels and a minimal last seen, tabs for Entities, Features and Events like EarthRanger's Subjects, Features, Analyzers and Events, and search plus sort with a grouped or flat view. All four built: the panel is a full-height drawer with the three tabs, the top controls move aside while it is open, features hide per type and per feature, events per type, and every row has a locate button.
@@ -1090,3 +1095,8 @@ Listed by the phase where they are first needed.
 
 - Built D105: the technical details preference on the user's preference document (server admins default on), the sidebar switch, the folded Technical details section (one click opens it for a page, the switch everywhere), the Network section shown only with the preference on, the device page's identities, traffic and provenance links folded, the driver column on the devices list gated. The audit of the other pages found nothing to fold: they show the entity, its state and the next action already. The inventory per role is in the administration docs.
 - Where to continue: the style pass, then coverage (D107), then v2.0.0.
+
+### 2026-09-06, style pass (Claude)
+
+- Column picker on the shared table, kept per user in the preference document; the admin devices list hides Created by default. Wording: Time instead of When, Status instead of State. Empty states now say what to do next on the project lists. The screenshot sweep ran against the local stack as the check: every route clean at the three widths, once the sweep learned to fill the entity route with a real entity (its only finding was its own placeholder hitting the API).
+- Where to continue: coverage (D107), then v2.0.0.

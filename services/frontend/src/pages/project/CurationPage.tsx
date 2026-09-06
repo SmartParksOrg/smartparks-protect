@@ -77,7 +77,7 @@ export function CurationPage() {
   const resend = useMutationToast({ mutationFn: (d: IntegrationDelivery) => api.post<IntegrationDelivery>(`/api/v1/projects/${projectId}/integrations/deliveries/${d.id}/resend`), success: t("Corrected object queued for delivery"), onSuccess: () => { void stale.refetch(); void summary.refetch(); } });
 
   const correctionColumns: ColumnDef<Correction, unknown>[] = [
-    { header: t("When"), accessorKey: "created_at", cell: ({ getValue }) => formatAgo(getValue<string>()) },
+    { header: t("Time"), accessorKey: "created_at", cell: ({ getValue }) => formatAgo(getValue<string>()) },
     { header: t("Record"), id: "record", cell: ({ row }) => <Button variant="link" size="sm" className="h-auto p-0" onClick={(e) => { e.stopPropagation(); setHistory({ target_type: row.original.target_type as CurationTarget["target_type"], target_id: row.original.target_id, target_time: row.original.target_time }); }}>{row.original.target_type} {row.original.target_id}{row.original.metric_key ? ` (${row.original.metric_key})` : ""}</Button> },
     { header: t("Field"), accessorKey: "field", cell: ({ getValue }) => FIELD_LABELS[getValue<string>()] ?? getValue<string>() },
     { header: t("Change"), id: "change", cell: ({ row }) => <span className="text-xs">{t("{{from}} to {{to}}", { from: formatValue(row.original.field, row.original.original_value), to: formatValue(row.original.field, row.original.corrected_value) })}</span> },

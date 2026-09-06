@@ -249,7 +249,7 @@ function DrillDownDialog({ projectId, row, bucketSeconds, timezone, onClose, can
             <DialogTitle>{t("Rows behind the bucket")}</DialogTitle>
             <DialogDescription>{row && `${row.metric_key}${row.owner_name ? ` · ${row.owner_name}` : ""}, from ${formatInZone(row.time, timezone)} for ${bucketLabel(bucketSeconds)}`}</DialogDescription>
           </DialogHeader>
-          <DataTable columns={columns} data={rows.data?.items} isLoading={rows.isPending} emptyMessage={t("No rows.")} footer={rows.data?.next_cursor ? "Showing the first 500 rows" : undefined} />
+          <DataTable columns={columns} data={rows.data?.items} isLoading={rows.isPending} emptyMessage={t("No rows in this range. Widen the period or pick another metric.")} footer={rows.data?.next_cursor ? "Showing the first 500 rows" : undefined} />
         </DialogContent>
       </Dialog>
       <SourceEventDialog id={event?.id ?? null} ingestedAt={event?.ingestedAt ?? null} onClose={() => setEvent(null)} />

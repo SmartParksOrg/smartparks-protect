@@ -90,7 +90,7 @@ export function MembersPage() {
             {lastLink && <Callout kind="warning" className="mt-3">{lastLink}</Callout>}
           </CardContent>
         </Card>
-        <DataTable columns={memberColumns} data={members.data?.items} searchable isLoading={members.isPending} emptyMessage={t("No members yet.")} />
+        <DataTable columns={memberColumns} data={members.data?.items} searchable isLoading={members.isPending} emptyMessage={t("No members yet. Invite someone with the form on the right.")} />
         <h2 className="text-base font-medium">{t("Open invitations")}</h2>
         <DataTable columns={invitationColumns} data={invitations.data?.items} searchable isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
       </Page>

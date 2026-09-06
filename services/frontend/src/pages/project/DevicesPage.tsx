@@ -147,7 +147,7 @@ export function DevicesPage() {
               : undefined
           }
           isLoading={devices.isPending}
-          emptyMessage={t("No devices are assigned to this project.")}
+          emptyMessage={t("No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.")} columnsKey="devices"
           onRowClick={(d) => navigate(`/projects/${projectId}/devices/${d.id}`)}
         />
       </Page>

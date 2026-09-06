@@ -148,7 +148,7 @@ export function AdminDevicesPage() {
       </>} />
       <Page>
         <Callout kind="info">{t("CSV columns: device_name, external_identifier, device_type, datasource, project, effective_from (ISO 8601 with offset), entity (optional). All rows or none.")}</Callout>
-        <DataTable columns={columns} data={devices.data?.items} searchable onSearchChange={setQ} footer={devices.data?.next_cursor ? t("Only the first 500 rows are shown. Search to find the rest.") : undefined} isLoading={devices.isPending} onRowClick={(d) => setParams({ device: d.id })} />
+        <DataTable columns={columns} columnsKey="admin-devices" defaultHidden={["Created"]} data={devices.data?.items} searchable onSearchChange={setQ} footer={devices.data?.next_cursor ? t("Only the first 500 rows are shown. Search to find the rest.") : undefined} isLoading={devices.isPending} onRowClick={(d) => setParams({ device: d.id })} />
       </Page>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

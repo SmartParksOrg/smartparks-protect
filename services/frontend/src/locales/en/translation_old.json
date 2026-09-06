@@ -38,7 +38,12 @@
   "ms": "ms",
   "Needs {{keys}}": "Needs {{keys}}",
   "new,": "new,",
+  "No devices are assigned to this project.": "No devices are assigned to this project.",
+  "No entities yet.": "No entities yet.",
+  "No features yet.": "No features yet.",
   "No groups yet. Groups let you filter the lists and show or hide parts of the map.": "No groups yet. Groups let you filter the lists and show or hide parts of the map.",
+  "No members yet.": "No members yet.",
+  "No rows.": "No rows.",
   "Now:": "Now:",
   "of": "of",
   "on": "on",
@@ -66,5 +71,6 @@
   "to": "to",
   "uses": "uses",
   "Valid from": "Valid from",
+  "When": "When",
   "Workers without a heartbeat for 15 minutes:": "Workers without a heartbeat for 15 minutes:"
 }

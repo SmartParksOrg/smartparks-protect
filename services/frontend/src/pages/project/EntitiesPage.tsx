@@ -225,7 +225,7 @@ export function EntitiesPage() {
               : undefined
           }
           isLoading={entities.isPending}
-          emptyMessage={t("No entities yet.")}
+          emptyMessage={t("No entities yet. Add one with New entity, or onboard collars with their animals from Needs attention.")} columnsKey="entities"
           onRowClick={(e) =>
             void navigate(`/projects/${projectId}/entities/${e.id}`)
           }
