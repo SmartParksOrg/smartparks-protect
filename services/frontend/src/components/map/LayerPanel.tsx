@@ -208,7 +208,8 @@ export function LayerPanel({
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
   const [grouped, setGrouped] = useState(true);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // every row starts folded; a search opens what it reaches
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const term = q.trim().toLowerCase();
   const order = (a: EntityFeatureProperties, b: EntityFeatureProperties) =>
     sort === "name"
@@ -286,12 +287,34 @@ export function LayerPanel({
   }, [entities, groups, projects, perProject, sort, t]);
 
   const flip = (id: string) =>
-    setCollapsed((s) => {
+    setExpanded((s) => {
       const next = new Set(s);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  /** Fold or unfold every row of a tab at once. */
+  const foldAll = (keys: string[]) => {
+    const anyOpen = keys.some((k) => expanded.has(k));
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-xs"
+        disabled={keys.length === 0}
+        onClick={() =>
+          setExpanded((s) => {
+            const next = new Set(s);
+            for (const k of keys) if (anyOpen) next.delete(k);
+            else next.add(k);
+            return next;
+          })
+        }
+      >
+        {anyOpen ? t("Fold all") : t("Unfold all")}
+      </Button>
+    );
+  };
   const shownCount = entities.filter(
     (f) =>
       isGroupShown(layerOf(f, perProject), choices, groups) &&
@@ -440,9 +463,9 @@ export function LayerPanel({
               if (term && !groupMatch && members.length === 0 && !belowMatch)
                 return null;
               const shown = isGroupShown(row.id, choices, groups);
-              const open = !collapsed.has(row.id) || Boolean(term);
+              const open = expanded.has(row.id) || Boolean(term);
               // folded above: the whole subtree goes, unless a search reaches into it
-              if (!term && row.parents.some((p) => collapsed.has(p))) return null;
+              if (!term && row.parents.some((p) => !expanded.has(p))) return null;
               return (
                 <div key={row.id}>
                   <Row depth={row.depth} header>
@@ -521,6 +544,7 @@ export function LayerPanel({
           })}
         </span>
         <span className="flex gap-1">
+          {foldAll(rows.map((r) => r.id))}
           <Button
             variant="ghost"
             size="sm"
@@ -535,7 +559,11 @@ export function LayerPanel({
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => onChange(hideAllEntities(choices, groups))}
+            onClick={() =>
+              onChange(
+                hideAllEntities(choices, groups, projects?.map((p) => p.id) ?? []),
+              )
+            }
           >
             {t("Hide all")}
           </Button>
@@ -582,7 +610,7 @@ export function LayerPanel({
           if (term && items.length === 0) return null;
           const typeOn =
             choices.features && !choices.hidden_feature_types.includes(type);
-          const open = !collapsed.has(`ft:${type}`) || Boolean(term);
+          const open = expanded.has(`ft:${type}`) || Boolean(term);
           return (
             <div key={type}>
               <Row depth={1} header>
@@ -676,6 +704,9 @@ export function LayerPanel({
           );
         })}
       </div>
+      <div className="flex items-center justify-end border-t px-1 pt-2 text-xs text-muted-foreground">
+        {foldAll(featureTypes.map((type) => `ft:${type}`))}
+      </div>
     </>
   );
 
@@ -717,7 +748,7 @@ export function LayerPanel({
           if (term && items.length === 0) return null;
           const typeOn =
             choices.events && !choices.hidden_event_types.includes(type);
-          const open = !collapsed.has(`ev:${type}`) || Boolean(term);
+          const open = expanded.has(`ev:${type}`) || Boolean(term);
           return (
             <div key={type}>
               <Row depth={1} header>
@@ -793,6 +824,9 @@ export function LayerPanel({
             </div>
           );
         })}
+      </div>
+      <div className="flex items-center justify-end border-t px-1 pt-2 text-xs text-muted-foreground">
+        {foldAll(eventTypes.map((type) => `ev:${type}`))}
       </div>
     </>
   );
@@ -934,7 +968,24 @@ export function LayerPanel({
           const ids = all.map((d) => d.device_id);
           const onCount = ids.filter((id) => isDeviceShown(id, choices)).length;
           const foldKey = `dev:${section.key}`;
-          const open = !collapsed.has(foldKey) || Boolean(term);
+          const open = !section.name || expanded.has(foldKey) || Boolean(term);
+          const openU = expanded.has(`${foldKey}:u`) || Boolean(term);
+          const openT = expanded.has(`${foldKey}:t`) || Boolean(term);
+          const foldButton = (key: string, isOpen: boolean) => (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0"
+              aria-label={isOpen ? t("Collapse") : t("Expand")}
+              onClick={() => flip(key)}
+            >
+              {isOpen ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
+            </Button>
+          );
           return (
           <div key={section.key}>
             {section.name && (
@@ -973,6 +1024,7 @@ export function LayerPanel({
             )}
             {open && section.unassigned.length > 0 && (
               <Row depth={section.name ? 1 : 0} header>
+                {foldButton(`${foldKey}:u`, openU)}
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   {t("Without an entity")}
                 </span>
@@ -981,9 +1033,10 @@ export function LayerPanel({
                 </span>
               </Row>
             )}
-            {open && section.unassigned.map(deviceRow)}
+            {open && openU && section.unassigned.map(deviceRow)}
             {open && section.tracking.length > 0 && (
               <Row depth={section.name ? 1 : 0} header>
+                {foldButton(`${foldKey}:t`, openT)}
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   {t("Tracking an entity")}
                 </span>
@@ -992,7 +1045,7 @@ export function LayerPanel({
                 </span>
               </Row>
             )}
-            {open && section.tracking.map(deviceRow)}
+            {open && openT && section.tracking.map(deviceRow)}
           </div>
           );
         })}
@@ -1002,6 +1055,13 @@ export function LayerPanel({
           {t("{{shown}} of {{total}} shown", { shown: shownDevices, total: devices.length })}
         </span>
         <span className="flex gap-1">
+          {foldAll(
+            deviceSections.flatMap((sec) => [
+              `dev:${sec.key}`,
+              `dev:${sec.key}:u`,
+              `dev:${sec.key}:t`,
+            ]),
+          )}
           <Button
             variant="ghost"
             size="sm"

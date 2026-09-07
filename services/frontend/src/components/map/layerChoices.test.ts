@@ -191,3 +191,15 @@ describe("the project as a layer (all-projects scope)", () => {
     expect(isVisible(entity("e1", "p1", null), DEFAULT_LAYERS, groups)).toBe(true);
   });
 });
+
+describe("hide all in the all scope", () => {
+  it("hides every project, group and ungrouped layer", () => {
+    const groups = [{ ...group("g1"), project_id: "p1" }];
+    const hidden = hideAllEntities(DEFAULT_LAYERS, groups, ["p1", "p2"]);
+    const entity = (id: string, project_id: string, group_id: string | null) =>
+      ({ entity_id: id, project_id, group_id, name: id } as unknown as Parameters<typeof isVisible>[0]);
+    expect(isVisible(entity("e1", "p1", "g1"), hidden, groups, true)).toBe(false);
+    expect(isVisible(entity("e2", "p1", null), hidden, groups, true)).toBe(false);
+    expect(isVisible(entity("e3", "p2", null), hidden, groups, true)).toBe(false);
+  });
+});

@@ -1207,3 +1207,7 @@ Listed by the phase where they are first needed.
 ### 2026-09-07, folds and project switches in the layers panel (Claude)
 
 - Tim found that folding a project row in the all scope left its Ungrouped row and entities standing, and that the Devices tab's project rows had no switch and no fold. Rows now carry their ancestors (`parents`) and a folded ancestor hides the whole subtree, for projects and for groups alike, unless a search reaches into it; the device project rows got a fold and a checkbox over every device of the project (`hideDevices` next to `showDevices`, an indeterminate state while some are on). Checked on the local build against the dev API.
+
+### 2026-09-07, layers panel: folded by default, fold all, hide all across projects (Claude)
+
+- Tim found Hide all on the Entities tab leaving entities showing in the all scope: it hid the groups and the shared Ungrouped layer but not the per-project ones or the project rows (`hideAllEntities` now takes the project ids, with a test). He also asked for a fold-all button and for every row to start folded: the panel keeps an `expanded` set instead of a collapsed one, every tab has Fold all or Unfold all, and the Devices tab's two sections per project fold as well. Checked on the local build against the dev API: Hide all leaves 0 of 1004 entities shown, Show all brings them back.

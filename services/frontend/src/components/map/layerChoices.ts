@@ -236,10 +236,13 @@ export function toggleEntity(
 export function hideAllEntities(
   choices: LayerChoices,
   groups: EntityGroup[] | undefined,
+  projectIds: string[] = [],
 ): LayerChoices {
+  // in the all scope the layers are per project: their rows and ungrouped layers go too
+  const perProject = projectIds.flatMap((id) => [projectLayerOf(id), ungroupedLayerOf(id)]);
   return {
     ...choices,
-    hidden_groups: [UNGROUPED_LAYER, ...(groups ?? []).map((g) => g.id)],
+    hidden_groups: [UNGROUPED_LAYER, ...(groups ?? []).map((g) => g.id), ...perProject],
     hidden_entities: [],
   };
 }
