@@ -1,8 +1,14 @@
 """Bulk onboarding from Needs attention (decision D96): a selection of unknown identities
 becomes devices, optionally with an entity each, or is ignored, in one call."""
 
-import pytest
+import uuid
 
+import pytest
+from sqlalchemy import select
+
+from shared.enums import ProcessingStatus
+from shared.models import GatewayReception, SourceEvent
+from shared.timeutil import utc_now
 from tests.api.conftest import actor, create_project
 from tests.conftest import unique_name
 
@@ -31,6 +37,55 @@ async def _unknown_identities(client, headers, count: int):
     identities = [i for i in listed["items"] if i["external_id"] in euis]
     assert len(identities) == count
     return source, identities
+
+
+async def test_linking_gives_the_receptions_the_device(client, db):
+    """A reception stored while the identity was unknown gets the device when the identity is
+    linked, so the gateway layer sees the uplink (decision D121)."""
+    admin = await actor(client, db, superuser=True)
+    h = admin.headers
+    device_type = (
+        await client.post(
+            "/api/v1/device-types",
+            json={
+                "key": unique_name("gj").replace("-", "_"),
+                "label": "Generic",
+                "driver_key": "generic_json",
+            },
+            headers=h,
+        )
+    ).json()
+    source, (identity,) = await _unknown_identities(client, h, 1)
+    event = await db.scalar(
+        select(SourceEvent).where(SourceEvent.external_identity_id == uuid.UUID(identity["id"]))
+    )
+    assert event is not None and event.device_id is None
+    db.add(
+        GatewayReception(
+            time=utc_now(),
+            data_source_id=uuid.UUID(source["id"]),
+            device_id=None,
+            source_event_id=event.id,
+            source_event_ingested_at=event.ingested_at,
+            gateway_id="gw-test-1",
+            rssi=-100.0,
+        )
+    )
+    await db.commit()
+
+    result = await client.post(
+        "/api/v1/attention/identities/bulk-create-devices",
+        json={"identity_ids": [identity["id"]], "device_type_id": device_type["id"]},
+        headers=h,
+    )
+    assert result.status_code == 201, result.text
+    assert result.json()["queued"] == 1
+    db.expire_all()
+    reception = await db.scalar(
+        select(GatewayReception).where(GatewayReception.source_event_id == event.id)
+    )
+    assert reception is not None
+    assert str(reception.device_id) == result.json()["device_ids"][0]
 
 
 async def test_bulk_create_devices_with_entities_names_and_skips(client, db):
@@ -94,7 +149,20 @@ async def test_bulk_create_devices_with_entities_names_and_skips(client, db):
     assert result.status_code == 201, result.text
     body = result.json()
     assert body["created"] == 3 and body["entities"] == 3 and body["skipped"] == []
-    assert body["republished"] == 3
+    assert body["queued"] == 3
+    # the retained events wait for the decoder with their device (decision D121)
+    events = (
+        await db.scalars(
+            select(SourceEvent).where(
+                SourceEvent.external_identity_id.in_([uuid.UUID(i["id"]) for i in identities])
+            )
+        )
+    ).all()
+    assert len(events) == 3
+    assert {e.processing_status for e in events} == {ProcessingStatus.RECEIVED}
+    assert all(e.device_id is not None for e in events)
+    summary = (await client.get("/api/v1/attention/summary", headers=h)).json()
+    assert summary["queued_source_events"] >= 3
     devices = {
         (await client.get(f"/api/v1/devices/{device_id}", headers=h)).json()["name"]: device_id
         for device_id in body["device_ids"]

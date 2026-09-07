@@ -26,7 +26,7 @@ export function ProjectSwitcher() {
   const label = all ? t("All projects") : (current?.name ?? t("Select a project"));
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
           <span className="truncate">{label}</span>

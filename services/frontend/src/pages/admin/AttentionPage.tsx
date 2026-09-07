@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -21,12 +22,54 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatAgo, formatTime } from "@/lib/format";
+import { useQueryClient } from "@tanstack/react-query";
 
 const DEAD_TOPICS = ["source_event.received", "position.created", "measurement.created", "device.state_changed", "event.created", "needs_attention.created"];
 
 function Stat({ label, value, tone }: { label: string; value: number | string; tone?: "warn" | "bad" }) {
   return (
     <Card><CardContent className="pt-4"><div className="text-xs text-muted-foreground">{label}</div><div className={`text-2xl font-semibold ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-brand-sand" : ""}`}>{value}</div></CardContent></Card>
+  );
+}
+
+/** How far the decoder is with the events that wait for it (decision D121): the queue drains as
+ * it works, so the page polls the summary every few seconds while any wait, and the bar runs
+ * from the most events seen waiting since it was last empty. */
+function QueueProgress({ queued, onDrained }: { queued: number; onDrained: () => void }) {
+  const { t } = useTranslation();
+  // The most events seen waiting since the queue was last empty, adjusted during render.
+  const [peak, setPeak] = useState(0);
+  if (queued > peak) setPeak(queued);
+  if (queued === 0 && peak > 0) setPeak(0);
+  // The drain is announced once, from the count the effect kept.
+  const counted = useRef(0);
+  useEffect(() => {
+    if (queued > 0) {
+      counted.current = Math.max(counted.current, queued);
+      return;
+    }
+    if (counted.current > 0) {
+      toast.success(t("{{count}} retained events processed", { count: counted.current }));
+      counted.current = 0;
+      onDrained();
+    }
+  }, [queued, onDrained, t]);
+  if (queued === 0) return null;
+  const total = Math.max(peak, queued);
+  const done = total - queued;
+  return (
+    <Card>
+      <CardContent className="space-y-2 pt-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium">{t("Processing retained events")}</span>
+          <span className="text-muted-foreground">{t("{{done}} of {{total}} done, {{queued}} waiting", { done, total, queued })}</span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label={t("Processing retained events")}>
+          <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${total ? Math.round((done / total) * 100) : 0}%` }} />
+        </div>
+        <p className="text-xs text-muted-foreground">{t("The decoder works through them in the background; the counts, the devices and the map fill in as it goes. You can leave this page.")}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -78,7 +121,7 @@ function BulkCreateDialog({ identities, onClose, onDone }: { identities: Unknown
   const create = useMutationToast({
     mutationFn: () => api.post<BulkCreateResult>("/api/v1/attention/identities/bulk-create-devices", { body: { identity_ids: identities.map((i) => i.id), device_type_id: typeId, project_id: projectId || null, entity_type_id: entityTypeId || null, group_id: entityTypeId && groupId ? groupId : null } }),
     invalidate: [queryKeys.unknownIdentities, queryKeys.attentionSummary, queryKeys.devices({})],
-    success: t("Devices created; retained events are being processed"),
+    success: t("Devices created; the retained events are processed in the background"),
     onSuccess: (data: BulkCreateResult) => { setResult(data); onDone(); if (data.skipped.length === 0) onClose(); },
   });
   const names = identities.map(platformName);
@@ -89,7 +132,7 @@ function BulkCreateDialog({ identities, onClose, onDone }: { identities: Unknown
         <DialogHeader><DialogTitle>{t("Create {{count}} devices", { count: identities.length })}</DialogTitle></DialogHeader>
         {result ? (
           <div className="space-y-2 text-sm">
-            <Callout kind="info">{t("{{created}} devices and {{entities}} entities created, {{republished}} retained events reprocessed.", { created: result.created, entities: result.entities, republished: result.republished })}</Callout>
+            <Callout kind="info">{t("{{created}} devices and {{entities}} entities created, {{queued}} retained events handed to the decoder; they are processed in the background.", { created: result.created, entities: result.entities, queued: result.queued })}</Callout>
             {result.skipped.length > 0 && <ul className="list-disc space-y-1 pl-5 text-xs">{result.skipped.map((s) => <li key={s.identity_id}><span className="font-mono">{s.external_id ?? s.identity_id}</span>: {s.reason}</li>)}</ul>}
           </div>
         ) : (
@@ -144,7 +187,8 @@ function NewMetricRow({ metric, categories, onDefined }: { metric: NewMetric; ca
 
 export function AttentionPage() {
   const { t } = useTranslation();
-  const summary = useQuery({ queryKey: queryKeys.attentionSummary, queryFn: () => api.get<AttentionSummary>("/api/v1/attention/summary"), refetchInterval: 30_000 });
+  const queryClient = useQueryClient();
+  const summary = useQuery({ queryKey: queryKeys.attentionSummary, queryFn: () => api.get<AttentionSummary>("/api/v1/attention/summary"), refetchInterval: (query) => (query.state.data?.queued_source_events ? 3_000 : 30_000) });
   const clocks = useQuery({ queryKey: ["attention", "clock-ahead"], queryFn: () => api.get<ClockAheadDevice[]>("/api/v1/attention/clock-ahead"), refetchInterval: 60_000 });
   const clockColumns: ColumnDef<ClockAheadDevice, unknown>[] = [
     { header: t("Device"), accessorKey: "name", cell: ({ row }) => <Link className="underline" to={`/admin/devices/${row.original.device_id}`}>{row.original.name}</Link> },
@@ -171,18 +215,18 @@ export function AttentionPage() {
   const resolve = useMutationToast({ mutationFn: (d: DeadLetter) => api.post(`/api/v1/attention/dead-letters/${d.topic}/${d.id}/resolve`), invalidate: invalidateAll, success: t("Dead letter resolved") });
 
   const identityColumns: ColumnDef<UnknownIdentity, unknown>[] = [
-    { header: t("External id"), accessorKey: "external_id", cell: ({ getValue }) => <span className="font-mono">{getValue<string>()}</span> },
-    { header: t("Name"), id: "name", accessorFn: (row) => (typeof row.attributes?.name === "string" ? row.attributes.name : ""), cell: ({ getValue }) => getValue<string>() || <span className="text-muted-foreground">{t("none")}</span> },
+    { header: t("External id"), accessorKey: "external_id", meta: { filter: "text" }, cell: ({ getValue }) => <span className="font-mono">{getValue<string>()}</span> },
+    { header: t("Name"), id: "name", accessorFn: (row) => (typeof row.attributes?.name === "string" ? row.attributes.name : ""), meta: { filter: "text" }, cell: ({ getValue }) => getValue<string>() || <span className="text-muted-foreground">{t("none")}</span> },
     { header: t("Data source"), accessorKey: "data_source_name" },
     { header: t("Type"), accessorKey: "identity_type" },
-    { header: t("First seen"), accessorKey: "first_seen_at", cell: ({ getValue }) => formatTime(getValue<string | null>()) },
-    { header: t("Last seen"), accessorKey: "last_seen_at", cell: ({ getValue }) => formatAgo(getValue<string | null>()) },
-    { header: t("Events"), accessorKey: "event_count" },
+    { header: t("First seen"), accessorKey: "first_seen_at", meta: { filter: false }, cell: ({ getValue }) => formatTime(getValue<string | null>()) },
+    { header: t("Last seen"), accessorKey: "last_seen_at", meta: { filter: false }, cell: ({ getValue }) => formatAgo(getValue<string | null>()) },
+    { header: t("Events"), accessorKey: "event_count", meta: { filter: false } },
     { id: "actions", header: "", cell: ({ row }) => <div className="flex gap-1"><Button size="sm" onClick={() => setCreating(row.original)}>{t("Create device")}</Button><Button size="sm" variant="ghost" onClick={() => ignore.mutate(row.original.id)}>{t("Ignore")}</Button></div> },
   ];
   const failedColumns: ColumnDef<SourceEventSummary, unknown>[] = [
-    { header: t("Ingested"), accessorKey: "ingested_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { header: t("External id"), accessorKey: "external_id", cell: ({ getValue }) => <span className="font-mono">{getValue<string | null>()}</span> },
+    { header: t("Ingested"), accessorKey: "ingested_at", meta: { filter: false }, cell: ({ getValue }) => formatTime(getValue<string>()) },
+    { header: t("External id"), accessorKey: "external_id", meta: { filter: "text" }, cell: ({ getValue }) => <span className="font-mono">{getValue<string | null>()}</span> },
     { header: t("Type"), accessorKey: "event_type" },
     { header: t("Error"), accessorKey: "error_code", cell: ({ getValue }) => <span className="text-xs text-destructive">{getValue<string | null>()}</span> },
     { id: "actions", header: "", cell: ({ row }) => <div className="flex gap-1"><Button size="sm" variant="outline" onClick={() => setEvent({ id: row.original.id, ingestedAt: row.original.ingested_at })}>{t("Inspect")}</Button>{row.original.trace_id && <Button size="sm" variant="ghost" onClick={() => setTrace(row.original.trace_id)}>{t("Trace")}</Button>}<Button size="sm" variant="ghost" disabled={!row.original.device_id} onClick={() => reprocess.mutate(row.original)}>{t("Reprocess")}</Button></div> },
@@ -208,6 +252,7 @@ export function AttentionPage() {
           <Stat label={t("New metrics")} value={s?.uncategorized_metrics ?? "…"} tone={s?.uncategorized_metrics ? "warn" : undefined} />
           <Stat label={t("Clocks ahead")} value={s?.clock_ahead_devices ?? "…"} tone={s?.clock_ahead_devices ? "warn" : undefined} />
         </div>
+        <QueueProgress queued={s?.queued_source_events ?? 0} onDrained={() => { for (const key of invalidateAll) void queryClient.invalidateQueries({ queryKey: key }); void queryClient.invalidateQueries({ queryKey: queryKeys.devices({}) }); }} />
         <Tabs defaultValue="identities">
           <TabsList><TabsTrigger value="identities">{t("Unknown identities")}</TabsTrigger><TabsTrigger value="metrics">{t("New metrics")}</TabsTrigger><TabsTrigger value="clocks">{t("Clocks ahead")}</TabsTrigger><TabsTrigger value="failed">{t("Failed source events")}</TabsTrigger><TabsTrigger value="dead">{t("Dead letters")}</TabsTrigger></TabsList>
           <TabsContent value="metrics">
@@ -232,9 +277,9 @@ export function AttentionPage() {
                 <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t("Clear selection")}</Button>
               </div>
             )}
-            <DataTable columns={identityColumns} data={identities.data?.items} searchable isLoading={identities.isPending} emptyMessage={t("Every identity is linked to a device.")} selection={{ selected, onChange: setSelected, rowId: (row) => row.id }} />
+            <DataTable columns={identityColumns} data={identities.data?.items} searchable columnFilters isLoading={identities.isPending} emptyMessage={t("Every identity is linked to a device.")} selection={{ selected, onChange: setSelected, rowId: (row) => row.id }} />
           </TabsContent>
-          <TabsContent value="failed"><DataTable columns={failedColumns} data={failed.data} searchable isLoading={failed.isPending} emptyMessage={t("No failed source events.")} /></TabsContent>
+          <TabsContent value="failed"><DataTable columns={failedColumns} data={failed.data} searchable columnFilters isLoading={failed.isPending} emptyMessage={t("No failed source events.")} /></TabsContent>
           <TabsContent value="dead" className="space-y-3">
             <Select value={topic} onValueChange={setTopic}><SelectTrigger className="w-72"><SelectValue /></SelectTrigger><SelectContent>{DEAD_TOPICS.map((t) => <SelectItem key={t} value={t}>{t} {s?.dead_letters[t] ? `(${s.dead_letters[t]})` : ""}</SelectItem>)}</SelectContent></Select>
             <DataTable columns={deadColumns} data={dead.data} searchable isLoading={dead.isPending} emptyMessage={t("No dead letters on this topic.")} />

@@ -50,6 +50,7 @@ class Topic:
     LOG_FILE_UPLOADED = "log_file.uploaded"
     CURATION_JOB_REQUESTED = "curation.job_requested"
     CURATION_APPLIED = "curation.applied"
+    IDENTITY_REPROCESS_REQUESTED = "identity.reprocess_requested"
 
 
 SCHEMA_VERSION = 1

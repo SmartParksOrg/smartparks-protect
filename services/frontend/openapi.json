@@ -18829,6 +18829,12 @@
       "type": "integer",
       "title": "Clock Ahead Devices",
       "default": 0
+     },
+     "queued_source_events": {
+      "type": "integer",
+      "title": "Queued Source Events",
+      "description": "Events with a device that wait for the decoder, retained ones mostly",
+      "default": 0
      }
     },
     "type": "object",
@@ -19807,9 +19813,10 @@
       "type": "integer",
       "title": "Entities"
      },
-     "republished": {
+     "queued": {
       "type": "integer",
-      "title": "Republished"
+      "title": "Queued",
+      "description": "Retained events handed to the decoder"
      },
      "device_ids": {
       "items": {
@@ -19831,7 +19838,7 @@
     "required": [
      "created",
      "entities",
-     "republished",
+     "queued",
      "device_ids",
      "skipped"
     ],
@@ -31101,14 +31108,15 @@
    },
    "ReprocessResult": {
     "properties": {
-     "republished": {
+     "queued": {
       "type": "integer",
-      "title": "Republished"
+      "title": "Queued",
+      "description": "Retained events handed to the decoder"
      }
     },
     "type": "object",
     "required": [
-     "republished"
+     "queued"
     ],
     "title": "ReprocessResult"
    },

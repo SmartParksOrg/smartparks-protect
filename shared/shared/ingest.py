@@ -10,11 +10,11 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from sqlalchemy import select
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -416,6 +416,69 @@ async def commit_and_publish(
     for item in stored:
         if item.topic is not None:
             await bus.publish(item.topic, item.payload, trace_id=str(item.trace_id))
+
+
+RETAINED = (ProcessingStatus.UNASSIGNED, ProcessingStatus.FAILED, ProcessingStatus.IGNORED)
+
+
+async def link_receptions(session: AsyncSession, identity: ExternalIdentity) -> int:
+    """Receptions stored while the identity was unknown carry no device; give them the device
+    their source event has now, so the gateway layer and the coverage see those uplinks."""
+    result = cast(
+        "CursorResult[Any]",
+        await session.execute(
+            update(GatewayReception)
+            .where(
+                GatewayReception.device_id.is_(None),
+                GatewayReception.source_event_id == SourceEvent.id,
+                GatewayReception.source_event_ingested_at == SourceEvent.ingested_at,
+                SourceEvent.external_identity_id == identity.id,
+                SourceEvent.device_id.is_not(None),
+            )
+            .values(device_id=SourceEvent.device_id)
+        ),
+    )
+    return int(result.rowcount or 0)
+
+
+async def queue_identity_reprocess(
+    session: AsyncSession, bus: RedisStreamsBus, identity: ExternalIdentity
+) -> int:
+    """Hand the retained source events of a linked identity to the decoder (decision D121):
+    every unassigned, failed or ignored event gets the device and the received status in one
+    statement, the receptions of the same uplinks get the device too, and one message asks the
+    decoder to walk them in order. Returns how many events wait; the caller has committed the
+    link, this commits the queue before the message goes out."""
+    if identity.device_id is None:
+        raise ValueError("The identity has no device")
+    result = cast(
+        "CursorResult[Any]",
+        await session.execute(
+            update(SourceEvent)
+            .where(
+                SourceEvent.external_identity_id == identity.id,
+                SourceEvent.processing_status.in_(RETAINED),
+            )
+            .values(
+                device_id=identity.device_id,
+                processing_status=ProcessingStatus.RECEIVED,
+                error_code=None,
+            )
+        ),
+    )
+    queued = int(result.rowcount or 0)
+    await link_receptions(session, identity)
+    await session.commit()
+    if queued:
+        await bus.publish(
+            Topic.IDENTITY_REPROCESS_REQUESTED,
+            {
+                "external_identity_id": str(identity.id),
+                "device_id": str(identity.device_id),
+                "queued": queued,
+            },
+        )
+    return queued
 
 
 async def republish_source_event(bus: RedisStreamsBus, event: SourceEvent) -> str:

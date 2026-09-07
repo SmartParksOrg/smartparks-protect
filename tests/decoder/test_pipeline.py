@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from protect_decoder.main import build_worker
 from protect_decoder.pipeline import process_source_event, publish_outcome
-from shared.bus import RedisStreamsBus, Topic
+from shared.bus import Message, RedisStreamsBus, Topic
 from shared.enums import AcquisitionChannel, ErrorCode, ProcessingStatus, TraceStatus
 from shared.ingest import commit_and_publish, store_inbound
 from shared.models import (
@@ -220,6 +220,68 @@ async def test_unknown_device_is_retained_and_processed_after_linking(db, bus, w
         )
     )
     assert position.project_id == world.project_a.id
+
+
+async def test_identity_walker_processes_the_retained_events_in_order(db, bus, world):
+    """The decoder walks the retained events of an identity that got a device, oldest first,
+    each on its own commit (decision D121)."""
+    from shared.ingest import queue_identity_reprocess
+
+    unknown_id = uuid.uuid4().hex[:16].upper()
+    stored = []
+    for day in (13, 14, 15):
+        one = await store_inbound(
+            db,
+            world.source,
+            inbound(
+                unknown_id, {"time": f"2026-03-{day}T00:00:00+00:00", "lat": -24.6, "lon": 31.2}
+            ),
+        )
+        await commit_and_publish(db, bus, [one])
+        stored.append(one)
+    identity = stored[0].identity
+    assert identity is not None and identity.device_id is None
+    identity.device_id = world.device.id
+    await db.commit()
+    assert await queue_identity_reprocess(db, bus, identity) == 3
+    statuses = (
+        await db.scalars(
+            select(SourceEvent.processing_status).where(
+                SourceEvent.external_identity_id == identity.id
+            )
+        )
+    ).all()
+    assert set(statuses) == {ProcessingStatus.RECEIVED}
+
+    worker = build_worker()
+    worker.bus = bus
+    handler = next(h for t, h in worker._subscriptions if t == Topic.IDENTITY_REPROCESS_REQUESTED)
+    await handler(
+        Message(
+            topic=Topic.IDENTITY_REPROCESS_REQUESTED,
+            payload={"external_identity_id": str(identity.id), "device_id": str(world.device.id)},
+        )
+    )
+    db.expire_all()
+    statuses = (
+        await db.scalars(
+            select(SourceEvent.processing_status).where(
+                SourceEvent.external_identity_id == identity.id
+            )
+        )
+    ).all()
+    assert statuses == [ProcessingStatus.PROCESSED] * 3
+    positions = (
+        await db.scalars(
+            select(Position.time)
+            .where(
+                Position.device_id == world.device.id,
+                Position.time >= datetime(2026, 3, 13, tzinfo=UTC),
+            )
+            .order_by(Position.time)
+        )
+    ).all()
+    assert [p.day for p in positions] == [13, 14, 15]
 
 
 async def test_decode_failure_lands_in_dead_letter(db, bus, world):

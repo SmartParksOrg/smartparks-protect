@@ -23,7 +23,7 @@ from shared.config import get_settings
 from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.enums import DeviceStatus, ProcessingStatus
-from shared.ingest import republish_source_event
+from shared.ingest import queue_identity_reprocess, republish_source_event
 from shared.models import (
     DataSource,
     Device,
@@ -48,7 +48,6 @@ router = APIRouter(
     prefix="/attention", tags=["needs attention"], dependencies=[Depends(require_server_admin)]
 )
 
-REPROCESS_BATCH = 1000
 DEAD_TOPICS = (
     Topic.SOURCE_EVENT_RECEIVED,
     Topic.POSITION_CREATED,
@@ -68,6 +67,9 @@ class AttentionSummary(BaseModel):
     workers: dict[str, datetime | None]
     uncategorized_metrics: int = 0
     clock_ahead_devices: int = 0
+    queued_source_events: int = Field(
+        0, description="Events with a device that wait for the decoder, retained ones mostly"
+    )
 
 
 class ClockAheadDevice(BaseModel):
@@ -151,7 +153,7 @@ class BulkSkipped(BaseModel):
 class BulkCreateResult(BaseModel):
     created: int
     entities: int
-    republished: int
+    queued: int = Field(description="Retained events handed to the decoder")
     device_ids: list[uuid.UUID]
     skipped: list[BulkSkipped]
 
@@ -162,7 +164,7 @@ class BulkIgnoreResult(BaseModel):
 
 
 class ReprocessResult(BaseModel):
-    republished: int
+    queued: int = Field(description="Retained events handed to the decoder")
 
 
 class SourceEventSummary(BaseModel):
@@ -207,6 +209,14 @@ async def summary(
         .select_from(SourceEvent)
         .where(SourceEvent.processing_status == ProcessingStatus.UNASSIGNED)
     )
+    queued = await session.scalar(
+        select(func.count())
+        .select_from(SourceEvent)
+        .where(
+            SourceEvent.processing_status == ProcessingStatus.RECEIVED,
+            SourceEvent.device_id.is_not(None),
+        )
+    )
     dead = {topic: await bus.dead_count(topic) for topic in DEAD_TOPICS}
     workers = await bus.heartbeats()
     uncategorized = await session.scalar(
@@ -222,6 +232,7 @@ async def summary(
         workers=workers,
         uncategorized_metrics=int(uncategorized or 0),
         clock_ahead_devices=clock_ahead,
+        queued_source_events=int(queued or 0),
     )
 
 
@@ -376,28 +387,9 @@ async def unknown_identities(
 async def _reprocess_identity(
     session: AsyncSession, bus: RedisStreamsBus, identity: ExternalIdentity
 ) -> int:
-    """Attach the device to retained source events of this identity and put them back on the bus."""
-    events = (
-        await session.scalars(
-            select(SourceEvent)
-            .where(
-                SourceEvent.external_identity_id == identity.id,
-                SourceEvent.processing_status.in_(
-                    [ProcessingStatus.UNASSIGNED, ProcessingStatus.FAILED, ProcessingStatus.IGNORED]
-                ),
-            )
-            .order_by(SourceEvent.ingested_at)
-            .limit(REPROCESS_BATCH)
-        )
-    ).all()
-    for event in events:
-        event.device_id = identity.device_id
-        event.processing_status = ProcessingStatus.RECEIVED
-        event.error_code = None
-    await session.commit()
-    for event in events:
-        await republish_source_event(bus, event)
-    return len(events)
+    """Queue the retained events of this identity for the decoder; the request does not wait
+    for the processing (decision D121)."""
+    return await queue_identity_reprocess(session, bus, identity)
 
 
 @router.post(
@@ -610,14 +602,14 @@ async def bulk_create_devices(
         linked.append(identity)
     await flush_or_409(session, "Bulk create")
     await session.commit()
-    republished = 0
+    queued = 0
     if body.reprocess:
         for identity in linked:
-            republished += await _reprocess_identity(session, bus, identity)
+            queued += await _reprocess_identity(session, bus, identity)
     return BulkCreateResult(
         created=len(created),
         entities=entities,
-        republished=republished,
+        queued=queued,
         device_ids=[d.id for d in created],
         skipped=skipped,
     )
@@ -667,7 +659,7 @@ async def link_identity(
     )
     await session.commit()
     count = await _reprocess_identity(session, bus, identity) if body.reprocess else 0
-    return ReprocessResult(republished=count)
+    return ReprocessResult(queued=count)
 
 
 @router.post("/identities/{identity_id}/ignore", status_code=status.HTTP_204_NO_CONTENT)
@@ -706,7 +698,7 @@ async def reprocess_identity(
         object_id=str(identity.id),
     )
     await session.commit()
-    return ReprocessResult(republished=await _reprocess_identity(session, bus, identity))
+    return ReprocessResult(queued=await _reprocess_identity(session, bus, identity))
 
 
 @router.get("/source-events", response_model=list[SourceEventSummary])
@@ -754,7 +746,7 @@ async def reprocess_source_event(
     )
     await session.commit()
     await republish_source_event(bus, event)
-    return ReprocessResult(republished=1)
+    return ReprocessResult(queued=1)
 
 
 @router.get("/dead-letters", response_model=list[DeadLetter])
@@ -798,7 +790,7 @@ async def retry_dead_letter(
         object_id=f"{topic}/{dead_id}",
     )
     await session.commit()
-    return ReprocessResult(republished=1)
+    return ReprocessResult(queued=1)
 
 
 @router.post("/dead-letters/{topic}/{dead_id}/resolve", status_code=status.HTTP_204_NO_CONTENT)

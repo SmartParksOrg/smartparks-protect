@@ -4407,6 +4407,12 @@ export interface components {
              * @default 0
              */
             clock_ahead_devices: number;
+            /**
+             * Queued Source Events
+             * @description Events with a device that wait for the decoder, retained ones mostly
+             * @default 0
+             */
+            queued_source_events: number;
         };
         /** AuditRead */
         AuditRead: {
@@ -4762,8 +4768,11 @@ export interface components {
             created: number;
             /** Entities */
             entities: number;
-            /** Republished */
-            republished: number;
+            /**
+             * Queued
+             * @description Retained events handed to the decoder
+             */
+            queued: number;
             /** Device Ids */
             device_ids: string[];
             /** Skipped */
@@ -8705,8 +8714,11 @@ export interface components {
         };
         /** ReprocessResult */
         ReprocessResult: {
-            /** Republished */
-            republished: number;
+            /**
+             * Queued
+             * @description Retained events handed to the decoder
+             */
+            queued: number;
         };
         /**
          * Role

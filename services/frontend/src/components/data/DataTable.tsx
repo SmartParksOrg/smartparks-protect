@@ -1,13 +1,16 @@
 import {
   type ColumnDef,
+  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
   getFilteredRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, Columns3, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Columns3, Search, X } from "lucide-react";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -21,6 +24,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { usePreference } from "@/hooks/usePreference";
 
@@ -34,6 +44,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    /** The column's filter when the table shows filters: a choice of its values, a text
+     * match, or none (dates and counts). Without it: a choice up to a dozen values, else text. */
+    filter?: false | "text" | "select";
+  }
+}
+
+/** Distinct values up to this many make a choice; more make a text match. */
+const SELECT_UP_TO = 12;
+
+/** A choice filter holds the whole value; a text filter holds the text to look for. */
+type Filter = string | { eq: string };
+
+function passes(cell: unknown, filter: Filter): boolean {
+  const text = cell === null || cell === undefined ? "" : String(cell);
+  if (typeof filter === "string") return text.toLowerCase().includes(filter.toLowerCase());
+  return text === filter.eq;
+}
 
 interface Props<T> {
   columns: ColumnDef<T, unknown>[];
@@ -59,6 +90,9 @@ interface Props<T> {
   defaultHidden?: string[];
   /** Column ids hidden by default on a phone as well, so the operational columns fit. */
   defaultHiddenSmall?: string[];
+  /** A filter row under the header: a choice or a text match per column, so a selection
+   * (the header box takes every row that passes) can be organised in bulk. */
+  columnFilters?: boolean;
 }
 
 /** Below this many rows a search box is noise; it still appears once a term is typed. */
@@ -79,9 +113,11 @@ export function DataTable<T>({
   columnsKey,
   defaultHidden = [],
   defaultHiddenSmall = [],
+  columnFilters: withFilters,
 }: Props<T>) {
   const { t } = useTranslation();
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [filters, setFilters] = useState<ColumnFiltersState>([]);
   const [search, setSearch] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allColumns = useMemo<ColumnDef<T, unknown>[]>(() => {
@@ -146,7 +182,13 @@ export function DataTable<T>({
   const table = useReactTable({
     data: data ?? [],
     columns: allColumns,
-    state: { sorting, globalFilter: search, columnVisibility },
+    state: { sorting, globalFilter: search, columnVisibility, columnFilters: filters },
+    onColumnFiltersChange: setFilters,
+    defaultColumn: {
+      filterFn: (row, id, filter: Filter) => passes(row.getValue(id), filter),
+    },
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
     onColumnVisibilityChange: (updater) => {
       if (!columnsKey) return;
       const next =
@@ -163,6 +205,7 @@ export function DataTable<T>({
   const total = data?.length ?? 0;
   const shown = table.getRowModel().rows.length;
   const showSearch = searchable && (total >= SEARCH_FROM_ROWS || search !== "");
+  const filtering = filters.length > 0;
   const onSearch = (value: string) => {
     setSearch(value);
     if (!onSearchChange) return;
@@ -172,8 +215,19 @@ export function DataTable<T>({
 
   return (
     <div className="rounded-md border">
-      {(showSearch || columnsKey) && (
+      {(showSearch || columnsKey || filtering) && (
         <div className="flex items-center gap-2 border-b px-3 py-2">
+          {filtering && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1 text-muted-foreground"
+              onClick={() => setFilters([])}
+            >
+              <X className="size-4" />
+              {t("Clear filters ({{shown}} of {{total}})", { shown, total })}
+            </Button>
+          )}
           {showSearch && (
             <>
               <Search
@@ -255,6 +309,73 @@ export function DataTable<T>({
                         {sorted === "asc" && <ArrowUp className="size-3" />}
                         {sorted === "desc" && <ArrowDown className="size-3" />}
                       </span>
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+            {withFilters && table.getHeaderGroups().map((group) => (
+              <TableRow key={`${group.id}-filters`} className="hover:bg-transparent">
+                {group.headers.map((header) => {
+                  const column = header.column;
+                  const meta = column.columnDef.meta;
+                  const filterable =
+                    column.id !== "select" &&
+                    column.id !== "actions" &&
+                    meta?.filter !== false &&
+                    typeof column.columnDef.header === "string" &&
+                    column.columnDef.header !== "";
+                  if (!filterable)
+                    return <TableHead key={`${header.id}-filter`} className="h-8" />;
+                  const values = [...column.getFacetedUniqueValues().keys()]
+                    .filter((v) => v !== null && v !== undefined && v !== "")
+                    .map(String)
+                    .sort();
+                  const kind =
+                    meta?.filter ??
+                    (values.length <= SELECT_UP_TO ? "select" : "text");
+                  const filter = column.getFilterValue() as Filter | undefined;
+                  const current =
+                    filter === undefined ? "" : typeof filter === "string" ? filter : filter.eq;
+                  return (
+                    <TableHead key={`${header.id}-filter`} className="h-8 py-1">
+                      {kind === "select" ? (
+                        <Select
+                          value={current || "__all"}
+                          onValueChange={(v) =>
+                            column.setFilterValue(v === "__all" ? undefined : { eq: v })
+                          }
+                        >
+                          <SelectTrigger
+                            className="h-7 min-w-24 text-xs font-normal"
+                            aria-label={t("Filter {{column}}", {
+                              column: column.columnDef.header as string,
+                            })}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all">{t("All")}</SelectItem>
+                            {values.map((v) => (
+                              <SelectItem key={v} value={v}>
+                                {v}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={current}
+                          onChange={(e) =>
+                            column.setFilterValue(e.target.value || undefined)
+                          }
+                          placeholder={t("Filter…")}
+                          aria-label={t("Filter {{column}}", {
+                            column: column.columnDef.header as string,
+                          })}
+                          className="h-7 min-w-24 text-xs font-normal"
+                        />
+                      )}
                     </TableHead>
                   );
                 })}
