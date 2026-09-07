@@ -1220,6 +1220,10 @@ Listed by the phase where they are first needed.
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
 
+### 2026-09-07, CI red since the device layer (Claude)
+
+- Tim asked why he gets CI failure mails. CI had failed on every push since 19677ec (12:52 UTC), the API and decoder test jobs only; nobody looked because the next pushes kept coming. Seven failures, all in tests: the device layer tests lacked the `bus` fixture import; the access matrix did not know the all scope answers 404 for a random gateway id on the gateway detail; the D119 test looked for step rows that a compact trace does not store (the compaction now also keeps a step's `note`, so the clock-ahead note shows in the trace explorer); two D121 tests read expired attributes after `expire_all`; the needs-attention test consumed the old topic after the linking moved to the decoder's walk. No production code was wrong apart from the dropped note.
+
 ### 2026-09-07, heard positions as dots (Tim)
 
 - Tim found the hexagons lagging and asked for the coloured points from the beginning (D123): points at every zoom, capped at the newest 10,000 in view with the panel saying so, hexagons only on `mode=hexagons`.

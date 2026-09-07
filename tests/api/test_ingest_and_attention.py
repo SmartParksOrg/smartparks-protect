@@ -72,16 +72,21 @@ async def _decode_pending(db, bus):
 
     worker = build_worker()
     worker.bus = bus
-    handler = worker._subscriptions[0][1]
+    handlers = dict(worker._subscriptions)
     group = f"decoder-api-test-{uuid.uuid4().hex[:6]}"
-    # start the group at the end of the stream so old test messages are not replayed
+    # start the groups at the end of the streams so old test messages are not replayed
     import contextlib
 
     from redis.exceptions import ResponseError
 
-    with contextlib.suppress(ResponseError):
-        await bus.redis.xgroup_create(Topic.SOURCE_EVENT_RECEIVED, group, id="$", mkstream=True)
-    return group, handler
+    for topic in (Topic.SOURCE_EVENT_RECEIVED, Topic.IDENTITY_REPROCESS_REQUESTED):
+        with contextlib.suppress(ResponseError):
+            await bus.redis.xgroup_create(topic, group, id="$", mkstream=True)
+    return (
+        group,
+        handlers[Topic.SOURCE_EVENT_RECEIVED],
+        handlers[Topic.IDENTITY_REPROCESS_REQUESTED],
+    )
 
 
 @pytest_asyncio.fixture
@@ -95,7 +100,7 @@ async def bus():
 
 async def test_webhook_to_position_with_trace_and_duplicate(client, db, bus):
     admin, project, _, source, _device, external_id = await _setup(client, db)
-    group, handler = await _decode_pending(db, bus)
+    group, handler, _walk = await _decode_pending(db, bus)
     auth = {"Authorization": f"Bearer {source['webhook_token']}"}
     body = {
         "device_id": external_id,
@@ -172,7 +177,7 @@ async def _ingested_at(db, source_event_id: int) -> datetime:
 
 async def test_unknown_device_needs_attention_then_processed(client, db, bus):
     admin, project, device_type, source, _device, _external = await _setup(client, db)
-    group, handler = await _decode_pending(db, bus)
+    group, _handler, walk = await _decode_pending(db, bus)
     auth = {"Authorization": f"Bearer {source['webhook_token']}"}
     unknown = uuid.uuid4().hex[:16].upper()
     body = {"device_id": unknown, "time": "2026-03-21T10:00:00+00:00", "lat": -24.8, "lon": 31.4}
@@ -199,7 +204,8 @@ async def test_unknown_device_needs_attention_then_processed(client, db, bus):
         headers=admin.headers,
     )
     assert created.status_code == 201, created.text
-    await bus.consume(Topic.SOURCE_EVENT_RECEIVED, group, "c1", handler, once=True)
+    # linking queues the retained event for the decoder's walk (decision D121)
+    await bus.consume(Topic.IDENTITY_REPROCESS_REQUESTED, group, "c1", walk, once=True)
     positions = (
         await client.get(
             f"/api/v1/projects/{project.id}/positions",
@@ -225,7 +231,7 @@ async def test_unknown_device_needs_attention_then_processed(client, db, bus):
 
 async def test_dead_letter_admin(client, db, bus):
     admin, _project, _, source, _device, external_id = await _setup(client, db)
-    group, handler = await _decode_pending(db, bus)
+    group, handler, _walk = await _decode_pending(db, bus)
     auth = {"Authorization": f"Bearer {source['webhook_token']}"}
     accepted = await client.post(
         f"/api/v1/ingest/http/{source['id']}",

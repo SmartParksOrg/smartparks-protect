@@ -11,13 +11,13 @@ from sqlalchemy import func
 from shared.enums import Role
 from shared.models import DeviceCurrentState
 from tests.api.conftest import create_project, project_actor
-from tests.api.test_network_and_map import _feed, _setup
+from tests.api.test_network_and_map import _feed, _setup, bus  # noqa: F401
 from tests.conftest import unique_name
 
 pytestmark = pytest.mark.asyncio
 
 
-async def test_device_layer_lists_assigned_devices(client, db, bus):
+async def test_device_layer_lists_assigned_devices(client, db, bus):  # noqa: F811
     admin, project, entity, source, device, external_id = await _setup(client, db)
     start = datetime(2026, 4, 1, tzinfo=UTC)
     for i in range(3):
@@ -118,7 +118,7 @@ async def test_device_layer_lists_assigned_devices(client, db, bus):
     ).status_code == 403
 
 
-async def test_all_scope_lists_devices_in_no_project_for_server_admins(client, db, bus):
+async def test_all_scope_lists_devices_in_no_project_for_server_admins(client, db, bus):  # noqa: F811
     """Decision D120: a device without a project assignment shows in the all scope with its
     position and no project; a project admin cannot use the scope."""
     admin, project, entity, source, device, external_id = await _setup(client, db)

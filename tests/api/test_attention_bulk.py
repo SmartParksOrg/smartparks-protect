@@ -60,13 +60,14 @@ async def test_linking_gives_the_receptions_the_device(client, db):
         select(SourceEvent).where(SourceEvent.external_identity_id == uuid.UUID(identity["id"]))
     )
     assert event is not None and event.device_id is None
+    event_id, ingested_at = event.id, event.ingested_at
     db.add(
         GatewayReception(
             time=utc_now(),
             data_source_id=uuid.UUID(source["id"]),
             device_id=None,
-            source_event_id=event.id,
-            source_event_ingested_at=event.ingested_at,
+            source_event_id=event_id,
+            source_event_ingested_at=ingested_at,
             gateway_id="gw-test-1",
             rssi=-100.0,
         )
@@ -82,7 +83,7 @@ async def test_linking_gives_the_receptions_the_device(client, db):
     assert result.json()["queued"] == 1
     db.expire_all()
     reception = await db.scalar(
-        select(GatewayReception).where(GatewayReception.source_event_id == event.id)
+        select(GatewayReception).where(GatewayReception.source_event_id == event_id)
     )
     assert reception is not None
     assert str(reception.device_id) == result.json()["device_ids"][0]

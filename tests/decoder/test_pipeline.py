@@ -17,7 +17,6 @@ from shared.models import (
     EntityCurrentState,
     Measurement,
     Position,
-    ProcessingStep,
     ProcessingTrace,
     SourceDelivery,
     SourceEvent,
@@ -243,11 +242,12 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
     assert identity is not None and identity.device_id is None
     identity.device_id = world.device.id
     await db.commit()
+    identity_id = identity.id
     assert await queue_identity_reprocess(db, bus, identity) == 3
     statuses = (
         await db.scalars(
             select(SourceEvent.processing_status).where(
-                SourceEvent.external_identity_id == identity.id
+                SourceEvent.external_identity_id == identity_id
             )
         )
     ).all()
@@ -259,14 +259,14 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
     await handler(
         Message(
             topic=Topic.IDENTITY_REPROCESS_REQUESTED,
-            payload={"external_identity_id": str(identity.id), "device_id": str(world.device.id)},
+            payload={"external_identity_id": str(identity_id), "device_id": str(world.device.id)},
         )
     )
     db.expire_all()
     statuses = (
         await db.scalars(
             select(SourceEvent.processing_status).where(
-                SourceEvent.external_identity_id == identity.id
+                SourceEvent.external_identity_id == identity_id
             )
         )
     ).all()
@@ -510,15 +510,11 @@ async def test_a_record_from_the_future_is_kept_invalid_and_leaves_the_current_s
         or state.latest_position_time is None
         or state.latest_position_time.year < 2030
     )
-    step = (
-        await db.execute(
-            select(ProcessingStep).where(
-                ProcessingStep.trace_id == event.trace_id,
-                ProcessingStep.operation == "canonical rows written",
-            )
-        )
-    ).scalar_one()
-    assert step.metadata_["clock_ahead_records"] == 1
+    # the compact trace keeps the step's note: the clock ahead is visible in the trace explorer
+    trace = await db.get(ProcessingTrace, event.trace_id)
+    assert trace is not None
+    step = next(s for s in trace.compact_steps if s["operation"] == "canonical rows written")
+    assert "ahead" in step["note"] and "1 records kept invalid" in step["note"]
 
     # a record with a sane time then moves the state as usual
     sane = {"time": "2026-09-07T12:59:01+00:00", "lat": 52.05, "lon": 5.78}
