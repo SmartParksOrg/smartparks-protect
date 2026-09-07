@@ -318,6 +318,23 @@ async def recompute_current_state(
         else:
             device_state.latest_position = latest[1] if latest[1] is not None else latest[0]
             device_state.latest_position_time = latest[2]
+        # last seen follows the effective times as well: a time correction (a device clock
+        # ahead, decision D119) must move it back with the records
+        last_measurement = await session.scalar(
+            select(func.max(effective_time(Measurement))).where(
+                Measurement.device_id == device_id, visible(Measurement)
+            )
+        )
+        seen = [
+            t
+            for t in (
+                latest[2] if latest else None,
+                last_measurement,
+                device_state.latest_state_time,
+            )
+            if t is not None
+        ]
+        device_state.last_seen_at = max(seen) if seen else None
         device_state.updated_at = utc_now()
     # rows added earlier in this transaction (the decoder's) must be visible to `get`
     await session.flush()
@@ -354,7 +371,9 @@ async def recompute_current_state(
             entity_state.latest_position_time = row[2]
             entity_state.device_id = row[3]
         last_measurement = await session.scalar(
-            select(func.max(Measurement.time)).where(Measurement.entity_id == entity_id)
+            select(func.max(effective_time(Measurement))).where(
+                Measurement.entity_id == entity_id, visible(Measurement)
+            )
         )
         seen = [t for t in (row[2] if row else None, last_measurement) if t is not None]
         entity_state.last_seen_at = max(seen) if seen else None

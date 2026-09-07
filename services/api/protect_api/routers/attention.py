@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import Range, array
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ from protect_api.schemas.domain import DeviceRead, ExternalIdentityRead
 from protect_api.serial import fill_serial_from_identity
 from shared.bus import RedisStreamsBus, Topic, is_stale
 from shared.config import get_settings
+from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.enums import DeviceStatus, ProcessingStatus
 from shared.ingest import republish_source_event
@@ -232,8 +233,11 @@ async def _clock_ahead_devices(session: AsyncSession) -> list[ClockAheadDevice]:
     for model, kind in ((Position, "positions"), (Measurement, "measurements")):
         rows = (
             await session.execute(
-                select(model.device_id, func.count(), func.max(model.time))
-                .where(model.time > horizon)
+                select(model.device_id, func.count(), func.max(effective_time(model)))
+                .where(
+                    model.time > horizon,  # chunk exclusion: only the chunks after today
+                    or_(model.curated_time.is_(None), model.curated_time > horizon),
+                )
                 .group_by(model.device_id)
             )
         ).all()

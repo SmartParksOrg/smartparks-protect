@@ -548,8 +548,10 @@ async def device_data_span(
     for model, attr in ((Position, "positions"), (Measurement, "measurements")):
         count, until = (
             await session.execute(
-                select(func.count(), func.max(model.time)).where(
-                    model.device_id == device.id, model.time > horizon
+                select(func.count(), func.max(effective_time(model))).where(
+                    model.device_id == device.id,
+                    model.time > horizon,
+                    or_(model.curated_time.is_(None), model.curated_time > horizon),
                 )
             )
         ).one()
