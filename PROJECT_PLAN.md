@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 15 complete with v2.0.0 on 2026-09-06; the next phase is planned with Tim from the open items (the live verification stages that wait for accounts, Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack) |
+| Active phase | Phase 16, the device layer on the map and the all-projects scope (decisions D111 to D118, planned 2026-09-07); nothing built yet |
 | Latest release | v2.0.0 (2026-09-06): phases 10 to 15 and the deployment fixes |
 | Last session | 2026-09-07 |
-| Next item | Release the fixes from Tim's first hour as v2.0.1 on his word, then plan the next phase with Tim. Open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live verification stages that wait for other accounts |
+| Next item | Phase 16 part A, the device layer, starting with `GET /projects/{id}/map/devices`; v2.0.1 with the fixes since v2.0.0 on Tim's word, or fold them into v2.1.0. Open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live verification stages that wait for other accounts |
 | Blockers | Live verification: KPN LoRa is live; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -151,6 +151,14 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D108 | Order of phase 15 | Correctness and visibility first, then getting around, then organising, then the clean-up of technical detail, the coverage tool last, v2.0.0 at the end | Every later screen builds on health, attribution and groups. Decided by Tim on 2026-09-06. |
 | D109 | Track length on the map | One length for every track, set from a Tracks card that appears while a track is on: since the device was assigned to the entity, or a custom length from one hour to ninety days (slider in days, number in hours or days, quick picks); in the URL as `track=` and remembered per user as the default | Modelled on EarthRanger's Track settings, which Tim uses next to Protect; the event date filter EarthRanger matches has no equivalent on our map, the assignment start has. Decided by Tim on 2026-09-07. |
 | D110 | Profile pictures | One picture per entity and per device, uploaded as any JPEG, PNG or WebP and kept only as a 512 px WebP square made on the server (Pillow); shown small next to the name on the object's page, in the lists and layer panel in place of the type icon, and in the map's selection panel, never as the marker; set by whoever may edit the object | Tim wants to tell animals apart without giving the picture room the functional view needs; a server-made square keeps pages light and phone photos upright. Decided by Tim on 2026-09-07. |
+| D111 | Device layer data | `GET /projects/{id}/map/devices`: every device with a project assignment valid now, its latest position from `device_current_state`, health, last seen, the entity it tracks or none, and `project_since`; device tracks reuse `GET /tracks?device_id=`, the device's positions attributed to the project across every entity it tracked; devices without a position are listed, not drawn | The entity layer cannot show a device without an entity, which is what the layer is for; the current state and the track endpoint exist. Decided by Tim on 2026-09-07. |
+| D112 | Device marker and panel | The square marker family with the device type icon (or its picture) and the health colour, the name as label; a click opens a device panel (name, type, last seen, health, the entity it tracks, open device, Show the track); a device tracking an entity draws next to its entity dot | Square is already the family for devices and infrastructure, so a collar and its animal stay apart on the map. Decided by Tim on 2026-09-07. |
+| D113 | Devices tab | A fifth tab in the layers panel: search, sort by name or last seen, Unassigned first then the rest under the entity they track, a row per device with the icon or picture, last seen, a track toggle and locate, Show all and Hide all; devices are a shown set (`shown_devices`), so every device is off by default and a new device stays off; kept per user and project | Tim asked for the layer off by default; a shown set makes that hold for devices that arrive later. Decided by Tim on 2026-09-07. |
+| D114 | Device tracks | The Tracks card's length applies (custom hours; "since assignment" means since the device joined the project), drawn dashed in the device's colour, `?device_tracks=` in the URL, the card counts both kinds | An entity track and a device track over the same ground must stay apart. Decided by Tim on 2026-09-07. |
+| D115 | All-projects scope | The reserved project id `all`, server admins only: the switcher lists All projects, the URL is `/projects/all/...`, the API's project context accepts `all` for a server admin as a scope over every project, the read endpoints that support it filter on the set, everyone else gets 403 | One id keeps every page, link, query key and preference working; a separate route tree or a multi-select would cost far more for what Tim asked. ADR 0022. Decided by Tim on 2026-09-07. |
+| D116 | Pages in the all scope | The live map with every layer, the entities and devices lists, alerts, events, gateways and traffic; rules, automations, explorer, exports, curation, dashboards and project admin stay per project and the sidebar hides them in the all scope | The overview is for monitoring; the other pages need a design of their own to span projects. Decided by Tim on 2026-09-07. |
+| D117 | Display across projects | Features and rows carry `project_id` and `project_name`; the layers panel nests project, group, entity (and project, devices); lists gain a Project column; the panels show the project; links inside the all scope point at the object's own project page; preferences for the scope live under the key `all` | Hiding one park at a time needs the project as a level, and one click should leave the overview. Decided by Tim on 2026-09-07. |
+| D118 | Live updates and bounds across projects | The WebSocket accepts `all` for a server admin and forwards every project's messages on one connection; the current-state endpoint keeps its 5,000 feature limit and the tiles switch above 2,000 entities, tiles accept the scope; tracks stay bounded per entity and device; the events layer keeps 24 hours | Bounded queries hold across projects as within one (architecture 13.10); one connection is simpler in the browser. Decided by Tim on 2026-09-07. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -212,6 +220,7 @@ From architecture section 2, used when reviewing a change. These are never done;
 | v1.5.0 | 13 | The Things Stack, Actility, WildlifeNL, FerusTracker, Movebank, dashboards, MCP write tools |
 | (no tag) | 14 | Production hardening, full-scale benchmark, documentation audit; released with 2.0 |
 | v2.0.0 | 15 | Correctness and usability from the first live days (D97) |
+| v2.1.0 | 16 | The device layer on the map and the all-projects scope for server admins (D111 to D118) |
 
 ## Architecture coverage map
 
@@ -732,6 +741,45 @@ Release:
 
 ---
 
+### Phase 16: the device layer on the map and the all-projects scope (v2.1.0)
+
+**Goal.** Two ways of looking at the same data that the entity-first map cannot give today: the map from the device's side (a layer of devices, off by default, that shows collars without an animal and a collar's whole path across the animals it tracked), and, for server admins, every project at once in one map and the monitoring lists.
+
+**Why here.** Both came from the first live weeks: the KPN application delivers dozens of collars that sit in project Smart Parks without an entity (Needs attention, D96), so a park needs to see where its unassigned hardware is; and one server now carries several parks, so the person running it wants one overview. Both build on what phase 15 finished: the layers panel, the Tracks card, groups, health on features, pictures.
+
+**Order (D111 to D118).** Part A first, per project, so it ships whole and is proven with the live collars; part B then carries every layer, part A's included, across projects. Every item lands with its tests, docs and changelog entry in the same commit.
+
+**Deliverables.**
+
+Part A, the device layer (D111 to D114):
+
+- [ ] API `GET /projects/{id}/map/devices` (D111): devices with a project assignment valid now, `device_current_state` latest position and time, last seen, health, the entity tracked today (`entity_id`, `entity_name`, `group_id`), `project_since` (the assignment's start, for the "since assignment" track length), device type key and icon, `picture_updated_at`; the same `bbox` and `limit` bounds as `map/current`; devices without a position come back without geometry so the panel can list them. Tests: an unassigned device with a position appears, a device whose assignment ended does not, a viewer of another project gets 403, the bound holds.
+- [ ] Map layers (`layers.ts`): a `devices` source with the square marker family and the device type icon, health colour as for entities, the name as label; `bindDeviceClicks`; `setDevices`. Device tracks (D114) on the track source with a dashed line style and the device's colour; `trackFrom` for a device uses `project_since` for the assigned length.
+- [ ] Layer choices (D113): `shown_devices` as a shown set with `showDevice`, `hideDevice`, `showAllDevices`, `hideAllDevices`, `isDeviceShown`; `?device_tracks=` next to `?tracks=`; unit tests in `layerChoices.test.ts` including "a new device is off".
+- [ ] Devices tab in the layers panel: search, sort by name or last seen, Unassigned heading first then devices under the entity they track, a row with the icon or picture, last seen, the track toggle and locate, Show all and Hide all; the badge counts shown devices; the Tracks card counts entity and device tracks.
+- [ ] Device panel on the map (D112) with `?device=`: name, type, last seen, the health line, the entity it tracks with a link (or "no entity"), open device, Show the track; opening it closes the entity panel and the other way round; on a phone the map moves the device above the panel as for entities.
+- [ ] Getting there: the device page's "Show on map" works for a device without an entity (the map with the device shown and selected), the devices list's map link does the same, the search palette's device hit too.
+- [ ] Docs: the live map row in `docs/administration/pages.md`, the map section of `DEVELOPERS.md`, the changelog.
+
+Part B, the all-projects scope (D115 to D118):
+
+- [ ] Project context with a scope (D115): `get_project_context` accepts `all` for a server admin and returns a context with `project` None and `project_ids` None (every project); a `ProjectScope` helper gives the filter (`Entity.project_id.in_(...)` or nothing) to the endpoints that support the scope; every other `/projects/{project_id}` endpoint keeps a UUID path parameter and answers 422 for `all`. ADR 0022. The access matrix test learns the `all` id: a server admin gets 200 on the supported reads, a project admin 403, and every unsupported endpoint refuses it.
+- [ ] Endpoints in the scope (D116): `map/current`, `map/tiles`, `map/devices`, `map/events`, `tracks`, `entities` (list), `entity-assignments` (list), `groups` (list), `features` (list), `events`, `alerts`, `gateways`, `coverage`, `traffic`, `search`; reads carry `project_id` and `project_name` (D117), map features too.
+- [ ] WebSocket `ws/projects/all` for server admins (D118): one connection that forwards every project's messages; the message keeps `project_id` so the map patches the right feature.
+- [ ] Frontend scope: `isAllProjects(projectId)`, the switcher lists All projects at the top for server admins, `useProjectRole` answers server-admin for `all`, the sidebar shows only the Monitor and Network sections in the scope, the palette's page list follows, the project settings and admin links are absent.
+- [ ] Layers panel across projects (D117): project as the top level (project, group, entity; project, devices), counts per project, hide a project at once; the entity and device panels and the lists show the project; links inside the scope go to the object's own project page; preferences under the key `all`.
+- [ ] Lists in the scope: entities, devices, alerts, events, gateways, traffic with a Project column (hidden per width like the others) and the project filter where one exists.
+- [ ] Bounds proven (D118): the benchmark parks on the dev server (thousands of entities) put the all scope over the tiles threshold; the map stays interactive, the lists stay capped at 500 with the server search.
+- [ ] Docs: `docs/administration/pages.md` (the all scope per role), `docs/administration/permissions.md`, `DEVELOPERS.md`, ADR 0022, the changelog.
+
+Release:
+
+- [ ] `VERSION` v2.1.0 with the changelog and the release process; the fixes since v2.0.0 ship with it unless v2.0.1 went out first.
+
+**Exit criteria.** Part A: on the dev server, a collar onboarded from Needs attention without an entity shows as a square when switched on in the Devices tab, SP051307's device track drawn over 30 days is one dashed line across the entities it tracked, the device panel opens from the marker and from the device page, and a device that arrives later stays off until switched on. Part B: the operations admin picks All projects, sees Smart Parks, Demo park and the benchmark parks on one map with tiles above the threshold, hides the benchmark parks in the layers panel, opens an animal from Smart Parks and lands on its page in that project, sees a KPN uplink move the animal live, and a project admin who types `/projects/all/map` gets the 403 page.
+
+---
+
 ## Continuous work in every phase
 
 - [ ] Keep `CHANGELOG.md` Unreleased current.
@@ -1123,3 +1171,9 @@ Listed by the phase where they are first needed.
 
 - Tim asked for a profile picture per device and per entity, kept small so the functional view keeps its room; four decisions asked and taken as recommended, D110. Built: `shared/pictures.py` (Pillow, a new exact-pinned dependency) with unit tests, migration 0021, the picture endpoints on entities (project admin) and devices (server admin) with audit rows and a cached, token-guarded GET, `picture_updated_at` on reads and map features, and in the frontend the blob fetch, the `usePicture` hook, `ObjectPicture`, the header `PictureEditor`, and the small pictures in the lists, the layers panel and the map's selection panel.
 - Verified: ruff, mypy, the picture unit tests (run with `--noconftest`, Docker being off), frontend lint, types, catalogue, tests, build, OpenAPI regenerated. The API tests in `tests/api/test_pictures.py` and the migration wait for CI and the dev server. Not committed.
+
+### 2026-09-07, plan for phase 16: the device layer and the all-projects scope (Claude and Tim)
+
+- Tim asked for two features: a device layer on the map, separate from the entities, off by default, showing devices that belong to the project whether or not they track an entity and a device's path regardless of the entities it tracked; and an All projects choice in the project switcher for server admins, so the map and the monitoring views show every project at once. Checked first: `device_current_state` already holds a latest position, `GET /tracks?device_id=` exists, the project context is one UUID, the WebSocket is one stream per project, layer choices are hidden sets per project.
+- Eight decisions asked in two rounds, every recommendation taken: D111 (device layer data), D112 (square marker, own panel), D113 (Devices tab, shown set), D114 (dashed device tracks on the card's length), D115 (the reserved id `all` for server admins), D116 (the monitor pages first), D117 (project as the top level), D118 (one stream, the same bounds).
+- Written: phase 16 with part A (device layer) before part B (all scope), the v2.1.0 milestone, the status block. Nothing built yet; the first item is the map devices endpoint.
