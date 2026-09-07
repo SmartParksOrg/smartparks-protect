@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import Select, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ from protect_api.crud import (
 )
 from protect_api.deps import ProjectContext, require_permission
 from protect_api.pagination import Page, PageResponse, page, paginate
+from protect_api.pictures import drop_picture, picture_response, store_picture
 from protect_api.schemas.domain import (
     AssignmentChange,
     AssignmentEnd,
@@ -237,6 +238,64 @@ async def update_entity(
         details=changed,
     )
     await session.commit()
+    return entity_read(entity)
+
+
+@router.get("/entities/{entity_id}/picture", response_class=Response)
+async def get_entity_picture(
+    entity_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """The entity's profile picture (decision D110), a WebP square."""
+    entity = await _project_entity(session, context, entity_id)
+    return await picture_response(entity.picture_key, entity.picture_updated_at)
+
+
+@router.put("/entities/{entity_id}/picture", response_model=EntityRead)
+async def set_entity_picture(
+    entity_id: uuid.UUID,
+    file: UploadFile,
+    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> EntityRead:
+    """Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square."""
+    entity = await _project_entity(session, context, entity_id)
+    entity.picture_key, entity.picture_updated_at = await store_picture("entities", entity.id, file)
+    await record_audit(
+        session,
+        user=context.user,
+        project_id=context.project.id,
+        action="entity.picture_set",
+        object_type="entity",
+        object_id=str(entity.id),
+        details={"name": entity.name},
+    )
+    await session.commit()
+    await session.refresh(entity)
+    return entity_read(entity)
+
+
+@router.delete("/entities/{entity_id}/picture", response_model=EntityRead)
+async def remove_entity_picture(
+    entity_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> EntityRead:
+    entity = await _project_entity(session, context, entity_id)
+    await drop_picture(entity.picture_key)
+    entity.picture_key, entity.picture_updated_at = None, None
+    await record_audit(
+        session,
+        user=context.user,
+        project_id=context.project.id,
+        action="entity.picture_removed",
+        object_type="entity",
+        object_id=str(entity.id),
+        details={"name": entity.name},
+    )
+    await session.commit()
+    await session.refresh(entity)
     return entity_read(entity)
 
 

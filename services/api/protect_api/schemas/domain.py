@@ -125,6 +125,9 @@ class EntityRead(ORMModel):
     geometry: dict[str, Any] | None = None
     attributes: dict[str, Any]
     notes: str | None
+    picture_updated_at: datetime | None = Field(
+        default=None, description="Set when the entity has a profile picture (decision D110)"
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -217,6 +220,9 @@ class DeviceRead(ORMModel):
     firmware_version: str | None
     attributes: dict[str, Any]
     notes: str | None
+    picture_updated_at: datetime | None = Field(
+        default=None, description="Set when the device has a profile picture (decision D110)"
+    )
     created_at: datetime
     updated_at: datetime
     last_seen_at: datetime | None = Field(

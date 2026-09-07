@@ -16,6 +16,7 @@ import type {
   Track,
 } from "@/api/types";
 import { Icon } from "@/components/icons/Icon";
+import { ObjectPicture } from "@/components/common/ObjectPicture";
 import {
   type BasemapKey,
   BASEMAPS,
@@ -736,7 +737,15 @@ export function MapPage() {
           className={`absolute bottom-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80 ${panelOpen ? "left-[23rem]" : "left-3"}`}
         >
           <div className="flex items-start gap-2">
-            <Icon iconKey={selected.icon_key} className="size-7 text-primary" />
+            <ObjectPicture
+              path={`/api/v1/projects/${projectId}/entities/${selected.entity_id}/picture`}
+              updatedAt={selected.picture_updated_at}
+              name={selected.name}
+              size="md"
+              fallback={
+                <Icon iconKey={selected.icon_key} className="size-7 text-primary" />
+              }
+            />
             <div className="min-w-0 flex-1">
               <Link
                 className="block truncate font-semibold underline-offset-2 hover:underline"

@@ -476,6 +476,31 @@ export interface paths {
         patch: operations["update_entity_api_v1_projects__project_id__entities__entity_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/entities/{entity_id}/picture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Entity Picture
+         * @description The entity's profile picture (decision D110), a WebP square.
+         */
+        get: operations["get_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_get"];
+        /**
+         * Set Entity Picture
+         * @description Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square.
+         */
+        put: operations["set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put"];
+        post?: never;
+        /** Remove Entity Picture */
+        delete: operations["remove_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/features": {
         parameters: {
             query?: never;
@@ -646,6 +671,32 @@ export interface paths {
         /** Create Device */
         post: operations["create_device_api_v1_devices_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/picture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Device Picture
+         * @description The device's profile picture (decision D110), a WebP square, for whoever may see the
+         *     device.
+         */
+        get: operations["get_device_picture_api_v1_devices__device_id__picture_get"];
+        /**
+         * Set Device Picture
+         * @description Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square.
+         */
+        put: operations["set_device_picture_api_v1_devices__device_id__picture_put"];
+        post?: never;
+        /** Remove Device Picture */
+        delete: operations["remove_device_picture_api_v1_devices__device_id__picture_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4598,6 +4649,16 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** Body_set_device_picture_api_v1_devices__device_id__picture_put */
+        Body_set_device_picture_api_v1_devices__device_id__picture_put: {
+            /** File */
+            file: string;
+        };
+        /** Body_set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put */
+        Body_set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_log_file_api_v1_devices__device_id__log_files_post */
         Body_upload_log_file_api_v1_devices__device_id__log_files_post: {
             /** File */
@@ -5785,6 +5846,11 @@ export interface components {
             /** Notes */
             notes: string | null;
             /**
+             * Picture Updated At
+             * @description Set when the device has a profile picture (decision D110)
+             */
+            picture_updated_at?: string | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -5946,6 +6012,11 @@ export interface components {
             };
             /** Notes */
             notes: string | null;
+            /**
+             * Picture Updated At
+             * @description Set when the device has a profile picture (decision D110)
+             */
+            picture_updated_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -6262,6 +6333,11 @@ export interface components {
             };
             /** Notes */
             notes: string | null;
+            /**
+             * Picture Updated At
+             * @description Set when the entity has a profile picture (decision D110)
+             */
+            picture_updated_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -10758,6 +10834,104 @@ export interface operations {
             };
         };
     };
+    get_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_features_api_v1_projects__project_id__features_get: {
         parameters: {
             query?: {
@@ -11258,6 +11432,101 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_device_picture_api_v1_devices__device_id__picture_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_device_picture_api_v1_devices__device_id__picture_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_set_device_picture_api_v1_devices__device_id__picture_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_device_picture_api_v1_devices__device_id__picture_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

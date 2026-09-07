@@ -33,6 +33,7 @@ import {
 } from "@/components/devices/ProvenancePanel";
 import { WebBleCard } from "@/components/devices/WebBleCard";
 import { Icon } from "@/components/icons/Icon";
+import { PictureEditor } from "@/components/common/PictureEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -161,6 +162,16 @@ export function DevicePage() {
       <PageHeader
         title={d.name}
         description={type ? `${type.label} (${type.driver_key})` : undefined}
+        leading={
+          <PictureEditor
+            path={`/api/v1/devices/${d.id}/picture`}
+            updatedAt={d.picture_updated_at}
+            name={d.name}
+            editable={Boolean(user?.is_superuser)}
+            invalidate={[queryKeys.device(d.id), ["devices"]]}
+            fallback={<Icon iconKey={type?.icon_key} className="size-6" />}
+          />
+        }
         actions={
           <>
             <StatusBadge value={d.status} />

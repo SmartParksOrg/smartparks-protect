@@ -13,6 +13,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { HealthLine } from "@/components/devices/HealthCard";
 import { Icon } from "@/components/icons/Icon";
+import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { useNow } from "@/hooks/useNow";
 import { useTechnicalDetails } from "@/hooks/useTechnicalDetails";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
@@ -60,7 +61,15 @@ export function DevicesPage() {
       accessorKey: "name",
       cell: ({ row }) => (
         <span className="inline-flex items-center gap-2">
-          <Icon iconKey={typeById.get(row.original.device_type_id)?.icon_key} />
+          <ObjectPicture
+            path={`/api/v1/devices/${row.original.id}/picture`}
+            updatedAt={row.original.picture_updated_at}
+            name={row.original.name}
+            size="xs"
+            fallback={
+              <Icon iconKey={typeById.get(row.original.device_type_id)?.icon_key} />
+            }
+          />
           {row.original.name}
         </span>
       ),

@@ -8,6 +8,7 @@ From Tim's first hour with v2.0.0 on the dev server.
 
 ### Added
 
+- Profile pictures for entities and devices (decision D110): a project admin sets an entity's picture and a server admin a device's, from any JPEG, PNG or WebP up to 10 MB; the server keeps a 512 px WebP square in the `pictures` bucket and nothing else. It shows small on purpose: next to the name on the entity and device pages (where it is set or removed), in place of the type icon in the entities and devices lists and the layers panel, and in the map's selection panel; the marker stays the type icon. `PUT` and `DELETE /projects/{id}/entities/{id}/picture`, `PUT` and `DELETE /devices/{id}/picture`, `GET .../picture` with the bearer token; reads and map features carry `picture_updated_at`. Migration 0021. Pillow is a new dependency of the API.
 - The source event dialog opens on a Decoded tab that lists what the delivery became: positions with coordinates, measurements with their values, device state and events, or the reason nothing came out; the read carries `records`. Asked because a Bluetooth row in the traffic view did not say what it meant.
 - The entity page shows the entity's recent events, its recent positions with a "Track on the map" link, and, under Technical details, the traffic of the device tracking it.
 - The sidebar hides on desktop too: a button in its header folds it to a slim rail with a button to bring it back; the choice is kept per browser.
@@ -29,6 +30,10 @@ From Tim's first hour with v2.0.0 on the dev server.
 - An entity assigned to a device with history stayed off the map and without last seen after the repair: the attribution recompute skipped entities that had no current-state row yet, so only the next record would have created one. The recompute now creates the row with the latest position, device and last seen. The entity page says how many of the device's records sit before the assignment and offers the same repair as the device page, and the assign dialog says what a later start means.
 - In the layers panel, ticking a row under a switched-off parent (a gateway under Gateways, a feature under its type, an entity under a hidden group) switches the parent on and hides the other rows instead of doing nothing; no checkbox is greyed out any more.
 - The entity details panel on the map moves right of the layers panel while that is open instead of hiding under it.
+
+### Migrations
+
+- 0021 (`picture_key` and `picture_updated_at` on entities and devices): the downgrade drops the columns; the stored squares stay in the bucket and are unreachable until a picture is set again.
 
 ## v2.0.0, 2026-09-06
 

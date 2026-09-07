@@ -6,7 +6,7 @@ import io
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from protect_api.auth.users import current_active_user
 from protect_api.crud import apply_patch, flush_or_409, get_or_404, range_bounds
 from protect_api.deps import accessible_project_ids, require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
+from protect_api.pictures import drop_picture, picture_response, store_picture
 from protect_api.routers.entities import assignment_read, group_and_subgroups
 from protect_api.schemas.domain import (
     AssignmentEnd,
@@ -263,6 +264,63 @@ async def create_device(
     )
     await session.commit()
     return device
+
+
+@router.get("/{device_id}/picture", response_class=Response)
+async def get_device_picture(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """The device's profile picture (decision D110), a WebP square, for whoever may see the
+    device."""
+    device = await _visible_device(session, user, device_id)
+    return await picture_response(device.picture_key, device.picture_updated_at)
+
+
+@router.put("/{device_id}/picture", response_model=DeviceRead)
+async def set_device_picture(
+    device_id: uuid.UUID,
+    file: UploadFile,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceRead:
+    """Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square."""
+    device = await get_or_404(session, Device, device_id, "Device")
+    device.picture_key, device.picture_updated_at = await store_picture("devices", device.id, file)
+    await record_audit(
+        session,
+        user=user,
+        action="device.picture_set",
+        object_type="device",
+        object_id=str(device.id),
+        details={"name": device.name},
+    )
+    await session.commit()
+    await session.refresh(device)
+    return (await with_state(session, [device]))[0]
+
+
+@router.delete("/{device_id}/picture", response_model=DeviceRead)
+async def remove_device_picture(
+    device_id: uuid.UUID,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceRead:
+    device = await get_or_404(session, Device, device_id, "Device")
+    await drop_picture(device.picture_key)
+    device.picture_key, device.picture_updated_at = None, None
+    await record_audit(
+        session,
+        user=user,
+        action="device.picture_removed",
+        object_type="device",
+        object_id=str(device.id),
+        details={"name": device.name},
+    )
+    await session.commit()
+    await session.refresh(device)
+    return (await with_state(session, [device]))[0]
 
 
 @router.get("/{device_id}", response_model=DeviceWithAssignments)

@@ -28,6 +28,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx==0.65b0",
     "opentelemetry-instrumentation-redis==0.65b0",
     "chirpstack-api==4.19.0",
+    "pillow==12.3.0",
 ]
 
 [build-system]

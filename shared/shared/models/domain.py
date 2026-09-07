@@ -106,6 +106,10 @@ class Entity(UuidPrimaryKeyMixin, TimestampMixin, Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     notes: Mapped[str | None] = mapped_column(Text)
+    picture_key: Mapped[str | None] = mapped_column(
+        String(200), comment="Object key of the profile picture in the pictures bucket (D110)"
+    )
+    picture_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Feature(UuidPrimaryKeyMixin, TimestampMixin, Base):
@@ -168,6 +172,10 @@ class Device(UuidPrimaryKeyMixin, TimestampMixin, Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     notes: Mapped[str | None] = mapped_column(Text)
+    picture_key: Mapped[str | None] = mapped_column(
+        String(200), comment="Object key of the profile picture in the pictures bucket (D110)"
+    )
+    picture_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class DeviceProjectAssignment(UuidPrimaryKeyMixin, Base):

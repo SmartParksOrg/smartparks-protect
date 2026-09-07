@@ -29,6 +29,7 @@ import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { ChangeAssignmentDialog } from "@/components/entities/ChangeAssignmentDialog";
 import { EntityDialog } from "@/components/entities/EntityDialog";
 import { Icon } from "@/components/icons/Icon";
+import { PictureEditor } from "@/components/common/PictureEditor";
 import type { EntityFeatureProperties } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -228,12 +229,27 @@ export function EntityPage() {
       <PageHeader
         title={e.name}
         description={type?.label}
+        leading={
+          <PictureEditor
+            path={`/api/v1/projects/${projectId}/entities/${e.id}/picture`}
+            updatedAt={e.picture_updated_at}
+            name={e.name}
+            editable={admin}
+            invalidate={[
+              queryKeys.entity(projectId, e.id),
+              queryKeys.entities(projectId),
+              queryKeys.currentState(projectId),
+            ]}
+            fallback={
+              <Icon
+                iconKey={e.icon_key ?? type?.icon_key}
+                className="size-6"
+              />
+            }
+          />
+        }
         actions={
           <>
-            <Icon
-              iconKey={e.icon_key ?? type?.icon_key}
-              className="size-6 text-primary"
-            />
             <StatusBadge value={e.status} />
             {live?.position_time && (
               <Button asChild variant="outline" size="sm">

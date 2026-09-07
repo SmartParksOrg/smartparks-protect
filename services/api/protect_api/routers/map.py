@@ -100,6 +100,7 @@ async def current_state(
             EntityType.group_key,
             Entity.group_id,
             func.ST_AsGeoJSON(EntityCurrentState.latest_position),
+            Entity.picture_updated_at,
         )
         .join(Entity, Entity.id == EntityCurrentState.entity_id)
         .join(EntityType, EntityType.id == Entity.entity_type_id)
@@ -165,7 +166,7 @@ async def current_state(
     features = []
     for row in rows:
         state, name, entity_status, icon_override, type_key, type_icon, group_key = row[:7]
-        group_id, geojson = row[7], row[8]
+        group_id, geojson, picture_updated_at = row[7], row[8], row[9]
         import json
 
         device_state = device_states.get(state.device_id) if state.device_id else None
@@ -193,6 +194,9 @@ async def current_state(
                     "group": group_key,
                     "group_id": str(group_id) if group_id else None,
                     "icon_key": icon_override or type_icon,
+                    "picture_updated_at": picture_updated_at.isoformat()
+                    if picture_updated_at
+                    else None,
                     "device_id": str(state.device_id) if state.device_id else None,
                     "assigned_since": assigned_since[state.entity_id].isoformat()
                     if state.entity_id in assigned_since

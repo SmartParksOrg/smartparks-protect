@@ -30,6 +30,8 @@ export interface EntityFeatureProperties {
   group: string;
   group_id?: string | null;
   icon_key: string;
+  /** Set when the entity has a profile picture (decision D110); its version for the cache. */
+  picture_updated_at?: string | null;
   device_id: string | null;
   /** When the device tracking the entity today was assigned to it (track settings). */
   assigned_since?: string | null;

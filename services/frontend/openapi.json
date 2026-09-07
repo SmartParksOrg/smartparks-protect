@@ -2092,6 +2092,181 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/entities/{entity_id}/picture": {
+   "get": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Get Entity Picture",
+    "description": "The entity's profile picture (decision D110), a WebP square.",
+    "operationId": "get_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "entity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Set Entity Picture",
+    "description": "Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square.",
+    "operationId": "set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "entity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Remove Entity Picture",
+    "operationId": "remove_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "entity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/features": {
    "get": {
     "tags": [
@@ -3129,6 +3304,151 @@
     },
     "responses": {
      "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/picture": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Get Device Picture",
+    "description": "The device's profile picture (decision D110), a WebP square, for whoever may see the\ndevice.",
+    "operationId": "get_device_picture_api_v1_devices__device_id__picture_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Set Device Picture",
+    "description": "Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square.",
+    "operationId": "set_device_picture_api_v1_devices__device_id__picture_put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_set_device_picture_api_v1_devices__device_id__picture_put"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Remove Device Picture",
+    "operationId": "remove_device_picture_api_v1_devices__device_id__picture_delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
       "description": "Successful Response",
       "content": {
        "application/json": {
@@ -19224,6 +19544,34 @@
     ],
     "title": "Body_reset_reset_password_api_v1_auth_reset_password_post"
    },
+   "Body_set_device_picture_api_v1_devices__device_id__picture_put": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_set_device_picture_api_v1_devices__device_id__picture_put"
+   },
+   "Body_set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put"
+   },
    "Body_upload_log_file_api_v1_devices__device_id__log_files_post": {
     "properties": {
      "file": {
@@ -22545,6 +22893,19 @@
       ],
       "title": "Notes"
      },
+     "picture_updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Picture Updated At",
+      "description": "Set when the device has a profile picture (decision D110)"
+     },
      "created_at": {
       "type": "string",
       "format": "date-time",
@@ -23005,6 +23366,19 @@
        }
       ],
       "title": "Notes"
+     },
+     "picture_updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Picture Updated At",
+      "description": "Set when the device has a profile picture (decision D110)"
      },
      "created_at": {
       "type": "string",
@@ -23835,6 +24209,19 @@
        }
       ],
       "title": "Notes"
+     },
+     "picture_updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Picture Updated At",
+      "description": "Set when the entity has a profile picture (decision D110)"
      },
      "created_at": {
       "type": "string",

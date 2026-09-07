@@ -22,6 +22,7 @@ import { EntityDialog } from "@/components/entities/EntityDialog";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { MoveToGroupDialog } from "@/components/entities/MoveToGroupDialog";
 import { Icon } from "@/components/icons/Icon";
+import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { Button } from "@/components/ui/button";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { useNow } from "@/hooks/useNow";
@@ -102,10 +103,18 @@ export function EntitiesPage() {
       accessorKey: "name",
       cell: ({ row }) => (
         <span className="inline-flex items-center gap-2">
-          <Icon
-            iconKey={
-              row.original.icon_key ??
-              typeById.get(row.original.entity_type_id)?.icon_key
+          <ObjectPicture
+            path={`/api/v1/projects/${projectId}/entities/${row.original.id}/picture`}
+            updatedAt={row.original.picture_updated_at}
+            name={row.original.name}
+            size="xs"
+            fallback={
+              <Icon
+                iconKey={
+                  row.original.icon_key ??
+                  typeById.get(row.original.entity_type_id)?.icon_key
+                }
+              />
             }
           />
           {row.original.name}

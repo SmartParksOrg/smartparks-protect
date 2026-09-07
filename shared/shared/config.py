@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     minio_bucket_uploads: str = "uploads"
     minio_bucket_exports: str = "exports"
     minio_bucket_log_files: str = "device-log-files"
+    minio_bucket_pictures: str = "pictures"
+    picture_max_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        description="Largest upload accepted for a profile picture; the stored square is small",
+    )
 
     jwt_secret: str = Field(min_length=32, description="At least 32 bytes, RFC 7518 3.2")
     jwt_lifetime_seconds: int = 3600

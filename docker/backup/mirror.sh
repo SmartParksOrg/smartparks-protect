@@ -11,7 +11,7 @@ mc --quiet alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PAS
 mc --quiet alias set remote "${scheme}://${BACKUP_S3_ENDPOINT}" "$BACKUP_S3_KEY" "$BACKUP_S3_KEY_SECRET"
 prefix="${BACKUP_OBJECT_PREFIX:-objects}"
 status=0
-for bucket in ${MIRROR_BUCKETS:-uploads exports device-log-files}; do
+for bucket in ${MIRROR_BUCKETS:-uploads exports device-log-files pictures}; do
     remote="remote/${BACKUP_S3_BUCKET}/${prefix}/${bucket}"
     if [ "${MIRROR_DIRECTION:-backup}" = "restore" ]; then
         echo "restore ${remote} -> local/${bucket}"
