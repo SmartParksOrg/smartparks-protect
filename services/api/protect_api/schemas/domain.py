@@ -357,6 +357,11 @@ class DeviceDataSpan(BaseModel):
     earliest_entity_assignment_id: uuid.UUID | None
     before_project: RecordCounts
     before_entity: RecordCounts
+    clock_ahead: RecordCounts = Field(
+        default_factory=RecordCounts,
+        description="Records whose device time runs ahead of the clock (decision D119)",
+    )
+    clock_ahead_until: datetime | None = None
 
 
 class HandoverRequest(BaseModel):

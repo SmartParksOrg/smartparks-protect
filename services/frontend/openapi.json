@@ -6186,6 +6186,37 @@
     ]
    }
   },
+  "/api/v1/attention/clock-ahead": {
+   "get": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "Clock Ahead Devices",
+    "description": "Devices whose records carry a device time ahead of the clock (decision D119).",
+    "operationId": "clock_ahead_devices_api_v1_attention_clock_ahead_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ClockAheadDevice"
+         },
+         "type": "array",
+         "title": "Response Clock Ahead Devices Api V1 Attention Clock Ahead Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/attention/metrics": {
    "get": {
     "tags": [
@@ -18781,6 +18812,11 @@
       "type": "integer",
       "title": "Uncategorized Metrics",
       "default": 0
+     },
+     "clock_ahead_devices": {
+      "type": "integer",
+      "title": "Clock Ahead Devices",
+      "default": 0
      }
     },
     "type": "object",
@@ -19967,6 +20003,55 @@
      "state"
     ],
     "title": "ChannelStatus"
+   },
+   "ClockAheadDevice": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "positions": {
+      "type": "integer",
+      "title": "Positions"
+     },
+     "measurements": {
+      "type": "integer",
+      "title": "Measurements"
+     },
+     "until": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Until"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "name",
+     "project_id",
+     "positions",
+     "measurements",
+     "until"
+    ],
+    "title": "ClockAheadDevice",
+    "description": "A device with records whose device time runs ahead of the delivery (decision D119):\nkept, invalid, waiting for a curation job with a time offset."
    },
    "CommandCreate": {
     "properties": {
@@ -22594,6 +22679,22 @@
      },
      "before_entity": {
       "$ref": "#/components/schemas/RecordCounts"
+     },
+     "clock_ahead": {
+      "$ref": "#/components/schemas/RecordCounts",
+      "description": "Records whose device time runs ahead of the clock (decision D119)"
+     },
+     "clock_ahead_until": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clock Ahead Until"
      }
     },
     "type": "object",

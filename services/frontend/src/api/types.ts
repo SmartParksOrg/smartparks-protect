@@ -108,3 +108,4 @@ export interface Page<T> {
 }
 
 export type Role = "project-viewer" | "project-admin" | "server-admin";
+export type ClockAheadDevice = Schemas["ClockAheadDevice"];

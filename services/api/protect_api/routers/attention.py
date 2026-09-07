@@ -2,7 +2,7 @@
 letters. Server admin only in phase 2. Every action is audited."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -19,6 +19,7 @@ from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.domain import DeviceRead, ExternalIdentityRead
 from protect_api.serial import fill_serial_from_identity
 from shared.bus import RedisStreamsBus, Topic, is_stale
+from shared.config import get_settings
 from shared.database import get_session
 from shared.enums import DeviceStatus, ProcessingStatus
 from shared.ingest import republish_source_event
@@ -33,7 +34,9 @@ from shared.models import (
     EntityType,
     ExternalIdentity,
     Group,
+    Measurement,
     Metric,
+    Position,
     Project,
     SourceEvent,
     User,
@@ -63,6 +66,19 @@ class AttentionSummary(BaseModel):
     stale_workers: list[str]
     workers: dict[str, datetime | None]
     uncategorized_metrics: int = 0
+    clock_ahead_devices: int = 0
+
+
+class ClockAheadDevice(BaseModel):
+    """A device with records whose device time runs ahead of the delivery (decision D119):
+    kept, invalid, waiting for a curation job with a time offset."""
+
+    device_id: uuid.UUID
+    name: str
+    project_id: uuid.UUID | None
+    positions: int
+    measurements: int
+    until: datetime
 
 
 class NewMetric(BaseModel):
@@ -195,6 +211,7 @@ async def summary(
     uncategorized = await session.scalar(
         select(func.count()).select_from(Metric).where(Metric.category == "uncategorized")
     )
+    clock_ahead = len(await _clock_ahead_devices(session))
     return AttentionSummary(
         unknown_identities=int(unknown or 0),
         failed_source_events=int(failed or 0),
@@ -203,7 +220,67 @@ async def summary(
         stale_workers=[w for w, stamp in workers.items() if is_stale(stamp)],
         workers=workers,
         uncategorized_metrics=int(uncategorized or 0),
+        clock_ahead_devices=clock_ahead,
     )
+
+
+async def _clock_ahead_devices(session: AsyncSession) -> list[ClockAheadDevice]:
+    """Records in the future, per device: `time > now` keeps the hypertable scan to the
+    chunks after today, so the count is cheap however large the history is."""
+    horizon = utc_now() + timedelta(seconds=get_settings().clock_ahead_tolerance_seconds)
+    found: dict[uuid.UUID, dict[str, Any]] = {}
+    for model, kind in ((Position, "positions"), (Measurement, "measurements")):
+        rows = (
+            await session.execute(
+                select(model.device_id, func.count(), func.max(model.time))
+                .where(model.time > horizon)
+                .group_by(model.device_id)
+            )
+        ).all()
+        for device_id, count, until in rows:
+            entry = found.setdefault(device_id, {"positions": 0, "measurements": 0, "until": until})
+            entry[kind] = int(count)
+            entry["until"] = max(entry["until"], until)
+    if not found:
+        return []
+    names = {
+        d.id: d.name
+        for d in (await session.scalars(select(Device).where(Device.id.in_(found)))).all()
+    }
+    now = utc_now()
+    projects = {
+        device_id: project_id
+        for device_id, project_id in (
+            await session.execute(
+                select(DeviceProjectAssignment.device_id, DeviceProjectAssignment.project_id).where(
+                    DeviceProjectAssignment.device_id.in_(found),
+                    DeviceProjectAssignment.validity.op("@>")(now),
+                )
+            )
+        ).all()
+    }
+    return sorted(
+        (
+            ClockAheadDevice(
+                device_id=device_id,
+                name=names.get(device_id, str(device_id)),
+                project_id=projects.get(device_id),
+                positions=entry["positions"],
+                measurements=entry["measurements"],
+                until=entry["until"],
+            )
+            for device_id, entry in found.items()
+        ),
+        key=lambda d: d.name,
+    )
+
+
+@router.get("/clock-ahead", response_model=list[ClockAheadDevice])
+async def clock_ahead_devices(
+    session: AsyncSession = Depends(get_session),
+) -> list[ClockAheadDevice]:
+    """Devices whose records carry a device time ahead of the clock (decision D119)."""
+    return await _clock_ahead_devices(session)
 
 
 @router.get("/metrics", response_model=NewMetricsResponse)

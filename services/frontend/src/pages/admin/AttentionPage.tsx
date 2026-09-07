@@ -2,10 +2,11 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
+import { Link } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { AttentionSummary, BulkCreateResult, BulkIgnoreResult, DeadLetter, DeviceType, EntityType, NewMetric, NewMetricsResponse, Page as PageType, ProjectWithRole, SourceEventSummary, UnknownIdentity } from "@/api/types";
+import type { AttentionSummary, BulkCreateResult, BulkIgnoreResult, ClockAheadDevice, DeadLetter, DeviceType, EntityType, NewMetric, NewMetricsResponse, Page as PageType, ProjectWithRole, SourceEventSummary, UnknownIdentity } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -144,6 +145,13 @@ function NewMetricRow({ metric, categories, onDefined }: { metric: NewMetric; ca
 export function AttentionPage() {
   const { t } = useTranslation();
   const summary = useQuery({ queryKey: queryKeys.attentionSummary, queryFn: () => api.get<AttentionSummary>("/api/v1/attention/summary"), refetchInterval: 30_000 });
+  const clocks = useQuery({ queryKey: ["attention", "clock-ahead"], queryFn: () => api.get<ClockAheadDevice[]>("/api/v1/attention/clock-ahead"), refetchInterval: 60_000 });
+  const clockColumns: ColumnDef<ClockAheadDevice, unknown>[] = [
+    { header: t("Device"), accessorKey: "name", cell: ({ row }) => <Link className="underline" to={`/admin/devices/${row.original.device_id}`}>{row.original.name}</Link> },
+    { header: t("Positions"), accessorKey: "positions" },
+    { header: t("Measurements"), accessorKey: "measurements" },
+    { header: t("Device time up to"), accessorKey: "until", cell: ({ getValue }) => formatTime(getValue<string>()) },
+  ];
   const identities = useQuery({ queryKey: queryKeys.unknownIdentities, queryFn: () => api.get<PageType<UnknownIdentity>>("/api/v1/attention/identities", { query: { limit: 200 } }) });
   const failed = useQuery({ queryKey: queryKeys.failedSourceEvents("failed"), queryFn: () => api.get<SourceEventSummary[]>("/api/v1/attention/source-events", { query: { status: "failed", limit: 200 } }) });
   const newMetrics = useQuery({ queryKey: queryKeys.newMetrics, queryFn: () => api.get<NewMetricsResponse>("/api/v1/attention/metrics") });
@@ -198,14 +206,21 @@ export function AttentionPage() {
           <Stat label={t("Failed source events")} value={s?.failed_source_events ?? "…"} tone={s?.failed_source_events ? "bad" : undefined} />
           <Stat label={t("Dead letters")} value={s ? Object.values(s.dead_letters).reduce((a, b) => a + b, 0) : "…"} tone={s && Object.keys(s.dead_letters).length ? "bad" : undefined} />
           <Stat label={t("New metrics")} value={s?.uncategorized_metrics ?? "…"} tone={s?.uncategorized_metrics ? "warn" : undefined} />
+          <Stat label={t("Clocks ahead")} value={s?.clock_ahead_devices ?? "…"} tone={s?.clock_ahead_devices ? "warn" : undefined} />
         </div>
         <Tabs defaultValue="identities">
-          <TabsList><TabsTrigger value="identities">{t("Unknown identities")}</TabsTrigger><TabsTrigger value="metrics">{t("New metrics")}</TabsTrigger><TabsTrigger value="failed">{t("Failed source events")}</TabsTrigger><TabsTrigger value="dead">{t("Dead letters")}</TabsTrigger></TabsList>
+          <TabsList><TabsTrigger value="identities">{t("Unknown identities")}</TabsTrigger><TabsTrigger value="metrics">{t("New metrics")}</TabsTrigger><TabsTrigger value="clocks">{t("Clocks ahead")}</TabsTrigger><TabsTrigger value="failed">{t("Failed source events")}</TabsTrigger><TabsTrigger value="dead">{t("Dead letters")}</TabsTrigger></TabsList>
           <TabsContent value="metrics">
             <div className="rounded-md border">
               <p className="border-b px-3 py-2 text-xs text-muted-foreground">{t("Metrics a device sent that nobody defined yet. They are stored and charted already; give each a label, a unit and a category.")}</p>
               {(newMetrics.data?.items ?? []).map((m) => <NewMetricRow key={m.key} metric={m} categories={newMetrics.data?.categories ?? []} onDefined={() => undefined} />)}
               {newMetrics.data && newMetrics.data.items.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("Every metric is defined.")}</p>}
+            </div>
+          </TabsContent>
+          <TabsContent value="clocks">
+            <div className="rounded-md border">
+              <p className="border-b px-3 py-2 text-xs text-muted-foreground">{t("Devices whose records carry a device time ahead of the clock. The records are kept but invalid, so they stay off the map and out of the analysis, and the device's last seen does not move. Fix: on the device's project, Analyze, Curation, a bulk job with a time offset and the reason Device clock error.")}</p>
+              <DataTable columns={clockColumns} data={clocks.data} isLoading={clocks.isPending} emptyMessage={t("Every device clock is within an hour of the delivery.")} />
             </div>
           </TabsContent>
           <TabsContent value="identities" className="space-y-2">

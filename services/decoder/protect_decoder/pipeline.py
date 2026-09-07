@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
+from shared.config import get_settings
 from shared.control.commands import apply_provider_signal, interpret_device_records
 from shared.device_drivers.base import (
     DecodedMeasurement,
@@ -58,7 +59,7 @@ from shared.models import (
     SourceEvent,
 )
 from shared.storage import get_object
-from shared.timeutil import utc_now
+from shared.timeutil import clock_ahead, utc_now
 from shared.trace import ApplicationError, Tracer
 
 log = get_logger("decoder")
@@ -84,6 +85,15 @@ class Outcome:
     latest: datetime | None = None
     firmware_version: str | None = None
     decoder_version: str | None = None
+    # records whose device time ran ahead of the delivery (decision D119), kept invalid
+    clock_ahead: int = 0
+    clock_ahead_seconds: float = 0.0
+
+
+def _ahead_of_delivery(event: SourceEvent, record_time: datetime) -> float:
+    """Seconds the record's device time runs ahead of the delivery beyond the tolerance."""
+    received = event.network_received_at or event.ingested_at
+    return clock_ahead(record_time, received, get_settings().clock_ahead_tolerance_seconds)
 
 
 def event_age(record_time: datetime, ingested_at: datetime) -> float:
@@ -148,8 +158,6 @@ async def payload_of(event: SourceEvent) -> dict[str, Any]:
             component="decoder",
         )
     import json
-
-    from shared.config import get_settings
 
     data = json.loads(
         await get_object(get_settings().minio_bucket_uploads, event.payload_object_key)
@@ -283,6 +291,13 @@ async def process_source_event(
             await _write_events(session, event, device, records, outcome, attribution_at)
             total = sum(outcome.created.values())
             step.metadata.update(created=total, duplicates=outcome.duplicates)
+            if outcome.clock_ahead:
+                step.metadata["clock_ahead_records"] = outcome.clock_ahead
+                step.metadata["clock_ahead_days"] = round(outcome.clock_ahead_seconds / 86400, 2)
+                step.metadata["note"] = (
+                    f"device clock {outcome.clock_ahead_seconds / 86400:.1f} days ahead of the "
+                    f"delivery: {outcome.clock_ahead} records kept invalid until curated"
+                )
             if total == 0 and outcome.duplicates > 0:
                 step.duplicate(of="existing canonical rows")
             unassigned = [t for t, a in attributions.items() if not a.assigned]
@@ -379,6 +394,10 @@ async def _write_positions(
                 )
             continue
         attribution = await attribution_at(record.time)
+        ahead = _ahead_of_delivery(event, record.time)
+        if ahead:
+            outcome.clock_ahead += 1
+            outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
         position = Position(
             time=record.time,
             device_id=device.id,
@@ -389,6 +408,7 @@ async def _write_positions(
             source_event_ingested_at=event.ingested_at,
             record_type=record.record_type,
             canonical_key=key,
+            valid=not ahead,
             geom=from_shape(Point(record.longitude, record.latitude), srid=4326),
             altitude_m=record.altitude_m,
             speed_mps=record.speed_mps,
@@ -471,6 +491,10 @@ async def _write_measurements(
         columns, value_type = _value_columns(record.value)
         await _ensure_metric(session, record.metric_key, value_type)
         attribution = await attribution_at(record.time)
+        ahead = _ahead_of_delivery(event, record.time)
+        if ahead:
+            outcome.clock_ahead += 1
+            outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
         measurement = Measurement(
             time=record.time,
             device_id=device.id,
@@ -481,6 +505,7 @@ async def _write_measurements(
             source_event_ingested_at=event.ingested_at,
             metric_key=record.metric_key,
             canonical_key=key,
+            valid=not ahead,
             trace_id=event.trace_id,
             **columns,
         )
@@ -614,22 +639,25 @@ async def _update_current_state(
     attributions: dict[datetime, Attribution],
 ) -> None:
     now = utc_now()
+    # a record from the future (decision D119) must not become the newest position, state or
+    # last seen: it would block every real update until the clock is curated
+    timely_positions = [p for p in records.positions if not _ahead_of_delivery(event, p.time)]
+    timely_states = [s for s in records.states if not _ahead_of_delivery(event, s.time)]
+    timely_measurements = [m for m in records.measurements if not _ahead_of_delivery(event, m.time)]
+    timely_events = [e for e in records.events if not _ahead_of_delivery(event, e.time)]
     latest_position: DecodedPosition | None = max(
-        records.positions, key=lambda p: p.time, default=None
+        timely_positions, key=lambda p: p.time, default=None
     )
-    latest_state = max(records.states, key=lambda s: s.time, default=None)
+    latest_state = max(timely_states, key=lambda s: s.time, default=None)
     latest_measurements: dict[str, DecodedMeasurement] = {}
-    for m in records.measurements:
+    for m in timely_measurements:
         if (
             m.metric_key not in latest_measurements
             or m.time > latest_measurements[m.metric_key].time
         ):
             latest_measurements[m.metric_key] = m
     seen_at = max(
-        [
-            r.time
-            for r in records.positions + records.measurements + records.states + records.events
-        ],
+        [r.time for r in timely_positions + timely_measurements + timely_states + timely_events],
         default=event.network_received_at or event.ingested_at,
     )
 

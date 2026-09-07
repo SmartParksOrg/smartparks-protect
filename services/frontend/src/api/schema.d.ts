@@ -1358,6 +1358,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attention/clock-ahead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Clock Ahead Devices
+         * @description Devices whose records carry a device time ahead of the clock (decision D119).
+         */
+        get: operations["clock_ahead_devices_api_v1_attention_clock_ahead_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attention/metrics": {
         parameters: {
             query?: never;
@@ -4382,6 +4402,11 @@ export interface components {
              * @default 0
              */
             uncategorized_metrics: number;
+            /**
+             * Clock Ahead Devices
+             * @default 0
+             */
+            clock_ahead_devices: number;
         };
         /** AuditRead */
         AuditRead: {
@@ -4807,6 +4832,31 @@ export interface components {
              * @default 0
              */
             count_24h: number;
+        };
+        /**
+         * ClockAheadDevice
+         * @description A device with records whose device time runs ahead of the delivery (decision D119):
+         *     kept, invalid, waiting for a curation job with a time offset.
+         */
+        ClockAheadDevice: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Name */
+            name: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Positions */
+            positions: number;
+            /** Measurements */
+            measurements: number;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
         };
         /** CommandCreate */
         CommandCreate: {
@@ -5748,6 +5798,10 @@ export interface components {
             earliest_entity_assignment_id: string | null;
             before_project: components["schemas"]["RecordCounts"];
             before_entity: components["schemas"]["RecordCounts"];
+            /** @description Records whose device time runs ahead of the clock (decision D119) */
+            clock_ahead?: components["schemas"]["RecordCounts"];
+            /** Clock Ahead Until */
+            clock_ahead_until?: string | null;
         };
         /** DeviceHealth */
         DeviceHealth: {
@@ -13242,6 +13296,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttentionSummary"];
+                };
+            };
+        };
+    };
+    clock_ahead_devices_api_v1_attention_clock_ahead_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClockAheadDevice"][];
                 };
             };
         };

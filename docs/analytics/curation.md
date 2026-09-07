@@ -95,3 +95,7 @@ preview, get, `preview`, `apply`, `approve`, `revert`). Deliveries:
 `/integrations/deliveries?stale=true` and `POST /integrations/deliveries/{id}/resend`. Positions
 and analytics rows carry `original_time`, `curated_fields`, `valid` and `curation_version`;
 `include_invalid=true` shows invalid rows.
+
+## A device clock ahead of time
+
+When the decoder finds a device time more than an hour ahead of the delivery, it keeps the record invalid (Needs attention, Clocks ahead, lists the devices). Correct it here with a bulk job on the device: target the positions and then the measurements, the period from the earliest wrong time to the latest, transformation time offset with the negative of the clock's lead, reason Device clock error. The preview shows the rows and the impact; applying moves the rows to their real times. Rows the decoder marked invalid become valid with a second job, transformation validity, over the corrected period. The offset may span twenty years, which a clock started from a wrong epoch needs.

@@ -4,7 +4,7 @@ device is a handover that closes one assignment and opens the next (architecture
 import csv
 import io
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import exists, func, or_, select
@@ -37,6 +37,7 @@ from protect_api.schemas.domain import (
     RecordCounts,
 )
 from protect_api.serial import fill_serial_from_identity
+from shared.config import get_settings
 from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
@@ -541,6 +542,20 @@ async def device_data_span(
     ).scalar_one_or_none()
     project_from = range_bounds(project_assignment.validity)[0] if project_assignment else None
     entity_from = range_bounds(entity_assignment.validity)[0] if entity_assignment else None
+    horizon = utc_now() + timedelta(seconds=get_settings().clock_ahead_tolerance_seconds)
+    ahead = RecordCounts()
+    ahead_until: datetime | None = None
+    for model, attr in ((Position, "positions"), (Measurement, "measurements")):
+        count, until = (
+            await session.execute(
+                select(func.count(), func.max(model.time)).where(
+                    model.device_id == device.id, model.time > horizon
+                )
+            )
+        ).one()
+        setattr(ahead, attr, int(count or 0))
+        if until is not None and (ahead_until is None or until > ahead_until):
+            ahead_until = until
     return DeviceDataSpan(
         first_record_at=min(firsts, default=None),
         last_record_at=max(lasts, default=None),
@@ -553,6 +568,8 @@ async def device_data_span(
         earliest_entity_assignment_id=entity_assignment.id if entity_assignment else None,
         before_project=await _record_counts(session, device.id, project_from),
         before_entity=await _record_counts(session, device.id, entity_from),
+        clock_ahead=ahead,
+        clock_ahead_until=ahead_until,
     )
 
 

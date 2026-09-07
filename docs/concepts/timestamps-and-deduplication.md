@@ -22,3 +22,7 @@ The same device record can arrive over LoRaWAN, WebBLE, a raw log file and Iridi
 ## Attribution
 
 Project and entity are resolved at the canonical time of the record, so a record generated in July and delivered in August belongs to July's project (ADR 0010). Records generated while the device had no project are stored with `project_id` null and are visible to server admins until attributed.
+
+## A device clock ahead of time
+
+A device time is canonical, but a clock can be wrong. A record whose device time runs more than an hour ahead of the moment it was delivered (the network's receive time, or the ingest time) cannot be right: nothing is delivered before it happens. Such a record is stored with its device time and marked invalid, so it stays off the map, the lists, the rules and the exports and does not move the device's current state or its last seen; the processing trace says by how much the clock runs ahead. Needs attention lists the devices concerned and the device page warns. The fix is a bulk curation job with a time offset (reason Device clock error) on the device's project: the records move to their real times, and the correction stays on record. Records from the past are never a problem: flash logs and satellite deliveries arrive after the fact by design.

@@ -17,6 +17,7 @@ from shared.models import (
     EntityCurrentState,
     Measurement,
     Position,
+    ProcessingStep,
     ProcessingTrace,
     SourceDelivery,
     SourceEvent,
@@ -425,3 +426,41 @@ async def test_status_message_updates_health_state_and_firmware(db, bus, world):
     device = await db.get(Device, world.device.id)
     await db.refresh(device)
     assert device.firmware_version == "7.2"
+
+
+async def test_a_record_from_the_future_is_kept_invalid_and_leaves_the_current_state(
+    db, bus, world
+):
+    """Decision D119: a collar whose clock runs years ahead keeps sending; its records are
+    stored, marked invalid, and never become the newest position or the last seen."""
+    future = {"time": "2030-09-05T12:59:01+00:00", "lat": 52.04, "lon": 5.77}
+    event, outcome = await _ingest_and_process(db, bus, world, future)
+    assert outcome.status == ProcessingStatus.PROCESSED
+    assert outcome.clock_ahead == 1 and outcome.clock_ahead_seconds > 365 * 86400
+    await db.rollback()
+    row = (
+        await db.execute(select(Position).where(Position.source_event_id == event.id))
+    ).scalar_one()
+    assert row.valid is False
+    state = await db.get(DeviceCurrentState, world.device.id)
+    assert (
+        state is None
+        or state.latest_position_time is None
+        or state.latest_position_time.year < 2030
+    )
+    step = (
+        await db.execute(
+            select(ProcessingStep).where(
+                ProcessingStep.trace_id == event.trace_id,
+                ProcessingStep.operation == "canonical rows written",
+            )
+        )
+    ).scalar_one()
+    assert step.metadata_["clock_ahead_records"] == 1
+
+    # a record with a sane time then moves the state as usual
+    sane = {"time": "2026-09-07T12:59:01+00:00", "lat": 52.05, "lon": 5.78}
+    await _ingest_and_process(db, bus, world, sane)
+    await db.rollback()
+    state = await db.get(DeviceCurrentState, world.device.id)
+    assert state is not None and state.latest_position_time.year == 2026

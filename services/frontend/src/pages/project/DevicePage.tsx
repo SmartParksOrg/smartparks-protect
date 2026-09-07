@@ -204,6 +204,22 @@ export function DevicePage() {
         }
       />
       <Page>
+        {sp && (sp.clock_ahead?.positions ?? 0) + (sp.clock_ahead?.measurements ?? 0) > 0 && (
+          <Callout kind="warning">
+            {t(
+              "{{count}} records carry a device time ahead of the clock, up to {{until}}. They are kept but invalid until corrected, and the device's last seen does not move.",
+              {
+                count: (sp.clock_ahead?.positions ?? 0) + (sp.clock_ahead?.measurements ?? 0),
+                until: formatTime(sp.clock_ahead_until),
+              },
+            )}{" "}
+            {projectId && (
+              <Link className="underline" to={`/projects/${projectId}/analyze/curation`}>
+                {t("Correct the times under Curation")}
+              </Link>
+            )}
+          </Callout>
+        )}
         {sp && beforeProject > 0 && sp.earliest_project_assignment_id && (
           <Callout kind="warning">
             {t(

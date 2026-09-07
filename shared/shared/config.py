@@ -128,6 +128,12 @@ class Settings(BaseSettings):
     log_file_batch_size: int = Field(
         default=200, ge=1, description="Frames of a log file decoded per transaction"
     )
+    clock_ahead_tolerance_seconds: int = Field(
+        default=3600,
+        ge=0,
+        description="A record whose device time is further ahead of its delivery than this is "
+        "kept invalid until curated (decision D119)",
+    )
 
     rate_limit_enabled: bool = Field(
         default=True,
