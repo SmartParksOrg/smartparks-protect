@@ -1251,11 +1251,6 @@ export function LayerPanel({
                 t("Loading…")
               )}
             </div>
-            <div>
-              {t(
-                "Only where collars were: a blank area may still have coverage.",
-              )}
-            </div>
           </div>
         )}
         <Row depth={0} header>
