@@ -2,12 +2,14 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+// min-w-0 added: a card in a grid or flex row must shrink to its container, so a table or a
+// wide button inside it scrolls within the card instead of widening the page on a phone.
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
+        "min-w-0 flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
         className
       )}
       {...props}

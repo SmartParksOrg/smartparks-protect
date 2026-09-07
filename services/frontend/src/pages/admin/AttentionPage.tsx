@@ -192,7 +192,7 @@ export function AttentionPage() {
       <PageHeader title={t("Needs attention")} description={t("Unknown devices, failed messages and dead letters, with the actions to fix them")} />
       <Page>
         {s && s.stale_workers.length > 0 && <Callout kind="error">{t("Workers without a heartbeat for 15 minutes: {{workers}}", { workers: s.stale_workers.join(", ") })}</Callout>}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Stat label={t("Unknown identities")} value={s?.unknown_identities ?? "…"} tone={s?.unknown_identities ? "warn" : undefined} />
           <Stat label={t("Unassigned source events")} value={s?.unassigned_source_events ?? "…"} tone={s?.unassigned_source_events ? "warn" : undefined} />
           <Stat label={t("Failed source events")} value={s?.failed_source_events ?? "…"} tone={s?.failed_source_events ? "bad" : undefined} />

@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { usePreference } from "@/hooks/usePreference";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,6 +57,8 @@ interface Props<T> {
   columnsKey?: string;
   /** Column ids hidden until the person shows them (the picker lists them). */
   defaultHidden?: string[];
+  /** Column ids hidden by default on a phone as well, so the operational columns fit. */
+  defaultHiddenSmall?: string[];
 }
 
 /** Below this many rows a search box is noise; it still appears once a term is typed. */
@@ -75,6 +78,7 @@ export function DataTable<T>({
   selection,
   columnsKey,
   defaultHidden = [],
+  defaultHiddenSmall = [],
 }: Props<T>) {
   const { t } = useTranslation();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -131,12 +135,14 @@ export function DataTable<T>({
     () => (columnsKey ? (allChoices[columnsKey] ?? {}) : {}),
     [allChoices, columnsKey],
   );
+  const phone = useIsPhone();
   const columnVisibility = useMemo(() => {
     const visibility: Record<string, boolean> = {};
     for (const id of defaultHidden) visibility[id] = false;
+    if (phone) for (const id of defaultHiddenSmall) visibility[id] = false;
     return { ...visibility, ...chosen };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chosen, defaultHidden.join("|")]);
+  }, [chosen, phone, defaultHidden.join("|"), defaultHiddenSmall.join("|")]);
   const table = useReactTable({
     data: data ?? [],
     columns: allColumns,

@@ -42,7 +42,12 @@ export function useMap(container: RefObject<HTMLDivElement | null>, basemap: Bas
     // explains a refused permission itself (phase 15).
     map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false, showUserLocation: true }), "top-right");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
-    map.on("load", () => setReady(true));
+    map.on("load", () => {
+      // MapLibre opens the compact attribution on load; on a phone it then covers the bottom
+      // of the map until tapped, so start it folded to the button
+      map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+      setReady(true);
+    });
     mapRef.current = map;
     return () => {
       map.remove();

@@ -54,7 +54,8 @@ Do not invent z-index values. Pick the layer; ties are broken by DOM order.
 ## Responsive rules
 
 - Target viewports: phone 390 px, tablet 768 px, desktop 1440 px. The screenshot sweep (phase 3) opens every route at all three.
-- The page body never scrolls horizontally. Wide content (tables, charts, code) scrolls inside its own `overflow-x-auto` container.
+- The page body never scrolls horizontally. Wide content (tables, charts, code) scrolls inside its own `overflow-x-auto` container. A card or grid item that holds such content needs `min-w-0` (the shared `Card` has it), otherwise the intrinsic width of a table with non-wrapping headers widens the page and clips everything at the edge; the sweep does not catch this because `main` scrolls, so measure `main.scrollWidth` when in doubt.
+- Branch on width with `useIsPhone()` from `hooks/useMediaQuery.ts` or Tailwind's `sm:` classes, never with `window.innerWidth` in render. Long labels on phone buttons wrap (`h-auto whitespace-normal`) rather than overflow.
 - Charts that become unreadable when squeezed get a minimum drawn width and scroll.
 - Inputs stay 16 px on touch devices (global rule in `index.css`) so iOS does not zoom on focus.
 - Safe-area insets are handled once on `body`. No per-component notch padding.

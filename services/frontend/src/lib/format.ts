@@ -5,6 +5,18 @@ export function formatTime(value: string | null | undefined): string {
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 }
 
+/** Compact form for narrow columns: the time alone for today, else a short date with the time. */
+export function formatTimeShort(value: string | null | undefined, now: Date = new Date()): string {
+  if (!value) return "";
+  const date = new Date(value);
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  if (sameDay) return date.toLocaleTimeString(undefined, { timeStyle: "medium" });
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 export function formatAgo(value: string | null | undefined, now: number = Date.now()): string {
   if (!value) return "never";
   const seconds = Math.round((now - new Date(value).getTime()) / 1000);

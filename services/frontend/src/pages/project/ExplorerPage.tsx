@@ -79,6 +79,7 @@ export function ExplorerPage() {
   const update = useCallback((patch: Partial<ExplorerState>) => setParams(writeState({ ...readState(params), ...patch })), [params, setParams]);
   const [drill, setDrill] = useState<LongRow | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
 
   const window = useMemo(() => rangeFor(state.range), [state.range]);
@@ -162,7 +163,11 @@ export function ExplorerPage() {
         </>}
       />
       <Page>
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <Button variant="outline" className="w-full justify-between sm:hidden" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((o) => !o)}>
+          <span>{filtersOpen ? t("Hide filters") : t("Filters")}</span>
+          <span className="truncate text-xs font-normal text-muted-foreground">{t("{{count}} metrics", { count: state.metrics.length })}, {RANGE_PRESETS[state.range].label}</span>
+        </Button>
+        <div className={`${filtersOpen ? "grid" : "hidden sm:grid"} gap-3 md:grid-cols-3 xl:grid-cols-6`}>
           <Field label={t("Metrics")} htmlFor="metrics">
             <MultiSelect options={(metrics.data ?? []).map((m) => ({ value: m.key, label: m.category === "uncategorized" ? `${m.label} (${t("not defined yet")})` : m.label, hint: m.unit ?? undefined }))} value={state.metrics} onChange={(v) => update({ metrics: v })} placeholder={t("Choose metrics")} label={t("metrics")} className="w-full" maxSelected={20} />
           </Field>

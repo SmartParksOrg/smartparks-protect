@@ -108,7 +108,7 @@ export function Sidebar({
         >
           <Search className="size-4" />
           <span className="flex-1 text-left">{t("Search…")}</span>
-          <kbd className="rounded border bg-muted px-1.5 text-[10px] font-medium">
+          <kbd className="hidden rounded border bg-muted px-1.5 text-[10px] font-medium sm:inline">
             {t("Ctrl K")}
           </kbd>
         </Button>

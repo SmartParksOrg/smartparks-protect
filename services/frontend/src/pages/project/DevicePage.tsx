@@ -202,7 +202,7 @@ export function DevicePage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="ml-2"
+                className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
                 disabled={extendProject.isPending}
                 onClick={() => extendProject.mutate(sp)}
               >
@@ -230,7 +230,7 @@ export function DevicePage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="ml-2"
+                  className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
                   disabled={extendEntity.isPending}
                   onClick={() => extendEntity.mutate(sp)}
                 >
@@ -241,7 +241,7 @@ export function DevicePage() {
               )}
             </Callout>
           )}
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

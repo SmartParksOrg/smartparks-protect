@@ -73,6 +73,8 @@ import { useGroups } from "@/hooks/useGroups";
 import { usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { useNow } from "@/hooks/useNow";
+import { useTechnicalDetails } from "@/hooks/useTechnicalDetails";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { formatAgo, formatTime } from "@/lib/format";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
 import { useProjectStore } from "@/stores/project";
@@ -153,9 +155,16 @@ export function MapPage() {
   const [allLayers, setAllLayers] = usePreference<
     Record<string, Partial<LayerChoices>>
   >("map_layers", {});
+  // gateways are the network, not the animals: on by default only for people who asked for
+  // the technical picture (decision D105); the layers panel switches them either way
+  const [technical] = useTechnicalDetails();
   const layers = useMemo<LayerChoices>(
-    () => ({ ...DEFAULT_LAYERS, ...allLayers[projectId] }),
-    [allLayers, projectId],
+    () => ({
+      ...DEFAULT_LAYERS,
+      gateways: technical,
+      ...allLayers[projectId],
+    }),
+    [allLayers, projectId, technical],
   );
   const setLayers = useCallback(
     (next: LayerChoices) => setAllLayers({ ...allLayers, [projectId]: next }),
@@ -244,12 +253,19 @@ export function MapPage() {
           query: {
             entity_id: entityId,
             max_points: 5000,
-            from: trackFrom(trackLength, assignedSince(entityId), fallbackHours),
+            from: trackFrom(
+              trackLength,
+              assignedSince(entityId),
+              fallbackHours,
+            ),
           },
         }),
     })),
   });
-  const trackPoints = tracks.reduce((n, q) => n + (q.data?.returned_points ?? 0), 0);
+  const trackPoints = tracks.reduce(
+    (n, q) => n + (q.data?.returned_points ?? 0),
+    0,
+  );
   const selectedTrack = selectedId
     ? tracks[trackedIds.indexOf(selectedId)]?.data
     : undefined;
@@ -546,84 +562,111 @@ export function MapPage() {
     (f) => f.properties.entity_id === selectedId,
   )?.properties;
 
+  // on a phone the selection panel covers the lower part of the map: bring the selected
+  // entity into the free part once, when it is selected or first known
+  const phone = useIsPhone();
+  const pannedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !selectedId || !phone) return;
+    if (pannedFor.current === selectedId) return;
+    const feature = currentFeatures?.find(
+      (f) => f.properties.entity_id === selectedId,
+    );
+    if (!feature) return;
+    pannedFor.current = selectedId;
+    map.easeTo({
+      center: feature.geometry.coordinates as [number, number],
+      offset: [0, -Math.round(map.getContainer().clientHeight * 0.2)],
+      duration: 400,
+    });
+  }, [mapRef, ready, selectedId, phone, currentFeatures]);
+
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={container} className="absolute! inset-0 z-0" />
+      {/* bounded on the right so the controls wrap on a phone instead of widening the page;
+          the map's own buttons sit in the strip that stays free at the right */}
       <div
-        className={`absolute top-3 z-10 flex items-center gap-2 ${panelOpen ? "left-[23rem]" : "left-3"}`}
+        className={`absolute top-3 right-16 z-10 flex flex-col items-start gap-2 ${panelOpen ? "left-[23rem]" : "left-3"}`}
       >
-        <Select
-          value={basemap}
-          onValueChange={(v) => {
-            setBasemap(v as BasemapKey);
-            saveBasemap(v as BasemapKey);
-          }}
-        >
-          <SelectTrigger className="h-9 w-32 bg-card">
-            <Layers className="size-4" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(BASEMAPS).map(([key, b]) => (
-              <SelectItem key={key} value={key}>
-                {b.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          variant={panelOpen ? "default" : "outline"}
-          size="sm"
-          className={panelOpen ? "" : "bg-card"}
-          aria-pressed={panelOpen}
-          onClick={() => setPanelOpen((o) => !o)}
-        >
-          <ListTree className="size-4" /> {t("Layers")}
-        </Button>
-        {current.data && (
-          <Badge variant="secondary" className="bg-card">
-            {visibleFeatures &&
-            visibleFeatures.length !== currentFeatures?.length
-              ? `${visibleFeatures.length} / `
-              : ""}
-            {current.data.total} {t("entities")}
-            {current.data.use_tiles ? ", tiles" : ""}
-          </Badge>
-        )}
-        {events.data && events.data.features.length > 0 && (
-          <Badge
-            variant="secondary"
-            className="bg-card cursor-pointer"
-            onClick={() => void navigate(`/projects/${projectId}/rules/events`)}
-          >
-            {events.data.features.length} {t("events, 24 h")}
-          </Badge>
-        )}
-        {trackedIds.length > 0 && (
-          <TracksCard
-            count={trackedIds.length}
-            points={trackPoints}
-            length={trackLength}
-            settingsOpen={trackSettingsOpen}
-            onToggleSettings={() => setTrackSettingsOpen((o) => !o)}
-            onClear={() => {
-              setTracked([]);
-              setTrackSettingsOpen(false);
+        <div className="flex max-w-full flex-wrap items-center gap-2">
+          <Select
+            value={basemap}
+            onValueChange={(v) => {
+              setBasemap(v as BasemapKey);
+              saveBasemap(v as BasemapKey);
             }}
-          />
-        )}
-      </div>
-      {trackSettingsOpen && trackedIds.length > 0 && (
-        <div
-          className={`absolute top-14 z-10 ${panelOpen ? "left-[23rem]" : "left-3"}`}
-        >
+          >
+            <SelectTrigger
+              className="h-9 w-9 justify-center bg-card px-0 sm:w-32 sm:justify-between sm:px-3"
+              aria-label={t("Base map")}
+            >
+              <Layers className="size-4" />
+              <span className="hidden sm:inline">
+                <SelectValue />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(BASEMAPS).map(([key, b]) => (
+                <SelectItem key={key} value={key}>
+                  {b.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant={panelOpen ? "default" : "outline"}
+            size="sm"
+            className={panelOpen ? "" : "bg-card"}
+            aria-pressed={panelOpen}
+            onClick={() => setPanelOpen((o) => !o)}
+          >
+            <ListTree className="size-4" /> {t("Layers")}
+          </Button>
+          {current.data && (
+            <Badge variant="secondary" className="bg-card">
+              {visibleFeatures &&
+              visibleFeatures.length !== currentFeatures?.length
+                ? `${visibleFeatures.length} / `
+                : ""}
+              {current.data.total} {t("entities")}
+              {current.data.use_tiles ? ", tiles" : ""}
+            </Badge>
+          )}
+          {events.data && events.data.features.length > 0 && (
+            <Badge
+              variant="secondary"
+              className="bg-card cursor-pointer"
+              onClick={() =>
+                void navigate(`/projects/${projectId}/rules/events`)
+              }
+            >
+              {events.data.features.length} {t("events, 24 h")}
+            </Badge>
+          )}
+          {trackedIds.length > 0 && (
+            <TracksCard
+              count={trackedIds.length}
+              points={trackPoints}
+              length={trackLength}
+              settingsOpen={trackSettingsOpen}
+              onToggleSettings={() => setTrackSettingsOpen((o) => !o)}
+              onClear={() => {
+                setTracked([]);
+                setTrackSettingsOpen(false);
+              }}
+            />
+          )}
+        </div>
+        {trackSettingsOpen && trackedIds.length > 0 && (
           <TrackSettingsPanel
             length={trackLength}
             onChange={setTrackLength}
             onClose={() => setTrackSettingsOpen(false)}
           />
-        </div>
-      )}
+        )}
+      </div>
       {panelOpen && currentFeatures && (
         <LayerPanel
           entities={currentFeatures.map((f) => f.properties)}
@@ -780,7 +823,9 @@ export function MapPage() {
               size="sm"
               className="h-8"
               aria-pressed={trackedIds.includes(selected.entity_id)}
-              title={t("Show the track, {{length}}", { length: trackLengthLabel })}
+              title={t("Show the track, {{length}}", {
+                length: trackLengthLabel,
+              })}
               onClick={() =>
                 setTracked(
                   trackedIds.includes(selected.entity_id)

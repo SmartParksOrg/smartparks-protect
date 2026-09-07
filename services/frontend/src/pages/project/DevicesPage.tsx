@@ -66,12 +66,14 @@ export function DevicesPage() {
       ),
     },
     {
+      id: "type",
       header: t("Type"),
       accessorFn: (d) => typeById.get(d.device_type_id)?.label ?? "",
     },
     ...(technical
       ? [
           {
+            id: "driver",
             header: t("Driver"),
             accessorFn: (d: Device) =>
               typeById.get(d.device_type_id)?.driver_key ?? "",
@@ -148,6 +150,7 @@ export function DevicesPage() {
           }
           isLoading={devices.isPending}
           emptyMessage={t("No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.")} columnsKey="devices"
+          defaultHiddenSmall={["type", "driver", "serial_number", "status"]}
           onRowClick={(d) => navigate(`/projects/${projectId}/devices/${d.id}`)}
         />
       </Page>

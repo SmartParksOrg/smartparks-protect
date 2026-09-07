@@ -5,6 +5,7 @@
  *
  *   SWEEP_EMAIL=... SWEEP_PASSWORD=... npm run sweep            # against http://localhost:3000
  *   SWEEP_BASE=http://localhost:5173 npm run sweep               # against the Vite dev server
+ *   SWEEP_PROJECT="Smart Parks" npm run sweep                    # this project (name or id) instead of the first
  *
  * Routes come from the router file so the list cannot drift: every static path and, for project
  * and device routes, the first project and device the account can see.
@@ -41,11 +42,13 @@ const token = login.access_token;
 const headers = { authorization: `Bearer ${token}` };
 const me = await json("/api/v1/users/me", { headers });
 const projects = (await json("/api/v1/projects?limit=5", { headers })).items;
-const project = projects[0];
+const wanted = process.env.SWEEP_PROJECT;
+const project = wanted ? projects.find((p) => p.id === wanted || p.name === wanted) : projects[0];
+if (wanted && !project) throw new Error(`SWEEP_PROJECT ${wanted} is not among the account's projects`);
 if (!project) throw new Error("The sweep account needs at least one project");
 const devices = (await json(`/api/v1/devices?project_id=${project.id}&limit=1`, { headers })).items;
 const sources = me.is_superuser ? (await json("/api/v1/data-sources?limit=1", { headers })).items : [];
-const entities = (await json(`/api/v1/projects/${project.id}/entities?limit=1`, { headers })).items;
+const entities = (await json(`/api/v1/projects/${project.id}/entities?limit=2`, { headers })).items;
 
 const routerSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const paths = [...routerSource.matchAll(/path="([^"*]+)"/g)].map((m) => m[1]).filter((p) => !p.startsWith("/login") && !["register", "forgot-password", "reset-password"].some((s) => p.includes(s)));
@@ -61,6 +64,14 @@ for (const p of paths) {
   if (full.includes("/data-sources/") && !sources[0]) continue;
   if (full.startsWith("/admin") && !me.is_superuser) continue;
   routes.add(full);
+}
+
+// stateful map views the router cannot list: an entity selected, and two tracks on with the
+// Tracks card (the card once widened the page on a phone; a plain route never showed it)
+const tracked = entities.slice(0, 2).map((e) => e.id);
+if (tracked.length > 0) {
+  routes.add(`/projects/${project.id}/map?entity=${tracked[0]}`);
+  routes.add(`/projects/${project.id}/map?entity=${tracked[0]}&tracks=${tracked.join(",")}&track=168`);
 }
 
 rmSync("ui-sweep-output", { recursive: true, force: true });

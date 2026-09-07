@@ -45,8 +45,8 @@ export function TracksCard({
   const { t } = useTranslation();
   const lengthLabel = useTrackLengthLabel(length);
   return (
-    <div className="flex h-9 items-center gap-1 rounded-md border bg-card pl-3 pr-1 text-sm shadow-sm">
-      <span className="whitespace-nowrap">
+    <div className="flex min-h-9 max-w-full items-center gap-1 rounded-md border bg-card py-1 pl-3 pr-1 text-sm shadow-sm">
+      <span className="min-w-0 flex-1 leading-tight">
         {t("{{count}} tracks", { count })}
         {", "}
         {t("{{count}} points over {{length}}", { count: points, length: lengthLabel })}
@@ -62,7 +62,7 @@ export function TracksCard({
       >
         <Settings2 className="size-4" />
       </Button>
-      <Button variant="ghost" size="sm" className="h-7" onClick={onClear}>
+      <Button variant="ghost" size="sm" className="h-7 shrink-0" onClick={onClear}>
         {t("Clear tracks")}
       </Button>
     </div>
@@ -106,7 +106,7 @@ export function TrackSettingsPanel({
   const days = Math.min(TRACK_MAX_DAYS, Math.max(1, Math.round(customHours / 24)));
 
   return (
-    <div className="w-80 rounded-md border bg-card p-3 text-sm shadow-md">
+    <div className="w-full max-w-80 rounded-md border bg-card p-3 text-sm shadow-md">
       <div className="mb-2 flex items-center justify-between">
         <span className="font-medium">{t("Track settings")}</span>
         <Button
@@ -127,9 +127,12 @@ export function TrackSettingsPanel({
       >
         <div className="flex items-start gap-2">
           <RadioGroupItem value="assigned" id="track-assigned" className="mt-0.5" />
-          <Label htmlFor="track-assigned" className="font-normal leading-snug">
-            {t("Since the device was assigned to the entity")}
-            <span className="block text-xs text-muted-foreground">
+          <Label
+            htmlFor="track-assigned"
+            className="flex-col items-start gap-0.5 font-normal leading-snug"
+          >
+            <span>{t("Since the device was assigned to the entity")}</span>
+            <span className="text-xs text-muted-foreground">
               {t("An entity without a device gets the custom length.")}
             </span>
           </Label>

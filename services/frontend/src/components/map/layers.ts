@@ -450,6 +450,7 @@ export function ensureGatewayLayers(map: MapLibreMap): void {
       id: "gateway-labels",
       type: "symbol",
       source: SOURCES.gateways,
+      minzoom: 9,
       layout: {
         "text-field": ["get", "name"],
         "text-size": 10,

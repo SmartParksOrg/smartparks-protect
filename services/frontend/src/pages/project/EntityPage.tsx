@@ -269,7 +269,7 @@ export function EntityPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="ml-2"
+                className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
                 disabled={extend.isPending}
                 onClick={() => extend.mutate(sp)}
               >
@@ -287,7 +287,7 @@ export function EntityPage() {
             )}
           </Callout>
         )}
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           <Card>
             <CardHeader>
               <CardTitle>{t("Entity")}</CardTitle>

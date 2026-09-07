@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { TrafficRow } from "@/api/types";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
-import { channelLabel, formatAgo, formatTime } from "@/lib/format";
+import { channelLabel, formatAgo, formatTime, formatTimeShort } from "@/lib/format";
 
 /** The one traffic table (phase 15): the columns follow the row's channel, so a Bluetooth,
  * log file or satellite delivery shows its frame and delivery time where a LoRaWAN uplink shows
@@ -13,7 +13,7 @@ import { channelLabel, formatAgo, formatTime } from "@/lib/format";
 export function TrafficTable({ rows, isLoading, emptyMessage, footer, showSource, showIdentity, onSelect }: { rows: TrafficRow[] | undefined; isLoading?: boolean; emptyMessage: string; footer?: ReactNode; showSource?: boolean; showIdentity?: boolean; onSelect: (row: TrafficRow) => void }) {
   const { t } = useTranslation();
   const columns: ColumnDef<TrafficRow, unknown>[] = [
-    { header: t("Received"), accessorKey: "ingested_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
+    { header: t("Received"), accessorKey: "ingested_at", cell: ({ getValue }) => <><span className="sm:hidden">{formatTimeShort(getValue<string>())}</span><span className="hidden sm:inline">{formatTime(getValue<string>())}</span></> },
     ...(showSource ? [{ header: t("Source"), accessorKey: "data_source_name" } as ColumnDef<TrafficRow, unknown>] : []),
     ...(showIdentity ? [{ header: t("Identity"), accessorKey: "external_id", cell: ({ row }) => <span className="font-mono text-xs">{row.original.external_id ?? ""}</span> } as ColumnDef<TrafficRow, unknown>] : []),
     { header: t("Device"), accessorKey: "device_name", cell: ({ row }) => row.original.device_name ?? <span className="text-muted-foreground" title={row.original.external_id ?? ""}>{showIdentity ? t("not linked") : (row.original.external_id ?? "")}</span> },
