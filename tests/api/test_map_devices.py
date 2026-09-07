@@ -157,4 +157,17 @@ async def test_all_scope_lists_devices_in_no_project_for_server_admins(client, d
     assert (
         await client.get("/api/v1/projects/all/map/devices", headers=manager.headers)
     ).status_code == 403
+    # the devices list filters them on the server, for server admins only
+    listed = (
+        await client.get(
+            "/api/v1/devices", params={"in_no_project": "true", "limit": 500}, headers=admin.headers
+        )
+    ).json()["items"]
+    names = {d["id"] for d in listed}
+    assert inventory["id"] in names and device["id"] not in names
+    assert (
+        await client.get(
+            "/api/v1/devices", params={"in_no_project": "true"}, headers=manager.headers
+        )
+    ).status_code == 403
     assert entity and source and external_id and bus

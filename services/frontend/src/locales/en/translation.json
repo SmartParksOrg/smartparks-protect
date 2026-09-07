@@ -709,6 +709,7 @@
   "No deliveries yet.": "No deliveries yet.",
   "No device has tracked this entity yet.": "No device has tracked this entity yet.",
   "No device is assigned to this project.": "No device is assigned to this project.",
+  "No device matches the filter.": "No device matches the filter.",
   "No device matches.": "No device matches.",
   "No device tracks this entity today.": "No device tracks this entity today.",
   "No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.": "No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.",

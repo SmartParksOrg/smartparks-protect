@@ -37,24 +37,26 @@ export function DevicesPage() {
   const projectName = (id: string | null | undefined) =>
     projectList.data?.items.find((p) => p.id === id)?.name ?? "";
   const devices = useQuery({
-    queryKey: queryKeys.devices({ projectId, q, group }),
+    queryKey: queryKeys.devices({ projectId, q, group, projectFilter }),
     queryFn: () =>
       api.get<PageType<Device>>("/api/v1/devices", {
         query: {
-          project_id: allProjects ? undefined : projectId,
+          project_id: allProjects
+            ? projectFilter && projectFilter !== "none"
+              ? projectFilter
+              : undefined
+            : projectId,
+          in_no_project: allProjects && projectFilter === "none" ? true : undefined,
           q: q || undefined,
           group_id: group && group !== UNGROUPED ? group : undefined,
           limit: 500,
         },
       }),
     placeholderData: (previous) => previous,
-    select: (page) => {
-      let items = page.items;
-      if (group === UNGROUPED) items = items.filter((d) => !d.group_id);
-      if (projectFilter === "none") items = items.filter((d) => !d.project_id);
-      else if (projectFilter) items = items.filter((d) => d.project_id === projectFilter);
-      return { ...page, items };
-    },
+    select: (page) =>
+      group === UNGROUPED
+        ? { ...page, items: page.items.filter((d) => !d.group_id) }
+        : page,
   });
   const groups = useGroups(projectId);
   const groupName = (id: string | null | undefined) =>
@@ -213,7 +215,7 @@ export function DevicesPage() {
               : undefined
           }
           isLoading={devices.isPending}
-          emptyMessage={t("No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.")} columnsKey="devices"
+          emptyMessage={allProjects ? t("No device matches the filter.") : t("No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.")} columnsKey="devices"
           defaultHiddenSmall={["type", "driver", "serial_number", "status"]}
           onRowClick={(d) =>
             navigate(`/projects/${projectFor(projectId, d.project_id)}/devices/${d.id}`)

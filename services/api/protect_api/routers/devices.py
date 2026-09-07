@@ -196,6 +196,11 @@ async def list_devices(
         description="Only devices whose entity today is in this group or its subgroups "
         "(needs project_id, decision D98)",
     ),
+    in_no_project: bool = Query(
+        False,
+        description="Only devices assigned to no project today: inventory, workshop, freshly "
+        "onboarded (server admins, decision D120)",
+    ),
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[DeviceRead]:
@@ -208,6 +213,19 @@ async def list_devices(
     if (unassigned or group_id is not None) and project_id is None:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "unassigned and group_id need project_id"
+        )
+    if in_no_project:
+        if not user.is_superuser:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
+        if project_id is not None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "in_no_project excludes project_id"
+            )
+        statement = statement.where(
+            ~exists().where(
+                DeviceProjectAssignment.device_id == Device.id,
+                DeviceProjectAssignment.validity.op("@>")(now),
+            )
         )
     if group_id is not None:
         statement = statement.where(

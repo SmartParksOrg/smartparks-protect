@@ -11474,6 +11474,8 @@ export interface operations {
                 unassigned?: boolean;
                 /** @description Only devices whose entity today is in this group or its subgroups (needs project_id, decision D98) */
                 group_id?: string | null;
+                /** @description Only devices assigned to no project today: inventory, workshop, freshly onboarded (server admins, decision D120) */
+                in_no_project?: boolean;
                 limit?: number;
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
