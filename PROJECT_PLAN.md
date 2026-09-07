@@ -1218,6 +1218,10 @@ Listed by the phase where they are first needed.
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
 
+### 2026-09-07, gateways in the north, coverage sparse (Claude and Tim)
+
+- Tim saw no gateways in the north of the Netherlands and a sparse heard-positions layer. Cause: 76 of the 78 devices onboarded today are in no project (the bulk create ran with "No project yet"), so the Smart Parks map counts only its 4 devices; 4,996 of the 5,481 Dutch positions of the week carry no project. In the all scope the coverage query already took unassigned positions, but `_scope_device_ids` did not take devices in no project, so the gateway layer, Traffic and connectivity missed them there; fixed with a test. Assigning the devices to Smart Parks is Tim's call; there is no bulk assignment yet.
+
 ### 2026-09-07, layers panel the same on every tab (Claude)
 
 - Tim asked that the layers menu works the same on every tab, fold all and show all included; the Coverage tab's gateways did not fold. One footer now serves every tab (shown of total, Fold all or Unfold all, Show all, Hide all), the Gateways row folds, and `layerChoices` gained show all and hide all helpers for features, events and gateways (tests). Checked on the dev API: Coverage Hide all leaves 0 of 91 shown, Show all brings the 91 back.

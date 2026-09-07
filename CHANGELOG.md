@@ -28,6 +28,7 @@ From Tim's first hour with v2.0.0 on the dev server.
 
 ### Fixed
 
+- In the all-projects scope the gateway layer, the Gateways page, Traffic and the connectivity analysis count devices in no project as well, as the map and the devices list already did (decision D120); before, a server admin saw the positions of an unassigned collar there but not the gateways that heard it.
 - Gateway receptions of uplinks that arrived while the identity was unknown never got the device when the identity was linked, so the gateway layer and the coverage missed everything from before the device existed. Linking now gives the receptions the device, and migration 0022 repairs the existing rows.
 - The project switcher's list can be scrolled with a finger on a phone: the sidebar sheet blocked touch scrolling in the popover outside it, which is now modal with its own scroll allowance.
 - Devices in no project (decision D120): in the all scope the device layer and the Devices tab show them under "Not in a project", with their latest position and their track over the positions that belong to no project; the panel names the gap and links to Server admin, Devices; the all-scope devices list filters by project, "Not in a project" included. A project's own map never shows them.

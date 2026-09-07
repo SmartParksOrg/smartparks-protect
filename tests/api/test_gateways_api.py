@@ -148,6 +148,45 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     assert (await client.get("/api/v1/admin/gateways", headers=viewer.headers)).status_code == 403
 
 
+async def test_all_scope_counts_devices_in_no_project(client, db, bus):  # noqa: F811
+    """A device in no project is heard in the all scope, not in a project (decision D120)."""
+    from datetime import UTC, datetime
+
+    admin, project, _entity, source, device, _ = await _setup(client, db)
+    h = admin.headers
+    row = await db.get(DataSource, uuid.UUID(source["id"]))
+    loose = (
+        await client.post(
+            "/api/v1/devices",
+            json={"device_type_id": device["device_type_id"], "name": "loose", "status": "active"},
+            headers=h,
+        )
+    ).json()
+    external_id = uuid.uuid4().hex[:16].upper()
+    await _uplink(db, bus, row, external_id, [("gw-c", -90, 5.0)], datetime.now(UTC).isoformat())
+    identity = next(
+        i
+        for i in (await client.get("/api/v1/attention/identities?limit=500", headers=h)).json()[
+            "items"
+        ]
+        if i["external_id"] == external_id
+    )
+    linked = await client.post(
+        f"/api/v1/attention/identities/{identity['id']}/link",
+        json={"device_id": loose["id"], "reprocess": False},
+        headers=h,
+    )
+    assert linked.status_code == 200, linked.text
+    await _uplink(db, bus, row, external_id, [("gw-c", -92, 4.0)], datetime.now(UTC).isoformat())
+
+    in_project = (await client.get(f"/api/v1/projects/{project.id}/gateways", headers=h)).json()
+    assert "gw-c" not in [g["external_id"] for g in in_project]
+    in_all = (await client.get("/api/v1/projects/all/gateways", headers=h)).json()
+    assert "gw-c" in [g["external_id"] for g in in_all]
+    connectivity = (await client.get("/api/v1/projects/all/connectivity", headers=h)).json()
+    assert loose["id"] in [c["device_id"] for c in connectivity]
+
+
 async def test_polling_cursor_reset(client, db):
     from tests.api.conftest import actor
 

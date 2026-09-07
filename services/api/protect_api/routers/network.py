@@ -155,17 +155,25 @@ async def _project_device_ids(
 async def _scope_device_ids(
     session: AsyncSession, context: ScopeContext, at_from: datetime, at_to: datetime
 ) -> list[uuid.UUID]:
-    """Devices assigned to the scope's project, or to any project in the all scope, at any
-    time in the window (decision D115)."""
+    """Devices assigned to the scope's project at any time in the window (decision D115); in
+    the all scope every device, the ones in no project during the window included, since a
+    server admin sees unassigned data there (decision D120)."""
     from sqlalchemy.dialects.postgresql import Range
 
+    window = Range(at_from, at_to, bounds="[)")
     rows = await session.scalars(
         select(DeviceProjectAssignment.device_id).where(
             context.where(DeviceProjectAssignment.project_id),
-            DeviceProjectAssignment.validity.op("&&")(Range(at_from, at_to, bounds="[)")),
+            DeviceProjectAssignment.validity.op("&&")(window),
         )
     )
-    return list(set(rows))
+    ids = set(rows)
+    if context.is_all:
+        assigned = select(DeviceProjectAssignment.device_id).where(
+            DeviceProjectAssignment.validity.op("&&")(window)
+        )
+        ids |= set(await session.scalars(select(Device.id).where(Device.id.not_in(assigned))))
+    return list(ids)
 
 
 @router.get("/projects/{project_id}/traffic", response_model=list[TrafficRow])
