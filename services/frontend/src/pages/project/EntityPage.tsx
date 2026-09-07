@@ -32,6 +32,7 @@ import { Icon } from "@/components/icons/Icon";
 import { PictureEditor } from "@/components/common/PictureEditor";
 import type { EntityFeatureProperties } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
+import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -241,10 +242,7 @@ export function EntityPage() {
               queryKeys.currentState(projectId),
             ]}
             fallback={
-              <Icon
-                iconKey={e.icon_key ?? type?.icon_key}
-                className="size-6"
-              />
+              <Icon iconKey={e.icon_key ?? type?.icon_key} className="size-6" />
             }
           />
         }
@@ -362,6 +360,17 @@ export function EntityPage() {
                   </>
                 )}
               </dl>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("On the map")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MiniMap
+                positions={positions.data ?? []}
+                to={`/projects/${projectId}/map?entity=${e.id}`}
+              />
             </CardContent>
           </Card>
           <Card>

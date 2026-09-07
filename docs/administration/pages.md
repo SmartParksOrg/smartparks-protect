@@ -21,6 +21,7 @@ A folded section opens for one page with a click without changing the preference
 | Entities | Name, type, status, group, last seen, the device by name, a map link | Nothing more |
 | Entity page | The entity, the device tracking it with its health, the assignment history | Nothing more |
 | Devices | Name, type, status, serial, entity, group, last seen, health | The driver column |
+| Entity and device page | Details, health, assignments, a small map with the newest position and a short trail that opens the live map, recent positions and events | Traffic and traces |
 | Device page | Device, health, assignments, actions, recent positions | External identities, the traffic section, the deliveries and provenance links on positions |
 | Alerts, Events | The open alerts and the recent events | Nothing more |
 | Commands | The command timelines | Nothing more |

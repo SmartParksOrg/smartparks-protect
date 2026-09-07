@@ -36,6 +36,7 @@ import { Icon } from "@/components/icons/Icon";
 import { PictureEditor } from "@/components/common/PictureEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
@@ -204,22 +205,30 @@ export function DevicePage() {
         }
       />
       <Page>
-        {sp && (sp.clock_ahead?.positions ?? 0) + (sp.clock_ahead?.measurements ?? 0) > 0 && (
-          <Callout kind="warning">
-            {t(
-              "{{count}} records carry a device time ahead of the clock, up to {{until}}. They are kept but invalid until corrected, and the device's last seen does not move.",
-              {
-                count: (sp.clock_ahead?.positions ?? 0) + (sp.clock_ahead?.measurements ?? 0),
-                until: formatTime(sp.clock_ahead_until),
-              },
-            )}{" "}
-            {projectId && (
-              <Link className="underline" to={`/projects/${projectId}/analyze/curation`}>
-                {t("Correct the times under Curation")}
-              </Link>
-            )}
-          </Callout>
-        )}
+        {sp &&
+          (sp.clock_ahead?.positions ?? 0) +
+            (sp.clock_ahead?.measurements ?? 0) >
+            0 && (
+            <Callout kind="warning">
+              {t(
+                "{{count}} records carry a device time ahead of the clock, up to {{until}}. They are kept but invalid until corrected, and the device's last seen does not move.",
+                {
+                  count:
+                    (sp.clock_ahead?.positions ?? 0) +
+                    (sp.clock_ahead?.measurements ?? 0),
+                  until: formatTime(sp.clock_ahead_until),
+                },
+              )}{" "}
+              {projectId && (
+                <Link
+                  className="underline"
+                  to={`/projects/${projectId}/analyze/curation`}
+                >
+                  {t("Correct the times under Curation")}
+                </Link>
+              )}
+            </Callout>
+          )}
         {sp && beforeProject > 0 && sp.earliest_project_assignment_id && (
           <Callout kind="warning">
             {t(
@@ -292,6 +301,23 @@ export function DevicePage() {
               </dl>
             </CardContent>
           </Card>
+          {projectId && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("On the map")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MiniMap
+                  positions={positions.data ?? []}
+                  to={
+                    currentEntityId
+                      ? `/projects/${projectId}/map?entity=${currentEntityId}`
+                      : `/projects/${projectId}/map?device=${d.id}`
+                  }
+                />
+              </CardContent>
+            </Card>
+          )}
           <HealthCard health={d.health} />
           <Card>
             <CardHeader>
