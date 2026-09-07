@@ -262,6 +262,7 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
             payload={"external_identity_id": str(identity_id), "device_id": str(world.device.id)},
         )
     )
+    device_id = world.device.id
     db.expire_all()
     statuses = (
         await db.scalars(
@@ -275,7 +276,7 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
         await db.scalars(
             select(Position.time)
             .where(
-                Position.device_id == world.device.id,
+                Position.device_id == device_id,
                 Position.time >= datetime(2026, 3, 13, tzinfo=UTC),
             )
             .order_by(Position.time)

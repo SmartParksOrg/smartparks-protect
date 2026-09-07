@@ -62,7 +62,7 @@ async def test_new_metric_is_listed_with_its_reporters_and_defined_in_one_call(c
         headers=h,
     )
     metric_key = unique_name("soil_moisture").replace("-", "_")[:40]
-    group, handler = await _decode_pending(db, bus)
+    group, handler, _walk = await _decode_pending(db, bus)
     accepted = await client.post(
         f"/api/v1/ingest/http/{source['id']}",
         json={

@@ -63,7 +63,7 @@ async def _device_with_early_records(client, db, bus):
         json={"data_source_id": source["id"], "external_id": external_id},
         headers=h,
     )
-    group, handler = await _decode_pending(db, bus)
+    group, handler, _walk = await _decode_pending(db, bus)
     auth = {"Authorization": f"Bearer {source['webhook_token']}"}
     for day in (3, 4, 5):
         body = {
