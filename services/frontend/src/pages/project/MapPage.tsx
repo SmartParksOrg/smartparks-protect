@@ -517,8 +517,17 @@ export function MapPage() {
           .then((zoom) => map.easeTo({ center: lngLat, zoom }));
       },
     );
-    const unbindDevices = bindDeviceClicks(map, (props) =>
-      selectDevice(props.device_id),
+    const unbindDevices = bindDeviceClicks(
+      map,
+      (props) => selectDevice(props.device_id),
+      (lngLat, clusterId) => {
+        const source = map.getSource(
+          SOURCES.devices,
+        ) as maplibregl.GeoJSONSource;
+        void source
+          .getClusterExpansionZoom(clusterId)
+          .then((zoom) => map.easeTo({ center: lngLat, zoom }));
+      },
     );
     const unbindEvents = bindEventClicks(map, (props) =>
       setParams(

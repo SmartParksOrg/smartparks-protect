@@ -222,24 +222,66 @@ export function deviceStateFor(
  * layers, which it sits beneath. */
 export function ensureDeviceLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.devices)) return;
+  // clustered like the entities; a device cluster is the inverse of an entity cluster
+  // (white with a green ring) and sits a little down and right of it, so a collar cluster
+  // and its animals' cluster over the same ground both stay visible
   map.addSource(SOURCES.devices, {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
+    cluster: true,
+    clusterRadius: 48,
+    clusterMaxZoom: 14,
     promoteId: "device_id",
   });
+  map.addLayer(
+    {
+      id: "device-clusters",
+      type: "circle",
+      source: SOURCES.devices,
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-color": "#ffffff",
+        "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 50, 24],
+        "circle-stroke-width": 3,
+        "circle-stroke-color": "#52735E",
+        "circle-translate": [10, 10],
+      },
+    },
+    "entity-clusters",
+  );
+  map.addLayer(
+    {
+      id: "device-cluster-count",
+      type: "symbol",
+      source: SOURCES.devices,
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": ["get", "point_count_abbreviated"],
+        "text-size": 11,
+        "text-font": FONT,
+        "text-offset": [0.9, 0.9],
+        "text-allow-overlap": true,
+      },
+      paint: { "text-color": "#2F4A3A" },
+    },
+    "entity-clusters",
+  );
   map.addLayer(
     {
       id: "device-markers",
       type: "symbol",
       source: SOURCES.devices,
+      filter: ["!", ["has", "point_count"]],
       layout: {
         "icon-image": ["get", "marker"],
         "icon-size": 0.75,
+        // beside its animal (decision D112), not under it
+        "icon-offset": [16, 16],
         "icon-allow-overlap": true,
         "text-field": ["get", "name"],
         "text-size": 10,
         "text-font": FONT,
-        "text-offset": [0, 1.6],
+        "text-offset": [1.2, 2.4],
         "text-anchor": "top",
         "text-optional": true,
       },
@@ -251,26 +293,42 @@ export function ensureDeviceLayers(map: MapLibreMap): void {
     },
     "entity-clusters",
   );
-  map.on(
-    "mouseenter",
-    "device-markers",
-    () => (map.getCanvas().style.cursor = "pointer"),
-  );
-  map.on("mouseleave", "device-markers", () => (map.getCanvas().style.cursor = ""));
+  for (const layer of ["device-markers", "device-clusters"]) {
+    map.on(
+      "mouseenter",
+      layer,
+      () => (map.getCanvas().style.cursor = "pointer"),
+    );
+    map.on("mouseleave", layer, () => (map.getCanvas().style.cursor = ""));
+  }
 }
 
 /** Bind the device marker click; the returned function unbinds it. */
 export function bindDeviceClicks(
   map: MapLibreMap,
   onClick: (props: DeviceFeatureProperties) => void,
+  onClusterClick: (lngLat: [number, number], clusterId: number) => void,
 ): () => void {
   const onMarker = (e: MapLayerMouseEvent) => {
     const feature = e.features?.[0];
     if (feature)
       onClick(feature.properties as unknown as DeviceFeatureProperties);
   };
+  const onCluster = (e: MapLayerMouseEvent) => {
+    const feature = e.features?.[0];
+    if (!feature) return;
+    const geometry = feature.geometry as GeoJSON.Point;
+    onClusterClick(
+      geometry.coordinates as [number, number],
+      feature.properties?.cluster_id as number,
+    );
+  };
   map.on("click", "device-markers", onMarker);
-  return () => map.off("click", "device-markers", onMarker);
+  map.on("click", "device-clusters", onCluster);
+  return () => {
+    map.off("click", "device-markers", onMarker);
+    map.off("click", "device-clusters", onCluster);
+  };
 }
 
 export async function setDevices(
