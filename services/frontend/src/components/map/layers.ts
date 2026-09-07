@@ -31,6 +31,8 @@ export interface EntityFeatureProperties {
   group_id?: string | null;
   icon_key: string;
   device_id: string | null;
+  /** When the device tracking the entity today was assigned to it (track settings). */
+  assigned_since?: string | null;
   last_seen_at: string | null;
   position_time: string | null;
   active_alert_count: number;

@@ -26,6 +26,7 @@ from shared.domain.health import device_health
 from shared.models import (
     Device,
     DeviceCurrentState,
+    DeviceEntityAssignment,
     DeviceType,
     Entity,
     EntityCurrentState,
@@ -143,6 +144,24 @@ async def current_state(
                 )
             ).all()
         }
+    # when the device tracking the entity today was assigned to it: the start of the "since the
+    # device was assigned" track length in the map's track settings
+    assigned_since: dict[uuid.UUID, datetime] = {}
+    if device_ids:
+        assigned_since = {
+            entity_id: since
+            for entity_id, since in (
+                await session.execute(
+                    select(
+                        DeviceEntityAssignment.entity_id,
+                        func.lower(DeviceEntityAssignment.validity),
+                    ).where(
+                        DeviceEntityAssignment.device_id.in_(device_ids),
+                        DeviceEntityAssignment.validity.op("@>")(utc_now()),
+                    )
+                )
+            ).all()
+        }
     features = []
     for row in rows:
         state, name, entity_status, icon_override, type_key, type_icon, group_key = row[:7]
@@ -175,6 +194,9 @@ async def current_state(
                     "group_id": str(group_id) if group_id else None,
                     "icon_key": icon_override or type_icon,
                     "device_id": str(state.device_id) if state.device_id else None,
+                    "assigned_since": assigned_since[state.entity_id].isoformat()
+                    if state.entity_id in assigned_since
+                    else None,
                     "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
                     "position_time": state.latest_position_time.isoformat()
                     if state.latest_position_time

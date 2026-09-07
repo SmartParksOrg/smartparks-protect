@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next";
-import i18n from "@/i18n";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Layers, ListTree, X } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
@@ -51,6 +50,15 @@ import {
   type LayerChoices,
 } from "@/components/map/layerChoices";
 import { LayerPanel } from "@/components/map/LayerPanel";
+import {
+  DEFAULT_TRACK_HOURS,
+  parseTrackLength,
+  trackFrom,
+  type TrackLength,
+  trackLengthParam,
+} from "@/components/map/trackLength";
+import { TracksCard, TrackSettingsPanel } from "@/components/map/TrackSettings";
+import { useTrackLengthLabel } from "@/components/map/useTrackLengthLabel";
 import { useMap } from "@/components/map/useMap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,13 +107,6 @@ interface CurrentFeature {
   properties: EntityFeatureProperties;
 }
 
-const TRACK_PERIODS = [
-  { label: i18n.t("6 hours"), hours: 6 },
-  { label: i18n.t("24 hours"), hours: 24 },
-  { label: i18n.t("7 days"), hours: 168 },
-  { label: i18n.t("30 days"), hours: 720 },
-];
-
 /**
  * Live map (architecture 11 and 13). Entities come from the current-state endpoint (bounded),
  * updates arrive over the WebSocket, a selected entity shows its panel and optional track. The
@@ -117,7 +118,16 @@ export function MapPage() {
   const [params, setParams] = useSearchParams();
   const now = useNow();
   const selectedId = params.get("entity");
-  const trackHours = Number(params.get("track") ?? 0) || 24;
+  // one track length for every track: the URL has it, the last choice is the default (D109)
+  const [preferredLength, setPreferredLength] = usePreference<TrackLength>(
+    "track_length",
+    DEFAULT_TRACK_HOURS,
+  );
+  const trackLength = parseTrackLength(params.get("track"), preferredLength);
+  const fallbackHours =
+    typeof preferredLength === "number" ? preferredLength : DEFAULT_TRACK_HOURS;
+  const trackLengthLabel = useTrackLengthLabel(trackLength);
+  const [trackSettingsOpen, setTrackSettingsOpen] = useState(false);
   const trackedIds = useMemo(
     () => (params.get("tracks") ?? "").split(",").filter(Boolean),
     [params],
@@ -215,11 +225,18 @@ export function MapPage() {
       ),
     refetchInterval: 120_000,
   });
+  const assignedSince = useCallback(
+    (entityId: string) =>
+      currentFeatures?.find((f) => f.properties.entity_id === entityId)
+        ?.properties.assigned_since ?? null,
+    [currentFeatures],
+  );
   const tracks = useQueries({
     queries: trackedIds.map((entityId) => ({
       queryKey: queryKeys.track(projectId, {
         entity_id: entityId,
-        hours: trackHours,
+        length: trackLengthParam(trackLength),
+        since: trackLength === "assigned" ? assignedSince(entityId) : null,
         max_points: 5000,
       }),
       queryFn: () =>
@@ -227,26 +244,40 @@ export function MapPage() {
           query: {
             entity_id: entityId,
             max_points: 5000,
-            from: new Date(Date.now() - trackHours * 3600_000).toISOString(),
+            from: trackFrom(trackLength, assignedSince(entityId), fallbackHours),
           },
         }),
     })),
   });
+  const trackPoints = tracks.reduce((n, q) => n + (q.data?.returned_points ?? 0), 0);
   const selectedTrack = selectedId
     ? tracks[trackedIds.indexOf(selectedId)]?.data
     : undefined;
   const setTracked = useCallback(
-    (ids: string[], hours?: number) =>
+    (ids: string[], length?: TrackLength) =>
       setParams(
         (p) => {
           if (ids.length > 0) p.set("tracks", ids.join(","));
           else p.delete("tracks");
-          if (hours) p.set("track", String(hours));
+          if (length) p.set("track", trackLengthParam(length));
           return p;
         },
         { replace: true },
       ),
     [setParams],
+  );
+  const setTrackLength = useCallback(
+    (next: TrackLength) => {
+      setPreferredLength(next);
+      setParams(
+        (p) => {
+          p.set("track", trackLengthParam(next));
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setParams, setPreferredLength],
   );
 
   const select = useCallback(
@@ -568,7 +599,31 @@ export function MapPage() {
             {events.data.features.length} {t("events, 24 h")}
           </Badge>
         )}
+        {trackedIds.length > 0 && (
+          <TracksCard
+            count={trackedIds.length}
+            points={trackPoints}
+            length={trackLength}
+            settingsOpen={trackSettingsOpen}
+            onToggleSettings={() => setTrackSettingsOpen((o) => !o)}
+            onClear={() => {
+              setTracked([]);
+              setTrackSettingsOpen(false);
+            }}
+          />
+        )}
       </div>
+      {trackSettingsOpen && trackedIds.length > 0 && (
+        <div
+          className={`absolute top-14 z-10 ${panelOpen ? "left-[23rem]" : "left-3"}`}
+        >
+          <TrackSettingsPanel
+            length={trackLength}
+            onChange={setTrackLength}
+            onClose={() => setTrackSettingsOpen(false)}
+          />
+        </div>
+      )}
       {panelOpen && currentFeatures && (
         <LayerPanel
           entities={currentFeatures.map((f) => f.properties)}
@@ -581,6 +636,7 @@ export function MapPage() {
           coverage={layers.coverage ? coverage.data : undefined}
           choices={layers}
           trackedIds={trackedIds}
+          trackLabel={trackLengthLabel}
           onChange={setLayers}
           onClose={() => setPanelOpen(false)}
           onToggleTrack={(id) =>
@@ -588,7 +644,7 @@ export function MapPage() {
               trackedIds.includes(id)
                 ? trackedIds.filter((x) => x !== id)
                 : [...trackedIds, id],
-              trackHours,
+              trackLength,
             )
           }
           onPickGateway={(id) => {
@@ -717,33 +773,27 @@ export function MapPage() {
             </dd>
           </dl>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Select
-              value={
-                trackedIds.includes(selected.entity_id)
-                  ? String(trackHours)
-                  : "0"
+            <Button
+              variant={
+                trackedIds.includes(selected.entity_id) ? "default" : "outline"
               }
-              onValueChange={(v) =>
+              size="sm"
+              className="h-8"
+              aria-pressed={trackedIds.includes(selected.entity_id)}
+              title={t("Show the track, {{length}}", { length: trackLengthLabel })}
+              onClick={() =>
                 setTracked(
-                  v === "0"
+                  trackedIds.includes(selected.entity_id)
                     ? trackedIds.filter((x) => x !== selected.entity_id)
                     : [...new Set([...trackedIds, selected.entity_id])],
-                  v === "0" ? undefined : Number(v),
+                  trackLength,
                 )
               }
             >
-              <SelectTrigger className="h-8 w-36">
-                <SelectValue placeholder={t("Track")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">{t("No track")}</SelectItem>
-                {TRACK_PERIODS.map((p) => (
-                  <SelectItem key={p.hours} value={String(p.hours)}>
-                    {t("Track")} {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {trackedIds.includes(selected.entity_id)
+                ? t("Hide the track")
+                : t("Show the track")}
+            </Button>
             {selectedTrack && (
               <span className="text-xs text-muted-foreground">
                 {t("{{returned}} of {{total}} points", {

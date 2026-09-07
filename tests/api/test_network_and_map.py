@@ -231,6 +231,7 @@ async def test_current_state_tiles_and_track(client, db, bus):
         feature["properties"]["name"] == "Rhino 14"
         and feature["properties"]["icon_key"] == "wildlife.rhino"
     )
+    assert feature["properties"]["assigned_since"] == "2026-01-01T00:00:00+00:00"
     assert feature["geometry"]["coordinates"] == [pytest.approx(31.529), pytest.approx(-24.871)]
 
     outside = (

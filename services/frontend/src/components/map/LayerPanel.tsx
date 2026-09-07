@@ -136,6 +136,7 @@ export function LayerPanel({
   coverage,
   choices,
   trackedIds,
+  trackLabel,
   onChange,
   onClose,
   onPickEntity,
@@ -152,6 +153,8 @@ export function LayerPanel({
   coverage: CoverageResponse | undefined;
   choices: LayerChoices;
   trackedIds: string[];
+  /** The current track length, for the tooltip of the track button ("21 days"). */
+  trackLabel: string;
   onChange: (next: LayerChoices) => void;
   onClose: () => void;
   onPickEntity: (entityId: string) => void;
@@ -274,7 +277,7 @@ export function LayerPanel({
           title={
             trackedIds.includes(m.entity_id)
               ? t("Hide the track")
-              : t("Show the track, 24 hours")
+              : t("Show the track, {{length}}", { length: trackLabel })
           }
           onClick={() => onToggleTrack(m.entity_id)}
         >
