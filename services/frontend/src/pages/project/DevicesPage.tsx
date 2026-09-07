@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { api } from "@/api/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProjects } from "@/hooks/useProjects";
 import { isAllProjects, projectFor } from "@/lib/scope";
 import { queryKeys } from "@/api/queryKeys";
@@ -30,6 +31,7 @@ export function DevicesPage() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
   const allProjects = isAllProjects(projectId);
   const projectList = useProjects();
   const projectName = (id: string | null | undefined) =>
@@ -46,10 +48,13 @@ export function DevicesPage() {
         },
       }),
     placeholderData: (previous) => previous,
-    select: (page) =>
-      group === UNGROUPED
-        ? { ...page, items: page.items.filter((d) => !d.group_id) }
-        : page,
+    select: (page) => {
+      let items = page.items;
+      if (group === UNGROUPED) items = items.filter((d) => !d.group_id);
+      if (projectFilter === "none") items = items.filter((d) => !d.project_id);
+      else if (projectFilter) items = items.filter((d) => d.project_id === projectFilter);
+      return { ...page, items };
+    },
   });
   const groups = useGroups(projectId);
   const groupName = (id: string | null | undefined) =>
@@ -171,13 +176,29 @@ export function DevicesPage() {
             : t("Hardware currently assigned to this project")
         }
         actions={
-          <GroupSelect
-            projectId={projectId}
-            mode="filter"
-            value={group}
-            onChange={setGroup}
-            className="h-9 w-44"
-          />
+          <>
+            {allProjects && (
+              <Select value={projectFilter || "all"} onValueChange={(v) => setProjectFilter(v === "all" ? "" : v)}>
+                <SelectTrigger className="h-9 w-52" aria-label={t("Project")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All projects")}</SelectItem>
+                  <SelectItem value="none">{t("Not in a project")}</SelectItem>
+                  {(projectList.data?.items ?? []).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <GroupSelect
+              projectId={projectId}
+              mode="filter"
+              value={group}
+              onChange={setGroup}
+              className="h-9 w-44"
+            />
+          </>
         }
       />
       <Page>

@@ -257,21 +257,25 @@ async def devices_state(
         )
         .subquery()
     )
-    total = int(await session.scalar(select(func.count()).select_from(assigned)) or 0)
-    base = (
-        select(
-            Device,
-            DeviceType.key,
-            DeviceType.icon_key,
-            DeviceType.driver_key,
-            DeviceCurrentState,
-            assigned.c.since,
-            assigned.c.project_id,
-            func.ST_AsGeoJSON(DeviceCurrentState.latest_position),
-        )
-        .join(assigned, assigned.c.device_id == Device.id)
-        .join(DeviceType, DeviceType.id == Device.device_type_id)
-        .outerjoin(DeviceCurrentState, DeviceCurrentState.device_id == Device.id)
+    base = select(
+        Device,
+        DeviceType.key,
+        DeviceType.icon_key,
+        DeviceType.driver_key,
+        DeviceCurrentState,
+        assigned.c.since,
+        assigned.c.project_id,
+        func.ST_AsGeoJSON(DeviceCurrentState.latest_position),
+    )
+    if context.is_all:
+        # the all scope (decision D120): devices in no project come too, with project None
+        total = int(await session.scalar(select(func.count()).select_from(Device)) or 0)
+        base = base.outerjoin(assigned, assigned.c.device_id == Device.id)
+    else:
+        total = int(await session.scalar(select(func.count()).select_from(assigned)) or 0)
+        base = base.join(assigned, assigned.c.device_id == Device.id)
+    base = base.join(DeviceType, DeviceType.id == Device.device_type_id).outerjoin(
+        DeviceCurrentState, DeviceCurrentState.device_id == Device.id
     )
     box = _bbox(bbox)
     if box is not None:
@@ -320,7 +324,7 @@ async def devices_state(
                 "geometry": json.loads(geojson) if geojson else None,
                 "properties": {
                     "device_id": str(device.id),
-                    "project_id": str(device_project_id),
+                    "project_id": str(device_project_id) if device_project_id else None,
                     "name": device.name,
                     "serial_number": device.serial_number,
                     "status": device.status,
@@ -415,7 +419,7 @@ async def track(
     time_to = require_aware(time_to) if time_to else utc_now()
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
     conditions = [
-        context.where(Position.project_id),
+        context.where(Position.project_id, unassigned=True),
         in_window(Position, time_from, time_to),
         visible(Position),
     ]

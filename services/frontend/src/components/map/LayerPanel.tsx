@@ -852,14 +852,21 @@ export function LayerPanel({
     .sort(deviceOrder);
   const deviceSections = (
     projects
-      ? [...projects]
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((p) => ({
-            key: p.id,
-            name: p.name,
-            devices: listedDevices.filter((d) => d.project_id === p.id),
-          }))
-          .filter((sec) => sec.devices.length > 0)
+      ? [
+          ...[...projects]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((p) => ({
+              key: p.id,
+              name: p.name,
+              devices: listedDevices.filter((d) => d.project_id === p.id),
+            })),
+          // a server admin sees inventory too (decision D120): devices in no project
+          {
+            key: "none",
+            name: t("Not in a project"),
+            devices: listedDevices.filter((d) => !d.project_id),
+          },
+        ].filter((sec) => sec.devices.length > 0)
       : [{ key: "all", name: null, devices: listedDevices }]
   ).map((sec) => ({
     key: sec.key,

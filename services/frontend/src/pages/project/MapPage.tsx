@@ -1100,14 +1100,22 @@ export function MapPage() {
             <div className="min-w-0 flex-1">
               <Link
                 className="block truncate font-semibold underline-offset-2 hover:underline"
-                to={`/projects/${projectFor(projectId, selectedDevice.properties.project_id)}/devices/${selectedDevice.properties.device_id}`}
+                to={
+                  allProjects && !selectedDevice.properties.project_id
+                    ? `/admin/devices/${selectedDevice.properties.device_id}`
+                    : `/projects/${projectFor(projectId, selectedDevice.properties.project_id)}/devices/${selectedDevice.properties.device_id}`
+                }
               >
                 {selectedDevice.properties.name}
               </Link>
               <div className="text-xs text-muted-foreground">
                 {selectedDevice.properties.device_type}
-                {allProjects && selectedDevice.properties.project_id
-                  ? ` · ${projectName(selectedDevice.properties.project_id)}`
+                {allProjects
+                  ? ` · ${
+                      selectedDevice.properties.project_id
+                        ? projectName(selectedDevice.properties.project_id)
+                        : t("Not in a project")
+                    }`
                   : ""}
               </div>
             </div>
@@ -1152,6 +1160,19 @@ export function MapPage() {
                 <dt className="text-muted-foreground">{t("Last status")}</dt>
                 <dd title={formatTime(selectedDevice.properties.last_status_at)}>
                   {formatAgo(selectedDevice.properties.last_status_at, now)}
+                </dd>
+              </>
+            )}
+            {allProjects && !selectedDevice.properties.project_id && (
+              <>
+                <dt className="text-muted-foreground">{t("Project")}</dt>
+                <dd>
+                  <Link
+                    className="underline"
+                    to={`/admin/devices/${selectedDevice.properties.device_id}`}
+                  >
+                    {t("none, assign under Server admin")}
+                  </Link>
                 </dd>
               </>
             )}

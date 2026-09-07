@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.users import current_active_user
@@ -67,9 +67,14 @@ class ScopeContext:
     def project_id(self) -> uuid.UUID | None:
         return None if self.project is None else self.project.id
 
-    def where(self, column: Any) -> Any:
-        """The project filter: one project, or any project at all (never the system scope)."""
-        return column.is_not(None) if self.project is None else column == self.project.id
+    def where(self, column: Any, *, unassigned: bool = False) -> Any:
+        """The project filter: one project, or any project at all (never the system scope of
+        events without a project). With `unassigned`, the all scope takes data that belongs to
+        no project as well (decision D120: a server admin sees inventory devices and their
+        positions until they are attributed, architecture 28.11)."""
+        if self.project is not None:
+            return column == self.project.id
+        return true() if unassigned else column.is_not(None)
 
 
 async def get_scope_context(

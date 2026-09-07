@@ -116,3 +116,45 @@ async def test_device_layer_lists_assigned_devices(client, db, bus):
     assert (
         await client.get(f"/api/v1/projects/{project.id}/map/devices", headers=stranger.headers)
     ).status_code == 403
+
+
+async def test_all_scope_lists_devices_in_no_project_for_server_admins(client, db, bus):
+    """Decision D120: a device without a project assignment shows in the all scope with its
+    position and no project; a project admin cannot use the scope."""
+    admin, project, entity, source, device, external_id = await _setup(client, db)
+    manager = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    inventory = (
+        await client.post(
+            "/api/v1/devices",
+            json={"device_type_id": device["device_type_id"], "name": unique_name("SP-inv")},
+            headers=admin.headers,
+        )
+    ).json()
+    when = datetime(2026, 5, 1, tzinfo=UTC)
+    db.add(
+        DeviceCurrentState(
+            device_id=inventory["id"],
+            last_seen_at=when,
+            latest_position_time=when,
+            latest_position=func.ST_SetSRID(func.ST_MakePoint(31.7, -24.7), 4326),
+        )
+    )
+    await db.commit()
+    body = (await client.get("/api/v1/projects/all/map/devices", headers=admin.headers)).json()
+    by_id = {f["properties"]["device_id"]: f for f in body["features"]}
+    assert inventory["id"] in by_id
+    assert by_id[inventory["id"]]["properties"]["project_id"] is None
+    assert by_id[inventory["id"]]["geometry"]["coordinates"] == [
+        pytest.approx(31.7),
+        pytest.approx(-24.7),
+    ]
+    assert by_id[device["id"]]["properties"]["project_id"] == str(project.id)
+    # not in a project's own scope
+    own = (
+        await client.get(f"/api/v1/projects/{project.id}/map/devices", headers=admin.headers)
+    ).json()
+    assert inventory["id"] not in {f["properties"]["device_id"] for f in own["features"]}
+    assert (
+        await client.get("/api/v1/projects/all/map/devices", headers=manager.headers)
+    ).status_code == 403
+    assert entity and source and external_id and bus

@@ -25,6 +25,7 @@ From Tim's first hour with v2.0.0 on the dev server.
 
 ### Fixed
 
+- Devices in no project (decision D120): in the all scope the device layer and the Devices tab show them under "Not in a project", with their latest position and their track over the positions that belong to no project; the panel names the gap and links to Server admin, Devices; the all-scope devices list filters by project, "Not in a project" included. A project's own map never shows them.
 - The device layer clusters when zoomed out like the entities: a device cluster is white with a green ring and sits a little down and right of an entity cluster over the same ground, so both stay readable; a single device marker sits beside its animal's marker rather than under it. Clicking a device cluster zooms in.
 - The layers panel starts with every row folded, each tab has a Fold all or Unfold all button, the Devices tab's "Without an entity" and "Tracking an entity" sections fold too, and Hide all on the Entities tab hides every project's layers in the all scope (it left the per-project Ungrouped layers showing).
 - In the layers panel, folding a row folds everything below it (a project's groups, its Ungrouped row and their entities in the all scope; a group's subgroups anywhere); a search still reaches into a folded subtree. In the all scope the Devices tab's project rows fold as well and carry a switch that shows or hides every device of the project, shown as a dash while only some are on.
