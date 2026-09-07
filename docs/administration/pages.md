@@ -16,7 +16,7 @@ A folded section opens for one page with a click without changing the preference
 
 | Page | Shows | With technical details on |
 | --- | --- | --- |
-| Live map | Entities with their health, the layers panel (Entities, Features, Events, Coverage), tracks with the Tracks card and its length settings, recent events | Nothing more |
+| Live map | Entities with their health, the layers panel (Entities, Devices, Features, Events, Coverage), tracks with the Tracks card and its length settings, recent events. The Devices tab is the device layer: every device of the project, off by default, with or without an entity; a device track is dashed | Nothing more |
 | Entities | Name, type, status, group, last seen, the device by name, a map link | Nothing more |
 | Entity page | The entity, the device tracking it with its health, the assignment history | Nothing more |
 | Devices | Name, type, status, serial, entity, group, last seen, health | The driver column |

@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { EntityGroup } from "@/api/types";
 import {
   DEFAULT_LAYERS,
+  hideAllDevices,
   hideAllEntities,
+  isDeviceShown,
+  showDevices,
+  toggleDevice,
   isVisible,
   onlyGroup,
   showEntity,
@@ -138,5 +142,21 @@ describe("layer choices", () => {
     expect(isVisible(rhino, one, groups)).toBe(true);
     expect(one.hidden_entities).toEqual(["calf-in-herd"]);
     expect(isVisible(loose, one, groups)).toBe(false);
+  });
+});
+
+describe("device layer choices", () => {
+  it("shows no device until someone switches it on", () => {
+    expect(isDeviceShown("d1", DEFAULT_LAYERS)).toBe(false);
+    const on = toggleDevice(DEFAULT_LAYERS, "d1", true);
+    expect(isDeviceShown("d1", on)).toBe(true);
+    expect(isDeviceShown("d2", on)).toBe(false); // a device that arrives later stays off
+    expect(isDeviceShown("d1", toggleDevice(on, "d1", false))).toBe(false);
+  });
+
+  it("shows all listed devices and hides them all again", () => {
+    const all = showDevices(toggleDevice(DEFAULT_LAYERS, "d1", true), ["d1", "d2"]);
+    expect(all.shown_devices).toEqual(["d1", "d2"]);
+    expect(hideAllDevices(all).shown_devices).toEqual([]);
   });
 });

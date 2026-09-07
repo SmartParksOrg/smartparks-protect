@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
@@ -129,6 +130,20 @@ export function DevicesPage() {
       id: "health",
       accessorFn: (d) => d.health?.level ?? "",
       cell: ({ row }) => <HealthLine health={row.original.health} />,
+    },
+    {
+      id: "map",
+      header: "",
+      cell: ({ row }) =>
+        row.original.last_seen_at ? (
+          <Link
+            className="inline-flex items-center gap-1 text-xs underline"
+            to={`/projects/${projectId}/map?device=${row.original.id}`}
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <MapPin className="size-3" /> {t("Map")}
+          </Link>
+        ) : null,
     },
   ];
   return (

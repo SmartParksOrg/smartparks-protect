@@ -7789,6 +7789,85 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/map/devices": {
+   "get": {
+    "tags": [
+     "map"
+    ],
+    "summary": "Devices State",
+    "description": "The device layer (decision D111): every device assigned to the project today with its\nlatest position from the device's own current state, whether or not it tracks an entity.\nA device without a position comes back without geometry so the panel can list it; with a\n`bbox` only positioned devices inside it return.",
+    "operationId": "devices_state_api_v1_projects__project_id__map_devices_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "bbox",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "west,south,east,north in WGS84",
+       "title": "Bbox"
+      },
+      "description": "west,south,east,north in WGS84"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 5000,
+       "minimum": 1,
+       "default": 5000,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CurrentStateResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/map/tiles/{z}/{x}/{y}.mvt": {
    "get": {
     "tags": [

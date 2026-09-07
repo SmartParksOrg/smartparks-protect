@@ -17,6 +17,7 @@ export const queryKeys = {
   coverage: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "coverage", params] as const,
   entityAssignments: (projectId: string, params: Record<string, unknown> = {}) => ["projects", projectId, "entity-assignments", params] as const,
   currentState: (projectId: string) => ["projects", projectId, "map", "current"] as const,
+  mapDevices: (projectId: string) => ["projects", projectId, "map", "devices"] as const,
   track: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "track", params] as const,
   positions: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "positions", params] as const,
   traffic: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "traffic", params] as const,

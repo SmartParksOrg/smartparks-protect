@@ -20,6 +20,8 @@ export interface LayerChoices {
   hidden_gateways: string[];
   coverage: boolean;
   coverage_hours: number;
+  /** The device layer (decision D113) is a shown set: every device is off until switched on. */
+  shown_devices: string[];
 }
 
 export const UNGROUPED_LAYER = "ungrouped";
@@ -35,7 +37,36 @@ export const DEFAULT_LAYERS: LayerChoices = {
   hidden_gateways: [],
   coverage: false,
   coverage_hours: 168,
+  shown_devices: [],
 };
+
+export function isDeviceShown(deviceId: string, choices: LayerChoices): boolean {
+  return choices.shown_devices.includes(deviceId);
+}
+
+export function toggleDevice(
+  choices: LayerChoices,
+  deviceId: string,
+  show: boolean,
+): LayerChoices {
+  const rest = choices.shown_devices.filter((id) => id !== deviceId);
+  return { ...choices, shown_devices: show ? [...rest, deviceId] : rest };
+}
+
+/** Every listed device on (the Devices tab's "Show all"); devices that arrive later stay off. */
+export function showDevices(
+  choices: LayerChoices,
+  deviceIds: string[],
+): LayerChoices {
+  return {
+    ...choices,
+    shown_devices: [...new Set([...choices.shown_devices, ...deviceIds])],
+  };
+}
+
+export function hideAllDevices(choices: LayerChoices): LayerChoices {
+  return { ...choices, shown_devices: [] };
+}
 
 export const layerOf = (props: EntityFeatureProperties): string =>
   props.group_id ?? UNGROUPED_LAYER;

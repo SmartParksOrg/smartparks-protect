@@ -12,6 +12,7 @@ import {
 
 export const SOURCES = {
   entities: "entities",
+  devices: "devices",
   track: "track",
   features: "features",
   events: "events",
@@ -42,6 +43,27 @@ export interface EntityFeatureProperties {
   battery_voltage?: number | null;
   last_status_at?: string | null;
   device_last_seen_at?: string | null;
+}
+
+/** A device on the device layer (decision D111): assigned to the project today, with or
+ * without an entity; `project_since` starts the "since assignment" track length. */
+export interface DeviceFeatureProperties {
+  device_id: string;
+  name: string;
+  serial_number: string | null;
+  status: string;
+  device_type: string;
+  icon_key: string;
+  entity_id: string | null;
+  entity_name: string | null;
+  group_id: string | null;
+  project_since: string | null;
+  last_seen_at: string | null;
+  position_time: string | null;
+  health_level?: string | null;
+  battery_voltage?: number | null;
+  last_status_at?: string | null;
+  picture_updated_at?: string | null;
 }
 
 const OFFLINE_AFTER_MS = 24 * 3600_000;
@@ -178,6 +200,99 @@ export async function setEntities(
   source.setData({ type: "FeatureCollection", features: withMarkers });
 }
 
+export function deviceStateFor(
+  props: DeviceFeatureProperties,
+  selectedId: string | null,
+): MarkerState {
+  if (props.device_id === selectedId) return "selected";
+  if (props.health_level === "critical") return "critical";
+  if (
+    props.last_seen_at &&
+    Date.now() - new Date(props.last_seen_at).getTime() > OFFLINE_AFTER_MS
+  )
+    return "offline";
+  return "normal";
+}
+
+/** The device layer (decision D112): square markers under the entities, so a collar and its
+ * animal stay apart. No clustering: the layer is opt-in per device. Add after the entity
+ * layers, which it sits beneath. */
+export function ensureDeviceLayers(map: MapLibreMap): void {
+  if (map.getSource(SOURCES.devices)) return;
+  map.addSource(SOURCES.devices, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+    promoteId: "device_id",
+  });
+  map.addLayer(
+    {
+      id: "device-markers",
+      type: "symbol",
+      source: SOURCES.devices,
+      layout: {
+        "icon-image": ["get", "marker"],
+        "icon-size": 0.75,
+        "icon-allow-overlap": true,
+        "text-field": ["get", "name"],
+        "text-size": 10,
+        "text-font": FONT,
+        "text-offset": [0, 1.6],
+        "text-anchor": "top",
+        "text-optional": true,
+      },
+      paint: {
+        "text-color": "#2F4A3A",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1.2,
+      },
+    },
+    "entity-clusters",
+  );
+  map.on(
+    "mouseenter",
+    "device-markers",
+    () => (map.getCanvas().style.cursor = "pointer"),
+  );
+  map.on("mouseleave", "device-markers", () => (map.getCanvas().style.cursor = ""));
+}
+
+/** Bind the device marker click; the returned function unbinds it. */
+export function bindDeviceClicks(
+  map: MapLibreMap,
+  onClick: (props: DeviceFeatureProperties) => void,
+): () => void {
+  const onMarker = (e: MapLayerMouseEvent) => {
+    const feature = e.features?.[0];
+    if (feature)
+      onClick(feature.properties as unknown as DeviceFeatureProperties);
+  };
+  map.on("click", "device-markers", onMarker);
+  return () => map.off("click", "device-markers", onMarker);
+}
+
+export async function setDevices(
+  map: MapLibreMap,
+  features: GeoJSON.Feature[],
+  selectedId: string | null,
+): Promise<void> {
+  const source = map.getSource(SOURCES.devices) as GeoJSONSource | undefined;
+  if (!source) return;
+  const withMarkers: GeoJSON.Feature[] = [];
+  for (const feature of features) {
+    const props = feature.properties as unknown as DeviceFeatureProperties;
+    const marker = await ensureMarkerImage(
+      map,
+      props.icon_key,
+      deviceStateFor(props, selectedId),
+    );
+    withMarkers.push({
+      ...feature,
+      properties: { ...feature.properties, marker },
+    });
+  }
+  source.setData({ type: "FeatureCollection", features: withMarkers });
+}
+
 const TRACK_COLORS = [
   "#2F4A3A",
   "#b45309",
@@ -207,11 +322,35 @@ export function ensureTrackLayers(map: MapLibreMap): void {
       id: "track-line",
       type: "line",
       source: SOURCES.track,
-      filter: ["==", ["geometry-type"], "LineString"],
+      filter: [
+        "all",
+        ["==", ["geometry-type"], "LineString"],
+        ["!=", ["get", "kind"], "device"],
+      ],
       paint: {
         "line-color": ["coalesce", ["get", "color"], "#2F4A3A"],
         "line-width": 3,
         "line-opacity": 0.85,
+      },
+    },
+    "entity-clusters",
+  );
+  // device tracks are dashed (decision D114), so a collar's path and its animal's stay apart
+  map.addLayer(
+    {
+      id: "track-line-device",
+      type: "line",
+      source: SOURCES.track,
+      filter: [
+        "all",
+        ["==", ["geometry-type"], "LineString"],
+        ["==", ["get", "kind"], "device"],
+      ],
+      paint: {
+        "line-color": ["coalesce", ["get", "color"], "#2F4A3A"],
+        "line-width": 2.5,
+        "line-opacity": 0.85,
+        "line-dasharray": [2, 1.5],
       },
     },
     "entity-clusters",
@@ -234,7 +373,9 @@ export function ensureTrackLayers(map: MapLibreMap): void {
 }
 
 export interface TrackLayer {
+  /** The entity or the device the track belongs to; the colour comes from it. */
   entityId: string;
+  kind?: "entity" | "device";
   geometry: GeoJSON.Geometry;
   times: string[];
 }
@@ -249,7 +390,11 @@ export function setTracks(map: MapLibreMap, tracks: TrackLayer[]): void {
     features.push({
       type: "Feature",
       geometry: track.geometry,
-      properties: { color, entity_id: track.entityId },
+      properties: {
+        color,
+        entity_id: track.entityId,
+        kind: track.kind ?? "entity",
+      },
     });
     const coordinates =
       track.geometry.type === "LineString"

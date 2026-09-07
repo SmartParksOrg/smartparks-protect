@@ -1769,6 +1769,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/map/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Devices State
+         * @description The device layer (decision D111): every device assigned to the project today with its
+         *     latest position from the device's own current state, whether or not it tracks an entity.
+         *     A device without a position comes back without geometry so the panel can list it; with a
+         *     `bbox` only positioned devices inside it return.
+         */
+        get: operations["devices_state_api_v1_projects__project_id__map_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/map/tiles/{z}/{x}/{y}.mvt": {
         parameters: {
             query?: never;
@@ -13895,6 +13918,41 @@ export interface operations {
         };
     };
     current_state_api_v1_projects__project_id__map_current_get: {
+        parameters: {
+            query?: {
+                /** @description west,south,east,north in WGS84 */
+                bbox?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentStateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    devices_state_api_v1_projects__project_id__map_devices_get: {
         parameters: {
             query?: {
                 /** @description west,south,east,north in WGS84 */

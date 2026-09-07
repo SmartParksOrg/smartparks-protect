@@ -20,7 +20,11 @@ import type {
 import { Icon } from "@/components/icons/Icon";
 import {
   DEFAULT_LAYERS,
+  hideAllDevices,
   hideAllEntities,
+  isDeviceShown,
+  showDevices,
+  toggleDevice,
   isGroupShown,
   layerOf,
   onlyGroup,
@@ -36,6 +40,7 @@ import {
   UNGROUPED_LAYER,
 } from "@/components/map/layerChoices";
 import type {
+  DeviceFeatureProperties,
   EntityFeatureProperties,
   EventFeatureProperties,
 } from "@/components/map/layers";
@@ -57,7 +62,7 @@ import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { formatAgo, formatTime } from "@/lib/format";
 
 type Sort = "name" | "recent";
-type Tab = "entities" | "features" | "events" | "coverage";
+type Tab = "entities" | "devices" | "features" | "events" | "coverage";
 
 interface GroupRow {
   id: string;
@@ -140,10 +145,14 @@ export function LayerPanel({
   choices,
   trackedIds,
   trackLabel,
+  devices,
+  trackedDeviceIds,
   onChange,
   onClose,
   onPickEntity,
   onToggleTrack,
+  onPickDevice,
+  onToggleDeviceTrack,
   onPickFeature,
   onPickEvent,
   onPickGateway,
@@ -158,10 +167,15 @@ export function LayerPanel({
   trackedIds: string[];
   /** The current track length, for the tooltip of the track button ("21 days"). */
   trackLabel: string;
+  /** The device layer (decision D113): every device assigned to the project today. */
+  devices: DeviceFeatureProperties[];
+  trackedDeviceIds: string[];
   onChange: (next: LayerChoices) => void;
   onClose: () => void;
   onPickEntity: (entityId: string) => void;
   onToggleTrack: (entityId: string) => void;
+  onPickDevice: (deviceId: string) => void;
+  onToggleDeviceTrack: (deviceId: string) => void;
   onPickFeature: (featureId: string) => void;
   onPickEvent: (eventId: string) => void;
   onPickGateway: (gatewayId: string) => void;
@@ -722,6 +736,159 @@ export function LayerPanel({
   const heardBy = new Map(
     (coverage?.gateways ?? []).map((g) => [g.gateway_id ?? g.external_id, g]),
   );
+  const deviceOrder = (a: DeviceFeatureProperties, b: DeviceFeatureProperties) =>
+    sort === "name"
+      ? a.name.localeCompare(b.name)
+      : (b.last_seen_at ?? "").localeCompare(a.last_seen_at ?? "") ||
+        a.name.localeCompare(b.name);
+  const listedDevices = devices
+    .filter((d) => matches(d.name, term) || matches(d.serial_number ?? "", term))
+    .sort(deviceOrder);
+  const unassignedDevices = listedDevices.filter((d) => !d.entity_id);
+  const trackingDevices = listedDevices.filter((d) => d.entity_id);
+  const shownDevices = devices.filter((d) => isDeviceShown(d.device_id, choices)).length;
+  const deviceRow = (d: DeviceFeatureProperties) => {
+    const on = isDeviceShown(d.device_id, choices);
+    return (
+      <Row key={d.device_id} depth={1}>
+        <Check
+          checked={on}
+          label={d.name}
+          onChange={(v) => onChange(toggleDevice(choices, d.device_id, v))}
+        />
+        <ObjectPicture
+          path={`/api/v1/devices/${d.device_id}/picture`}
+          updatedAt={d.picture_updated_at}
+          name={d.name}
+          size="xs"
+          className={on ? "" : "opacity-60"}
+          fallback={
+            <Icon
+              iconKey={d.icon_key}
+              className={`size-5 shrink-0 ${on ? "text-primary" : "text-muted-foreground"}`}
+            />
+          }
+        />
+        <button
+          type="button"
+          className={`min-w-0 flex-1 truncate text-left ${on ? "" : "text-muted-foreground"}`}
+          title={d.entity_name ? t("Tracks {{name}}", { name: d.entity_name }) : d.name}
+          onClick={() => onPickDevice(d.device_id)}
+        >
+          {d.name}
+          {d.entity_name && (
+            <span className="ml-1 text-[11px] text-muted-foreground">
+              {d.entity_name}
+            </span>
+          )}
+        </button>
+        <span
+          className="shrink-0 text-[11px] text-muted-foreground"
+          title={formatTime(d.last_seen_at)}
+        >
+          {formatAgo(d.last_seen_at, now)}
+        </span>
+        <Button
+          variant={trackedDeviceIds.includes(d.device_id) ? "default" : "ghost"}
+          size="icon"
+          className={`size-7 shrink-0 ${trackedDeviceIds.includes(d.device_id) ? "" : "text-muted-foreground"}`}
+          aria-pressed={trackedDeviceIds.includes(d.device_id)}
+          aria-label={
+            trackedDeviceIds.includes(d.device_id)
+              ? t("Hide the track")
+              : t("Show the track")
+          }
+          title={
+            trackedDeviceIds.includes(d.device_id)
+              ? t("Hide the track")
+              : t("Show the track, {{length}}", { length: trackLabel })
+          }
+          onClick={() => onToggleDeviceTrack(d.device_id)}
+        >
+          <Route className="size-4" />
+        </Button>
+        {d.position_time ? (
+          <Locate label={t("Show on map")} onClick={() => onPickDevice(d.device_id)} />
+        ) : (
+          <span className="size-7 shrink-0" title={t("No position yet")} />
+        )}
+      </Row>
+    );
+  };
+  const devicesTab = (
+    <>
+      <div className="flex items-center gap-1.5 px-1 pb-2">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={t("Search…")}
+          className="h-8"
+          aria-label={t("Search devices")}
+        />
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-8 shrink-0"
+          aria-label={sort === "name" ? t("Sort by last update") : t("Sort by name")}
+          title={sort === "name" ? t("Sort by last update") : t("Sort by name")}
+          onClick={() => setSort(sort === "name" ? "recent" : "name")}
+        >
+          <ArrowDownUp className="size-4" />
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {devices.length === 0 && (
+          <div className="px-2 py-4 text-sm text-muted-foreground">
+            {t("No device is assigned to this project.")}
+          </div>
+        )}
+        {unassignedDevices.length > 0 && (
+          <Row depth={0} header>
+            <span className="min-w-0 flex-1 truncate font-semibold">
+              {t("Without an entity")}
+            </span>
+            <span className="text-xs text-muted-foreground">{unassignedDevices.length}</span>
+          </Row>
+        )}
+        {unassignedDevices.map(deviceRow)}
+        {trackingDevices.length > 0 && (
+          <Row depth={0} header>
+            <span className="min-w-0 flex-1 truncate font-semibold">
+              {t("Tracking an entity")}
+            </span>
+            <span className="text-xs text-muted-foreground">{trackingDevices.length}</span>
+          </Row>
+        )}
+        {trackingDevices.map(deviceRow)}
+      </div>
+      <div className="flex items-center justify-between border-t px-1 pt-2 text-xs text-muted-foreground">
+        <span>
+          {t("{{shown}} of {{total}} shown", { shown: shownDevices, total: devices.length })}
+        </span>
+        <span className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() =>
+              onChange(showDevices(choices, listedDevices.map((d) => d.device_id)))
+            }
+          >
+            {t("Show all")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => onChange(hideAllDevices(choices))}
+          >
+            {t("Hide all")}
+          </Button>
+        </span>
+      </div>
+    </>
+  );
+
   const coverageTab = (
     <>
       <div className="flex items-center gap-1.5 px-1 pb-2">
@@ -929,6 +1096,9 @@ export function LayerPanel({
           <TabsTrigger value="entities" className="flex-1">
             {t("Entities")}
           </TabsTrigger>
+          <TabsTrigger value="devices" className="flex-1">
+            {t("Devices")}
+          </TabsTrigger>
           <TabsTrigger value="features" className="flex-1">
             {t("Features")}
           </TabsTrigger>
@@ -942,6 +1112,7 @@ export function LayerPanel({
       </Tabs>
       <div className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2">
         {tab === "entities" && entitiesTab}
+        {tab === "devices" && devicesTab}
         {tab === "features" && featuresTab}
         {tab === "events" && eventsTab}
         {tab === "coverage" && coverageTab}

@@ -27,6 +27,7 @@ from shared.models import (
     Device,
     DeviceCurrentState,
     DeviceEntityAssignment,
+    DeviceProjectAssignment,
     DeviceType,
     Entity,
     EntityCurrentState,
@@ -222,6 +223,124 @@ async def current_state(
         total=int(total or 0),
         returned=len(features),
         use_tiles=int(total or 0) > TILE_THRESHOLD,
+    )
+
+
+@router.get("/map/devices", response_model=CurrentStateResponse)
+async def devices_state(
+    bbox: str | None = Query(None, description="west,south,east,north in WGS84"),
+    limit: int = Query(MAX_FEATURES, ge=1, le=MAX_FEATURES),
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> CurrentStateResponse:
+    """The device layer (decision D111): every device assigned to the project today with its
+    latest position from the device's own current state, whether or not it tracks an entity.
+    A device without a position comes back without geometry so the panel can list it; with a
+    `bbox` only positioned devices inside it return."""
+    import json
+
+    now = utc_now()
+    assigned = (
+        select(
+            DeviceProjectAssignment.device_id.label("device_id"),
+            func.lower(DeviceProjectAssignment.validity).label("since"),
+        )
+        .where(
+            DeviceProjectAssignment.project_id == context.project.id,
+            DeviceProjectAssignment.validity.op("@>")(now),
+        )
+        .subquery()
+    )
+    total = int(await session.scalar(select(func.count()).select_from(assigned)) or 0)
+    base = (
+        select(
+            Device,
+            DeviceType.key,
+            DeviceType.icon_key,
+            DeviceType.driver_key,
+            DeviceCurrentState,
+            assigned.c.since,
+            func.ST_AsGeoJSON(DeviceCurrentState.latest_position),
+        )
+        .join(assigned, assigned.c.device_id == Device.id)
+        .join(DeviceType, DeviceType.id == Device.device_type_id)
+        .outerjoin(DeviceCurrentState, DeviceCurrentState.device_id == Device.id)
+    )
+    box = _bbox(bbox)
+    if box is not None:
+        base = base.where(
+            DeviceCurrentState.latest_position.is_not(None),
+            func.ST_Intersects(
+                DeviceCurrentState.latest_position, func.ST_MakeEnvelope(*box, 4326)
+            ),
+        )
+    rows = (await session.execute(base.order_by(Device.name).limit(limit))).all()
+    device_ids = [row[0].id for row in rows]
+    tracking: dict[uuid.UUID, tuple[uuid.UUID, str, uuid.UUID | None]] = {}
+    if device_ids:
+        tracking = {
+            device_id: (entity_id, name, group_id)
+            for device_id, entity_id, name, group_id in (
+                await session.execute(
+                    select(
+                        DeviceEntityAssignment.device_id, Entity.id, Entity.name, Entity.group_id
+                    )
+                    .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
+                    .where(
+                        DeviceEntityAssignment.device_id.in_(device_ids),
+                        DeviceEntityAssignment.validity.op("@>")(now),
+                    )
+                )
+            ).all()
+        }
+    features = []
+    for device, type_key, type_icon, driver_key, state, since, geojson in rows:
+        health = None
+        if state is not None:
+            driver = DRIVERS.get(driver_key or "")
+            health = device_health(
+                getattr(driver, "health", None),
+                latest_measurements=state.latest_measurements,
+                latest_state=state.latest_state,
+                latest_state_time=state.latest_state_time,
+                last_seen_at=state.last_seen_at,
+            )
+        entity = tracking.get(device.id)
+        features.append(
+            {
+                "type": "Feature",
+                "id": str(device.id),
+                "geometry": json.loads(geojson) if geojson else None,
+                "properties": {
+                    "device_id": str(device.id),
+                    "name": device.name,
+                    "serial_number": device.serial_number,
+                    "status": device.status,
+                    "device_type": type_key,
+                    "icon_key": type_icon,
+                    "entity_id": str(entity[0]) if entity else None,
+                    "entity_name": entity[1] if entity else None,
+                    "group_id": str(entity[2]) if entity and entity[2] else None,
+                    "project_since": since.isoformat() if since else None,
+                    "last_seen_at": state.last_seen_at.isoformat()
+                    if state and state.last_seen_at
+                    else None,
+                    "position_time": state.latest_position_time.isoformat()
+                    if state and state.latest_position_time
+                    else None,
+                    "health_level": health.level if health else None,
+                    "battery_voltage": state.battery_voltage if state else None,
+                    "last_status_at": health.last_status_at.isoformat()
+                    if health and health.last_status_at
+                    else None,
+                    "picture_updated_at": device.picture_updated_at.isoformat()
+                    if device.picture_updated_at
+                    else None,
+                },
+            }
+        )
+    return CurrentStateResponse(
+        features=features, total=total, returned=len(features), use_tiles=False
     )
 
 

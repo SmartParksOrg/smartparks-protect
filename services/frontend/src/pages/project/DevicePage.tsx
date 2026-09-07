@@ -182,10 +182,14 @@ export function DevicePage() {
                 </a>
               </Button>
             ))}
-            {projectId && currentEntityId && (
+            {projectId && (
               <Button asChild variant="outline" size="sm">
                 <Link
-                  to={`/projects/${projectId}/map?entity=${currentEntityId}`}
+                  to={
+                    currentEntityId
+                      ? `/projects/${projectId}/map?entity=${currentEntityId}`
+                      : `/projects/${projectId}/map?device=${d.id}`
+                  }
                 >
                   <MapPin className="size-4" /> {t("Show on map")}
                 </Link>

@@ -24,9 +24,12 @@ import {
   saveBasemap,
 } from "@/components/map/basemap";
 import {
+  bindDeviceClicks,
   bindEntityClicks,
   bindEventClicks,
+  type DeviceFeatureProperties,
   type EntityFeatureProperties,
+  ensureDeviceLayers,
   ensureEntityLayers,
   ensureEventLayers,
   ensureFeatureLayers,
@@ -35,6 +38,7 @@ import {
   ensureTrackLayers,
   type EventFeatureProperties,
   setCoverage,
+  setDevices,
   setEntities,
   setEvents,
   setFeatures,
@@ -46,6 +50,7 @@ import {
   DEFAULT_LAYERS,
   isEventVisible,
   isFeatureVisible,
+  isDeviceShown,
   isGatewayVisible,
   isVisible,
   type LayerChoices,
@@ -110,6 +115,13 @@ interface CurrentFeature {
   properties: EntityFeatureProperties;
 }
 
+interface DeviceFeature {
+  type: "Feature";
+  id: string;
+  geometry: GeoJSON.Point | null;
+  properties: DeviceFeatureProperties;
+}
+
 /**
  * Live map (architecture 11 and 13). Entities come from the current-state endpoint (bounded),
  * updates arrive over the WebSocket, a selected entity shows its panel and optional track. The
@@ -121,6 +133,7 @@ export function MapPage() {
   const [params, setParams] = useSearchParams();
   const now = useNow();
   const selectedId = params.get("entity");
+  const selectedDeviceId = params.get("device");
   // one track length for every track: the URL has it, the last choice is the default (D109)
   const [preferredLength, setPreferredLength] = usePreference<TrackLength>(
     "track_length",
@@ -133,6 +146,10 @@ export function MapPage() {
   const [trackSettingsOpen, setTrackSettingsOpen] = useState(false);
   const trackedIds = useMemo(
     () => (params.get("tracks") ?? "").split(",").filter(Boolean),
+    [params],
+  );
+  const trackedDeviceIds = useMemo(
+    () => (params.get("device_tracks") ?? "").split(",").filter(Boolean),
     [params],
   );
   const [basemap, setBasemap] = useState<BasemapKey>(loadBasemap);
@@ -152,6 +169,15 @@ export function MapPage() {
   });
   const currentFeatures = current.data?.features as unknown as
     CurrentFeature[] | undefined;
+  // the device layer (decision D111): every device of the project, drawn when switched on
+  const devices = useQuery({
+    queryKey: queryKeys.mapDevices(projectId),
+    queryFn: () =>
+      api.get<CurrentState>(`/api/v1/projects/${projectId}/map/devices`),
+    refetchInterval: 60_000,
+  });
+  const deviceFeatures = devices.data?.features as unknown as
+    DeviceFeature[] | undefined;
   const groups = useGroups(projectId);
   const [allLayers, setAllLayers] = usePreference<
     Record<string, Partial<LayerChoices>>
@@ -263,10 +289,33 @@ export function MapPage() {
         }),
     })),
   });
-  const trackPoints = tracks.reduce(
-    (n, q) => n + (q.data?.returned_points ?? 0),
-    0,
+  const projectSince = useCallback(
+    (deviceId: string) =>
+      deviceFeatures?.find((f) => f.properties.device_id === deviceId)
+        ?.properties.project_since ?? null,
+    [deviceFeatures],
   );
+  const deviceTracks = useQueries({
+    queries: trackedDeviceIds.map((deviceId) => ({
+      queryKey: queryKeys.track(projectId, {
+        device_id: deviceId,
+        length: trackLengthParam(trackLength),
+        since: trackLength === "assigned" ? projectSince(deviceId) : null,
+        max_points: 5000,
+      }),
+      queryFn: () =>
+        api.get<Track>(`/api/v1/projects/${projectId}/tracks`, {
+          query: {
+            device_id: deviceId,
+            max_points: 5000,
+            from: trackFrom(trackLength, projectSince(deviceId), fallbackHours),
+          },
+        }),
+    })),
+  });
+  const trackPoints =
+    tracks.reduce((n, q) => n + (q.data?.returned_points ?? 0), 0) +
+    deviceTracks.reduce((n, q) => n + (q.data?.returned_points ?? 0), 0);
   const selectedTrack = selectedId
     ? tracks[trackedIds.indexOf(selectedId)]?.data
     : undefined;
@@ -276,6 +325,19 @@ export function MapPage() {
         (p) => {
           if (ids.length > 0) p.set("tracks", ids.join(","));
           else p.delete("tracks");
+          if (length) p.set("track", trackLengthParam(length));
+          return p;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const setTrackedDevices = useCallback(
+    (ids: string[], length?: TrackLength) =>
+      setParams(
+        (p) => {
+          if (ids.length > 0) p.set("device_tracks", ids.join(","));
+          else p.delete("device_tracks");
           if (length) p.set("track", trackLengthParam(length));
           return p;
         },
@@ -303,6 +365,20 @@ export function MapPage() {
         (p) => {
           if (id) p.set("entity", id);
           else p.delete("entity");
+          p.delete("device");
+          return p;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const selectDevice = useCallback(
+    (id: string | null) =>
+      setParams(
+        (p) => {
+          if (id) p.set("device", id);
+          else p.delete("device");
+          p.delete("entity");
           return p;
         },
         { replace: true },
@@ -347,9 +423,43 @@ export function MapPage() {
           };
         },
       );
+      const deviceId = message.device_id as string | null;
+      if (deviceId)
+        client.setQueryData<CurrentState>(
+          queryKeys.mapDevices(projectId),
+          (old) => {
+            if (!old) return old;
+            const time = message.time as string;
+            const features = (old.features as unknown as DeviceFeature[]).map(
+              (f) =>
+                f.properties.device_id === deviceId
+                  ? {
+                      ...f,
+                      geometry: {
+                        type: "Point" as const,
+                        coordinates: [
+                          message.longitude as number,
+                          message.latitude as number,
+                        ],
+                      },
+                      properties: {
+                        ...f.properties,
+                        last_seen_at: time,
+                        position_time: time,
+                      },
+                    }
+                  : f,
+            );
+            return {
+              ...old,
+              features: features as unknown as CurrentState["features"],
+            };
+          },
+        );
       if (
-        typeof message.entity_id === "string" &&
-        trackedIds.includes(message.entity_id)
+        (typeof message.entity_id === "string" &&
+          trackedIds.includes(message.entity_id)) ||
+        (deviceId && trackedDeviceIds.includes(deviceId))
       )
         void client.invalidateQueries({
           queryKey: ["projects", projectId, "track"],
@@ -373,6 +483,7 @@ export function MapPage() {
     const map = mapRef.current;
     if (!map || !ready) return;
     ensureEntityLayers(map);
+    ensureDeviceLayers(map);
     ensureFeatureLayers(map);
     ensureGatewayLayers(map);
     ensureCoverageLayers(map);
@@ -398,6 +509,9 @@ export function MapPage() {
           .then((zoom) => map.easeTo({ center: lngLat, zoom }));
       },
     );
+    const unbindDevices = bindDeviceClicks(map, (props) =>
+      selectDevice(props.device_id),
+    );
     const unbindEvents = bindEventClicks(map, (props) =>
       setParams(
         (p) => {
@@ -409,9 +523,10 @@ export function MapPage() {
     );
     return () => {
       unbindEntities();
+      unbindDevices();
       unbindEvents();
     };
-  }, [mapRef, ready, select, setParams]);
+  }, [mapRef, ready, select, selectDevice, setParams]);
 
   // the viewport for the coverage query, settled a moment after the map stops moving
   useEffect(() => {
@@ -537,31 +652,71 @@ export function MapPage() {
     );
   }, [mapRef, ready, features.data, layers]);
 
-  const trackData = tracks.map((q) => q.data);
+  const visibleDevices = useMemo(
+    () =>
+      (deviceFeatures ?? []).filter(
+        (f) =>
+          f.geometry &&
+          (isDeviceShown(f.properties.device_id, layers) ||
+            f.properties.device_id === selectedDeviceId),
+      ),
+    [deviceFeatures, layers, selectedDeviceId],
+  );
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    setTracks(
+    void setDevices(
       map,
-      trackedIds.flatMap((entityId, i) => {
+      visibleDevices as unknown as GeoJSON.Feature[],
+      selectedDeviceId,
+    );
+  }, [mapRef, ready, visibleDevices, selectedDeviceId]);
+
+  const trackData = tracks.map((q) => q.data);
+  const deviceTrackData = deviceTracks.map((q) => q.data);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setTracks(map, [
+      ...trackedIds.flatMap((entityId, i) => {
         const data = trackData[i];
         return data
           ? [
               {
                 entityId,
+                kind: "entity" as const,
                 geometry: data.geometry as unknown as GeoJSON.Geometry,
                 times: data.times,
               },
             ]
           : [];
       }),
-    );
+      ...trackedDeviceIds.flatMap((deviceId, i) => {
+        const data = deviceTrackData[i];
+        return data
+          ? [
+              {
+                entityId: deviceId,
+                kind: "device" as const,
+                geometry: data.geometry as unknown as GeoJSON.Geometry,
+                times: data.times,
+              },
+            ]
+          : [];
+      }),
+    ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapRef, ready, trackedIds, ...trackData]);
+  }, [mapRef, ready, trackedIds, trackedDeviceIds, ...trackData, ...deviceTrackData]);
 
   const selected = currentFeatures?.find(
     (f) => f.properties.entity_id === selectedId,
   )?.properties;
+  const selectedDevice = deviceFeatures?.find(
+    (f) => f.properties.device_id === selectedDeviceId,
+  );
+  const selectedDeviceTrack = selectedDeviceId
+    ? deviceTracks[trackedDeviceIds.indexOf(selectedDeviceId)]?.data
+    : undefined;
 
   // on a phone the selection panel covers the lower part of the map: bring the selected
   // entity into the free part once, when it is selected or first known
@@ -569,19 +724,31 @@ export function MapPage() {
   const pannedFor = useRef<string | null>(null);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !selectedId || !phone) return;
-    if (pannedFor.current === selectedId) return;
-    const feature = currentFeatures?.find(
-      (f) => f.properties.entity_id === selectedId,
-    );
-    if (!feature) return;
-    pannedFor.current = selectedId;
+    const key =
+      selectedId ?? (selectedDeviceId ? `device:${selectedDeviceId}` : null);
+    if (!map || !ready || !key || !phone) return;
+    if (pannedFor.current === key) return;
+    const point = selectedId
+      ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)
+          ?.geometry
+      : deviceFeatures?.find((f) => f.properties.device_id === selectedDeviceId)
+          ?.geometry;
+    if (!point) return;
+    pannedFor.current = key;
     map.easeTo({
-      center: feature.geometry.coordinates as [number, number],
+      center: point.coordinates as [number, number],
       offset: [0, -Math.round(map.getContainer().clientHeight * 0.2)],
       duration: 400,
     });
-  }, [mapRef, ready, selectedId, phone, currentFeatures]);
+  }, [
+    mapRef,
+    ready,
+    selectedId,
+    selectedDeviceId,
+    phone,
+    currentFeatures,
+    deviceFeatures,
+  ]);
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -633,6 +800,9 @@ export function MapPage() {
                 : ""}
               {current.data.total} {t("entities")}
               {current.data.use_tiles ? ", tiles" : ""}
+              {visibleDevices.length > 0
+                ? `, ${t("{{count}} devices", { count: visibleDevices.length })}`
+                : ""}
             </Badge>
           )}
           {events.data && events.data.features.length > 0 && (
@@ -646,21 +816,28 @@ export function MapPage() {
               {events.data.features.length} {t("events, 24 h")}
             </Badge>
           )}
-          {trackedIds.length > 0 && (
+          {trackedIds.length + trackedDeviceIds.length > 0 && (
             <TracksCard
-              count={trackedIds.length}
+              count={trackedIds.length + trackedDeviceIds.length}
               points={trackPoints}
               length={trackLength}
               settingsOpen={trackSettingsOpen}
               onToggleSettings={() => setTrackSettingsOpen((o) => !o)}
               onClear={() => {
-                setTracked([]);
+                setParams(
+                  (p) => {
+                    p.delete("tracks");
+                    p.delete("device_tracks");
+                    return p;
+                  },
+                  { replace: true },
+                );
                 setTrackSettingsOpen(false);
               }}
             />
           )}
         </div>
-        {trackSettingsOpen && trackedIds.length > 0 && (
+        {trackSettingsOpen && trackedIds.length + trackedDeviceIds.length > 0 && (
           <TrackSettingsPanel
             length={trackLength}
             onChange={setTrackLength}
@@ -681,6 +858,25 @@ export function MapPage() {
           choices={layers}
           trackedIds={trackedIds}
           trackLabel={trackLengthLabel}
+          devices={(deviceFeatures ?? []).map((f) => f.properties)}
+          trackedDeviceIds={trackedDeviceIds}
+          onPickDevice={(id) => {
+            selectDevice(id);
+            const f = deviceFeatures?.find((x) => x.properties.device_id === id);
+            if (f?.geometry && mapRef.current)
+              mapRef.current.easeTo({
+                center: f.geometry.coordinates as [number, number],
+                zoom: Math.max(mapRef.current.getZoom(), 12),
+              });
+          }}
+          onToggleDeviceTrack={(id) =>
+            setTrackedDevices(
+              trackedDeviceIds.includes(id)
+                ? trackedDeviceIds.filter((x) => x !== id)
+                : [...trackedDeviceIds, id],
+              trackLength,
+            )
+          }
           onChange={setLayers}
           onClose={() => setPanelOpen(false)}
           onToggleTrack={(id) =>
@@ -853,6 +1049,134 @@ export function MapPage() {
                 {t("{{returned}} of {{total}} points", {
                   returned: selectedTrack.returned_points,
                   total: selectedTrack.total_points,
+                })}
+              </span>
+            )}
+          </div>
+        </aside>
+      )}
+      {!selected && selectedDevice && (
+        <aside
+          className={`absolute bottom-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80 ${panelOpen ? "left-[23rem]" : "left-3"}`}
+        >
+          <div className="flex items-start gap-2">
+            <ObjectPicture
+              path={`/api/v1/devices/${selectedDevice.properties.device_id}/picture`}
+              updatedAt={selectedDevice.properties.picture_updated_at}
+              name={selectedDevice.properties.name}
+              size="md"
+              fallback={
+                <Icon
+                  iconKey={selectedDevice.properties.icon_key}
+                  className="size-7 text-primary"
+                />
+              }
+            />
+            <div className="min-w-0 flex-1">
+              <Link
+                className="block truncate font-semibold underline-offset-2 hover:underline"
+                to={`/projects/${projectId}/devices/${selectedDevice.properties.device_id}`}
+              >
+                {selectedDevice.properties.name}
+              </Link>
+              <div className="text-xs text-muted-foreground">
+                {selectedDevice.properties.device_type}
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("Close")}
+              onClick={() => selectDevice(null)}
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
+          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">{t("Last seen")}</dt>
+            <dd title={formatTime(selectedDevice.properties.last_seen_at)}>
+              {formatAgo(selectedDevice.properties.last_seen_at, now)}
+            </dd>
+            <dt className="text-muted-foreground">{t("Position")}</dt>
+            <dd>
+              {selectedDevice.properties.position_time
+                ? formatTime(selectedDevice.properties.position_time)
+                : t("none yet")}
+            </dd>
+            {selectedDevice.properties.battery_voltage != null && (
+              <>
+                <dt className="text-muted-foreground">{t("Battery")}</dt>
+                <dd
+                  className={
+                    selectedDevice.properties.health_level === "critical"
+                      ? "text-destructive"
+                      : selectedDevice.properties.health_level === "warn"
+                        ? "text-brand-sand"
+                        : ""
+                  }
+                >
+                  {selectedDevice.properties.battery_voltage.toFixed(2)} V
+                </dd>
+              </>
+            )}
+            {selectedDevice.properties.last_status_at && (
+              <>
+                <dt className="text-muted-foreground">{t("Last status")}</dt>
+                <dd title={formatTime(selectedDevice.properties.last_status_at)}>
+                  {formatAgo(selectedDevice.properties.last_status_at, now)}
+                </dd>
+              </>
+            )}
+            <dt className="text-muted-foreground">{t("Entity")}</dt>
+            <dd>
+              {selectedDevice.properties.entity_id ? (
+                <Link
+                  className="underline"
+                  to={`/projects/${projectId}/entities/${selectedDevice.properties.entity_id}`}
+                >
+                  {selectedDevice.properties.entity_name}
+                </Link>
+              ) : (
+                t("none")
+              )}
+            </dd>
+          </dl>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button
+              variant={
+                trackedDeviceIds.includes(selectedDevice.properties.device_id)
+                  ? "default"
+                  : "outline"
+              }
+              size="sm"
+              className="h-8"
+              aria-pressed={trackedDeviceIds.includes(selectedDevice.properties.device_id)}
+              title={t("Show the track, {{length}}", { length: trackLengthLabel })}
+              onClick={() =>
+                setTrackedDevices(
+                  trackedDeviceIds.includes(selectedDevice.properties.device_id)
+                    ? trackedDeviceIds.filter(
+                        (x) => x !== selectedDevice.properties.device_id,
+                      )
+                    : [
+                        ...new Set([
+                          ...trackedDeviceIds,
+                          selectedDevice.properties.device_id,
+                        ]),
+                      ],
+                  trackLength,
+                )
+              }
+            >
+              {trackedDeviceIds.includes(selectedDevice.properties.device_id)
+                ? t("Hide the track")
+                : t("Show the track")}
+            </Button>
+            {selectedDeviceTrack && (
+              <span className="text-xs text-muted-foreground">
+                {t("{{returned}} of {{total}} points", {
+                  returned: selectedDeviceTrack.returned_points,
+                  total: selectedDeviceTrack.total_points,
                 })}
               </span>
             )}
