@@ -64,6 +64,14 @@ export function showDevices(
   };
 }
 
+/** These devices off (a project row's switch in the all scope); the rest stay as they are. */
+export function hideDevices(choices: LayerChoices, deviceIds: string[]): LayerChoices {
+  return {
+    ...choices,
+    shown_devices: choices.shown_devices.filter((id) => !deviceIds.includes(id)),
+  };
+}
+
 export function hideAllDevices(choices: LayerChoices): LayerChoices {
   return { ...choices, shown_devices: [] };
 }

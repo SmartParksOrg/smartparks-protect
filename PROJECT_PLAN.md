@@ -1203,3 +1203,7 @@ Listed by the phase where they are first needed.
 
 - The clock work committed as 03c5bf8 and 3c587cc on Tim's word, deployed. On the dev server the curation job shifted SP051479's 99 positions by 1459 days (previewed 99, applied 99; no measurements carried the wrong time), after which two gaps showed and were fixed: the Clocks ahead counter and the device span read the original time column and still counted the curated rows (now the effective time, with the chunk exclusion kept), and the curation recompute left the device's last seen in 2030 (it now follows the effective times too; a one-off recompute on the server brought SP051479 to 2026-09-07 12:59). The Clocks ahead list is empty; the decoder rule itself waits for the collar's next uplink, which lands invalid with the reason on its trace and returns the device to the list until curated.
 - Part B's boxes ticked; phase 16 is complete. Next: v2.1.0 on Tim's word.
+
+### 2026-09-07, folds and project switches in the layers panel (Claude)
+
+- Tim found that folding a project row in the all scope left its Ungrouped row and entities standing, and that the Devices tab's project rows had no switch and no fold. Rows now carry their ancestors (`parents`) and a folded ancestor hides the whole subtree, for projects and for groups alike, unless a search reaches into it; the device project rows got a fold and a checkbox over every device of the project (`hideDevices` next to `showDevices`, an indeterminate state while some are on). Checked on the local build against the dev API.

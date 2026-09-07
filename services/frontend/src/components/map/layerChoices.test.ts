@@ -4,6 +4,7 @@ import type { EntityGroup } from "@/api/types";
 import {
   DEFAULT_LAYERS,
   hideAllDevices,
+  hideDevices,
   hideAllEntities,
   isDeviceShown,
   isGroupShown,
@@ -162,6 +163,7 @@ describe("device layer choices", () => {
     const all = showDevices(toggleDevice(DEFAULT_LAYERS, "d1", true), ["d1", "d2"]);
     expect(all.shown_devices).toEqual(["d1", "d2"]);
     expect(hideAllDevices(all).shown_devices).toEqual([]);
+    expect(hideDevices(all, ["d1"]).shown_devices).toEqual(["d2"]); // a project's devices off, the rest stay
   });
 });
 

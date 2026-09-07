@@ -9,7 +9,7 @@ import {
   Route,
   X,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   CoverageResponse,
@@ -22,6 +22,7 @@ import {
   DEFAULT_LAYERS,
   hideAllDevices,
   hideAllEntities,
+  hideDevices,
   isDeviceShown,
   isGroupShown,
   layerOf,
@@ -57,7 +58,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { groupTree } from "@/hooks/useGroups";
+import { ancestorIds, groupTree } from "@/hooks/useGroups";
 import { useParams } from "react-router";
 
 import { useNow } from "@/hooks/useNow";
@@ -74,6 +75,9 @@ interface GroupRow {
   color: string | null;
   /** A project row of the all scope: no "only", its groups below it. */
   project?: boolean;
+  /** The rows above this one (groups, and the project in the all scope): folding any of them
+   * hides this row. */
+  parents: string[];
   members: EntityFeatureProperties[];
   total: number;
 }
@@ -102,17 +106,25 @@ function Row({
 
 function Check({
   checked,
+  indeterminate = false,
   disabled,
   label,
   onChange,
 }: {
   checked: boolean;
+  /** Some of the rows below are on: shown as a dash, a click switches all of them on. */
+  indeterminate?: boolean;
   disabled?: boolean;
   label: string;
   onChange: (on: boolean) => void;
 }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate && !checked;
+  }, [indeterminate, checked]);
   return (
     <input
+      ref={ref}
       type="checkbox"
       className="size-4 shrink-0 accent-primary"
       checked={checked}
@@ -216,8 +228,10 @@ export function LayerPanel({
       scopeGroups: EntityGroup[] | undefined,
       depthOffset: number,
       ungroupedId: string,
+      parent: string | null,
     ): GroupRow[] => {
       const tree = groupTree(scopeGroups);
+      const above = parent ? [parent] : [];
       const out: GroupRow[] = tree.map(({ group, depth }) => {
         const members = [...(byLayer.get(group.id) ?? [])].sort(order);
         const total = groupTree(scopeGroups, group.id, 1).reduce(
@@ -229,6 +243,7 @@ export function LayerPanel({
           name: group.name,
           depth: depth + depthOffset,
           color: group.color ?? null,
+          parents: [...above, ...ancestorIds(scopeGroups, group.id)],
           members,
           total,
         };
@@ -240,17 +255,18 @@ export function LayerPanel({
           name: t("Ungrouped"),
           depth: depthOffset,
           color: null,
+          parents: above,
           members: loose,
           total: loose.length,
         });
       return out;
     };
-    if (!projects) return rowsOf(groups, 0, UNGROUPED_LAYER);
+    if (!projects) return rowsOf(groups, 0, UNGROUPED_LAYER, null);
     // the all scope: every project as the top level (decision D117), busiest first by count
     const out: GroupRow[] = [];
     for (const project of [...projects].sort((a, b) => a.name.localeCompare(b.name))) {
       const own = (groups ?? []).filter((g) => g.project_id === project.id);
-      const below = rowsOf(own, 1, ungroupedLayerOf(project.id));
+      const below = rowsOf(own, 1, ungroupedLayerOf(project.id), projectLayerOf(project.id));
       const total = entities.filter((e) => e.project_id === project.id).length;
       if (total === 0 && below.length === 0) continue;
       out.push({
@@ -259,6 +275,7 @@ export function LayerPanel({
         depth: 0,
         color: null,
         project: true,
+        parents: [],
         members: [],
         total,
       });
@@ -424,6 +441,8 @@ export function LayerPanel({
                 return null;
               const shown = isGroupShown(row.id, choices, groups);
               const open = !collapsed.has(row.id) || Boolean(term);
+              // folded above: the whole subtree goes, unless a search reaches into it
+              if (!term && row.parents.some((p) => collapsed.has(p))) return null;
               return (
                 <div key={row.id}>
                   <Row depth={row.depth} header>
@@ -910,19 +929,49 @@ export function LayerPanel({
             {t("No device is assigned to this project.")}
           </div>
         )}
-        {deviceSections.map((section) => (
+        {deviceSections.map((section) => {
+          const all = [...section.unassigned, ...section.tracking];
+          const ids = all.map((d) => d.device_id);
+          const onCount = ids.filter((id) => isDeviceShown(id, choices)).length;
+          const foldKey = `dev:${section.key}`;
+          const open = !collapsed.has(foldKey) || Boolean(term);
+          return (
           <div key={section.key}>
             {section.name && (
               <Row depth={0} header>
-                <span className="min-w-0 flex-1 truncate font-semibold">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 shrink-0"
+                  aria-label={open ? t("Collapse") : t("Expand")}
+                  onClick={() => flip(foldKey)}
+                >
+                  {open ? (
+                    <ChevronDown className="size-4" />
+                  ) : (
+                    <ChevronRight className="size-4" />
+                  )}
+                </Button>
+                <Check
+                  checked={ids.length > 0 && onCount === ids.length}
+                  indeterminate={onCount > 0 && onCount < ids.length}
+                  label={section.name}
+                  onChange={(v) =>
+                    onChange(v ? showDevices(choices, ids) : hideDevices(choices, ids))
+                  }
+                />
+                <span
+                  className={`min-w-0 flex-1 truncate font-semibold ${onCount > 0 ? "" : "text-muted-foreground"}`}
+                >
                   {section.name}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {section.unassigned.length + section.tracking.length}
+                  {onCount > 0 ? `${onCount} / ` : ""}
+                  {all.length}
                 </span>
               </Row>
             )}
-            {section.unassigned.length > 0 && (
+            {open && section.unassigned.length > 0 && (
               <Row depth={section.name ? 1 : 0} header>
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   {t("Without an entity")}
@@ -932,8 +981,8 @@ export function LayerPanel({
                 </span>
               </Row>
             )}
-            {section.unassigned.map(deviceRow)}
-            {section.tracking.length > 0 && (
+            {open && section.unassigned.map(deviceRow)}
+            {open && section.tracking.length > 0 && (
               <Row depth={section.name ? 1 : 0} header>
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   {t("Tracking an entity")}
@@ -943,9 +992,10 @@ export function LayerPanel({
                 </span>
               </Row>
             )}
-            {section.tracking.map(deviceRow)}
+            {open && section.tracking.map(deviceRow)}
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="flex items-center justify-between border-t px-1 pt-2 text-xs text-muted-foreground">
         <span>
