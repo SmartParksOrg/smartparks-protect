@@ -40,7 +40,10 @@ export const DEFAULT_LAYERS: LayerChoices = {
   shown_devices: [],
 };
 
-export function isDeviceShown(deviceId: string, choices: LayerChoices): boolean {
+export function isDeviceShown(
+  deviceId: string,
+  choices: LayerChoices,
+): boolean {
   return choices.shown_devices.includes(deviceId);
 }
 
@@ -65,10 +68,15 @@ export function showDevices(
 }
 
 /** These devices off (a project row's switch in the all scope); the rest stay as they are. */
-export function hideDevices(choices: LayerChoices, deviceIds: string[]): LayerChoices {
+export function hideDevices(
+  choices: LayerChoices,
+  deviceIds: string[],
+): LayerChoices {
   return {
     ...choices,
-    shown_devices: choices.shown_devices.filter((id) => !deviceIds.includes(id)),
+    shown_devices: choices.shown_devices.filter(
+      (id) => !deviceIds.includes(id),
+    ),
   };
 }
 
@@ -87,7 +95,8 @@ export const layerOf = (
     ? ungroupedLayerOf(props.project_id)
     : UNGROUPED_LAYER);
 
-export const projectLayerOf = (projectId: string): string => `project:${projectId}`;
+export const projectLayerOf = (projectId: string): string =>
+  `project:${projectId}`;
 export const ungroupedLayerOf = (projectId: string): string =>
   `ungrouped:${projectId}`;
 
@@ -111,7 +120,9 @@ export function withProjectShown(
   if (!project) return choices;
   return {
     ...choices,
-    hidden_groups: choices.hidden_groups.filter((g) => g !== projectLayerOf(project)),
+    hidden_groups: choices.hidden_groups.filter(
+      (g) => g !== projectLayerOf(project),
+    ),
   };
 }
 
@@ -239,10 +250,17 @@ export function hideAllEntities(
   projectIds: string[] = [],
 ): LayerChoices {
   // in the all scope the layers are per project: their rows and ungrouped layers go too
-  const perProject = projectIds.flatMap((id) => [projectLayerOf(id), ungroupedLayerOf(id)]);
+  const perProject = projectIds.flatMap((id) => [
+    projectLayerOf(id),
+    ungroupedLayerOf(id),
+  ]);
   return {
     ...choices,
-    hidden_groups: [UNGROUPED_LAYER, ...(groups ?? []).map((g) => g.id), ...perProject],
+    hidden_groups: [
+      UNGROUPED_LAYER,
+      ...(groups ?? []).map((g) => g.id),
+      ...perProject,
+    ],
     hidden_entities: [],
   };
 }
@@ -265,6 +283,37 @@ function onlyThis(
 ): string[] {
   const base = parentWasOn ? hidden : withAll(hidden, siblings);
   return without(base, [id]);
+}
+
+/** Show all and Hide all of a tab: the layer's switch with its hidden lists cleared, or the
+ * switch off; ticking one item under a switched-off layer then shows only that item. */
+export function showAllFeatures(choices: LayerChoices): LayerChoices {
+  return {
+    ...choices,
+    features: true,
+    hidden_feature_types: [],
+    hidden_features: [],
+  };
+}
+
+export function hideAllFeatures(choices: LayerChoices): LayerChoices {
+  return { ...choices, features: false };
+}
+
+export function showAllEvents(choices: LayerChoices): LayerChoices {
+  return { ...choices, events: true, hidden_event_types: [] };
+}
+
+export function hideAllEvents(choices: LayerChoices): LayerChoices {
+  return { ...choices, events: false };
+}
+
+export function showAllGateways(choices: LayerChoices): LayerChoices {
+  return { ...choices, gateways: true, hidden_gateways: [] };
+}
+
+export function hideAllGateways(choices: LayerChoices): LayerChoices {
+  return { ...choices, gateways: false };
 }
 
 export function showGateway(

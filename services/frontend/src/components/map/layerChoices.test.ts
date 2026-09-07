@@ -21,6 +21,12 @@ import {
   UNGROUPED_LAYER,
   ungroupedLayerOf,
   withProjectShown,
+  hideAllEvents,
+  hideAllFeatures,
+  hideAllGateways,
+  showAllEvents,
+  showAllFeatures,
+  showAllGateways,
 } from "@/components/map/layerChoices";
 import type { EntityFeatureProperties } from "@/components/map/layers";
 
@@ -160,35 +166,103 @@ describe("device layer choices", () => {
   });
 
   it("shows all listed devices and hides them all again", () => {
-    const all = showDevices(toggleDevice(DEFAULT_LAYERS, "d1", true), ["d1", "d2"]);
+    const all = showDevices(toggleDevice(DEFAULT_LAYERS, "d1", true), [
+      "d1",
+      "d2",
+    ]);
     expect(all.shown_devices).toEqual(["d1", "d2"]);
     expect(hideAllDevices(all).shown_devices).toEqual([]);
     expect(hideDevices(all, ["d1"]).shown_devices).toEqual(["d2"]); // a project's devices off, the rest stay
   });
 });
 
+describe("show all and hide all on the features, events and coverage tabs", () => {
+  it("clears the hidden lists and switches the layer on, or switches it off", () => {
+    const some = {
+      ...DEFAULT_LAYERS,
+      features: false,
+      hidden_feature_types: ["fence"],
+      hidden_features: ["f1"],
+      hidden_event_types: ["alarm"],
+      gateways: false,
+      hidden_gateways: ["g1"],
+    };
+    const features = showAllFeatures(some);
+    expect([
+      features.features,
+      features.hidden_feature_types,
+      features.hidden_features,
+    ]).toEqual([true, [], []]);
+    expect(hideAllFeatures(features).features).toBe(false);
+    const events = showAllEvents(some);
+    expect([events.events, events.hidden_event_types]).toEqual([true, []]);
+    expect(hideAllEvents(events).events).toBe(false);
+    const gateways = showAllGateways(some);
+    expect([gateways.gateways, gateways.hidden_gateways]).toEqual([true, []]);
+    expect(hideAllGateways(gateways).gateways).toBe(false);
+  });
+
+  it("ticking one gateway after hide all shows only that one", () => {
+    const one = showGateway(hideAllGateways(DEFAULT_LAYERS), "g1", [
+      "g1",
+      "g2",
+      "g3",
+    ]);
+    expect(one.gateways).toBe(true);
+    expect(one.hidden_gateways.sort()).toEqual(["g2", "g3"]);
+  });
+});
+
 describe("the project as a layer (all-projects scope)", () => {
-  const groups = [group("g1"), group("g2")].map((g, i) => ({ ...g, project_id: i === 0 ? "p1" : "p2" }));
+  const groups = [group("g1"), group("g2")].map((g, i) => ({
+    ...g,
+    project_id: i === 0 ? "p1" : "p2",
+  }));
   const entity = (id: string, project_id: string, group_id: string | null) =>
-    ({ entity_id: id, project_id, group_id, name: id } as unknown as Parameters<typeof isVisible>[0]);
+    ({
+      entity_id: id,
+      project_id,
+      group_id,
+      name: id,
+    }) as unknown as Parameters<typeof isVisible>[0];
 
   it("hides every group and the ungrouped layer of a hidden project", () => {
-    const hidden = toggleGroup(DEFAULT_LAYERS, projectLayerOf("p1"), false, groups);
+    const hidden = toggleGroup(
+      DEFAULT_LAYERS,
+      projectLayerOf("p1"),
+      false,
+      groups,
+    );
     expect(isGroupShown("g1", hidden, groups)).toBe(false);
     expect(isGroupShown(ungroupedLayerOf("p1"), hidden, groups)).toBe(false);
     expect(isGroupShown("g2", hidden, groups)).toBe(true);
-    expect(isVisible(entity("e1", "p1", null), hidden, groups, true)).toBe(false);
-    expect(isVisible(entity("e2", "p2", null), hidden, groups, true)).toBe(true);
+    expect(isVisible(entity("e1", "p1", null), hidden, groups, true)).toBe(
+      false,
+    );
+    expect(isVisible(entity("e2", "p2", null), hidden, groups, true)).toBe(
+      true,
+    );
   });
 
   it("showing a group inside a hidden project shows the project again", () => {
-    const hidden = toggleGroup(DEFAULT_LAYERS, projectLayerOf("p1"), false, groups);
-    const shown = withProjectShown(toggleGroup(hidden, "g1", true, groups), "g1", groups);
+    const hidden = toggleGroup(
+      DEFAULT_LAYERS,
+      projectLayerOf("p1"),
+      false,
+      groups,
+    );
+    const shown = withProjectShown(
+      toggleGroup(hidden, "g1", true, groups),
+      "g1",
+      groups,
+    );
     expect(isGroupShown("g1", shown, groups)).toBe(true);
   });
 
   it("keeps the shared ungrouped layer within one project", () => {
-    expect(isVisible(entity("e1", "p1", null), DEFAULT_LAYERS, groups)).toBe(true);
+    expect(isVisible(entity("e1", "p1", null), DEFAULT_LAYERS, groups)).toBe(
+      true,
+    );
   });
 });
 
@@ -197,9 +271,20 @@ describe("hide all in the all scope", () => {
     const groups = [{ ...group("g1"), project_id: "p1" }];
     const hidden = hideAllEntities(DEFAULT_LAYERS, groups, ["p1", "p2"]);
     const entity = (id: string, project_id: string, group_id: string | null) =>
-      ({ entity_id: id, project_id, group_id, name: id } as unknown as Parameters<typeof isVisible>[0]);
-    expect(isVisible(entity("e1", "p1", "g1"), hidden, groups, true)).toBe(false);
-    expect(isVisible(entity("e2", "p1", null), hidden, groups, true)).toBe(false);
-    expect(isVisible(entity("e3", "p2", null), hidden, groups, true)).toBe(false);
+      ({
+        entity_id: id,
+        project_id,
+        group_id,
+        name: id,
+      }) as unknown as Parameters<typeof isVisible>[0];
+    expect(isVisible(entity("e1", "p1", "g1"), hidden, groups, true)).toBe(
+      false,
+    );
+    expect(isVisible(entity("e2", "p1", null), hidden, groups, true)).toBe(
+      false,
+    );
+    expect(isVisible(entity("e3", "p2", null), hidden, groups, true)).toBe(
+      false,
+    );
   });
 });

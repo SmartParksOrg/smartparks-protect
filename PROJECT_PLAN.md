@@ -1218,6 +1218,10 @@ Listed by the phase where they are first needed.
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
 
+### 2026-09-07, layers panel the same on every tab (Claude)
+
+- Tim asked that the layers menu works the same on every tab, fold all and show all included; the Coverage tab's gateways did not fold. One footer now serves every tab (shown of total, Fold all or Unfold all, Show all, Hide all), the Gateways row folds, and `layerChoices` gained show all and hide all helpers for features, events and gateways (tests). Checked on the dev API: Coverage Hide all leaves 0 of 91 shown, Show all brings the 91 back.
+
 ### 2026-09-07, bulk onboarding in the background, receptions linked, switcher on touch (Claude and Tim)
 
 - Tim tested the bulk create and asked whether the user has to wait, whether there is progress, and whether it can run in the background; two decisions taken as recommended (D121): the decoder takes the reprocessing over from one message per identity, and Needs attention shows a Processing card with a progress bar and a toast at the end. Built: `queue_identity_reprocess` and `link_receptions` in `shared.ingest`, the `identity.reprocess_requested` topic, the decoder walker, `queued_source_events` in the summary, the card polling every 3 s while events wait, tests for the API and the decoder.

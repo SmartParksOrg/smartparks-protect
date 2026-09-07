@@ -42,6 +42,13 @@ import {
   UNGROUPED_LAYER,
   ungroupedLayerOf,
   withProjectShown,
+  hideAllEvents,
+  hideAllFeatures,
+  hideAllGateways,
+  showAllEvents,
+  showAllFeatures,
+  showAllGateways,
+  isGatewayVisible,
 } from "@/components/map/layerChoices";
 import type {
   DeviceFeatureProperties,
@@ -265,9 +272,16 @@ export function LayerPanel({
     if (!projects) return rowsOf(groups, 0, UNGROUPED_LAYER, null);
     // the all scope: every project as the top level (decision D117), busiest first by count
     const out: GroupRow[] = [];
-    for (const project of [...projects].sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const project of [...projects].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
       const own = (groups ?? []).filter((g) => g.project_id === project.id);
-      const below = rowsOf(own, 1, ungroupedLayerOf(project.id), projectLayerOf(project.id));
+      const below = rowsOf(
+        own,
+        1,
+        ungroupedLayerOf(project.id),
+        projectLayerOf(project.id),
+      );
       const total = entities.filter((e) => e.project_id === project.id).length;
       if (total === 0 && below.length === 0) continue;
       out.push({
@@ -305,8 +319,9 @@ export function LayerPanel({
         onClick={() =>
           setExpanded((s) => {
             const next = new Set(s);
-            for (const k of keys) if (anyOpen) next.delete(k);
-            else next.add(k);
+            for (const k of keys)
+              if (anyOpen) next.delete(k);
+              else next.add(k);
             return next;
           })
         }
@@ -315,6 +330,37 @@ export function LayerPanel({
       </Button>
     );
   };
+  /** The footer every tab shares: what is shown, fold all, show all, hide all. */
+  const footer = (
+    keys: string[],
+    shown: number,
+    total: number,
+    showAll: () => void,
+    hideAll: () => void,
+  ) => (
+    <div className="flex items-center justify-between border-t px-1 pt-2 text-xs text-muted-foreground">
+      <span>{t("{{shown}} of {{total}} shown", { shown, total })}</span>
+      <span className="flex gap-1">
+        {foldAll(keys)}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={showAll}
+        >
+          {t("Show all")}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={hideAll}
+        >
+          {t("Hide all")}
+        </Button>
+      </span>
+    </div>
+  );
   const shownCount = entities.filter(
     (f) =>
       isGroupShown(layerOf(f, perProject), choices, groups) &&
@@ -465,7 +511,8 @@ export function LayerPanel({
               const shown = isGroupShown(row.id, choices, groups);
               const open = expanded.has(row.id) || Boolean(term);
               // folded above: the whole subtree goes, unless a search reaches into it
-              if (!term && row.parents.some((p) => !expanded.has(p))) return null;
+              if (!term && row.parents.some((p) => !expanded.has(p)))
+                return null;
               return (
                 <div key={row.id}>
                   <Row depth={row.depth} header>
@@ -533,42 +580,23 @@ export function LayerPanel({
               .filter((m) => matches(m.name, term))
               .sort(order)
               .map((m) =>
-                entityRow(m, 0, isGroupShown(layerOf(m, perProject), choices, groups)),
+                entityRow(
+                  m,
+                  0,
+                  isGroupShown(layerOf(m, perProject), choices, groups),
+                ),
               )}
       </div>
-      <div className="flex items-center justify-between border-t px-1 pt-2 text-xs text-muted-foreground">
-        <span>
-          {t("{{shown}} of {{total}} shown", {
-            shown: shownCount,
-            total: entities.length,
-          })}
-        </span>
-        <span className="flex gap-1">
-          {foldAll(rows.map((r) => r.id))}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() =>
-              onChange({ ...choices, hidden_groups: [], hidden_entities: [] })
-            }
-          >
-            {t("Show all")}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() =>
-              onChange(
-                hideAllEntities(choices, groups, projects?.map((p) => p.id) ?? []),
-              )
-            }
-          >
-            {t("Hide all")}
-          </Button>
-        </span>
-      </div>
+      {footer(
+        rows.map((r) => r.id),
+        shownCount,
+        entities.length,
+        () => onChange({ ...choices, hidden_groups: [], hidden_entities: [] }),
+        () =>
+          onChange(
+            hideAllEntities(choices, groups, projects?.map((p) => p.id) ?? []),
+          ),
+      )}
     </>
   );
 
@@ -704,9 +732,18 @@ export function LayerPanel({
           );
         })}
       </div>
-      <div className="flex items-center justify-end border-t px-1 pt-2 text-xs text-muted-foreground">
-        {foldAll(featureTypes.map((type) => `ft:${type}`))}
-      </div>
+      {footer(
+        featureTypes.map((type) => `ft:${type}`),
+        features.filter(
+          (f) =>
+            choices.features &&
+            !choices.hidden_feature_types.includes(f.feature_type) &&
+            !choices.hidden_features.includes(f.id),
+        ).length,
+        features.length,
+        () => onChange(showAllFeatures(choices)),
+        () => onChange(hideAllFeatures(choices)),
+      )}
     </>
   );
 
@@ -825,9 +862,17 @@ export function LayerPanel({
           );
         })}
       </div>
-      <div className="flex items-center justify-end border-t px-1 pt-2 text-xs text-muted-foreground">
-        {foldAll(eventTypes.map((type) => `ev:${type}`))}
-      </div>
+      {footer(
+        eventTypes.map((type) => `ev:${type}`),
+        events.filter(
+          (e) =>
+            choices.events &&
+            !choices.hidden_event_types.includes(e.event_type),
+        ).length,
+        events.length,
+        () => onChange(showAllEvents(choices)),
+        () => onChange(hideAllEvents(choices)),
+      )}
     </>
   );
 
@@ -842,13 +887,18 @@ export function LayerPanel({
   const heardBy = new Map(
     (coverage?.gateways ?? []).map((g) => [g.gateway_id ?? g.external_id, g]),
   );
-  const deviceOrder = (a: DeviceFeatureProperties, b: DeviceFeatureProperties) =>
+  const deviceOrder = (
+    a: DeviceFeatureProperties,
+    b: DeviceFeatureProperties,
+  ) =>
     sort === "name"
       ? a.name.localeCompare(b.name)
       : (b.last_seen_at ?? "").localeCompare(a.last_seen_at ?? "") ||
         a.name.localeCompare(b.name);
   const listedDevices = devices
-    .filter((d) => matches(d.name, term) || matches(d.serial_number ?? "", term))
+    .filter(
+      (d) => matches(d.name, term) || matches(d.serial_number ?? "", term),
+    )
     .sort(deviceOrder);
   const deviceSections = (
     projects
@@ -874,7 +924,9 @@ export function LayerPanel({
     unassigned: sec.devices.filter((d) => !d.entity_id),
     tracking: sec.devices.filter((d) => d.entity_id),
   }));
-  const shownDevices = devices.filter((d) => isDeviceShown(d.device_id, choices)).length;
+  const shownDevices = devices.filter((d) =>
+    isDeviceShown(d.device_id, choices),
+  ).length;
   const deviceRow = (d: DeviceFeatureProperties) => {
     const on = isDeviceShown(d.device_id, choices);
     return (
@@ -900,7 +952,11 @@ export function LayerPanel({
         <button
           type="button"
           className={`min-w-0 flex-1 truncate text-left ${on ? "" : "text-muted-foreground"}`}
-          title={d.entity_name ? t("Tracks {{name}}", { name: d.entity_name }) : d.name}
+          title={
+            d.entity_name
+              ? t("Tracks {{name}}", { name: d.entity_name })
+              : d.name
+          }
           onClick={() => onPickDevice(d.device_id)}
         >
           {d.name}
@@ -936,7 +992,10 @@ export function LayerPanel({
           <Route className="size-4" />
         </Button>
         {d.position_time ? (
-          <Locate label={t("Show on map")} onClick={() => onPickDevice(d.device_id)} />
+          <Locate
+            label={t("Show on map")}
+            onClick={() => onPickDevice(d.device_id)}
+          />
         ) : (
           <span className="size-7 shrink-0" title={t("No position yet")} />
         )}
@@ -957,7 +1016,9 @@ export function LayerPanel({
           variant="outline"
           size="icon"
           className="size-8 shrink-0"
-          aria-label={sort === "name" ? t("Sort by last update") : t("Sort by name")}
+          aria-label={
+            sort === "name" ? t("Sort by last update") : t("Sort by name")
+          }
           title={sort === "name" ? t("Sort by last update") : t("Sort by name")}
           onClick={() => setSort(sort === "name" ? "recent" : "name")}
         >
@@ -994,104 +1055,94 @@ export function LayerPanel({
             </Button>
           );
           return (
-          <div key={section.key}>
-            {section.name && (
-              <Row depth={0} header>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 shrink-0"
-                  aria-label={open ? t("Collapse") : t("Expand")}
-                  onClick={() => flip(foldKey)}
-                >
-                  {open ? (
-                    <ChevronDown className="size-4" />
-                  ) : (
-                    <ChevronRight className="size-4" />
-                  )}
-                </Button>
-                <Check
-                  checked={ids.length > 0 && onCount === ids.length}
-                  indeterminate={onCount > 0 && onCount < ids.length}
-                  label={section.name}
-                  onChange={(v) =>
-                    onChange(v ? showDevices(choices, ids) : hideDevices(choices, ids))
-                  }
-                />
-                <span
-                  className={`min-w-0 flex-1 truncate font-semibold ${onCount > 0 ? "" : "text-muted-foreground"}`}
-                >
-                  {section.name}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {onCount > 0 ? `${onCount} / ` : ""}
-                  {all.length}
-                </span>
-              </Row>
-            )}
-            {open && section.unassigned.length > 0 && (
-              <Row depth={section.name ? 1 : 0} header>
-                {foldButton(`${foldKey}:u`, openU)}
-                <span className="min-w-0 flex-1 truncate font-semibold">
-                  {t("Without an entity")}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {section.unassigned.length}
-                </span>
-              </Row>
-            )}
-            {open && openU && section.unassigned.map(deviceRow)}
-            {open && section.tracking.length > 0 && (
-              <Row depth={section.name ? 1 : 0} header>
-                {foldButton(`${foldKey}:t`, openT)}
-                <span className="min-w-0 flex-1 truncate font-semibold">
-                  {t("Tracking an entity")}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {section.tracking.length}
-                </span>
-              </Row>
-            )}
-            {open && openT && section.tracking.map(deviceRow)}
-          </div>
+            <div key={section.key}>
+              {section.name && (
+                <Row depth={0} header>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 shrink-0"
+                    aria-label={open ? t("Collapse") : t("Expand")}
+                    onClick={() => flip(foldKey)}
+                  >
+                    {open ? (
+                      <ChevronDown className="size-4" />
+                    ) : (
+                      <ChevronRight className="size-4" />
+                    )}
+                  </Button>
+                  <Check
+                    checked={ids.length > 0 && onCount === ids.length}
+                    indeterminate={onCount > 0 && onCount < ids.length}
+                    label={section.name}
+                    onChange={(v) =>
+                      onChange(
+                        v
+                          ? showDevices(choices, ids)
+                          : hideDevices(choices, ids),
+                      )
+                    }
+                  />
+                  <span
+                    className={`min-w-0 flex-1 truncate font-semibold ${onCount > 0 ? "" : "text-muted-foreground"}`}
+                  >
+                    {section.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {onCount > 0 ? `${onCount} / ` : ""}
+                    {all.length}
+                  </span>
+                </Row>
+              )}
+              {open && section.unassigned.length > 0 && (
+                <Row depth={section.name ? 1 : 0} header>
+                  {foldButton(`${foldKey}:u`, openU)}
+                  <span className="min-w-0 flex-1 truncate font-semibold">
+                    {t("Without an entity")}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {section.unassigned.length}
+                  </span>
+                </Row>
+              )}
+              {open && openU && section.unassigned.map(deviceRow)}
+              {open && section.tracking.length > 0 && (
+                <Row depth={section.name ? 1 : 0} header>
+                  {foldButton(`${foldKey}:t`, openT)}
+                  <span className="min-w-0 flex-1 truncate font-semibold">
+                    {t("Tracking an entity")}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {section.tracking.length}
+                  </span>
+                </Row>
+              )}
+              {open && openT && section.tracking.map(deviceRow)}
+            </div>
           );
         })}
       </div>
-      <div className="flex items-center justify-between border-t px-1 pt-2 text-xs text-muted-foreground">
-        <span>
-          {t("{{shown}} of {{total}} shown", { shown: shownDevices, total: devices.length })}
-        </span>
-        <span className="flex gap-1">
-          {foldAll(
-            deviceSections.flatMap((sec) => [
-              `dev:${sec.key}`,
-              `dev:${sec.key}:u`,
-              `dev:${sec.key}:t`,
-            ]),
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() =>
-              onChange(showDevices(choices, listedDevices.map((d) => d.device_id)))
-            }
-          >
-            {t("Show all")}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => onChange(hideAllDevices(choices))}
-          >
-            {t("Hide all")}
-          </Button>
-        </span>
-      </div>
+      {footer(
+        deviceSections.flatMap((sec) => [
+          `dev:${sec.key}`,
+          `dev:${sec.key}:u`,
+          `dev:${sec.key}:t`,
+        ]),
+        shownDevices,
+        devices.length,
+        () =>
+          onChange(
+            showDevices(
+              choices,
+              listedDevices.map((d) => d.device_id),
+            ),
+          ),
+        () => onChange(hideAllDevices(choices)),
+      )}
     </>
   );
 
+  const gatewaysOpen = expanded.has("gw") || Boolean(term);
   const coverageTab = (
     <>
       <div className="flex items-center gap-1.5 px-1 pb-2">
@@ -1167,6 +1218,19 @@ export function LayerPanel({
           </div>
         )}
         <Row depth={0} header>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0"
+            aria-label={gatewaysOpen ? t("Collapse") : t("Expand")}
+            onClick={() => flip("gw")}
+          >
+            {gatewaysOpen ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronRight className="size-4" />
+            )}
+          </Button>
           <Check
             checked={choices.gateways}
             label={t("Gateways")}
@@ -1179,74 +1243,75 @@ export function LayerPanel({
             {placed.length}
           </span>
         </Row>
-        {placed.length === 0 && (
+        {gatewaysOpen && placed.length === 0 && (
           <div className="px-2 py-3 text-xs text-muted-foreground">
             {t("No gateway with a position yet.")}
           </div>
         )}
-        {placed
-          .filter((g) => matches(g.display_name, term))
-          .map((g) => {
-            const on =
-              choices.gateways && !choices.hidden_gateways.includes(g.id);
-            const heard = heardBy.get(g.id);
-            return (
-              <Row key={g.id} depth={1}>
-                <Check
-                  checked={on}
-                  label={g.display_name}
-                  onChange={(v) =>
-                    onChange(
-                      v
-                        ? showGateway(
-                            choices,
-                            g.id,
-                            placed.map((x) => x.id),
-                          )
-                        : {
-                            ...choices,
-                            hidden_gateways: toggleInList(
-                              choices.hidden_gateways,
+        {gatewaysOpen &&
+          placed
+            .filter((g) => matches(g.display_name, term))
+            .map((g) => {
+              const on =
+                choices.gateways && !choices.hidden_gateways.includes(g.id);
+              const heard = heardBy.get(g.id);
+              return (
+                <Row key={g.id} depth={1}>
+                  <Check
+                    checked={on}
+                    label={g.display_name}
+                    onChange={(v) =>
+                      onChange(
+                        v
+                          ? showGateway(
+                              choices,
                               g.id,
-                              false,
-                            ),
-                          },
-                    )
-                  }
-                />
-                <RadioTower
-                  className={`size-4 shrink-0 ${on ? "text-primary" : "text-muted-foreground"}`}
-                />
-                <button
-                  type="button"
-                  className={`min-w-0 flex-1 truncate text-left ${on ? "" : "text-muted-foreground"}`}
-                  onClick={() => onPickGateway(g.id)}
-                >
-                  {g.display_name}
-                </button>
-                {choices.coverage && heard ? (
-                  <span
-                    className="shrink-0 text-[11px] text-muted-foreground"
-                    title={t("Heard positions and share")}
+                              placed.map((x) => x.id),
+                            )
+                          : {
+                              ...choices,
+                              hidden_gateways: toggleInList(
+                                choices.hidden_gateways,
+                                g.id,
+                                false,
+                              ),
+                            },
+                      )
+                    }
+                  />
+                  <RadioTower
+                    className={`size-4 shrink-0 ${on ? "text-primary" : "text-muted-foreground"}`}
+                  />
+                  <button
+                    type="button"
+                    className={`min-w-0 flex-1 truncate text-left ${on ? "" : "text-muted-foreground"}`}
+                    onClick={() => onPickGateway(g.id)}
                   >
-                    {heard.heard} · {Math.round(heard.share * 100)}%
-                  </span>
-                ) : (
-                  <span
-                    className="shrink-0 text-[11px] text-muted-foreground"
-                    title={formatTime(g.last_seen_at)}
-                  >
-                    {formatAgo(g.last_seen_at, now)}
-                  </span>
-                )}
-                <Locate
-                  label={t("Show on map")}
-                  onClick={() => onPickGateway(g.id)}
-                />
-              </Row>
-            );
-          })}
-        {gateways.length > placed.length && (
+                    {g.display_name}
+                  </button>
+                  {choices.coverage && heard ? (
+                    <span
+                      className="shrink-0 text-[11px] text-muted-foreground"
+                      title={t("Heard positions and share")}
+                    >
+                      {heard.heard} · {Math.round(heard.share * 100)}%
+                    </span>
+                  ) : (
+                    <span
+                      className="shrink-0 text-[11px] text-muted-foreground"
+                      title={formatTime(g.last_seen_at)}
+                    >
+                      {formatAgo(g.last_seen_at, now)}
+                    </span>
+                  )}
+                  <Locate
+                    label={t("Show on map")}
+                    onClick={() => onPickGateway(g.id)}
+                  />
+                </Row>
+              );
+            })}
+        {gatewaysOpen && gateways.length > placed.length && (
           <div className="px-2 py-2 text-xs text-muted-foreground">
             {t("{{count}} gateways without a position are not on the map.", {
               count: gateways.length - placed.length,
@@ -1254,6 +1319,13 @@ export function LayerPanel({
           </div>
         )}
       </div>
+      {footer(
+        ["gw"],
+        placed.filter((g) => isGatewayVisible(g.id, choices)).length,
+        placed.length,
+        () => onChange(showAllGateways(choices)),
+        () => onChange(hideAllGateways(choices)),
+      )}
     </>
   );
 
