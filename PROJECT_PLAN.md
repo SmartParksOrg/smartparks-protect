@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 16, the device layer on the map and the all-projects scope (decisions D111 to D118, planned 2026-09-07); nothing built yet |
+| Active phase | Phase 16 complete on 2026-09-07 (both parts live on the dev server); v2.1.0 waits for Tim's word |
 | Latest release | v2.0.0 (2026-09-06): phases 10 to 15 and the deployment fixes |
 | Last session | 2026-09-07 |
-| Next item | Phase 16 part B is built and waits for CI and its live check on the dev server (then tick its boxes and release v2.1.0); v2.0.1 with the fixes since v2.0.0 on Tim's word, or fold them into v2.1.0. Open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live verification stages that wait for other accounts |
+| Next item | Release v2.1.0 on Tim's word (phase 16 complete, plus the fixes since v2.0.0); v2.0.1 with the fixes since v2.0.0 on Tim's word, or fold them into v2.1.0. Open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live verification stages that wait for other accounts |
 | Blockers | Live verification: KPN LoRa is live; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
 ## What we are building
@@ -764,14 +764,14 @@ Part A, the device layer (D111 to D114):
 
 Part B, the all-projects scope (D115 to D118):
 
-- [ ] Project context with a scope (D115): `get_project_context` accepts `all` for a server admin and returns a context with `project` None and `project_ids` None (every project); a `ProjectScope` helper gives the filter (`Entity.project_id.in_(...)` or nothing) to the endpoints that support the scope; every other `/projects/{project_id}` endpoint keeps a UUID path parameter and answers 422 for `all`. ADR 0022. The access matrix test learns the `all` id: a server admin gets 200 on the supported reads, a project admin 403, and every unsupported endpoint refuses it.
-- [ ] Endpoints in the scope (D116): `map/current`, `map/tiles`, `map/devices`, `map/events`, `tracks`, `entities` (list), `entity-assignments` (list), `groups` (list), `features` (list), `events`, `alerts`, `gateways`, `coverage`, `traffic`, `search`; reads carry `project_id` and `project_name` (D117), map features too.
-- [ ] WebSocket `ws/projects/all` for server admins (D118): one connection that forwards every project's messages; the message keeps `project_id` so the map patches the right feature.
-- [ ] Frontend scope: `isAllProjects(projectId)`, the switcher lists All projects at the top for server admins, `useProjectRole` answers server-admin for `all`, the sidebar shows only the Monitor and Network sections in the scope, the palette's page list follows, the project settings and admin links are absent.
-- [ ] Layers panel across projects (D117): project as the top level (project, group, entity; project, devices), counts per project, hide a project at once; the entity and device panels and the lists show the project; links inside the scope go to the object's own project page; preferences under the key `all`.
-- [ ] Lists in the scope: entities, devices, alerts, events, gateways, traffic with a Project column (hidden per width like the others) and the project filter where one exists.
-- [ ] Bounds proven (D118): the benchmark parks on the dev server (thousands of entities) put the all scope over the tiles threshold; the map stays interactive, the lists stay capped at 500 with the server search.
-- [ ] Docs: `docs/administration/pages.md` (the all scope per role), `docs/administration/permissions.md`, `DEVELOPERS.md`, ADR 0022, the changelog.
+- [x] (2026-09-07, commit b5b1b51, live on the dev server) Project context with a scope (D115): `get_project_context` accepts `all` for a server admin and returns a context with `project` None and `project_ids` None (every project); a `ProjectScope` helper gives the filter (`Entity.project_id.in_(...)` or nothing) to the endpoints that support the scope; every other `/projects/{project_id}` endpoint keeps a UUID path parameter and answers 422 for `all`. ADR 0022. The access matrix test learns the `all` id: a server admin gets 200 on the supported reads, a project admin 403, and every unsupported endpoint refuses it.
+- [x] Endpoints in the scope (D116): `map/current`, `map/tiles`, `map/devices`, `map/events`, `tracks`, `entities` (list), `entity-assignments` (list), `groups` (list), `features` (list), `events`, `alerts`, `gateways`, `coverage`, `traffic`, `search`; reads carry `project_id` and `project_name` (D117), map features too.
+- [x] WebSocket `ws/projects/all` for server admins (D118): one connection that forwards every project's messages; the message keeps `project_id` so the map patches the right feature.
+- [x] Frontend scope: `isAllProjects(projectId)`, the switcher lists All projects at the top for server admins, `useProjectRole` answers server-admin for `all`, the sidebar shows only the Monitor and Network sections in the scope, the palette's page list follows, the project settings and admin links are absent.
+- [x] Layers panel across projects (D117): project as the top level (project, group, entity; project, devices), counts per project, hide a project at once; the entity and device panels and the lists show the project; links inside the scope go to the object's own project page; preferences under the key `all`.
+- [x] Lists in the scope: entities, devices, alerts, events, gateways, traffic with a Project column (hidden per width like the others) and the project filter where one exists.
+- [x] Bounds proven (D118): the benchmark parks on the dev server (thousands of entities) put the all scope over the tiles threshold; the map stays interactive, the lists stay capped at 500 with the server search.
+- [x] Docs: `docs/administration/pages.md` (the all scope per role), `docs/administration/permissions.md`, `DEVELOPERS.md`, ADR 0022, the changelog.
 
 Release:
 
@@ -1198,3 +1198,8 @@ Listed by the phase where they are first needed.
 
 - Part B committed as b5b1b51 on Tim's word, pushed, dev server updated. Live: every supported read answers with `all` for the operations admin (1004 entities from ten projects on one map, tiles served, devices, alerts, events, groups, gateways, features, traffic, coverage), an unsupported endpoint answers 422 and the frontend sends the page to the map, the WebSocket connects with `all`; the switcher shows All projects, the layers panel nests project, group, entity and hides a park at once, the lists carry a Project column. The project admin's 403 is covered by the access matrix in CI; a live uplink in the scope was not waited for.
 - SP051479's clock: all 99 positions dated 2030, ingested 2026-09-07; the offset measured 1457.7 to 1459.0 days across records, whole days aligning the wall clock, so the clock runs 1459 days ahead. Three decisions asked and taken (D119): keep and mark invalid, one hour tolerance, shift the existing rows by curation. Built: `clock_ahead` in `shared.timeutil` with `CLOCK_AHEAD_TOLERANCE_SECONDS`, the decoder writing such positions and measurements with `valid=False`, counting them on the outcome and the trace step and leaving them out of the current state, `GET /attention/clock-ahead` with the counter and the Clocks ahead tab, `clock_ahead` on the device span with the warning and the way to Curation, the curation offset bound raised to twenty years, "clock ahead" instead of a negative age, unit and decoder tests, docs.
+
+### 2026-09-07, the clock fix live and part B ticked (Claude)
+
+- The clock work committed as 03c5bf8 and 3c587cc on Tim's word, deployed. On the dev server the curation job shifted SP051479's 99 positions by 1459 days (previewed 99, applied 99; no measurements carried the wrong time), after which two gaps showed and were fixed: the Clocks ahead counter and the device span read the original time column and still counted the curated rows (now the effective time, with the chunk exclusion kept), and the curation recompute left the device's last seen in 2030 (it now follows the effective times too; a one-off recompute on the server brought SP051479 to 2026-09-07 12:59). The Clocks ahead list is empty; the decoder rule itself waits for the collar's next uplink, which lands invalid with the reason on its trace and returns the device to the list until curated.
+- Part B's boxes ticked; phase 16 is complete. Next: v2.1.0 on Tim's word.
