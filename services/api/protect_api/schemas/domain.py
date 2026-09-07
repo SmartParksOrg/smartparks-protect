@@ -233,6 +233,9 @@ class DeviceRead(ORMModel):
     )
     entity_id: uuid.UUID | None = Field(default=None, description="The entity it tracks today")
     entity_name: str | None = None
+    project_id: uuid.UUID | None = Field(
+        default=None, description="The project the device is assigned to today, if any"
+    )
     group_id: uuid.UUID | None = Field(
         default=None, description="The group of that entity (decision D98)"
     )

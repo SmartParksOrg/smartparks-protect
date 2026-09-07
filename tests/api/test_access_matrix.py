@@ -11,7 +11,7 @@ import pytest
 from protect_api.main import app
 from shared.enums import Role
 from shared.oauth import READ_SCOPES, mint_access_token
-from tests.api.conftest import create_project, project_actor
+from tests.api.conftest import actor, create_project, project_actor
 
 pytestmark = pytest.mark.asyncio
 
@@ -138,3 +138,55 @@ async def test_an_ai_client_with_read_scopes_can_only_read(client, db):
         if response.status_code != 403:
             leaks.append((method, path, response.status_code))
     assert leaks == []
+
+
+# The reads that work across projects with the reserved id `all` (decision D115), with the
+# query a call needs to be answered rather than refused for its parameters.
+ALL_SCOPE_READS: dict[str, dict[str, str]] = {
+    "/api/v1/projects/{project_id}/map/current": {},
+    "/api/v1/projects/{project_id}/map/tiles/{z}/{x}/{y}.mvt": {},
+    "/api/v1/projects/{project_id}/map/devices": {},
+    "/api/v1/projects/{project_id}/map/events": {},
+    "/api/v1/projects/{project_id}/tracks": {"entity_id": str(uuid.uuid4())},
+    "/api/v1/projects/{project_id}/entities": {},
+    "/api/v1/projects/{project_id}/entity-assignments": {},
+    "/api/v1/projects/{project_id}/features": {},
+    "/api/v1/projects/{project_id}/groups": {},
+    "/api/v1/projects/{project_id}/events": {},
+    "/api/v1/projects/{project_id}/alerts": {},
+    "/api/v1/projects/{project_id}/gateways": {},
+    "/api/v1/projects/{project_id}/connectivity": {},
+    "/api/v1/projects/{project_id}/coverage": {},
+    "/api/v1/projects/{project_id}/traffic": {},
+}
+
+
+def fill_all(path: str) -> str:
+    path = path.replace("{project_id}", "all")
+    path = path.replace("{z}", "0").replace("{x}", "0").replace("{y}", "0")
+    path = UUID_PARAMS.sub(lambda m: str(uuid.uuid4()), path)
+    return re.sub(r"\{[a-z_]+\}", "x", path)
+
+
+async def test_the_all_scope_is_for_server_admins_and_reads_only(client, db):
+    project = await create_project(db)
+    manager = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    admin = await actor(client, db, superuser=True)
+    wrong = []
+    for method, path in operations():
+        if "{project_id}" not in path:
+            continue
+        supported = method == "GET" and path in ALL_SCOPE_READS
+        query = ALL_SCOPE_READS.get(path, {})
+        response = await client.request(method, fill_all(path), params=query, headers=admin.headers)
+        if supported and not is_success(response.status_code):
+            wrong.append(("server admin", method, path, response.status_code))
+        if not supported and response.status_code != 422:
+            wrong.append(("server admin, unsupported", method, path, response.status_code))
+        if supported:
+            refused = await client.request(
+                method, fill_all(path), params=query, headers=manager.headers
+            )
+            if refused.status_code != 403:
+                wrong.append(("project admin", method, path, refused.status_code))
+    assert wrong == []

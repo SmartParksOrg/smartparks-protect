@@ -15,7 +15,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from protect_api.deps import ProjectContext, require_permission
+from protect_api.deps import (
+    ScopeContext,
+    require_scope_permission,
+)
 from protect_api.routers.map import _bbox
 from shared.database import get_session
 from shared.models import Gateway
@@ -68,7 +71,7 @@ async def coverage(
         pattern="^(points|hexagons)$",
         description="Force a mode; without it points from zoom 13 or up to 500 positions",
     ),
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> CoverageResponse:
     """Heard positions of the project in the window and viewport, as points from zoom 13 and
@@ -77,7 +80,7 @@ async def coverage(
     since = until - timedelta(hours=hours)
     box = _bbox(bbox) or (-180.0, -90.0, 180.0, 90.0)
     params: dict[str, Any] = {
-        "project_id": context.project.id,
+        "project_id": context.project_id,
         "since": since,
         "until": until,
         "west": box[0],
@@ -108,7 +111,7 @@ async def coverage(
             FROM positions p
             JOIN gateway_receptions r
               ON r.device_id = p.device_id AND r.source_event_id = p.source_event_id
-            WHERE p.project_id = :project_id
+            WHERE (CAST(:project_id AS uuid) IS NULL OR p.project_id = CAST(:project_id AS uuid))
               AND p.time >= :since AND p.time < :until
               AND p.geom && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
               {gateway_filter}

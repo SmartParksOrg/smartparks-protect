@@ -25,6 +25,8 @@ const FONT = ["Noto Sans Regular"];
 
 export interface EntityFeatureProperties {
   entity_id: string;
+  /** The entity's project; in the all scope (decision D117) it names the project and links. */
+  project_id?: string;
   name: string;
   status: string;
   entity_type: string;
@@ -49,6 +51,7 @@ export interface EntityFeatureProperties {
  * without an entity; `project_since` starts the "since assignment" track length. */
 export interface DeviceFeatureProperties {
   device_id: string;
+  project_id?: string;
   name: string;
   serial_number: string | null;
   status: string;

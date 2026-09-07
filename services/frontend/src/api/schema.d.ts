@@ -5898,6 +5898,11 @@ export interface components {
             /** Entity Name */
             entity_name?: string | null;
             /**
+             * Project Id
+             * @description The project the device is assigned to today, if any
+             */
+            project_id?: string | null;
+            /**
              * Group Id
              * @description The group of that entity (decision D98)
              */
@@ -6064,6 +6069,11 @@ export interface components {
             entity_id?: string | null;
             /** Entity Name */
             entity_name?: string | null;
+            /**
+             * Project Id
+             * @description The project the device is assigned to today, if any
+             */
+            project_id?: string | null;
             /**
              * Group Id
              * @description The group of that entity (decision D98)

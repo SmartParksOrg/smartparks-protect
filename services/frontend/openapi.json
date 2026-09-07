@@ -1661,7 +1661,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -2286,7 +2285,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -2610,7 +2608,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -2926,7 +2923,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      }
@@ -7224,7 +7220,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -7730,7 +7725,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -7809,7 +7803,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -7915,7 +7908,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      }
@@ -7957,7 +7949,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -10032,7 +10023,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -10309,7 +10299,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -10383,7 +10372,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -15239,7 +15227,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -15325,7 +15312,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -15386,7 +15372,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -15606,7 +15591,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      },
@@ -23043,6 +23027,19 @@
       ],
       "title": "Entity Name"
      },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id",
+      "description": "The project the device is assigned to today, if any"
+     },
      "group_id": {
       "anyOf": [
        {
@@ -23516,6 +23513,19 @@
        }
       ],
       "title": "Entity Name"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id",
+      "description": "The project the device is assigned to today, if any"
      },
      "group_id": {
       "anyOf": [

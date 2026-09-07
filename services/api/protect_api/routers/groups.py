@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
 from protect_api.crud import apply_patch, flush_or_409, get_or_404
-from protect_api.deps import ProjectContext, require_permission
+from protect_api.deps import (
+    ProjectContext,
+    ScopeContext,
+    require_permission,
+    require_scope_permission,
+)
 from protect_api.routers.entities import group_and_subgroups
 from protect_api.schemas.domain import EntityGroupCreate, EntityGroupRead, EntityGroupUpdate
 from shared.database import get_session
@@ -56,7 +61,7 @@ def group_read(group: Group, entity_count: int = 0) -> EntityGroupRead:
 
 @router.get("", response_model=list[EntityGroupRead])
 async def list_groups(
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> list[EntityGroupRead]:
     """Every group of the project with the number of entities directly in it, by sort order
@@ -66,7 +71,7 @@ async def list_groups(
         for group_id, count in (
             await session.execute(
                 select(Entity.group_id, func.count())
-                .where(Entity.project_id == context.project.id, Entity.group_id.is_not(None))
+                .where(context.where(Entity.project_id), Entity.group_id.is_not(None))
                 .group_by(Entity.group_id)
             )
         ).all()
@@ -74,7 +79,7 @@ async def list_groups(
     groups = (
         await session.scalars(
             select(Group)
-            .where(Group.project_id == context.project.id)
+            .where(context.where(Group.project_id))
             .order_by(Group.sort_order, Group.name)
         )
     ).all()

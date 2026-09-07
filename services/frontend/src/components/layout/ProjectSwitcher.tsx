@@ -8,6 +8,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useProjects } from "@/hooks/useProjects";
 import { cn } from "@/lib/utils";
+import { ALL_PROJECTS, isAllProjects } from "@/lib/scope";
+import { useAuthStore } from "@/stores/auth";
 import { useProjectStore } from "@/stores/project";
 
 export function ProjectSwitcher() {
@@ -18,13 +20,16 @@ export function ProjectSwitcher() {
   const setLast = useProjectStore((s) => s.setLastProjectId);
   const [open, setOpen] = useState(false);
   const projects = data?.items ?? [];
+  const user = useAuthStore((s) => s.user);
+  const all = isAllProjects(projectId);
   const current = projects.find((p) => p.id === projectId);
+  const label = all ? t("All projects") : (current?.name ?? t("Select a project"));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
-          <span className="truncate">{current?.name ?? "Select a project"}</span>
+          <span className="truncate">{label}</span>
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -34,6 +39,20 @@ export function ProjectSwitcher() {
           <CommandList>
             <CommandEmpty>{t("No project found.")}</CommandEmpty>
             <CommandGroup>
+              {user?.is_superuser && (
+                <CommandItem
+                  value={t("All projects")}
+                  onSelect={() => {
+                    setLast(ALL_PROJECTS);
+                    setOpen(false);
+                    void navigate(`/projects/${ALL_PROJECTS}/map`);
+                  }}
+                >
+                  <Check className={cn("mr-2 size-4", all ? "opacity-100" : "opacity-0")} />
+                  <span className="truncate">{t("All projects")}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{t("server admin")}</span>
+                </CommandItem>
+              )}
               {projects.map((project) => (
                 <CommandItem
                   key={project.id}

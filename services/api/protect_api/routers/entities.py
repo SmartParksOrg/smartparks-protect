@@ -17,7 +17,12 @@ from protect_api.crud import (
     get_or_404,
     range_bounds,
 )
-from protect_api.deps import ProjectContext, require_permission
+from protect_api.deps import (
+    ProjectContext,
+    ScopeContext,
+    require_permission,
+    require_scope_permission,
+)
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
 from protect_api.schemas.domain import (
@@ -116,10 +121,10 @@ async def list_entities(
         None, description="In this group or one of its subgroups (decision D98)"
     ),
     ungrouped: bool = Query(False, description="Only entities in no group"),
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[EntityRead]:
-    statement = select(Entity).where(Entity.project_id == context.project.id)
+    statement = select(Entity).where(context.where(Entity.project_id))
     if entity_type_id is not None:
         statement = statement.where(Entity.entity_type_id == entity_type_id)
     if group_id is not None:
@@ -328,10 +333,10 @@ async def delete_entity(
 async def list_features(
     page: Page = Depends(page),
     feature_type: str | None = None,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[FeatureRead]:
-    statement = select(Feature).where(Feature.project_id == context.project.id)
+    statement = select(Feature).where(context.where(Feature.project_id))
     if feature_type is not None:
         statement = statement.where(Feature.feature_type == feature_type)
     rows, next_cursor = await paginate(session, Feature.id, statement, page)
@@ -436,7 +441,7 @@ async def list_entity_assignments(
     page: Page = Depends(page),
     entity_id: uuid.UUID | None = None,
     device_id: uuid.UUID | None = None,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[EntityAssignmentRead]:
     """The assignments of this project's entities with the device's name,
@@ -444,7 +449,7 @@ async def list_entity_assignments(
     statement = (
         select(DeviceEntityAssignment)
         .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
-        .where(Entity.project_id == context.project.id)
+        .where(context.where(Entity.project_id))
     )
     if entity_id is not None:
         statement = statement.where(DeviceEntityAssignment.entity_id == entity_id)

@@ -18,7 +18,10 @@ from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from protect_api.deps import ProjectContext, require_permission
+from protect_api.deps import (
+    ScopeContext,
+    require_scope_permission,
+)
 from shared.curation.effective import effective_geom, effective_time, in_window, visible
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
@@ -87,7 +90,7 @@ def _bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
 async def current_state(
     bbox: str | None = Query(None, description="west,south,east,north in WGS84"),
     limit: int = Query(MAX_FEATURES, ge=1, le=MAX_FEATURES),
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> CurrentStateResponse:
     base = (
@@ -102,11 +105,12 @@ async def current_state(
             Entity.group_id,
             func.ST_AsGeoJSON(EntityCurrentState.latest_position),
             Entity.picture_updated_at,
+            Entity.project_id,
         )
         .join(Entity, Entity.id == EntityCurrentState.entity_id)
         .join(EntityType, EntityType.id == Entity.entity_type_id)
         .where(
-            EntityCurrentState.project_id == context.project.id,
+            context.where(EntityCurrentState.project_id),
             EntityCurrentState.latest_position.is_not(None),
         )
     )
@@ -114,7 +118,7 @@ async def current_state(
         select(func.count())
         .select_from(EntityCurrentState)
         .where(
-            EntityCurrentState.project_id == context.project.id,
+            context.where(EntityCurrentState.project_id),
             EntityCurrentState.latest_position.is_not(None),
         )
     )
@@ -167,7 +171,7 @@ async def current_state(
     features = []
     for row in rows:
         state, name, entity_status, icon_override, type_key, type_icon, group_key = row[:7]
-        group_id, geojson, picture_updated_at = row[7], row[8], row[9]
+        group_id, geojson, picture_updated_at, entity_project_id = row[7], row[8], row[9], row[10]
         import json
 
         device_state = device_states.get(state.device_id) if state.device_id else None
@@ -189,6 +193,7 @@ async def current_state(
                 "geometry": json.loads(geojson),
                 "properties": {
                     "entity_id": str(state.entity_id),
+                    "project_id": str(entity_project_id),
                     "name": name,
                     "status": entity_status,
                     "entity_type": type_key,
@@ -230,7 +235,7 @@ async def current_state(
 async def devices_state(
     bbox: str | None = Query(None, description="west,south,east,north in WGS84"),
     limit: int = Query(MAX_FEATURES, ge=1, le=MAX_FEATURES),
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> CurrentStateResponse:
     """The device layer (decision D111): every device assigned to the project today with its
@@ -243,10 +248,11 @@ async def devices_state(
     assigned = (
         select(
             DeviceProjectAssignment.device_id.label("device_id"),
+            DeviceProjectAssignment.project_id.label("project_id"),
             func.lower(DeviceProjectAssignment.validity).label("since"),
         )
         .where(
-            DeviceProjectAssignment.project_id == context.project.id,
+            context.where(DeviceProjectAssignment.project_id),
             DeviceProjectAssignment.validity.op("@>")(now),
         )
         .subquery()
@@ -260,6 +266,7 @@ async def devices_state(
             DeviceType.driver_key,
             DeviceCurrentState,
             assigned.c.since,
+            assigned.c.project_id,
             func.ST_AsGeoJSON(DeviceCurrentState.latest_position),
         )
         .join(assigned, assigned.c.device_id == Device.id)
@@ -294,7 +301,7 @@ async def devices_state(
             ).all()
         }
     features = []
-    for device, type_key, type_icon, driver_key, state, since, geojson in rows:
+    for device, type_key, type_icon, driver_key, state, since, device_project_id, geojson in rows:
         health = None
         if state is not None:
             driver = DRIVERS.get(driver_key or "")
@@ -313,6 +320,7 @@ async def devices_state(
                 "geometry": json.loads(geojson) if geojson else None,
                 "properties": {
                     "device_id": str(device.id),
+                    "project_id": str(device_project_id),
                     "name": device.name,
                     "serial_number": device.serial_number,
                     "status": device.status,
@@ -349,7 +357,7 @@ async def current_state_tile(
     z: int,
     x: int,
     y: int,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     """Entity current state as a Mapbox vector tile, layer `entities`."""
@@ -364,6 +372,7 @@ async def current_state_tile(
                    s.entity_id::text AS entity_id, e.name, e.status,
                    et.key AS entity_type, et.group_key AS "group",
                    e.group_id::text AS group_id,
+                   e.project_id::text AS project_id,
                    COALESCE(e.icon_key, et.icon_key) AS icon_key,
                    s.device_id::text AS device_id,
                    to_char(s.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
@@ -373,7 +382,7 @@ async def current_state_tile(
             JOIN entities e ON e.id = s.entity_id
             JOIN entity_types et ON et.id = e.entity_type_id
             CROSS JOIN bounds
-            WHERE s.project_id = :project_id
+            WHERE (CAST(:project_id AS uuid) IS NULL OR s.project_id = CAST(:project_id AS uuid))
               AND s.latest_position IS NOT NULL
               AND ST_Transform(s.latest_position, 3857) && bounds.geom
             LIMIT :limit
@@ -382,7 +391,7 @@ async def current_state_tile(
         """
     )
     tile = await session.scalar(
-        sql, {"z": z, "x": x, "y": y, "project_id": context.project.id, "limit": MAX_FEATURES}
+        sql, {"z": z, "x": x, "y": y, "project_id": context.project_id, "limit": MAX_FEATURES}
     )
     return Response(content=bytes(tile or b""), media_type="application/vnd.mapbox-vector-tile")
 
@@ -394,7 +403,7 @@ async def track(
     time_from: datetime | None = Query(None, alias="from"),
     time_to: datetime | None = Query(None, alias="to"),
     max_points: int = Query(DEFAULT_TRACK_POINTS, ge=2, le=MAX_TRACK_POINTS),
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> TrackResponse:
     """Track of one entity or device attributed to the project. Longer periods are decimated so
@@ -406,7 +415,7 @@ async def track(
     time_to = require_aware(time_to) if time_to else utc_now()
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
     conditions = [
-        Position.project_id == context.project.id,
+        context.where(Position.project_id),
         in_window(Position, time_from, time_to),
         visible(Position),
     ]

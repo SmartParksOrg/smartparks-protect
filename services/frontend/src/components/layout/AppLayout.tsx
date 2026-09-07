@@ -1,13 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { Menu, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Outlet, useParams } from "react-router";
+import { Navigate, Outlet, useLocation, useParams } from "react-router";
 
 import LogoMark from "@/assets/brand/logo-mark.svg?react";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { ALL_PROJECTS, isAllProjects } from "@/lib/scope";
 import { useIconStore } from "@/stores/icons";
 import { useLayoutStore } from "@/stores/layout";
 
@@ -23,9 +24,18 @@ export function AppLayout() {
   const loadIcons = useIconStore((s) => s.load);
   const sidebarHidden = useLayoutStore((s) => s.sidebarHidden);
   const setSidebarHidden = useLayoutStore((s) => s.setSidebarHidden);
+  const location = useLocation();
   useEffect(() => {
-    void loadIcons(projectId ?? null);
+    void loadIcons(projectId && !isAllProjects(projectId) ? projectId : null);
   }, [projectId, loadIcons]);
+  // the all scope (decision D116) has the monitoring pages only; any other project page
+  // opened with it goes to the map
+  const allScopePage = /^\/projects\/all\/([a-z/]*)/.exec(location.pathname)?.[1] ?? null;
+  if (
+    allScopePage !== null &&
+    !["map", "entities", "devices", "alerts", "rules/events", "network/traffic", "network/gateways"].includes(allScopePage)
+  )
+    return <Navigate to={`/projects/${ALL_PROJECTS}/map`} replace />;
   return (
     <div className="flex h-screen">
       <CommandPalette />

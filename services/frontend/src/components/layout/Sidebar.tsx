@@ -4,13 +4,10 @@ import { Link, NavLink, useParams } from "react-router";
 
 import LogoWide from "@/assets/brand/logo-wide.svg?react";
 import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
-import {
-  projectSections,
-  serverSections,
-  type NavItem,
-} from "@/components/layout/navigation";
+import { sectionsFor, serverSections, type NavItem } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { isAllProjects } from "@/lib/scope";
 import { useTechnicalDetails } from "@/hooks/useTechnicalDetails";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -115,7 +112,7 @@ export function Sidebar({
       </div>
       <nav className="flex-1 space-y-4 overflow-y-auto px-2 pb-4">
         {projectId &&
-          projectSections.map((section) => {
+          sectionsFor(isAllProjects(projectId)).map((section) => {
             if (section.technical && !technical) return null;
             const items = section.items.filter(
               (item) => !item.adminOnly || canAdmin(role),

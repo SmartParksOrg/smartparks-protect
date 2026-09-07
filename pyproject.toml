@@ -57,7 +57,7 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF", "ANN"]
 ignore = ["ANN401"]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "fastapi.Path", "fastapi.File", "fastapi.UploadFile", "protect_api.deps.require_permission", "protect_api.deps.require_project_role"]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "fastapi.Path", "fastapi.File", "fastapi.UploadFile", "protect_api.deps.require_permission", "protect_api.deps.require_project_role", "protect_api.deps.require_scope_permission"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "E501"]

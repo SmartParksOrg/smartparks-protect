@@ -83,6 +83,8 @@ import { useTechnicalDetails } from "@/hooks/useTechnicalDetails";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { formatAgo, formatTime } from "@/lib/format";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
+import { isAllProjects, projectFor } from "@/lib/scope";
+import { useProjects } from "@/hooks/useProjects";
 import { useProjectStore } from "@/stores/project";
 
 /** Fly to a feature: a point gets a close zoom, everything else fits its bounds. */
@@ -160,6 +162,12 @@ export function MapPage() {
   const selectedEvent = params.get("event");
   const setLast = useProjectStore((s) => s.setLastProjectId);
   useEffect(() => setLast(projectId), [projectId, setLast]);
+  // the all scope (decision D117): the project is the top level of the layers panel and the
+  // panels name it; links go to the object's own project
+  const allProjects = isAllProjects(projectId);
+  const projectList = useProjects();
+  const projectName = (id: string | null | undefined) =>
+    projectList.data?.items.find((p) => p.id === id)?.name ?? "";
 
   const current = useQuery({
     queryKey: queryKeys.currentState(projectId),
@@ -201,9 +209,9 @@ export function MapPage() {
   const visibleFeatures = useMemo(
     () =>
       currentFeatures?.filter((f) =>
-        isVisible(f.properties, layers, groups.data),
+        isVisible(f.properties, layers, groups.data, allProjects),
       ),
-    [currentFeatures, layers, groups.data],
+    [currentFeatures, layers, groups.data, allProjects],
   );
   const features = useQuery({
     queryKey: queryKeys.features(projectId),
@@ -859,6 +867,11 @@ export function MapPage() {
           trackedIds={trackedIds}
           trackLabel={trackLengthLabel}
           devices={(deviceFeatures ?? []).map((f) => f.properties)}
+          projects={
+            allProjects
+              ? (projectList.data?.items ?? []).map((p) => ({ id: p.id, name: p.name }))
+              : undefined
+          }
           trackedDeviceIds={trackedDeviceIds}
           onPickDevice={(id) => {
             selectDevice(id);
@@ -945,12 +958,15 @@ export function MapPage() {
             <div className="min-w-0 flex-1">
               <Link
                 className="block truncate font-semibold underline-offset-2 hover:underline"
-                to={`/projects/${projectId}/entities/${selected.entity_id}`}
+                to={`/projects/${projectFor(projectId, selected.project_id)}/entities/${selected.entity_id}`}
               >
                 {selected.name}
               </Link>
               <div className="text-xs text-muted-foreground">
                 {selected.entity_type}
+                {allProjects && selected.project_id
+                  ? ` · ${projectName(selected.project_id)}`
+                  : ""}
               </div>
             </div>
             <Button
@@ -998,7 +1014,7 @@ export function MapPage() {
               {selected.device_id ? (
                 <Link
                   className="underline"
-                  to={`/projects/${projectId}/devices/${selected.device_id}`}
+                  to={`/projects/${projectFor(projectId, selected.project_id)}/devices/${selected.device_id}`}
                 >
                   {t("open device")}
                 </Link>
@@ -1075,12 +1091,15 @@ export function MapPage() {
             <div className="min-w-0 flex-1">
               <Link
                 className="block truncate font-semibold underline-offset-2 hover:underline"
-                to={`/projects/${projectId}/devices/${selectedDevice.properties.device_id}`}
+                to={`/projects/${projectFor(projectId, selectedDevice.properties.project_id)}/devices/${selectedDevice.properties.device_id}`}
               >
                 {selectedDevice.properties.name}
               </Link>
               <div className="text-xs text-muted-foreground">
                 {selectedDevice.properties.device_type}
+                {allProjects && selectedDevice.properties.project_id
+                  ? ` · ${projectName(selectedDevice.properties.project_id)}`
+                  : ""}
               </div>
             </div>
             <Button
@@ -1132,7 +1151,7 @@ export function MapPage() {
               {selectedDevice.properties.entity_id ? (
                 <Link
                   className="underline"
-                  to={`/projects/${projectId}/entities/${selectedDevice.properties.entity_id}`}
+                  to={`/projects/${projectFor(projectId, selectedDevice.properties.project_id)}/entities/${selectedDevice.properties.entity_id}`}
                 >
                   {selectedDevice.properties.entity_name}
                 </Link>

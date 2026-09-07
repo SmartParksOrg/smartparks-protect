@@ -11,6 +11,8 @@ export interface NavItem {
   phase?: number;
   adminOnly?: boolean;
   serverAdminOnly?: boolean;
+  /** Works in the all-projects scope (decision D116); the rest is per project. */
+  allScope?: boolean;
 }
 
 export interface NavSection {
@@ -20,14 +22,22 @@ export interface NavSection {
   technical?: boolean;
 }
 
+/** The sections as they apply to a scope: in the all scope only the items that work there. */
+export function sectionsFor(allProjects: boolean): NavSection[] {
+  if (!allProjects) return projectSections;
+  return projectSections
+    .map((section) => ({ ...section, items: section.items.filter((item) => item.allScope) }))
+    .filter((section) => section.items.length > 0);
+}
+
 export const projectSections: NavSection[] = [
   {
     label: "Monitor",
     items: [
-      { label: "Live map", icon: MapIcon, to: "map" },
-      { label: "Entities", icon: PawPrint, to: "entities" },
-      { label: "Devices", icon: Cpu, to: "devices" },
-      { label: "Alerts", icon: Bell, to: "alerts" },
+      { label: "Live map", allScope: true, icon: MapIcon, to: "map" },
+      { label: "Entities", allScope: true, icon: PawPrint, to: "entities" },
+      { label: "Devices", allScope: true, icon: Cpu, to: "devices" },
+      { label: "Alerts", allScope: true, icon: Bell, to: "alerts" },
     ],
   },
   {
@@ -43,8 +53,8 @@ export const projectSections: NavSection[] = [
     label: "Network",
     technical: true,
     items: [
-      { label: "Traffic", icon: Radio, to: "network/traffic" },
-      { label: "Gateways", icon: Waypoints, to: "network/gateways" },
+      { label: "Traffic", allScope: true, icon: Radio, to: "network/traffic" },
+      { label: "Gateways", allScope: true, icon: Waypoints, to: "network/gateways" },
       { label: "Trace explorer", icon: ListTree, to: "network/traces" },
     ],
   },
@@ -52,7 +62,7 @@ export const projectSections: NavSection[] = [
     label: "Rules",
     items: [
       { label: "Rules", icon: GitBranch, to: "rules" },
-      { label: "Events", icon: Activity, to: "rules/events" },
+      { label: "Events", allScope: true, icon: Activity, to: "rules/events" },
       { label: "Automations", icon: Workflow, to: "rules/automations", adminOnly: true },
     ],
   },

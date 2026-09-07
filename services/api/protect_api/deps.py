@@ -40,6 +40,75 @@ class ProjectContext:
         return self.user.is_superuser
 
 
+ALL_PROJECTS = "all"
+
+
+@dataclass(frozen=True, slots=True)
+class ScopeContext:
+    """One project, or every project for a server admin (decision D115, the reserved project
+    id `all`). Endpoints that support the scope take this instead of `ProjectContext` and
+    filter with `where`; every other `/projects/{project_id}` endpoint keeps a UUID parameter,
+    so `all` is a 422 there."""
+
+    user: User
+    project: Project | None
+    role: Role | None
+    permissions: frozenset[Permission]
+
+    @property
+    def is_all(self) -> bool:
+        return self.project is None
+
+    @property
+    def is_server_admin(self) -> bool:
+        return self.user.is_superuser
+
+    @property
+    def project_id(self) -> uuid.UUID | None:
+        return None if self.project is None else self.project.id
+
+    def where(self, column: Any) -> Any:
+        """The project filter: one project, or any project at all (never the system scope)."""
+        return column.is_not(None) if self.project is None else column == self.project.id
+
+
+async def get_scope_context(
+    project_id: str,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> ScopeContext:
+    if project_id == ALL_PROJECTS:
+        if not user.is_superuser:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "All projects is for server admins")
+        return ScopeContext(
+            user=user, project=None, role=None, permissions=permissions_for(None, server_admin=True)
+        )
+    try:
+        parsed = uuid.UUID(project_id)
+    except ValueError:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "project_id must be a UUID or all"
+        ) from None
+    context = await get_project_context(parsed, user, session)
+    return ScopeContext(
+        user=context.user,
+        project=context.project,
+        role=context.role,
+        permissions=context.permissions,
+    )
+
+
+def require_scope_permission(
+    permission: Permission,
+) -> Callable[..., Coroutine[Any, Any, ScopeContext]]:
+    async def dependency(context: ScopeContext = Depends(get_scope_context)) -> ScopeContext:
+        if permission not in context.permissions:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"Permission {permission} required")
+        return context
+
+    return dependency
+
+
 async def require_server_admin(user: User = Depends(current_active_user)) -> User:
     if not user.is_superuser:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")

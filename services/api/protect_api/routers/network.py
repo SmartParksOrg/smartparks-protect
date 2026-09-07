@@ -12,7 +12,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.bus import get_bus
-from protect_api.deps import ProjectContext, require_permission, require_server_admin
+from protect_api.deps import (
+    ProjectContext,
+    ScopeContext,
+    require_permission,
+    require_scope_permission,
+    require_server_admin,
+)
 from protect_api.health_areas import AreaHealth, area_health
 from shared.bus import RedisStreamsBus, Topic, is_stale
 from shared.database import get_session
@@ -146,6 +152,22 @@ async def _project_device_ids(
     return list(set(rows))
 
 
+async def _scope_device_ids(
+    session: AsyncSession, context: ScopeContext, at_from: datetime, at_to: datetime
+) -> list[uuid.UUID]:
+    """Devices assigned to the scope's project, or to any project in the all scope, at any
+    time in the window (decision D115)."""
+    from sqlalchemy.dialects.postgresql import Range
+
+    rows = await session.scalars(
+        select(DeviceProjectAssignment.device_id).where(
+            context.where(DeviceProjectAssignment.project_id),
+            DeviceProjectAssignment.validity.op("&&")(Range(at_from, at_to, bounds="[)")),
+        )
+    )
+    return list(set(rows))
+
+
 @router.get("/projects/{project_id}/traffic", response_model=list[TrafficRow])
 async def traffic(
     device_id: uuid.UUID | None = None,
@@ -154,13 +176,13 @@ async def traffic(
     time_to: datetime | None = Query(None, alias="to"),
     limit: int = Query(100, ge=1, le=MAX_ROWS),
     include_payload: bool = False,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> list[TrafficRow]:
     """Source events of the project's devices, newest first. Default window: last 24 hours."""
     time_to = require_aware(time_to) if time_to else utc_now()
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
-    device_ids = await _project_device_ids(session, context.project.id, time_from, time_to)
+    device_ids = await _scope_device_ids(session, context, time_from, time_to)
     if device_id is not None:
         device_ids = [d for d in device_ids if d == device_id]
     if not device_ids:

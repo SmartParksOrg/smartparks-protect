@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { api } from "@/api/client";
+import { useProjects } from "@/hooks/useProjects";
+import { isAllProjects, projectFor } from "@/lib/scope";
 import { queryKeys } from "@/api/queryKeys";
 import type { Device, DeviceType, Page as PageType } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -28,12 +30,16 @@ export function DevicesPage() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("");
+  const allProjects = isAllProjects(projectId);
+  const projectList = useProjects();
+  const projectName = (id: string | null | undefined) =>
+    projectList.data?.items.find((p) => p.id === id)?.name ?? "";
   const devices = useQuery({
     queryKey: queryKeys.devices({ projectId, q, group }),
     queryFn: () =>
       api.get<PageType<Device>>("/api/v1/devices", {
         query: {
-          project_id: projectId,
+          project_id: allProjects ? undefined : projectId,
           q: q || undefined,
           group_id: group && group !== UNGROUPED ? group : undefined,
           limit: 500,
@@ -57,6 +63,15 @@ export function DevicesPage() {
   });
   const typeById = new Map(types.data?.items.map((t) => [t.id, t]));
   const columns: ColumnDef<Device, unknown>[] = [
+    ...(allProjects
+      ? [
+          {
+            id: "project",
+            header: t("Project"),
+            accessorFn: (d: Device) => projectName(d.project_id) || t("none"),
+          } as ColumnDef<Device, unknown>,
+        ]
+      : []),
     {
       header: t("Name"),
       accessorKey: "name",
@@ -150,7 +165,11 @@ export function DevicesPage() {
     <>
       <PageHeader
         title={t("Devices")}
-        description={t("Hardware currently assigned to this project")}
+        description={
+          allProjects
+            ? t("Every device on the server with the project it is assigned to today")
+            : t("Hardware currently assigned to this project")
+        }
         actions={
           <GroupSelect
             projectId={projectId}
@@ -175,7 +194,9 @@ export function DevicesPage() {
           isLoading={devices.isPending}
           emptyMessage={t("No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.")} columnsKey="devices"
           defaultHiddenSmall={["type", "driver", "serial_number", "status"]}
-          onRowClick={(d) => navigate(`/projects/${projectId}/devices/${d.id}`)}
+          onRowClick={(d) =>
+            navigate(`/projects/${projectFor(projectId, d.project_id)}/devices/${d.id}`)
+          }
         />
       </Page>
     </>

@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router";
 
 import { api } from "@/api/client";
+import { useProjects } from "@/hooks/useProjects";
+import { isAllProjects, projectFor } from "@/lib/scope";
 import { queryKeys } from "@/api/queryKeys";
 import type {
   CurrentState,
@@ -77,7 +79,7 @@ export function EntitiesPage() {
     queryKey: queryKeys.devices({ projectId }),
     queryFn: () =>
       api.get<PageType<Device>>("/api/v1/devices", {
-        query: { project_id: projectId, limit: 500 },
+        query: { project_id: allProjects ? undefined : projectId, limit: 500 },
       }),
     enabled: Boolean(projectId),
   });
@@ -97,7 +99,20 @@ export function EntitiesPage() {
     [state.data],
   );
 
+  const allProjects = isAllProjects(projectId);
+  const projectList = useProjects();
+  const projectName = (id: string | null | undefined) =>
+    projectList.data?.items.find((p) => p.id === id)?.name ?? "";
   const columns: ColumnDef<Entity, unknown>[] = [
+    ...(allProjects
+      ? [
+          {
+            id: "project",
+            header: t("Project"),
+            accessorFn: (e: Entity) => projectName(e.project_id),
+          } as ColumnDef<Entity, unknown>,
+        ]
+      : []),
     {
       header: t("Name"),
       accessorKey: "name",
@@ -152,7 +167,7 @@ export function EntitiesPage() {
         return id ? (
           <Link
             className="underline"
-            to={`/projects/${projectId}/devices/${id}`}
+            to={`/projects/${projectFor(projectId, row.original.project_id)}/devices/${id}`}
             onClick={(ev) => ev.stopPropagation()}
           >
             {deviceNames.get(id) ?? t("open device")}
@@ -236,7 +251,7 @@ export function EntitiesPage() {
           isLoading={entities.isPending}
           emptyMessage={t("No entities yet. Add one with New entity, or onboard collars with their animals from Needs attention.")} columnsKey="entities"
           onRowClick={(e) =>
-            void navigate(`/projects/${projectId}/entities/${e.id}`)
+            void navigate(`/projects/${projectFor(projectId, e.project_id)}/entities/${e.id}`)
           }
           selection={
             canAdmin(role)

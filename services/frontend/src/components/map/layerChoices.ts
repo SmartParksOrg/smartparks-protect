@@ -68,8 +68,44 @@ export function hideAllDevices(choices: LayerChoices): LayerChoices {
   return { ...choices, shown_devices: [] };
 }
 
-export const layerOf = (props: EntityFeatureProperties): string =>
-  props.group_id ?? UNGROUPED_LAYER;
+/** The layer an entity sits in: its group, else the ungrouped layer; in the all scope the
+ * ungrouped layer is per project (decision D117). */
+export const layerOf = (
+  props: EntityFeatureProperties,
+  perProject = false,
+): string =>
+  props.group_id ??
+  (perProject && props.project_id
+    ? ungroupedLayerOf(props.project_id)
+    : UNGROUPED_LAYER);
+
+export const projectLayerOf = (projectId: string): string => `project:${projectId}`;
+export const ungroupedLayerOf = (projectId: string): string =>
+  `ungrouped:${projectId}`;
+
+/** The project a layer belongs to, when the layer is a group or a per-project ungrouped layer. */
+export function projectOfLayer(
+  id: string,
+  groups: EntityGroup[] | undefined,
+): string | null {
+  if (id.startsWith("ungrouped:")) return id.slice("ungrouped:".length);
+  if (id.startsWith("project:")) return id.slice("project:".length);
+  return groups?.find((g) => g.id === id)?.project_id ?? null;
+}
+
+/** Showing a layer inside a hidden project shows the project as well. */
+export function withProjectShown(
+  choices: LayerChoices,
+  id: string,
+  groups: EntityGroup[] | undefined,
+): LayerChoices {
+  const project = projectOfLayer(id, groups);
+  if (!project) return choices;
+  return {
+    ...choices,
+    hidden_groups: choices.hidden_groups.filter((g) => g !== projectLayerOf(project)),
+  };
+}
 
 /** A group shows unless it or a group above it is hidden. */
 export function isGroupShown(
@@ -78,6 +114,9 @@ export function isGroupShown(
   groups: EntityGroup[] | undefined,
 ): boolean {
   if (choices.hidden_groups.includes(id)) return false;
+  const project = projectOfLayer(id, groups);
+  if (project && choices.hidden_groups.includes(projectLayerOf(project)))
+    return false;
   return !ancestorIds(groups, id).some((a) =>
     choices.hidden_groups.includes(a),
   );
@@ -88,9 +127,10 @@ export function isVisible(
   props: EntityFeatureProperties,
   choices: LayerChoices,
   groups: EntityGroup[] | undefined,
+  perProject = false,
 ): boolean {
   if (choices.hidden_entities.includes(props.entity_id)) return false;
-  return isGroupShown(layerOf(props), choices, groups);
+  return isGroupShown(layerOf(props, perProject), choices, groups);
 }
 
 export function isFeatureVisible(

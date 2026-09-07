@@ -23,21 +23,24 @@ import {
   hideAllDevices,
   hideAllEntities,
   isDeviceShown,
-  showDevices,
-  toggleDevice,
   isGroupShown,
   layerOf,
   onlyGroup,
+  projectLayerOf,
+  showDevices,
   showEntity,
   showEventType,
   showFeature,
   showFeatureType,
   showGateway,
+  toggleDevice,
   toggleEntity,
   toggleGroup,
   toggleInList,
   type LayerChoices,
   UNGROUPED_LAYER,
+  ungroupedLayerOf,
+  withProjectShown,
 } from "@/components/map/layerChoices";
 import type {
   DeviceFeatureProperties,
@@ -69,6 +72,8 @@ interface GroupRow {
   name: string;
   depth: number;
   color: string | null;
+  /** A project row of the all scope: no "only", its groups below it. */
+  project?: boolean;
   members: EntityFeatureProperties[];
   total: number;
 }
@@ -147,6 +152,7 @@ export function LayerPanel({
   trackLabel,
   devices,
   trackedDeviceIds,
+  projects,
   onChange,
   onClose,
   onPickEntity,
@@ -170,6 +176,9 @@ export function LayerPanel({
   /** The device layer (decision D113): every device assigned to the project today. */
   devices: DeviceFeatureProperties[];
   trackedDeviceIds: string[];
+  /** In the all-projects scope (decision D117): the projects, each the top level of its
+   * groups, entities and devices. */
+  projects?: { id: string; name: string }[];
   onChange: (next: LayerChoices) => void;
   onClose: () => void;
   onPickEntity: (entityId: string) => void;
@@ -195,39 +204,69 @@ export function LayerPanel({
       : (b.last_seen_at ?? "").localeCompare(a.last_seen_at ?? "") ||
         a.name.localeCompare(b.name);
 
+  const perProject = Boolean(projects);
   const rows = useMemo<GroupRow[]>(() => {
     const byLayer = new Map<string, EntityFeatureProperties[]>();
     for (const f of entities)
-      byLayer.set(layerOf(f), [...(byLayer.get(layerOf(f)) ?? []), f]);
-    const tree = groupTree(groups);
-    const out: GroupRow[] = tree.map(({ group, depth }) => {
-      const members = [...(byLayer.get(group.id) ?? [])].sort(order);
-      const total = groupTree(groups, group.id, 1).reduce(
-        (n, r) => n + (byLayer.get(r.group.id)?.length ?? 0),
-        members.length,
-      );
-      return {
-        id: group.id,
-        name: group.name,
-        depth,
-        color: group.color ?? null,
-        members,
-        total,
-      };
-    });
-    const loose = [...(byLayer.get(UNGROUPED_LAYER) ?? [])].sort(order);
-    if (loose.length > 0 || out.length > 0)
+      byLayer.set(layerOf(f, perProject), [
+        ...(byLayer.get(layerOf(f, perProject)) ?? []),
+        f,
+      ]);
+    const rowsOf = (
+      scopeGroups: EntityGroup[] | undefined,
+      depthOffset: number,
+      ungroupedId: string,
+    ): GroupRow[] => {
+      const tree = groupTree(scopeGroups);
+      const out: GroupRow[] = tree.map(({ group, depth }) => {
+        const members = [...(byLayer.get(group.id) ?? [])].sort(order);
+        const total = groupTree(scopeGroups, group.id, 1).reduce(
+          (n, r) => n + (byLayer.get(r.group.id)?.length ?? 0),
+          members.length,
+        );
+        return {
+          id: group.id,
+          name: group.name,
+          depth: depth + depthOffset,
+          color: group.color ?? null,
+          members,
+          total,
+        };
+      });
+      const loose = [...(byLayer.get(ungroupedId) ?? [])].sort(order);
+      if (loose.length > 0 || out.length > 0)
+        out.push({
+          id: ungroupedId,
+          name: t("Ungrouped"),
+          depth: depthOffset,
+          color: null,
+          members: loose,
+          total: loose.length,
+        });
+      return out;
+    };
+    if (!projects) return rowsOf(groups, 0, UNGROUPED_LAYER);
+    // the all scope: every project as the top level (decision D117), busiest first by count
+    const out: GroupRow[] = [];
+    for (const project of [...projects].sort((a, b) => a.name.localeCompare(b.name))) {
+      const own = (groups ?? []).filter((g) => g.project_id === project.id);
+      const below = rowsOf(own, 1, ungroupedLayerOf(project.id));
+      const total = entities.filter((e) => e.project_id === project.id).length;
+      if (total === 0 && below.length === 0) continue;
       out.push({
-        id: UNGROUPED_LAYER,
-        name: t("Ungrouped"),
+        id: projectLayerOf(project.id),
+        name: project.name,
         depth: 0,
         color: null,
-        members: loose,
-        total: loose.length,
+        project: true,
+        members: [],
+        total,
       });
+      out.push(...below);
+    }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entities, groups, sort, t]);
+  }, [entities, groups, projects, perProject, sort, t]);
 
   const flip = (id: string) =>
     setCollapsed((s) => {
@@ -238,13 +277,17 @@ export function LayerPanel({
     });
   const shownCount = entities.filter(
     (f) =>
-      isGroupShown(layerOf(f), choices, groups) &&
+      isGroupShown(layerOf(f, perProject), choices, groups) &&
       !choices.hidden_entities.includes(f.entity_id),
   ).length;
 
   const siblingsOf = (m: EntityFeatureProperties) =>
     entities
-      .filter((e) => layerOf(e) === layerOf(m) && e.entity_id !== m.entity_id)
+      .filter(
+        (e) =>
+          layerOf(e, perProject) === layerOf(m, perProject) &&
+          e.entity_id !== m.entity_id,
+      )
       .map((e) => e.entity_id);
   const entityRow = (
     m: EntityFeatureProperties,
@@ -401,7 +444,15 @@ export function LayerPanel({
                       checked={shown}
                       label={row.name}
                       onChange={(v) =>
-                        onChange(toggleGroup(choices, row.id, v, groups))
+                        onChange(
+                          v
+                            ? withProjectShown(
+                                toggleGroup(choices, row.id, v, groups),
+                                row.id,
+                                groups,
+                              )
+                            : toggleGroup(choices, row.id, v, groups),
+                        )
                       }
                     />
                     {row.color && (
@@ -418,16 +469,18 @@ export function LayerPanel({
                     <span className="shrink-0 text-[11px] text-muted-foreground">
                       {row.total}
                     </span>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="h-auto shrink-0 p-0 text-xs opacity-0 group-hover:opacity-100 focus:opacity-100"
-                      onClick={() =>
-                        onChange(onlyGroup(choices, row.id, groups))
-                      }
-                    >
-                      {t("only")}
-                    </Button>
+                    {!row.project && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto shrink-0 p-0 text-xs opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        onClick={() =>
+                          onChange(onlyGroup(choices, row.id, groups))
+                        }
+                      >
+                        {t("only")}
+                      </Button>
+                    )}
                   </Row>
                   {open &&
                     members.map((m) => entityRow(m, row.depth + 1, shown))}
@@ -438,7 +491,7 @@ export function LayerPanel({
               .filter((m) => matches(m.name, term))
               .sort(order)
               .map((m) =>
-                entityRow(m, 0, isGroupShown(layerOf(m), choices, groups)),
+                entityRow(m, 0, isGroupShown(layerOf(m, perProject), choices, groups)),
               )}
       </div>
       <div className="flex items-center justify-between border-t px-1 pt-2 text-xs text-muted-foreground">
@@ -744,8 +797,23 @@ export function LayerPanel({
   const listedDevices = devices
     .filter((d) => matches(d.name, term) || matches(d.serial_number ?? "", term))
     .sort(deviceOrder);
-  const unassignedDevices = listedDevices.filter((d) => !d.entity_id);
-  const trackingDevices = listedDevices.filter((d) => d.entity_id);
+  const deviceSections = (
+    projects
+      ? [...projects]
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((p) => ({
+            key: p.id,
+            name: p.name,
+            devices: listedDevices.filter((d) => d.project_id === p.id),
+          }))
+          .filter((sec) => sec.devices.length > 0)
+      : [{ key: "all", name: null, devices: listedDevices }]
+  ).map((sec) => ({
+    key: sec.key,
+    name: sec.name,
+    unassigned: sec.devices.filter((d) => !d.entity_id),
+    tracking: sec.devices.filter((d) => d.entity_id),
+  }));
   const shownDevices = devices.filter((d) => isDeviceShown(d.device_id, choices)).length;
   const deviceRow = (d: DeviceFeatureProperties) => {
     const on = isDeviceShown(d.device_id, choices);
@@ -842,24 +910,42 @@ export function LayerPanel({
             {t("No device is assigned to this project.")}
           </div>
         )}
-        {unassignedDevices.length > 0 && (
-          <Row depth={0} header>
-            <span className="min-w-0 flex-1 truncate font-semibold">
-              {t("Without an entity")}
-            </span>
-            <span className="text-xs text-muted-foreground">{unassignedDevices.length}</span>
-          </Row>
-        )}
-        {unassignedDevices.map(deviceRow)}
-        {trackingDevices.length > 0 && (
-          <Row depth={0} header>
-            <span className="min-w-0 flex-1 truncate font-semibold">
-              {t("Tracking an entity")}
-            </span>
-            <span className="text-xs text-muted-foreground">{trackingDevices.length}</span>
-          </Row>
-        )}
-        {trackingDevices.map(deviceRow)}
+        {deviceSections.map((section) => (
+          <div key={section.key}>
+            {section.name && (
+              <Row depth={0} header>
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  {section.name}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {section.unassigned.length + section.tracking.length}
+                </span>
+              </Row>
+            )}
+            {section.unassigned.length > 0 && (
+              <Row depth={section.name ? 1 : 0} header>
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  {t("Without an entity")}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {section.unassigned.length}
+                </span>
+              </Row>
+            )}
+            {section.unassigned.map(deviceRow)}
+            {section.tracking.length > 0 && (
+              <Row depth={section.name ? 1 : 0} header>
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  {t("Tracking an entity")}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {section.tracking.length}
+                </span>
+              </Row>
+            )}
+            {section.tracking.map(deviceRow)}
+          </div>
+        ))}
       </div>
       <div className="flex items-center justify-between border-t px-1 pt-2 text-xs text-muted-foreground">
         <span>

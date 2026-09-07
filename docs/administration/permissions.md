@@ -45,3 +45,7 @@ Nobody can register without an invitation. Server admins invite server admins; p
 ## Audit
 
 Every mutating admin action writes an `audit_log` row with the actor, action, object, project, request id and a summary of what changed. Project admins read their project's log at `/api/v1/projects/{id}/audit`; server admins read everything at `/api/v1/admin/audit`.
+
+## All projects
+
+A server admin can open every project at once from the project switcher (the reserved project id `all`, decision D115). The live map, the entities and devices lists, alerts, events, gateways and traffic then read across projects; nothing can be changed from that scope, and every write and configuration page stays per project. A project admin or viewer who opens `/projects/all/...` gets a 403.

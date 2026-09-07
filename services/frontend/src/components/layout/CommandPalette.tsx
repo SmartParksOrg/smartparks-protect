@@ -15,10 +15,7 @@ import { useNavigate, useParams } from "react-router";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { SearchHit, SearchResponse } from "@/api/types";
-import {
-  projectSections,
-  serverSections,
-} from "@/components/layout/navigation";
+import { sectionsFor, serverSections } from "@/components/layout/navigation";
 import {
   CommandDialog,
   CommandEmpty,
@@ -30,6 +27,7 @@ import {
 } from "@/components/ui/command";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { useAuthStore } from "@/stores/auth";
+import { isAllProjects } from "@/lib/scope";
 import { useProjectStore } from "@/stores/project";
 
 type Kind =
@@ -169,7 +167,7 @@ export function CommandPalette() {
     const term = debounced.toLowerCase();
     const out: { label: string; to: string; icon: typeof PawPrint }[] = [];
     if (projectId)
-      for (const section of projectSections)
+      for (const section of sectionsFor(isAllProjects(projectId)))
         for (const item of section.items)
           if (item.to && (!item.adminOnly || canAdmin(role)))
             out.push({

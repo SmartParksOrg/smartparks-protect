@@ -20,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { isAllProjects, projectFor } from "@/lib/scope";
+import { useProjects } from "@/hooks/useProjects";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { formatTime } from "@/lib/format";
 import { eventIcon, type Scope, scopeBase, SEVERITIES } from "@/lib/rules";
@@ -66,7 +68,7 @@ export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; e
               <div><span className="text-muted-foreground">{t("Severity")}</span><div><StatusBadge value={d.event.severity} /></div></div>
               <div><span className="text-muted-foreground">{t("Created")}</span><div>{formatTime(d.event.created_at)}</div></div>
               {d.event.entity_id && projectPath && <div><span className="text-muted-foreground">{t("Entity")}</span><div><Link className="underline" to={`${projectPath}/map?entity=${d.event.entity_id}`}>{t("show on map")}</Link></div></div>}
-              {d.event.device_id && projectPath && <div><span className="text-muted-foreground">{t("Device")}</span><div><Link className="underline" to={`${projectPath}/devices/${d.event.device_id}`}>{t("open device")}</Link></div></div>}
+              {d.event.device_id && projectPath && <div><span className="text-muted-foreground">{t("Device")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/devices/${d.event.device_id}`}>{t("open device")}</Link></div></div>}
               {d.event.trace_id && projectPath && <div><span className="text-muted-foreground">{t("Trace")}</span><div><Link className="underline" to={`${projectPath}/network/traces?trace=${d.event.trace_id}`}>{t("view processing trace")}</Link></div></div>}
               {d.event.description && <div className="col-span-2"><span className="text-muted-foreground">{t("Description")}</span><div>{d.event.description}</div></div>}
             </div>
@@ -107,7 +109,11 @@ export function EventsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   useProjectStream(scope === "server" ? undefined : scope, (m) => { if (m.topic === "event.created") void client.invalidateQueries({ queryKey: ["events", scope] }); });
   const items = [...pages, ...(events.data?.items ?? [])];
 
+  const allProjects = isAllProjects(scope);
+  const projectList = useProjects();
+  const projectName = (id: string | null | undefined) => projectList.data?.items.find((p) => p.id === id)?.name ?? "";
   const columns: ColumnDef<EventItem, unknown>[] = [
+    ...(allProjects ? [{ id: "project", header: t("Project"), accessorFn: (e: EventItem) => projectName(e.project_id) } as ColumnDef<EventItem, unknown>] : []),
     { header: t("Time"), accessorKey: "time", cell: ({ getValue }) => <span className="whitespace-nowrap">{formatTime(getValue<string>())}</span> },
     { header: t("Event"), accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{row.original.title}</span> },
     { header: t("Type"), accessorKey: "event_type", cell: ({ getValue }) => <code className="text-xs">{getValue<string>()}</code> },

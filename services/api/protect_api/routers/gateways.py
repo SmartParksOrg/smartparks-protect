@@ -14,9 +14,13 @@ from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.crud import geom_to_geojson, get_or_404
-from protect_api.deps import ProjectContext, require_permission, require_server_admin
+from protect_api.deps import (
+    ScopeContext,
+    require_scope_permission,
+    require_server_admin,
+)
 from protect_api.pagination import Page, PageResponse, page, paginate
-from protect_api.routers.network import _project_device_ids
+from protect_api.routers.network import _scope_device_ids
 from protect_api.schemas.integrations import (
     DeviceConnectivity,
     GatewayDetail,
@@ -118,14 +122,14 @@ def _window(hours: int) -> tuple[datetime, datetime]:
 
 @router.get("/projects/{project_id}/gateways", response_model=list[GatewayRead])
 async def project_gateways(
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     hours: int = Query(24, ge=1, le=MAX_HOURS),
     limit: int = Query(200, ge=1, le=500),
     session: AsyncSession = Depends(get_session),
 ) -> list[GatewayRead]:
     """Gateways that received the project's devices in the window, busiest first."""
     since, until = _window(hours)
-    device_ids = await _project_device_ids(session, context.project.id, since, until)
+    device_ids = await _scope_device_ids(session, context, since, until)
     stats = await _reception_stats(session, device_ids, since, until)
     if not stats:
         return []
@@ -150,13 +154,13 @@ async def project_gateways(
 @router.get("/projects/{project_id}/gateways/{gateway_id}", response_model=GatewayDetail)
 async def project_gateway(
     gateway_id: uuid.UUID,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     hours: int = Query(24, ge=1, le=MAX_HOURS),
     session: AsyncSession = Depends(get_session),
 ) -> GatewayDetail:
     gateway = await get_or_404(session, Gateway, gateway_id, "Gateway")
     since, until = _window(hours)
-    device_ids = await _project_device_ids(session, context.project.id, since, until)
+    device_ids = await _scope_device_ids(session, context, since, until)
     stats = await _reception_stats(session, device_ids, since, until)
     source = await session.get(DataSource, gateway.data_source_id)
     rows = (
@@ -208,7 +212,7 @@ async def project_gateway(
 
 @router.get("/projects/{project_id}/connectivity", response_model=list[DeviceConnectivity])
 async def project_connectivity(
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     hours: int = Query(24, ge=1, le=MAX_HOURS),
     limit: int = Query(200, ge=1, le=500),
     session: AsyncSession = Depends(get_session),
@@ -216,7 +220,7 @@ async def project_connectivity(
     """Gateway diversity per device: how many gateways heard it, which one most often and
     how large that gateway's share is, mean signal, last reception."""
     since, until = _window(hours)
-    device_ids = await _project_device_ids(session, context.project.id, since, until)
+    device_ids = await _scope_device_ids(session, context, since, until)
     if not device_ids:
         return []
     rows = (

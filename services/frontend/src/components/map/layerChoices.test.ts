@@ -6,16 +6,20 @@ import {
   hideAllDevices,
   hideAllEntities,
   isDeviceShown,
-  showDevices,
-  toggleDevice,
+  isGroupShown,
   isVisible,
   onlyGroup,
+  projectLayerOf,
+  showDevices,
   showEntity,
   showFeature,
   showGateway,
+  toggleDevice,
   toggleEntity,
   toggleGroup,
   UNGROUPED_LAYER,
+  ungroupedLayerOf,
+  withProjectShown,
 } from "@/components/map/layerChoices";
 import type { EntityFeatureProperties } from "@/components/map/layers";
 
@@ -158,5 +162,30 @@ describe("device layer choices", () => {
     const all = showDevices(toggleDevice(DEFAULT_LAYERS, "d1", true), ["d1", "d2"]);
     expect(all.shown_devices).toEqual(["d1", "d2"]);
     expect(hideAllDevices(all).shown_devices).toEqual([]);
+  });
+});
+
+describe("the project as a layer (all-projects scope)", () => {
+  const groups = [group("g1"), group("g2")].map((g, i) => ({ ...g, project_id: i === 0 ? "p1" : "p2" }));
+  const entity = (id: string, project_id: string, group_id: string | null) =>
+    ({ entity_id: id, project_id, group_id, name: id } as unknown as Parameters<typeof isVisible>[0]);
+
+  it("hides every group and the ungrouped layer of a hidden project", () => {
+    const hidden = toggleGroup(DEFAULT_LAYERS, projectLayerOf("p1"), false, groups);
+    expect(isGroupShown("g1", hidden, groups)).toBe(false);
+    expect(isGroupShown(ungroupedLayerOf("p1"), hidden, groups)).toBe(false);
+    expect(isGroupShown("g2", hidden, groups)).toBe(true);
+    expect(isVisible(entity("e1", "p1", null), hidden, groups, true)).toBe(false);
+    expect(isVisible(entity("e2", "p2", null), hidden, groups, true)).toBe(true);
+  });
+
+  it("showing a group inside a hidden project shows the project again", () => {
+    const hidden = toggleGroup(DEFAULT_LAYERS, projectLayerOf("p1"), false, groups);
+    const shown = withProjectShown(toggleGroup(hidden, "g1", true, groups), "g1", groups);
+    expect(isGroupShown("g1", shown, groups)).toBe(true);
+  });
+
+  it("keeps the shared ungrouped layer within one project", () => {
+    expect(isVisible(entity("e1", "p1", null), DEFAULT_LAYERS, groups)).toBe(true);
   });
 });

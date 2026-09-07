@@ -12,7 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
 from protect_api.crud import geom_to_geojson, get_or_404
-from protect_api.deps import ProjectContext, require_permission, require_server_admin
+from protect_api.deps import (
+    ProjectContext,
+    ScopeContext,
+    require_permission,
+    require_scope_permission,
+    require_server_admin,
+)
 from protect_api.pagination import Page, PageResponse, page
 from protect_api.schemas.rules import (
     ActionDeliveryRead,
@@ -85,13 +91,17 @@ async def list_events_for(
     entity_id: uuid.UUID | None,
     time_from: datetime | None,
     time_to: datetime | None,
+    all_projects: bool = False,
 ) -> PageResponse[EventRead]:
+    """`project_id` None is the system scope (events of no project); `all_projects` is every
+    project's events at once (decision D115), never the system ones."""
     statement = select(Event, Alert).outerjoin(Alert, Alert.event_id == Event.id)
-    statement = (
-        statement.where(Event.project_id == project_id)
-        if project_id is not None
-        else statement.where(Event.project_id.is_(None))
-    )
+    if all_projects:
+        statement = statement.where(Event.project_id.is_not(None))
+    elif project_id is not None:
+        statement = statement.where(Event.project_id == project_id)
+    else:
+        statement = statement.where(Event.project_id.is_(None))
     if event_type:
         statement = statement.where(Event.event_type == event_type)
     if severity:
@@ -121,13 +131,15 @@ async def list_alerts_for(
     alert_status: str | None,
     severity: str | None,
     entity_id: uuid.UUID | None,
+    all_projects: bool = False,
 ) -> PageResponse[AlertRead]:
     statement = select(Alert, Event).join(Event, Event.id == Alert.event_id)
-    statement = (
-        statement.where(Alert.project_id == project_id)
-        if project_id is not None
-        else statement.where(Alert.project_id.is_(None))
-    )
+    if all_projects:
+        statement = statement.where(Alert.project_id.is_not(None))
+    elif project_id is not None:
+        statement = statement.where(Alert.project_id == project_id)
+    else:
+        statement = statement.where(Alert.project_id.is_(None))
     if alert_status:
         statement = statement.where(Alert.status == alert_status)
     if severity:
@@ -213,19 +225,20 @@ async def list_events(
     entity_id: uuid.UUID | None = None,
     time_from: datetime | None = Query(None, alias="from"),
     time_to: datetime | None = Query(None, alias="to"),
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[EventRead]:
     """Newest first. The cursor is the time of the last item of the previous page."""
     return await list_events_for(
         session,
-        context.project.id,
+        context.project_id,
         page,
         event_type=event_type,
         severity=severity,
         entity_id=entity_id,
         time_from=time_from,
         time_to=time_to,
+        all_projects=context.is_all,
     )
 
 
@@ -242,7 +255,7 @@ async def get_event(
 async def map_events(
     hours: int = Query(24, ge=1, le=24 * 30),
     limit: int = Query(500, ge=1, le=2000),
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Recent events with a location as GeoJSON, for the event layer of the live map. Events use
@@ -253,7 +266,7 @@ async def map_events(
             select(Event, Alert)
             .outerjoin(Alert, Alert.event_id == Event.id)
             .where(
-                Event.project_id == context.project.id,
+                context.where(Event.project_id),
                 Event.geom.is_not(None),
                 Event.time >= since,
             )
@@ -270,6 +283,7 @@ async def map_events(
                 "geometry": geom_to_geojson(event.geom),
                 "properties": {
                     "event_id": str(event.id),
+                    "project_id": str(event.project_id) if event.project_id else None,
                     "event_type": event.event_type,
                     "severity": event.severity,
                     "title": event.title,
@@ -290,16 +304,17 @@ async def list_alerts(
     alert_status: str | None = Query(None, alias="status"),
     severity: str | None = None,
     entity_id: uuid.UUID | None = None,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[AlertRead]:
     return await list_alerts_for(
         session,
-        context.project.id,
+        context.project_id,
         page,
         alert_status=alert_status,
         severity=severity,
         entity_id=entity_id,
+        all_projects=context.is_all,
     )
 
 

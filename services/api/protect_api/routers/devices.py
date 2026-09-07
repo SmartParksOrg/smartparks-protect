@@ -150,7 +150,19 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
             )
         ).all()
     }
+    current_projects = {
+        device_id: project_id
+        for device_id, project_id in (
+            await session.execute(
+                select(DeviceProjectAssignment.device_id, DeviceProjectAssignment.project_id).where(
+                    DeviceProjectAssignment.device_id.in_(ids),
+                    DeviceProjectAssignment.validity.op("@>")(now),
+                )
+            )
+        ).all()
+    }
     for device, read in zip(devices, reads, strict=True):
+        read.project_id = current_projects.get(device.id)
         if device.id in tracking:
             read.entity_id, read.entity_name, read.group_id = tracking[device.id]
         state = states.get(device.id)

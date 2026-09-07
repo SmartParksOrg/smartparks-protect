@@ -15,6 +15,8 @@ import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isAllProjects } from "@/lib/scope";
+import { useProjects } from "@/hooks/useProjects";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { formatAgo, formatTime } from "@/lib/format";
 import { eventIcon, type Scope, scopeBase } from "@/lib/rules";
@@ -37,7 +39,11 @@ export function AlertsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   useProjectStream(scope === "server" ? undefined : scope, (m) => { if (m.topic === "alert.created" || m.topic === "event.created") void client.invalidateQueries({ queryKey: ["alerts", scope] }); });
   const projectPath = scope === "server" ? null : `/projects/${scope}`;
 
+  const allProjects = isAllProjects(scope);
+  const projectList = useProjects();
+  const projectName = (id: string | null | undefined) => projectList.data?.items.find((p) => p.id === id)?.name ?? "";
   const columns: ColumnDef<Alert, unknown>[] = [
+    ...(allProjects ? [{ id: "project", header: t("Project"), accessorFn: (a: Alert) => projectName(a.project_id) } as ColumnDef<Alert, unknown>] : []),
     { header: t("Severity"), accessorKey: "severity", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
     { header: t("Alert"), accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{row.original.title}</span> },
     { header: t("Time"), accessorKey: "time", cell: ({ row }) => <span title={formatTime(row.original.time)}>{formatAgo(row.original.time)}</span> },

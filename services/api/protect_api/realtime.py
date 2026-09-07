@@ -21,6 +21,7 @@ from sqlalchemy import select
 
 from protect_api.auth.users import get_jwt_strategy, get_user_manager
 from protect_api.bus import get_bus
+from protect_api.deps import ALL_PROJECTS
 from shared.bus import Message, Topic
 from shared.database import session_scope
 from shared.logger import get_logger
@@ -98,7 +99,7 @@ class Broadcaster:
             key = uuid.UUID(str(project_id))
         except ValueError:
             return
-        sockets = self.clients.get(key)
+        sockets = set(self.clients.get(key, ())) | set(self.clients.get(ALL_PROJECTS_KEY, ()))
         if not sockets:
             return
         text = json.dumps(
@@ -113,7 +114,8 @@ class Broadcaster:
             try:
                 await socket.send_text(text)
             except Exception:
-                sockets.discard(socket)
+                self.clients[key].discard(socket)
+                self.clients[ALL_PROJECTS_KEY].discard(socket)
 
 
 broadcaster = Broadcaster()
@@ -144,19 +146,36 @@ async def _allowed(user: User, project_id: uuid.UUID) -> bool:
     return role is not None
 
 
+# the key under which the sockets of the all-projects scope are kept (decision D118)
+ALL_PROJECTS_KEY = uuid.UUID(int=0)
+
+
 @router.websocket("/ws/projects/{project_id}")
-async def project_stream(socket: WebSocket, project_id: uuid.UUID, token: str) -> None:
+async def project_stream(socket: WebSocket, project_id: str, token: str) -> None:
+    """One project's messages, or every project's for a server admin who connects with the
+    reserved id `all` (decision D115); every message carries its `project_id`."""
     user = await _authenticate(token)
     if user is None:
         await socket.close(code=status.WS_1008_POLICY_VIOLATION, reason="invalid token")
         return
-    if not await _allowed(user, project_id):
-        await socket.close(code=status.WS_1008_POLICY_VIOLATION, reason="no access to project")
-        return
+    if project_id == ALL_PROJECTS:
+        if not user.is_superuser:
+            await socket.close(code=status.WS_1008_POLICY_VIOLATION, reason="no access to project")
+            return
+        key = ALL_PROJECTS_KEY
+    else:
+        try:
+            key = uuid.UUID(project_id)
+        except ValueError:
+            await socket.close(code=status.WS_1008_POLICY_VIOLATION, reason="invalid project")
+            return
+        if not await _allowed(user, key):
+            await socket.close(code=status.WS_1008_POLICY_VIOLATION, reason="no access to project")
+            return
     await socket.accept()
-    broadcaster.add(project_id, socket)
+    broadcaster.add(key, socket)
     broadcaster.start()
-    await socket.send_text(json.dumps({"topic": "connected", "project_id": str(project_id)}))
+    await socket.send_text(json.dumps({"topic": "connected", "project_id": project_id}))
     try:
         while True:
             # clients may send pings; anything else is ignored
@@ -164,7 +183,7 @@ async def project_stream(socket: WebSocket, project_id: uuid.UUID, token: str) -
     except WebSocketDisconnect:
         pass
     finally:
-        broadcaster.remove(project_id, socket)
+        broadcaster.remove(key, socket)
 
 
 def payload_for_client(message: Message) -> dict[str, Any]:
