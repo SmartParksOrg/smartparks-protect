@@ -105,15 +105,28 @@ async def coverage(
             params[f"gs{i}"] = source_id
             params[f"gx{i}"] = external_id
         gateway_filter = " AND (" + " OR ".join(clauses) + ")"
+    # Receptions first: the devices heard in the window are few, and a positions scan per
+    # device uses the compressed chunks' device index, where a bounding-box scan over every
+    # chunk of the window decompresses them all (seconds per 90 days in the all scope).
     heard = f"""
         heard AS (
             SELECT p.id, p.time, p.geom, r.rssi, r.gateway_id, r.data_source_id
-            FROM positions p
+            FROM (
+                SELECT DISTINCT r.device_id FROM gateway_receptions r
+                WHERE r.time >= :since AND r.device_id IS NOT NULL {gateway_filter}
+            ) d
+            JOIN LATERAL (
+                SELECT p.id, p.time, p.geom, p.device_id, p.source_event_id
+                FROM positions p
+                WHERE p.device_id = d.device_id
+                  AND (CAST(:project_id AS uuid) IS NULL
+                       OR p.project_id = CAST(:project_id AS uuid))
+                  AND p.time >= :since AND p.time < :until
+                  AND p.geom && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
+            ) p ON true
             JOIN gateway_receptions r
               ON r.device_id = p.device_id AND r.source_event_id = p.source_event_id
-            WHERE (CAST(:project_id AS uuid) IS NULL OR p.project_id = CAST(:project_id AS uuid))
-              AND p.time >= :since AND p.time < :until
-              AND p.geom && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
+             AND r.time >= :since
               {gateway_filter}
         ),
         best AS (

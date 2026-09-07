@@ -1219,6 +1219,10 @@ Listed by the phase where they are first needed.
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
 
+### 2026-09-07, heard positions in the all scope, fold (Claude and Tim)
+
+- Tim's phone showed "Loading…" for the heard positions in All projects over 90 days, and he wanted the row to fold. The server log showed every request answered 200, but each took 5 to 7 s: the bounding-box filter cannot use the spatial index on compressed positions chunks, so every chunk of the window was decompressed, and panning fired a request per second. Rewritten receptions-first with a lateral positions scan per device (0.56 s in the same explain), the request of a gone viewport is cancelled, the settle is 600 ms, the panel shows a load error with a retry, and Heard positions folds and joins Fold all.
+
 ### 2026-09-07, bulk assignment (Claude and Tim)
 
 - Tim asked for the bulk assignment after the gateway finding (D122). Built: `POST /devices/bulk-assign` with the first-data start, optional entities and groups, reattribution and skips; the all-scope devices list has a selection, column filters and the Assign to project action with its dialog; an API test covers the start, the entities, the skips and the 403. Checked on the local build: three devices from "Not in a project" selected and the dialog opened on Smart Parks, not submitted.

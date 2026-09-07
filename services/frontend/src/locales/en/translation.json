@@ -280,6 +280,7 @@
   "Correction approved and applied": "Correction approved and applied",
   "corrections applied on": "corrections applied on",
   "Corrections need approval": "Corrections need approval",
+  "Could not load the heard positions: {{message}}": "Could not load the heard positions: {{message}}",
   "Coverage": "Coverage",
   "Create": "Create",
   "Create {{count}} devices_one": "Create {{count}} device",

@@ -166,6 +166,8 @@ export function LayerPanel({
   events,
   gateways,
   coverage,
+  coverageError,
+  onRetryCoverage,
   choices,
   trackedIds,
   trackLabel,
@@ -188,6 +190,9 @@ export function LayerPanel({
   events: EventFeatureProperties[];
   gateways: Gateway[];
   coverage: CoverageResponse | undefined;
+  /** Why the heard positions did not load, if they did not; the panel offers a retry. */
+  coverageError?: string;
+  onRetryCoverage?: () => void;
   choices: LayerChoices;
   trackedIds: string[];
   /** The current track length, for the tooltip of the track button ("21 days"). */
@@ -1143,6 +1148,7 @@ export function LayerPanel({
   );
 
   const gatewaysOpen = expanded.has("gw") || Boolean(term);
+  const coverageOpen = expanded.has("cov") || Boolean(term);
   const coverageTab = (
     <>
       <div className="flex items-center gap-1.5 px-1 pb-2">
@@ -1156,6 +1162,19 @@ export function LayerPanel({
       </div>
       <div className="flex-1 overflow-y-auto">
         <Row depth={0} header>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0"
+            aria-label={coverageOpen ? t("Collapse") : t("Expand")}
+            onClick={() => flip("cov")}
+          >
+            {coverageOpen ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronRight className="size-4" />
+            )}
+          </Button>
           <Check
             checked={choices.coverage}
             label={t("Heard positions")}
@@ -1185,7 +1204,7 @@ export function LayerPanel({
             </SelectContent>
           </Select>
         </Row>
-        {choices.coverage && (
+        {coverageOpen && choices.coverage && (
           <div className="space-y-1 px-2 py-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <span>{t("-120 dBm")}</span>
@@ -1199,16 +1218,33 @@ export function LayerPanel({
               <span>{t("-80 dBm")}</span>
             </div>
             <div>
-              {coverage
-                ? coverage.mode === "hexagons"
-                  ? t(
-                      "{{count}} heard positions in view, as hexagons of about {{size}} m",
-                      { count: coverage.total, size: coverage.hexagon_m ?? 0 },
-                    )
-                  : t("{{count}} heard positions in view", {
-                      count: coverage.total,
-                    })
-                : t("Loading…")}
+              {coverageError ? (
+                <span className="text-destructive">
+                  {t("Could not load the heard positions: {{message}}", {
+                    message: coverageError,
+                  })}{" "}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={onRetryCoverage}
+                  >
+                    {t("Retry")}
+                  </button>
+                </span>
+              ) : coverage ? (
+                coverage.mode === "hexagons" ? (
+                  t(
+                    "{{count}} heard positions in view, as hexagons of about {{size}} m",
+                    { count: coverage.total, size: coverage.hexagon_m ?? 0 },
+                  )
+                ) : (
+                  t("{{count}} heard positions in view", {
+                    count: coverage.total,
+                  })
+                )
+              ) : (
+                t("Loading…")
+              )}
             </div>
             <div>
               {t(
@@ -1320,7 +1356,7 @@ export function LayerPanel({
         )}
       </div>
       {footer(
-        ["gw"],
+        ["cov", "gw"],
         placed.filter((g) => isGatewayVisible(g.id, choices)).length,
         placed.length,
         () => onChange(showAllGateways(choices)),

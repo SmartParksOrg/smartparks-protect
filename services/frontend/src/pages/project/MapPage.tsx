@@ -252,11 +252,13 @@ export function MapPage() {
   );
   const coverage = useQuery({
     queryKey: queryKeys.coverage(projectId, coverageParams),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api.get<CoverageResponse>(`/api/v1/projects/${projectId}/coverage`, {
         query: coverageParams,
+        signal,
       }),
     enabled: layers.coverage && viewport !== null,
+    retry: false,
     placeholderData: (previous) => previous,
     refetchInterval: 120_000,
   });
@@ -560,7 +562,7 @@ export function MapPage() {
             .join(","),
           zoom: Math.round(map.getZoom()),
         });
-      }, 400);
+      }, 600);
     };
     update();
     map.on("moveend", update);
@@ -723,7 +725,16 @@ export function MapPage() {
       }),
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapRef, ready, trackedIds, trackedDeviceIds, ...trackData, ...deviceTrackData]);
+  }, [
+    mapRef,
+    ready,
+    trackedIds,
+    trackedDeviceIds,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ...trackData,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ...deviceTrackData,
+  ]);
 
   const selected = currentFeatures?.find(
     (f) => f.properties.entity_id === selectedId,
@@ -854,13 +865,14 @@ export function MapPage() {
             />
           )}
         </div>
-        {trackSettingsOpen && trackedIds.length + trackedDeviceIds.length > 0 && (
-          <TrackSettingsPanel
-            length={trackLength}
-            onChange={setTrackLength}
-            onClose={() => setTrackSettingsOpen(false)}
-          />
-        )}
+        {trackSettingsOpen &&
+          trackedIds.length + trackedDeviceIds.length > 0 && (
+            <TrackSettingsPanel
+              length={trackLength}
+              onChange={setTrackLength}
+              onClose={() => setTrackSettingsOpen(false)}
+            />
+          )}
       </div>
       {panelOpen && currentFeatures && (
         <LayerPanel
@@ -872,19 +884,30 @@ export function MapPage() {
           )}
           gateways={gateways.data ?? []}
           coverage={layers.coverage ? coverage.data : undefined}
+          coverageError={
+            layers.coverage && coverage.isError
+              ? coverage.error.message
+              : undefined
+          }
+          onRetryCoverage={() => void coverage.refetch()}
           choices={layers}
           trackedIds={trackedIds}
           trackLabel={trackLengthLabel}
           devices={(deviceFeatures ?? []).map((f) => f.properties)}
           projects={
             allProjects
-              ? (projectList.data?.items ?? []).map((p) => ({ id: p.id, name: p.name }))
+              ? (projectList.data?.items ?? []).map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                }))
               : undefined
           }
           trackedDeviceIds={trackedDeviceIds}
           onPickDevice={(id) => {
             selectDevice(id);
-            const f = deviceFeatures?.find((x) => x.properties.device_id === id);
+            const f = deviceFeatures?.find(
+              (x) => x.properties.device_id === id,
+            );
             if (f?.geometry && mapRef.current)
               mapRef.current.easeTo({
                 center: f.geometry.coordinates as [number, number],
@@ -961,7 +984,10 @@ export function MapPage() {
               name={selected.name}
               size="md"
               fallback={
-                <Icon iconKey={selected.icon_key} className="size-7 text-primary" />
+                <Icon
+                  iconKey={selected.icon_key}
+                  className="size-7 text-primary"
+                />
               }
             />
             <div className="min-w-0 flex-1">
@@ -1158,7 +1184,9 @@ export function MapPage() {
             {selectedDevice.properties.last_status_at && (
               <>
                 <dt className="text-muted-foreground">{t("Last status")}</dt>
-                <dd title={formatTime(selectedDevice.properties.last_status_at)}>
+                <dd
+                  title={formatTime(selectedDevice.properties.last_status_at)}
+                >
                   {formatAgo(selectedDevice.properties.last_status_at, now)}
                 </dd>
               </>
@@ -1199,8 +1227,12 @@ export function MapPage() {
               }
               size="sm"
               className="h-8"
-              aria-pressed={trackedDeviceIds.includes(selectedDevice.properties.device_id)}
-              title={t("Show the track, {{length}}", { length: trackLengthLabel })}
+              aria-pressed={trackedDeviceIds.includes(
+                selectedDevice.properties.device_id,
+              )}
+              title={t("Show the track, {{length}}", {
+                length: trackLengthLabel,
+              })}
               onClick={() =>
                 setTrackedDevices(
                   trackedDeviceIds.includes(selectedDevice.properties.device_id)
