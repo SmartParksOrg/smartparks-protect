@@ -2,6 +2,7 @@ import type {
   ExpressionSpecification,
   GeoJSONSource,
   Map as MapLibreMap,
+  MapLayerMouseEvent,
 } from "maplibre-gl";
 
 import {
@@ -55,12 +56,11 @@ export function stateFor(
   return "normal";
 }
 
-/** Add the entity source and layers once; features are pushed with `setEntities`. */
-export function ensureEntityLayers(
-  map: MapLibreMap,
-  onClick: (props: EntityFeatureProperties) => void,
-  onClusterClick: (lngLat: [number, number], clusterId: number) => void,
-): void {
+/** Add the entity source and layers once; features are pushed with `setEntities`. Click
+ * handlers are not bound here: the map outlives a project change on the same page, so a handler
+ * registered once would keep the callbacks of the first project. Use `bindEntityClicks` from an
+ * effect and call the returned function in its cleanup. */
+export function ensureEntityLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.entities)) return;
   map.addSource(SOURCES.entities, {
     type: "geojson",
@@ -116,20 +116,6 @@ export function ensureEntityLayers(
       "text-halo-width": 1.2,
     },
   });
-  map.on("click", "entity-markers", (e) => {
-    const feature = e.features?.[0];
-    if (feature)
-      onClick(feature.properties as unknown as EntityFeatureProperties);
-  });
-  map.on("click", "entity-clusters", (e) => {
-    const feature = e.features?.[0];
-    if (!feature) return;
-    const geometry = feature.geometry as GeoJSON.Point;
-    onClusterClick(
-      geometry.coordinates as [number, number],
-      feature.properties?.cluster_id as number,
-    );
-  });
   for (const layer of ["entity-markers", "entity-clusters"]) {
     map.on(
       "mouseenter",
@@ -138,6 +124,34 @@ export function ensureEntityLayers(
     );
     map.on("mouseleave", layer, () => (map.getCanvas().style.cursor = ""));
   }
+}
+
+/** Bind the entity and cluster clicks; the returned function unbinds them. */
+export function bindEntityClicks(
+  map: MapLibreMap,
+  onClick: (props: EntityFeatureProperties) => void,
+  onClusterClick: (lngLat: [number, number], clusterId: number) => void,
+): () => void {
+  const onMarker = (e: MapLayerMouseEvent) => {
+    const feature = e.features?.[0];
+    if (feature)
+      onClick(feature.properties as unknown as EntityFeatureProperties);
+  };
+  const onCluster = (e: MapLayerMouseEvent) => {
+    const feature = e.features?.[0];
+    if (!feature) return;
+    const geometry = feature.geometry as GeoJSON.Point;
+    onClusterClick(
+      geometry.coordinates as [number, number],
+      feature.properties?.cluster_id as number,
+    );
+  };
+  map.on("click", "entity-markers", onMarker);
+  map.on("click", "entity-clusters", onCluster);
+  return () => {
+    map.off("click", "entity-markers", onMarker);
+    map.off("click", "entity-clusters", onCluster);
+  };
 }
 
 export async function setEntities(
@@ -326,11 +340,9 @@ export interface EventFeatureProperties {
 }
 
 /** Recent events use the event marker family (diamond), so a wolf detection never looks like a
- * tracked wolf (architecture 24.5). Placed under the entity layers so entities stay on top. */
-export function ensureEventLayers(
-  map: MapLibreMap,
-  onClick: (props: EventFeatureProperties) => void,
-): void {
+ * tracked wolf (architecture 24.5). Placed under the entity layers so entities stay on top.
+ * Clicks are bound with `bindEventClicks`, for the reason given at `ensureEntityLayers`. */
+export function ensureEventLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.events)) return;
   map.addSource(SOURCES.events, {
     type: "geojson",
@@ -351,11 +363,6 @@ export function ensureEventLayers(
     },
     "entity-clusters",
   );
-  map.on("click", "event-markers", (e) => {
-    const feature = e.features?.[0];
-    if (feature)
-      onClick(feature.properties as unknown as EventFeatureProperties);
-  });
   map.on(
     "mouseenter",
     "event-markers",
@@ -366,6 +373,20 @@ export function ensureEventLayers(
     "event-markers",
     () => (map.getCanvas().style.cursor = ""),
   );
+}
+
+/** Bind the event marker click; the returned function unbinds it. */
+export function bindEventClicks(
+  map: MapLibreMap,
+  onClick: (props: EventFeatureProperties) => void,
+): () => void {
+  const onMarker = (e: MapLayerMouseEvent) => {
+    const feature = e.features?.[0];
+    if (feature)
+      onClick(feature.properties as unknown as EventFeatureProperties);
+  };
+  map.on("click", "event-markers", onMarker);
+  return () => map.off("click", "event-markers", onMarker);
 }
 
 export async function setEvents(

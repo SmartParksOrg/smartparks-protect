@@ -18,6 +18,7 @@ From Tim's first hour with v2.0.0 on the dev server.
 
 ### Fixed
 
+- Clicking an entity on the live map after switching project on that page jumped back to the project opened first: the map's click handlers were bound once per map with the first project's URL writer, and the map outlives a project switch on the same page. Click handlers are now bound in an effect that unbinds them on cleanup, so they follow the current project; the map also fits the new project's entities after a switch instead of staying on the old viewport.
 - The guided start field never reported its default: a form that opened on "since the device's first data" and was submitted without a click kept "from now" instead, which is how an entity assigned with all its history ended up starting at the moment of the click. The field reports its first choice as well.
 - The entity page's traffic section shows the tracked device's messages from the assignment start, not before it.
 - An entity assigned to a device with history stayed off the map and without last seen after the repair: the attribution recompute skipped entities that had no current-state row yet, so only the next record would have created one. The recompute now creates the row with the latest position, device and last seen. The entity page says how many of the device's records sit before the assignment and offers the same repair as the device page, and the assign dialog says what a later start means.

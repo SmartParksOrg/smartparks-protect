@@ -24,6 +24,8 @@ import {
   saveBasemap,
 } from "@/components/map/basemap";
 import {
+  bindEntityClicks,
+  bindEventClicks,
   type EntityFeatureProperties,
   ensureEntityLayers,
   ensureEventLayers,
@@ -318,11 +320,25 @@ export function MapPage() {
     }
   });
 
-  // layers
+  // layers, once per map style
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    ensureEntityLayers(
+    ensureEntityLayers(map);
+    ensureFeatureLayers(map);
+    ensureGatewayLayers(map);
+    ensureCoverageLayers(map);
+    ensureTrackLayers(map);
+    ensureEventLayers(map);
+  }, [mapRef, ready]);
+
+  // clicks, rebound whenever the URL writers change: `setParams` carries the current pathname,
+  // and the map outlives a switch to another project on this page, so a handler bound once
+  // would keep sending clicks to the first project's URL.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const unbindEntities = bindEntityClicks(
       map,
       (props) => select(props.entity_id),
       (lngLat, clusterId) => {
@@ -334,11 +350,7 @@ export function MapPage() {
           .then((zoom) => map.easeTo({ center: lngLat, zoom }));
       },
     );
-    ensureFeatureLayers(map);
-    ensureGatewayLayers(map);
-    ensureCoverageLayers(map);
-    ensureTrackLayers(map);
-    ensureEventLayers(map, (props) =>
+    const unbindEvents = bindEventClicks(map, (props) =>
       setParams(
         (p) => {
           p.set("event", props.event_id);
@@ -347,6 +359,10 @@ export function MapPage() {
         { replace: true },
       ),
     );
+    return () => {
+      unbindEntities();
+      unbindEvents();
+    };
   }, [mapRef, ready, select, setParams]);
 
   // the viewport for the coverage query, settled a moment after the map stops moving
@@ -438,6 +454,9 @@ export function MapPage() {
   }, [mapRef, ready, featureParam, features.data]);
 
   const fitted = useRef(false);
+  useEffect(() => {
+    fitted.current = false; // another project: fit to its entities once they arrive
+  }, [projectId]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !currentFeatures || !visibleFeatures) return;

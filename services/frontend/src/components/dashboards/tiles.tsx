@@ -10,7 +10,7 @@ import type { Alert, CurrentState, Entity, EventItem, MetricWithData, Page as Pa
 import { SeriesChart } from "@/components/analytics/SeriesChart";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { loadBasemap } from "@/components/map/basemap";
-import { ensureEntityLayers, setEntities } from "@/components/map/layers";
+import { bindEntityClicks, ensureEntityLayers, setEntities } from "@/components/map/layers";
 import { useMap } from "@/components/map/useMap";
 import { type Aggregate, AGGREGATES, browserTimezone, CHART_TYPES, type ChartType, RANGE_PRESETS, type RangePreset, rangeFor, seriesLabel } from "@/lib/analytics";
 import { formatAgo, formatTime } from "@/lib/format";
@@ -66,7 +66,8 @@ export function MapTile({ projectId }: { projectId: string }) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    ensureEntityLayers(map, () => undefined, (lngLat, clusterId) => {
+    ensureEntityLayers(map);
+    return bindEntityClicks(map, () => undefined, (lngLat, clusterId) => {
       const source = map.getSource("entities") as maplibregl.GeoJSONSource | undefined;
       void source?.getClusterExpansionZoom(clusterId).then((zoom) => map.easeTo({ center: lngLat, zoom }));
     });

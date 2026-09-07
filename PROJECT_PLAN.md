@@ -18,7 +18,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | --- | --- |
 | Active phase | Phase 15 complete with v2.0.0 on 2026-09-06; the next phase is planned with Tim from the open items (the live verification stages that wait for accounts, Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack) |
 | Latest release | v2.0.0 (2026-09-06): phases 10 to 15 and the deployment fixes |
-| Last session | 2026-09-06 |
+| Last session | 2026-09-07 |
 | Next item | Release the fixes from Tim's first hour as v2.0.1 on his word, then plan the next phase with Tim. Open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live verification stages that wait for other accounts |
 | Blockers | Live verification: KPN LoRa is live; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
 
@@ -1060,39 +1060,6 @@ Listed by the phase where they are first needed.
 - Built the Layers panel on the live map: groups and subgroups with counts, show and hide per group and per entity, "only", ungrouped as a layer, features and events switches. Hidden sets rather than shown sets, so new groups and entities appear until hidden. The choices live in a new per-user preference document (`users.preferences`, migration 0020) through `PATCH /users/me`, saved a moment after the last change; the same store serves D105's detail-level preference next.
 - Where to continue: site-wide search (D99), then presentation (D105).
 
-### 2026-09-06, site-wide search (Claude)
-
-- Built D99: one bounded search endpoint (at most 50 per kind) over entities, devices (name, serial or an external id such as a DevEUI), features, gateways (through the data sources scoped to the caller's projects), data sources (server admins) and projects, inside what the caller may see; the command palette on Ctrl+K or Cmd+K and from the sidebar, with the pages of the current project, recent picks kept in the browser, and results grouped by kind with the project as subtitle. A feature opens the map on itself (`?feature=`); gateways and data sources open their lists because they have no page of their own.
-- Where to continue: presentation (D105).
-
-### 2026-09-06, operational view first (Claude)
-
-- Built D105: the technical details preference on the user's preference document (server admins default on), the sidebar switch, the folded Technical details section (one click opens it for a page, the switch everywhere), the Network section shown only with the preference on, the device page's identities, traffic and provenance links folded, the driver column on the devices list gated. The audit of the other pages found nothing to fold: they show the entity, its state and the next action already. The inventory per role is in the administration docs.
-- Where to continue: the style pass, then coverage (D107), then v2.0.0.
-
-### 2026-09-06, style pass (Claude)
-
-- Column picker on the shared table, kept per user in the preference document; the admin devices list hides Created by default. Wording: Time instead of When, Status instead of State. Empty states now say what to do next on the project lists. The screenshot sweep ran against the local stack as the check: every route clean at the three widths, once the sweep learned to fill the entity route with a real entity (its only finding was its own placeholder hitting the API).
-- Where to continue: coverage (D107), then v2.0.0.
-
-### 2026-09-06, coverage (Claude)
-
-- Tim chose to build coverage before the release. Built D107 in the map's Coverage tab rather than as a separate page: heard positions (positions joined to the receptions of their own source event, best RSSI) as dots zoomed in and as hexagons aggregated by PostGIS zoomed out, a period from a day to 90 days, the gateway checkboxes as the filter, the share per gateway on its row, a legend and the note that it shows only where collars were. `mode` on the endpoint forces points or hexagons for checks. The API client now sends repeated query parameters for lists.
-- Where to continue: v2.0.0.
-
-### 2026-09-06, release v2.0.0 (Claude)
-
-- Prepared the release on Tim's word: `VERSION` v2.0.0, the changelog's Unreleased section became v2.0.0 with the phase 15 summary, a Breaking section (the KPN source config's one-key form, the major for the production milestone) and every migration from 0013 to 0020 with its downgrade, the plan's status block. The tag `v2.0.0` goes on the release commit; the dev server follows `main`, which is that commit.
-- Phase 15 is complete. Where to continue: plan the next phase with Tim from the open items.
-
-### 2026-09-06, Tim's first hour with v2.0.0 (Claude)
-
-- Five observations from the dev server, all built: the track button shows its state and several tracks run at once with their own colours (`?tracks=`); a row under a switched-off parent switches the parent on and hides the rest, on every tab; the source event dialog opens on a Decoded tab with the records a delivery became (`records` on the read); the map's entity panel moves aside while the layers panel is open; the entity page shows recent events, recent positions with a track link and the tracked device's traffic under Technical details.
-- Tim also asked to hide and show the left navigation on desktop: a header button folds the sidebar to a slim rail with the reopen button, kept per browser (`stores/layout.ts`); the rail keeps the map's controls from being covered.
-- Tim's bug: Hooglander Horsterwold 0253 assigned to SP051440 "from now" (18:03:45) showed no last seen and no position while the collar had traffic. Cause one: nothing had arrived since the start, by design. Cause two, real: `recompute_current_state` skipped entities without a current-state row, so the repair could never put a fresh entity on the map; fixed, with the repair test asserting the map feature. The entity page now warns about records before the assignment and offers the repair; the dialog explains the start choice.
-- Tim's second look found the real cause of the "from now" start: `AssignmentStartField` showed "since the device's first data" but only reported a choice on click, so the dialog submitted its own default. Fixed at the field, which now reports its first choice. Also asked: change an assignment instead of only removing it (`AssignmentChange` on the PATCH, the Change… dialog on the entity page), the entity's traffic windowed to the assignment, and KPN's join notification recognised as a join (live fixture `kpn_live_join_notification.json`; source event 5121 on the dev server stays a log line, it was stored before the change).
-- Where to continue: plan the next phase with Tim from the open items; these fixes go out as v2.0.1 when he says so.
-
 ### 2026-09-06, map layers reworked on Tim's feedback (Claude)
 
 - Tim tried the panel on the dev server against EarthRanger's Map Layers and asked for four changes: groups of any depth (D98 amended, ADR 0020 amended, no migration needed: the parent column already pointed at the table; filters and deletions now walk a recursive query, a group cannot move into itself or below itself), a cleaner panel with the entity icons, clearer levels and a minimal last seen, tabs for Entities, Features and Events like EarthRanger's Subjects, Features, Analyzers and Events, and search plus sort with a grouped or flat view. All four built: the panel is a full-height drawer with the three tabs, the top controls move aside while it is open, features hide per type and per feature, events per type, and every row has a locate button.
@@ -1132,4 +1099,13 @@ Listed by the phase where they are first needed.
 ### 2026-09-06, Tim's first hour with v2.0.0 (Claude)
 
 - Five observations from the dev server, all built: the track button shows its state and several tracks run at once with their own colours (`?tracks=`); a row under a switched-off parent switches the parent on and hides the rest, on every tab; the source event dialog opens on a Decoded tab with the records a delivery became (`records` on the read); the map's entity panel moves aside while the layers panel is open; the entity page shows recent events, recent positions with a track link and the tracked device's traffic under Technical details.
+- Tim also asked to hide and show the left navigation on desktop: a header button folds the sidebar to a slim rail with the reopen button, kept per browser (`stores/layout.ts`); the rail keeps the map's controls from being covered.
+- Tim's bug: Hooglander Horsterwold 0253 assigned to SP051440 "from now" (18:03:45) showed no last seen and no position while the collar had traffic. Cause one: nothing had arrived since the start, by design. Cause two, real: `recompute_current_state` skipped entities without a current-state row, so the repair could never put a fresh entity on the map; fixed, with the repair test asserting the map feature. The entity page now warns about records before the assignment and offers the repair; the dialog explains the start choice.
+- Tim's second look found the real cause of the "from now" start: `AssignmentStartField` showed "since the device's first data" but only reported a choice on click, so the dialog submitted its own default. Fixed at the field, which now reports its first choice. Also asked: change an assignment instead of only removing it (`AssignmentChange` on the PATCH, the Change… dialog on the entity page), the entity's traffic windowed to the assignment, and KPN's join notification recognised as a join (live fixture `kpn_live_join_notification.json`; source event 5121 on the dev server stays a log line, it was stored before the change).
 - Where to continue: plan the next phase with Tim from the open items; these fixes go out as v2.0.1 when he says so.
+
+### 2026-09-07, map clicks after a project switch (Claude)
+
+- Tim found on the dev server that clicking an entity on the live map sometimes moved him from project Smart Parks to Demo. Cause: the map's click handlers were bound once per map (inside `ensureEntityLayers`) with the first project's `select`, whose `setSearchParams` resolves against the pathname it was created with; the map and the page outlive a project switch on the map page because only the route parameter changes. So after opening Demo first and switching to Smart Parks, a click wrote `?entity=` onto the Demo URL. Fixed by splitting layer creation (`ensure*Layers`, once) from click binding (`bindEntityClicks`, `bindEventClicks`, bound in an effect with a cleanup that unbinds), with a unit test over a fake map; the map also fits the new project's entities after a switch, which the same stale page had skipped. The dashboard's map tile uses the same binding.
+- Housekeeping: the session log had the entries from site-wide search to Tim's first hour twice (a compaction artefact); the duplicate block is removed and the two entries between them (map layers reworked, organizing page) now sit in date order.
+- Not committed. Tim reviews and commits; these fixes go out with v2.0.1.
