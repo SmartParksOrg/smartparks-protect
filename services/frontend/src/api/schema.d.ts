@@ -2267,7 +2267,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Event */
+        /**
+         * Get Event
+         * @description One event of the project, or of any project in the all scope (decision D115).
+         */
         get: operations["get_event_api_v1_projects__project_id__events__event_id__get"];
         put?: never;
         post?: never;

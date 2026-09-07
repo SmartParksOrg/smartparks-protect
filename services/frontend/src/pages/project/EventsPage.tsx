@@ -67,9 +67,9 @@ export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; e
             <div className="grid grid-cols-2 gap-2">
               <div><span className="text-muted-foreground">{t("Severity")}</span><div><StatusBadge value={d.event.severity} /></div></div>
               <div><span className="text-muted-foreground">{t("Created")}</span><div>{formatTime(d.event.created_at)}</div></div>
-              {d.event.entity_id && projectPath && <div><span className="text-muted-foreground">{t("Entity")}</span><div><Link className="underline" to={`${projectPath}/map?entity=${d.event.entity_id}`}>{t("show on map")}</Link></div></div>}
+              {d.event.entity_id && projectPath && <div><span className="text-muted-foreground">{t("Entity")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/map?entity=${d.event.entity_id}`}>{t("show on map")}</Link></div></div>}
               {d.event.device_id && projectPath && <div><span className="text-muted-foreground">{t("Device")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/devices/${d.event.device_id}`}>{t("open device")}</Link></div></div>}
-              {d.event.trace_id && projectPath && <div><span className="text-muted-foreground">{t("Trace")}</span><div><Link className="underline" to={`${projectPath}/network/traces?trace=${d.event.trace_id}`}>{t("view processing trace")}</Link></div></div>}
+              {d.event.trace_id && projectPath && <div><span className="text-muted-foreground">{t("Trace")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/network/traces?trace=${d.event.trace_id}`}>{t("view processing trace")}</Link></div></div>}
               {d.event.description && <div className="col-span-2"><span className="text-muted-foreground">{t("Description")}</span><div>{d.event.description}</div></div>}
             </div>
             {d.alert && (

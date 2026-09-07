@@ -10317,6 +10317,7 @@
      "events"
     ],
     "summary": "Get Event",
+    "description": "One event of the project, or of any project in the all scope (decision D115).",
     "operationId": "get_event_api_v1_projects__project_id__events__event_id__get",
     "security": [
      {
@@ -10340,7 +10341,6 @@
       "required": true,
       "schema": {
        "type": "string",
-       "format": "uuid",
        "title": "Project Id"
       }
      }

@@ -1220,6 +1220,10 @@ Listed by the phase where they are first needed.
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
 
+### 2026-09-07, events in the all scope, slow decoded tab (Claude and Tim)
+
+- Tim: events do not load on the dev server, and the Decoded tab of a traffic row takes seconds. The nginx log showed the event detail answering 422 under `/projects/all`: the detail endpoint took a `ProjectContext`; it takes the scope now, with the all scope accepting any project's event, listed in `ALL_SCOPE_READS`, and the dialog's map and trace links use the event's project. The decoded records looked up positions, measurements, states and events by source event id alone, a column no hypertable indexes: explain on the server gave 76 s cold for the positions, 45 ms with the device id; every lookup takes the device now.
+
 ### 2026-09-07, CI red since the device layer (Claude)
 
 - Tim asked why he gets CI failure mails. CI had failed on every push since 19677ec (12:52 UTC), the API and decoder test jobs only; nobody looked because the next pushes kept coming. Seven failures, all in tests: the device layer tests lacked the `bus` fixture import; the access matrix did not know the all scope answers 404 for a random gateway id on the gateway detail; the D119 test looked for step rows that a compact trace does not store (the compaction now also keeps a step's `note`, so the clock-ahead note shows in the trace explorer); two D121 tests read expired attributes after `expire_all`; the needs-attention test consumed the old topic after the linking moved to the decoder's walk. No production code was wrong apart from the dropped note.

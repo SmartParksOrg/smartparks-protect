@@ -195,10 +195,15 @@ async def _transition(
 
 
 async def event_detail_for(
-    session: AsyncSession, event_id: uuid.UUID, project_id: uuid.UUID | None
+    session: AsyncSession,
+    event_id: uuid.UUID,
+    project_id: uuid.UUID | None,
+    *,
+    all_projects: bool = False,
 ) -> EventDetail:
     event = await get_or_404(session, Event, event_id, "Event")
-    if event.project_id != project_id:
+    visible = event.project_id is not None if all_projects else event.project_id == project_id
+    if not visible:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Event not found")
     alert = await session.scalar(select(Alert).where(Alert.event_id == event.id))
     deliveries = await session.scalars(
@@ -245,10 +250,13 @@ async def list_events(
 @router.get("/projects/{project_id}/events/{event_id}", response_model=EventDetail)
 async def get_event(
     event_id: uuid.UUID,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> EventDetail:
-    return await event_detail_for(session, event_id, context.project.id)
+    """One event of the project, or of any project in the all scope (decision D115)."""
+    return await event_detail_for(
+        session, event_id, context.project_id, all_projects=context.is_all
+    )
 
 
 @router.get("/projects/{project_id}/map/events")

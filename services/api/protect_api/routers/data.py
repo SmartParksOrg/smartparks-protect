@@ -297,14 +297,21 @@ async def get_source_event(
         deliveries=[DeliveryRead.model_validate(d, from_attributes=True) for d in deliveries],
         links=resolve_links(source, identity) if source else [],
         data_source_name=source.name if source else None,
-        records=await _decoded_records(session, event.id),
+        records=await _decoded_records(session, event.id, event.device_id),
     )
 
 
-async def _decoded_records(session: AsyncSession, source_event_id: int) -> DecodedRecordsRead:
+async def _decoded_records(
+    session: AsyncSession, source_event_id: int, device_id: uuid.UUID | None
+) -> DecodedRecordsRead:
     """The positions, measurements, states and events that carry this source event's id, so
-    the traffic view can show what a delivery meant without opening the data explorer."""
+    the traffic view can show what a delivery meant without opening the data explorer. The
+    device narrows every lookup to its rows: the hypertables have no index on the source event
+    id, and compressed chunks are read per device, so the id alone scanned them whole."""
     from shared.models import DeviceStateHistory, Event, Measurement, Position
+
+    if device_id is None:
+        return DecodedRecordsRead(positions=[], measurements=[], states=[], events=[])
 
     positions = (
         await session.execute(
@@ -315,7 +322,7 @@ async def _decoded_records(session: AsyncSession, source_event_id: int) -> Decod
                 Position.altitude_m,
                 Position.accuracy_m,
             )
-            .where(Position.source_event_id == source_event_id)
+            .where(Position.device_id == device_id, Position.source_event_id == source_event_id)
             .order_by(Position.time)
             .limit(200)
         )
@@ -323,7 +330,9 @@ async def _decoded_records(session: AsyncSession, source_event_id: int) -> Decod
     measurements = (
         await session.scalars(
             select(Measurement)
-            .where(Measurement.source_event_id == source_event_id)
+            .where(
+                Measurement.device_id == device_id, Measurement.source_event_id == source_event_id
+            )
             .order_by(Measurement.time, Measurement.metric_key)
             .limit(500)
         )
@@ -331,7 +340,10 @@ async def _decoded_records(session: AsyncSession, source_event_id: int) -> Decod
     states = (
         await session.scalars(
             select(DeviceStateHistory)
-            .where(DeviceStateHistory.source_event_id == source_event_id)
+            .where(
+                DeviceStateHistory.device_id == device_id,
+                DeviceStateHistory.source_event_id == source_event_id,
+            )
             .order_by(DeviceStateHistory.time)
             .limit(50)
         )
@@ -339,7 +351,7 @@ async def _decoded_records(session: AsyncSession, source_event_id: int) -> Decod
     events = (
         await session.scalars(
             select(Event)
-            .where(Event.source_event_id == source_event_id)
+            .where(Event.device_id == device_id, Event.source_event_id == source_event_id)
             .order_by(Event.time)
             .limit(50)
         )
