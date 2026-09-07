@@ -3583,6 +3583,53 @@
     }
    }
   },
+  "/api/v1/devices/bulk-assign": {
+   "post": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Bulk Assign",
+    "description": "Devices in no project, onboarded in bulk, join a project in one go (decision D122): each\ngets an assignment from its first data unless a start is given, optionally an entity of one\ntype with the device's name, and the records inside the range get the project (D103). A\ndevice assigned anywhere in that range is skipped; an entity name already taken in the\nproject leaves that device without one.",
+    "operationId": "bulk_assign_api_v1_devices_bulk_assign_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BulkAssign"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BulkAssignResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/devices/{device_id}/project-assignments": {
    "post": {
     "tags": [
@@ -19734,6 +19781,130 @@
     ],
     "title": "BrowserResult",
     "description": "What the browser reports after executing a WebBLE command."
+   },
+   "BulkAssign": {
+    "properties": {
+     "device_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Device Ids"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "valid_from": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid From",
+      "description": "Start of every assignment; without it each device starts at its first data (records, identity first seen, log files), or now when it has none"
+     },
+     "entity_type_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Type Id",
+      "description": "Also create an entity of this type per device, named as the device"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_ids",
+     "project_id"
+    ],
+    "title": "BulkAssign",
+    "description": "Assign a selection of devices to one project at once (decision D122)."
+   },
+   "BulkAssignResult": {
+    "properties": {
+     "assigned": {
+      "type": "integer",
+      "title": "Assigned"
+     },
+     "entities": {
+      "type": "integer",
+      "title": "Entities"
+     },
+     "reattributed": {
+      "$ref": "#/components/schemas/RecordCounts"
+     },
+     "skipped": {
+      "items": {
+       "$ref": "#/components/schemas/BulkAssignSkipped"
+      },
+      "type": "array",
+      "title": "Skipped"
+     }
+    },
+    "type": "object",
+    "required": [
+     "assigned",
+     "entities",
+     "reattributed",
+     "skipped"
+    ],
+    "title": "BulkAssignResult"
+   },
+   "BulkAssignSkipped": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "reason"
+    ],
+    "title": "BulkAssignSkipped"
    },
    "BulkCreateDevices": {
     "properties": {

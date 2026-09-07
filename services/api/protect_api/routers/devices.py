@@ -5,8 +5,10 @@ import csv
 import io
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
+from pydantic import BaseModel, Field
 from sqlalchemy import exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,7 +56,9 @@ from shared.models import (
     DeviceProjectAssignment,
     DeviceType,
     Entity,
+    EntityType,
     ExternalIdentity,
+    Group,
     Measurement,
     Position,
     Project,
@@ -444,6 +448,198 @@ async def update_device(
 
 
 # Project assignments
+
+
+class BulkAssign(BaseModel):
+    """Assign a selection of devices to one project at once (decision D122)."""
+
+    device_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    project_id: uuid.UUID
+    valid_from: datetime | None = Field(
+        None,
+        description="Start of every assignment; without it each device starts at its first data "
+        "(records, identity first seen, log files), or now when it has none",
+    )
+    entity_type_id: uuid.UUID | None = Field(
+        None, description="Also create an entity of this type per device, named as the device"
+    )
+    group_id: uuid.UUID | None = None
+
+
+class BulkAssignSkipped(BaseModel):
+    device_id: uuid.UUID
+    name: str | None = None
+    reason: str
+
+
+class BulkAssignResult(BaseModel):
+    assigned: int
+    entities: int
+    reattributed: RecordCounts
+    skipped: list[BulkAssignSkipped]
+
+
+async def _first_data_at(session: AsyncSession, device_id: uuid.UUID) -> datetime | None:
+    """The earliest the device produced anything: a record, an identity seen, a log file."""
+    candidates: list[datetime] = []
+    for model in (Position, Measurement):
+        first = await session.scalar(
+            select(func.min(effective_time(model))).where(model.device_id == device_id)
+        )
+        if first is not None:
+            candidates.append(first)
+    for value in (
+        await session.scalar(
+            select(func.min(ExternalIdentity.first_seen_at)).where(
+                ExternalIdentity.device_id == device_id
+            )
+        ),
+        await session.scalar(
+            select(func.min(DeviceLogFile.period_start)).where(DeviceLogFile.device_id == device_id)
+        ),
+    ):
+        if value is not None:
+            candidates.append(value)
+    return min(candidates, default=None)
+
+
+@router.post("/bulk-assign", response_model=BulkAssignResult, status_code=status.HTTP_201_CREATED)
+async def bulk_assign(
+    body: BulkAssign,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> BulkAssignResult:
+    """Devices in no project, onboarded in bulk, join a project in one go (decision D122): each
+    gets an assignment from its first data unless a start is given, optionally an entity of one
+    type with the device's name, and the records inside the range get the project (D103). A
+    device assigned anywhere in that range is skipped; an entity name already taken in the
+    project leaves that device without one."""
+    project = await get_or_404(session, Project, body.project_id, "Project")
+    if body.valid_from is not None:
+        body.valid_from = require_aware(body.valid_from)
+    if body.entity_type_id is not None:
+        await get_or_404(session, EntityType, body.entity_type_id, "Entity type")
+    if body.group_id is not None:
+        if body.entity_type_id is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "A group needs entities: set entity_type_id"
+            )
+        group = await get_or_404(session, Group, body.group_id, "Group")
+        if group.project_id != project.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found in this project")
+    devices = {
+        d.id: d
+        for d in (
+            await session.scalars(select(Device).where(Device.id.in_(set(body.device_ids))))
+        ).all()
+    }
+    taken_entities: set[str] = set()
+    if body.entity_type_id is not None:
+        taken_entities = set(
+            (
+                await session.scalars(
+                    select(Entity.name).where(
+                        Entity.project_id == project.id,
+                        Entity.name.in_([d.name for d in devices.values()]),
+                    )
+                )
+            ).all()
+        )
+    projects_by_id = {
+        p.id: p.name
+        for p in (
+            await session.scalars(
+                select(Project).where(
+                    Project.id.in_(
+                        select(DeviceProjectAssignment.project_id).where(
+                            DeviceProjectAssignment.device_id.in_(devices.keys())
+                        )
+                    )
+                )
+            )
+        ).all()
+    }
+    now = utc_now()
+    assigned = entities = 0
+    reattributed = {"positions": 0, "measurements": 0}
+    skipped: list[BulkAssignSkipped] = []
+    for device_id in dict.fromkeys(body.device_ids):  # in the caller's order, once each
+        device = devices.get(device_id)
+        if device is None:
+            skipped.append(BulkAssignSkipped(device_id=device_id, reason="not found"))
+            continue
+        start = body.valid_from or await _first_data_at(session, device.id) or now
+        overlapping = await session.scalar(
+            select(DeviceProjectAssignment)
+            .where(
+                DeviceProjectAssignment.device_id == device.id,
+                DeviceProjectAssignment.validity.op("&&")(Range(start, None, bounds="[)")),
+            )
+            .order_by(func.lower(DeviceProjectAssignment.validity))
+            .limit(1)
+        )
+        if overlapping is not None:
+            where = projects_by_id.get(overlapping.project_id, "a project")
+            reason = (
+                "already in this project"
+                if overlapping.project_id == project.id
+                else f"assigned to {where} since {range_bounds(overlapping.validity)[0]:%Y-%m-%d}"
+            )
+            skipped.append(BulkAssignSkipped(device_id=device.id, name=device.name, reason=reason))
+            continue
+        session.add(
+            DeviceProjectAssignment(
+                device_id=device.id,
+                project_id=project.id,
+                validity=Range(start, None, bounds="[)"),
+                reason="bulk assignment",
+                created_by_user_id=user.id,
+            )
+        )
+        details: dict[str, Any] = {"device_id": str(device.id), "valid_from": start.isoformat()}
+        if body.entity_type_id is not None and device.name not in taken_entities:
+            entity = Entity(
+                project_id=project.id,
+                entity_type_id=body.entity_type_id,
+                group_id=body.group_id,
+                name=device.name,
+            )
+            session.add(entity)
+            await session.flush()
+            session.add(
+                DeviceEntityAssignment(
+                    device_id=device.id,
+                    entity_id=entity.id,
+                    validity=Range(start, None, bounds="[)"),
+                    reason="bulk assignment",
+                    created_by_user_id=user.id,
+                )
+            )
+            taken_entities.add(device.name)
+            entities += 1
+            details["entity_id"] = str(entity.id)
+        await flush_or_409(session, "Bulk assignment")
+        counts = await reattribute(session, device.id, start, now)
+        for key in reattributed:
+            reattributed[key] += int(counts.get(key, 0))
+        details["reattributed"] = counts
+        await record_audit(
+            session,
+            user=user,
+            action="project_assignment.created",
+            object_type="device",
+            object_id=str(device.id),
+            project_id=project.id,
+            details={**details, "bulk": True},
+        )
+        assigned += 1
+    await session.commit()
+    return BulkAssignResult(
+        assigned=assigned,
+        entities=entities,
+        reattributed=RecordCounts(**reattributed),
+        skipped=skipped,
+    )
 
 
 @router.post(

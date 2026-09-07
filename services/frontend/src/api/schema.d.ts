@@ -720,6 +720,30 @@ export interface paths {
         patch: operations["update_device_api_v1_devices__device_id__patch"];
         trace?: never;
     };
+    "/api/v1/devices/bulk-assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Assign
+         * @description Devices in no project, onboarded in bulk, join a project in one go (decision D122): each
+         *     gets an assignment from its first data unless a start is given, optionally an entity of one
+         *     type with the device's name, and the records inside the range get the project (D103). A
+         *     device assigned anywhere in that range is skipped; an entity name already taken in the
+         *     project leaves that device without one.
+         */
+        post: operations["bulk_assign_api_v1_devices_bulk_assign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/project-assignments": {
         parameters: {
             query?: never;
@@ -4731,6 +4755,53 @@ export interface components {
             };
             /** Error Message */
             error_message?: string | null;
+        };
+        /**
+         * BulkAssign
+         * @description Assign a selection of devices to one project at once (decision D122).
+         */
+        BulkAssign: {
+            /** Device Ids */
+            device_ids: string[];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Valid From
+             * @description Start of every assignment; without it each device starts at its first data (records, identity first seen, log files), or now when it has none
+             */
+            valid_from?: string | null;
+            /**
+             * Entity Type Id
+             * @description Also create an entity of this type per device, named as the device
+             */
+            entity_type_id?: string | null;
+            /** Group Id */
+            group_id?: string | null;
+        };
+        /** BulkAssignResult */
+        BulkAssignResult: {
+            /** Assigned */
+            assigned: number;
+            /** Entities */
+            entities: number;
+            reattributed: components["schemas"]["RecordCounts"];
+            /** Skipped */
+            skipped: components["schemas"]["BulkAssignSkipped"][];
+        };
+        /** BulkAssignSkipped */
+        BulkAssignSkipped: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Name */
+            name?: string | null;
+            /** Reason */
+            reason: string;
         };
         /**
          * BulkCreateDevices
@@ -11699,6 +11770,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_assign_api_v1_devices_bulk_assign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssign"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkAssignResult"];
                 };
             };
             /** @description Validation Error */

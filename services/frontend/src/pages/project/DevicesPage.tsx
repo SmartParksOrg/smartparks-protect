@@ -6,7 +6,13 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { api } from "@/api/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useProjects } from "@/hooks/useProjects";
 import { isAllProjects, projectFor } from "@/lib/scope";
 import { queryKeys } from "@/api/queryKeys";
@@ -15,7 +21,9 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
 import { GroupSelect } from "@/components/entities/GroupSelect";
+import { BulkAssignDialog } from "@/components/devices/BulkAssignDialog";
 import { HealthLine } from "@/components/devices/HealthCard";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icons/Icon";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { useNow } from "@/hooks/useNow";
@@ -32,6 +40,8 @@ export function DevicesPage() {
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [assigning, setAssigning] = useState<Device[]>([]);
   const allProjects = isAllProjects(projectId);
   const projectList = useProjects();
   const projectName = (id: string | null | undefined) =>
@@ -46,7 +56,8 @@ export function DevicesPage() {
               ? projectFilter
               : undefined
             : projectId,
-          in_no_project: allProjects && projectFilter === "none" ? true : undefined,
+          in_no_project:
+            allProjects && projectFilter === "none" ? true : undefined,
           q: q || undefined,
           group_id: group && group !== UNGROUPED ? group : undefined,
           limit: 500,
@@ -90,7 +101,9 @@ export function DevicesPage() {
             name={row.original.name}
             size="xs"
             fallback={
-              <Icon iconKey={typeById.get(row.original.device_type_id)?.icon_key} />
+              <Icon
+                iconKey={typeById.get(row.original.device_type_id)?.icon_key}
+              />
             }
           />
           {row.original.name}
@@ -144,6 +157,7 @@ export function DevicesPage() {
       : []),
     {
       header: t("Last seen"),
+      meta: { filter: false },
       accessorKey: "last_seen_at",
       cell: ({ getValue }) => formatAgo(getValue<string | null>(), now),
     },
@@ -174,13 +188,18 @@ export function DevicesPage() {
         title={t("Devices")}
         description={
           allProjects
-            ? t("Every device on the server with the project it is assigned to today")
+            ? t(
+                "Every device on the server with the project it is assigned to today",
+              )
             : t("Hardware currently assigned to this project")
         }
         actions={
           <>
             {allProjects && (
-              <Select value={projectFilter || "all"} onValueChange={(v) => setProjectFilter(v === "all" ? "" : v)}>
+              <Select
+                value={projectFilter || "all"}
+                onValueChange={(v) => setProjectFilter(v === "all" ? "" : v)}
+              >
                 <SelectTrigger className="h-9 w-52" aria-label={t("Project")}>
                   <SelectValue />
                 </SelectTrigger>
@@ -188,7 +207,9 @@ export function DevicesPage() {
                   <SelectItem value="all">{t("All projects")}</SelectItem>
                   <SelectItem value="none">{t("Not in a project")}</SelectItem>
                   {(projectList.data?.items ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -204,10 +225,38 @@ export function DevicesPage() {
         }
       />
       <Page>
+        {allProjects && selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+            <span>{t("{{count}} selected", { count: selected.size })}</span>
+            <Button
+              size="sm"
+              onClick={() =>
+                setAssigning(
+                  (devices.data?.items ?? []).filter((d) => selected.has(d.id)),
+                )
+              }
+            >
+              {t("Assign to project")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelected(new Set())}
+            >
+              {t("Clear selection")}
+            </Button>
+          </div>
+        )}
         <DataTable
           columns={columns}
           data={devices.data?.items}
           searchable
+          columnFilters={allProjects}
+          selection={
+            allProjects
+              ? { selected, onChange: setSelected, rowId: (d) => d.id }
+              : undefined
+          }
           onSearchChange={setQ}
           footer={
             devices.data?.next_cursor
@@ -215,12 +264,28 @@ export function DevicesPage() {
               : undefined
           }
           isLoading={devices.isPending}
-          emptyMessage={allProjects ? t("No device matches the filter.") : t("No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.")} columnsKey="devices"
+          emptyMessage={
+            allProjects
+              ? t("No device matches the filter.")
+              : t(
+                  "No devices are assigned to this project. A server admin assigns them under Server admin, Devices, or creates them from Needs attention.",
+                )
+          }
+          columnsKey="devices"
           defaultHiddenSmall={["type", "driver", "serial_number", "status"]}
           onRowClick={(d) =>
-            navigate(`/projects/${projectFor(projectId, d.project_id)}/devices/${d.id}`)
+            navigate(
+              `/projects/${projectFor(projectId, d.project_id)}/devices/${d.id}`,
+            )
           }
         />
+        {allProjects && (
+          <BulkAssignDialog
+            devices={assigning}
+            onClose={() => setAssigning([])}
+            onDone={() => setSelected(new Set())}
+          />
+        )}
       </Page>
     </>
   );
