@@ -3527,8 +3527,9 @@ export interface paths {
         };
         /**
          * Coverage
-         * @description Heard positions of the project in the window and viewport, as points from zoom 13 and
-         *     as hexagons with the count and best signal below, plus the share per gateway.
+         * @description Heard positions of the project in the window and viewport as points, the newest first
+         *     up to a cap, or as hexagons with the count and best signal on request, plus the share per
+         *     gateway.
          */
         get: operations["coverage_api_v1_projects__project_id__coverage_get"];
         put?: never;
@@ -17987,7 +17988,7 @@ export interface operations {
                 hours?: number;
                 /** @description Only receptions by these registry gateways */
                 gateway_id?: string[] | null;
-                /** @description Force a mode; without it points from zoom 13 or up to 500 positions */
+                /** @description Points at every zoom unless hexagons are asked for (decision D123) */
                 mode?: string | null;
             };
             header?: never;

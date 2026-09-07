@@ -28,8 +28,8 @@ from shared.timeutil import utc_now
 router = APIRouter(prefix="/projects/{project_id}", tags=["gateways"])
 
 MAX_HOURS = 24 * 90
-MAX_POINTS = 5000
-POINTS_FROM_ZOOM = 13
+# Points are the default at every zoom (decision D123): the newest this many in view.
+MAX_POINTS = 10000
 WORLD_M = 40_075_016.686
 
 
@@ -69,13 +69,14 @@ async def coverage(
     mode: str | None = Query(
         None,
         pattern="^(points|hexagons)$",
-        description="Force a mode; without it points from zoom 13 or up to 500 positions",
+        description="Points at every zoom unless hexagons are asked for (decision D123)",
     ),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> CoverageResponse:
-    """Heard positions of the project in the window and viewport, as points from zoom 13 and
-    as hexagons with the count and best signal below, plus the share per gateway."""
+    """Heard positions of the project in the window and viewport as points, the newest first
+    up to a cap, or as hexagons with the count and best signal on request, plus the share per
+    gateway."""
     until = utc_now()
     since = until - timedelta(hours=hours)
     box = _bbox(bbox) or (-180.0, -90.0, 180.0, 90.0)
@@ -180,7 +181,7 @@ async def coverage(
     if total == 0:
         return CoverageResponse(hours=hours, mode="points", total=0, features=[], gateways=[])
 
-    as_points = mode == "points" if mode else (zoom >= POINTS_FROM_ZOOM or total <= 500)
+    as_points = mode != "hexagons"
     if as_points:
         rows = (
             await session.execute(

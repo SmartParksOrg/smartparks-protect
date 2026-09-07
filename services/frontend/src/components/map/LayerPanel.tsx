@@ -1237,6 +1237,11 @@ export function LayerPanel({
                     "{{count}} heard positions in view, as hexagons of about {{size}} m",
                     { count: coverage.total, size: coverage.hexagon_m ?? 0 },
                   )
+                ) : coverage.features.length < coverage.total ? (
+                  t(
+                    "{{count}} heard positions in view, the newest {{shown}} drawn",
+                    { count: coverage.total, shown: coverage.features.length },
+                  )
                 ) : (
                   t("{{count}} heard positions in view", {
                     count: coverage.total,

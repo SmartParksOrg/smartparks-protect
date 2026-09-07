@@ -49,6 +49,8 @@
   "{{count}} heard positions in view_other": "{{count}} heard positions in view",
   "{{count}} heard positions in view, as hexagons of about {{size}} m_one": "{{count}} heard position in view, as hexagons of about {{size}} m",
   "{{count}} heard positions in view, as hexagons of about {{size}} m_other": "{{count}} heard positions in view, as hexagons of about {{size}} m",
+  "{{count}} heard positions in view, the newest {{shown}} drawn_one": "{{count}} heard positions in view, the newest {{shown}} drawn",
+  "{{count}} heard positions in view, the newest {{shown}} drawn_other": "{{count}} heard positions in view, the newest {{shown}} drawn",
   "{{count}} hours_one": "{{count}} hour",
   "{{count}} hours_other": "{{count}} hours",
   "{{count}} messages, last {{hours}} hours_one": "{{count}} message, last {{hours}} hours",

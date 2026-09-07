@@ -62,8 +62,7 @@ async def test_coverage_points_hexagons_and_shares(client, db, bus):  # noqa: F8
     gw_a = next(g for g in body["gateways"] if g["external_id"] == "gw-a")
     assert gw_a["gateway_id"] is not None and gw_a["best_rssi"] == -95.0
 
-    # three positions stay points at any zoom; hexagons on request (the map asks for them from
-    # zoom 12 down once more than 500 positions are in view)
+    # points at any zoom (decision D123); hexagons on request only
     assert (
         await client.get(
             f"{base}/coverage",

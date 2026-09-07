@@ -29,6 +29,7 @@ From Tim's first hour with v2.0.0 on the dev server.
 
 ### Fixed
 
+- Heard positions are coloured dots at every zoom (decision D123), the newest ten thousand in view when there are more; the hexagons stay available to API users with `mode=hexagons`.
 - The heard-positions layer loads in the all-projects scope over long windows: the coverage query starts from the receptions and scans positions per device, which uses the compressed chunks' index instead of decompressing every chunk of the window (0.5 s instead of 6 s for 90 days); the map cancels the request of a viewport that is gone and settles a little longer after a move, so panning no longer piles up slow requests; the panel shows a load error with a retry instead of "Loading…" for ever, and the Heard positions row folds like the others.
 - In the all-projects scope the gateway layer, the Gateways page, Traffic and the connectivity analysis count devices in no project as well, as the map and the devices list already did (decision D120); before, a server admin saw the positions of an unassigned collar there but not the gateways that heard it.
 - Gateway receptions of uplinks that arrived while the identity was unknown never got the device when the identity was linked, so the gateway layer and the coverage missed everything from before the device existed. Linking now gives the receptions the device, and migration 0022 repairs the existing rows.
