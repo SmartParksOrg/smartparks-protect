@@ -28,7 +28,7 @@ type RowState = {
 };
 
 /** The platform's applications and whether each posts to this source (decision D132): connect
- * or disconnect one at a time, with a spinner on the row while ChirpStack answers, or connect
+ * or disconnect one at a time, with a spinner on the row while the platform answers, or connect
  * every application that does not post to us yet, one after the other. Only this source's
  * URL entry is ever added or removed; other URLs and every header stay. */
 export function ApplicationsDialog({
