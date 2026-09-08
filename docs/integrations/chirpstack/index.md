@@ -90,10 +90,15 @@ A ChirpStack v4 that already serves gateways and collars connects in one of two 
   `mqtt_username` and `mqtt_password` credentials; the ingest service subscribes to the
   application and gateway topics and no HTTP integration is needed.
 
-Downlinks, device sync and gateway sync use ChirpStack's gRPC API, the only API of
-ChirpStack v4 (the REST gateway is not used): `api_url` is `grpcs://host:443` through a TLS
-proxy or `grpc://host:8080` straight to ChirpStack on a private network, and `api_token` is an
-API key of the tenant. Without an API channel the uplink path works and commands are held
+Downlinks, device sync, gateway sync and Connect applications use ChirpStack's gRPC API, the
+only API of ChirpStack v4 (the REST gateway is not used), over one of two transports
+(decision D131): `api_url` `https://host`, the address of the web UI, speaks grpc-web the way
+the web UI itself does and works through any reverse proxy that serves the UI, even one that
+speaks HTTP/1.1 only (Apache without HTTP/2, Cloudflare); `grpcs://host:443` through a TLS proxy
+with a gRPC location or `grpc://host:8080` straight to ChirpStack on a private network speaks
+native gRPC. `api_token` is an API key of the tenant. A tenant API key cannot ask ChirpStack
+which tenant it belongs to, so the quick setup reads the tenant id from the address copied
+from the browser tab while inside the tenant. Without an API channel the uplink path works and commands are held
 back until one is configured.
 
 Exposing the gRPC API through an existing nginx that fronts ChirpStack on 443 needs care:

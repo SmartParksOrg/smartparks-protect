@@ -6,18 +6,24 @@ ChirpStack REST API (`chirpstack-rest-api`) with an API token (decision D50): a 
 a device queue item, `txack` and `ack` events carry its `queueItemId` back.
 
 Config keys: `mqtt_host` (empty for the HTTP integration), `mqtt_port` (1883), `mqtt_tls`
-(false), `api_url` (the gRPC API, grpcs://host:443 or grpc://host:8080, for
+(false), `api_url` (grpcs://host:443 or grpc://host:8080 for native gRPC, https://host for
+grpc-web through the web UI's own path, decision D131; for
 example `http://chirpstack-rest-api:8090`), `web_url` (the ChirpStack web UI, for deep links),
 `tenant_id`, `topic_prefix` (empty by default; ChirpStack can prefix integration topics).
 Credentials: `api_token`, optional `mqtt_username` and `mqtt_password`.
 """
 
 import json
+import re
 from datetime import datetime
 from typing import Any, ClassVar
 from urllib.parse import urlsplit
 
-from shared.connectivity.adapters.chirpstack.grpc_api import ChirpStackGrpc, is_grpc_url
+from shared.connectivity.adapters.chirpstack.grpc_api import (
+    _ChirpStackCalls,
+    client_for,
+    is_api_url,
+)
 from shared.connectivity.base import (
     AdapterCapabilities,
     DataSourceContext,
@@ -336,10 +342,10 @@ class ChirpStackManagement:
         self.base = str(source.config.get("api_url", "")).strip()
         self.token = str(source.credentials.get("api_token", "") or "")
         self.tenant_id = str(source.config.get("tenant_id") or "")
-        self._grpc: ChirpStackGrpc | None = None
+        self._grpc: _ChirpStackCalls | None = None
 
     @property
-    def grpc(self) -> ChirpStackGrpc:
+    def grpc(self) -> _ChirpStackCalls:
         """The client, checked on first use so a source without an API channel fails the
         call that needs it, with the reason, not the ingest of its uplinks."""
         if self._grpc is not None:
@@ -347,16 +353,18 @@ class ChirpStackManagement:
         if not self.base:
             raise ApplicationError(
                 code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
-                message="the data source needs `api_url` (grpcs://host:443 or grpc://host:8080)",
+                message="the data source needs `api_url` (https://host for grpc-web, "
+                "grpcs://host:443 or grpc://host:8080 for native gRPC)",
                 component="adapter.chirpstack",
                 user_actionable=True,
             )
-        if not is_grpc_url(self.base):
+        if not is_api_url(self.base):
             raise ApplicationError(
                 code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
                 message=(
-                    f"api_url {self.base!r} is not a gRPC address: ChirpStack v4 speaks gRPC, "
-                    "use grpcs://host:443 (through a TLS proxy) or grpc://host:8080"
+                    f"api_url {self.base!r} is not an API address: grpcs://host:443 or "
+                    "grpc://host:8080 for native gRPC, https://host for grpc-web through the "
+                    "address of the web UI"
                 ),
                 component="adapter.chirpstack",
                 user_actionable=True,
@@ -368,7 +376,7 @@ class ChirpStackManagement:
                 component="adapter.chirpstack",
                 user_actionable=True,
             )
-        self._grpc = ChirpStackGrpc(self.base, self.token)
+        self._grpc = client_for(self.base, self.token)
         return self._grpc
 
     async def list_applications(self) -> list[dict[str, Any]]:
@@ -519,15 +527,17 @@ class ChirpStackAdapter:
     quick_setup: ClassVar[dict[str, Any]] = {
         "address_key": "web_url",
         "address_label": "ChirpStack address",
-        "address_placeholder": "https://chirpstack.example.org",
+        "address_placeholder": "https://chirpstack.example.org/#/tenants/<id>/applications",
         "credential_key": "api_token",
         "credential_label": "Tenant API key",
         "channels_on": ["http", "api"],
         "derived_keys": ["api_url", "tenant_id"],
-        "hint": "The address of the ChirpStack web UI and an API key of the tenant are enough: "
-        "saving derives the gRPC address (grpcs://host:443 behind a TLS proxy) and looks the "
-        "tenant up through the key. The webhook token is shown next, with Connect applications. "
-        "Advanced holds MQTT, the gRPC address and the tenant id.",
+        "hint": "Copy the address from the ChirpStack browser tab while inside the tenant "
+        "(it holds /tenants/<id>) and add an API key of that tenant: saving keeps the origin as "
+        "the address, reads the tenant id, and reaches the API the way the web UI does "
+        "(grpc-web), so any ChirpStack you can open in a browser works. The webhook token is "
+        "shown next, with Connect applications. Advanced holds MQTT, the API address "
+        "(grpcs://host:443 for native gRPC) and the tenant id.",
     }
     credentials_schema: ClassVar[dict[str, str]] = {
         "api_token": "ChirpStack API key (tenant or global) for the gRPC API",
@@ -587,8 +597,8 @@ class ChirpStackAdapter:
             "ChirpStack's gRPC API",
             "config_keys": ["api_url"],
             "credential_keys": ["api_token"],
-            "hint": "api_url is grpcs://host:443 (a TLS proxy with grpc_pass) or "
-            "grpc://host:8080; api_token a tenant API key",
+            "hint": "api_url is https://host (grpc-web, the web UI's address), or "
+            "grpcs://host:443 / grpc://host:8080 for native gRPC; api_token a tenant API key",
             "capabilities": [
                 "downlink",
                 "device_management",
@@ -616,8 +626,9 @@ class ChirpStackAdapter:
             "topic_prefix": {"type": "string", "default": ""},
             "api_url": {
                 "type": "string",
-                "description": "ChirpStack's gRPC API: grpcs://host:443 through a TLS proxy, "
-                "or grpc://host:8080 on a private network",
+                "description": "ChirpStack's API: https://host for grpc-web through the web "
+                "UI's address (works behind any proxy), grpcs://host:443 for native gRPC "
+                "through a TLS proxy with grpc_pass, or grpc://host:8080 on a private network",
             },
             "web_url": {"type": "string", "description": "ChirpStack web UI, for deep links"},
             "tenant_id": {"type": "string"},
@@ -625,28 +636,46 @@ class ChirpStackAdapter:
     }
 
     async def complete_config(self, source: DataSourceContext) -> dict[str, Any]:
-        """Quick setup (decision D128): `api_url` from `web_url` when missing (grpcs on 443
-        behind https, grpc on 8080 behind http), `tenant_id` from the tenants the API key
-        sees when missing; a key that sees none or several is refused with the reason."""
+        """Quick setup (decision D128): the address as copied from the ChirpStack browser tab
+        gives `web_url` (its origin) and, inside a tenant, `tenant_id` (`/tenants/<id>` in the
+        fragment); `api_url` defaults to the origin, grpc-web through whatever serves the web
+        UI (D131). A tenant id still missing is asked of the key: a global key with one tenant
+        gives it, a tenant key cannot tell (ChirpStack refuses the call), several tenants need
+        the choice made under Advanced."""
         config = dict(source.config)
-        web = str(config.get("web_url") or "").strip().rstrip("/")
-        if web and not config.get("api_url"):
-            parts = urlsplit(web)
-            if parts.hostname:
-                config["api_url"] = (
-                    f"grpcs://{parts.hostname}:443"
-                    if parts.scheme == "https"
-                    else f"grpc://{parts.hostname}:8080"
-                )
+        web = str(config.get("web_url") or "").strip()
+        parts = urlsplit(web)
+        if web and parts.hostname:
+            found = re.search(r"/tenants/([0-9a-fA-F-]{36})", parts.fragment or parts.path)
+            if found and not config.get("tenant_id"):
+                config["tenant_id"] = found.group(1).lower()
+            config["web_url"] = f"{parts.scheme}://{parts.netloc}"
+        if "chirpstack.example.org" in str(config.get("api_url") or ""):
+            config.pop("api_url")  # the old form's example, never a real address
+        if config.get("web_url") and not config.get("api_url"):
+            config["api_url"] = str(config["web_url"])
         token = str(source.credentials.get("api_token") or "")
         if token and config.get("api_url") and not config.get("tenant_id"):
-            tenants = await ChirpStackGrpc(str(config["api_url"]), token).list_tenants()
+            try:
+                tenants = await client_for(str(config["api_url"]), token).list_tenants()
+            except ApplicationError as error:
+                if error.code != ErrorCode.CONNECTIVITY_AUTH_FAILED:
+                    raise
+                raise ApplicationError(
+                    code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
+                    message="a tenant API key cannot tell its tenant: copy the address from "
+                    "the browser while inside the tenant (it contains /tenants/<id>), or fill "
+                    "the tenant id in under Advanced",
+                    component="adapter.chirpstack",
+                    user_actionable=True,
+                ) from error
             if len(tenants) == 1:
                 config["tenant_id"] = str(tenants[0]["id"])
             elif not tenants:
                 raise ApplicationError(
                     code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
-                    message="the API key sees no tenant: use a tenant API key",
+                    message="the API key sees no tenant: use a tenant API key and copy the "
+                    "address from the browser while inside the tenant",
                     component="adapter.chirpstack",
                     user_actionable=True,
                 )

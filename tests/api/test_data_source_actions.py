@@ -169,15 +169,14 @@ async def test_connect_applications_needs_the_token_copy_and_reports_per_applica
 async def test_quick_setup_completes_the_config_on_save(client, db, monkeypatch):
     """Decision D128: a ChirpStack source saved with the address and a key gets its gRPC
     address and tenant; a key that sees several tenants is refused with the reason."""
-    from shared.connectivity.adapters.chirpstack import grpc_api
-
     admin = await actor(client, db, superuser=True)
     tenants = [{"id": "t-1", "name": "Smart Parks"}]
 
-    async def list_tenants(self):
-        return tenants
+    class FakeClient:
+        async def list_tenants(self):
+            return tenants
 
-    monkeypatch.setattr(grpc_api.ChirpStackGrpc, "list_tenants", list_tenants)
+    monkeypatch.setattr(chirpstack, "client_for", lambda url, token: FakeClient())
     created = await client.post(
         "/api/v1/data-sources",
         json={
@@ -191,7 +190,8 @@ async def test_quick_setup_completes_the_config_on_save(client, db, monkeypatch)
     )
     assert created.status_code == 201, created.text
     config = created.json()["config"]
-    assert config["api_url"] == "grpcs://cs.example.org:443" and config["tenant_id"] == "t-1"
+    # grpc-web through the web address by default (D131), the tenant from the global key
+    assert config["api_url"] == "https://cs.example.org" and config["tenant_id"] == "t-1"
 
     tenants.append({"id": "t-2", "name": "Other"})
     refused = await client.post(
