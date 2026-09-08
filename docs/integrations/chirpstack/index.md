@@ -8,18 +8,21 @@ ChirpStack v4 is the reference LoRaWAN network server of Smart Parks Protect: it
 - Records every gateway reception of an uplink with RSSI, SNR and frequency, and the best RSSI and SNR, spreading factor, port and frame counter as provider metadata.
 - Keeps the ChirpStack receive time as `network_received_at`; the device time comes from the driver.
 - Merges tenant, application and device profile ids and names into the external identity, so "Open in ChirpStack" links can be built.
-- Lists applications, devices and gateways through ChirpStack's gRPC API (management connector) and tests the connection.
+- Lists applications, devices and gateways through ChirpStack's API, over native gRPC or grpc-web by the address's scheme (management connector), and tests the connection.
 - Accepts the same events over the ChirpStack HTTP integration at `POST /api/v1/ingest/http/{data_source_id}?event=up` with the source's bearer token.
 
 Downlinks go through the gRPC device queue, see [device control](../../devices/device-control.md).
 
 ## Data source configuration
 
+The form asks for the ChirpStack address and a tenant API key (decision D128); the keys below
+are derived on save and editable under Advanced.
+
 | Key | Meaning |
 | --- | --- |
 | `mqtt_host`, `mqtt_port`, `mqtt_tls` | The broker ChirpStack publishes to (`chirpstack-mosquitto`, 1883 in compose) |
 | `topic_prefix` | Only when ChirpStack is configured with an integration topic prefix |
-| `api_url` | ChirpStack's gRPC API: `grpc://chirpstack:8080` in compose, `grpcs://host:443` through a TLS proxy |
+| `api_url` | `https://host` (the web UI's address, grpc-web, the normal case), `grpcs://host:443` through a TLS proxy with a gRPC location, or `grpc://host:8080` on a private network |
 | `web_url` | ChirpStack web UI, used in deep links (`http://localhost:8080`) |
 | `tenant_id` | Tenant whose applications and gateways are listed |
 
@@ -52,7 +55,7 @@ the settings switch on and whether each works:
 | --- | --- | --- | --- | --- |
 | HTTP integration | in | nothing, the webhook token is issued on save | uplinks, joins, downlink acknowledgements | messages arrive on the webhook |
 | MQTT subscription | in | `mqtt_host` (and `mqtt_username`, `mqtt_password` when the broker asks) | the same events plus gateway statistics | the ingest service reports its connection as connected |
-| gRPC API | out | `api_url` (`grpcs://host:443` or `grpc://host:8080`) and the `api_token` credential | downlinks, device sync, gateway sync, Test connection | the last Test connection answered |
+| gRPC API | out | `api_url` (`https://host`, `grpcs://host:443` or `grpc://host:8080`) and the `api_token` credential | downlinks, device sync, gateway sync, Test connection | the last Test connection answered |
 
 Each channel has its own switch on the source. A new source starts with the MQTT and API
 channels off, since both need input; turn one on once its fields are filled in. Off means the webhook answers 409, the ingest
@@ -68,10 +71,11 @@ A ChirpStack v4 that already serves gateways and collars connects in one of two 
 
 - **HTTP integration (no broker exposure).** Server admin, Data sources, New data source,
   adapter ChirpStack: a name, the ChirpStack address (the web UI's URL) and a tenant API key
-  are enough (decision D128). Saving derives the gRPC address (`grpcs://host:443` behind
-  https, `grpc://host:8080` behind http) and looks the tenant up through the key; a global
-  key that sees several tenants is refused until the tenant id is filled in under Advanced,
-  where MQTT, the gRPC address and the tenant id live. The webhook token is shown next with
+  are enough (decision D128). Saving keeps the address as the API address (grpc-web through the web UI's own path,
+  D131) and reads the tenant id from the address as copied from the browser tab while inside
+  the tenant (`/tenants/<id>`); a tenant API key cannot ask ChirpStack for its tenant, so an
+  address without it is refused with that sentence. Advanced holds MQTT, the API address (a
+  native `grpcs://host:443` when wanted) and the tenant id. The webhook token is shown next with
   "Connect applications" (also on the data source row): it first previews what would change
   on every application's HTTP integration, nothing written, and Apply then does it (D129,
   for a ChirpStack in operation): created where there is none, our URL appended to the

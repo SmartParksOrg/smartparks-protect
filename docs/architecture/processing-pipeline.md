@@ -40,7 +40,7 @@ A step that raises `ApplicationError` records the error on the trace and marks t
 
 ## Needs Attention
 
-`/api/v1/attention/*` (server admin): unknown identities with counts and first and last seen, failed and unassigned source events, dead letters per topic, worker heartbeats and stale workers. Actions: create a device for an identity (with an optional project assignment from first seen), link an identity to an existing device, ignore, reprocess. Linking or creating puts the retained source events of that identity back on the bus, so nothing received while the device was unknown is lost.
+`/api/v1/attention/*` (server admin): unknown identities with counts and first and last seen, failed and unassigned source events, dead letters per topic, worker heartbeats and stale workers. Actions: create a device for an identity (with an optional project assignment from first seen), link an identity to an existing device, ignore, reprocess. Linking or creating queues the retained source events of that identity for the decoder (one `identity.reprocess_requested` message; the decoder walks them and Needs attention shows the progress, decision D121), so nothing received while the device was unknown is lost.
 
 ## Late data
 

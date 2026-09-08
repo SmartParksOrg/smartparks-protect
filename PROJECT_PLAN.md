@@ -16,11 +16,11 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 16 complete on 2026-09-07 (both parts live on the dev server); v2.1.0 waits for Tim's word |
+| Active phase | Phases 16, 17 and 18 built and live on the dev server (2026-09-08, 0b04f85); v2.2.0 (folding the never-tagged v2.1.0) waits for Tim's word |
 | Latest release | v2.0.0 (2026-09-06): phases 10 to 15 and the deployment fixes |
-| Last session | 2026-09-07 |
-| Next item | Release v2.1.0 on Tim's word (phase 16 complete, plus the fixes since v2.0.0); v2.0.1 with the fixes since v2.0.0 on Tim's word, or fold them into v2.1.0. Open: Request status through KPN for the complete timeline, Sync gateways and the four DevEUIs on ChirpStack, the live verification stages that wait for other accounts |
-| Blockers | Live verification: KPN LoRa is live; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live. The dev server (dev-protect.smartparks.org, DigitalOcean) and the backup bucket exist since 2026-09-04 |
+| Last session | 2026-09-08 |
+| Next item | Release v2.2.0 with everything since v2.0.0. Then, from the open items: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
 
@@ -145,9 +145,9 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D102 | New metrics | Unknown metric keys keep registering as `uncategorized` on arrival and appear in a Needs attention tab where an admin sets label, unit and category; drivers and seeds define the known ones upfront | No data is lost on a firmware update, and the catalogue stays curated. Decided by Tim on 2026-09-06. |
 | D103 | Assignment dates | Assignment dialogs offer "since the device's first data", "since it joined the project", "from now" and a date, date-only with the start of the day; a device or entity page with records before its earliest assignment offers to move the assignment start back, which reruns attribution through the recompute path | The 29,253 log records of SP051307 sit without a project because the assignment began the day of the sync; the system knows the dates and should offer them. Decided by Tim on 2026-09-06. |
 | D104 | Device health | Drivers declare the health keys (from state and measurements) with labels, units and thresholds; OpenCollar from the port 4 status and the last fix; a Health card on the device page and a compact health line in lists, the entity page and the map selection; last seen moves on every record | The status message is the collar's heartbeat and carries what a ranger needs; it reached only the traffic view. Decided by Tim on 2026-09-06. |
-| D105 | Detail levels | Every page shows the operational picture first; identities, ports, traces and provider fields sit under Technical details, expanded by a per-user preference that server admins have on by default; the Network section shows for project users only with details on | A ranger sees animals and their state; an admin or a helping ranger can still open the machinery. Decided by Tim on 2026-09-06. |
+| D105 | Detail levels | Every page shows the operational picture first; identities, ports, traces and provider fields sit under Technical details, expanded by a per-user preference that server admins have on by default; the Network section shows for project users only with details on | A ranger sees animals and their state; an admin or a helping ranger can still open the machinery. Decided by Tim on 2026-09-06. Superseded on 2026-09-08 by D133 and D134: no switch or preference, tabs instead. |
 | D106 | Entities and devices | The entities list shows the assigned device with a link; the entity page has an Assignments section with the history and "Assign device" from the project's unassigned devices with the guided dialog | The animal is where a user starts; the collar should be one step away. Decided by Tim on 2026-09-06. |
-| D107 | LoRaWAN network tool | Network, Coverage: the gateway registry on a map plus a coverage layer from stored receptions joined to positions (where collars were heard, by which gateway, at what RSSI, over a period; points or hexagons aggregated server-side per viewport) | Every collar is a mapper; nothing to install, and the data is already stored. Kept deliberately small. Decided by Tim on 2026-09-06. |
+| D107 | LoRaWAN network tool | Network, Coverage: the gateway registry on a map plus a coverage layer from stored receptions joined to positions (where collars were heard, by which gateway, at what RSSI, over a period; points or hexagons aggregated server-side per viewport) | Every collar is a mapper; nothing to install, and the data is already stored. Kept deliberately small. Decided by Tim on 2026-09-06. Superseded in part on 2026-09-08 by D123: dots at every zoom, hexagons in the API on request only. |
 | D108 | Order of phase 15 | Correctness and visibility first, then getting around, then organising, then the clean-up of technical detail, the coverage tool last, v2.0.0 at the end | Every later screen builds on health, attribution and groups. Decided by Tim on 2026-09-06. |
 | D109 | Track length on the map | One length for every track, set from a Tracks card that appears while a track is on: since the device was assigned to the entity, or a custom length from one hour to ninety days (slider in days, number in hours or days, quick picks); in the URL as `track=` and remembered per user as the default | Modelled on EarthRanger's Track settings, which Tim uses next to Protect; the event date filter EarthRanger matches has no equivalent on our map, the assignment start has. Decided by Tim on 2026-09-07. |
 | D110 | Profile pictures | One picture per entity and per device, uploaded as any JPEG, PNG or WebP and kept only as a 512 px WebP square made on the server (Pillow); shown small next to the name on the object's page, in the lists and layer panel in place of the type icon, and in the map's selection panel, never as the marker; set by whoever may edit the object | Tim wants to tell animals apart without giving the picture room the functional view needs; a server-made square keeps pages light and phone photos upright. Decided by Tim on 2026-09-07. |
@@ -168,8 +168,8 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D125 | Connect applications on a ChirpStack data source | A ChirpStack source keeps an encrypted copy of its webhook token next to the hash, and a "Connect applications" action uses the tenant API key to put the source's webhook URL on the HTTP integration of every application of the tenant: created where there is none, our URL appended to the comma-separated list where one exists, never a URL or header removed. The result names every application: connected, already connected, failed with the reason. | ChirpStack sets the HTTP integration per application while the API key is per tenant, so a tenant with many applications meant the same copy-and-paste per application; the API has create, get and update calls for the HTTP integration. Decided by Tim on 2026-09-08. |
 | D126 | No automatic connect of new applications | Only the button connects; Test connection and the data source status list the applications that are not connected, so a new application shows up as a thing to do rather than a thing that happened. | Tim wants the admin to decide when an application starts posting to the platform. Decided by Tim on 2026-09-08. |
 | D127 | The token travels in the URL for managed integrations | The URL the action writes carries `?token=<webhook token>` and the integration's headers are never touched, since ChirpStack sends one header map to every URL of an application and another system may own an Authorization header there; the webhook accepts the token in the query for ChirpStack as it does for Cloudloop and ThingPark (D78). A hand-made integration with the Authorization header keeps working. | ChirpStack allows several URLs per HTTP integration but one header map; taking over another system's bearer token would tie the two together. Tim chose the URL token on 2026-09-08. |
-| D128 | ChirpStack quick setup | A new ChirpStack source asks for a name, the ChirpStack address and a tenant API key; saving derives the gRPC address from the address and looks the tenant up through the key (a key that sees several tenants is refused with the reason); the channel cards, MQTT, the gRPC address and the tenant id fold under Advanced, on edit as well. Adapters declare a `quick_setup` and a `complete_config`. | Tim found the connect flow works well and the form still asked for everything by hand. Decided by Tim on 2026-09-08. |
-| D129 | Connect applications previews before it writes | The button runs a dry run first: the dialog shows, per application, what Apply would do, the URL list before and after, the other URLs and the headers that stay, with a tick per application; Apply writes the ticked ones only; a dry run leaves no audit entry. | Tim added a ChirpStack in operation (cs.loranam.org) whose integrations must not be disturbed; a preview lets him check every application before anything changes. Decided on 2026-09-08. |
+| D128 | ChirpStack quick setup | A new ChirpStack source asks for a name, the ChirpStack address and a tenant API key; saving derives the gRPC address from the address and looks the tenant up through the key (a key that sees several tenants is refused with the reason); the channel cards, MQTT, the gRPC address and the tenant id fold under Advanced, on edit as well. Adapters declare a `quick_setup` and a `complete_config`. | Tim found the connect flow works well and the form still asked for everything by hand. Decided by Tim on 2026-09-08. Amended on 2026-09-08 by D131: a tenant API key cannot list tenants, the tenant id is read from the browser address and the API address defaults to the web address (grpc-web). |
+| D129 | Connect applications previews before it writes | The button runs a dry run first: the dialog shows, per application, what Apply would do, the URL list before and after, the other URLs and the headers that stay, with a tick per application; Apply writes the ticked ones only; a dry run leaves no audit entry. | Tim added a ChirpStack in operation (cs.loranam.org) whose integrations must not be disturbed; a preview lets him check every application before anything changes. Decided on 2026-09-08. Superseded on 2026-09-08 by D132: the Applications dialog with Connect and Disconnect per application replaces the one-shot preview; the dry run stays in the API. |
 | D130 | Reload once on a stale page chunk | The app listens for a failed page chunk load and reloads itself once, with a guard against a loop during a real outage, so a tab opened before a deploy recovers by itself. | Tim saw a blank entity page from the map after a day of deploys: the tab asked for a chunk of the previous build (404 in the nginx log); a refresh fixed it. Decided on 2026-09-08. |
 | D131 | grpc-web as a second ChirpStack transport | `api_url` `https://host` speaks grpc-web, the web UI's own protocol on the same paths, through whatever serves the UI; `grpcs://` and `grpc://` keep native gRPC. The quick setup derives the web address as the API address and reads the tenant id from the address copied from the browser tab, since a tenant API key is refused when it asks for its tenants. | LoRaNAM's ChirpStack sits behind an Apache that speaks HTTP/1.1 only, so native gRPC cannot reach it and port 8080 is closed; grpc-web with the stored key listed its applications read-only during the check. Decided by Tim on 2026-09-08. |
 | D132 | An Applications dialog per ChirpStack source | Lists every application with its state (posts to this source, elsewhere only, no integration), what its integration holds besides, Connect and Disconnect per row with a spinner while the platform answers, Connect the other N in sequence, Refresh; replaces the one-shot preview; Disconnect removes only this source's entry. | Tim wanted feedback per application while connecting and a way to see and undo the connections afterwards. Decided by Tim on 2026-09-08. |
@@ -227,16 +227,17 @@ From architecture section 2, used when reviewing a change. These are never done;
 | v0.2.0 | 4 | Data Explorer, export jobs, benchmark fixture, TimescaleDB decision confirmed |
 | v0.3.0 | 5 | Rules, events, alerts, automations, email and Telegram notifications |
 | v0.4.0 | 6 | Device control through ChirpStack |
-| v0.5.0 | 7 | KPN and LORIOT adapters, device control over a second network, dev server deployed with Ansible |
-| v1.0.0 | 8 | First demonstrator: EarthRanger, AddaxAI Connect inbound, Traccar, gateways, provenance links, section 33 demonstration passes |
-| v1.1.0 | 9 | MCP read-only proof of concept |
-| v1.2.0 | 10 | Full observability, System Health, backup and disaster recovery proven |
-| v1.3.0 | 11 | WebBLE, raw log files, Cloudloop/Iridium |
-| v1.4.0 | 12 | Data curation and corrections |
-| v1.5.0 | 13 | The Things Stack, Actility, WildlifeNL, FerusTracker, Movebank, dashboards, MCP write tools |
+| (v0.5.0, folded into v0.6.0 or v2.0.0, never tagged) | 7 | KPN and LORIOT adapters, device control over a second network, dev server deployed with Ansible |
+| (v1.0.0, folded into v0.6.0 or v2.0.0, never tagged) | 8 | First demonstrator: EarthRanger, AddaxAI Connect inbound, Traccar, gateways, provenance links, section 33 demonstration passes |
+| (v1.1.0, folded into v0.6.0 or v2.0.0, never tagged) | 9 | MCP read-only proof of concept |
+| (v1.2.0, folded into v0.6.0 or v2.0.0, never tagged) | 10 | Full observability, System Health, backup and disaster recovery proven |
+| (v1.3.0, folded into v0.6.0 or v2.0.0, never tagged) | 11 | WebBLE, raw log files, Cloudloop/Iridium |
+| (v1.4.0, folded into v0.6.0 or v2.0.0, never tagged) | 12 | Data curation and corrections |
+| (v1.5.0, folded into v0.6.0 or v2.0.0, never tagged) | 13 | The Things Stack, Actility, WildlifeNL, FerusTracker, Movebank, dashboards, MCP write tools |
 | (no tag) | 14 | Production hardening, full-scale benchmark, documentation audit; released with 2.0 |
 | v2.0.0 | 15 | Correctness and usability from the first live days (D97) |
-| v2.1.0 | 16 | The device layer on the map and the all-projects scope for server admins (D111 to D118) |
+| (folded into v2.2.0) | 16 | The device layer on the map and the all-projects scope for server admins (D111 to D118); v2.1.0 was never tagged |
+| v2.2.0 | 17, 18 | ChirpStack applications connected from the tenant (D125 to D132), simple first with the Overview, Data and Network tabs (D133, D134), and the fixes since v2.0.0 |
 
 ## Architecture coverage map
 
@@ -573,7 +574,7 @@ Release:
 - [x] ExternalLink coverage: every data source type ships link templates; provenance panel works for every adapter.
 - [x] Integrate section UI: integrations per project, delivery log with payload and response inspection, retry, backfill dialog. AddaxAI Connect source configuration screen.
 - [ ] Demonstrator script (architecture 33) written as `docs/getting-started/demonstration.md` (done) and executed (local steps pass; the live steps wait for accounts): two LoRaWAN backends, same entities on the map, raw and normalized traffic, battery and RSSI analysed and exported, geofence or speed rule creating an event, event forwarded to EarthRanger, one Traccar entity, one AddaxAI Connect wolf detection entering as an event with a source link and forwarded by a rule, an alert acknowledged, a device reassigned to another entity with historical positions staying with the old entity, and one command sent through the abstract control path.
-- [ ] `VERSION` v0.6.0 for the code (D67), changelog, tag; v1.0.0 after the demonstration.
+- [x] (v0.6.0 tagged 2026-09-04; v1.0.0 folded into v2.0.0 by D97) `VERSION` v0.6.0 for the code (D67), changelog, tag; v1.0.0 after the demonstration.
 
 **Exit criteria.** The demonstration passes end to end and its result is recorded in the session log with screenshots in `docs/assets/`.
 
@@ -790,9 +791,9 @@ Part B, the all-projects scope (D115 to D118):
 
 Release:
 
-- [ ] `VERSION` v2.1.0 with the changelog and the release process; the fixes since v2.0.0 ship with it unless v2.0.1 went out first.
+- [x] (never tagged: folded into v2.2.0 with phases 17 and 18) `VERSION` v2.1.0 with the changelog and the release process.
 
-**Exit criteria.** Part A: on the dev server, a collar onboarded from Needs attention without an entity shows as a square when switched on in the Devices tab, SP051307's device track drawn over 30 days is one dashed line across the entities it tracked, the device panel opens from the marker and from the device page, and a device that arrives later stays off until switched on. Part B: the operations admin picks All projects, sees Smart Parks, Demo park and the benchmark parks on one map with tiles above the threshold, hides the benchmark parks in the layers panel, opens an animal from Smart Parks and lands on its page in that project, sees a KPN uplink move the animal live, and a project admin who types `/projects/all/map` gets the 403 page.
+**Exit criteria (part B's live uplink checked on 2026-09-08: the all-scope current state carried Rode geus koe 2081's KPN position from 15:52 to 16:08 UTC between two reads; the project-admin refusal is covered by the access matrix in CI).** Part A: on the dev server, a collar onboarded from Needs attention without an entity shows as a square when switched on in the Devices tab, SP051307's device track drawn over 30 days is one dashed line across the entities it tracked, the device panel opens from the marker and from the device page, and a device that arrives later stays off until switched on. Part B: the operations admin picks All projects, sees Smart Parks, Demo park and the benchmark parks on one map with tiles above the threshold, hides the benchmark parks in the layers panel, opens an animal from Smart Parks and lands on its page in that project, sees a KPN uplink move the animal live, and a project admin who types `/projects/all/map` gets the 403 page.
 
 ### Phase 17: ChirpStack applications connected from the tenant (v2.2.0)
 
@@ -814,7 +815,9 @@ Release:
 - [x] Frontend: a "Connect applications" button next to Sync devices and Sync gateways on the data sources page for ChirpStack sources with the API channel on; a result dialog listing the applications with the outcome and the reason; Test connection's dialog shows the application status; the create dialog for a ChirpStack source offers the button right after saving, when the token is shown.
 - [x] Docs: `docs/integrations/chirpstack/index.md` (the one-step setup, the token in the URL, what stays manual), `DEVELOPERS.md` (the connector calls, the encrypted copy), the changelog; ADR when the token copy is judged worth one.
 
-**Exit criteria.** On the dev server, against the ChirpStack at chirpstack-dev4.smartparks.org: one Connect applications puts the source on every application of the tenant, an application that already posted to another URL keeps doing so and posts to us too, Test connection lists the applications with their state, a token rotation followed by Connect applications updates every URL, and the uplinks of a newly connected application arrive with the application name on the identity.
+- [ ] Release: `VERSION` v2.2.0 with the changelog and the release process, together with phase 18.
+
+**Exit criteria (checked on 2026-09-08 against LoRaNAM rather than chirpstack-dev4, which has sent nothing since 2026-09-06: 565 uplinks from 31 devices of the connected applications arrived within five hours, every new identity named after the device with its application name; the multi-application case ran as a dry run over six applications and an Apply on the chosen ones; the other URLs kept posting).** On the dev server, against the ChirpStack at chirpstack-dev4.smartparks.org: one Connect applications puts the source on every application of the tenant, an application that already posted to another URL keeps doing so and posts to us too, Test connection lists the applications with their state, a token rotation followed by Connect applications updates every URL, and the uplinks of a newly connected application arrive with the application name on the identity.
 
 ### Phase 18: simple first, details one click deeper (v2.2.0)
 
@@ -833,7 +836,9 @@ Release:
 - [x] Map: the gateway layer off by default for everyone, on through the layers panel and remembered per user as today; the `?gateways=1` and `?gateway=` parameters unchanged; the entity and device panels keep only state and the links to the object's pages.
 - [x] Docs: `docs/administration/pages.md` rewritten around the tab rule (what each tab of each object holds, per role), the D105 wording replaced in `DEVELOPERS.md`, the changelog; the sweep screenshots the three tabs of an entity and a device.
 
-**Exit criteria.** A viewer's account on the dev server sees no switch and a sidebar with Monitor and Analyze; the entity page opens on Overview with the small map and reaches the device's traffic on its Network tab in one click; `?tab=network` on a device link lands on the tab; a project admin sees the Network section; a server admin sees the same pages as the viewer plus the admin sections, so what a ranger sees is one account switch away rather than a preference.
+- [ ] Release: `VERSION` v2.2.0 with the changelog and the release process, together with phase 17.
+
+**Exit criteria (checked on 2026-09-08 with two temporary accounts in Smart Parks, removed afterwards: the viewer's sidebar has Monitor, Analyze, Rules and Control and no switch, the project admin's adds Network, Integrate and Project admin, and `?tab=network` on an entity lands on the Network tab for both).** A viewer's account on the dev server sees no switch and a sidebar with Monitor and Analyze; the entity page opens on Overview with the small map and reaches the device's traffic on its Network tab in one click; `?tab=network` on a device link lands on the tab; a project admin sees the Network section; a server admin sees the same pages as the viewer plus the admin sections, so what a ranger sees is one account switch away rather than a preference.
 
 ---
 
@@ -850,15 +855,21 @@ Release:
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | OpenCollar decoder details are spread over firmware, Node-RED flows and dashboards | Driver correctness | Fixture corpus from real payloads first, golden tests, driver docs as the single reference, ask Smart Parks for protocol tables early (phase 3 input) |
-| KPN or LORIOT expose fewer events or no downlink status | Lifecycle gaps, gateway data missing | Capabilities per data source; unknown stages stay unknown; document per provider |
-| TimescaleDB does not meet the budget or licensing is a concern | Storage redesign | Decision gate in phase 4 with native partitioning fallback; hypertable creation isolated in one migration; Timescale community licence is fine for self-hosting, no managed-service resale |
-| Vector tile and WebGL map work is larger than expected | Phase 3 delay | Start with bounded GeoJSON under a threshold, add MVT once the current-state table is stable |
-| Gundi cannot update or delete sent objects | Curation cannot correct EarthRanger | Flag stale deliveries (phase 12); direct EarthRanger connector in phase 13 |
+| KPN or LORIOT expose fewer events or no downlink status | Lifecycle gaps, gateway data missing | Capabilities per data source; unknown stages stay unknown; document per provider (KPN live in both directions since phase 15; LORIOT still waits for an account) |
+| (settled in phase 4, re-proven by the phase 14 benchmark) TimescaleDB does not meet the budget or licensing is a concern | Storage redesign | Decision gate in phase 4 with native partitioning fallback; hypertable creation isolated in one migration; Timescale community licence is fine for self-hosting, no managed-service resale |
+| (open in another form: the tile endpoint exists but the map does not switch to it above the threshold) Vector tile and WebGL map work is larger than expected | Phase 3 delay | Start with bounded GeoJSON under a threshold, add MVT once the current-state table is stable |
+| (settled: the direct EarthRanger connector shipped in phase 13) Gundi cannot update or delete sent objects | Curation cannot correct EarthRanger | Flag stale deliveries (phase 12); direct EarthRanger connector in phase 13 |
 | Polling AddaxAI Connect adds latency and load | Slow detections | Cursor polling with short intervals; webhook upgrade later |
 | Scope is large for one developer and an assistant | Schedule | Strict phase order, MVP through phase 8, every phase demonstrable alone |
 | Scope creep from the architecture's later sections | Delayed demonstrator | Sections 25-28 extras stay in phases 10-13 by design |
-| Rules become powerful before they are versioned and testable | Irreproducible events | Rule versions and replay testing land in phase 5 before any advanced construct |
+| (settled in phase 5) Rules become powerful before they are versioned and testable | Irreproducible events | Rule versions and replay testing land in phase 5 before any advanced construct |
 | Documentation structure grows without being maintained | Stale docs | Docs land in the same commit as code; `mkdocs build --strict` and link checks in CI |
+| Writing into a third party's integrations (ChirpStack HTTP integrations of a tenant in operation) | Another system stops receiving | The Applications dialog acts per application, adds or removes only this source's URL entry, never a header or another URL (D125, D132); tests pin the merge rule |
+| A tab opened before a deploy asks for old page chunks | Blank page until a refresh | Reload once on a failed chunk with a loop guard (D130) |
+| A ChirpStack behind a proxy without HTTP/2 | Native gRPC cannot reach it | grpc-web through the web UI's address, chosen by the scheme (D131) |
+| CI failures go unnoticed while pushes keep coming | A red main for hours (2026-09-07) | Check every run after a push; the credential-backed `gh api` reads the failed job's log |
+| The webhook token travels in the URL for adapters that cannot set a header | Tokens in access logs | Rotate on suspicion; keep the header form where the platform allows it |
+| A deploy restarts the API | A few seconds of 502 for incoming uplinks | Platforms retry or the uplink is lost; a rolling restart is future work |
 
 ## Inputs needed from Tim
 
@@ -1272,81 +1283,12 @@ Listed by the phase where they are first needed.
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
 
-### 2026-09-08, phase 18 built (Claude)
+### 2026-09-07, devices in no project (Claude and Tim)
 
-- On Tim's word: `useTab` reads `?tab=`; the entity page has Overview (entity, map, device, health, assignments), Data (events, positions) and Network (the device's traffic, a link to the device's Network tab); the device page Overview (device, map, health, assignments), Data (positions with all links, log files, Bluetooth), Network (control, identities, traffic). The switch, the preference hook and the fold are deleted; the Network section is `adminOnly` (test); the Driver column is `defaultHidden`; gateways start off for everyone; the gateway dialog links to the device's Network tab; the sweep visits the tabs; pages.md rewritten. Checked on the local build: each tab lands from its URL, no switch anywhere.
+- Tim asked how a server admin should see devices in no project. Three decisions taken as recommended (D120): a "Not in a project" section in the all scope's device layer and Devices tab, their positions and a track over unassigned data in that scope only, the plain marker with a panel that names the gap and links to Server admin, Devices. Built: the map devices endpoint takes every device in the all scope (outer join on the current assignment, project None for the rest), `ScopeContext.where(..., unassigned=True)` for the device tracks, the panel section and links, the devices list's project filter; a test for the scope with an inventory device.
+### 2026-09-07, column filters on Needs attention (Claude)
 
-### 2026-09-08, simple first, details one click deeper, planned (Claude and Tim)
-
-- Tim does not want the machinery behind the Technical details switch; he asked for a strategy that presents simple data first and lets a person click an item to dig deeper, and for a plan before code. Inventory of the switch: the Network section, the folds on the entity and device pages, the Driver column, the record links on the device page, the gateway layer default. Two decisions as recommended (D133, D134): tabs Overview, Data and Network on the entity and device pages with the tab in the URL, and the Network section by role with the switch and preference removed. Phase 18 written; nothing built.
-
-### 2026-09-08, unknown identities named after the ChirpStack device (Tim)
-
-- Tim: an unknown identity from ChirpStack shows name "none" while ChirpStack knows the device as SP010462. The adapter kept the uplink's `deviceName` under `device_name` only; it now also sets `name`, the attribute Needs attention and the bulk create read (D96). Identity attributes merge on every uplink and Sync devices writes `name` from the listing, so existing identities catch up either way. Test on the up fixture.
-
-### 2026-09-08, the Applications dialog (Claude and Tim)
-
-- LoRaNAM connected fine with the ticks. Tim asked for a spinner per application while connecting and a way to see and manage the connections afterwards (D132): `integration_status` gained the header names, `disconnect_applications` and `delete_http_integration` were added, two endpoints (list, disconnect), and the `ApplicationsDialog` replaced the preview: one request per application so each row spins on its own, Connect or Disconnect per row, Connect the other N in sequence. Tests on the connector and the API.
-
-### 2026-09-08, a tick per application in the preview (Tim)
-
-- With the LoRaNAM preview open (six applications, five to add, PangolinEdge to update), Tim asked for checkboxes so Apply touches only the chosen applications: `application_ids` in the request body, `only` on the connector, ticks in the dialog with the count on the Apply button; tests on both sides.
-
-### 2026-09-08, LoRaNAM cannot be reached over native gRPC; grpc-web (Claude and Tim)
-
-- Tim's LoRaNAM source failed Connect applications: its gRPC address was still the old form's example, then `grpc://cs.loranam.org:443`. Checked from the dev server: cs.loranam.org is an Apache without HTTP/2 (no h2 even with prior knowledge), 8080 closed, so native gRPC can never pass; a read-only grpc-web ListApplications with the stored key answered (six applications). Also found: a tenant API key cannot list tenants (UNAUTHENTICATED on both ChirpStacks), so D128's lookup only worked for global keys. Two decisions as recommended (D131): grpc-web as a transport for https:// addresses, and the tenant id read from the browser address. Built: `_ChirpStackCalls` with `ChirpStackGrpc` and `ChirpStackWeb`, `client_for`, the quick setup deriving `https://host`, the example address treated as unset.
-
-### 2026-09-08, blank entity page after a deploy (Claude and Tim)
-
-- Tim opened an entity from the map's device panel and got a blank page; a refresh loaded it. Not the entity: the nginx log shows the browser asking for `EntityPage-YQbqYCiK.js` from a build replaced by a later deploy, 404. `lib/staleChunk.ts` reloads once on `vite:preloadError` with a loop guard (D130, tested); checked by serving a chunk as 404 in Playwright and seeing the reload.
-
-### 2026-09-08, ChirpStack quick setup and a preview before writing (Claude and Tim)
-
-- Tim ran the three steps on the dev server: the token rotation at 08:24:44 UTC, Connect applications at 08:24:55 (the one application updated: the hand-made entry replaced by the URL form), Test connection ok with 1 of 1 connected; no API errors. No uplink has come through that ChirpStack since 2026-09-06, so the live proof of the webhook waits for the collar. Tim then asked to simplify the form now the flow works (D128, built: address and key, the rest derived) and, having added cs.loranam.org, a ChirpStack in operation, how to test Connect applications safely: a dry run that previews per application before Apply (D129, built).
-
-### 2026-09-08, ChirpStack applications connected from the tenant, built (Claude)
-
-- Phase 17 built on Tim's word: the three gRPC calls with fakes in the tests, `merge_endpoints` and `endpoint_state` (tested), the connector's `connect_applications` and `integration_status`, the token copy on create and rotation, the endpoint with its audit and the 409 for a source without the copy, Test connection's application count, the button, the result dialog, the offer in the token dialog, docs and changelog. The API test covers the endpoint, the rotation and the 409.
-
-### 2026-09-08, ChirpStack applications connected from the tenant, planned (Claude and Tim)
-
-- Tim found that a ChirpStack tenant with many applications needs the HTTP integration set on each application by hand while the API key is per tenant, and asked for a plan before any code. Checked: ChirpStack's application service has get, create and update calls for the HTTP integration, the URL field is a comma-separated list, the event parameter is added by a query builder so a URL with its own query keeps working, and one header map goes to every URL. Three decisions (D125 to D127): an encrypted copy of the webhook token and a Connect applications action, no automatic connect, the token in the URL so headers are never touched. Phase 17 written; nothing built.
-
-### 2026-09-08, gateways on the live map (Claude and Tim)
-
-- Tim asked for a button on the Gateways page to show the gateways on the live map, and a gateway's location on a small map when clicking one. The live map takes `?gateways=1` and `?gateway=<id>` (the layer on for the visit, whatever the saved choice, and a fit to that gateway); the page header has the button, the dialog the `MiniMap` with a fixed point that links to the map on the gateway. The map's gateway list is the last 7 days, so a gateway last heard before that does not get the fit.
-
-### 2026-09-07, a small map on the entity and device pages (Claude and Tim)
-
-- Tim asked for a small map on the entity and device pages; two choices taken as recommended (D124): the newest position with a short trail, and a still preview that opens the live map. Built `MiniMap.tsx` with `miniMapGeometry` (tested) on both pages, the device page only when the device is in a project.
-
-### 2026-09-07, events in the all scope, slow decoded tab (Claude and Tim)
-
-- Tim: events do not load on the dev server, and the Decoded tab of a traffic row takes seconds. The nginx log showed the event detail answering 422 under `/projects/all`: the detail endpoint took a `ProjectContext`; it takes the scope now, with the all scope accepting any project's event, listed in `ALL_SCOPE_READS`, and the dialog's map and trace links use the event's project. The decoded records looked up positions, measurements, states and events by source event id alone, a column no hypertable indexes: explain on the server gave 76 s cold for the positions, 45 ms with the device id; every lookup takes the device now.
-
-### 2026-09-07, CI red since the device layer (Claude)
-
-- Tim asked why he gets CI failure mails. CI had failed on every push since 19677ec (12:52 UTC), the API and decoder test jobs only; nobody looked because the next pushes kept coming. Seven failures, all in tests: the device layer tests lacked the `bus` fixture import; the access matrix did not know the all scope answers 404 for a random gateway id on the gateway detail; the D119 test looked for step rows that a compact trace does not store (the compaction now also keeps a step's `note`, so the clock-ahead note shows in the trace explorer); two D121 tests read expired attributes after `expire_all`; the needs-attention test consumed the old topic after the linking moved to the decoder's walk. No production code was wrong apart from the dropped note.
-
-### 2026-09-07, heard positions as dots (Tim)
-
-- Tim found the hexagons lagging and asked for the coloured points from the beginning (D123): points at every zoom, capped at the newest 10,000 in view with the panel saying so, hexagons only on `mode=hexagons`.
-
-### 2026-09-07, heard positions in the all scope, fold (Claude and Tim)
-
-- Tim's phone showed "Loading…" for the heard positions in All projects over 90 days, and he wanted the row to fold. The server log showed every request answered 200, but each took 5 to 7 s: the bounding-box filter cannot use the spatial index on compressed positions chunks, so every chunk of the window was decompressed, and panning fired a request per second. Rewritten receptions-first with a lateral positions scan per device (0.56 s in the same explain), the request of a gone viewport is cancelled, the settle is 600 ms, the panel shows a load error with a retry, and Heard positions folds and joins Fold all.
-
-### 2026-09-07, bulk assignment (Claude and Tim)
-
-- Tim asked for the bulk assignment after the gateway finding (D122). Built: `POST /devices/bulk-assign` with the first-data start, optional entities and groups, reattribution and skips; the all-scope devices list has a selection, column filters and the Assign to project action with its dialog; an API test covers the start, the entities, the skips and the 403. Checked on the local build: three devices from "Not in a project" selected and the dialog opened on Smart Parks, not submitted.
-
-### 2026-09-07, gateways in the north, coverage sparse (Claude and Tim)
-
-- Tim saw no gateways in the north of the Netherlands and a sparse heard-positions layer. Cause: 76 of the 78 devices onboarded today are in no project (the bulk create ran with "No project yet"), so the Smart Parks map counts only its 4 devices; 4,996 of the 5,481 Dutch positions of the week carry no project. In the all scope the coverage query already took unassigned positions, but `_scope_device_ids` did not take devices in no project, so the gateway layer, Traffic and connectivity missed them there; fixed with a test. Assigning the devices to Smart Parks is Tim's call; there is no bulk assignment yet.
-
-### 2026-09-07, layers panel the same on every tab (Claude)
-
-- Tim asked that the layers menu works the same on every tab, fold all and show all included; the Coverage tab's gateways did not fold. One footer now serves every tab (shown of total, Fold all or Unfold all, Show all, Hide all), the Gateways row folds, and `layerChoices` gained show all and hide all helpers for features, events and gateways (tests). Checked on the dev API: Coverage Hide all leaves 0 of 91 shown, Show all brings the 91 back.
+- Tim asked for filters on the columns of the Needs attention table to select and organise in bulk. `DataTable` gained an opt-in filter row (`columnFilters`): a choice of the column's distinct values when there are up to twelve, else a text match, `meta.filter` to force a kind or leave a column without one; the header box already selected the filtered row model, so a filter plus the box selects exactly the rows that pass, and the toolbar offers Clear filters with the count. Enabled on the unknown identities and failed source events tables, external id and name always as text. Checked on the dev API: "SP" in the name filter, the header box, "2 selected" with Create devices.
 
 ### 2026-09-07, bulk onboarding in the background, receptions linked, switcher on touch (Claude and Tim)
 
@@ -1354,10 +1296,84 @@ Listed by the phase where they are first needed.
 - Tim saw device tracks on the map after onboarding but no gateways from the same uplinks. Nothing is lost: 14,882 receptions on the dev server carried no device while their source events did. Linking now sets it, migration 0022 repairs the rows.
 - The project switcher's list did not scroll under a finger: the phone sidebar is a modal sheet, whose scroll lock blocks touch scrolling in the popover portaled outside it. The popover is modal now; a simulated swipe moved the list by 145 px where it moved 0 before.
 
-### 2026-09-07, column filters on Needs attention (Claude)
+### 2026-09-07, layers panel the same on every tab (Claude)
 
-- Tim asked for filters on the columns of the Needs attention table to select and organise in bulk. `DataTable` gained an opt-in filter row (`columnFilters`): a choice of the column's distinct values when there are up to twelve, else a text match, `meta.filter` to force a kind or leave a column without one; the header box already selected the filtered row model, so a filter plus the box selects exactly the rows that pass, and the toolbar offers Clear filters with the count. Enabled on the unknown identities and failed source events tables, external id and name always as text. Checked on the dev API: "SP" in the name filter, the header box, "2 selected" with Create devices.
+- Tim asked that the layers menu works the same on every tab, fold all and show all included; the Coverage tab's gateways did not fold. One footer now serves every tab (shown of total, Fold all or Unfold all, Show all, Hide all), the Gateways row folds, and `layerChoices` gained show all and hide all helpers for features, events and gateways (tests). Checked on the dev API: Coverage Hide all leaves 0 of 91 shown, Show all brings the 91 back.
 
-### 2026-09-07, devices in no project (Claude and Tim)
+### 2026-09-07, gateways in the north, coverage sparse (Claude and Tim)
 
-- Tim asked how a server admin should see devices in no project. Three decisions taken as recommended (D120): a "Not in a project" section in the all scope's device layer and Devices tab, their positions and a track over unassigned data in that scope only, the plain marker with a panel that names the gap and links to Server admin, Devices. Built: the map devices endpoint takes every device in the all scope (outer join on the current assignment, project None for the rest), `ScopeContext.where(..., unassigned=True)` for the device tracks, the panel section and links, the devices list's project filter; a test for the scope with an inventory device.
+- Tim saw no gateways in the north of the Netherlands and a sparse heard-positions layer. Cause: 76 of the 78 devices onboarded today are in no project (the bulk create ran with "No project yet"), so the Smart Parks map counts only its 4 devices; 4,996 of the 5,481 Dutch positions of the week carry no project. In the all scope the coverage query already took unassigned positions, but `_scope_device_ids` did not take devices in no project, so the gateway layer, Traffic and connectivity missed them there; fixed with a test. Assigning the devices to Smart Parks is Tim's call; there is no bulk assignment yet.
+
+### 2026-09-07, bulk assignment (Claude and Tim)
+
+- Tim asked for the bulk assignment after the gateway finding (D122). Built: `POST /devices/bulk-assign` with the first-data start, optional entities and groups, reattribution and skips; the all-scope devices list has a selection, column filters and the Assign to project action with its dialog; an API test covers the start, the entities, the skips and the 403. Checked on the local build: three devices from "Not in a project" selected and the dialog opened on Smart Parks, not submitted.
+
+### 2026-09-07, heard positions in the all scope, fold (Claude and Tim)
+
+- Tim's phone showed "Loading…" for the heard positions in All projects over 90 days, and he wanted the row to fold. The server log showed every request answered 200, but each took 5 to 7 s: the bounding-box filter cannot use the spatial index on compressed positions chunks, so every chunk of the window was decompressed, and panning fired a request per second. Rewritten receptions-first with a lateral positions scan per device (0.56 s in the same explain), the request of a gone viewport is cancelled, the settle is 600 ms, the panel shows a load error with a retry, and Heard positions folds and joins Fold all.
+
+### 2026-09-07, heard positions as dots (Tim)
+
+- Tim found the hexagons lagging and asked for the coloured points from the beginning (D123): points at every zoom, capped at the newest 10,000 in view with the panel saying so, hexagons only on `mode=hexagons`.
+
+### 2026-09-07, CI red since the device layer (Claude)
+
+- Tim asked why he gets CI failure mails. CI had failed on every push since 19677ec (12:52 UTC), the API and decoder test jobs only; nobody looked because the next pushes kept coming. Seven failures, all in tests: the device layer tests lacked the `bus` fixture import; the access matrix did not know the all scope answers 404 for a random gateway id on the gateway detail; the D119 test looked for step rows that a compact trace does not store (the compaction now also keeps a step's `note`, so the clock-ahead note shows in the trace explorer); two D121 tests read expired attributes after `expire_all`; the needs-attention test consumed the old topic after the linking moved to the decoder's walk. No production code was wrong apart from the dropped note.
+
+### 2026-09-07, events in the all scope, slow decoded tab (Claude and Tim)
+
+- Tim: events do not load on the dev server, and the Decoded tab of a traffic row takes seconds. The nginx log showed the event detail answering 422 under `/projects/all`: the detail endpoint took a `ProjectContext`; it takes the scope now, with the all scope accepting any project's event, listed in `ALL_SCOPE_READS`, and the dialog's map and trace links use the event's project. The decoded records looked up positions, measurements, states and events by source event id alone, a column no hypertable indexes: explain on the server gave 76 s cold for the positions, 45 ms with the device id; every lookup takes the device now.
+
+### 2026-09-07, a small map on the entity and device pages (Claude and Tim)
+
+- Tim asked for a small map on the entity and device pages; two choices taken as recommended (D124): the newest position with a short trail, and a still preview that opens the live map. Built `MiniMap.tsx` with `miniMapGeometry` (tested) on both pages, the device page only when the device is in a project.
+
+### 2026-09-08, gateways on the live map (Claude and Tim)
+
+- Tim asked for a button on the Gateways page to show the gateways on the live map, and a gateway's location on a small map when clicking one. The live map takes `?gateways=1` and `?gateway=<id>` (the layer on for the visit, whatever the saved choice, and a fit to that gateway); the page header has the button, the dialog the `MiniMap` with a fixed point that links to the map on the gateway. The map's gateway list is the last 7 days, so a gateway last heard before that does not get the fit.
+
+### 2026-09-08, ChirpStack applications connected from the tenant, planned (Claude and Tim)
+
+- Tim found that a ChirpStack tenant with many applications needs the HTTP integration set on each application by hand while the API key is per tenant, and asked for a plan before any code. Checked: ChirpStack's application service has get, create and update calls for the HTTP integration, the URL field is a comma-separated list, the event parameter is added by a query builder so a URL with its own query keeps working, and one header map goes to every URL. Three decisions (D125 to D127): an encrypted copy of the webhook token and a Connect applications action, no automatic connect, the token in the URL so headers are never touched. Phase 17 written; nothing built.
+
+### 2026-09-08, ChirpStack applications connected from the tenant, built (Claude)
+
+- Phase 17 built on Tim's word: the three gRPC calls with fakes in the tests, `merge_endpoints` and `endpoint_state` (tested), the connector's `connect_applications` and `integration_status`, the token copy on create and rotation, the endpoint with its audit and the 409 for a source without the copy, Test connection's application count, the button, the result dialog, the offer in the token dialog, docs and changelog. The API test covers the endpoint, the rotation and the 409.
+
+### 2026-09-08, ChirpStack quick setup and a preview before writing (Claude and Tim)
+
+- Tim ran the three steps on the dev server: the token rotation at 08:24:44 UTC, Connect applications at 08:24:55 (the one application updated: the hand-made entry replaced by the URL form), Test connection ok with 1 of 1 connected; no API errors. No uplink has come through that ChirpStack since 2026-09-06, so the live proof of the webhook waits for the collar. Tim then asked to simplify the form now the flow works (D128, built: address and key, the rest derived) and, having added cs.loranam.org, a ChirpStack in operation, how to test Connect applications safely: a dry run that previews per application before Apply (D129, built).
+
+### 2026-09-08, blank entity page after a deploy (Claude and Tim)
+
+- Tim opened an entity from the map's device panel and got a blank page; a refresh loaded it. Not the entity: the nginx log shows the browser asking for `EntityPage-YQbqYCiK.js` from a build replaced by a later deploy, 404. `lib/staleChunk.ts` reloads once on `vite:preloadError` with a loop guard (D130, tested); checked by serving a chunk as 404 in Playwright and seeing the reload.
+
+### 2026-09-08, LoRaNAM cannot be reached over native gRPC; grpc-web (Claude and Tim)
+
+- Tim's LoRaNAM source failed Connect applications: its gRPC address was still the old form's example, then `grpc://cs.loranam.org:443`. Checked from the dev server: cs.loranam.org is an Apache without HTTP/2 (no h2 even with prior knowledge), 8080 closed, so native gRPC can never pass; a read-only grpc-web ListApplications with the stored key answered (six applications). Also found: a tenant API key cannot list tenants (UNAUTHENTICATED on both ChirpStacks), so D128's lookup only worked for global keys. Two decisions as recommended (D131): grpc-web as a transport for https:// addresses, and the tenant id read from the browser address. Built: `_ChirpStackCalls` with `ChirpStackGrpc` and `ChirpStackWeb`, `client_for`, the quick setup deriving `https://host`, the example address treated as unset.
+
+### 2026-09-08, a tick per application in the preview (Tim)
+
+- With the LoRaNAM preview open (six applications, five to add, PangolinEdge to update), Tim asked for checkboxes so Apply touches only the chosen applications: `application_ids` in the request body, `only` on the connector, ticks in the dialog with the count on the Apply button; tests on both sides.
+
+### 2026-09-08, the Applications dialog (Claude and Tim)
+
+- LoRaNAM connected fine with the ticks. Tim asked for a spinner per application while connecting and a way to see and manage the connections afterwards (D132): `integration_status` gained the header names, `disconnect_applications` and `delete_http_integration` were added, two endpoints (list, disconnect), and the `ApplicationsDialog` replaced the preview: one request per application so each row spins on its own, Connect or Disconnect per row, Connect the other N in sequence. Tests on the connector and the API.
+
+### 2026-09-08, unknown identities named after the ChirpStack device (Tim)
+
+- Tim: an unknown identity from ChirpStack shows name "none" while ChirpStack knows the device as SP010462. The adapter kept the uplink's `deviceName` under `device_name` only; it now also sets `name`, the attribute Needs attention and the bulk create read (D96). Identity attributes merge on every uplink and Sync devices writes `name` from the listing, so existing identities catch up either way. Test on the up fixture.
+
+### 2026-09-08, simple first, details one click deeper, planned (Claude and Tim)
+
+- Tim does not want the machinery behind the Technical details switch; he asked for a strategy that presents simple data first and lets a person click an item to dig deeper, and for a plan before code. Inventory of the switch: the Network section, the folds on the entity and device pages, the Driver column, the record links on the device page, the gateway layer default. Two decisions as recommended (D133, D134): tabs Overview, Data and Network on the entity and device pages with the tab in the URL, and the Network section by role with the switch and preference removed. Phase 18 written; nothing built.
+
+### 2026-09-08, phase 18 built (Claude)
+
+- On Tim's word: `useTab` reads `?tab=`; the entity page has Overview (entity, map, device, health, assignments), Data (events, positions) and Network (the device's traffic, a link to the device's Network tab); the device page Overview (device, map, health, assignments), Data (positions with all links, log files, Bluetooth), Network (control, identities, traffic). The switch, the preference hook and the fold are deleted; the Network section is `adminOnly` (test); the Driver column is `defaultHidden`; gateways start off for everyone; the gateway dialog links to the device's Network tab; the sweep visits the tabs; pages.md rewritten. Checked on the local build: each tab lands from its URL, no switch anywhere.
+
+### 2026-09-08, review of the whole project (Claude and Tim)
+
+- Tim asked for a review of the whole project from the guiding documents, to know where we stand before any next phase. Three sweeps (plan consistency, stale docs, code health) plus the documents themselves. Findings: the status table and milestones stale for phases 17 and 18; D105, D107, D128 and D129 superseded without a note; the session log in two orders; the phase 8 release box open for a version folded long ago; the risks table pre-phase-8; README and docs index still "pre-release"; the ChirpStack page and DEVELOPERS describing the API as gRPC only and the quick setup as looking the tenant up; the pipeline doc's "republished"; the icons page missing from the administration index; the README's feature list without the device layer, all projects, bulk assignment and the ChirpStack connect. Code: no TODO, ruff and mypy clean, 16 lint warnings that are React Compiler bailouts, no dead frontend code, two endpoints without a caller (the curation re-preview, the connect dry run) and the vector tile endpoint the map never switches to above the threshold; tokens in URLs land in access logs; a deploy costs seconds of 502.
+- Housekeeping done in this entry's commit: all of the above in the plan, the docs and the README (the code findings stay as open items in the risks table and the next-item line). Verification gaps closed on the dev server: phase 16 part B's live uplink in the all scope, phase 17's uplinks with the application name (through LoRaNAM), phase 18's viewer and project admin sidebars and tabs (temporary accounts, removed).
+- Open for the next phase, in Tim's order: release v2.2.0; onboard and assign the KPN collars and LoRaNAM's applications; Request status through KPN for the complete command timeline; the map using the vector tiles above the threshold; the live stages that wait for accounts.

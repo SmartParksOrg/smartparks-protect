@@ -6,7 +6,7 @@
 
 Self-hosted operational data platform for [Smart Parks](https://www.smartparks.org) deployments. It connects field devices and IoT platforms to one Smart Parks domain and makes that data useful: a live map, analysis and export, a rules engine that turns observations into events and alerts, device control, and durable integrations with systems such as EarthRanger.
 
-**Status: pre-release.** Releases v0.1.0 to v0.4.0 cover the live map, the Data Explorer and exports, rules, alerts, automations and device control on a local ChirpStack; the production LoRaWAN adapters, deployment automation, integrations and the MCP server for AI clients are built and wait for live verification. The roadmap is in [`PROJECT_PLAN.md`](PROJECT_PLAN.md).
+**Status: v2.0.0 released on 2026-09-06**, with the device layer, the all-projects scope, ChirpStack onboarding from the tenant and the simple-first pages live on the development server since; see `CHANGELOG.md`.
 
 ## Core concepts
 
@@ -20,6 +20,11 @@ Self-hosted operational data platform for [Smart Parks](https://www.smartparks.o
 - **Rules produce meaning.** Versioned, testable rules create events; automations act on them; alerts are events that need a person.
 - **Control is bidirectional.** Commands go through one capability-driven path whether a person or an automation issues them.
 - **Integrations are first class.** Outbound delivery is durable, retried and inspectable.
+- **Devices on the map beside their entities.** A device layer, off by default, shows collars with or without an animal and a device's own track across the entities it tracked.
+- **All projects at once for server admins.** The live map, the lists and the network pages over every project, read-only, with devices in no project visible until assigned.
+- **Bulk onboarding and assignment.** Unknown identities become devices in one go, and a selection of devices joins a project from its first data, with an entity each if wanted.
+- **ChirpStack onboarding from the tenant.** One tenant API key connects every application of a ChirpStack to the platform's webhook, over native gRPC or grpc-web, application by application and undoable.
+- **Simple first.** Every page shows the operational picture; the machinery sits one click deeper on the Data and Network tabs of an entity or device.
 
 ## Documentation
 
