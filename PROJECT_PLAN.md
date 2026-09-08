@@ -173,6 +173,8 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D130 | Reload once on a stale page chunk | The app listens for a failed page chunk load and reloads itself once, with a guard against a loop during a real outage, so a tab opened before a deploy recovers by itself. | Tim saw a blank entity page from the map after a day of deploys: the tab asked for a chunk of the previous build (404 in the nginx log); a refresh fixed it. Decided on 2026-09-08. |
 | D131 | grpc-web as a second ChirpStack transport | `api_url` `https://host` speaks grpc-web, the web UI's own protocol on the same paths, through whatever serves the UI; `grpcs://` and `grpc://` keep native gRPC. The quick setup derives the web address as the API address and reads the tenant id from the address copied from the browser tab, since a tenant API key is refused when it asks for its tenants. | LoRaNAM's ChirpStack sits behind an Apache that speaks HTTP/1.1 only, so native gRPC cannot reach it and port 8080 is closed; grpc-web with the stored key listed its applications read-only during the check. Decided by Tim on 2026-09-08. |
 | D132 | An Applications dialog per ChirpStack source | Lists every application with its state (posts to this source, elsewhere only, no integration), what its integration holds besides, Connect and Disconnect per row with a spinner while the platform answers, Connect the other N in sequence, Refresh; replaces the one-shot preview; Disconnect removes only this source's entry. | Tim wanted feedback per application while connecting and a way to see and undo the connections afterwards. Decided by Tim on 2026-09-08. |
+| D133 | Object pages with tabs: Overview, Data, Network | The entity page and the device page keep the operational picture on an Overview tab (state, health, the small map, assignments, actions) and put the machinery one click deeper on the same two tabs everywhere: Data (the records with their provenance links) and Network (identities, traffic, traces, commands of that object). The tab lives in the URL (`?tab=`) so links land on it. No folded sections, no switch. | Tim did not like the machinery hidden behind a global switch; a person digs deeper by clicking the thing, and the same place on every object needs no explanation. Supersedes the folds of D105. Decided by Tim on 2026-09-08. |
+| D134 | The Network section by role, the technical details switch removed | Traffic, Gateways and Trace explorer show for project admins and server admins; a viewer's sidebar has Monitor and Analyze, and reaches the traffic and traces of one device on its Network tab. The `technical_details` preference, the sidebar switch, `useTechnicalDetails` and the `TechnicalDetails` fold go; nothing in the interface depends on a preference for detail any more. | Simplicity comes from the structure of the pages, not from hiding parts of them; role is the one axis left, and it already exists. Supersedes D105. Decided by Tim on 2026-09-08. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -814,6 +816,25 @@ Release:
 
 **Exit criteria.** On the dev server, against the ChirpStack at chirpstack-dev4.smartparks.org: one Connect applications puts the source on every application of the tenant, an application that already posted to another URL keeps doing so and posts to us too, Test connection lists the applications with their state, a token rotation followed by Connect applications updates every URL, and the uplinks of a newly connected application arrive with the application name on the identity.
 
+### Phase 18: simple first, details one click deeper (v2.2.0)
+
+**Goal.** No global switch for detail. Every page shows the operational picture first, and the machinery sits one click deeper in the same place on every object: the Data and Network tabs of the entity and device pages. The sidebar follows the role only.
+
+**Why here.** The Technical details switch of D105 hid identities, traffic, traces and the Network section behind a preference that a person has to know about; Tim wants a strategy instead: present clear and simple data, and let a person click an item to dig deeper. Phase 17's ChirpStack work brought several admins onto the pages and made the gap visible.
+
+**Order (D133, D134).** The tabs first, so nothing that the switch used to show becomes unreachable; then the switch and the preference go; then the lists, the map defaults and the docs. Each item lands with tests and docs, committed on Tim's word.
+
+**Deliverables.**
+
+- [ ] Tabs on the entity page (D133): Overview (entity card, the small map, the device and its health, assignments, the repair callouts), Data (positions and events of the entity with the curate, deliveries and source-event links always shown), Network (the traffic and traces of the device tracking it, with the link to the device). `?tab=` in the URL, Overview when absent; the existing deep links (`?event=`, the assignment dialogs) keep working.
+- [ ] Tabs on the device page (D133): Overview (device card, the small map, health, project and entity assignments, actions, the repair callouts), Data (recent positions and records with their links), Network (external identities, traffic, traces, commands and the request buttons). The Traffic and Trace explorer pages link into the device's Network tab where they name a device.
+- [ ] The switch goes (D134): `useTechnicalDetails`, `TechnicalDetails`, the sidebar switch and its strings, the `technical` flag on navigation sections replaced by the role rule (`adminOnly` for the Network section), `sectionsFor` tested for a viewer, a project admin and a server admin; the `technical_details` preference key is left unused on the server (no migration; the preference document tolerates unknown keys).
+- [ ] Lists: the devices list's Driver column becomes a column the picker can show (hidden by default, `defaultHidden`), no longer switch-bound; the entities, devices, gateways and traffic lists audited once more for columns a viewer does not need first.
+- [ ] Map: the gateway layer off by default for everyone, on through the layers panel and remembered per user as today; the `?gateways=1` and `?gateway=` parameters unchanged; the entity and device panels keep only state and the links to the object's pages.
+- [ ] Docs: `docs/administration/pages.md` rewritten around the tab rule (what each tab of each object holds, per role), the D105 wording replaced in `DEVELOPERS.md`, the changelog; the sweep screenshots the three tabs of an entity and a device.
+
+**Exit criteria.** A viewer's account on the dev server sees no switch and a sidebar with Monitor and Analyze; the entity page opens on Overview with the small map and reaches the device's traffic on its Network tab in one click; `?tab=network` on a device link lands on the tab; a project admin sees the Network section; a server admin sees the same pages as the viewer plus the admin sections, so what a ranger sees is one account switch away rather than a preference.
+
 ---
 
 ## Continuous work in every phase
@@ -1250,6 +1271,10 @@ Listed by the phase where they are first needed.
 ### 2026-09-07, device clusters (Claude)
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
+
+### 2026-09-08, simple first, details one click deeper, planned (Claude and Tim)
+
+- Tim does not want the machinery behind the Technical details switch; he asked for a strategy that presents simple data first and lets a person click an item to dig deeper, and for a plan before code. Inventory of the switch: the Network section, the folds on the entity and device pages, the Driver column, the record links on the device page, the gateway layer default. Two decisions as recommended (D133, D134): tabs Overview, Data and Network on the entity and device pages with the tab in the URL, and the Network section by role with the switch and preference removed. Phase 18 written; nothing built.
 
 ### 2026-09-08, unknown identities named after the ChirpStack device (Tim)
 
