@@ -113,6 +113,19 @@ class FakeApplicationService:
         return api.UpdateHttpIntegrationRequest()
 
 
+class FakeTenantService:
+    tenants: ClassVar[list[tuple[str, str]]] = [("t1", "Smart Parks")]
+
+    def __init__(self, channel):
+        pass
+
+    async def List(self, request, metadata=None, timeout=None):  # noqa: ASYNC109
+        return api.ListTenantsResponse(
+            total_count=len(self.tenants),
+            result=[api.TenantListItem(id=i, name=n) for i, n in self.tenants],
+        )
+
+
 class FakeGatewayService:
     def __init__(self, channel):
         pass
@@ -146,6 +159,8 @@ def fake_grpc(monkeypatch):
     monkeypatch.setattr(grpc_api.api, "DeviceServiceStub", FakeDeviceService)
     monkeypatch.setattr(grpc_api.api, "ApplicationServiceStub", FakeApplicationService)
     monkeypatch.setattr(grpc_api.api, "GatewayServiceStub", FakeGatewayService)
+    monkeypatch.setattr(grpc_api.api, "TenantServiceStub", FakeTenantService)
+    FakeTenantService.tenants = [("t1", "Smart Parks")]
     monkeypatch.setattr(grpc_api.ChirpStackGrpc, "_channel", lambda self: FakeChannel())
 
 
@@ -205,7 +220,7 @@ async def test_grpc_errors_become_platform_errors():
         with pytest.raises(ApplicationError) as excinfo:
             await commands.submit("0016C001F01192A0", b"\x00", {"f_port": 1})
         assert excinfo.value.code == expected
-    assert chirpstack.ChirpStackAdapter.config_example["api_url"].startswith("grpcs://")
+    assert chirpstack.ChirpStackAdapter.quick_setup["credential_key"] == "api_token"
 
 
 async def test_proxy_without_grpc_location_is_explained():
@@ -241,6 +256,20 @@ async def test_connect_applications_creates_merges_and_keeps_headers():
     }
     url = "https://protect.example/api/v1/ingest/http/S?token=new"
     management = ChirpStackManagement(source("grpc://cs:8080"))
+    # a dry run reports the same outcomes and writes nothing (decision D129)
+    preview = await management.connect_applications(url, dry_run=True)
+    assert [(r["name"], r["outcome"]) for r in preview] == [
+        ("smartparks", "connected"),
+        ("trackers", "updated"),
+        ("done", "already"),
+    ]
+    assert preview[1]["before"] == [
+        "https://other.example/hook",
+        "https://protect.example/api/v1/ingest/http/S?token=old",
+    ]
+    assert preview[1]["headers"] == ["Authorization"]
+    assert "a1" not in FakeApplicationService.integrations
+    assert not [c for c in Recorder.calls if "Integration" in c[0]]
     results = await management.connect_applications(url)
     assert [(r["name"], r["outcome"]) for r in results] == [
         ("smartparks", "connected"),
@@ -280,3 +309,28 @@ async def test_connect_applications_reports_a_refused_application():
     Recorder.fail = grpc.StatusCode.PERMISSION_DENIED
     results = await management.connect_applications("https://protect.example/hook?token=t")
     assert results[0]["outcome"] == "failed" and "refused" in results[0]["error"]
+
+
+async def test_quick_setup_derives_the_grpc_address_and_looks_the_tenant_up():
+    """Decision D128: the web address and a tenant key are enough."""
+    from dataclasses import replace
+
+    adapter = chirpstack.ChirpStackAdapter()
+    base = source("")
+    context = replace(base, config={"web_url": "https://cs.example.org/"})
+    completed = await adapter.complete_config(context)
+    assert completed["api_url"] == "grpcs://cs.example.org:443"
+    assert completed["tenant_id"] == "t1"
+    context = replace(base, config={"web_url": "http://10.0.0.5:8080", "tenant_id": "given"})
+    completed = await adapter.complete_config(context)
+    assert completed["api_url"] == "grpc://10.0.0.5:8080" and completed["tenant_id"] == "given"
+    context = replace(base, config={"web_url": "https://cs.example.org"})
+    FakeTenantService.tenants = [("t1", "One"), ("t2", "Two")]
+    with pytest.raises(ApplicationError, match="2 tenants"):
+        await adapter.complete_config(context)
+    FakeTenantService.tenants = []
+    with pytest.raises(ApplicationError, match="no tenant"):
+        await adapter.complete_config(context)
+    # no key: nothing looked up, the address still derived
+    context = replace(context, credentials={})
+    assert (await adapter.complete_config(context))["api_url"] == "grpcs://cs.example.org:443"

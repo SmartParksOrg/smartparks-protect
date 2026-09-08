@@ -1138,7 +1138,9 @@ export interface paths {
          * Connect Applications
          * @description Put this source's webhook on the HTTP integration of every application the platform
          *     lists for it (decision D125). Needs the API channel and the encrypted copy of the webhook
-         *     token, which a source made before the copy existed gets from one token rotation.
+         *     token, which a source made before the copy existed gets from one token rotation. With
+         *     `dry_run` nothing is written: the answer shows each application's URL list before and
+         *     after, so a platform in operation can be checked first (decision D129).
          */
         post: operations["connect_applications_api_v1_data_sources__data_source_id__connect_applications_post"];
         delete?: never;
@@ -4382,8 +4384,21 @@ export interface components {
              * @description connected, updated, already or failed
              */
             outcome: string;
-            /** Urls */
+            /**
+             * Urls
+             * @description The URL list after the change
+             */
             urls?: string[];
+            /**
+             * Before
+             * @description The URL list as it was
+             */
+            before?: string[];
+            /**
+             * Headers
+             * @description Header names, never changed
+             */
+            headers?: string[];
             /** Error */
             error?: string | null;
         };
@@ -5118,6 +5133,11 @@ export interface components {
         };
         /** ConnectApplicationsResult */
         ConnectApplicationsResult: {
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
             /** Connected */
             connected: number;
             /** Updated */
@@ -12848,7 +12868,10 @@ export interface operations {
     };
     connect_applications_api_v1_data_sources__data_source_id__connect_applications_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Report what would change on every application without writing */
+                dry_run?: boolean;
+            };
             header?: never;
             path: {
                 data_source_id: string;

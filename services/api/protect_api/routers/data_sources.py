@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
@@ -26,6 +26,7 @@ from protect_api.schemas.domain import (
 )
 from protect_api.schemas.integrations import CursorReset, GatewaySyncResult
 from shared.config import get_settings
+from shared.connectivity.base import AdapterCapabilities, DataSourceContext
 from shared.connectivity.channels import api_channel_key, channel_enabled
 from shared.connectivity.registry import ADAPTERS, channels_of, describe_adapter
 from shared.connectivity.state import read_api_test, read_connector, report_api_test
@@ -133,6 +134,9 @@ async def create_data_source(
     credentials = dict(body.credentials or {})
     if token and getattr(adapter, "keeps_webhook_token", False):
         credentials["webhook_token"] = token  # for Connect applications (decision D125)
+    values["config"] = await _complete_config(
+        body.adapter_key, dict(values.get("config") or {}), credentials, values.get("channels")
+    )
     source = DataSource(
         credentials_encrypted=encrypt_json(credentials) if credentials else None,
         webhook_token_hash=hash_token(token) if token else None,
@@ -254,11 +258,14 @@ class ApplicationConnection(BaseModel):
     application_id: str
     name: str
     outcome: str = Field(description="connected, updated, already or failed")
-    urls: list[str] = Field(default_factory=list)
+    urls: list[str] = Field(default_factory=list, description="The URL list after the change")
+    before: list[str] = Field(default_factory=list, description="The URL list as it was")
+    headers: list[str] = Field(default_factory=list, description="Header names, never changed")
     error: str | None = None
 
 
 class ConnectApplicationsResult(BaseModel):
+    dry_run: bool = False
     connected: int
     updated: int
     already: int
@@ -268,6 +275,36 @@ class ConnectApplicationsResult(BaseModel):
 
 def _webhook_base(source: DataSource) -> str:
     return f"{get_settings().public_url}/api/v1/ingest/http/{source.id}"
+
+
+async def _complete_config(
+    adapter_key: str,
+    config: dict[str, Any],
+    credentials: dict[str, Any],
+    channels: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Let an adapter with a quick setup (decision D128) fill in what it derives, when its API
+    channel is on; its refusal is the caller's 422 with the reason."""
+    adapter = ADAPTERS.get(adapter_key)
+    completer = getattr(adapter, "complete_config", None)
+    if completer is None or not channel_enabled(channels, api_channel_key(adapter_key)):
+        return config
+    context = DataSourceContext(
+        id=uuid.uuid4(),
+        name="",
+        adapter_key=adapter_key,
+        config=dict(config),
+        credentials=dict(credentials),
+        capabilities=AdapterCapabilities(),
+    )
+    try:
+        return dict(await completer(context))
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"platform unreachable: {error}"
+        ) from error
 
 
 def _management(source: DataSource) -> Any:
@@ -451,12 +488,17 @@ async def test_connection(
 @router.post("/{data_source_id}/connect-applications", response_model=ConnectApplicationsResult)
 async def connect_applications(
     data_source_id: uuid.UUID,
+    dry_run: bool = Query(
+        False, description="Report what would change on every application without writing"
+    ),
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
 ) -> ConnectApplicationsResult:
     """Put this source's webhook on the HTTP integration of every application the platform
     lists for it (decision D125). Needs the API channel and the encrypted copy of the webhook
-    token, which a source made before the copy existed gets from one token rotation."""
+    token, which a source made before the copy existed gets from one token rotation. With
+    `dry_run` nothing is written: the answer shows each application's URL list before and
+    after, so a platform in operation can be checked first (decision D129)."""
     source = await get_or_404(session, DataSource, data_source_id, "Data source")
     if not channel_enabled(source.channels, api_channel_key(source.adapter_key)):
         raise HTTPException(status.HTTP_409_CONFLICT, "The API channel of this source is off")
@@ -476,7 +518,7 @@ async def connect_applications(
             "connect the applications",
         )
     try:
-        results = await connect(f"{_webhook_base(source)}?token={token}")
+        results = await connect(f"{_webhook_base(source)}?token={token}", dry_run=dry_run)
     except ApplicationError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
     except httpx.HTTPError as error:
@@ -488,6 +530,8 @@ async def connect_applications(
         k: sum(1 for a in applications if a.outcome == k)
         for k in ("connected", "updated", "already", "failed")
     }
+    if dry_run:
+        return ConnectApplicationsResult(dry_run=True, **counts, applications=applications)
     await record_audit(
         session,
         user=user,
@@ -632,9 +676,19 @@ async def update_data_source(
 ) -> DataSourceRead:
     source = await get_or_404(session, DataSource, data_source_id, "Data source")
     changed = apply_patch(source, body, exclude={"credentials", "project_ids"})
+    stored = decrypt_json(source.credentials_encrypted) if source.credentials_encrypted else {}
     if body.credentials is not None:
-        source.credentials_encrypted = encrypt_json(body.credentials)
+        # a copy of the webhook token outlives a credentials update (decision D125)
+        kept = {k: v for k, v in stored.items() if k == "webhook_token"}
+        source.credentials_encrypted = encrypt_json({**kept, **body.credentials})
         changed["credentials"] = "replaced"
+    if body.config is not None or body.credentials is not None or body.channels is not None:
+        source.config = await _complete_config(
+            source.adapter_key,
+            dict(source.config),
+            decrypt_json(source.credentials_encrypted) if source.credentials_encrypted else {},
+            source.channels,
+        )
     if body.project_ids is not None:
         await _set_scopes(session, source, body.project_ids)
         changed["project_ids"] = [str(p) for p in body.project_ids]

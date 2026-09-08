@@ -147,6 +147,14 @@ class ChirpStackGrpc:
             f"application {application_id}",
         )
 
+    async def list_tenants(self) -> list[dict[str, Any]]:
+        """The tenants the key may see: one for a tenant API key, all for a global one."""
+        return await self._pages(
+            api.TenantServiceStub,
+            lambda limit, offset: api.ListTenantsRequest(limit=limit, offset=offset),
+            "the tenants",
+        )
+
     async def list_gateways(self, tenant_id: str) -> list[dict[str, Any]]:
         return await self._pages(
             api.GatewayServiceStub,

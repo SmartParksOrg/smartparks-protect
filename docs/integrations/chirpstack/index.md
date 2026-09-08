@@ -67,12 +67,15 @@ JSON), and Server admin, Data sources, Status lists the channels with their stat
 A ChirpStack v4 that already serves gateways and collars connects in one of two ways:
 
 - **HTTP integration (no broker exposure).** Server admin, Data sources, New data source,
-  adapter ChirpStack, with `mqtt_host` left empty, `web_url` the ChirpStack web UI,
-  `tenant_id` the tenant, and, for the one-step setup, `api_url` and the `api_token`
-  credential (a tenant API key). With those, "Connect applications" (offered when the token
-  is shown, and on the data source row) puts the source's webhook on the HTTP integration of
-  every application of the tenant (decision D125): created where there is none, appended to
-  the comma-separated URL list where one exists, with the token in the URL (`?token=`) so the
+  adapter ChirpStack: a name, the ChirpStack address (the web UI's URL) and a tenant API key
+  are enough (decision D128). Saving derives the gRPC address (`grpcs://host:443` behind
+  https, `grpc://host:8080` behind http) and looks the tenant up through the key; a global
+  key that sees several tenants is refused until the tenant id is filled in under Advanced,
+  where MQTT, the gRPC address and the tenant id live. The webhook token is shown next with
+  "Connect applications" (also on the data source row): it first previews what would change
+  on every application's HTTP integration, nothing written, and Apply then does it (D129,
+  for a ChirpStack in operation): created where there is none, our URL appended to the
+  comma-separated list where one exists, with the token in the URL (`?token=`) so the
   integration's headers are never touched (D127; ChirpStack sends one header map to every
   URL). Other URLs on an integration keep posting where they did. Test connection then shows
   how many applications post to this source and names the rest; a new application in

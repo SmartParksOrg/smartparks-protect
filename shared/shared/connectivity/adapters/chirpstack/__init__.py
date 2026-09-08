@@ -15,6 +15,7 @@ Credentials: `api_token`, optional `mqtt_username` and `mqtt_password`.
 import json
 from datetime import datetime
 from typing import Any, ClassVar
+from urllib.parse import urlsplit
 
 from shared.connectivity.adapters.chirpstack.grpc_api import ChirpStackGrpc, is_grpc_url
 from shared.connectivity.base import (
@@ -411,11 +412,14 @@ class ChirpStackManagement:
         applications = await self.list_applications()
         return {"ok": True, "applications": len(applications)}
 
-    async def connect_applications(self, url: str) -> list[dict[str, Any]]:
+    async def connect_applications(
+        self, url: str, *, dry_run: bool = False
+    ) -> list[dict[str, Any]]:
         """Put this source's webhook URL (with its token in the query, decision D127) on the
         HTTP integration of every application of the tenant (decision D125): created where
         there is none, the URL merged into the list where one exists, headers and the other
-        URLs left alone. One entry per application with the outcome."""
+        URLs left alone. One entry per application with the outcome. A dry run reads every
+        integration and reports what would change without writing (D129)."""
         results: list[dict[str, Any]] = []
         for application in await self.list_applications():
             application_id = str(application["id"])
@@ -426,11 +430,19 @@ class ChirpStackManagement:
             try:
                 current = await self.grpc.get_http_integration(application_id)
                 if current is None:
-                    await self.grpc.create_http_integration(application_id, url, {})
-                    entry.update(outcome="connected", urls=[url])
+                    if not dry_run:
+                        await self.grpc.create_http_integration(application_id, url, {})
+                    entry.update(outcome="connected", urls=[url], before=[])
                 else:
+                    before = [
+                        e.strip()
+                        for e in str(current.get("eventEndpointUrl") or "").split(",")
+                        if e.strip()
+                    ]
+                    entry["before"] = before
+                    entry["headers"] = sorted((current.get("headers") or {}).keys())
                     merged, outcome = merge_endpoints(current.get("eventEndpointUrl"), url)
-                    if outcome != "already":
+                    if outcome != "already" and not dry_run:
                         await self.grpc.update_http_integration(
                             application_id,
                             merged,
@@ -501,10 +513,21 @@ class ChirpStackAdapter:
     # An encrypted copy of the webhook token is kept so Connect applications can write it (D125).
     keeps_webhook_token: ClassVar[bool] = True
     acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.LORAWAN
-    config_example: ClassVar[dict[str, Any]] = {
-        "web_url": "https://chirpstack.example.org",
-        "api_url": "grpcs://chirpstack.example.org:443",
-        "tenant_id": "",
+    config_example: ClassVar[dict[str, Any]] = {}
+    # Quick setup (decision D128): the address and a tenant API key are enough; the gRPC
+    # address is derived and the tenant looked up through the key on save.
+    quick_setup: ClassVar[dict[str, Any]] = {
+        "address_key": "web_url",
+        "address_label": "ChirpStack address",
+        "address_placeholder": "https://chirpstack.example.org",
+        "credential_key": "api_token",
+        "credential_label": "Tenant API key",
+        "channels_on": ["http", "api"],
+        "derived_keys": ["api_url", "tenant_id"],
+        "hint": "The address of the ChirpStack web UI and an API key of the tenant are enough: "
+        "saving derives the gRPC address (grpcs://host:443 behind a TLS proxy) and looks the "
+        "tenant up through the key. The webhook token is shown next, with Connect applications. "
+        "Advanced holds MQTT, the gRPC address and the tenant id.",
     }
     credentials_schema: ClassVar[dict[str, str]] = {
         "api_token": "ChirpStack API key (tenant or global) for the gRPC API",
@@ -600,6 +623,43 @@ class ChirpStackAdapter:
             "tenant_id": {"type": "string"},
         },
     }
+
+    async def complete_config(self, source: DataSourceContext) -> dict[str, Any]:
+        """Quick setup (decision D128): `api_url` from `web_url` when missing (grpcs on 443
+        behind https, grpc on 8080 behind http), `tenant_id` from the tenants the API key
+        sees when missing; a key that sees none or several is refused with the reason."""
+        config = dict(source.config)
+        web = str(config.get("web_url") or "").strip().rstrip("/")
+        if web and not config.get("api_url"):
+            parts = urlsplit(web)
+            if parts.hostname:
+                config["api_url"] = (
+                    f"grpcs://{parts.hostname}:443"
+                    if parts.scheme == "https"
+                    else f"grpc://{parts.hostname}:8080"
+                )
+        token = str(source.credentials.get("api_token") or "")
+        if token and config.get("api_url") and not config.get("tenant_id"):
+            tenants = await ChirpStackGrpc(str(config["api_url"]), token).list_tenants()
+            if len(tenants) == 1:
+                config["tenant_id"] = str(tenants[0]["id"])
+            elif not tenants:
+                raise ApplicationError(
+                    code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
+                    message="the API key sees no tenant: use a tenant API key",
+                    component="adapter.chirpstack",
+                    user_actionable=True,
+                )
+            else:
+                names = ", ".join(str(t.get("name") or t.get("id")) for t in tenants[:5])
+                raise ApplicationError(
+                    code=ErrorCode.CONNECTIVITY_AUTH_FAILED,
+                    message=f"the API key sees {len(tenants)} tenants ({names}): a global key "
+                    "needs the tenant id filled in under Advanced",
+                    component="adapter.chirpstack",
+                    user_actionable=True,
+                )
+        return config
 
     def event_connector(self, source: DataSourceContext) -> EventConnector | None:
         """The MQTT subscription when a broker is configured; without one the events arrive

@@ -5209,7 +5209,7 @@
      "data sources"
     ],
     "summary": "Connect Applications",
-    "description": "Put this source's webhook on the HTTP integration of every application the platform\nlists for it (decision D125). Needs the API channel and the encrypted copy of the webhook\ntoken, which a source made before the copy existed gets from one token rotation.",
+    "description": "Put this source's webhook on the HTTP integration of every application the platform\nlists for it (decision D125). Needs the API channel and the encrypted copy of the webhook\ntoken, which a source made before the copy existed gets from one token rotation. With\n`dry_run` nothing is written: the answer shows each application's URL list before and\nafter, so a platform in operation can be checked first (decision D129).",
     "operationId": "connect_applications_api_v1_data_sources__data_source_id__connect_applications_post",
     "security": [
      {
@@ -5226,6 +5226,18 @@
        "format": "uuid",
        "title": "Data Source Id"
       }
+     },
+     {
+      "name": "dry_run",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Report what would change on every application without writing",
+       "default": false,
+       "title": "Dry Run"
+      },
+      "description": "Report what would change on every application without writing"
      }
     ],
     "responses": {
@@ -18757,7 +18769,24 @@
        "type": "string"
       },
       "type": "array",
-      "title": "Urls"
+      "title": "Urls",
+      "description": "The URL list after the change"
+     },
+     "before": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Before",
+      "description": "The URL list as it was"
+     },
+     "headers": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Headers",
+      "description": "Header names, never changed"
      },
      "error": {
       "anyOf": [
@@ -20757,6 +20786,11 @@
    },
    "ConnectApplicationsResult": {
     "properties": {
+     "dry_run": {
+      "type": "boolean",
+      "title": "Dry Run",
+      "default": false
+     },
      "connected": {
       "type": "integer",
       "title": "Connected"

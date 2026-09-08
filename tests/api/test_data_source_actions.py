@@ -164,3 +164,78 @@ async def test_connect_applications_needs_the_token_copy_and_reports_per_applica
     await db.commit()
     refused = await client.post(f"{base}/connect-applications", headers=admin.headers)
     assert refused.status_code == 409 and "new token" in refused.text
+
+
+async def test_quick_setup_completes_the_config_on_save(client, db, monkeypatch):
+    """Decision D128: a ChirpStack source saved with the address and a key gets its gRPC
+    address and tenant; a key that sees several tenants is refused with the reason."""
+    from shared.connectivity.adapters.chirpstack import grpc_api
+
+    admin = await actor(client, db, superuser=True)
+    tenants = [{"id": "t-1", "name": "Smart Parks"}]
+
+    async def list_tenants(self):
+        return tenants
+
+    monkeypatch.setattr(grpc_api.ChirpStackGrpc, "list_tenants", list_tenants)
+    created = await client.post(
+        "/api/v1/data-sources",
+        json={
+            "name": unique_name("ChirpStack quick"),
+            "adapter_key": "chirpstack",
+            "config": {"web_url": "https://cs.example.org"},
+            "credentials": {"api_token": "key"},
+            "channels": {"http": True, "api": True, "mqtt": False},
+        },
+        headers=admin.headers,
+    )
+    assert created.status_code == 201, created.text
+    config = created.json()["config"]
+    assert config["api_url"] == "grpcs://cs.example.org:443" and config["tenant_id"] == "t-1"
+
+    tenants.append({"id": "t-2", "name": "Other"})
+    refused = await client.post(
+        "/api/v1/data-sources",
+        json={
+            "name": unique_name("ChirpStack global"),
+            "adapter_key": "chirpstack",
+            "config": {"web_url": "https://cs.example.org"},
+            "credentials": {"api_token": "global"},
+            "channels": {"http": True, "api": True},
+        },
+        headers=admin.headers,
+    )
+    assert refused.status_code == 422 and "2 tenants" in refused.text
+
+    # a dry run of Connect applications writes nothing and leaves no audit entry
+    async def connect(self, url, *, dry_run=False):
+        return [
+            {
+                "application_id": "a1",
+                "name": "smartparks",
+                "outcome": "connected",
+                "urls": [url],
+                "before": [],
+            }
+        ]
+
+    monkeypatch.setattr(chirpstack.ChirpStackManagement, "connect_applications", connect)
+    preview = await client.post(
+        f"/api/v1/data-sources/{created.json()['id']}/connect-applications",
+        params={"dry_run": "true"},
+        headers=admin.headers,
+    )
+    assert preview.status_code == 200 and preview.json()["dry_run"] is True
+    from sqlalchemy import func, select
+
+    from shared.models import AuditLog
+
+    count = await db.scalar(
+        select(func.count())
+        .select_from(AuditLog)
+        .where(
+            AuditLog.action == "data_source.applications_connected",
+            AuditLog.object_id == created.json()["id"],
+        )
+    )
+    assert count == 0
