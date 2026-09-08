@@ -139,6 +139,8 @@ def parse_event(source: DataSourceContext, topic: str, payload: bytes) -> Inboun
                 "device_profile_id": info.get("deviceProfileId"),
                 "device_profile_name": info.get("deviceProfileName"),
                 "device_name": info.get("deviceName"),
+                # the name Needs attention shows and a bulk create uses (decision D96)
+                "name": info.get("deviceName"),
                 "tags": info.get("tags"),
             }.items()
             if v not in (None, {}, "")

@@ -1251,6 +1251,10 @@ Listed by the phase where they are first needed.
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
 
+### 2026-09-08, unknown identities named after the ChirpStack device (Tim)
+
+- Tim: an unknown identity from ChirpStack shows name "none" while ChirpStack knows the device as SP010462. The adapter kept the uplink's `deviceName` under `device_name` only; it now also sets `name`, the attribute Needs attention and the bulk create read (D96). Identity attributes merge on every uplink and Sync devices writes `name` from the listing, so existing identities catch up either way. Test on the up fixture.
+
 ### 2026-09-08, the Applications dialog (Claude and Tim)
 
 - LoRaNAM connected fine with the ticks. Tim asked for a spinner per application while connecting and a way to see and manage the connections afterwards (D132): `integration_status` gained the header names, `disconnect_applications` and `delete_http_integration` were added, two endpoints (list, disconnect), and the `ApplicationsDialog` replaced the preview: one request per application so each row spins on its own, Connect or Disconnect per row, Connect the other N in sequence. Tests on the connector and the API.

@@ -206,3 +206,27 @@ def test_webhook_token_in_query_passes_even_next_to_a_stale_header():
     assert webhook_authenticated({}, {"token": "new"}, stored, token_in_query=True)
     assert not webhook_authenticated({}, {"token": "old"}, stored, token_in_query=True)
     assert not webhook_authenticated({}, {}, stored, token_in_query=True)
+
+
+def test_uplink_names_the_identity_after_the_platform():
+    """The device name from the uplink is the identity's `name`, so Needs attention shows it
+    and a bulk create names the device after it (decision D96)."""
+    import json
+    from pathlib import Path
+
+    from shared.connectivity.adapters.chirpstack import parse_event
+    from shared.connectivity.base import AdapterCapabilities, DataSourceContext
+
+    payload = Path("tests/fixtures/payloads/chirpstack/up.json").read_bytes()
+    source = DataSourceContext(
+        id=uuid.uuid4(),
+        name="cs",
+        adapter_key="chirpstack",
+        config={},
+        credentials={},
+        capabilities=AdapterCapabilities(uplink=True),
+    )
+    message = parse_event(source, "application/a/device/0016c001f01a124a/event/up", payload)
+    expected = json.loads(payload)["deviceInfo"]["deviceName"]
+    assert message.identity_attributes["name"] == expected
+    assert message.identity_attributes["device_name"] == expected
