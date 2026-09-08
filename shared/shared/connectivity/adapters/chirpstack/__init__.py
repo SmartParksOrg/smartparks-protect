@@ -294,6 +294,39 @@ class ChirpStackConnector:
         await subscribe_forever(settings, topics, callback)
 
 
+def merge_endpoints(existing: str | None, url: str) -> tuple[str, str]:
+    """ChirpStack's HTTP integration takes a comma-separated list of event endpoint URLs and
+    sends every event, with one header map, to each (decision D125). Put `url` in the list:
+    kept as it is when present (`already`), replaced when an entry is the same webhook with
+    another token (`updated`, after a token rotation), appended otherwise (`connected`).
+    Nothing else in the list is touched."""
+    base = url.split("?", 1)[0]
+    entries = [e.strip() for e in (existing or "").split(",") if e.strip()]
+    if url in entries:
+        return ",".join(entries), "already"
+    merged = []
+    replaced = False
+    for entry in entries:
+        if entry.split("?", 1)[0] == base:
+            if not replaced:
+                merged.append(url)
+                replaced = True
+            continue
+        merged.append(entry)
+    if replaced:
+        return ",".join(merged), "updated"
+    return ",".join([*merged, url]), "connected"
+
+
+def endpoint_state(existing: str | None, base: str) -> str:
+    """`connected` when the list holds this webhook, `other` when it holds only other URLs,
+    `none` when there is no integration or no URL."""
+    entries = [e.strip() for e in (existing or "").split(",") if e.strip()]
+    if any(e.split("?", 1)[0] == base for e in entries):
+        return "connected"
+    return "other" if entries else "none"
+
+
 class ChirpStackManagement:
     """Control plane through ChirpStack's gRPC API, the only API of ChirpStack v4 (its REST
     gateway is not used): `api_url` is `grpcs://host:443` or `grpc://host:8080`."""
@@ -378,6 +411,60 @@ class ChirpStackManagement:
         applications = await self.list_applications()
         return {"ok": True, "applications": len(applications)}
 
+    async def connect_applications(self, url: str) -> list[dict[str, Any]]:
+        """Put this source's webhook URL (with its token in the query, decision D127) on the
+        HTTP integration of every application of the tenant (decision D125): created where
+        there is none, the URL merged into the list where one exists, headers and the other
+        URLs left alone. One entry per application with the outcome."""
+        results: list[dict[str, Any]] = []
+        for application in await self.list_applications():
+            application_id = str(application["id"])
+            entry: dict[str, Any] = {
+                "application_id": application_id,
+                "name": application.get("name") or application_id,
+            }
+            try:
+                current = await self.grpc.get_http_integration(application_id)
+                if current is None:
+                    await self.grpc.create_http_integration(application_id, url, {})
+                    entry.update(outcome="connected", urls=[url])
+                else:
+                    merged, outcome = merge_endpoints(current.get("eventEndpointUrl"), url)
+                    if outcome != "already":
+                        await self.grpc.update_http_integration(
+                            application_id,
+                            merged,
+                            dict(current.get("headers") or {}),
+                            str(current.get("encoding") or "JSON"),
+                        )
+                    entry.update(outcome=outcome, urls=merged.split(","))
+            except ApplicationError as error:
+                entry.update(outcome="failed", error=str(error))
+            results.append(entry)
+        return results
+
+    async def integration_status(self, base_url: str) -> list[dict[str, Any]]:
+        """Per application: whether its HTTP integration posts to this webhook (`connected`),
+        to other URLs only (`other`), or nowhere (`none`), for Test connection (D126)."""
+        results: list[dict[str, Any]] = []
+        for application in await self.list_applications():
+            application_id = str(application["id"])
+            current = await self.grpc.get_http_integration(application_id)
+            urls = [
+                e.strip()
+                for e in str((current or {}).get("eventEndpointUrl") or "").split(",")
+                if e.strip()
+            ]
+            results.append(
+                {
+                    "application_id": application_id,
+                    "name": application.get("name") or application_id,
+                    "state": endpoint_state((current or {}).get("eventEndpointUrl"), base_url),
+                    "urls": [u.split("?", 1)[0] for u in urls],
+                }
+            )
+        return results
+
 
 class ChirpStackCommands(ChirpStackManagement):
     """Command connector: the device queue over gRPC."""
@@ -408,6 +495,11 @@ class ChirpStackAdapter:
     push: ClassVar[bool] = (
         True  # the HTTP integration posts to the webhook; MQTT/websocket is optional
     )
+    # The token may travel in the URL (decision D127): ChirpStack sends one header map to every
+    # URL of an application, so a managed integration never touches the headers.
+    webhook_token_in_query: ClassVar[bool] = True
+    # An encrypted copy of the webhook token is kept so Connect applications can write it (D125).
+    keeps_webhook_token: ClassVar[bool] = True
     acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.LORAWAN
     config_example: ClassVar[dict[str, Any]] = {
         "web_url": "https://chirpstack.example.org",
@@ -420,8 +512,10 @@ class ChirpStackAdapter:
         "mqtt_password": "Broker password",
     }
     setup_hint: ClassVar[str] = (
-        "Point the application's HTTP integration (JSON) at this source's webhook URL with an "
-        "`Authorization` header holding `Bearer <token>`. Switch the MQTT channel on only when "
+        "With the gRPC API channel on, Connect applications puts this source's webhook on the "
+        "HTTP integration of every application of the tenant. By hand: point the application's "
+        "HTTP integration (JSON) at the webhook URL with an `Authorization` header holding "
+        "`Bearer <token>`, or the URL with `?token=`. Switch the MQTT channel on only when "
         "the broker ChirpStack publishes to is reachable from this server. The gRPC API "
         "channel (grpcs://host:443 through a proxy, or grpc://host:8080) with a tenant API key "
         "enables downlinks and the device and gateway sync."

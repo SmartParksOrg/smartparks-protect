@@ -43,7 +43,7 @@ from shared.models import (
     SourceEvent,
     User,
 )
-from shared.secrets import encrypt_json
+from shared.secrets import decrypt_json, encrypt_json
 from shared.timeutil import utc_now
 from shared.trace import ApplicationError
 
@@ -128,9 +128,13 @@ async def create_data_source(
 ) -> DataSourceRead:
     """HTTP push sources get a bearer token that is returned once, in this response only."""
     values = _adapter_defaults(body)
-    token = new_webhook_token() if getattr(ADAPTERS[body.adapter_key], "push", False) else None
+    adapter = ADAPTERS[body.adapter_key]
+    token = new_webhook_token() if getattr(adapter, "push", False) else None
+    credentials = dict(body.credentials or {})
+    if token and getattr(adapter, "keeps_webhook_token", False):
+        credentials["webhook_token"] = token  # for Connect applications (decision D125)
     source = DataSource(
-        credentials_encrypted=encrypt_json(body.credentials) if body.credentials else None,
+        credentials_encrypted=encrypt_json(credentials) if credentials else None,
         webhook_token_hash=hash_token(token) if token else None,
         **values,
     )
@@ -163,6 +167,11 @@ async def rotate_webhook_token(
     source = await get_or_404(session, DataSource, data_source_id, "Data source")
     token = new_webhook_token()
     source.webhook_token_hash = hash_token(token)
+    if getattr(ADAPTERS.get(source.adapter_key), "keeps_webhook_token", False):
+        credentials = (
+            decrypt_json(source.credentials_encrypted) if source.credentials_encrypted else {}
+        )
+        source.credentials_encrypted = encrypt_json({**credentials, "webhook_token": token})
     await record_audit(
         session,
         user=user,
@@ -239,6 +248,26 @@ class DeviceSyncResult(BaseModel):
     listed: int
     created: int
     updated: int
+
+
+class ApplicationConnection(BaseModel):
+    application_id: str
+    name: str
+    outcome: str = Field(description="connected, updated, already or failed")
+    urls: list[str] = Field(default_factory=list)
+    error: str | None = None
+
+
+class ConnectApplicationsResult(BaseModel):
+    connected: int
+    updated: int
+    already: int
+    failed: int
+    applications: list[ApplicationConnection]
+
+
+def _webhook_base(source: DataSource) -> str:
+    return f"{get_settings().public_url}/api/v1/ingest/http/{source.id}"
 
 
 def _management(source: DataSource) -> Any:
@@ -405,9 +434,76 @@ async def test_connection(
         await report_api_test(source.id, False, f"platform unreachable: {error}")
         return ConnectionTestResult(ok=False, detail=f"platform unreachable: {error}")
     await report_api_test(source.id, True, "The platform answered.")
-    return ConnectionTestResult(
-        ok=True, detail="The platform answered.", result=dict(result) if result else {}
+    payload = dict(result) if result else {}
+    status_of = getattr(connector, "integration_status", None)
+    if status_of is not None and source.webhook_token_hash is not None:
+        # which applications post to this webhook (decision D126)
+        try:
+            applications = await status_of(_webhook_base(source))
+        except ApplicationError as error:
+            payload["applications_error"] = str(error)
+        else:
+            payload["applications"] = applications
+            payload["connected"] = sum(1 for a in applications if a["state"] == "connected")
+    return ConnectionTestResult(ok=True, detail="The platform answered.", result=payload)
+
+
+@router.post("/{data_source_id}/connect-applications", response_model=ConnectApplicationsResult)
+async def connect_applications(
+    data_source_id: uuid.UUID,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ConnectApplicationsResult:
+    """Put this source's webhook on the HTTP integration of every application the platform
+    lists for it (decision D125). Needs the API channel and the encrypted copy of the webhook
+    token, which a source made before the copy existed gets from one token rotation."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    if not channel_enabled(source.channels, api_channel_key(source.adapter_key)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The API channel of this source is off")
+    connector = _management(source)
+    connect = getattr(connector, "connect_applications", None)
+    if connect is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "this data source's adapter does not manage its platform's integrations",
+        )
+    credentials = decrypt_json(source.credentials_encrypted) if source.credentials_encrypted else {}
+    token = credentials.get("webhook_token")
+    if not token or source.webhook_token_hash is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This source keeps no copy of its webhook token: issue a new token once, then "
+            "connect the applications",
+        )
+    try:
+        results = await connect(f"{_webhook_base(source)}?token={token}")
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"platform unreachable: {error}"
+        ) from error
+    applications = [ApplicationConnection(**r) for r in results]
+    counts = {
+        k: sum(1 for a in applications if a.outcome == k)
+        for k in ("connected", "updated", "already", "failed")
+    }
+    await record_audit(
+        session,
+        user=user,
+        action="data_source.applications_connected",
+        object_type="data_source",
+        object_id=str(source.id),
+        details={
+            **counts,
+            "applications": [
+                {"id": a.application_id, "name": a.name, "outcome": a.outcome, "error": a.error}
+                for a in applications
+            ],
+        },
     )
+    await session.commit()
+    return ConnectApplicationsResult(**counts, applications=applications)
 
 
 @router.post("/{data_source_id}/sync-devices", response_model=DeviceSyncResult)

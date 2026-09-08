@@ -1,6 +1,8 @@
 """Test connection and Sync devices on a data source: the platform's API called with the
 stored credentials, its device list turned into identities to link."""
 
+import uuid
+
 import pytest
 
 from shared.connectivity.adapters import chirpstack
@@ -88,3 +90,77 @@ async def test_connection_and_device_sync(client, db, monkeypatch):
             f"/api/v1/data-sources/{push_only['id']}/sync-devices", headers=admin.headers
         )
     ).status_code == 422
+
+
+async def test_connect_applications_needs_the_token_copy_and_reports_per_application(
+    client, db, monkeypatch
+):
+    """Decision D125: the action writes the webhook with its token to every application through
+    the connector; a source without the encrypted copy is told to rotate the token first."""
+    from sqlalchemy import select
+
+    from shared.models import AuditLog, DataSource
+    from shared.secrets import decrypt_json, encrypt_json
+
+    admin = await actor(client, db, superuser=True)
+    created = await client.post(
+        "/api/v1/data-sources",
+        json={
+            "name": unique_name("ChirpStack"),
+            "adapter_key": "chirpstack",
+            "config": {"api_url": "grpc://cs:8080", "tenant_id": "t1"},
+            "credentials": {"api_token": "key"},
+        },
+        headers=admin.headers,
+    )
+    assert created.status_code == 201, created.text
+    source = created.json()
+    token = source["webhook_token"]
+    assert token and source["webhook_url"].endswith(f"?token={token}")
+    base = f"/api/v1/data-sources/{source['id']}"
+    seen: dict[str, str] = {}
+
+    async def connect(self, url):
+        seen["url"] = url
+        return [
+            {"application_id": "a1", "name": "smartparks", "outcome": "connected", "urls": [url]},
+            {"application_id": "a2", "name": "other", "outcome": "failed", "error": "refused"},
+        ]
+
+    async def status(self, base_url):
+        seen["base"] = base_url
+        return [{"application_id": "a1", "name": "smartparks", "state": "connected", "urls": []}]
+
+    async def ok(self):
+        return {"ok": True}
+
+    monkeypatch.setattr(chirpstack.ChirpStackManagement, "connect_applications", connect)
+    monkeypatch.setattr(chirpstack.ChirpStackManagement, "integration_status", status)
+    monkeypatch.setattr(chirpstack.ChirpStackManagement, "test_connection", ok)
+    result = await client.post(f"{base}/connect-applications", headers=admin.headers)
+    assert result.status_code == 200, result.text
+    body = result.json()
+    assert (body["connected"], body["failed"], body["already"]) == (1, 1, 0)
+    assert seen["url"].endswith(f"/api/v1/ingest/http/{source['id']}?token={token}")
+    assert body["applications"][1]["error"] == "refused"
+    audit = await db.scalar(
+        select(AuditLog)
+        .where(AuditLog.action == "data_source.applications_connected")
+        .order_by(AuditLog.id.desc())
+    )
+    assert audit is not None and audit.details["connected"] == 1
+
+    tested = (await client.post(f"{base}/test", headers=admin.headers)).json()
+    assert tested["result"]["connected"] == 1 and seen["base"].endswith(source["id"])
+
+    # a rotation keeps the copy in step with the hash
+    rotated = (await client.post(f"{base}/webhook-token", headers=admin.headers)).json()
+    row = await db.get(DataSource, uuid.UUID(source["id"]))
+    await db.refresh(row)
+    assert decrypt_json(row.credentials_encrypted)["webhook_token"] == rotated["webhook_token"]
+
+    # a source from before the copy: told to rotate once
+    row.credentials_encrypted = encrypt_json({"api_token": "key"})
+    await db.commit()
+    refused = await client.post(f"{base}/connect-applications", headers=admin.headers)
+    assert refused.status_code == 409 and "new token" in refused.text

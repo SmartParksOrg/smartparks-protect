@@ -22,7 +22,7 @@ export interface AdapterInfo {
   label: string;
   push: boolean;
   can_send_commands: boolean;
-  can_manage: boolean;
+  connects_applications?: boolean; can_manage: boolean;
   polling: boolean;
   builtin: boolean;
   webhook_token_in_query: boolean;

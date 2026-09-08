@@ -168,3 +168,41 @@ def test_gateway_events_and_listing():
     )
     assert len(updates) == 1 and updates[0].name == "North ridge" and updates[0].status == "online"
     assert updates[0].attributes["description"] == "mast" and updates[0].seen_at is not None
+
+
+def test_merge_endpoints_keeps_other_urls_and_replaces_our_old_token():
+    from shared.connectivity.adapters.chirpstack import endpoint_state, merge_endpoints
+
+    ours = "https://p.example/api/v1/ingest/http/S?token=new"
+    assert merge_endpoints(None, ours) == (ours, "connected")
+    assert merge_endpoints("", ours) == (ours, "connected")
+    assert merge_endpoints("https://a.example/x", ours) == (
+        f"https://a.example/x,{ours}",
+        "connected",
+    )
+    assert merge_endpoints(f"https://a.example/x, {ours}", ours) == (
+        f"https://a.example/x,{ours}",
+        "already",
+    )
+    assert merge_endpoints(
+        "https://p.example/api/v1/ingest/http/S?token=old,https://a.example/x", ours
+    ) == (f"{ours},https://a.example/x", "updated")
+    base = "https://p.example/api/v1/ingest/http/S"
+    assert endpoint_state(None, base) == "none"
+    assert endpoint_state("https://a.example/x", base) == "other"
+    assert endpoint_state(f"https://a.example/x,{ours}", base) == "connected"
+    assert endpoint_state(base, base) == "connected"  # a hand-made one with the header
+
+
+def test_webhook_token_in_query_passes_even_next_to_a_stale_header():
+    from shared.connectivity.transports.http import hash_token, webhook_authenticated
+
+    stored = hash_token("new")
+    good_header = {"authorization": "Bearer new"}
+    stale_header = {"authorization": "Bearer old"}
+    assert webhook_authenticated(good_header, {}, stored, token_in_query=False)
+    assert not webhook_authenticated(stale_header, {"token": "new"}, stored, token_in_query=False)
+    assert webhook_authenticated(stale_header, {"token": "new"}, stored, token_in_query=True)
+    assert webhook_authenticated({}, {"token": "new"}, stored, token_in_query=True)
+    assert not webhook_authenticated({}, {"token": "old"}, stored, token_in_query=True)
+    assert not webhook_authenticated({}, {}, stored, token_in_query=True)

@@ -105,6 +105,7 @@ def describe_adapter(adapter: Adapter) -> dict[str, Any]:
         "push": bool(getattr(adapter, "push", False)),
         "can_send_commands": hasattr(adapter, "command_connector"),
         "can_manage": hasattr(adapter, "management_connector"),
+        "connects_applications": bool(getattr(adapter, "keeps_webhook_token", False)),
         "polling": bool(getattr(adapter, "polling", False)),
         "builtin": bool(getattr(adapter, "builtin", False)),
         "requires_client": bool(getattr(adapter, "requires_client", False)),

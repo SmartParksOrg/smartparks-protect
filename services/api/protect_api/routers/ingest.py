@@ -14,7 +14,7 @@ from protect_api.bus import get_bus
 from shared.bus import RedisStreamsBus
 from shared.connectivity.channels import channel_enabled, webhook_channel_key
 from shared.connectivity.registry import ADAPTERS
-from shared.connectivity.transports.http import bearer_token, raw_query_params, token_matches
+from shared.connectivity.transports.http import raw_query_params, webhook_authenticated
 from shared.database import get_session
 from shared.ingest import commit_and_publish, data_source_context, store_inbound
 from shared.models import DataSource
@@ -57,11 +57,14 @@ async def ingest_http(
         )
     if not channel_enabled(source.channels, webhook_channel_key(source.adapter_key)):
         raise HTTPException(status.HTTP_409_CONFLICT, "The HTTP channel of this source is off")
-    token = bearer_token(dict(request.headers))
-    if token is None and getattr(adapter, "webhook_token_in_query", False):
-        # Platforms that cannot set a header (Cloudloop) carry the token in the URL (D78).
-        token = request.query_params.get("token")
-    authenticated = token is not None and token_matches(token, source.webhook_token_hash)
+    # Platforms that cannot set a header (Cloudloop, D78) or send one header map to every URL
+    # (ChirpStack, D127) may carry the token in the URL.
+    authenticated = webhook_authenticated(
+        dict(request.headers),
+        dict(request.query_params),
+        source.webhook_token_hash,
+        token_in_query=bool(getattr(adapter, "webhook_token_in_query", False)),
+    )
     verify = getattr(adapter, "verify_webhook", None)
     if not authenticated and verify is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing bearer token")

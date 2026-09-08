@@ -92,6 +92,14 @@ def to_dict(message: Any) -> dict[str, Any]:
     return result
 
 
+def _encoding(name: str) -> int:
+    """The enum value for `JSON` or `PROTOBUF`; anything else is JSON."""
+    try:
+        return int(api.Encoding.Value(name))
+    except ValueError:
+        return int(api.Encoding.JSON)
+
+
 class ChirpStackGrpc:
     def __init__(self, url: str, token: str) -> None:
         self.target, self.tls = _target(url)
@@ -147,6 +155,58 @@ class ChirpStackGrpc:
             ),
             "the tenant's gateways",
         )
+
+    async def get_http_integration(self, application_id: str) -> dict[str, Any] | None:
+        """The application's HTTP integration (`eventEndpointUrl` is a comma-separated list,
+        `headers` a map), or None when the application has none."""
+        async with self._channel() as channel:
+            try:
+                response = await api.ApplicationServiceStub(channel).GetHttpIntegration(
+                    api.GetHttpIntegrationRequest(application_id=application_id),
+                    metadata=self.metadata,
+                    timeout=CALL_TIMEOUT,
+                )
+            except grpc.aio.AioRpcError as error:
+                if error.code() == grpc.StatusCode.NOT_FOUND:
+                    return None
+                raise _translate(error, f"application {application_id}") from error
+        return to_dict(response.integration)
+
+    async def create_http_integration(
+        self, application_id: str, event_endpoint_url: str, headers: dict[str, str]
+    ) -> None:
+        integration = api.HttpIntegration(
+            application_id=application_id,
+            headers=headers,
+            encoding=api.Encoding.JSON,
+            event_endpoint_url=event_endpoint_url,
+        )
+        async with self._channel() as channel:
+            await self._call(
+                api.ApplicationServiceStub(channel).CreateHttpIntegration,
+                api.CreateHttpIntegrationRequest(integration=integration),
+                f"application {application_id}",
+            )
+
+    async def update_http_integration(
+        self,
+        application_id: str,
+        event_endpoint_url: str,
+        headers: dict[str, str],
+        encoding: str = "JSON",
+    ) -> None:
+        integration = api.HttpIntegration(
+            application_id=application_id,
+            headers=headers,
+            encoding=_encoding(encoding),
+            event_endpoint_url=event_endpoint_url,
+        )
+        async with self._channel() as channel:
+            await self._call(
+                api.ApplicationServiceStub(channel).UpdateHttpIntegration,
+                api.UpdateHttpIntegrationRequest(integration=integration),
+                f"application {application_id}",
+            )
 
     async def enqueue(self, dev_eui: str, payload: bytes, f_port: int, confirmed: bool) -> str:
         request = api.EnqueueDeviceQueueItemRequest(

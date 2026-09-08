@@ -52,3 +52,23 @@ def require_object(body: Any, adapter: str) -> dict[str, Any]:
             user_actionable=True,
         )
     return body
+
+
+def webhook_authenticated(
+    headers: dict[str, str],
+    query: dict[str, str],
+    token_hash: str | None,
+    *,
+    token_in_query: bool,
+) -> bool:
+    """The bearer header matches, or, for adapters whose platform may carry the token in the
+    URL (D78, D127), `?token=` matches; a stale header next to a right URL token still passes,
+    since ChirpStack keeps sending an old `Authorization` header to every URL of an application
+    after a rotation (decision D127)."""
+    header = bearer_token(headers)
+    if header is not None and token_matches(header, token_hash):
+        return True
+    if not token_in_query:
+        return False
+    in_query = query.get("token")
+    return in_query is not None and token_matches(in_query, token_hash)

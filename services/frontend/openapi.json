@@ -5203,6 +5203,55 @@
     }
    }
   },
+  "/api/v1/data-sources/{data_source_id}/connect-applications": {
+   "post": {
+    "tags": [
+     "data sources"
+    ],
+    "summary": "Connect Applications",
+    "description": "Put this source's webhook on the HTTP integration of every application the platform\nlists for it (decision D125). Needs the API channel and the encrypted copy of the webhook\ntoken, which a source made before the copy existed gets from one token rotation.",
+    "operationId": "connect_applications_api_v1_data_sources__data_source_id__connect_applications_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "data_source_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Data Source Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConnectApplicationsResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/data-sources/{data_source_id}/sync-devices": {
    "post": {
     "tags": [
@@ -18688,6 +18737,48 @@
     ],
     "title": "AlertRead"
    },
+   "ApplicationConnection": {
+    "properties": {
+     "application_id": {
+      "type": "string",
+      "title": "Application Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "outcome": {
+      "type": "string",
+      "title": "Outcome",
+      "description": "connected, updated, already or failed"
+     },
+     "urls": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Urls"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     }
+    },
+    "type": "object",
+    "required": [
+     "application_id",
+     "name",
+     "outcome"
+    ],
+    "title": "ApplicationConnection"
+   },
    "AreaHealth": {
     "properties": {
      "key": {
@@ -20663,6 +20754,42 @@
      "updated_at"
     ],
     "title": "CommandRead"
+   },
+   "ConnectApplicationsResult": {
+    "properties": {
+     "connected": {
+      "type": "integer",
+      "title": "Connected"
+     },
+     "updated": {
+      "type": "integer",
+      "title": "Updated"
+     },
+     "already": {
+      "type": "integer",
+      "title": "Already"
+     },
+     "failed": {
+      "type": "integer",
+      "title": "Failed"
+     },
+     "applications": {
+      "items": {
+       "$ref": "#/components/schemas/ApplicationConnection"
+      },
+      "type": "array",
+      "title": "Applications"
+     }
+    },
+    "type": "object",
+    "required": [
+     "connected",
+     "updated",
+     "already",
+     "failed",
+     "applications"
+    ],
+    "title": "ConnectApplicationsResult"
    },
    "ConnectionRead": {
     "properties": {

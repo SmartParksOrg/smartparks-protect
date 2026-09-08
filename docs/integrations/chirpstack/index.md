@@ -67,12 +67,21 @@ JSON), and Server admin, Data sources, Status lists the channels with their stat
 A ChirpStack v4 that already serves gateways and collars connects in one of two ways:
 
 - **HTTP integration (no broker exposure).** Server admin, Data sources, New data source,
-  adapter ChirpStack, with `mqtt_host` left empty, `web_url` the ChirpStack web UI and
-  `tenant_id` the tenant. Copy the webhook URL and the bearer token shown once. In ChirpStack,
-  open the application, Integrations, HTTP: payload encoding JSON, the webhook URL as the
-  event endpoint URL, and a header `Authorization` with `Bearer <token>`. ChirpStack appends
-  `?event=up`, `?event=join` and so on, which the webhook understands. Save; the next uplink
-  appears under Network, Traffic.
+  adapter ChirpStack, with `mqtt_host` left empty, `web_url` the ChirpStack web UI,
+  `tenant_id` the tenant, and, for the one-step setup, `api_url` and the `api_token`
+  credential (a tenant API key). With those, "Connect applications" (offered when the token
+  is shown, and on the data source row) puts the source's webhook on the HTTP integration of
+  every application of the tenant (decision D125): created where there is none, appended to
+  the comma-separated URL list where one exists, with the token in the URL (`?token=`) so the
+  integration's headers are never touched (D127; ChirpStack sends one header map to every
+  URL). Other URLs on an integration keep posting where they did. Test connection then shows
+  how many applications post to this source and names the rest; a new application in
+  ChirpStack is connected by pressing the button again (D126). Sources made before the copy
+  of the token existed need one "New token" first. By hand: in ChirpStack, open the
+  application, Integrations, HTTP: payload encoding JSON, the webhook URL as the event
+  endpoint URL, and a header `Authorization` with `Bearer <token>` (or the URL with
+  `?token=`). ChirpStack appends `?event=up`, `?event=join` and so on, which the webhook
+  understands. Save; the next uplink appears under Network, Traffic.
 - **MQTT.** When the broker ChirpStack publishes to is reachable from the server (a TLS
   listener with a user for this purpose), set `mqtt_host`, `mqtt_port`, `mqtt_tls` and the
   `mqtt_username` and `mqtt_password` credentials; the ingest service subscribes to the

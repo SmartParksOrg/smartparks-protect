@@ -29,7 +29,6 @@
   "Dead letters:": "Dead letters:",
   "Devices created; retained events are being processed": "Devices created; retained events are being processed",
   "Every message received for this project's devices, with raw payload, decode result, gateway receptions and trace": "Every message received for this project's devices, with raw payload, decode result, gateway receptions and trace",
-  "failed": "failed",
   "failed:": "failed:",
   "FCnt": "FCnt",
   "Folders of entities: a herd, a team, a region. Two levels deep.": "Folders of entities: a herd, a team, a region. Two levels deep.",

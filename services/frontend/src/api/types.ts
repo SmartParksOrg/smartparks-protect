@@ -30,6 +30,7 @@ export type DeviceHealth = Schemas["DeviceHealth"];
 export type HealthValue = Schemas["HealthValue"];
 export type BulkCreateResult = Schemas["BulkCreateResult"];
 export type BulkAssignResult = Schemas["BulkAssignResult"];
+export type ConnectApplicationsResult = Schemas["ConnectApplicationsResult"];
 export type NewMetric = Schemas["NewMetric"];
 export type NewMetricsResponse = Schemas["NewMetricsResponse"];
 export type BulkIgnoreResult = Schemas["BulkIgnoreResult"];

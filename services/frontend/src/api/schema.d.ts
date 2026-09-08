@@ -1125,6 +1125,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data-sources/{data_source_id}/connect-applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connect Applications
+         * @description Put this source's webhook on the HTTP integration of every application the platform
+         *     lists for it (decision D125). Needs the API channel and the encrypted copy of the webhook
+         *     token, which a source made before the copy existed gets from one token rotation.
+         */
+        post: operations["connect_applications_api_v1_data_sources__data_source_id__connect_applications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/data-sources/{data_source_id}/sync-devices": {
         parameters: {
             query?: never;
@@ -4349,6 +4371,22 @@ export interface components {
             /** Time */
             time?: string | null;
         };
+        /** ApplicationConnection */
+        ApplicationConnection: {
+            /** Application Id */
+            application_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Outcome
+             * @description connected, updated, already or failed
+             */
+            outcome: string;
+            /** Urls */
+            urls?: string[];
+            /** Error */
+            error?: string | null;
+        };
         /** AreaHealth */
         AreaHealth: {
             /** Key */
@@ -5077,6 +5115,19 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** ConnectApplicationsResult */
+        ConnectApplicationsResult: {
+            /** Connected */
+            connected: number;
+            /** Updated */
+            updated: number;
+            /** Already */
+            already: number;
+            /** Failed */
+            failed: number;
+            /** Applications */
+            applications: components["schemas"]["ApplicationConnection"][];
         };
         /** ConnectionRead */
         ConnectionRead: {
@@ -12782,6 +12833,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConnectionTestResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_applications_api_v1_data_sources__data_source_id__connect_applications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectApplicationsResult"];
                 };
             };
             /** @description Validation Error */
