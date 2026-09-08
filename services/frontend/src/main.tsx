@@ -7,6 +7,9 @@ import App from "@/App";
 import "@/i18n";
 import { Toaster } from "@/components/ui/sonner";
 import "@/index.css";
+import { reloadOnStaleChunk } from "@/lib/staleChunk";
+
+reloadOnStaleChunk();
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -170,6 +170,7 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D127 | The token travels in the URL for managed integrations | The URL the action writes carries `?token=<webhook token>` and the integration's headers are never touched, since ChirpStack sends one header map to every URL of an application and another system may own an Authorization header there; the webhook accepts the token in the query for ChirpStack as it does for Cloudloop and ThingPark (D78). A hand-made integration with the Authorization header keeps working. | ChirpStack allows several URLs per HTTP integration but one header map; taking over another system's bearer token would tie the two together. Tim chose the URL token on 2026-09-08. |
 | D128 | ChirpStack quick setup | A new ChirpStack source asks for a name, the ChirpStack address and a tenant API key; saving derives the gRPC address from the address and looks the tenant up through the key (a key that sees several tenants is refused with the reason); the channel cards, MQTT, the gRPC address and the tenant id fold under Advanced, on edit as well. Adapters declare a `quick_setup` and a `complete_config`. | Tim found the connect flow works well and the form still asked for everything by hand. Decided by Tim on 2026-09-08. |
 | D129 | Connect applications previews before it writes | The button runs a dry run first: the dialog shows, per application, what Apply would do, the URL list before and after, the other URLs and the headers that stay; Apply writes; a dry run leaves no audit entry. | Tim added a ChirpStack in operation (cs.loranam.org) whose integrations must not be disturbed; a preview lets him check every application before anything changes. Decided on 2026-09-08. |
+| D130 | Reload once on a stale page chunk | The app listens for a failed page chunk load and reloads itself once, with a guard against a loop during a real outage, so a tab opened before a deploy recovers by itself. | Tim saw a blank entity page from the map after a day of deploys: the tab asked for a chunk of the previous build (404 in the nginx log); a refresh fixed it. Decided on 2026-09-08. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -1247,6 +1248,10 @@ Listed by the phase where they are first needed.
 ### 2026-09-07, device clusters (Claude)
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
+
+### 2026-09-08, blank entity page after a deploy (Claude and Tim)
+
+- Tim opened an entity from the map's device panel and got a blank page; a refresh loaded it. Not the entity: the nginx log shows the browser asking for `EntityPage-YQbqYCiK.js` from a build replaced by a later deploy, 404. `lib/staleChunk.ts` reloads once on `vite:preloadError` with a loop guard (D130, tested); checked by serving a chunk as 404 in Playwright and seeing the reload.
 
 ### 2026-09-08, ChirpStack quick setup and a preview before writing (Claude and Tim)
 
