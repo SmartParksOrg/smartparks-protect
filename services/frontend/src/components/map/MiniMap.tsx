@@ -15,11 +15,15 @@ const LATEST = "mini-latest";
  * fitted to the trail; no gestures, so the page scrolls as usual, and the whole map is a link to
  * the live map on the object. */
 export function MiniMap({
-  positions,
+  positions = [],
+  point,
   to,
   label,
 }: {
-  positions: Position[];
+  /** Positions newest first: the newest is marked, the rest is the trail. */
+  positions?: Position[];
+  /** One fixed place instead, [lon, lat]: a gateway. */
+  point?: [number, number];
   to: string;
   label?: string;
 }) {
@@ -28,7 +32,18 @@ export function MiniMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const readyRef = useRef(false);
   const pendingRef = useRef<(() => void) | null>(null);
-  const geometry = miniMapGeometry(positions);
+  const geometry = point
+    ? {
+        line: [],
+        latest: point,
+        bounds: [point[0], point[1], point[0], point[1]] as [
+          number,
+          number,
+          number,
+          number,
+        ],
+      }
+    : miniMapGeometry(positions);
   const hasGeometry = geometry !== null;
 
   useEffect(() => {

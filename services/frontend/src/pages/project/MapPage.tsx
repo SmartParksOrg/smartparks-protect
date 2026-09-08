@@ -193,13 +193,18 @@ export function MapPage() {
   // gateways are the network, not the animals: on by default only for people who asked for
   // the technical picture (decision D105); the layers panel switches them either way
   const [technical] = useTechnicalDetails();
+  // `?gateways=1` or `?gateway=<id>` (from the Gateways page) switches the layer on for the visit
+  const gatewayParam = params.get("gateway");
+  const gatewaysWanted =
+    gatewayParam !== null || params.get("gateways") === "1";
   const layers = useMemo<LayerChoices>(
     () => ({
       ...DEFAULT_LAYERS,
       gateways: technical,
       ...allLayers[projectId],
+      ...(gatewaysWanted ? { gateways: true } : {}),
     }),
-    [allLayers, projectId, technical],
+    [allLayers, projectId, technical, gatewaysWanted],
   );
   const setLayers = useCallback(
     (next: LayerChoices) => setAllLayers({ ...allLayers, [projectId]: next }),
@@ -634,6 +639,24 @@ export function MapPage() {
       fittedFeature.current = featureParam;
     }
   }, [mapRef, ready, featureParam, features.data]);
+
+  const fittedGateway = useRef<string | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (
+      !map ||
+      !ready ||
+      !gatewayParam ||
+      !gateways.data ||
+      fittedGateway.current === gatewayParam
+    )
+      return;
+    const g = gateways.data.find((x) => x.id === gatewayParam);
+    if (g?.geometry) {
+      fitGeometry(map, g.geometry as unknown as GeoJSON.Geometry);
+      fittedGateway.current = gatewayParam;
+    }
+  }, [mapRef, ready, gatewayParam, gateways.data]);
 
   const fitted = useRef(false);
   useEffect(() => {

@@ -1221,6 +1221,10 @@ Listed by the phase where they are first needed.
 
 - Tim asked for the devices to cluster like the entities and wondered how that reads next to the entity layer. Built: the device source clusters with the same radius; a device cluster is the inverse of an entity cluster (white with a green ring, the count in green) and is translated 10 px down and right, and a single device marker is offset 16 px, so a collar cluster or marker shows beside its animals' rather than under them (decision D112); a click on a device cluster zooms in. Checked on the local build against the dev API.
 
+### 2026-09-08, gateways on the live map (Claude and Tim)
+
+- Tim asked for a button on the Gateways page to show the gateways on the live map, and a gateway's location on a small map when clicking one. The live map takes `?gateways=1` and `?gateway=<id>` (the layer on for the visit, whatever the saved choice, and a fit to that gateway); the page header has the button, the dialog the `MiniMap` with a fixed point that links to the map on the gateway. The map's gateway list is the last 7 days, so a gateway last heard before that does not get the fit.
+
 ### 2026-09-07, a small map on the entity and device pages (Claude and Tim)
 
 - Tim asked for a small map on the entity and device pages; two choices taken as recommended (D124): the newest position with a short trail, and a still preview that opens the live map. Built `MiniMap.tsx` with `miniMapGeometry` (tested) on both pages, the device page only when the device is in a project.
