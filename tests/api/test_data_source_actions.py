@@ -120,7 +120,7 @@ async def test_connect_applications_needs_the_token_copy_and_reports_per_applica
     base = f"/api/v1/data-sources/{source['id']}"
     seen: dict[str, str] = {}
 
-    async def connect(self, url, *, dry_run=False):
+    async def connect(self, url, *, dry_run=False, only=None):
         seen["url"] = url
         return [
             {"application_id": "a1", "name": "smartparks", "outcome": "connected", "urls": [url]},
@@ -208,7 +208,10 @@ async def test_quick_setup_completes_the_config_on_save(client, db, monkeypatch)
     assert refused.status_code == 422 and "2 tenants" in refused.text
 
     # a dry run of Connect applications writes nothing and leaves no audit entry
-    async def connect(self, url, *, dry_run=False):
+    seen_only: list[set[str] | None] = []
+
+    async def connect(self, url, *, dry_run=False, only=None):
+        seen_only.append(only)
         return [
             {
                 "application_id": "a1",
@@ -226,6 +229,12 @@ async def test_quick_setup_completes_the_config_on_save(client, db, monkeypatch)
         headers=admin.headers,
     )
     assert preview.status_code == 200 and preview.json()["dry_run"] is True
+    chosen = await client.post(
+        f"/api/v1/data-sources/{created.json()['id']}/connect-applications",
+        json={"application_ids": ["a1"]},
+        headers=admin.headers,
+    )
+    assert chosen.status_code == 200 and seen_only[-1] == {"a1"}
     from sqlalchemy import func, select
 
     from shared.models import AuditLog

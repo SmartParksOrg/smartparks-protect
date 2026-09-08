@@ -264,6 +264,12 @@ class ApplicationConnection(BaseModel):
     error: str | None = None
 
 
+class ConnectApplications(BaseModel):
+    application_ids: list[str] | None = Field(
+        None, description="Only these applications; every application when absent"
+    )
+
+
 class ConnectApplicationsResult(BaseModel):
     dry_run: bool = False
     connected: int
@@ -491,6 +497,7 @@ async def connect_applications(
     dry_run: bool = Query(
         False, description="Report what would change on every application without writing"
     ),
+    body: ConnectApplications | None = None,
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
 ) -> ConnectApplicationsResult:
@@ -518,7 +525,10 @@ async def connect_applications(
             "connect the applications",
         )
     try:
-        results = await connect(f"{_webhook_base(source)}?token={token}", dry_run=dry_run)
+        only = set(body.application_ids) if body and body.application_ids is not None else None
+        results = await connect(
+            f"{_webhook_base(source)}?token={token}", dry_run=dry_run, only=only
+        )
     except ApplicationError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
     except httpx.HTTPError as error:

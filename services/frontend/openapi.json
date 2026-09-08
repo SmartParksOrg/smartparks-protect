@@ -5240,6 +5240,23 @@
       "description": "Report what would change on every application without writing"
      }
     ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/ConnectApplications"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
+       }
+      }
+     }
+    },
     "responses": {
      "200": {
       "description": "Successful Response",
@@ -20783,6 +20800,27 @@
      "updated_at"
     ],
     "title": "CommandRead"
+   },
+   "ConnectApplications": {
+    "properties": {
+     "application_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Application Ids",
+      "description": "Only these applications; every application when absent"
+     }
+    },
+    "type": "object",
+    "title": "ConnectApplications"
    },
    "ConnectApplicationsResult": {
     "properties": {

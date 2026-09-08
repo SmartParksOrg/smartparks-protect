@@ -5131,6 +5131,14 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ConnectApplications */
+        ConnectApplications: {
+            /**
+             * Application Ids
+             * @description Only these applications; every application when absent
+             */
+            application_ids?: string[] | null;
+        };
         /** ConnectApplicationsResult */
         ConnectApplicationsResult: {
             /**
@@ -12878,7 +12886,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ConnectApplications"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

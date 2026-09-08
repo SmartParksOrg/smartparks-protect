@@ -421,7 +421,7 @@ class ChirpStackManagement:
         return {"ok": True, "applications": len(applications)}
 
     async def connect_applications(
-        self, url: str, *, dry_run: bool = False
+        self, url: str, *, dry_run: bool = False, only: set[str] | None = None
     ) -> list[dict[str, Any]]:
         """Put this source's webhook URL (with its token in the query, decision D127) on the
         HTTP integration of every application of the tenant (decision D125): created where
@@ -431,6 +431,8 @@ class ChirpStackManagement:
         results: list[dict[str, Any]] = []
         for application in await self.list_applications():
             application_id = str(application["id"])
+            if only is not None and application_id not in only:
+                continue  # the person ticked the applications to touch (D129)
             entry: dict[str, Any] = {
                 "application_id": application_id,
                 "name": application.get("name") or application_id,

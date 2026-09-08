@@ -282,6 +282,10 @@ async def test_connect_applications_creates_merges_and_keeps_headers():
     assert preview[1]["headers"] == ["Authorization"]
     assert "a1" not in FakeApplicationService.integrations
     assert not [c for c in Recorder.calls if "Integration" in c[0]]
+    # only the ticked applications are touched
+    partial = await management.connect_applications(url, only={"a3"})
+    assert [(r["name"], r["outcome"]) for r in partial] == [("done", "already")]
+    assert "a1" not in FakeApplicationService.integrations
     results = await management.connect_applications(url)
     assert [(r["name"], r["outcome"]) for r in results] == [
         ("smartparks", "connected"),

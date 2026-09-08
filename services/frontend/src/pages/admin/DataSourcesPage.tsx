@@ -100,6 +100,7 @@ export function DataSourcesPage() {
   } | null>(null);
   const [removing, setRemoving] = useState<DataSource | null>(null);
   const [statusOf, setStatusOf] = useState<DataSource | null>(null);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [connectResult, setConnectResult] = useState<{
     source: DataSource;
     result: ConnectApplicationsResult;
@@ -152,6 +153,13 @@ export function DataSourcesPage() {
       ),
     onSuccess: (result, source) => {
       setToken(null);
+      setTicked(
+        new Set(
+          result.applications
+            .filter((a) => a.outcome === "connected" || a.outcome === "updated")
+            .map((a) => a.application_id),
+        ),
+      );
       setConnectResult({ source, result });
     },
   });
@@ -159,6 +167,7 @@ export function DataSourcesPage() {
     mutationFn: (s: DataSource) =>
       api.post<ConnectApplicationsResult>(
         `/api/v1/data-sources/${s.id}/connect-applications`,
+        { body: { application_ids: [...ticked] } },
       ),
     invalidate: [queryKeys.dataSources],
     success: (r) =>
@@ -495,6 +504,7 @@ export function DataSourcesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-muted-foreground">
+                  {connectResult.result.dry_run && <th className="w-6 py-1" />}
                   <th className="py-1">{t("Application")}</th>
                   <th>
                     {connectResult.result.dry_run ? t("Would") : t("Outcome")}
@@ -507,8 +517,30 @@ export function DataSourcesPage() {
                   const others = (a.urls ?? []).filter(
                     (u) => !u.includes("/api/v1/ingest/http/"),
                   ).length;
+                  const changeable =
+                    a.outcome === "connected" || a.outcome === "updated";
                   return (
                     <tr key={a.application_id} className="border-t align-top">
+                      {connectResult.result.dry_run && (
+                        <td className="py-1">
+                          <input
+                            type="checkbox"
+                            className="size-4 accent-primary"
+                            aria-label={t("Connect {{name}}", { name: a.name })}
+                            disabled={!changeable}
+                            checked={changeable && ticked.has(a.application_id)}
+                            onChange={(e) =>
+                              setTicked((s) => {
+                                const next = new Set(s);
+                                if (e.target.checked)
+                                  next.add(a.application_id);
+                                else next.delete(a.application_id);
+                                return next;
+                              })
+                            }
+                          />
+                        </td>
+                      )}
                       <td className="py-1">{a.name}</td>
                       <td className="py-1">
                         {a.outcome === "failed" ? (
@@ -544,13 +576,13 @@ export function DataSourcesPage() {
               connectResult.result.connected + connectResult.result.updated >
                 0 && (
                 <Button
-                  disabled={connectApplications.isPending}
+                  disabled={connectApplications.isPending || ticked.size === 0}
                   onClick={() =>
                     connectResult &&
                     connectApplications.mutate(connectResult.source)
                   }
                 >
-                  {t("Apply")}
+                  {t("Apply to {{count}} applications", { count: ticked.size })}
                 </Button>
               )}
             <Button
