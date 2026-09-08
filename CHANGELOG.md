@@ -4,7 +4,17 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
-From Tim's first hour with v2.0.0 on the dev server.
+Nothing yet.
+
+## v2.2.0, 2026-09-08
+
+Two days of live use after v2.0.0, released together with phases 16 to 18 (v2.1.0 was never tagged). The device layer on the live map and the all-projects scope for server admins (phase 16, D111 to D120); reprocessing after linking handed to the decoder with a progress card, bulk assignment of devices to a project, a dynamic track length, profile pictures, the clock-ahead rule, a small map on the entity, device and gateway views, column filters on Needs attention, heard positions as dots (D109, D110, D119, D121 to D124); ChirpStack applications connected from the tenant over native gRPC or grpc-web, with a quick setup and an Applications dialog (phase 17, D125 to D132); simple first with the Overview, Data and Network tabs and no technical details switch (phase 18, D133, D134); and the fixes from the first live days.
+
+### Upgrade notes
+
+- ChirpStack data sources created before this release keep no copy of their webhook token: press "New token" once on the row before "Connect applications", and re-enter the new token in any integration set by hand (an integration the action manages is updated by it).
+- The "Technical details" preference is gone; the per-user `technical_details` key in the preferences document is ignored and can stay.
+- The gateway layer of the live map starts off for everyone; switch it on in the layers panel where wanted, the choice is remembered per user.
 
 ### Added
 
@@ -67,6 +77,7 @@ From Tim's first hour with v2.0.0 on the dev server.
 ### Migrations
 
 - 0021 (`picture_key` and `picture_updated_at` on entities and devices): the downgrade drops the columns; the stored squares stay in the bucket and are unreachable until a picture is set again.
+- 0022 (gateway receptions from before the device existed get their device): a data repair only, no schema change; the downgrade does nothing, the links are right either way.
 
 ## v2.0.0, 2026-09-06
 

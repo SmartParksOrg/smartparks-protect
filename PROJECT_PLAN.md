@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phases 16, 17 and 18 built and live on the dev server (2026-09-08, 0b04f85); v2.2.0 (folding the never-tagged v2.1.0) waits for Tim's word |
-| Latest release | v2.0.0 (2026-09-06): phases 10 to 15 and the deployment fixes |
+| Active phase | Phases 16, 17 and 18 released as v2.2.0 on 2026-09-08; the next phase is to be planned with Tim |
+| Latest release | v2.2.0 (2026-09-08): phases 16 to 18 and the fixes since v2.0.0 |
 | Last session | 2026-09-08 |
-| Next item | Release v2.2.0 with everything since v2.0.0. Then, from the open items: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Next item | Plan the next phase from the open items: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -815,7 +815,7 @@ Release:
 - [x] Frontend: a "Connect applications" button next to Sync devices and Sync gateways on the data sources page for ChirpStack sources with the API channel on; a result dialog listing the applications with the outcome and the reason; Test connection's dialog shows the application status; the create dialog for a ChirpStack source offers the button right after saving, when the token is shown.
 - [x] Docs: `docs/integrations/chirpstack/index.md` (the one-step setup, the token in the URL, what stays manual), `DEVELOPERS.md` (the connector calls, the encrypted copy), the changelog; ADR when the token copy is judged worth one.
 
-- [ ] Release: `VERSION` v2.2.0 with the changelog and the release process, together with phase 18.
+- [x] (2026-09-08) Release: `VERSION` v2.2.0 with the changelog and the release process, together with phase 18.
 
 **Exit criteria (checked on 2026-09-08 against LoRaNAM rather than chirpstack-dev4, which has sent nothing since 2026-09-06: 565 uplinks from 31 devices of the connected applications arrived within five hours, every new identity named after the device with its application name; the multi-application case ran as a dry run over six applications and an Apply on the chosen ones; the other URLs kept posting).** On the dev server, against the ChirpStack at chirpstack-dev4.smartparks.org: one Connect applications puts the source on every application of the tenant, an application that already posted to another URL keeps doing so and posts to us too, Test connection lists the applications with their state, a token rotation followed by Connect applications updates every URL, and the uplinks of a newly connected application arrive with the application name on the identity.
 
@@ -836,7 +836,7 @@ Release:
 - [x] Map: the gateway layer off by default for everyone, on through the layers panel and remembered per user as today; the `?gateways=1` and `?gateway=` parameters unchanged; the entity and device panels keep only state and the links to the object's pages.
 - [x] Docs: `docs/administration/pages.md` rewritten around the tab rule (what each tab of each object holds, per role), the D105 wording replaced in `DEVELOPERS.md`, the changelog; the sweep screenshots the three tabs of an entity and a device.
 
-- [ ] Release: `VERSION` v2.2.0 with the changelog and the release process, together with phase 17.
+- [x] (2026-09-08) Release: `VERSION` v2.2.0 with the changelog and the release process, together with phase 17.
 
 **Exit criteria (checked on 2026-09-08 with two temporary accounts in Smart Parks, removed afterwards: the viewer's sidebar has Monitor, Analyze, Rules and Control and no switch, the project admin's adds Network, Integrate and Project admin, and `?tab=network` on an entity lands on the Network tab for both).** A viewer's account on the dev server sees no switch and a sidebar with Monitor and Analyze; the entity page opens on Overview with the small map and reaches the device's traffic on its Network tab in one click; `?tab=network` on a device link lands on the tab; a project admin sees the Network section; a server admin sees the same pages as the viewer plus the admin sections, so what a ranger sees is one account switch away rather than a preference.
 
@@ -1377,3 +1377,7 @@ Listed by the phase where they are first needed.
 - Tim asked for a review of the whole project from the guiding documents, to know where we stand before any next phase. Three sweeps (plan consistency, stale docs, code health) plus the documents themselves. Findings: the status table and milestones stale for phases 17 and 18; D105, D107, D128 and D129 superseded without a note; the session log in two orders; the phase 8 release box open for a version folded long ago; the risks table pre-phase-8; README and docs index still "pre-release"; the ChirpStack page and DEVELOPERS describing the API as gRPC only and the quick setup as looking the tenant up; the pipeline doc's "republished"; the icons page missing from the administration index; the README's feature list without the device layer, all projects, bulk assignment and the ChirpStack connect. Code: no TODO, ruff and mypy clean, 16 lint warnings that are React Compiler bailouts, no dead frontend code, two endpoints without a caller (the curation re-preview, the connect dry run) and the vector tile endpoint the map never switches to above the threshold; tokens in URLs land in access logs; a deploy costs seconds of 502.
 - Housekeeping done in this entry's commit: all of the above in the plan, the docs and the README (the code findings stay as open items in the risks table and the next-item line). Verification gaps closed on the dev server: phase 16 part B's live uplink in the all scope, phase 17's uplinks with the application name (through LoRaNAM), phase 18's viewer and project admin sidebars and tabs (temporary accounts, removed).
 - Open for the next phase, in Tim's order: release v2.2.0; onboard and assign the KPN collars and LoRaNAM's applications; Request status through KPN for the complete command timeline; the map using the vector tiles above the threshold; the live stages that wait for accounts.
+
+### 2026-09-08, release v2.2.0 (Tim)
+
+- Tim: release. `VERSION` v2.2.0, the changelog section with the lead paragraph, upgrade notes (a token rotation for ChirpStack sources from before, the dropped preference, gateways off by default) and migrations 0021 and 0022, the status block, the release boxes of phases 17 and 18; commit `Release v2.2.0`, annotated tag, pushed; the dev server updated and `scripts/verify-server.sh` run there.
