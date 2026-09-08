@@ -302,21 +302,14 @@ export function DevicePage() {
             </CardContent>
           </Card>
           {projectId && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("On the map")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MiniMap
-                  positions={positions.data ?? []}
-                  to={
-                    currentEntityId
-                      ? `/projects/${projectId}/map?entity=${currentEntityId}`
-                      : `/projects/${projectId}/map?device=${d.id}`
-                  }
-                />
-              </CardContent>
-            </Card>
+            <MiniMap
+              positions={positions.data ?? []}
+              to={
+                currentEntityId
+                  ? `/projects/${projectId}/map?entity=${currentEntityId}`
+                  : `/projects/${projectId}/map?device=${d.id}`
+              }
+            />
           )}
           <HealthCard health={d.health} />
           <Card>

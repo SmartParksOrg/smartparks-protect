@@ -362,17 +362,10 @@ export function EntityPage() {
               </dl>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("On the map")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <MiniMap
-                positions={positions.data ?? []}
-                to={`/projects/${projectId}/map?entity=${e.id}`}
-              />
-            </CardContent>
-          </Card>
+          <MiniMap
+            positions={positions.data ?? []}
+            to={`/projects/${projectId}/map?entity=${e.id}`}
+          />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{t("Device")}</CardTitle>

@@ -137,7 +137,7 @@ export function MiniMap({
 
   if (!geometry) {
     return (
-      <div className="flex h-56 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+      <div className="flex h-full min-h-56 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
         {t("No position yet.")}
       </div>
     );
@@ -146,7 +146,7 @@ export function MiniMap({
     <Link
       to={to}
       aria-label={label ?? t("Open in live map")}
-      className="relative block h-56 overflow-hidden rounded-md border"
+      className="relative block h-full min-h-56 overflow-hidden rounded-xl border shadow-sm"
     >
       <div ref={container} className="h-full w-full" />
       <span className="pointer-events-none absolute right-2 top-2 rounded bg-card/90 px-2 py-0.5 text-xs shadow-sm">
