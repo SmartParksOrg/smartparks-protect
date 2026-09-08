@@ -229,12 +229,6 @@ async def test_quick_setup_completes_the_config_on_save(client, db, monkeypatch)
         headers=admin.headers,
     )
     assert preview.status_code == 200 and preview.json()["dry_run"] is True
-    chosen = await client.post(
-        f"/api/v1/data-sources/{created.json()['id']}/connect-applications",
-        json={"application_ids": ["a1"]},
-        headers=admin.headers,
-    )
-    assert chosen.status_code == 200 and seen_only[-1] == {"a1"}
     from sqlalchemy import func, select
 
     from shared.models import AuditLog
@@ -248,3 +242,10 @@ async def test_quick_setup_completes_the_config_on_save(client, db, monkeypatch)
         )
     )
     assert count == 0
+    # applying with a choice writes only those applications
+    chosen = await client.post(
+        f"/api/v1/data-sources/{created.json()['id']}/connect-applications",
+        json={"application_ids": ["a1"]},
+        headers=admin.headers,
+    )
+    assert chosen.status_code == 200 and seen_only[-1] == {"a1"}
