@@ -120,7 +120,7 @@ async def test_connect_applications_needs_the_token_copy_and_reports_per_applica
     base = f"/api/v1/data-sources/{source['id']}"
     seen: dict[str, str] = {}
 
-    async def connect(self, url):
+    async def connect(self, url, *, dry_run=False):
         seen["url"] = url
         return [
             {"application_id": "a1", "name": "smartparks", "outcome": "connected", "urls": [url]},

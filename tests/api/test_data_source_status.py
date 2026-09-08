@@ -86,7 +86,9 @@ async def test_status_per_channel(client, db):
         and by_key["mqtt"]["missing"] == ["mqtt_host"]
         and by_key["mqtt"]["state"] == "off"
     )
-    assert not by_key["api"]["configured"] and by_key["api"]["missing"] == ["api_url", "api_token"]
+    # the gRPC address is derived from the web address on save (decision D128); the key is not
+    assert chirpstack["config"]["api_url"] == "grpcs://cs.example:443"
+    assert not by_key["api"]["configured"] and by_key["api"]["missing"] == ["api_token"]
     assert (
         "downlink" in status["limited_capabilities"]
         and status["effective_capabilities"]["downlink"] is False
