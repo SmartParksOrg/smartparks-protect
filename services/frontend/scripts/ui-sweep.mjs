@@ -69,6 +69,9 @@ for (const p of paths) {
 // stateful map views the router cannot list: an entity selected, and two tracks on with the
 // Tracks card (the card once widened the page on a phone; a plain route never showed it)
 const tracked = entities.slice(0, 2).map((e) => e.id);
+// the Data and Network tabs of an entity and a device (decision D133)
+if (entities[0]) for (const tab of ["data", "network"]) routes.add(`/projects/${project.id}/entities/${entities[0].id}?tab=${tab}`);
+if (devices[0]) for (const tab of ["data", "network"]) routes.add(`/projects/${project.id}/devices/${devices[0].id}?tab=${tab}`);
 if (tracked.length > 0) {
   routes.add(`/projects/${project.id}/map?entity=${tracked[0]}`);
   routes.add(`/projects/${project.id}/map?entity=${tracked[0]}&tracks=${tracked.join(",")}&track=168`);

@@ -154,7 +154,7 @@ export function GatewaysPage() {
       cell: ({ row }) => (
         <a
           className="underline"
-          href={`/projects/${projectId}/devices/${row.original.device_id}`}
+          href={`/projects/${projectId}/devices/${row.original.device_id}?tab=network`}
           onClick={(e) => e.stopPropagation()}
         >
           {row.original.device_name ?? row.original.device_id}

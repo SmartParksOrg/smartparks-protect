@@ -1,7 +1,37 @@
 /** Sidebar sections from architecture 28 (application navigation). Items without a route yet
  * render as disabled with the phase they arrive in. */
 import type { LucideIcon } from "lucide-react";
-import { Activity, Bell, Bot, Boxes, ChartLine, Cpu, Database, DatabaseBackup, FileClock, FolderTree, GitBranch, Layers, LayoutDashboard, ListTree, Map as MapIcon, PawPrint, PenLine, Plug, Radio, Ruler, ScrollText, Send, Settings2, Shield, SlidersHorizontal, TriangleAlert, Users, Waypoints, Workflow } from "lucide-react";
+import {
+  Activity,
+  Bell,
+  Bot,
+  Boxes,
+  ChartLine,
+  Cpu,
+  Database,
+  DatabaseBackup,
+  FileClock,
+  FolderTree,
+  GitBranch,
+  Layers,
+  LayoutDashboard,
+  ListTree,
+  Map as MapIcon,
+  PawPrint,
+  PenLine,
+  Plug,
+  Radio,
+  Ruler,
+  ScrollText,
+  Send,
+  Settings2,
+  Shield,
+  SlidersHorizontal,
+  TriangleAlert,
+  Users,
+  Waypoints,
+  Workflow,
+} from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -18,15 +48,18 @@ export interface NavItem {
 export interface NavSection {
   label: string;
   items: NavItem[];
-  /** Shown only with the technical details preference on (decision D105). */
-  technical?: boolean;
+  /** The whole section is for project admins and server admins (decision D134). */
+  adminOnly?: boolean;
 }
 
 /** The sections as they apply to a scope: in the all scope only the items that work there. */
 export function sectionsFor(allProjects: boolean): NavSection[] {
   if (!allProjects) return projectSections;
   return projectSections
-    .map((section) => ({ ...section, items: section.items.filter((item) => item.allScope) }))
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.allScope),
+    }))
     .filter((section) => section.items.length > 0);
 }
 
@@ -51,10 +84,15 @@ export const projectSections: NavSection[] = [
   },
   {
     label: "Network",
-    technical: true,
+    adminOnly: true,
     items: [
       { label: "Traffic", allScope: true, icon: Radio, to: "network/traffic" },
-      { label: "Gateways", allScope: true, icon: Waypoints, to: "network/gateways" },
+      {
+        label: "Gateways",
+        allScope: true,
+        icon: Waypoints,
+        to: "network/gateways",
+      },
       { label: "Trace explorer", icon: ListTree, to: "network/traces" },
     ],
   },
@@ -63,25 +101,59 @@ export const projectSections: NavSection[] = [
     items: [
       { label: "Rules", icon: GitBranch, to: "rules" },
       { label: "Events", allScope: true, icon: Activity, to: "rules/events" },
-      { label: "Automations", icon: Workflow, to: "rules/automations", adminOnly: true },
+      {
+        label: "Automations",
+        icon: Workflow,
+        to: "rules/automations",
+        adminOnly: true,
+      },
     ],
   },
   {
     label: "Integrate",
-    items: [{ label: "Integrations", icon: Plug, to: "integrate/integrations", adminOnly: true }],
+    items: [
+      {
+        label: "Integrations",
+        icon: Plug,
+        to: "integrate/integrations",
+        adminOnly: true,
+      },
+    ],
   },
   {
     label: "Control",
-    items: [{ label: "Commands", icon: SlidersHorizontal, to: "control/commands" }],
+    items: [
+      { label: "Commands", icon: SlidersHorizontal, to: "control/commands" },
+    ],
   },
   {
     label: "Project admin",
     items: [
       { label: "Members", icon: Users, to: "admin/members", adminOnly: true },
-      { label: "Features", icon: Layers, to: "admin/features", adminOnly: true },
-      { label: "Groups", icon: FolderTree, to: "admin/groups", adminOnly: true },
-      { label: "Notifications", icon: Send, to: "admin/notifications", adminOnly: true },
-      { label: "Settings", icon: Settings2, to: "admin/settings", adminOnly: true },
+      {
+        label: "Features",
+        icon: Layers,
+        to: "admin/features",
+        adminOnly: true,
+      },
+      {
+        label: "Groups",
+        icon: FolderTree,
+        to: "admin/groups",
+        adminOnly: true,
+      },
+      {
+        label: "Notifications",
+        icon: Send,
+        to: "admin/notifications",
+        adminOnly: true,
+      },
+      {
+        label: "Settings",
+        icon: Settings2,
+        to: "admin/settings",
+        adminOnly: true,
+      },
     ],
   },
 ];
@@ -90,22 +162,102 @@ export const serverSections: NavSection[] = [
   {
     label: "Server admin",
     items: [
-      { label: "Needs attention", icon: TriangleAlert, to: "/admin/attention", serverAdminOnly: true },
-      { label: "System health", icon: Shield, to: "/admin/health", serverAdminOnly: true },
-      { label: "Traffic", icon: Radio, to: "/admin/traffic", serverAdminOnly: true },
-      { label: "Backup and recovery", icon: DatabaseBackup, to: "/admin/backups", serverAdminOnly: true },
-      { label: "System alerts", icon: Bell, to: "/admin/alerts", serverAdminOnly: true },
-      { label: "Automations", icon: Workflow, to: "/admin/automations", serverAdminOnly: true },
-      { label: "Notifications", icon: Send, to: "/admin/notifications", serverAdminOnly: true },
-      { label: "Projects", icon: Boxes, to: "/admin/projects", serverAdminOnly: true },
-      { label: "Users", icon: Users, to: "/admin/users", serverAdminOnly: true },
-      { label: "Devices", icon: Cpu, to: "/admin/devices", serverAdminOnly: true },
-      { label: "Data sources", icon: Database, to: "/admin/data-sources", serverAdminOnly: true },
-      { label: "Device types", icon: Cpu, to: "/admin/device-types", serverAdminOnly: true },
-      { label: "Entity types", icon: PawPrint, to: "/admin/entity-types", serverAdminOnly: true },
-      { label: "Metrics", icon: Ruler, to: "/admin/metrics", serverAdminOnly: true },
-      { label: "Audit log", icon: ScrollText, to: "/admin/audit", serverAdminOnly: true },
-      { label: "AI clients policy", icon: Bot, to: "/admin/ai-policy", serverAdminOnly: true },
+      {
+        label: "Needs attention",
+        icon: TriangleAlert,
+        to: "/admin/attention",
+        serverAdminOnly: true,
+      },
+      {
+        label: "System health",
+        icon: Shield,
+        to: "/admin/health",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Traffic",
+        icon: Radio,
+        to: "/admin/traffic",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Backup and recovery",
+        icon: DatabaseBackup,
+        to: "/admin/backups",
+        serverAdminOnly: true,
+      },
+      {
+        label: "System alerts",
+        icon: Bell,
+        to: "/admin/alerts",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Automations",
+        icon: Workflow,
+        to: "/admin/automations",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Notifications",
+        icon: Send,
+        to: "/admin/notifications",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Projects",
+        icon: Boxes,
+        to: "/admin/projects",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Users",
+        icon: Users,
+        to: "/admin/users",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Devices",
+        icon: Cpu,
+        to: "/admin/devices",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Data sources",
+        icon: Database,
+        to: "/admin/data-sources",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Device types",
+        icon: Cpu,
+        to: "/admin/device-types",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Entity types",
+        icon: PawPrint,
+        to: "/admin/entity-types",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Metrics",
+        icon: Ruler,
+        to: "/admin/metrics",
+        serverAdminOnly: true,
+      },
+      {
+        label: "Audit log",
+        icon: ScrollText,
+        to: "/admin/audit",
+        serverAdminOnly: true,
+      },
+      {
+        label: "AI clients policy",
+        icon: Bot,
+        to: "/admin/ai-policy",
+        serverAdminOnly: true,
+      },
     ],
   },
 ];

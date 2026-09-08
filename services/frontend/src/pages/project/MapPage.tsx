@@ -79,7 +79,6 @@ import { useGroups } from "@/hooks/useGroups";
 import { usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { useNow } from "@/hooks/useNow";
-import { useTechnicalDetails } from "@/hooks/useTechnicalDetails";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { formatAgo, formatTime } from "@/lib/format";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
@@ -190,9 +189,8 @@ export function MapPage() {
   const [allLayers, setAllLayers] = usePreference<
     Record<string, Partial<LayerChoices>>
   >("map_layers", {});
-  // gateways are the network, not the animals: on by default only for people who asked for
-  // the technical picture (decision D105); the layers panel switches them either way
-  const [technical] = useTechnicalDetails();
+  // gateways are the network, not the animals: off by default for everyone, switched on in
+  // the layers panel and remembered per user (decision D134)
   // `?gateways=1` or `?gateway=<id>` (from the Gateways page) switches the layer on for the visit
   const gatewayParam = params.get("gateway");
   const gatewaysWanted =
@@ -200,11 +198,11 @@ export function MapPage() {
   const layers = useMemo<LayerChoices>(
     () => ({
       ...DEFAULT_LAYERS,
-      gateways: technical,
+      gateways: false,
       ...allLayers[projectId],
       ...(gatewaysWanted ? { gateways: true } : {}),
     }),
-    [allLayers, projectId, technical, gatewaysWanted],
+    [allLayers, projectId, gatewaysWanted],
   );
   const setLayers = useCallback(
     (next: LayerChoices) => setAllLayers({ ...allLayers, [projectId]: next }),

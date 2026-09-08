@@ -27,14 +27,12 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icons/Icon";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { useNow } from "@/hooks/useNow";
-import { useTechnicalDetails } from "@/hooks/useTechnicalDetails";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
 import { formatAgo } from "@/lib/format";
 
 export function DevicesPage() {
   const { t } = useTranslation();
   const now = useNow();
-  const [technical] = useTechnicalDetails();
   const { projectId = "" } = useParams();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
@@ -115,16 +113,11 @@ export function DevicesPage() {
       header: t("Type"),
       accessorFn: (d) => typeById.get(d.device_type_id)?.label ?? "",
     },
-    ...(technical
-      ? [
-          {
-            id: "driver",
-            header: t("Driver"),
-            accessorFn: (d: Device) =>
-              typeById.get(d.device_type_id)?.driver_key ?? "",
-          } as ColumnDef<Device, unknown>,
-        ]
-      : []),
+    {
+      id: "driver",
+      header: t("Driver"),
+      accessorFn: (d) => typeById.get(d.device_type_id)?.driver_key ?? "",
+    },
     {
       header: t("Status"),
       accessorKey: "status",
@@ -272,6 +265,7 @@ export function DevicesPage() {
                 )
           }
           columnsKey="devices"
+          defaultHidden={["driver"]}
           defaultHiddenSmall={["type", "driver", "serial_number", "status"]}
           onRowClick={(d) =>
             navigate(

@@ -36,6 +36,10 @@ From Tim's first hour with v2.0.0 on the dev server.
 - On a phone: the traffic list shows the time alone for today's rows and a short date for older ones, the Data explorer opens on the chart with its filters behind a Filters button that says what is set, Needs attention shows its counters two per row, the base map picker is an icon, gateway labels appear from zoom 9, the map's attribution starts folded, and the keyboard hint of the search box is hidden. Gateways are on the map by default only with Technical details on; the layers panel switches them either way. The devices list keeps Name, Entity, Last seen and Health on a phone and moves Type, Driver, Serial and Status into the column picker. Singular forms in the catalogue ("1 gateway", "1 device").
 - The screenshot sweep takes `SWEEP_PROJECT` (a project name or id) and opens the map with an entity selected and two tracks on, so the Tracks card is covered.
 
+### Changed
+
+- Simple first, details one click deeper (phase 18, decisions D133 and D134): the entity page and the device page have three tabs. Overview keeps the state, the health, the small map, the assignments and the actions; Data holds the records with their curate, deliveries and provenance links, and the log file and Bluetooth cards on a device; Network holds the identities, traffic, traces and commands of that object. The tab sits in the URL (`?tab=`), and the traffic, gateway and trace pages link to a device's Network tab. The "Technical details" switch, its preference and the folded sections are gone; the Network section of the sidebar shows for project admins and server admins; the Driver column of the devices list is a hidden column of the Columns picker; the gateway layer of the live map is off by default for everyone and remembered per user once switched on.
+
 ### Fixed
 
 - The Coverage tab no longer says "Only where collars were: a blank area may still have coverage": too much text, and the heard positions come from any tracker, not only collars.

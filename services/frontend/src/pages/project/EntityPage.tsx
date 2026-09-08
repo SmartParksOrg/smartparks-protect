@@ -20,7 +20,6 @@ import type {
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
-import { TechnicalDetails } from "@/components/common/TechnicalDetails";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { TrafficTable } from "@/components/network/TrafficTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -34,6 +33,7 @@ import type { EntityFeatureProperties } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -44,14 +44,18 @@ import {
 } from "@/components/ui/table";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
+import { useTab } from "@/hooks/useTab";
 import { groupPath, useGroups } from "@/hooks/useGroups";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
 
 /** One entity: what it is, the device tracking it now with its health, and the history of the
  * devices that tracked it, with "Assign device" for project admins (decision D106). */
+const TABS = ["overview", "data", "network"] as const;
+
 export function EntityPage() {
   const { t } = useTranslation();
+  const [tab, setTab] = useTab(TABS);
   const { projectId = "", entityId = "" } = useParams();
   const role = useProjectRole(projectId);
   const now = useNow();
@@ -301,318 +305,361 @@ export function EntityPage() {
             )}
           </Callout>
         )}
-        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("Entity")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                <dt className="text-muted-foreground">{t("Type")}</dt>
-                <dd>{type?.label ?? ""}</dd>
-                {e.group_id && (
-                  <>
-                    <dt className="text-muted-foreground">{t("Group")}</dt>
-                    <dd>{path}</dd>
-                  </>
-                )}
-                <dt className="text-muted-foreground">{t("Last seen")}</dt>
-                <dd title={formatTime(live?.last_seen_at)}>
-                  {live?.last_seen_at
-                    ? formatAgo(live.last_seen_at, now)
-                    : t("never")}
-                </dd>
-                <dt className="text-muted-foreground">{t("Last position")}</dt>
-                <dd>
-                  {live?.position_time
-                    ? formatTime(live.position_time)
-                    : t("none")}
-                </dd>
-                {point && (
-                  <>
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as (typeof TABS)[number])}
+        >
+          <TabsList>
+            <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
+            <TabsTrigger value="data">{t("Data")}</TabsTrigger>
+            <TabsTrigger value="network">{t("Network")}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="overview">
+            <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("Entity")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                    <dt className="text-muted-foreground">{t("Type")}</dt>
+                    <dd>{type?.label ?? ""}</dd>
+                    {e.group_id && (
+                      <>
+                        <dt className="text-muted-foreground">{t("Group")}</dt>
+                        <dd>{path}</dd>
+                      </>
+                    )}
+                    <dt className="text-muted-foreground">{t("Last seen")}</dt>
+                    <dd title={formatTime(live?.last_seen_at)}>
+                      {live?.last_seen_at
+                        ? formatAgo(live.last_seen_at, now)
+                        : t("never")}
+                    </dd>
                     <dt className="text-muted-foreground">
-                      {t("Static location")}
+                      {t("Last position")}
                     </dt>
-                    <dd className="font-mono text-xs">
-                      {point[1]?.toFixed(5)}, {point[0]?.toFixed(5)}
-                    </dd>
-                  </>
-                )}
-                {live && live.active_alert_count > 0 && (
-                  <>
-                    <dt className="text-muted-foreground">{t("Alerts")}</dt>
                     <dd>
-                      <Link
-                        className="underline"
-                        to={`/projects/${projectId}/alerts`}
-                      >
-                        {live.active_alert_count} {t("open")}
-                      </Link>
+                      {live?.position_time
+                        ? formatTime(live.position_time)
+                        : t("none")}
                     </dd>
-                  </>
-                )}
-                <dt className="text-muted-foreground">{t("Created")}</dt>
-                <dd>{formatTime(e.created_at)}</dd>
-                {e.notes && (
-                  <>
-                    <dt className="text-muted-foreground">{t("Notes")}</dt>
-                    <dd>{e.notes}</dd>
-                  </>
-                )}
-              </dl>
-            </CardContent>
-          </Card>
-          <MiniMap
-            positions={positions.data ?? []}
-            to={`/projects/${projectId}/map?entity=${e.id}`}
-          />
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{t("Device")}</CardTitle>
-              {admin && !current && (
-                <Button size="sm" onClick={() => setAssigning(true)}>
-                  <Plus className="size-4" /> {t("Assign device")}
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="text-sm">
-              {!current && (
-                <div className="text-muted-foreground">
-                  {t("No device tracks this entity today.")}
-                </div>
-              )}
-              {current && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link
-                    className="font-medium underline"
-                    to={`/projects/${projectId}/devices/${current.device_id}`}
-                  >
-                    {current.device_name ?? t("open device")}
-                  </Link>
-                  {device.data?.serial_number && (
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {device.data.serial_number}
-                    </span>
-                  )}
-                  <span className="text-muted-foreground">
-                    {t("since {{date}}", {
-                      date: formatTime(current.valid_from),
-                    })}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("last seen")} {formatAgo(device.data?.last_seen_at, now)}
-                  </span>
-                  {admin && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="ml-auto"
-                      onClick={() => setChanging(current)}
-                    >
-                      {t("Change…")}
-                    </Button>
-                  )}
-                  {admin && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={release.isPending}
-                      onClick={() => release.mutate(current.id)}
-                    >
-                      {t("Release device")}
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          {current && <HealthCard health={device.data?.health} />}
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{t("Assignments")}</CardTitle>
-              {admin && current && (
-                <span className="text-xs text-muted-foreground">
-                  {t("Release the current device to assign another.")}
-                </span>
-              )}
-            </CardHeader>
-            <CardContent>
-              {assignments.isPending && (
-                <div className="text-sm text-muted-foreground">
-                  {t("Loading…")}
-                </div>
-              )}
-              {assignments.data && history.length === 0 && (
-                <div className="text-sm text-muted-foreground">
-                  {t("No device has tracked this entity yet.")}
-                </div>
-              )}
-              {history.length > 0 && (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("Device")}</TableHead>
-                      <TableHead>{t("From")}</TableHead>
-                      <TableHead>{t("To")}</TableHead>
-                      <TableHead>{t("Reason")}</TableHead>
-                      <TableHead className="w-24" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {history.map((a) => (
-                      <TableRow key={a.id}>
-                        <TableCell>
+                    {point && (
+                      <>
+                        <dt className="text-muted-foreground">
+                          {t("Static location")}
+                        </dt>
+                        <dd className="font-mono text-xs">
+                          {point[1]?.toFixed(5)}, {point[0]?.toFixed(5)}
+                        </dd>
+                      </>
+                    )}
+                    {live && live.active_alert_count > 0 && (
+                      <>
+                        <dt className="text-muted-foreground">{t("Alerts")}</dt>
+                        <dd>
                           <Link
                             className="underline"
-                            to={`/projects/${projectId}/devices/${a.device_id}`}
+                            to={`/projects/${projectId}/alerts`}
                           >
-                            {a.device_name ?? a.device_id.slice(0, 8)}
+                            {live.active_alert_count} {t("open")}
                           </Link>
-                        </TableCell>
-                        <TableCell>{formatTime(a.valid_from)}</TableCell>
-                        <TableCell>
-                          {a.valid_to ? formatTime(a.valid_to) : t("now")}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {a.reason ?? ""}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {admin && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => setChanging(a)}
-                            >
-                              {t("Change…")}
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{t("Recent events")}</CardTitle>
-              <Button asChild variant="link" size="sm" className="h-auto p-0">
-                <Link to={`/projects/${projectId}/rules/events`}>
-                  {t("All events")}
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {events.data && events.data.items.length === 0 && (
-                <div className="text-sm text-muted-foreground">
-                  {t("No events for this entity yet.")}
-                </div>
-              )}
-              <ul className="divide-y text-sm">
-                {events.data?.items.map((ev) => (
-                  <li
-                    key={ev.id}
-                    className="flex flex-wrap items-center gap-2 py-1.5"
-                  >
-                    <StatusBadge value={ev.severity} />
-                    <Link
-                      className="font-medium hover:underline"
-                      to={`/projects/${projectId}/rules/events?event=${ev.id}`}
-                    >
-                      {ev.title}
-                    </Link>
-                    <span
-                      className="ml-auto text-xs text-muted-foreground"
-                      title={formatTime(ev.time)}
-                    >
-                      {formatAgo(ev.time, now)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{t("Recent positions")}</CardTitle>
-              {live?.position_time && (
-                <Button asChild variant="link" size="sm" className="h-auto p-0">
-                  <Link
-                    to={`/projects/${projectId}/map?entity=${e.id}&tracks=${e.id}&track=24`}
-                  >
-                    {t("Track on the map")}
-                  </Link>
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {positions.data?.length === 0 && (
-                <div className="text-sm text-muted-foreground">
-                  {t("No positions in the last 30 days.")}
-                </div>
-              )}
-              <ul className="divide-y text-sm">
-                {positions.data?.map((p) => (
-                  <li
-                    key={p.id}
-                    className="flex flex-wrap items-center gap-3 py-1.5"
-                  >
-                    <span>{formatTime(p.time)}</span>
-                    <span className="font-mono text-xs">
-                      {(p.geometry?.coordinates as number[])?.[1]?.toFixed(5)},{" "}
-                      {(p.geometry?.coordinates as number[])?.[0]?.toFixed(5)}
-                    </span>
-                    {p.accuracy_m != null && (
-                      <span className="text-muted-foreground">
-                        {t("±{{value}} m", { value: p.accuracy_m })}
-                      </span>
+                        </dd>
+                      </>
                     )}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-          {current && (
-            <TechnicalDetails className="lg:col-span-2">
+                    <dt className="text-muted-foreground">{t("Created")}</dt>
+                    <dd>{formatTime(e.created_at)}</dd>
+                    {e.notes && (
+                      <>
+                        <dt className="text-muted-foreground">{t("Notes")}</dt>
+                        <dd>{e.notes}</dd>
+                      </>
+                    )}
+                  </dl>
+                </CardContent>
+              </Card>
+              <MiniMap
+                positions={positions.data ?? []}
+                to={`/projects/${projectId}/map?entity=${e.id}`}
+              />
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>{t("Device")}</CardTitle>
+                  {admin && !current && (
+                    <Button size="sm" onClick={() => setAssigning(true)}>
+                      <Plus className="size-4" /> {t("Assign device")}
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="text-sm">
+                  {!current && (
+                    <div className="text-muted-foreground">
+                      {t("No device tracks this entity today.")}
+                    </div>
+                  )}
+                  {current && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Link
+                        className="font-medium underline"
+                        to={`/projects/${projectId}/devices/${current.device_id}`}
+                      >
+                        {current.device_name ?? t("open device")}
+                      </Link>
+                      {device.data?.serial_number && (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {device.data.serial_number}
+                        </span>
+                      )}
+                      <span className="text-muted-foreground">
+                        {t("since {{date}}", {
+                          date: formatTime(current.valid_from),
+                        })}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {t("last seen")}{" "}
+                        {formatAgo(device.data?.last_seen_at, now)}
+                      </span>
+                      {admin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="ml-auto"
+                          onClick={() => setChanging(current)}
+                        >
+                          {t("Change…")}
+                        </Button>
+                      )}
+                      {admin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={release.isPending}
+                          onClick={() => release.mutate(current.id)}
+                        >
+                          {t("Release device")}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              {current && <HealthCard health={device.data?.health} />}
               <Card className="lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>
-                    {t("Traffic of {{device}}", {
-                      device: current.device_name ?? t("the device"),
-                    })}
-                  </CardTitle>
+                  <CardTitle>{t("Assignments")}</CardTitle>
+                  {admin && current && (
+                    <span className="text-xs text-muted-foreground">
+                      {t("Release the current device to assign another.")}
+                    </span>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {assignments.isPending && (
+                    <div className="text-sm text-muted-foreground">
+                      {t("Loading…")}
+                    </div>
+                  )}
+                  {assignments.data && history.length === 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      {t("No device has tracked this entity yet.")}
+                    </div>
+                  )}
+                  {history.length > 0 && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("Device")}</TableHead>
+                          <TableHead>{t("From")}</TableHead>
+                          <TableHead>{t("To")}</TableHead>
+                          <TableHead>{t("Reason")}</TableHead>
+                          <TableHead className="w-24" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {history.map((a) => (
+                          <TableRow key={a.id}>
+                            <TableCell>
+                              <Link
+                                className="underline"
+                                to={`/projects/${projectId}/devices/${a.device_id}`}
+                              >
+                                {a.device_name ?? a.device_id.slice(0, 8)}
+                              </Link>
+                            </TableCell>
+                            <TableCell>{formatTime(a.valid_from)}</TableCell>
+                            <TableCell>
+                              {a.valid_to ? formatTime(a.valid_to) : t("now")}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {a.reason ?? ""}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {admin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => setChanging(a)}
+                                >
+                                  {t("Change…")}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          <TabsContent value="data">
+            <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>{t("Recent events")}</CardTitle>
                   <Button
                     asChild
                     variant="link"
                     size="sm"
                     className="h-auto p-0"
                   >
-                    <Link
-                      to={`/projects/${projectId}/network/traffic?device=${current.device_id}`}
-                    >
-                      {t("All traffic")}
+                    <Link to={`/projects/${projectId}/rules/events`}>
+                      {t("All events")}
                     </Link>
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <TrafficTable
-                    rows={traffic.data}
-                    isLoading={traffic.isPending}
-                    emptyMessage={t("No messages in the last 7 days.")}
-                    onSelect={(r) =>
-                      setEvent({
-                        id: r.source_event_id,
-                        ingestedAt: r.ingested_at,
-                      })
-                    }
-                  />
+                  {events.data && events.data.items.length === 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      {t("No events for this entity yet.")}
+                    </div>
+                  )}
+                  <ul className="divide-y text-sm">
+                    {events.data?.items.map((ev) => (
+                      <li
+                        key={ev.id}
+                        className="flex flex-wrap items-center gap-2 py-1.5"
+                      >
+                        <StatusBadge value={ev.severity} />
+                        <Link
+                          className="font-medium hover:underline"
+                          to={`/projects/${projectId}/rules/events?event=${ev.id}`}
+                        >
+                          {ev.title}
+                        </Link>
+                        <span
+                          className="ml-auto text-xs text-muted-foreground"
+                          title={formatTime(ev.time)}
+                        >
+                          {formatAgo(ev.time, now)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </CardContent>
               </Card>
-            </TechnicalDetails>
-          )}
-        </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>{t("Recent positions")}</CardTitle>
+                  {live?.position_time && (
+                    <Button
+                      asChild
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                    >
+                      <Link
+                        to={`/projects/${projectId}/map?entity=${e.id}&tracks=${e.id}&track=24`}
+                      >
+                        {t("Track on the map")}
+                      </Link>
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {positions.data?.length === 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      {t("No positions in the last 30 days.")}
+                    </div>
+                  )}
+                  <ul className="divide-y text-sm">
+                    {positions.data?.map((p) => (
+                      <li
+                        key={p.id}
+                        className="flex flex-wrap items-center gap-3 py-1.5"
+                      >
+                        <span>{formatTime(p.time)}</span>
+                        <span className="font-mono text-xs">
+                          {(p.geometry?.coordinates as number[])?.[1]?.toFixed(
+                            5,
+                          )}
+                          ,{" "}
+                          {(p.geometry?.coordinates as number[])?.[0]?.toFixed(
+                            5,
+                          )}
+                        </span>
+                        {p.accuracy_m != null && (
+                          <span className="text-muted-foreground">
+                            {t("±{{value}} m", { value: p.accuracy_m })}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          <TabsContent value="network">
+            <div className="grid gap-4 [&>*]:min-w-0">
+              {!current && (
+                <p className="text-sm text-muted-foreground">
+                  {t(
+                    "No device tracks this entity today, so there is no traffic to show.",
+                  )}
+                </p>
+              )}
+              {current && (
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>
+                      {t("Traffic of {{device}}", {
+                        device: current.device_name ?? t("the device"),
+                      })}
+                    </CardTitle>
+                    <Button
+                      asChild
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                    >
+                      <Link
+                        to={`/projects/${projectId}/devices/${current.device_id}?tab=network`}
+                      >
+                        {t("The device's network tab")}
+                      </Link>
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <TrafficTable
+                      rows={traffic.data}
+                      isLoading={traffic.isPending}
+                      emptyMessage={t("No messages in the last 7 days.")}
+                      onSelect={(r) =>
+                        setEvent({
+                          id: r.source_event_id,
+                          ingestedAt: r.ingested_at,
+                        })
+                      }
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </Page>
       <EntityDialog
         projectId={projectId}

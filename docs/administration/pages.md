@@ -1,50 +1,50 @@
 # Pages per role
 
-What each kind of user sees, and what the technical details preference adds (decision D105).
-The rule behind every page: the entity, its state and the next action first; identities,
-ports, traces and provider fields under Technical details.
+What each kind of user sees. The rule behind every page (decisions D133 and D134): the entity,
+its state and the next action first; the machinery one click deeper, in the same place on
+every object. There is no switch for detail: what a person sees follows the role only.
 
-## The preference
+## One click deeper
 
-Every person has a "Technical details" switch at the bottom of the sidebar. Off, the pages
-show the operational picture only. On, the folded Technical details sections open by default
-and the Network section appears in the sidebar. Server admins start with it on, everyone else
-off; the choice is kept per user on the server, so it follows the person to another browser.
-A folded section opens for one page with a click without changing the preference.
+The entity page and the device page have three tabs. Overview holds what a ranger needs: the
+state, the health, a small map with the newest position, the assignments and the actions.
+Data holds the records, positions and events, with the curate, deliveries and provenance
+links on each. Network holds the machinery of that object: identities, traffic, traces and
+commands. The tab sits in the URL (`?tab=data`, `?tab=network`), so a link from a traffic
+row, a gateway or a trace lands on the tab it means. A list shows the columns a person needs
+first; the Columns picker adds the rest, per user.
 
 ## Project viewer
 
-| Page | Shows | With technical details on |
+| Page | Shows | One click deeper |
 | --- | --- | --- |
 | Live map | Entities with their health, the layers panel (Entities, Devices, Features, Events, Coverage), tracks with the Tracks card and its length settings, recent events. The Devices tab is the device layer: every device of the project, off by default, with or without an entity; a device track is dashed | Nothing more |
 | All projects (server admins) | The project switcher's first entry: the live map, entities, devices, alerts, events, gateways and traffic over every project, with the project as the top level of the layers panel and a Project column in the lists; links go to the object's own project. Devices in no project appear under "Not in a project" on the device layer and in the devices list's project filter, where a selection can be assigned to a project at once, from each device's first data, with an entity per device if wanted. The other pages stay per project | Only server admins see the entry |
-| Entities | Name, type, status, group, last seen, the device by name, a map link | Nothing more |
-| Entity page | The entity, the device tracking it with its health, the assignment history | Nothing more |
-| Devices | Name, type, status, serial, entity, group, last seen, health | The driver column |
-| Entity and device page | Details, health, assignments, a small map with the newest position and a short trail that opens the live map, recent positions and events | Traffic and traces |
-| Device page | Device, health, assignments, actions, recent positions | External identities, the traffic section, the deliveries and provenance links on positions |
+| Entities | Name, type, status, group, last seen, the device by name, a map link | The entity page |
+| Entity page | Overview: the entity, the small map, the device tracking it with its health, the assignments | Data: positions and events; Network: the traffic and traces of the device tracking it |
+| Devices | Name, type, status, serial, entity, group, last seen, health | The driver column through the Columns picker |
+| Device page | Overview: device, the small map, health, project and entity assignments | Data: recent positions with curate, deliveries and provenance, log files, Bluetooth; Network: identities, traffic, commands |
 | Alerts, Events | The open alerts and the recent events | Nothing more |
 | Commands | The command timelines | Nothing more |
 | Data explorer, Exports, Dashboards | The data | Nothing more |
-| Network: Traffic, Gateways, Trace explorer | Hidden | The whole section |
+| Network: Traffic, Gateways, Trace explorer | Not in the sidebar; one device's traffic and traces are on its Network tab | Project admins and server admins have the section |
 
 ## Project admin
 
-Everything a viewer sees, plus Rules, Automations, Integrations, Curation and the Project
-admin section (Members, Features, Groups, Notifications, Settings). The technical details
-preference works the same way.
+Everything a viewer sees, plus the Network section (Traffic, Gateways, Trace explorer), Rules,
+Automations, Integrations, Curation and the Project admin section (Members, Features, Groups,
+Notifications, Settings).
 
 ## Server admin
 
 Everything, plus the Server admin section (Needs attention, System health, Traffic, Backup
 and recovery, System alerts, Automations, Notifications, Projects, Users, Devices, Data
-sources, Gateways, Audit, AI policy, catalogues). Server admins start with technical details
-on, since their pages are the machinery; switching it off gives the same operational view a
-ranger has, which is the way to check what a ranger sees.
+sources, Gateways, Audit, AI policy, catalogues). The project pages are the same as a ranger's:
+to check what a ranger sees, sign in as one.
 
 ## Where the machinery lives
 
-- Identities, ports and frames: the device page's Technical details and Network, Traffic.
+- Identities, ports and frames: the device page's Network tab and Network, Traffic.
 - Processing traces: Network, Trace explorer, and the provenance links on a position.
 - Provider fields: the source event dialog reached from traffic rows and provenance links.
 - Gateways: Network, Gateways, the map's Coverage tab and Server admin, Gateways.
