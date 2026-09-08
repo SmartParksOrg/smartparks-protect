@@ -270,6 +270,21 @@ class ConnectApplications(BaseModel):
     )
 
 
+class ApplicationStatus(BaseModel):
+    application_id: str
+    name: str
+    state: str = Field(description="connected, other (posts elsewhere only) or none")
+    urls: list[str] = Field(default_factory=list, description="URLs without their query")
+    headers: list[str] = Field(default_factory=list)
+
+
+class DisconnectApplicationsResult(BaseModel):
+    disconnected: int
+    not_connected: int
+    failed: int
+    applications: list[ApplicationConnection]
+
+
 class ConnectApplicationsResult(BaseModel):
     dry_run: bool = False
     connected: int
@@ -489,6 +504,86 @@ async def test_connection(
             payload["applications"] = applications
             payload["connected"] = sum(1 for a in applications if a["state"] == "connected")
     return ConnectionTestResult(ok=True, detail="The platform answered.", result=payload)
+
+
+@router.get("/{data_source_id}/applications", response_model=list[ApplicationStatus])
+async def list_applications(
+    data_source_id: uuid.UUID,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[ApplicationStatus]:
+    """The platform's applications with whether each posts to this source (decision D132)."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    if not channel_enabled(source.channels, api_channel_key(source.adapter_key)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The API channel of this source is off")
+    status_of = getattr(_management(source), "integration_status", None)
+    if status_of is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "this data source's adapter does not manage its platform's integrations",
+        )
+    try:
+        rows = await status_of(_webhook_base(source))
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"platform unreachable: {error}"
+        ) from error
+    return [ApplicationStatus(**r) for r in rows]
+
+
+@router.post(
+    "/{data_source_id}/disconnect-applications", response_model=DisconnectApplicationsResult
+)
+async def disconnect_applications(
+    data_source_id: uuid.UUID,
+    body: ConnectApplications,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> DisconnectApplicationsResult:
+    """Take this source's webhook out of the given applications' HTTP integrations (D132):
+    only our entries go, other URLs and headers stay."""
+    source = await get_or_404(session, DataSource, data_source_id, "Data source")
+    if not channel_enabled(source.channels, api_channel_key(source.adapter_key)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The API channel of this source is off")
+    disconnect = getattr(_management(source), "disconnect_applications", None)
+    if disconnect is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "this data source's adapter does not manage its platform's integrations",
+        )
+    if not body.application_ids:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "name the applications")
+    try:
+        results = await disconnect(_webhook_base(source), only=set(body.application_ids))
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"platform unreachable: {error}"
+        ) from error
+    applications = [ApplicationConnection(**r) for r in results]
+    counts = {
+        k: sum(1 for a in applications if a.outcome == k)
+        for k in ("disconnected", "not_connected", "failed")
+    }
+    await record_audit(
+        session,
+        user=user,
+        action="data_source.applications_disconnected",
+        object_type="data_source",
+        object_id=str(source.id),
+        details={
+            **counts,
+            "applications": [
+                {"id": a.application_id, "name": a.name, "outcome": a.outcome, "error": a.error}
+                for a in applications
+            ],
+        },
+    )
+    await session.commit()
+    return DisconnectApplicationsResult(**counts, applications=applications)
 
 
 @router.post("/{data_source_id}/connect-applications", response_model=ConnectApplicationsResult)

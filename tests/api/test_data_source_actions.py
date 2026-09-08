@@ -249,3 +249,65 @@ async def test_quick_setup_completes_the_config_on_save(client, db, monkeypatch)
         headers=admin.headers,
     )
     assert chosen.status_code == 200 and seen_only[-1] == {"a1"}
+
+
+async def test_applications_are_listed_and_disconnected(client, db, monkeypatch):
+    """Decision D132: the Applications dialog reads the state per application and takes this
+    source out of the chosen ones."""
+    admin = await actor(client, db, superuser=True)
+    created = await client.post(
+        "/api/v1/data-sources",
+        json={
+            "name": unique_name("ChirpStack apps"),
+            "adapter_key": "chirpstack",
+            "config": {"web_url": "https://cs.example.org", "tenant_id": "t1"},
+            "credentials": {"api_token": "key"},
+            "channels": {"http": True, "api": True},
+        },
+        headers=admin.headers,
+    )
+    assert created.status_code == 201, created.text
+    base = f"/api/v1/data-sources/{created.json()['id']}"
+    seen: dict[str, object] = {}
+
+    async def status(self, base_url):
+        seen["base"] = base_url
+        return [
+            {
+                "application_id": "a1",
+                "name": "one",
+                "state": "connected",
+                "urls": [base_url],
+                "headers": ["X"],
+            },
+            {
+                "application_id": "a2",
+                "name": "two",
+                "state": "other",
+                "urls": ["https://x"],
+                "headers": [],
+            },
+        ]
+
+    async def disconnect(self, base_url, *, only=None):
+        seen["only"] = only
+        return [{"application_id": "a1", "name": "one", "outcome": "disconnected", "urls": []}]
+
+    monkeypatch.setattr(chirpstack.ChirpStackManagement, "integration_status", status)
+    monkeypatch.setattr(chirpstack.ChirpStackManagement, "disconnect_applications", disconnect)
+    listed = await client.get(f"{base}/applications", headers=admin.headers)
+    assert listed.status_code == 200, listed.text
+    assert [(a["name"], a["state"]) for a in listed.json()] == [
+        ("one", "connected"),
+        ("two", "other"),
+    ]
+    assert str(seen["base"]).endswith(created.json()["id"])
+    gone = await client.post(
+        f"{base}/disconnect-applications", json={"application_ids": ["a1"]}, headers=admin.headers
+    )
+    assert gone.status_code == 200, gone.text
+    assert gone.json()["disconnected"] == 1 and seen["only"] == {"a1"}
+    empty = await client.post(
+        f"{base}/disconnect-applications", json={"application_ids": []}, headers=admin.headers
+    )
+    assert empty.status_code == 422

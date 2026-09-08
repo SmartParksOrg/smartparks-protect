@@ -241,6 +241,15 @@ class _ChirpStackCalls:
             f"application {application_id}",
         )
 
+    async def delete_http_integration(self, application_id: str) -> None:
+        await self._unary(
+            "ApplicationService",
+            "DeleteHttpIntegration",
+            api.DeleteHttpIntegrationRequest(application_id=application_id),
+            api.DeleteHttpIntegrationRequest,
+            f"application {application_id}",
+        )
+
     async def enqueue(self, dev_eui: str, payload: bytes, f_port: int, confirmed: bool) -> str:
         request = api.EnqueueDeviceQueueItemRequest(
             queue_item=api.DeviceQueueItem(

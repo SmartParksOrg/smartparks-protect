@@ -1125,6 +1125,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data-sources/{data_source_id}/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Applications
+         * @description The platform's applications with whether each posts to this source (decision D132).
+         */
+        get: operations["list_applications_api_v1_data_sources__data_source_id__applications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-sources/{data_source_id}/disconnect-applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disconnect Applications
+         * @description Take this source's webhook out of the given applications' HTTP integrations (D132):
+         *     only our entries go, other URLs and headers stay.
+         */
+        post: operations["disconnect_applications_api_v1_data_sources__data_source_id__disconnect_applications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/data-sources/{data_source_id}/connect-applications": {
         parameters: {
             query?: never;
@@ -4402,6 +4443,25 @@ export interface components {
             /** Error */
             error?: string | null;
         };
+        /** ApplicationStatus */
+        ApplicationStatus: {
+            /** Application Id */
+            application_id: string;
+            /** Name */
+            name: string;
+            /**
+             * State
+             * @description connected, other (posts elsewhere only) or none
+             */
+            state: string;
+            /**
+             * Urls
+             * @description URLs without their query
+             */
+            urls?: string[];
+            /** Headers */
+            headers?: string[];
+        };
         /** AreaHealth */
         AreaHealth: {
             /** Key */
@@ -6304,6 +6364,17 @@ export interface components {
             external_identities: components["schemas"]["ExternalIdentityRead"][];
             /** Links */
             links?: components["schemas"]["ExternalLink"][];
+        };
+        /** DisconnectApplicationsResult */
+        DisconnectApplicationsResult: {
+            /** Disconnected */
+            disconnected: number;
+            /** Not Connected */
+            not_connected: number;
+            /** Failed */
+            failed: number;
+            /** Applications */
+            applications: components["schemas"]["ApplicationConnection"][];
         };
         /** DriverCatalog */
         DriverCatalog: {
@@ -12861,6 +12932,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConnectionTestResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_applications_api_v1_data_sources__data_source_id__applications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationStatus"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disconnect_applications_api_v1_data_sources__data_source_id__disconnect_applications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectApplications"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisconnectApplicationsResult"];
                 };
             };
             /** @description Validation Error */

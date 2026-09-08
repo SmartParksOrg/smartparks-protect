@@ -21,7 +21,6 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
-  ConnectApplicationsResult,
   DataSource,
   Page as PageType,
   ProjectWithRole,
@@ -47,6 +46,7 @@ import {
   DataSourceForm,
   type AdapterInfo,
 } from "@/components/admin/DataSourceForm";
+import { ApplicationsDialog } from "@/components/admin/ApplicationsDialog";
 import { formatAgo, formatTime } from "@/lib/format";
 
 /** The capability inspector shows what the adapter supports for this account (architecture 8.2). */
@@ -100,11 +100,7 @@ export function DataSourcesPage() {
   } | null>(null);
   const [removing, setRemoving] = useState<DataSource | null>(null);
   const [statusOf, setStatusOf] = useState<DataSource | null>(null);
-  const [ticked, setTicked] = useState<Set<string>>(new Set());
-  const [connectResult, setConnectResult] = useState<{
-    source: DataSource;
-    result: ConnectApplicationsResult;
-  } | null>(null);
+  const [appsOf, setAppsOf] = useState<DataSource | null>(null);
   const navigate = useNavigate();
   const remove = useMutationToast({
     mutationFn: (s: DataSource) => api.delete(`/api/v1/data-sources/${s.id}`),
@@ -143,39 +139,6 @@ export function DataSourcesPage() {
     invalidate: [queryKeys.dataSources],
     success: (r) =>
       `${r.listed} devices listed, ${r.created} new identities (see Needs attention), ${r.updated} refreshed`,
-  });
-  // Connect applications previews first (a dry run, decision D129); Apply writes.
-  const previewApplications = useMutationToast({
-    mutationFn: (s: DataSource) =>
-      api.post<ConnectApplicationsResult>(
-        `/api/v1/data-sources/${s.id}/connect-applications`,
-        { query: { dry_run: true } },
-      ),
-    onSuccess: (result, source) => {
-      setToken(null);
-      setTicked(
-        new Set(
-          result.applications
-            .filter((a) => a.outcome === "connected" || a.outcome === "updated")
-            .map((a) => a.application_id),
-        ),
-      );
-      setConnectResult({ source, result });
-    },
-  });
-  const connectApplications = useMutationToast({
-    mutationFn: (s: DataSource) =>
-      api.post<ConnectApplicationsResult>(
-        `/api/v1/data-sources/${s.id}/connect-applications`,
-        { body: { application_ids: [...ticked] } },
-      ),
-    invalidate: [queryKeys.dataSources],
-    success: (r) =>
-      t(
-        "{{connected}} applications connected, {{updated}} updated, {{already}} already, {{failed}} failed",
-        r,
-      ),
-    onSuccess: (result, source) => setConnectResult({ source, result }),
   });
   const syncGateways = useMutationToast({
     mutationFn: (s: DataSource) =>
@@ -298,8 +261,7 @@ export function DataSourcesPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={previewApplications.isPending}
-                onClick={() => previewApplications.mutate(row.original)}
+                onClick={() => setAppsOf(row.original)}
               >
                 <Link2 className="size-4" /> {t("Connect applications")}
               </Button>
@@ -467,10 +429,11 @@ export function DataSourcesPage() {
                 ?.connects_applications && (
                 <Button
                   variant="outline"
-                  disabled={previewApplications.isPending}
-                  onClick={() =>
-                    token.source && previewApplications.mutate(token.source)
-                  }
+                  onClick={() => {
+                    const src = token.source;
+                    setToken(null);
+                    if (src) setAppsOf(src);
+                  }}
                 >
                   <Link2 className="size-4" /> {t("Connect applications")}
                 </Button>
@@ -479,121 +442,7 @@ export function DataSourcesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={connectResult != null}
-        onOpenChange={(o) => !o && setConnectResult(null)}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {t("Applications of {{name}}", {
-                name: connectResult?.source.name,
-              })}
-            </DialogTitle>
-            <DialogDescription>
-              {connectResult?.result.dry_run
-                ? t(
-                    "Nothing is changed yet. This is what Apply would do on each application's HTTP integration; other URLs and headers stay as they are.",
-                  )
-                : t(
-                    "Every application of the tenant posts its events to this source's webhook from now on; other URLs and headers on the integrations were left as they were.",
-                  )}
-            </DialogDescription>
-          </DialogHeader>
-          {connectResult && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-muted-foreground">
-                  {connectResult.result.dry_run && <th className="w-6 py-1" />}
-                  <th className="py-1">{t("Application")}</th>
-                  <th>
-                    {connectResult.result.dry_run ? t("Would") : t("Outcome")}
-                  </th>
-                  <th>{t("Kept")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {connectResult.result.applications.map((a) => {
-                  const others = (a.urls ?? []).filter(
-                    (u) => !u.includes("/api/v1/ingest/http/"),
-                  ).length;
-                  const changeable =
-                    a.outcome === "connected" || a.outcome === "updated";
-                  return (
-                    <tr key={a.application_id} className="border-t align-top">
-                      {connectResult.result.dry_run && (
-                        <td className="py-1">
-                          <input
-                            type="checkbox"
-                            className="size-4 accent-primary"
-                            aria-label={t("Connect {{name}}", { name: a.name })}
-                            disabled={!changeable}
-                            checked={changeable && ticked.has(a.application_id)}
-                            onChange={(e) =>
-                              setTicked((s) => {
-                                const next = new Set(s);
-                                if (e.target.checked)
-                                  next.add(a.application_id);
-                                else next.delete(a.application_id);
-                                return next;
-                              })
-                            }
-                          />
-                        </td>
-                      )}
-                      <td className="py-1">{a.name}</td>
-                      <td className="py-1">
-                        {a.outcome === "failed" ? (
-                          <span className="text-destructive">
-                            {t("failed")}: {a.error}
-                          </span>
-                        ) : a.outcome === "already" ? (
-                          t("already connected")
-                        ) : a.outcome === "updated" ? (
-                          t("our entry updated to the new token")
-                        ) : (a.before ?? []).length > 0 ? (
-                          t("ours added to the URL list")
-                        ) : (
-                          t("HTTP integration created")
-                        )}
-                      </td>
-                      <td className="py-1 text-xs text-muted-foreground">
-                        {others > 0
-                          ? t("{{count}} other URL", { count: others })
-                          : t("no other URL")}
-                        {(a.headers ?? []).length > 0
-                          ? `, ${t("{{count}} header", { count: (a.headers ?? []).length })}`
-                          : ""}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-          <DialogFooter>
-            {connectResult?.result.dry_run &&
-              connectResult.result.connected + connectResult.result.updated >
-                0 && (
-                <Button
-                  disabled={connectApplications.isPending || ticked.size === 0}
-                  onClick={() =>
-                    connectResult &&
-                    connectApplications.mutate(connectResult.source)
-                  }
-                >
-                  {t("Apply to {{count}} applications", { count: ticked.size })}
-                </Button>
-              )}
-            <Button
-              variant={connectResult?.result.dry_run ? "outline" : "default"}
-              onClick={() => setConnectResult(null)}
-            >
-              {connectResult?.result.dry_run ? t("Cancel") : t("Done")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ApplicationsDialog source={appsOf} onClose={() => setAppsOf(null)} />
       <StatusDialog source={statusOf} onClose={() => setStatusOf(null)} />
       <ConfirmDialog
         open={removing !== null}

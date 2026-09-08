@@ -5203,6 +5203,118 @@
     }
    }
   },
+  "/api/v1/data-sources/{data_source_id}/applications": {
+   "get": {
+    "tags": [
+     "data sources"
+    ],
+    "summary": "List Applications",
+    "description": "The platform's applications with whether each posts to this source (decision D132).",
+    "operationId": "list_applications_api_v1_data_sources__data_source_id__applications_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "data_source_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Data Source Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ApplicationStatus"
+         },
+         "title": "Response List Applications Api V1 Data Sources  Data Source Id  Applications Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/data-sources/{data_source_id}/disconnect-applications": {
+   "post": {
+    "tags": [
+     "data sources"
+    ],
+    "summary": "Disconnect Applications",
+    "description": "Take this source's webhook out of the given applications' HTTP integrations (D132):\nonly our entries go, other URLs and headers stay.",
+    "operationId": "disconnect_applications_api_v1_data_sources__data_source_id__disconnect_applications_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "data_source_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Data Source Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConnectApplications"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DisconnectApplicationsResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/data-sources/{data_source_id}/connect-applications": {
    "post": {
     "tags": [
@@ -18825,6 +18937,45 @@
     ],
     "title": "ApplicationConnection"
    },
+   "ApplicationStatus": {
+    "properties": {
+     "application_id": {
+      "type": "string",
+      "title": "Application Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "state": {
+      "type": "string",
+      "title": "State",
+      "description": "connected, other (posts elsewhere only) or none"
+     },
+     "urls": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Urls",
+      "description": "URLs without their query"
+     },
+     "headers": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Headers"
+     }
+    },
+    "type": "object",
+    "required": [
+     "application_id",
+     "name",
+     "state"
+    ],
+    "title": "ApplicationStatus"
+   },
    "AreaHealth": {
     "properties": {
      "key": {
@@ -24076,6 +24227,37 @@
      "external_identities"
     ],
     "title": "DeviceWithAssignments"
+   },
+   "DisconnectApplicationsResult": {
+    "properties": {
+     "disconnected": {
+      "type": "integer",
+      "title": "Disconnected"
+     },
+     "not_connected": {
+      "type": "integer",
+      "title": "Not Connected"
+     },
+     "failed": {
+      "type": "integer",
+      "title": "Failed"
+     },
+     "applications": {
+      "items": {
+       "$ref": "#/components/schemas/ApplicationConnection"
+      },
+      "type": "array",
+      "title": "Applications"
+     }
+    },
+    "type": "object",
+    "required": [
+     "disconnected",
+     "not_connected",
+     "failed",
+     "applications"
+    ],
+    "title": "DisconnectApplicationsResult"
    },
    "DriverCatalog": {
     "properties": {

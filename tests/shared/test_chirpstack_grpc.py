@@ -114,6 +114,11 @@ class FakeApplicationService:
         self.integrations[request.integration.application_id] = request.integration
         return api.UpdateHttpIntegrationRequest()
 
+    async def DeleteHttpIntegration(self, request, metadata=None, timeout=None):  # noqa: ASYNC109
+        Recorder.calls.append(("DeleteHttpIntegration", request, metadata))
+        self.integrations.pop(request.application_id, None)
+        return api.DeleteHttpIntegrationRequest()
+
 
 class FakeTenantService:
     tenants: ClassVar[list[tuple[str, str]]] = [("t1", "Smart Parks")]
@@ -447,3 +452,41 @@ async def test_grpc_web_transport_frames_status_and_errors():
     assert (
         down.value.code == ErrorCode.CONNECTIVITY_UNAVAILABLE and "HTTP 502" in down.value.message
     )
+
+
+async def test_disconnect_applications_removes_only_our_entries():
+    """Decision D132: our URL leaves the list, others and headers stay; an integration that
+    held only ours is deleted; an application that did not post to us is reported so."""
+    base = "https://protect.example/api/v1/ingest/http/S"
+    FakeApplicationService.applications = [("a1", "ours only"), ("a2", "shared"), ("a3", "theirs")]
+    FakeApplicationService.integrations = {
+        "a1": api.HttpIntegration(application_id="a1", event_endpoint_url=f"{base}?token=t"),
+        "a2": api.HttpIntegration(
+            application_id="a2",
+            headers={"Authorization": "Bearer theirs"},
+            event_endpoint_url=f"https://other.example/hook, {base}?token=t",
+        ),
+        "a3": api.HttpIntegration(
+            application_id="a3", event_endpoint_url="https://other.example/hook"
+        ),
+    }
+    management = ChirpStackManagement(source("grpc://cs:8080"))
+    results = await management.disconnect_applications(base)
+    assert [(r["name"], r["outcome"]) for r in results] == [
+        ("ours only", "disconnected"),
+        ("shared", "disconnected"),
+        ("theirs", "not_connected"),
+    ]
+    assert "a1" not in FakeApplicationService.integrations
+    shared_one = FakeApplicationService.integrations["a2"]
+    assert shared_one.event_endpoint_url == "https://other.example/hook"
+    assert dict(shared_one.headers) == {"Authorization": "Bearer theirs"}
+    assert (
+        FakeApplicationService.integrations["a3"].event_endpoint_url == "https://other.example/hook"
+    )
+    status = await management.integration_status(base)
+    assert [(a["name"], a["state"], a["headers"]) for a in status] == [
+        ("ours only", "none", []),
+        ("shared", "other", ["Authorization"]),
+        ("theirs", "other", []),
+    ]

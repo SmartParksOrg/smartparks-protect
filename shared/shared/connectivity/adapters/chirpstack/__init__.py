@@ -467,7 +467,8 @@ class ChirpStackManagement:
 
     async def integration_status(self, base_url: str) -> list[dict[str, Any]]:
         """Per application: whether its HTTP integration posts to this webhook (`connected`),
-        to other URLs only (`other`), or nowhere (`none`), for Test connection (D126)."""
+        to other URLs only (`other`), or nowhere (`none`), with the other URLs and the header
+        names, for Test connection and the Applications dialog (D126, D132)."""
         results: list[dict[str, Any]] = []
         for application in await self.list_applications():
             application_id = str(application["id"])
@@ -483,8 +484,50 @@ class ChirpStackManagement:
                     "name": application.get("name") or application_id,
                     "state": endpoint_state((current or {}).get("eventEndpointUrl"), base_url),
                     "urls": [u.split("?", 1)[0] for u in urls],
+                    "headers": sorted(((current or {}).get("headers") or {}).keys()),
                 }
             )
+        return results
+
+    async def disconnect_applications(
+        self, base_url: str, *, only: set[str] | None = None
+    ) -> list[dict[str, Any]]:
+        """Take this webhook out of the applications' HTTP integrations (D132): our entries
+        leave the URL list, the other URLs and the headers stay; an integration that held
+        only ours is deleted. Per application: `disconnected`, `not_connected` or `failed`."""
+        results: list[dict[str, Any]] = []
+        for application in await self.list_applications():
+            application_id = str(application["id"])
+            if only is not None and application_id not in only:
+                continue
+            entry: dict[str, Any] = {
+                "application_id": application_id,
+                "name": application.get("name") or application_id,
+            }
+            try:
+                current = await self.grpc.get_http_integration(application_id)
+                entries = [
+                    e.strip()
+                    for e in str((current or {}).get("eventEndpointUrl") or "").split(",")
+                    if e.strip()
+                ]
+                remaining = [e for e in entries if e.split("?", 1)[0] != base_url]
+                if current is None or len(remaining) == len(entries):
+                    entry.update(outcome="not_connected", urls=entries)
+                elif remaining:
+                    await self.grpc.update_http_integration(
+                        application_id,
+                        ",".join(remaining),
+                        dict(current.get("headers") or {}),
+                        str(current.get("encoding") or "JSON"),
+                    )
+                    entry.update(outcome="disconnected", urls=remaining)
+                else:
+                    await self.grpc.delete_http_integration(application_id)
+                    entry.update(outcome="disconnected", urls=[])
+            except ApplicationError as error:
+                entry.update(outcome="failed", error=str(error))
+            results.append(entry)
         return results
 
 
