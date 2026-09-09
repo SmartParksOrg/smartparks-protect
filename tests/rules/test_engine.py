@@ -182,8 +182,9 @@ async def test_broken_rule_is_isolated_and_recorded(db, bus, world):
         world.project,
         {
             "trigger": {"kind": "measurement", "metric_key": "battery_voltage"},
-            "conditions": {"type": "near", "meters": 5},
-            "event": {"event_type": "NEAR", "title": "x"},
+            # a reserved type the evaluator refuses (near is real since phase 19)
+            "conditions": {"type": "dwell", "seconds": 5},
+            "event": {"event_type": "DWELL", "title": "x"},
         },
         name="broken",
     )
@@ -197,7 +198,7 @@ async def test_broken_rule_is_isolated_and_recorded(db, bus, world):
     assert [e.event_type for e in await _events(db, world)] == ["BATTERY_LOW"]
     await db.refresh(broken)
     await db.refresh(good)
-    assert broken.last_error and "near" in broken.last_error
+    assert broken.last_error and "dwell" in broken.last_error
     assert good.last_error is None
     failed = await db.scalar(
         select(ProcessingTrace).where(
