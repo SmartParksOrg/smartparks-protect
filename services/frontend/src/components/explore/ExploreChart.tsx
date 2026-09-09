@@ -305,27 +305,34 @@ function buildOption(
     bottom: phone ? 28 : 56,
     containLabel: false,
   };
-  // a value axis around the data with a little air, rounded to a clean step, and never zoomed
-  // into a flat series: a battery that moves a hundredth of a volt stays a flat line, not a
-  // wall
+  // a value axis that hugs the data (Tim, 2026-09-09: the detail matters, a battery between
+  // 4.09 and 4.12 V fills the graph), with a little air, rounded to a clean step; a constant
+  // series gets a sliver of range so it still draws as a line
   const bounds = (extent: { min: number; max: number }): [number, number] => {
-    const pad = Math.max(
-      (extent.max - extent.min) * 0.08,
-      Math.abs(extent.max || extent.min || 1) * 0.02,
-    );
-    const low = extent.min - pad;
-    const high = extent.max + pad;
-    // a nice tick interval (1, 2 or 5 times a power of ten) for about five ticks, so the
-    // bounds are ticks themselves and no edge label doubles a tick label
-    const raw = (high - low) / 5;
-    const magnitude = 10 ** Math.floor(Math.log10(raw));
-    const normal = raw / magnitude;
-    const interval =
-      magnitude * (normal < 1.5 ? 1 : normal < 3 ? 2 : normal < 7 ? 5 : 10);
-    return [
-      Math.floor(low / interval) * interval,
-      Math.ceil(high / interval) * interval,
-    ];
+    const spread = extent.max - extent.min;
+    const pad =
+      spread > 0
+        ? spread * 0.08
+        : Math.abs(extent.max || extent.min || 1) * 0.005;
+    // ECharts splits the axis into about five nice steps (1, 2, 3, 5 or 10 times a power of
+    // ten); the bounds settle on multiples of that step, so no edge label sits off the grid
+    const nice = (v: number) => {
+      const e = 10 ** Math.floor(Math.log10(v));
+      const f = v / e;
+      return e * (f < 1.5 ? 1 : f < 2.5 ? 2 : f < 4 ? 3 : f < 7 ? 5 : 10);
+    };
+    const tidy = (v: number) => Number(v.toFixed(10));
+    let low = extent.min - pad;
+    let high = extent.max + pad;
+    for (let i = 0; i < 4; i++) {
+      const step = nice((high - low) / 5);
+      const nextLow = tidy(Math.floor(low / step) * step);
+      const nextHigh = tidy(Math.ceil(high / step) * step);
+      if (nextLow === low && nextHigh === high) break;
+      low = nextLow;
+      high = nextHigh;
+    }
+    return [low, high];
   };
   const valueAxis = {
     type: "value",
