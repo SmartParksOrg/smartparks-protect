@@ -203,3 +203,80 @@ async def test_records_before_the_assignment_are_repaired_by_moving_the_start(cl
         "project_assignment.start_moved",
         "entity_assignment.start_moved",
     }
+
+
+async def test_records_inside_an_assignment_without_an_entity_are_repaired(client, db, bus):
+    """The gap seen on the dev server on 2026-09-09: records decoded before the entity
+    assignment existed, under the code of that day, carry no entity although they fall inside
+    the assignment. The reattribute action rewrites them from the assignments as they stand."""
+    from sqlalchemy import select, update
+
+    from shared.models import Measurement, Position
+
+    admin, project, _device_type, device = await _device_with_early_records(client, db, bus)
+    h = admin.headers
+    entity_type = (
+        await client.post(
+            "/api/v1/entity-types",
+            json={
+                "key": unique_name("et").replace("-", "_"),
+                "label": "Animal",
+                "group_key": "tracked",
+                "icon_key": "wildlife.rhino",
+            },
+            headers=h,
+        )
+    ).json()
+    entity = (
+        await client.post(
+            f"/api/v1/projects/{project.id}/entities",
+            json={"entity_type_id": entity_type["id"], "name": "Cow 2081"},
+            headers=h,
+        )
+    ).json()
+    assigned = await client.post(
+        f"/api/v1/devices/{device['id']}/project-assignments",
+        json={"project_id": str(project.id), "valid_from": "2026-05-01T00:00:00+00:00"},
+        headers=h,
+    )
+    assert assigned.status_code == 201, assigned.text
+    tracked = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": device["id"],
+            "entity_id": entity["id"],
+            "valid_from": "2026-05-01T00:00:00+00:00",
+        },
+        headers=h,
+    )
+    assert tracked.status_code == 201, tracked.text
+    # the gap: the rows lose their entity as if decoded before the assignment existed
+    device_id = uuid.UUID(device["id"])
+    for model in (Position, Measurement):
+        await db.execute(update(model).where(model.device_id == device_id).values(entity_id=None))
+    await db.commit()
+    without = await db.scalar(
+        select(Position).where(Position.device_id == device_id, Position.entity_id.is_(None))
+    )
+    assert without is not None
+    repaired = await client.post(f"/api/v1/devices/{device['id']}/reattribute", json={}, headers=h)
+    assert repaired.status_code == 200, repaired.text
+    body = repaired.json()
+    assert body["reattributed"]["positions"] == 3 and body["reattributed"]["measurements"] == 3
+    assert body["valid_from"].startswith("2026-05-03T10:00:00")
+    db.expire_all()
+    left = (
+        await db.scalars(
+            select(Position).where(Position.device_id == device_id, Position.entity_id.is_(None))
+        )
+    ).all()
+    assert left == []
+    # a member who is not a project admin is refused
+    from shared.enums import Role
+    from tests.api.conftest import project_actor
+
+    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    refused = await client.post(
+        f"/api/v1/devices/{device['id']}/reattribute", json={}, headers=viewer.headers
+    )
+    assert refused.status_code == 403

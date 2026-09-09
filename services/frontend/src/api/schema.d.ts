@@ -786,6 +786,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/reattribute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reattribute Device
+         * @description Recompute the project and entity of the device's records over a window from its
+         *     assignments as they stand (decision D103): the repair for records that were decoded before
+         *     an assignment existed and so carry none, found on the dev server on 2026-09-09. Project
+         *     admins of the device's current project, or a server admin.
+         */
+        post: operations["reattribute_device_api_v1_devices__device_id__reattribute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/project-assignments/{assignment_id}/extend-start": {
         parameters: {
             query?: never;
@@ -8990,6 +9013,35 @@ export interface components {
             /** Items */
             items: components["schemas"]["QueueItem"][];
         };
+        /**
+         * ReattributeRequest
+         * @description Recompute the project and entity of a device's records over a window from its
+         *     assignments as they stand (decision D103): the repair for records decoded before an
+         *     assignment existed. The window defaults to the device's first data until now.
+         */
+        ReattributeRequest: {
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+        };
+        /** ReattributeResult */
+        ReattributeResult: {
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /**
+             * Valid To
+             * Format: date-time
+             */
+            valid_to: string;
+            /** Reattributed */
+            reattributed: {
+                [key: string]: number;
+            };
+        };
         /** ReceptionRead */
         ReceptionRead: {
             /** Gateway Id */
@@ -12319,6 +12371,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceDataSpan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reattribute_device_api_v1_devices__device_id__reattribute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReattributeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReattributeResult"];
                 };
             };
             /** @description Validation Error */

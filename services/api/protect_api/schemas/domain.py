@@ -323,6 +323,26 @@ class ProjectAssignmentExtended(ProjectAssignmentRead):
     reattributed: dict[str, int]
 
 
+class ReattributeRequest(BaseModel):
+    """Recompute the project and entity of a device's records over a window from its
+    assignments as they stand (decision D103): the repair for records decoded before an
+    assignment existed. The window defaults to the device's first data until now."""
+
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+
+    @field_validator("valid_from", "valid_to")
+    @classmethod
+    def _aware(cls, value: datetime | None) -> datetime | None:
+        return require_aware(value) if value is not None else None
+
+
+class ReattributeResult(BaseModel):
+    valid_from: datetime
+    valid_to: datetime
+    reattributed: dict[str, int]
+
+
 class EntityAssignmentExtended(EntityAssignmentRead):
     reattributed: dict[str, int]
 

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, MapPin, Table2 } from "lucide-react";
+import { ExternalLink, MapPin, RefreshCw, Table2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -137,6 +137,15 @@ export function DevicePage() {
     success: t(
       "Assignment extended; the earlier records now belong to the entity",
     ),
+  });
+  const recompute = useMutationToast({
+    mutationFn: () =>
+      api.post<{ reattributed: { positions: number; measurements: number } }>(
+        `/api/v1/devices/${deviceId}/reattribute`,
+        { body: {} },
+      ),
+    invalidate: [...repairInvalidate, ["projects", projectId ?? "", "records"]],
+    success: t("Attribution recomputed over the device's assignments"),
   });
   const d = device.data;
   const type = types.data?.items.find((t) => t.id === d?.device_type_id);
@@ -459,7 +468,21 @@ export function DevicePage() {
           </TabsContent>
           <TabsContent value="data">
             {projectId && (
-              <div className="mb-3 flex justify-end">
+              <div className="mb-3 flex flex-wrap justify-end gap-2">
+                {mayRepair && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title={t(
+                      "Give every record its project and entity again from the assignments as they stand, for records decoded before an assignment existed",
+                    )}
+                    onClick={() => recompute.mutate()}
+                    disabled={recompute.isPending}
+                  >
+                    <RefreshCw className="size-4" />{" "}
+                    {t("Recompute attribution")}
+                  </Button>
+                )}
                 <Button asChild variant="outline" size="sm">
                   <Link
                     to={recordsHref(projectId, {

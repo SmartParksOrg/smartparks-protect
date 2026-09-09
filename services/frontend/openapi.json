@@ -3738,6 +3738,65 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/reattribute": {
+   "post": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Reattribute Device",
+    "description": "Recompute the project and entity of the device's records over a window from its\nassignments as they stand (decision D103): the repair for records that were decoded before\nan assignment existed and so carry none, found on the dev server on 2026-09-09. Project\nadmins of the device's current project, or a server admin.",
+    "operationId": "reattribute_device_api_v1_devices__device_id__reattribute_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReattributeRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReattributeResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/project-assignments/{assignment_id}/extend-start": {
    "post": {
     "tags": [
@@ -32095,6 +32154,65 @@
      "items"
     ],
     "title": "QueueState"
+   },
+   "ReattributeRequest": {
+    "properties": {
+     "valid_from": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid From"
+     },
+     "valid_to": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valid To"
+     }
+    },
+    "type": "object",
+    "title": "ReattributeRequest",
+    "description": "Recompute the project and entity of a device's records over a window from its\nassignments as they stand (decision D103): the repair for records decoded before an\nassignment existed. The window defaults to the device's first data until now."
+   },
+   "ReattributeResult": {
+    "properties": {
+     "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Valid From"
+     },
+     "valid_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Valid To"
+     },
+     "reattributed": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Reattributed"
+     }
+    },
+    "type": "object",
+    "required": [
+     "valid_from",
+     "valid_to",
+     "reattributed"
+    ],
+    "title": "ReattributeResult"
    },
    "ReceptionRead": {
     "properties": {

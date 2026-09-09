@@ -36,6 +36,8 @@ from protect_api.schemas.domain import (
     ProjectAssignmentCreate,
     ProjectAssignmentExtended,
     ProjectAssignmentRead,
+    ReattributeRequest,
+    ReattributeResult,
     RecordCounts,
 )
 from protect_api.serial import fill_serial_from_identity
@@ -43,7 +45,7 @@ from shared.config import get_settings
 from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
-from shared.domain.assignments import reattribute
+from shared.domain.assignments import reattribute, resolve_attribution
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
 from shared.enums import DeviceStatus, Role
@@ -787,6 +789,46 @@ async def device_data_span(
         clock_ahead=ahead,
         clock_ahead_until=ahead_until,
     )
+
+
+@router.post("/{device_id}/reattribute", response_model=ReattributeResult)
+async def reattribute_device(
+    device_id: uuid.UUID,
+    body: ReattributeRequest,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> ReattributeResult:
+    """Recompute the project and entity of the device's records over a window from its
+    assignments as they stand (decision D103): the repair for records that were decoded before
+    an assignment existed and so carry none, found on the dev server on 2026-09-09. Project
+    admins of the device's current project, or a server admin."""
+    device = await get_or_404(session, Device, device_id, "Device")
+    attribution = await resolve_attribution(session, device.id, utc_now())
+    if not user.is_superuser:
+        if attribution.project_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
+        await _require_project_admin(session, user, attribution.project_id)
+    now = utc_now()
+    start = body.valid_from or await _first_data_at(session, device.id)
+    if start is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The device has no data yet")
+    end = body.valid_to or now
+    if end <= start:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "valid_to must be after valid_from"
+        )
+    counts = await reattribute(session, device.id, start, end)
+    await record_audit(
+        session,
+        user=user,
+        action="device.reattributed",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=attribution.project_id,
+        details={"from": start.isoformat(), "to": end.isoformat(), "reattributed": counts},
+    )
+    await session.commit()
+    return ReattributeResult(valid_from=start, valid_to=end, reattributed=counts)
 
 
 @router.post(

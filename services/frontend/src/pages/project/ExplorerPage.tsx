@@ -341,7 +341,10 @@ export function ExplorerPage() {
     if (state.chart === "scatter") {
       const y = metricsOnChart[0];
       const x = state.xMetric ?? metricsOnChart[1] ?? y;
-      const group = x && y ? scatterGroup(records.rows, x, y, columns) : null;
+      const group =
+        x && y
+          ? scatterGroup(records.rows, x, y, columns, state.entities)
+          : null;
       return group ? [group] : [];
     }
     if (aggregated)
@@ -353,7 +356,7 @@ export function ExplorerPage() {
             state.aggregates[0] ?? "mean",
           )
         : [];
-    return chartGroups(records.rows, metricsOnChart, columns);
+    return chartGroups(records.rows, metricsOnChart, columns, state.entities);
   }, [
     state.chart,
     state.xMetric,
@@ -365,6 +368,7 @@ export function ExplorerPage() {
     records.rows,
     metricsOnChart,
     columns,
+    state.entities,
   ]);
   const tracks = useMemo<TrackLayer[]>(() => {
     if (aggregated)
@@ -374,8 +378,8 @@ export function ExplorerPage() {
         geometry: track.geometry as unknown as GeoJSON.Geometry,
         times: track.times,
       }));
-    return tracksOf(records.rows);
-  }, [aggregated, trackReads.data, records.rows]);
+    return tracksOf(records.rows, state.entities);
+  }, [aggregated, trackReads.data, records.rows, state.entities]);
 
   const [drawerHeight, setDrawerHeight] = usePreference<number>(
     "explore_drawer_height",

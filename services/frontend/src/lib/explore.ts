@@ -131,11 +131,23 @@ export interface ChartGroup {
   series: ChartSeries[];
 }
 
-function ownerOf(row: RecordRow): { id: string; name: string } {
-  const id = row.entity_id ?? row.device_id;
+/** Whose line a record draws on (Tim, 2026-09-09: the perspective follows the selection): the
+ * entity when that entity was selected, else the device. A selected collar is one line whatever
+ * animals it tracked; a selected animal one line whatever collars tracked it. */
+function ownerOf(
+  row: RecordRow,
+  entities: ReadonlySet<string>,
+): { id: string; name: string; kind: "entity" | "device" } {
+  if (row.entity_id && entities.has(row.entity_id))
+    return {
+      id: row.entity_id,
+      name: row.entity_name ?? row.entity_id.slice(0, 8),
+      kind: "entity",
+    };
   return {
-    id,
-    name: row.entity_name ?? row.device_name ?? row.device_id.slice(0, 8),
+    id: row.device_id,
+    name: row.device_name ?? row.device_id.slice(0, 8),
+    kind: "device",
   };
 }
 
@@ -150,7 +162,9 @@ export function chartGroups(
   rows: RecordRow[],
   metrics: string[],
   columns: RecordColumn[],
+  selectedEntities: readonly string[] = [],
 ): ChartGroup[] {
+  const entities = new Set(selectedEntities);
   const byKey = new Map(columns.map((c) => [c.key, c]));
   const groups: ChartGroup[] = [];
   for (const metric of metrics) {
@@ -160,7 +174,7 @@ export function chartGroups(
     for (const row of rows) {
       const value = numberOf(cellOf(row, column));
       if (value === null) continue;
-      const owner = ownerOf(row);
+      const owner = ownerOf(row, entities);
       let s = series.get(owner.id);
       if (!s) {
         s = { ownerId: owner.id, name: owner.name, data: [] };
@@ -185,7 +199,9 @@ export function scatterGroup(
   xMetric: string,
   yMetric: string,
   columns: RecordColumn[],
+  selectedEntities: readonly string[] = [],
 ): ChartGroup | null {
+  const entities = new Set(selectedEntities);
   const byKey = new Map(columns.map((c) => [c.key, c]));
   const x = byKey.get(`m:${xMetric}`);
   const y = byKey.get(`m:${yMetric}`);
@@ -195,7 +211,7 @@ export function scatterGroup(
     const xv = numberOf(cellOf(row, x));
     const yv = numberOf(cellOf(row, y));
     if (xv === null || yv === null) continue;
-    const owner = ownerOf(row);
+    const owner = ownerOf(row, entities);
     let s = series.get(owner.id);
     if (!s) {
       s = { ownerId: owner.id, name: owner.name, data: [] };
@@ -278,8 +294,13 @@ export function nearestRowTime(rows: RecordRow[], ms: number): string | null {
   return best.time;
 }
 
-/** The tracks of the loaded rows: one per owner (the entity, else the device), oldest first. */
-export function tracksOf(rows: RecordRow[]): TrackLayer[] {
+/** The tracks of the loaded rows: one per owner (the selected entity, else the device),
+ * oldest first. */
+export function tracksOf(
+  rows: RecordRow[],
+  selectedEntities: readonly string[] = [],
+): TrackLayer[] {
+  const entities = new Set(selectedEntities);
   const byOwner = new Map<
     string,
     { kind: "entity" | "device"; coordinates: number[][]; times: string[] }
@@ -287,11 +308,11 @@ export function tracksOf(rows: RecordRow[]): TrackLayer[] {
   for (let i = rows.length - 1; i >= 0; i--) {
     const row = rows[i];
     if (!row.position) continue;
-    const owner = ownerOf(row);
+    const owner = ownerOf(row, entities);
     let track = byOwner.get(owner.id);
     if (!track) {
       track = {
-        kind: row.entity_id ? "entity" : "device",
+        kind: owner.kind,
         coordinates: [],
         times: [],
       };

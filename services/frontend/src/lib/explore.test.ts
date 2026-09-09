@@ -134,6 +134,40 @@ describe("explore data", () => {
     expect(axisIndexOf(groups[1], units)).toBe(1);
     expect(unitAxes([])).toEqual([]);
   });
+  it("draws from the perspective of what was selected", () => {
+    const tracked = [
+      {
+        ...row("2026-04-01T03:00:00Z", "a", { battery_voltage: 3.8 }),
+        entity_id: "e1",
+        entity_name: "Rhino",
+      },
+      {
+        ...row("2026-04-01T04:00:00Z", "a", { battery_voltage: 3.7 }),
+        entity_id: null,
+      },
+      {
+        ...row("2026-04-01T05:00:00Z", "b", { battery_voltage: 3.6 }),
+        entity_id: "e1",
+        entity_name: "Rhino",
+      },
+    ];
+    // the collar selected: one line named after it, whatever it tracked
+    const byDevice = chartGroups(tracked, ["battery_voltage"], columns);
+    expect(
+      byDevice[0].series.map((s) => [s.ownerId, s.name, s.data.length]),
+    ).toEqual([
+      ["a", "dev-a", 2],
+      ["b", "dev-b", 1],
+    ]);
+    // the animal selected: one line for it across both collars, the unassigned record apart
+    const byEntity = chartGroups(tracked, ["battery_voltage"], columns, ["e1"]);
+    expect(
+      byEntity[0].series.map((s) => [s.ownerId, s.name, s.data.length]),
+    ).toEqual([
+      ["e1", "Rhino", 2],
+      ["a", "dev-a", 1],
+    ]);
+  });
   it("pairs two metrics of the same moment for a scatter", () => {
     const group = scatterGroup(ROWS, "gnss_fix", "battery_voltage", columns)!;
     expect(group.series.map((s) => s.data)).toEqual([

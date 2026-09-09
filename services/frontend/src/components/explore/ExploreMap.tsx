@@ -169,7 +169,7 @@ export function ExploreMap({
         )}
       </div>
       {/* the time slider (decision D153): its moment is the marked one, released it pins */}
-      <div className="absolute right-14 bottom-9 left-3 z-10 flex items-center gap-3 rounded-md border bg-card/95 px-3 py-2 text-xs shadow">
+      <div className="absolute right-11 bottom-2 left-[7.25rem] z-10 flex items-center gap-3 rounded-md border bg-card/95 px-3 py-1.5 text-xs shadow">
         <span className="hidden whitespace-nowrap text-muted-foreground sm:inline">
           {formatInZone(window.from, timezone)}
         </span>
