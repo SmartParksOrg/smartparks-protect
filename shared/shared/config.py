@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
 
     database_url: str = Field(description="SQLAlchemy async URL, postgresql+asyncpg://...")
+    statement_timeout_seconds: int = Field(
+        default=0,
+        ge=0,
+        description="PostgreSQL statement_timeout for this process's connections; 0 is none. "
+        "The API runs with 120 (decision D147, the proxy's patience), the workers unbounded.",
+    )
     redis_url: str = Field(description="redis://:password@host:port/db")
 
     minio_endpoint: str = Field(description="host:port of the MinIO API, without scheme")

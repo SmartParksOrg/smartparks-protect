@@ -17,6 +17,7 @@ import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
+import { LoadMore } from "@/components/data/LoadMore";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { usePages } from "@/hooks/usePages";
 import { useNow } from "@/hooks/useNow";
 import { formatAgo, formatTime } from "@/lib/format";
 
@@ -112,7 +114,7 @@ export function AdminDevicesPage() {
   const navigate = useNavigate();
   const managing = params.get("device");
   const [q, setQ] = useState("");
-  const devices = useQuery({ queryKey: queryKeys.devices({ q }), queryFn: () => api.get<PageType<Device>>("/api/v1/devices", { query: { q: q || undefined, limit: 500 } }), placeholderData: (previous) => previous });
+  const devices = usePages<Device>({ queryKey: queryKeys.devices({ q }), fetchPage: (cursor) => api.get<PageType<Device>>("/api/v1/devices", { query: { q: q || undefined, limit: 500, cursor } }), keepPrevious: true });
   const types = useQuery({ queryKey: queryKeys.deviceTypes, queryFn: () => api.get<PageType<DeviceType>>("/api/v1/device-types", { query: { limit: 500 } }) });
   const typeById = new Map(types.data?.items.map((t) => [t.id, t]));
   const [open, setOpen] = useState(false);
@@ -148,7 +150,7 @@ export function AdminDevicesPage() {
       </>} />
       <Page>
         <Callout kind="info">{t("CSV columns: device_name, external_identifier, device_type, datasource, project, effective_from (ISO 8601 with offset), entity (optional). All rows or none.")}</Callout>
-        <DataTable columns={columns} columnsKey="admin-devices" defaultHidden={["Created"]} data={devices.data?.items} searchable onSearchChange={setQ} footer={devices.data?.next_cursor ? t("Only the first 500 rows are shown. Search to find the rest.") : undefined} isLoading={devices.isPending} onRowClick={(d) => setParams({ device: d.id })} />
+        <DataTable columns={columns} columnsKey="admin-devices" defaultHidden={["Created"]} data={devices.items} searchable onSearchChange={setQ} footer={<LoadMore count={devices.items.length} hasMore={devices.hasMore} isLoading={devices.isLoadingMore} onLoadMore={devices.loadMore} />} isLoading={devices.isPending} onRowClick={(d) => setParams({ device: d.id })} />
       </Page>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

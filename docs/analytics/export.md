@@ -8,19 +8,26 @@ Both paths take the same parameters, as a JSON body for jobs and as query parame
 
 | Parameter | Meaning |
 | --- | --- |
-| `dataset` | `positions`, `measurements` (normalized), `source_events` (raw inbound messages with payload), `aggregates` (the Data Explorer series), `movebank_events` or `movebank_reference` (see Movebank below). |
+| `dataset` | `records` (one row per moment of a device with its position, measurements and state, see below), `positions`, `measurements` (normalized), `source_events` (raw inbound messages with payload), `aggregates` (the Data explorer series), `movebank_events` or `movebank_reference` (see Movebank below). |
 | `format` | `csv`, `xlsx`, `json`; positions also `geojson` and `gpx`. |
 | `time_from`, `time_to` | Required, with offset. Source events are selected on `ingested_at`, everything else on the device time. |
 | `entity_ids`, `device_ids`, `metric_keys`, `data_source_id` | Filters. Source events are per device and refuse `entity_ids`. |
 | `timezone` | IANA name, default `UTC`. Times in the file are written in this zone with their offset. |
 | `include_names` | Adds entity, device and metric names and units as columns (default on). |
-| `bucket`, `aggregates`, `group_by`, `layout` | Aggregates only; same meaning as in the Data Explorer, layout `long` or `wide`. |
+| `bucket`, `aggregates`, `group_by`, `layout` | Aggregates only; same meaning as in the Data explorer, layout `long` or `wide`. A bucket too fine for the range becomes the finest that fits (decision D148). |
+| `records_layout` | Records only: `wide` (default, one row per moment with a column per metric `m_<key>` and per state field `s_<key>`) or `long` (one row per value). |
+
+## Records
+
+The `records` dataset is the records view of the Data explorer as a file (phase 20, decision D144): the selection needs at least one entity or device, and every moment they produced in the window becomes a row, oldest first, with the effective time, the entity and device, the position of the moment where there is one, and the measurements and state fields of that moment. The wide layout learns its metric and state columns from the selection before the first row is written; the long layout writes one row per value. The direct path and the job read the same statement and the same bound: the count of the moments decides.
+
+In the app the export dialog starts from the records view's selection, counts first, downloads directly under the bound and above it starts the job by itself and shows its progress and the download inline. The person asked for the data, not for a choice of mechanism.
 
 ## Direct download
 
 `GET /api/v1/projects/{project_id}/exports/direct?dataset=positions&format=gpx&time_from=...&time_to=...`
 
-Streams the file. The row count is checked first; above 100,000 rows the answer is 413 with the advice to create a job (architecture 13.8). XLSX is assembled in a temporary file because the format is complete only at the end; every other format streams as it is written.
+Streams the file. The row count is checked first; above 100,000 rows the answer is 413 with the advice to create a job (architecture 13.8), and the app's export dialog then creates the job by itself. XLSX is assembled in a temporary file because the format is complete only at the end; every other format streams as it is written.
 
 ## Jobs
 

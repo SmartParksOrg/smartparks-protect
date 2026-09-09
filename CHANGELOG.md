@@ -8,10 +8,19 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - 0023 (export jobs accept the `records` dataset): the check constraint gains the value; the downgrade deletes records jobs and restores the old constraint.
 
+### Upgrade notes
+
+- The API's database connections carry a PostgreSQL statement timeout of 120 s (decision D147): `API_STATEMENT_TIMEOUT_SECONDS` in `.env` (`api_statement_timeout_seconds` in the Ansible host vars), 0 for none. A request the proxy has given up on no longer runs on in the database. The workers are not affected.
+
 ### Added
 
 - The records view of the Data explorer (phase 20, decisions D142 to D146): the explorer opens on a Records tab where a person picks entities and devices (several, a group as a shortcut), a period (the presets, a custom range, or since the device was assigned) and the timezone, and gets everything they produced as one row per moment with the position and every metric and state field of that moment, newest first. The rows load page after page with a progress bar against the count and a Stop button, in a virtualized table that scrolls a year of a collar as one list; a "Charts and map" toggle adds a small chart per numeric column (click to enlarge) and the loaded track on a small map, a row opens its source event, the columns can be hidden per user, and "Analyse these" carries the selection into the Analysis tab, which is today's explorer. `GET /projects/{id}/records` and `/records/count`, paged on a time and device cursor, in the all scope too.
 - The records export (decision D144): a Records dataset in CSV, XLSX and JSON, wide (a column per metric and state field) or long (a row per value), with entities and devices as the selection; started from the records view with its selection, and when a direct download is too large the dialog starts the job by itself and shows its progress and the download inline.
+- Links land in the records view (decision D145): "All records" on the Data tab of the entity and device pages (at the moment a track point linked to, when there is one), "Every record at this time" on the map's track point panel, and a Data button on the entity and device hits of the search palette. A link with a moment opens the twelve hours around it with that row marked and scrolled into view.
+
+### Changed
+
+- The limits answer instead of refusing (decisions D148 and D149). A bucket too fine for the range answers with the finest bucket that fits and a note; more entities or devices than fit under 20 series answer with the first that fit by name and a note that says how many there are; grouping by device without a filter covers the devices assigned to the project today. The rows behind a bucket, the entity, device and group lists and the server admin's device list load the next page on "Load more" instead of stopping at the first 500 rows with a note to search. The rule test says that its list holds the first 500 events while the counts cover them all.
 
 ## v2.3.0, 2026-09-09
 

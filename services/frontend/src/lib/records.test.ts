@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { RecordRow } from "@/api/types";
 import {
+  inputValue,
+  recordsHref,
   cellOf,
   columnsOf,
   readRecordsState,
@@ -60,6 +62,7 @@ describe("records state", () => {
       from: "2026-04-01T00:00",
       to: "2026-04-02T00:00",
       timezone: "UTC",
+      at: null,
     });
     expect(writeRecordsState(state).toString()).toBe(
       "mode=records&entity=e1&entity=e2&device=d1&range=custom&from=2026-04-01T00%3A00&to=2026-04-02T00%3A00&tz=UTC",
@@ -157,5 +160,41 @@ describe("records columns", () => {
     expect(seriesOf(rows, battery)).toEqual([
       { time: "2026-04-01T12:00:00Z", value: 3.8 },
     ]);
+  });
+});
+
+describe("records links", () => {
+  it("lands on the twelve hours around a moment with the row marked", () => {
+    const href = recordsHref("p1", {
+      devices: ["d1"],
+      at: "2026-09-04T12:00:00.000Z",
+    });
+    const params = new URLSearchParams(href.split("?")[1]);
+    expect(href.startsWith("/projects/p1/analyze/explorer?")).toBe(true);
+    expect(params.get("mode")).toBe("records");
+    expect(params.getAll("device")).toEqual(["d1"]);
+    expect(params.get("range")).toBe("custom");
+    expect(params.get("from")).toBe("2026-09-04T00:00:00.000Z");
+    expect(params.get("to")).toBe("2026-09-05T00:00:00.000Z");
+    expect(params.get("at")).toBe("2026-09-04T12:00:00.000Z");
+  });
+  it("takes the last 30 days without a moment, and ignores a bad one", () => {
+    const params = new URLSearchParams(
+      recordsHref("p1", { entities: ["e1"], at: "yesterday" }).split("?")[1],
+    );
+    expect(params.get("range")).toBe("30d");
+    expect(params.get("at")).toBeNull();
+    expect(params.getAll("entity")).toEqual(["e1"]);
+  });
+});
+
+describe("records inputs", () => {
+  it("shows an input's own value and a zoned time as a local minute", () => {
+    expect(inputValue(null)).toBe("");
+    expect(inputValue("2026-04-01T00:00")).toBe("2026-04-01T00:00");
+    expect(inputValue("2026-04-01T00:00:00.000Z")).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/,
+    );
+    expect(inputValue("xZ")).toBe("");
   });
 });

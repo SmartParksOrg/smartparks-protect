@@ -71,6 +71,17 @@ class Resolution:
     key: str
     width: timedelta
     automatic: bool
+    # the bucket the caller asked for when it was too fine and a coarser one answers (D148)
+    requested: str | None = None
+
+    @property
+    def note(self) -> str | None:
+        if self.requested is None:
+            return None
+        return (
+            f"Bucket {self.requested} gives more than {MAX_BUCKETS} points over this range; "
+            f"shown per {self.key}"
+        )
 
     @property
     def seconds(self) -> int:
@@ -79,23 +90,18 @@ class Resolution:
 
 def choose_resolution(time_from: datetime, time_to: datetime, bucket: str | None) -> Resolution:
     """Smallest ladder bucket that keeps one series at or under MAX_BUCKETS points. An explicit
-    bucket is accepted only if it respects the same bound, so a request can never explode."""
+    bucket that is too fine for the range is answered with the finest bucket that fits, and the
+    resolution says so (`requested`, decision D148): the bound holds, the request is answered."""
     span = time_to - time_from
     if span <= timedelta(0):
         raise AnalyticsError("`to` must be after `from`")
-    if bucket is not None:
-        if bucket not in BUCKETS:
-            raise AnalyticsError(f"Unknown bucket {bucket!r}; one of {', '.join(BUCKETS)}")
-        width = BUCKETS[bucket]
-        if span / width > MAX_BUCKETS:
-            raise AnalyticsError(
-                f"Bucket {bucket} gives more than {MAX_BUCKETS} points over this range; "
-                "widen the bucket or shorten the range"
-            )
-        return Resolution(bucket, width, automatic=False)
+    if bucket is not None and bucket not in BUCKETS:
+        raise AnalyticsError(f"Unknown bucket {bucket!r}; one of {', '.join(BUCKETS)}")
+    if bucket is not None and span / BUCKETS[bucket] <= MAX_BUCKETS:
+        return Resolution(bucket, BUCKETS[bucket], automatic=False)
     for key, width in BUCKETS.items():
         if span / width <= MAX_BUCKETS:
-            return Resolution(key, width, automatic=True)
+            return Resolution(key, width, automatic=True, requested=bucket)
     raise AnalyticsError(f"Range too long for the coarsest bucket ({list(BUCKETS)[-1]})")
 
 

@@ -1,10 +1,13 @@
 """Data Explorer backend: bucketed aggregates, drill-down rows and the metrics with data.
 
 Every endpoint is bounded (architecture 13.10): a series has at most MAX_BUCKETS points, a
-request at most MAX_SERIES series, drill-down rows are paginated.
+request at most MAX_SERIES series, drill-down rows are paginated. The bounds answer rather than
+refuse (decision D148): a bucket too fine becomes the finest that fits, more owners than fit
+become the first by name, and `notes` says so.
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -32,7 +35,7 @@ from shared.analytics import (
 from shared.curation.effective import effective_time, in_window, visible
 from shared.database import get_session
 from shared.enums import ValueType
-from shared.models import Entity, Measurement, Metric, SavedView
+from shared.models import Device, DeviceProjectAssignment, Entity, Measurement, Metric, SavedView
 from shared.permissions import Permission
 from shared.timeutil import require_aware, utc_now
 
@@ -56,6 +59,10 @@ class Series(BaseModel):
 
 
 class SeriesResponse(BaseModel):
+    """The series, and what the bounds did to the request (decision D148): `notes` says when a
+    coarser bucket answers a bucket too fine for the range, or when only the first owners that
+    fit under MAX_SERIES are shown (`owners_shown` of `owners_total`)."""
+
     time_from: datetime
     time_to: datetime
     bucket: str
@@ -64,6 +71,9 @@ class SeriesResponse(BaseModel):
     aggregates: list[Aggregate]
     group_by: GroupBy
     layout: Layout
+    notes: list[str] = Field(default_factory=list)
+    owners_shown: int | None = None
+    owners_total: int | None = None
     series: list[Series] | None = None
     columns: list[str] | None = None
     rows: list[dict[str, Any]] | list[list[Any]] | None = None
@@ -125,40 +135,64 @@ async def _aggregatable_metrics(session: AsyncSession, keys: list[str]) -> dict[
     return found
 
 
-async def _bound_series(
+@dataclass(slots=True)
+class Owners:
+    entity_ids: list[uuid.UUID]
+    device_ids: list[uuid.UUID]
+    shown: int
+    total: int
+
+    @property
+    def note(self) -> str | None:
+        if self.shown >= self.total:
+            return None
+        kind = "entities" if self.entity_ids else "devices"
+        return f"{self.shown} of {self.total} {kind} shown; pick {kind} or a group for the rest"
+
+
+async def _owners(
     session: AsyncSession,
     context: ProjectContext,
     metrics: list[str],
     entity_ids: list[uuid.UUID],
     device_ids: list[uuid.UUID],
     group_by: GroupBy,
-) -> None:
-    """Refuse a request that could return more than MAX_SERIES series, without touching the
-    hypertable: the number of groups is known from the filters or from the entity registry."""
-    if group_by is GroupBy.ENTITY and entity_ids:
-        groups = len(entity_ids)
-    elif group_by is GroupBy.DEVICE and device_ids:
-        groups = len(device_ids)
-    elif group_by is GroupBy.ENTITY:
-        groups = int(
-            await session.scalar(
-                select(func.count())
-                .select_from(Entity)
-                .where(Entity.project_id == context.project.id)
-            )
-            or 0
+) -> Owners:
+    """The owners the request covers, at most MAX_SERIES series in all (decision D148): the
+    given entities or devices, else every entity of the project or every device assigned to it
+    today, and when more would exceed the bound, the first that fit by name, with the count
+    for the note. Nothing touches the hypertable here."""
+    fit = max(1, MAX_SERIES // len(metrics))
+    if group_by is GroupBy.ENTITY:
+        candidates = select(Entity.id).where(Entity.project_id == context.project.id)
+        if entity_ids:
+            candidates = candidates.where(Entity.id.in_(entity_ids))
+        total = int(
+            await session.scalar(select(func.count()).select_from(candidates.subquery())) or 0
         )
-    else:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "group_by=device needs a device_id filter",
+        if entity_ids and total <= fit:
+            return Owners(entity_ids, [], total, total)
+        chosen = list(
+            (await session.scalars(candidates.order_by(Entity.name, Entity.id).limit(fit))).all()
         )
-    if len(metrics) * groups > MAX_SERIES:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            f"{len(metrics)} metrics times {groups} {group_by.value}s exceeds {MAX_SERIES} series; "
-            f"select fewer metrics or {group_by.value}s",
+        return Owners(chosen, [], len(chosen), total)
+    candidates = (
+        select(Device.id)
+        .join(DeviceProjectAssignment, DeviceProjectAssignment.device_id == Device.id)
+        .where(
+            DeviceProjectAssignment.project_id == context.project.id,
+            DeviceProjectAssignment.validity.op("@>")(utc_now()),
         )
+    )
+    if device_ids:
+        candidates = select(Device.id).where(Device.id.in_(device_ids))
+    total = int(await session.scalar(select(func.count()).select_from(candidates.subquery())) or 0)
+    if device_ids and total <= fit:
+        return Owners([], device_ids, total, total)
+    chosen = list(
+        (await session.scalars(candidates.order_by(Device.name, Device.id).limit(fit))).all()
+    )
+    return Owners([], chosen, len(chosen), total)
 
 
 @router.get("/series", response_model=SeriesResponse)
@@ -182,17 +216,40 @@ async def series(
     entity (or device). Boolean metrics aggregate as 0 and 1, so `mean` is the fraction true."""
     frm, to = _window(time_from, time_to, DEFAULT_RANGE)
     metrics = await _aggregatable_metrics(session, metric)
-    await _bound_series(session, context, metric, entity_id, device_id, group_by)
+    owners = await _owners(session, context, metric, entity_id, device_id, group_by)
     aggregates = list(dict.fromkeys(agg))
     try:
         resolution = whole_range(frm, to) if bucket == "all" else choose_resolution(frm, to, bucket)
     except AnalyticsError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
+    notes = [n for n in (resolution.note, owners.note) if n]
+    result = SeriesResponse(
+        time_from=frm,
+        time_to=to,
+        bucket=resolution.key,
+        bucket_seconds=resolution.seconds,
+        automatic_bucket=resolution.automatic,
+        aggregates=aggregates,
+        group_by=group_by,
+        layout=layout,
+        notes=notes,
+        owners_shown=owners.shown,
+        owners_total=owners.total,
+    )
+    if owners.shown == 0:
+        # a project without entities, or without devices assigned today: nothing to group
+        if layout is Layout.SERIES:
+            result.series = []
+        elif layout is Layout.LONG:
+            result.rows = []
+        else:
+            result.columns, result.rows = ["time"], []
+        return result
     statement = aggregate_statement(
         project_id=context.project.id,
         metrics=metric,
-        entity_ids=entity_id,
-        device_ids=device_id,
+        entity_ids=owners.entity_ids,
+        device_ids=owners.device_ids,
         data_source_id=data_source_id,
         time_from=frm,
         time_to=to,
@@ -224,16 +281,6 @@ async def series(
                 },
             )
         )
-    result = SeriesResponse(
-        time_from=frm,
-        time_to=to,
-        bucket=resolution.key,
-        bucket_seconds=resolution.seconds,
-        automatic_bucket=resolution.automatic,
-        aggregates=aggregates,
-        group_by=group_by,
-        layout=layout,
-    )
     all_series = list(series_map.values())
     if layout is Layout.SERIES:
         result.series = all_series

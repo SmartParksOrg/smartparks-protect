@@ -18,6 +18,15 @@ export interface RecordsState {
   from: string | null;
   to: string | null;
   timezone: string;
+  // the moment a link came from (a track point, a Data tab at a time): that row is highlighted
+  at?: string | null;
+}
+
+const HALF_WINDOW_MS = 12 * 3600_000;
+
+function validTime(raw: string | null): string | null {
+  const ms = raw ? Date.parse(raw) : NaN;
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
 
 export function readRecordsState(params: URLSearchParams): RecordsState {
@@ -34,6 +43,7 @@ export function readRecordsState(params: URLSearchParams): RecordsState {
     from,
     to,
     timezone: params.get("tz") ?? browserTimezone(),
+    at: validTime(params.get("at")),
   };
 }
 
@@ -48,7 +58,40 @@ export function writeRecordsState(state: RecordsState): URLSearchParams {
     if (state.to) params.set("to", state.to);
   }
   params.set("tz", state.timezone);
+  if (state.at) params.set("at", state.at);
   return params;
+}
+
+/** The records view of one selection, for the links that land there (decision D145): the Data
+ * tabs, the map's point panel and the search palette. With `at`, the twelve hours either side
+ * of that moment and the row at it highlighted; without, the last 30 days. */
+export function recordsHref(
+  projectId: string,
+  selection: { entities?: string[]; devices?: string[]; at?: string | null },
+): string {
+  const at = validTime(selection.at ?? null);
+  const ms = at ? Date.parse(at) : 0;
+  const params = writeRecordsState({
+    entities: selection.entities ?? [],
+    devices: selection.devices ?? [],
+    range: at ? "custom" : "30d",
+    from: at ? new Date(ms - HALF_WINDOW_MS).toISOString() : null,
+    to: at ? new Date(ms + HALF_WINDOW_MS).toISOString() : null,
+    timezone: browserTimezone(),
+    at,
+  });
+  return `/projects/${projectId}/analyze/explorer?${params.toString()}`;
+}
+
+/** What a `datetime-local` input can show: a value written by the input as it is, an ISO time
+ * with a zone (a link's window) as the browser's local minute. */
+export function inputValue(value: string | null): string {
+  if (!value) return "";
+  if (!/(Z|[+-]\d\d:\d\d)$/.test(value)) return value.slice(0, 16);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /** The window the selection covers: a preset, a custom range, or since an entity's assignment

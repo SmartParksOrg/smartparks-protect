@@ -15,6 +15,7 @@ import type {
   Page as PageType,
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
+import { LoadMore } from "@/components/data/LoadMore";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -55,6 +56,7 @@ import { MoveToGroupDialog } from "@/components/entities/MoveToGroupDialog";
 import { Icon } from "@/components/icons/Icon";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { usePages } from "@/hooks/usePages";
 
 const schema = z.object({
   name: z.string().min(1, "Give the group a name").max(200),
@@ -280,13 +282,13 @@ export function GroupsPage() {
     ungrouped: node === NONE ? true : undefined,
     limit: 500,
   };
-  const entities = useQuery({
+  const entities = usePages<Entity>({
     queryKey: [...queryKeys.entities(projectId), "organize", filters],
-    queryFn: () =>
+    fetchPage: (cursor) =>
       api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, {
-        query: filters,
+        query: { ...filters, cursor },
       }),
-    placeholderData: (previous) => previous,
+    keepPrevious: true,
   });
   const all = useQuery({
     queryKey: [...queryKeys.entities(projectId), "organize", "all"],
@@ -321,7 +323,7 @@ export function GroupsPage() {
     onSuccess: () => setSelected(new Set()),
   });
   const tree = groupTree(groups.data);
-  const rows = useMemo(() => entities.data?.items ?? [], [entities.data]);
+  const rows = entities.items;
   const typeById = useMemo(
     () => new Map(types.data?.items.map((x) => [x.id, x])),
     [types.data],
@@ -554,7 +556,7 @@ export function GroupsPage() {
                   {t("Loading…")}
                 </div>
               )}
-              {entities.data && rows.length === 0 && (
+              {entities.loaded && rows.length === 0 && (
                 <div className="text-sm text-muted-foreground">
                   {t("No entities here.")}
                 </div>
@@ -630,13 +632,12 @@ export function GroupsPage() {
                   </TableBody>
                 </Table>
               )}
-              {entities.data?.next_cursor && (
-                <div className="text-xs text-muted-foreground">
-                  {t(
-                    "Only the first 500 rows are shown. Search to find the rest.",
-                  )}
-                </div>
-              )}
+              <LoadMore
+                count={rows.length}
+                hasMore={entities.hasMore}
+                isLoading={entities.isLoadingMore}
+                onLoadMore={entities.loadMore}
+              />
             </CardContent>
           </Card>
         </div>

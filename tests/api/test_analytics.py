@@ -142,10 +142,15 @@ async def test_bounds_and_validation(client, db):
     admin, project, _entity, _source, _device, _ = await _setup(client, db)
     h = admin.headers
     window = f"&from={_ts(T0)}&to={_ts(T0 + timedelta(days=30))}"
+    # a bucket too fine answers with the finest that fits and says so (decision D148)
     too_fine = await client.get(
         _url(project, metric="battery_voltage", bucket="1s") + window, headers=h
     )
-    assert too_fine.status_code == 422 and "5000" in too_fine.text
+    assert too_fine.status_code == 200
+    coarser = too_fine.json()
+    assert coarser["bucket"] == "15m" and coarser["automatic_bucket"] is True
+    assert len(coarser["notes"]) == 1 and "1s" in coarser["notes"][0]
+    assert coarser["series"], "the coarser bucket still carries the data"
     unknown = await client.get(_url(project, metric="no_such_metric") + window, headers=h)
     assert unknown.status_code == 404
     text_metric = await client.get(_url(project, metric="firmware_version") + window, headers=h)
@@ -154,10 +159,15 @@ async def test_bounds_and_validation(client, db):
         _url(project, metric=[f"m{i}" for i in range(21)]) + window, headers=h
     )
     assert too_many.status_code == 422
+    # grouping by device without a filter covers the devices assigned to the project today
     device_without_filter = await client.get(
         _url(project, metric="battery_voltage", group_by="device") + window, headers=h
     )
-    assert device_without_filter.status_code == 422
+    assert device_without_filter.status_code == 200
+    by_device = device_without_filter.json()
+    assert by_device["owners_shown"] == by_device["owners_total"] == 1
+    assert by_device["notes"] == []
+    assert {s["device_id"] for s in by_device["series"]} == {_device["id"]}
     reversed_window = await client.get(
         _url(project, metric="battery_voltage")
         + f"&from={_ts(T0 + timedelta(days=1))}&to={_ts(T0)}",
@@ -171,6 +181,37 @@ async def test_bounds_and_validation(client, db):
     assert (
         await client.get(_url(project, metric="battery_voltage") + window, headers=outsider.headers)
     ).status_code == 403
+
+
+async def test_more_owners_than_fit_answer_with_the_first_by_name(client, db):
+    """Two metrics leave room for ten owners under MAX_SERIES (decision D148): eleven entities
+    give the first ten by name and a note, and the eleventh, the one with data, is the one
+    left out, so the series list is empty rather than the request refused."""
+    admin, project, entity, _source, _device, _ = await _setup(client, db)
+    h = admin.headers
+    for i in range(10):
+        created = await client.post(
+            f"/api/v1/projects/{project.id}/entities",
+            json={"entity_type_id": entity["entity_type_id"], "name": f"E{i:02d}"},
+            headers=h,
+        )
+        assert created.status_code == 201, created.text
+    window = f"&from={_ts(T0)}&to={_ts(T0 + timedelta(days=1))}"
+    capped = await client.get(
+        _url(project, metric=["battery_voltage", "gnss_fix"]) + window, headers=h
+    )
+    assert capped.status_code == 200, capped.text
+    body = capped.json()
+    assert (body["owners_shown"], body["owners_total"]) == (10, 11)
+    assert body["notes"] == ["10 of 11 entities shown; pick entities or a group for the rest"]
+    assert body["series"] == []
+    # an explicit list within the bound is used as given
+    chosen = await client.get(
+        _url(project, metric="battery_voltage", entity_id=entity["id"]) + window, headers=h
+    )
+    assert chosen.status_code == 200
+    assert chosen.json()["notes"] == [] and chosen.json()["owners_total"] == 1
+    assert chosen.json()["series"]
 
 
 async def test_drill_down_rows_and_metrics_with_data(client, db):

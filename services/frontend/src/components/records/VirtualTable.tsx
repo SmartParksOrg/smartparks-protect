@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import type { RecordRow } from "@/api/types";
 import { formatInZone } from "@/lib/analytics";
@@ -22,12 +22,15 @@ export function VirtualTable({
   columns,
   timezone,
   onRowClick,
+  highlightTime = null,
   height = 480,
 }: {
   rows: RecordRow[];
   columns: RecordColumn[];
   timezone: string;
   onRowClick?: (row: RecordRow) => void;
+  /** The moment a link came from: its row is marked and scrolled into view once it loads. */
+  highlightTime?: string | null;
   height?: number;
 }) {
   const parent = useRef<HTMLDivElement | null>(null);
@@ -37,6 +40,16 @@ export function VirtualTable({
     estimateSize: () => ROW_HEIGHT,
     overscan: 12,
   });
+  const highlightMs = highlightTime ? Date.parse(highlightTime) : NaN;
+  const highlightIndex = Number.isFinite(highlightMs)
+    ? rows.findIndex((r) => Date.parse(r.time) === highlightMs)
+    : -1;
+  const scrolledFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (highlightIndex < 0 || scrolledFor.current === highlightMs) return;
+    scrolledFor.current = highlightMs;
+    virtualizer.scrollToIndex(highlightIndex, { align: "center" });
+  }, [highlightIndex, highlightMs, virtualizer]);
   const width = columns.reduce((n, c) => n + cellWidth(c), 0);
   return (
     <div
@@ -46,7 +59,7 @@ export function VirtualTable({
     >
       <div style={{ minWidth: width }}>
         <div
-          className="sticky top-0 z-10 flex border-b bg-muted/60 text-xs font-medium"
+          className="sticky top-0 z-10 flex border-b bg-muted text-xs font-medium"
           style={{ height: ROW_HEIGHT }}
         >
           {columns.map((c) => (
@@ -72,7 +85,10 @@ export function VirtualTable({
             return (
               <div
                 key={item.key}
-                className={`absolute left-0 flex w-full border-b text-sm ${onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}`}
+                className={`absolute left-0 flex w-full border-b text-sm ${onRowClick ? "cursor-pointer hover:bg-muted/50" : ""} ${item.index === highlightIndex ? "bg-primary/10 font-medium" : ""}`}
+                aria-current={
+                  item.index === highlightIndex ? "true" : undefined
+                }
                 style={{
                   transform: `translateY(${item.start}px)`,
                   height: ROW_HEIGHT,

@@ -20,6 +20,7 @@ import { RecordsView } from "@/components/records/RecordsView";
 import { MultiSelect } from "@/components/analytics/MultiSelect";
 import { SeriesChart } from "@/components/analytics/SeriesChart";
 import { Callout } from "@/components/common/Callout";
+import { LoadMore } from "@/components/data/LoadMore";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -52,6 +53,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { usePages } from "@/hooks/usePages";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
 import {
@@ -540,6 +542,11 @@ export function ExplorerPage() {
                 {series.error && (
                   <Callout kind="error">{series.error.message}</Callout>
                 )}
+                {series.data?.notes?.map((note) => (
+                  <Callout key={note} kind="info">
+                    {note}
+                  </Callout>
+                ))}
                 <div className="rounded-md border p-2">
                   <Tabs
                     value={state.chart}
@@ -636,14 +643,14 @@ function DrillDownDialog({
         new Date(row.time).getTime() + Math.max(bucketSeconds, 1) * 1000,
       ).toISOString()
     : undefined;
-  const rows = useQuery({
+  const rows = usePages<MeasurementRow>({
     queryKey: queryKeys.analyticsRows(projectId, {
       metric: row?.metric_key,
       owner: row?.owner_id,
       from,
       to,
     }),
-    queryFn: () =>
+    fetchPage: (cursor) =>
       api.get<PageType<MeasurementRow>>(
         `/api/v1/projects/${projectId}/analytics/rows`,
         {
@@ -653,6 +660,7 @@ function DrillDownDialog({
             from,
             to,
             limit: 500,
+            cursor,
           },
         },
       ),
@@ -775,13 +783,18 @@ function DrillDownDialog({
           </DialogHeader>
           <DataTable
             columns={columns}
-            data={rows.data?.items}
+            data={rows.items}
             isLoading={rows.isPending}
             emptyMessage={t(
               "No rows in this range. Widen the period or pick another metric.",
             )}
             footer={
-              rows.data?.next_cursor ? "Showing the first 500 rows" : undefined
+              <LoadMore
+                count={rows.items.length}
+                hasMore={rows.hasMore}
+                isLoading={rows.isLoadingMore}
+                onLoadMore={rows.loadMore}
+              />
             }
           />
         </DialogContent>
@@ -797,7 +810,7 @@ function DrillDownDialog({
         target={curating}
         onClose={() => {
           setCurating(null);
-          void rows.refetch();
+          rows.refetch();
         }}
       />
       <RecordHistoryDialog

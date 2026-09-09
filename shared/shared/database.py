@@ -26,8 +26,18 @@ class Base(DeclarativeBase):
 
 @lru_cache
 def get_engine() -> AsyncEngine:
+    """The process's engine. With `STATEMENT_TIMEOUT_SECONDS` set (the API service, decision
+    D147) every connection carries PostgreSQL's `statement_timeout`, so a request the proxy has
+    given up on does not run on in the database for half an hour."""
     settings = get_settings()
-    return create_async_engine(settings.database_url, pool_pre_ping=True)
+    server_settings: dict[str, str] = {}
+    if settings.statement_timeout_seconds:
+        server_settings["statement_timeout"] = str(settings.statement_timeout_seconds * 1000)
+    return create_async_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        connect_args={"server_settings": server_settings} if server_settings else {},
+    )
 
 
 @lru_cache

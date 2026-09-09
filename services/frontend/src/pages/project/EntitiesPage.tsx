@@ -20,6 +20,7 @@ import type { EntityFeatureProperties } from "@/components/map/layers";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
+import { LoadMore } from "@/components/data/LoadMore";
 import { EntityDialog } from "@/components/entities/EntityDialog";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { MoveToGroupDialog } from "@/components/entities/MoveToGroupDialog";
@@ -28,6 +29,7 @@ import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { Button } from "@/components/ui/button";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { useNow } from "@/hooks/useNow";
+import { usePages } from "@/hooks/usePages";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
 import { formatAgo } from "@/lib/format";
 
@@ -42,18 +44,19 @@ export function EntitiesPage() {
   const [group, setGroup] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState<string[] | null>(null);
-  const entities = useQuery({
+  const entities = usePages<Entity>({
     queryKey: [...queryKeys.entities(projectId), q, group],
-    queryFn: () =>
+    fetchPage: (cursor) =>
       api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, {
         query: {
           q: q || undefined,
           group_id: group && group !== UNGROUPED ? group : undefined,
           ungrouped: group === UNGROUPED ? true : undefined,
           limit: 500,
+          cursor,
         },
       }),
-    placeholderData: (previous) => previous,
+    keepPrevious: true,
   });
   const groups = useGroups(projectId);
   const groupName = (id: string | null | undefined) =>
@@ -240,18 +243,26 @@ export function EntitiesPage() {
         )}
         <DataTable
           columns={columns}
-          data={entities.data?.items}
+          data={entities.items}
           searchable
           onSearchChange={setQ}
           footer={
-            entities.data?.next_cursor
-              ? t("Only the first 500 rows are shown. Search to find the rest.")
-              : undefined
+            <LoadMore
+              count={entities.items.length}
+              hasMore={entities.hasMore}
+              isLoading={entities.isLoadingMore}
+              onLoadMore={entities.loadMore}
+            />
           }
           isLoading={entities.isPending}
-          emptyMessage={t("No entities yet. Add one with New entity, or onboard collars with their animals from Needs attention.")} columnsKey="entities"
+          emptyMessage={t(
+            "No entities yet. Add one with New entity, or onboard collars with their animals from Needs attention.",
+          )}
+          columnsKey="entities"
           onRowClick={(e) =>
-            void navigate(`/projects/${projectFor(projectId, e.project_id)}/entities/${e.id}`)
+            void navigate(
+              `/projects/${projectFor(projectId, e.project_id)}/entities/${e.id}`,
+            )
           }
           selection={
             canAdmin(role)

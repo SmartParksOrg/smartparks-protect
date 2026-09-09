@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { api } from "@/api/client";
@@ -20,6 +20,7 @@ import type { Device, DeviceType, Page as PageType } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
+import { LoadMore } from "@/components/data/LoadMore";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { BulkAssignDialog } from "@/components/devices/BulkAssignDialog";
 import { HealthLine } from "@/components/devices/HealthCard";
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icons/Icon";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { useNow } from "@/hooks/useNow";
+import { usePages } from "@/hooks/usePages";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
 import { formatAgo } from "@/lib/format";
 
@@ -44,9 +46,9 @@ export function DevicesPage() {
   const projectList = useProjects();
   const projectName = (id: string | null | undefined) =>
     projectList.data?.items.find((p) => p.id === id)?.name ?? "";
-  const devices = useQuery({
+  const devicePages = usePages<Device>({
     queryKey: queryKeys.devices({ projectId, q, group, projectFilter }),
-    queryFn: () =>
+    fetchPage: (cursor) =>
       api.get<PageType<Device>>("/api/v1/devices", {
         query: {
           project_id: allProjects
@@ -59,14 +61,19 @@ export function DevicesPage() {
           q: q || undefined,
           group_id: group && group !== UNGROUPED ? group : undefined,
           limit: 500,
+          cursor,
         },
       }),
-    placeholderData: (previous) => previous,
-    select: (page) =>
-      group === UNGROUPED
-        ? { ...page, items: page.items.filter((d) => !d.group_id) }
-        : page,
+    keepPrevious: true,
   });
+  const deviceItems = useMemo(
+    () =>
+      group === UNGROUPED
+        ? devicePages.items.filter((d) => !d.group_id)
+        : devicePages.items,
+    [devicePages.items, group],
+  );
+  const devices = { ...devicePages, items: deviceItems };
   const groups = useGroups(projectId);
   const groupName = (id: string | null | undefined) =>
     groups.data?.find((g) => g.id === id)?.name ?? "";
@@ -224,9 +231,7 @@ export function DevicesPage() {
             <Button
               size="sm"
               onClick={() =>
-                setAssigning(
-                  (devices.data?.items ?? []).filter((d) => selected.has(d.id)),
-                )
+                setAssigning(devices.items.filter((d) => selected.has(d.id)))
               }
             >
               {t("Assign to project")}
@@ -242,7 +247,7 @@ export function DevicesPage() {
         )}
         <DataTable
           columns={columns}
-          data={devices.data?.items}
+          data={devices.items}
           searchable
           columnFilters={allProjects}
           selection={
@@ -252,9 +257,12 @@ export function DevicesPage() {
           }
           onSearchChange={setQ}
           footer={
-            devices.data?.next_cursor
-              ? t("Only the first 500 rows are shown. Search to find the rest.")
-              : undefined
+            <LoadMore
+              count={devices.items.length}
+              hasMore={devices.hasMore}
+              isLoading={devices.isLoadingMore}
+              onLoadMore={devices.loadMore}
+            />
           }
           isLoading={devices.isPending}
           emptyMessage={

@@ -8,22 +8,58 @@ import { z } from "zod";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { Entity, Feature, Metric, Page as PageType, ReplayResult, Rule, RuleTemplate, RuleVersion } from "@/api/types";
+import type {
+  Entity,
+  Feature,
+  Metric,
+  Page as PageType,
+  ReplayResult,
+  Rule,
+  RuleTemplate,
+  RuleVersion,
+} from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { JsonView } from "@/components/common/JsonView";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatTime } from "@/lib/format";
-import { AGGREGATES, CONDITION_TYPES, DERIVED_METRICS, defaultForm, documentToForm, emptyCondition, FEATURE_TYPES, formToDocument, OPERATORS, RELATIONS, type RuleFormValues, SEVERITIES, TRIGGER_KINDS } from "@/lib/rules";
+import {
+  AGGREGATES,
+  CONDITION_TYPES,
+  DERIVED_METRICS,
+  defaultForm,
+  documentToForm,
+  emptyCondition,
+  FEATURE_TYPES,
+  formToDocument,
+  OPERATORS,
+  RELATIONS,
+  type RuleFormValues,
+  SEVERITIES,
+  TRIGGER_KINDS,
+} from "@/lib/rules";
 
 const conditionSchema = z.object({
   type: z.string(),
@@ -49,7 +85,12 @@ const schema = z.object({
   conditions: z.array(conditionSchema).min(1, "Add at least one condition"),
   for_seconds: z.number().int().min(0),
   cooldown_seconds: z.number().int().min(0),
-  event_type: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/, "Upper case letters, digits and underscores, for example GEOFENCE_EXIT"),
+  event_type: z
+    .string()
+    .regex(
+      /^[A-Z][A-Z0-9_]{1,63}$/,
+      "Upper case letters, digits and underscores, for example GEOFENCE_EXIT",
+    ),
   severity: z.string(),
   title: z.string().min(1).max(300),
   event_description: z.string(),
@@ -59,12 +100,21 @@ type Values = z.infer<typeof schema>;
 
 const NUMBER = "h-8 w-24";
 
-function toForm(rule: Rule | null, template: RuleTemplate | null): { values: Values; json: string | null } {
+function toForm(
+  rule: Rule | null,
+  template: RuleTemplate | null,
+): { values: Values; json: string | null } {
   const doc = rule?.document ?? template?.document ?? null;
-  const base = doc ? documentToForm(doc as Record<string, unknown>) : defaultForm();
+  const base = doc
+    ? documentToForm(doc as Record<string, unknown>)
+    : defaultForm();
   const name = rule?.name ?? template?.name ?? "";
   const description = rule?.description ?? template?.description ?? "";
-  if (!base) return { values: { ...flatten(defaultForm()), name, description }, json: JSON.stringify(doc, null, 2) };
+  if (!base)
+    return {
+      values: { ...flatten(defaultForm()), name, description },
+      json: JSON.stringify(doc, null, 2),
+    };
   return { values: { ...flatten(base), name, description }, json: null };
 }
 
@@ -106,21 +156,64 @@ interface Props {
  * of leaves; documents with nesting the form cannot show are edited as JSON. Editing an
  * existing rule saves a new version; name, description and enabled are patched separately.
  */
-export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplate, initialFeatureId }: Props) {
+export function RuleEditor({
+  projectId,
+  rule,
+  open,
+  onOpenChange,
+  initialTemplate,
+  initialFeatureId,
+}: Props) {
   const { t } = useTranslation();
   const base = `/api/v1/projects/${projectId}/rules`;
-  const templates = useQuery({ queryKey: queryKeys.ruleTemplates(projectId), queryFn: () => api.get<RuleTemplate[]>(`${base}/templates`), enabled: open });
-  const entities = useQuery({ queryKey: queryKeys.entities(projectId), queryFn: () => api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, { query: { limit: 500 } }), enabled: open });
-  const features = useQuery({ queryKey: queryKeys.features(projectId), queryFn: () => api.get<PageType<Feature>>(`/api/v1/projects/${projectId}/features`, { query: { limit: 500 } }), enabled: open });
-  const metrics = useQuery({ queryKey: queryKeys.metrics, queryFn: () => api.get<PageType<Metric>>("/api/v1/metrics", { query: { limit: 500 } }), enabled: open });
-  const versions = useQuery({ queryKey: queryKeys.ruleVersions(projectId, rule?.id ?? ""), queryFn: () => api.get<RuleVersion[]>(`${base}/${rule?.id}/versions`), enabled: open && Boolean(rule) });
+  const templates = useQuery({
+    queryKey: queryKeys.ruleTemplates(projectId),
+    queryFn: () => api.get<RuleTemplate[]>(`${base}/templates`),
+    enabled: open,
+  });
+  const entities = useQuery({
+    queryKey: queryKeys.entities(projectId),
+    queryFn: () =>
+      api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, {
+        query: { limit: 500 },
+      }),
+    enabled: open,
+  });
+  const features = useQuery({
+    queryKey: queryKeys.features(projectId),
+    queryFn: () =>
+      api.get<PageType<Feature>>(`/api/v1/projects/${projectId}/features`, {
+        query: { limit: 500 },
+      }),
+    enabled: open,
+  });
+  const metrics = useQuery({
+    queryKey: queryKeys.metrics,
+    queryFn: () =>
+      api.get<PageType<Metric>>("/api/v1/metrics", { query: { limit: 500 } }),
+    enabled: open,
+  });
+  const versions = useQuery({
+    queryKey: queryKeys.ruleVersions(projectId, rule?.id ?? ""),
+    queryFn: () => api.get<RuleVersion[]>(`${base}/${rule?.id}/versions`),
+    enabled: open && Boolean(rule),
+  });
   const [template, setTemplate] = useState<string>(initialTemplate ?? "");
   const [json, setJson] = useState<string | null>(null);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [replay, setReplay] = useState<ReplayResult | null>(null);
-  const [range, setRange] = useState(() => ({ from: new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 16), to: new Date().toISOString().slice(0, 16) }));
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { ...flatten(defaultForm()), name: "", description: "" } });
-  const conditions = useFieldArray({ control: form.control, name: "conditions" });
+  const [range, setRange] = useState(() => ({
+    from: new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 16),
+    to: new Date().toISOString().slice(0, 16),
+  }));
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: { ...flatten(defaultForm()), name: "", description: "" },
+  });
+  const conditions = useFieldArray({
+    control: form.control,
+    name: "conditions",
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -129,23 +222,45 @@ export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplat
     if (!rule && initialFeatureId && template === initialTemplate) {
       // a link from a feature on the map: the template's first spatial or near condition takes
       // that feature instead of every feature of its type
-      const index = values.conditions.findIndex((c) => c.type === "spatial" || c.type === "near");
-      if (index >= 0) values.conditions[index] = { ...values.conditions[index], feature_ids: [initialFeatureId], feature_type: "" };
+      const index = values.conditions.findIndex(
+        (c) => c.type === "spatial" || c.type === "near",
+      );
+      if (index >= 0)
+        values.conditions[index] = {
+          ...values.conditions[index],
+          feature_ids: [initialFeatureId],
+          feature_type: "",
+        };
     }
     form.reset(values);
     setJson(rawJson);
     setJsonError(null);
     setReplay(null);
-  }, [open, rule, template, templates.data, form, initialTemplate, initialFeatureId]);
+  }, [
+    open,
+    rule,
+    template,
+    templates.data,
+    form,
+    initialTemplate,
+    initialFeatureId,
+  ]);
 
-  const metricOptions = [...DERIVED_METRICS, ...(metrics.data?.items.map((m) => m.key) ?? [])];
-  const invalidate = [queryKeys.rules(projectId), queryKeys.ruleVersions(projectId, rule?.id ?? "")];
+  const metricOptions = [
+    ...DERIVED_METRICS,
+    ...(metrics.data?.items.map((m) => m.key) ?? []),
+  ];
+  const invalidate = [
+    queryKeys.rules(projectId),
+    queryKeys.ruleVersions(projectId, rule?.id ?? ""),
+  ];
 
   function buildDocument(values: Values): Record<string, unknown> | null {
     if (json !== null) {
       try {
         const parsed = JSON.parse(json) as unknown;
-        if (!parsed || typeof parsed !== "object") throw new Error("not an object");
+        if (!parsed || typeof parsed !== "object")
+          throw new Error("not an object");
         setJsonError(null);
         return parsed as Record<string, unknown>;
       } catch (e) {
@@ -160,12 +275,26 @@ export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplat
     mutationFn: async (values: Values) => {
       const document = buildDocument(values);
       if (!document) throw new Error("Fix the JSON first");
-      if (!rule) return api.post<Rule>(base, { body: { name: values.name, description: values.description || null, document, enabled: false } });
-      await api.patch<Rule>(`${base}/${rule.id}`, { body: { name: values.name, description: values.description || null } });
-      return api.put<Rule>(`${base}/${rule.id}/document`, { body: { document } });
+      if (!rule)
+        return api.post<Rule>(base, {
+          body: {
+            name: values.name,
+            description: values.description || null,
+            document,
+            enabled: false,
+          },
+        });
+      await api.patch<Rule>(`${base}/${rule.id}`, {
+        body: { name: values.name, description: values.description || null },
+      });
+      return api.put<Rule>(`${base}/${rule.id}/document`, {
+        body: { document },
+      });
     },
     invalidate,
-    success: rule ? "New rule version saved" : "Rule created (disabled until you enable it)",
+    success: rule
+      ? "New rule version saved"
+      : "Rule created (disabled until you enable it)",
     onSuccess: () => onOpenChange(false),
     onError: (error) => form.setError("root", { message: error.message }),
   });
@@ -173,7 +302,11 @@ export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplat
     mutationFn: async (values: Values) => {
       const document = buildDocument(values);
       if (!document) throw new Error("Fix the JSON first");
-      const body = { from: new Date(range.from).toISOString(), to: new Date(range.to).toISOString(), document };
+      const body = {
+        from: new Date(range.from).toISOString(),
+        to: new Date(range.to).toISOString(),
+        document,
+      };
       return api.post<ReplayResult>(`${base}/test-document`, { body });
     },
     onSuccess: (result) => setReplay(result),
@@ -187,152 +320,665 @@ export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplat
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{rule ? `Edit rule: ${rule.name}` : "New rule"}</DialogTitle>
-          <DialogDescription>{rule ? `Version ${rule.current_version}. Saving creates a new version; events keep the version that created them.` : "Start from a template or build the rule from scratch. New rules start disabled."}</DialogDescription>
+          <DialogTitle>
+            {rule ? `Edit rule: ${rule.name}` : "New rule"}
+          </DialogTitle>
+          <DialogDescription>
+            {rule
+              ? `Version ${rule.current_version}. Saving creates a new version; events keep the version that created them.`
+              : "Start from a template or build the rule from scratch. New rules start disabled."}
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="definition">
           <TabsList>
             <TabsTrigger value="definition">{t("Definition")}</TabsTrigger>
             <TabsTrigger value="test">{t("Test on history")}</TabsTrigger>
-            {rule && <TabsTrigger value="versions">{t("Versions")}</TabsTrigger>}
+            {rule && (
+              <TabsTrigger value="versions">{t("Versions")}</TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="definition">
-            <form id="rule-form" className="space-y-4" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
+            <form
+              id="rule-form"
+              className="space-y-4"
+              onSubmit={form.handleSubmit((v) => save.mutate(v))}
+              noValidate
+            >
               {!rule && (
-                <Field label={t("Template")} htmlFor="rule-template" hint={t("Optional starting point; every field stays editable")}>
-                  <Select value={template || "none"} onValueChange={(v) => setTemplate(v === "none" ? "" : v)}>
-                    <SelectTrigger id="rule-template"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="none">{t("From scratch")}</SelectItem>{templates.data?.map((t) => <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>)}</SelectContent>
+                <Field
+                  label={t("Template")}
+                  htmlFor="rule-template"
+                  hint={t(
+                    "Optional starting point; every field stays editable",
+                  )}
+                >
+                  <Select
+                    value={template || "none"}
+                    onValueChange={(v) => setTemplate(v === "none" ? "" : v)}
+                  >
+                    <SelectTrigger id="rule-template">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{t("From scratch")}</SelectItem>
+                      {templates.data?.map((t) => (
+                        <SelectItem key={t.key} value={t.key}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </Field>
               )}
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={t("Name")} htmlFor="rule-name" error={err.name?.message}><Input id="rule-name" {...form.register("name")} /></Field>
-                <Field label={t("Description")} htmlFor="rule-description"><Input id="rule-description" {...form.register("description")} /></Field>
+                <Field
+                  label={t("Name")}
+                  htmlFor="rule-name"
+                  error={err.name?.message}
+                >
+                  <Input id="rule-name" {...form.register("name")} />
+                </Field>
+                <Field label={t("Description")} htmlFor="rule-description">
+                  <Input
+                    id="rule-description"
+                    {...form.register("description")}
+                  />
+                </Field>
               </div>
               {json !== null ? (
-                <Field label={t("Document (JSON)")} htmlFor="rule-json" hint={t("This document uses nesting the form cannot show, so it is edited as JSON")} error={jsonError ?? undefined}>
-                  <Textarea id="rule-json" rows={18} className="font-mono text-xs" value={json} onChange={(e) => setJson(e.target.value)} />
+                <Field
+                  label={t("Document (JSON)")}
+                  htmlFor="rule-json"
+                  hint={t(
+                    "This document uses nesting the form cannot show, so it is edited as JSON",
+                  )}
+                  error={jsonError ?? undefined}
+                >
+                  <Textarea
+                    id="rule-json"
+                    rows={18}
+                    className="font-mono text-xs"
+                    value={json}
+                    onChange={(e) => setJson(e.target.value)}
+                  />
                 </Field>
               ) : (
                 <>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <Field label={t("Trigger")} htmlFor="rule-trigger">
-                      <Select value={kind} onValueChange={(v) => form.setValue("trigger_kind", v)}>
-                        <SelectTrigger id="rule-trigger"><SelectValue /></SelectTrigger>
-                        <SelectContent>{TRIGGER_KINDS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                      <Select
+                        value={kind}
+                        onValueChange={(v) => form.setValue("trigger_kind", v)}
+                      >
+                        <SelectTrigger id="rule-trigger">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TRIGGER_KINDS.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
                     </Field>
                     {kind === "measurement" && (
-                      <Field label={t("Metric")} htmlFor="rule-metric" hint={t("Empty means any metric")}>
-                        <Input id="rule-metric" list="metric-keys" {...form.register("metric_key")} />
+                      <Field
+                        label={t("Metric")}
+                        htmlFor="rule-metric"
+                        hint={t("Empty means any metric")}
+                      >
+                        <Input
+                          id="rule-metric"
+                          list="metric-keys"
+                          {...form.register("metric_key")}
+                        />
                       </Field>
                     )}
                     {kind === "schedule" && (
-                      <Field label={t("Check every (seconds)")} htmlFor="rule-every" error={err.every_seconds?.message}><Input id="rule-every" type="number" {...form.register("every_seconds", { valueAsNumber: true })} /></Field>
+                      <Field
+                        label={t("Check every (seconds)")}
+                        htmlFor="rule-every"
+                        error={err.every_seconds?.message}
+                      >
+                        <Input
+                          id="rule-every"
+                          type="number"
+                          {...form.register("every_seconds", {
+                            valueAsNumber: true,
+                          })}
+                        />
+                      </Field>
                     )}
-                    <Field label={t("Entities")} htmlFor="rule-scope" hint={t("Empty means every entity of the project")}>
+                    <Field
+                      label={t("Entities")}
+                      htmlFor="rule-scope"
+                      hint={t("Empty means every entity of the project")}
+                    >
                       <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
-                        {entities.data?.items.map((e) => { const on = form.watch("entity_ids").includes(e.id); return <Button key={e.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => form.setValue("entity_ids", on ? form.getValues("entity_ids").filter((x) => x !== e.id) : [...form.getValues("entity_ids"), e.id])}>{e.name}</Button>; })}
+                        {entities.data?.items.map((e) => {
+                          const on = form.watch("entity_ids").includes(e.id);
+                          return (
+                            <Button
+                              key={e.id}
+                              type="button"
+                              size="sm"
+                              variant={on ? "default" : "outline"}
+                              className="h-7"
+                              onClick={() =>
+                                form.setValue(
+                                  "entity_ids",
+                                  on
+                                    ? form
+                                        .getValues("entity_ids")
+                                        .filter((x) => x !== e.id)
+                                    : [...form.getValues("entity_ids"), e.id],
+                                )
+                              }
+                            >
+                              {e.name}
+                            </Button>
+                          );
+                        })}
                       </div>
                     </Field>
                   </div>
-                  <datalist id="metric-keys">{metricOptions.map((m) => <option key={m} value={m} />)}</datalist>
+                  <datalist id="metric-keys">
+                    {metricOptions.map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
                   <div className="space-y-2 rounded-md border p-3">
-                    <div className="flex items-center justify-between"><span className="text-sm font-medium">{t("Conditions (all must hold)")}</span><Button type="button" size="sm" variant="outline" onClick={() => conditions.append(emptyCondition())}><Plus className="size-4" /> {t("Add condition")}</Button></div>
-                    {typeof err.conditions?.message === "string" && <p className="text-sm text-destructive">{err.conditions.message}</p>}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {t("Conditions (all must hold)")}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => conditions.append(emptyCondition())}
+                      >
+                        <Plus className="size-4" /> {t("Add condition")}
+                      </Button>
+                    </div>
+                    {typeof err.conditions?.message === "string" && (
+                      <p className="text-sm text-destructive">
+                        {err.conditions.message}
+                      </p>
+                    )}
                     {conditions.fields.map((field, index) => {
                       const type = form.watch(`conditions.${index}.type`);
                       return (
-                        <div key={field.id} className="flex flex-wrap items-end gap-2 rounded bg-muted/40 p-2">
-                          <Select value={type} onValueChange={(v) => form.setValue(`conditions.${index}`, { ...emptyCondition(v), ...(v === "threshold" || v === "window" ? { metric: form.getValues(`conditions.${index}.metric`) } : {}) })}>
-                            <SelectTrigger className="h-8 w-44" aria-label={t("Condition type")}><SelectValue /></SelectTrigger>
-                            <SelectContent>{CONDITION_TYPES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                        <div
+                          key={field.id}
+                          className="flex flex-wrap items-end gap-2 rounded bg-muted/40 p-2"
+                        >
+                          <Select
+                            value={type}
+                            onValueChange={(v) =>
+                              form.setValue(`conditions.${index}`, {
+                                ...emptyCondition(v),
+                                ...(v === "threshold" || v === "window"
+                                  ? {
+                                      metric: form.getValues(
+                                        `conditions.${index}.metric`,
+                                      ),
+                                    }
+                                  : {}),
+                              })
+                            }
+                          >
+                            <SelectTrigger
+                              className="h-8 w-44"
+                              aria-label={t("Condition type")}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CONDITION_TYPES.map((c) => (
+                                <SelectItem key={c.value} value={c.value}>
+                                  {c.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
                           </Select>
-                          {(type === "threshold" || type === "window") && <Input className="h-8 w-40" list="metric-keys" aria-label={t("Metric")} {...form.register(`conditions.${index}.metric`)} />}
+                          {(type === "threshold" || type === "window") && (
+                            <Input
+                              className="h-8 w-40"
+                              list="metric-keys"
+                              aria-label={t("Metric")}
+                              {...form.register(`conditions.${index}.metric`)}
+                            />
+                          )}
                           {type === "window" && (
                             <>
-                              <Select value={form.watch(`conditions.${index}.aggregate`)} onValueChange={(v) => form.setValue(`conditions.${index}.aggregate`, v)}>
-                                <SelectTrigger className="h-8 w-24" aria-label={t("Aggregate")}><SelectValue /></SelectTrigger>
-                                <SelectContent>{AGGREGATES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                              <Select
+                                value={form.watch(
+                                  `conditions.${index}.aggregate`,
+                                )}
+                                onValueChange={(v) =>
+                                  form.setValue(
+                                    `conditions.${index}.aggregate`,
+                                    v,
+                                  )
+                                }
+                              >
+                                <SelectTrigger
+                                  className="h-8 w-24"
+                                  aria-label={t("Aggregate")}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {AGGREGATES.map((a) => (
+                                    <SelectItem key={a} value={a}>
+                                      {a}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
                               </Select>
-                              <span className="text-xs text-muted-foreground">{t("over")}</span>
-                              <Input className={NUMBER} type="number" aria-label={t("Window seconds")} {...form.register(`conditions.${index}.seconds`, { valueAsNumber: true })} />
-                              <span className="text-xs text-muted-foreground">{t("s", { context: "seconds" })}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {t("over")}
+                              </span>
+                              <Input
+                                className={NUMBER}
+                                type="number"
+                                aria-label={t("Window seconds")}
+                                {...form.register(
+                                  `conditions.${index}.seconds`,
+                                  { valueAsNumber: true },
+                                )}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                {t("s", { context: "seconds" })}
+                              </span>
                             </>
                           )}
                           {(type === "threshold" || type === "window") && (
                             <>
-                              <Select value={form.watch(`conditions.${index}.op`)} onValueChange={(v) => form.setValue(`conditions.${index}.op`, v)}>
-                                <SelectTrigger className="h-8 w-16" aria-label={t("Operator")}><SelectValue /></SelectTrigger>
-                                <SelectContent>{OPERATORS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                              <Select
+                                value={form.watch(`conditions.${index}.op`)}
+                                onValueChange={(v) =>
+                                  form.setValue(`conditions.${index}.op`, v)
+                                }
+                              >
+                                <SelectTrigger
+                                  className="h-8 w-16"
+                                  aria-label={t("Operator")}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {OPERATORS.map((o) => (
+                                    <SelectItem key={o} value={o}>
+                                      {o}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
                               </Select>
-                              <Input className={NUMBER} type="number" step="any" aria-label={t("Value")} {...form.register(`conditions.${index}.value`, { valueAsNumber: true })} />
+                              <Input
+                                className={NUMBER}
+                                type="number"
+                                step="any"
+                                aria-label={t("Value")}
+                                {...form.register(`conditions.${index}.value`, {
+                                  valueAsNumber: true,
+                                })}
+                              />
                             </>
                           )}
                           {type === "spatial" && (
                             <>
-                              <Select value={form.watch(`conditions.${index}.relation`)} onValueChange={(v) => form.setValue(`conditions.${index}.relation`, v)}>
-                                <SelectTrigger className="h-8 w-28" aria-label={t("Relation")}><SelectValue /></SelectTrigger>
-                                <SelectContent>{RELATIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                              <Select
+                                value={form.watch(
+                                  `conditions.${index}.relation`,
+                                )}
+                                onValueChange={(v) =>
+                                  form.setValue(
+                                    `conditions.${index}.relation`,
+                                    v,
+                                  )
+                                }
+                              >
+                                <SelectTrigger
+                                  className="h-8 w-28"
+                                  aria-label={t("Relation")}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {RELATIONS.map((r) => (
+                                    <SelectItem key={r} value={r}>
+                                      {r}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
                               </Select>
-                              <Select value={form.watch(`conditions.${index}.feature_ids`).length > 0 ? "selected" : form.watch(`conditions.${index}.feature_type`)} onValueChange={(v) => { if (v === "selected") return; form.setValue(`conditions.${index}.feature_type`, v); form.setValue(`conditions.${index}.feature_ids`, []); }}>
-                                <SelectTrigger className="h-8 w-36" aria-label={t("Feature type")}><SelectValue /></SelectTrigger>
-                                <SelectContent>{FEATURE_TYPES.map((f) => <SelectItem key={f} value={f}>{t("every")} {f}</SelectItem>)}<SelectItem value="selected" disabled>{t("selected features")}</SelectItem></SelectContent>
+                              <Select
+                                value={
+                                  form.watch(`conditions.${index}.feature_ids`)
+                                    .length > 0
+                                    ? "selected"
+                                    : form.watch(
+                                        `conditions.${index}.feature_type`,
+                                      )
+                                }
+                                onValueChange={(v) => {
+                                  if (v === "selected") return;
+                                  form.setValue(
+                                    `conditions.${index}.feature_type`,
+                                    v,
+                                  );
+                                  form.setValue(
+                                    `conditions.${index}.feature_ids`,
+                                    [],
+                                  );
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="h-8 w-36"
+                                  aria-label={t("Feature type")}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {FEATURE_TYPES.map((f) => (
+                                    <SelectItem key={f} value={f}>
+                                      {t("every")} {f}
+                                    </SelectItem>
+                                  ))}
+                                  <SelectItem value="selected" disabled>
+                                    {t("selected features")}
+                                  </SelectItem>
+                                </SelectContent>
                               </Select>
                               <div className="flex flex-wrap gap-1">
-                                {features.data?.items.map((f) => { const on = form.watch(`conditions.${index}.feature_ids`).includes(f.id); return <Button key={f.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => { const current = form.getValues(`conditions.${index}.feature_ids`); form.setValue(`conditions.${index}.feature_ids`, on ? current.filter((x) => x !== f.id) : [...current, f.id]); }}>{f.name}</Button>; })}
+                                {features.data?.items.map((f) => {
+                                  const on = form
+                                    .watch(`conditions.${index}.feature_ids`)
+                                    .includes(f.id);
+                                  return (
+                                    <Button
+                                      key={f.id}
+                                      type="button"
+                                      size="sm"
+                                      variant={on ? "default" : "outline"}
+                                      className="h-7"
+                                      onClick={() => {
+                                        const current = form.getValues(
+                                          `conditions.${index}.feature_ids`,
+                                        );
+                                        form.setValue(
+                                          `conditions.${index}.feature_ids`,
+                                          on
+                                            ? current.filter((x) => x !== f.id)
+                                            : [...current, f.id],
+                                        );
+                                      }}
+                                    >
+                                      {f.name}
+                                    </Button>
+                                  );
+                                })}
                               </div>
                             </>
                           )}
                           {type === "near" && (
                             <>
-                              <span className="text-xs text-muted-foreground">{t("within")}</span>
-                              <Input className={NUMBER} type="number" aria-label={t("Metres")} {...form.register(`conditions.${index}.meters`, { valueAsNumber: true })} />
-                              <span className="text-xs text-muted-foreground">{t("m of")}</span>
-                              <Select value={form.watch(`conditions.${index}.feature_ids`).length > 0 ? "selected" : form.watch(`conditions.${index}.feature_type`) || "none"} onValueChange={(v) => { if (v === "selected") return; form.setValue(`conditions.${index}.feature_type`, v === "none" ? "" : v); form.setValue(`conditions.${index}.feature_ids`, []); }}>
-                                <SelectTrigger className="h-8 w-36" aria-label={t("Feature type")}><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="none">{t("no feature type")}</SelectItem>{FEATURE_TYPES.map((f) => <SelectItem key={f} value={f}>{t("every")} {f}</SelectItem>)}<SelectItem value="selected" disabled>{t("selected features")}</SelectItem></SelectContent>
+                              <span className="text-xs text-muted-foreground">
+                                {t("within")}
+                              </span>
+                              <Input
+                                className={NUMBER}
+                                type="number"
+                                aria-label={t("Metres")}
+                                {...form.register(
+                                  `conditions.${index}.meters`,
+                                  { valueAsNumber: true },
+                                )}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                {t("m of")}
+                              </span>
+                              <Select
+                                value={
+                                  form.watch(`conditions.${index}.feature_ids`)
+                                    .length > 0
+                                    ? "selected"
+                                    : form.watch(
+                                        `conditions.${index}.feature_type`,
+                                      ) || "none"
+                                }
+                                onValueChange={(v) => {
+                                  if (v === "selected") return;
+                                  form.setValue(
+                                    `conditions.${index}.feature_type`,
+                                    v === "none" ? "" : v,
+                                  );
+                                  form.setValue(
+                                    `conditions.${index}.feature_ids`,
+                                    [],
+                                  );
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="h-8 w-36"
+                                  aria-label={t("Feature type")}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">
+                                    {t("no feature type")}
+                                  </SelectItem>
+                                  {FEATURE_TYPES.map((f) => (
+                                    <SelectItem key={f} value={f}>
+                                      {t("every")} {f}
+                                    </SelectItem>
+                                  ))}
+                                  <SelectItem value="selected" disabled>
+                                    {t("selected features")}
+                                  </SelectItem>
+                                </SelectContent>
                               </Select>
                               <div className="flex flex-wrap gap-1">
-                                {features.data?.items.map((f) => { const on = form.watch(`conditions.${index}.feature_ids`).includes(f.id); return <Button key={f.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => { const current = form.getValues(`conditions.${index}.feature_ids`); form.setValue(`conditions.${index}.feature_ids`, on ? current.filter((x) => x !== f.id) : [...current, f.id]); if (!on) form.setValue(`conditions.${index}.feature_type`, ""); }}>{f.name}</Button>; })}
+                                {features.data?.items.map((f) => {
+                                  const on = form
+                                    .watch(`conditions.${index}.feature_ids`)
+                                    .includes(f.id);
+                                  return (
+                                    <Button
+                                      key={f.id}
+                                      type="button"
+                                      size="sm"
+                                      variant={on ? "default" : "outline"}
+                                      className="h-7"
+                                      onClick={() => {
+                                        const current = form.getValues(
+                                          `conditions.${index}.feature_ids`,
+                                        );
+                                        form.setValue(
+                                          `conditions.${index}.feature_ids`,
+                                          on
+                                            ? current.filter((x) => x !== f.id)
+                                            : [...current, f.id],
+                                        );
+                                        if (!on)
+                                          form.setValue(
+                                            `conditions.${index}.feature_type`,
+                                            "",
+                                          );
+                                      }}
+                                    >
+                                      {f.name}
+                                    </Button>
+                                  );
+                                })}
                               </div>
-                              <span className="text-xs text-muted-foreground">{t("or of the entities")}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {t("or of the entities")}
+                              </span>
                               <div className="flex flex-wrap gap-1">
-                                {entities.data?.items.map((e) => { const on = form.watch(`conditions.${index}.entity_ids`).includes(e.id); return <Button key={e.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => { const current = form.getValues(`conditions.${index}.entity_ids`); form.setValue(`conditions.${index}.entity_ids`, on ? current.filter((x) => x !== e.id) : [...current, e.id]); }}>{e.name}</Button>; })}
+                                {entities.data?.items.map((e) => {
+                                  const on = form
+                                    .watch(`conditions.${index}.entity_ids`)
+                                    .includes(e.id);
+                                  return (
+                                    <Button
+                                      key={e.id}
+                                      type="button"
+                                      size="sm"
+                                      variant={on ? "default" : "outline"}
+                                      className="h-7"
+                                      onClick={() => {
+                                        const current = form.getValues(
+                                          `conditions.${index}.entity_ids`,
+                                        );
+                                        form.setValue(
+                                          `conditions.${index}.entity_ids`,
+                                          on
+                                            ? current.filter((x) => x !== e.id)
+                                            : [...current, e.id],
+                                        );
+                                      }}
+                                    >
+                                      {e.name}
+                                    </Button>
+                                  );
+                                })}
                               </div>
                             </>
                           )}
                           {type === "no_data" && (
                             <>
-                              <span className="text-xs text-muted-foreground">{t("for")}</span>
-                              <Input className={NUMBER} type="number" aria-label={t("Silence seconds")} {...form.register(`conditions.${index}.for_seconds`, { valueAsNumber: true })} />
-                              <span className="text-xs text-muted-foreground">{t("seconds")}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {t("for")}
+                              </span>
+                              <Input
+                                className={NUMBER}
+                                type="number"
+                                aria-label={t("Silence seconds")}
+                                {...form.register(
+                                  `conditions.${index}.for_seconds`,
+                                  { valueAsNumber: true },
+                                )}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                {t("seconds")}
+                              </span>
                             </>
                           )}
-                          <Button type="button" size="icon" variant="ghost" className="ml-auto size-8" aria-label={t("Remove condition")} onClick={() => conditions.remove(index)}><Trash2 className="size-4" /></Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="ml-auto size-8"
+                            aria-label={t("Remove condition")}
+                            onClick={() => conditions.remove(index)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
                         </div>
                       );
                     })}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label={t("Must hold for (seconds)")} htmlFor="rule-for" hint={t("0 fires as soon as the condition is true")} error={err.for_seconds?.message}><Input id="rule-for" type="number" {...form.register("for_seconds", { valueAsNumber: true })} /></Field>
-                    <Field label={t("Cooldown (seconds)")} htmlFor="rule-cooldown" hint={t("While the condition stays true, remind again after this long; 0 never")} error={err.cooldown_seconds?.message}><Input id="rule-cooldown" type="number" {...form.register("cooldown_seconds", { valueAsNumber: true })} /></Field>
+                    <Field
+                      label={t("Must hold for (seconds)")}
+                      htmlFor="rule-for"
+                      hint={t("0 fires as soon as the condition is true")}
+                      error={err.for_seconds?.message}
+                    >
+                      <Input
+                        id="rule-for"
+                        type="number"
+                        {...form.register("for_seconds", {
+                          valueAsNumber: true,
+                        })}
+                      />
+                    </Field>
+                    <Field
+                      label={t("Cooldown (seconds)")}
+                      htmlFor="rule-cooldown"
+                      hint={t(
+                        "While the condition stays true, remind again after this long; 0 never",
+                      )}
+                      error={err.cooldown_seconds?.message}
+                    >
+                      <Input
+                        id="rule-cooldown"
+                        type="number"
+                        {...form.register("cooldown_seconds", {
+                          valueAsNumber: true,
+                        })}
+                      />
+                    </Field>
                   </div>
                   <div className="space-y-3 rounded-md border p-3">
                     <span className="text-sm font-medium">{t("Event")}</span>
                     <div className="grid gap-3 sm:grid-cols-3">
-                      <Field label={t("Event type")} htmlFor="rule-event-type" error={err.event_type?.message}><Input id="rule-event-type" placeholder={t("GEOFENCE_EXIT")} {...form.register("event_type")} /></Field>
+                      <Field
+                        label={t("Event type")}
+                        htmlFor="rule-event-type"
+                        error={err.event_type?.message}
+                      >
+                        <Input
+                          id="rule-event-type"
+                          placeholder={t("GEOFENCE_EXIT")}
+                          {...form.register("event_type")}
+                        />
+                      </Field>
                       <Field label={t("Severity")} htmlFor="rule-severity">
-                        <Select value={form.watch("severity")} onValueChange={(v) => form.setValue("severity", v)}>
-                          <SelectTrigger id="rule-severity"><SelectValue /></SelectTrigger>
-                          <SelectContent>{SEVERITIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        <Select
+                          value={form.watch("severity")}
+                          onValueChange={(v) => form.setValue("severity", v)}
+                        >
+                          <SelectTrigger id="rule-severity">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SEVERITIES.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
                         </Select>
                       </Field>
-                      <div className="flex items-end gap-2 pb-2"><Switch id="rule-alert" checked={form.watch("create_alert")} onCheckedChange={(v) => form.setValue("create_alert", v)} /><label htmlFor="rule-alert" className="text-sm">{t("Create an alert")}</label></div>
+                      <div className="flex items-end gap-2 pb-2">
+                        <Switch
+                          id="rule-alert"
+                          checked={form.watch("create_alert")}
+                          onCheckedChange={(v) =>
+                            form.setValue("create_alert", v)
+                          }
+                        />
+                        <label htmlFor="rule-alert" className="text-sm">
+                          {t("Create an alert")}
+                        </label>
+                      </div>
                     </div>
-                    <Field label={t("Title")} htmlFor="rule-title" hint={t("Placeholders: {entity} {device} {feature} {metric} {value} {rule}")} error={err.title?.message}><Input id="rule-title" {...form.register("title")} /></Field>
-                    <Field label={t("Description")} htmlFor="rule-event-description"><Textarea id="rule-event-description" rows={2} {...form.register("event_description")} /></Field>
+                    <Field
+                      label={t("Title")}
+                      htmlFor="rule-title"
+                      hint={t(
+                        "Placeholders: {entity} {device} {feature} {metric} {value} {rule}",
+                      )}
+                      error={err.title?.message}
+                    >
+                      <Input id="rule-title" {...form.register("title")} />
+                    </Field>
+                    <Field
+                      label={t("Description")}
+                      htmlFor="rule-event-description"
+                    >
+                      <Textarea
+                        id="rule-event-description"
+                        rows={2}
+                        {...form.register("event_description")}
+                      />
+                    </Field>
                   </div>
                 </>
               )}
@@ -341,16 +987,65 @@ export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplat
           </TabsContent>
           <TabsContent value="test">
             <div className="space-y-3">
-              <Callout kind="info">{t("Replays the definition above over the project's positions and measurements without creating anything. Bounded to 50,000 rows and 500 events.")}</Callout>
+              <Callout kind="info">
+                {t(
+                  "Replays the definition above over the project's positions and measurements without creating anything. Bounded to 50,000 rows and 500 events.",
+                )}
+              </Callout>
               <div className="flex flex-wrap items-end gap-2">
-                <Field label={t("From")} htmlFor="replay-from"><Input id="replay-from" type="datetime-local" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /></Field>
-                <Field label={t("To")} htmlFor="replay-to"><Input id="replay-to" type="datetime-local" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></Field>
-                <Button type="button" onClick={() => void form.handleSubmit((v: Values) => test.mutate(v))()} disabled={test.isPending}>{test.isPending ? "Running…" : "Run test"}</Button>
+                <Field label={t("From")} htmlFor="replay-from">
+                  <Input
+                    id="replay-from"
+                    type="datetime-local"
+                    value={range.from}
+                    onChange={(e) =>
+                      setRange({ ...range, from: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label={t("To")} htmlFor="replay-to">
+                  <Input
+                    id="replay-to"
+                    type="datetime-local"
+                    value={range.to}
+                    onChange={(e) => setRange({ ...range, to: e.target.value })}
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void form.handleSubmit((v: Values) => test.mutate(v))()
+                  }
+                  disabled={test.isPending}
+                >
+                  {test.isPending ? "Running…" : "Run test"}
+                </Button>
               </div>
               {replay && (
                 <>
-                  <div className="text-sm text-muted-foreground">{replay.total} {t("events over")} {replay.samples} {t("samples")}{replay.truncated ? ", showing the first 500" : ""}</div>
-                  <DataTable columns={[{ header: t("Time"), accessorKey: "time", cell: ({ getValue }) => formatTime(getValue<string>()) }, { header: t("Subject"), accessorKey: "subject_key" }, { header: t("Title"), accessorKey: "title" }, { header: t("Reason"), accessorKey: "reason" }]} data={replay.events} emptyMessage={t("The rule would not have fired in this range.")} />
+                  <div className="text-sm text-muted-foreground">
+                    {replay.total} {t("events over")} {replay.samples}{" "}
+                    {t("samples")}
+                    {replay.truncated
+                      ? t(", the first 500 listed; the counts cover them all")
+                      : ""}
+                  </div>
+                  <DataTable
+                    columns={[
+                      {
+                        header: t("Time"),
+                        accessorKey: "time",
+                        cell: ({ getValue }) => formatTime(getValue<string>()),
+                      },
+                      { header: t("Subject"), accessorKey: "subject_key" },
+                      { header: t("Title"), accessorKey: "title" },
+                      { header: t("Reason"), accessorKey: "reason" },
+                    ]}
+                    data={replay.events}
+                    emptyMessage={t(
+                      "The rule would not have fired in this range.",
+                    )}
+                  />
                 </>
               )}
             </div>
@@ -359,9 +1054,23 @@ export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplat
             <TabsContent value="versions">
               <div className="space-y-2">
                 {versions.data?.map((v) => (
-                  <details key={v.id} className="rounded-md border p-2" open={v.version === rule.current_version}>
-                    <summary className="cursor-pointer text-sm">{t("Version")} {v.version} <span className="text-muted-foreground">{formatTime(v.created_at)}</span> {v.version === rule.current_version && <StatusBadge value="active" />}</summary>
-                    <div className="mt-2"><JsonView value={v.document} /></div>
+                  <details
+                    key={v.id}
+                    className="rounded-md border p-2"
+                    open={v.version === rule.current_version}
+                  >
+                    <summary className="cursor-pointer text-sm">
+                      {t("Version")} {v.version}{" "}
+                      <span className="text-muted-foreground">
+                        {formatTime(v.created_at)}
+                      </span>{" "}
+                      {v.version === rule.current_version && (
+                        <StatusBadge value="active" />
+                      )}
+                    </summary>
+                    <div className="mt-2">
+                      <JsonView value={v.document} />
+                    </div>
                   </details>
                 ))}
               </div>
@@ -369,8 +1078,16 @@ export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplat
           )}
         </Tabs>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t("Cancel")}</Button>
-          <Button type="submit" form="rule-form" disabled={save.isPending}>{rule ? "Save new version" : "Create rule"}</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            {t("Cancel")}
+          </Button>
+          <Button type="submit" form="rule-form" disabled={save.isPending}>
+            {rule ? "Save new version" : "Create rule"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

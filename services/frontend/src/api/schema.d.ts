@@ -9505,7 +9505,12 @@ export interface components {
                 [key: string]: number | null;
             };
         };
-        /** SeriesResponse */
+        /**
+         * SeriesResponse
+         * @description The series, and what the bounds did to the request (decision D148): `notes` says when a
+         *     coarser bucket answers a bucket too fine for the range, or when only the first owners that
+         *     fit under MAX_SERIES are shown (`owners_shown` of `owners_total`).
+         */
         SeriesResponse: {
             /**
              * Time From
@@ -9527,6 +9532,12 @@ export interface components {
             aggregates: components["schemas"]["Aggregate"][];
             group_by: components["schemas"]["GroupBy"];
             layout: components["schemas"]["Layout"];
+            /** Notes */
+            notes?: string[];
+            /** Owners Shown */
+            owners_shown?: number | null;
+            /** Owners Total */
+            owners_total?: number | null;
             /** Series */
             series?: components["schemas"]["Series"][] | null;
             /** Columns */

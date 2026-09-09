@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Pencil, Plus } from "lucide-react";
+import { MapPin, Pencil, Plus, Table2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -31,6 +31,7 @@ import { Icon } from "@/components/icons/Icon";
 import { PictureEditor } from "@/components/common/PictureEditor";
 import type { EntityFeatureProperties } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
+import { recordsHref } from "@/lib/records";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -519,6 +520,18 @@ export function EntityPage() {
             </div>
           </TabsContent>
           <TabsContent value="data">
+            <div className="mb-3 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to={recordsHref(projectId, {
+                    entities: [e.id],
+                    at: around.at,
+                  })}
+                >
+                  <Table2 className="size-4" /> {t("All records")}
+                </Link>
+              </Button>
+            </div>
             <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">

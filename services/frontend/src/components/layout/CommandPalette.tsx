@@ -28,6 +28,7 @@ import {
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { useAuthStore } from "@/stores/auth";
 import { isAllProjects } from "@/lib/scope";
+import { recordsHref } from "@/lib/records";
 import { useProjectStore } from "@/stores/project";
 
 type Kind =
@@ -224,6 +225,35 @@ export function CommandPalette() {
                 {hit.subtitle}
               </span>
             )}
+            {(kind === "entity" || kind === "device") &&
+              (hit.project_id ?? projectId) && (
+                <button
+                  type="button"
+                  className={`${hit.subtitle ? "" : "ml-auto "}rounded border px-1.5 text-xs text-muted-foreground hover:bg-muted`}
+                  title={t("Every record of the last 30 days")}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    remember({
+                      kind,
+                      id: hit.id,
+                      name: hit.name,
+                      subtitle: hit.subtitle ?? null,
+                      to: target(kind, hit, projectId),
+                    });
+                    setOpen(false);
+                    void navigate(
+                      recordsHref(
+                        (hit.project_id ?? projectId)!,
+                        kind === "entity"
+                          ? { entities: [hit.id] }
+                          : { devices: [hit.id] },
+                      ),
+                    );
+                  }}
+                >
+                  {t("Data")}
+                </button>
+              )}
           </CommandItem>
         ))}
       </CommandGroup>

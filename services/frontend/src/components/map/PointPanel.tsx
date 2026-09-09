@@ -10,6 +10,7 @@ import { MapPanel, PanelRow } from "@/components/map/MapObjectPanel";
 import { measurementText } from "@/components/map/measurementText";
 import { Button } from "@/components/ui/button";
 import { formatTime } from "@/lib/format";
+import { recordsHref } from "@/lib/records";
 import { projectFor } from "@/lib/scope";
 
 /**
@@ -167,6 +168,17 @@ export function PointPanel({
               to={`/projects/${project}/devices/${p.device_id}?tab=data&${atParam}`}
             >
               {point.data?.device_name ?? t("device")}
+            </Link>
+          </PanelRow>
+          <PanelRow label={t("Records")}>
+            <Link
+              className="underline"
+              to={recordsHref(project, {
+                devices: [p.device_id],
+                at: p.time ?? time,
+              })}
+            >
+              {t("Every record at this time")}
             </Link>
           </PanelRow>
           {(p.curated_fields?.length ?? 0) > 0 && (

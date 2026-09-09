@@ -36,9 +36,15 @@ import {
 import { useGroups } from "@/hooks/useGroups";
 import { usePreference } from "@/hooks/usePreference";
 import { useRecords } from "@/hooks/useRecords";
-import { browserTimezone, RANGE_PRESETS, TIMEZONES } from "@/lib/analytics";
+import {
+  browserTimezone,
+  formatInZone,
+  RANGE_PRESETS,
+  TIMEZONES,
+} from "@/lib/analytics";
 import {
   columnsOf,
+  inputValue,
   readRecordsState,
   type RecordColumn,
   type RecordsState,
@@ -300,7 +306,7 @@ export function RecordsView({ projectId }: { projectId: string }) {
               <Input
                 id="rec-from"
                 type="datetime-local"
-                value={state.from ?? ""}
+                value={inputValue(state.from)}
                 onChange={(e) => update({ from: e.target.value })}
               />
             </Field>
@@ -308,7 +314,7 @@ export function RecordsView({ projectId }: { projectId: string }) {
               <Input
                 id="rec-to"
                 type="datetime-local"
-                value={state.to ?? ""}
+                value={inputValue(state.to)}
                 onChange={(e) => update({ to: e.target.value })}
               />
             </Field>
@@ -401,6 +407,20 @@ export function RecordsView({ projectId }: { projectId: string }) {
             </Button>
           </div>
           {records.error && <Callout kind="error">{records.error}</Callout>}
+          {state.at && (
+            <Callout kind="info">
+              {t("Around {{time}}: the row at that moment is marked.", {
+                time: formatInZone(state.at, state.timezone),
+              })}{" "}
+              <button
+                type="button"
+                className="underline"
+                onClick={() => update({ at: null })}
+              >
+                {t("Forget the moment")}
+              </button>
+            </Callout>
+          )}
           {total !== null && total > 50_000 && records.status === "loading" && (
             <Callout kind="info">
               {t(
@@ -443,6 +463,7 @@ export function RecordsView({ projectId }: { projectId: string }) {
             rows={records.rows}
             columns={shown}
             timezone={state.timezone}
+            highlightTime={state.at}
             onRowClick={(row: RecordRow) => {
               if (row.source_event_id != null && row.source_event_ingested_at)
                 setEvent({

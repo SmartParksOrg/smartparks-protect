@@ -33520,6 +33520,35 @@
      "layout": {
       "$ref": "#/components/schemas/Layout"
      },
+     "notes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Notes"
+     },
+     "owners_shown": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Owners Shown"
+     },
+     "owners_total": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Owners Total"
+     },
      "series": {
       "anyOf": [
        {
@@ -33582,7 +33611,8 @@
      "group_by",
      "layout"
     ],
-    "title": "SeriesResponse"
+    "title": "SeriesResponse",
+    "description": "The series, and what the bounds did to the request (decision D148): `notes` says when a\ncoarser bucket answers a bucket too fine for the range, or when only the first owners that\nfit under MAX_SERIES are shown (`owners_shown` of `owners_total`)."
    },
    "ServerAdminInvitationCreate": {
     "properties": {
