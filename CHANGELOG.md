@@ -4,6 +4,12 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+Nothing yet.
+
+## v2.4.0, 2026-09-09
+
+Phase 20, explore and export from the entity or device (decisions D142 to D149), built in one day on Tim's observation that people think from the animal or the collar and the time, not from a metric: the Data explorer opens on a Records tab that gives everything a selection produced as one row per moment, loaded page after page with progress and never a refusal, exported as one file directly or through a job the dialog starts itself, reached from the Data tabs, the map's track points and the search palette; the analysis bounds answer with a coarser bucket or the first owners and say so, every list loads more instead of stopping at 500, and the API's queries stop in the database when the proxy gives up.
+
 ### Migrations
 
 - 0023 (export jobs accept the `records` dataset): the check constraint gains the value; the downgrade deletes records jobs and restores the old constraint.

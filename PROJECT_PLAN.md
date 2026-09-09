@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 20 (explore and export from the entity or device): the records read, the records view and the records export built on 2026-09-09, not committed; the limits, the links and the docs are next; phase 20 (explore and export from the entity or device) after it |
-| Latest release | v2.3.0 (2026-09-09): phase 19, the live map as a working tool |
+| Active phase | Phase 20 (explore and export from the entity or device) released as v2.4.0 on 2026-09-09; the next phase is to plan with Tim |
+| Latest release | v2.4.0 (2026-09-09): phase 20, explore and export from the entity or device |
 | Last session | 2026-09-09 |
-| Next item | Phase 20: the limits reworded (a coarser bucket instead of an error, paging instead of a stop at 500), the links from the Data tabs and the map into the records view, the docs; Tim commits the first three items first. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Next item | Plan the next phase with Tim from live use. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -254,7 +254,7 @@ From architecture section 2, used when reviewing a change. These are never done;
 | (folded into v2.2.0) | 16 | The device layer on the map and the all-projects scope for server admins (D111 to D118); v2.1.0 was never tagged |
 | v2.2.0 | 17, 18 | ChirpStack applications connected from the tenant (D125 to D132), simple first with the Overview, Data and Network tabs (D133, D134), and the fixes since v2.0.0 |
 | v2.3.0 (2026-09-09) | 19 | The live map as a working tool: panels on every dot, links that make the object visible, one control strip, heatmaps per entity and device, drawing and measuring with features that start rules, the proximity condition, satellite imagery and terrain |
-| v2.4.0 | 20 | Explore and export from the entity or device: the records view, paging with progress instead of refusals, the records export |
+| v2.4.0 (2026-09-09) | 20 | Explore and export from the entity or device: the records view, paging with progress instead of refusals, the records export, links from the Data tabs and the map, the bounds that answer, a statement timeout on the API |
 
 ## Architecture coverage map
 
@@ -946,9 +946,9 @@ Release:
 
 Release:
 
-- [ ] `VERSION` v2.4.0 with the changelog and the release process.
+- [x] (2026-09-09) `VERSION` v2.4.0 with the changelog and the release process.
 
-**Exit criteria.** On the dev server: SP051307 with its whole assignment period gives every fix and status record of the collar as rows with the metrics of each moment, the progress bar runs to the count and the table scrolls through all of them; the same selection exports as one XLSX through a job started from the dialog without a refusal; a bucket too fine in the Analysis tab answers with a coarser bucket and a note; the Data tab of Rhino 14's entity page opens the records view on the entity; a click on a track point on the map lands on that row.
+**Exit criteria (every item checked in a browser against the dev server on 2026-09-09; the canvas click itself by hand in phase 19).** On the dev server: SP051307 with its whole assignment period gives every fix and status record of the collar as rows with the metrics of each moment, the progress bar runs to the count and the table scrolls through all of them; the same selection exports as one XLSX through a job started from the dialog without a refusal; a bucket too fine in the Analysis tab answers with a coarser bucket and a note; the Data tab of Rhino 14's entity page opens the records view on the entity; a click on a track point on the map lands on that row.
 
 ---
 
@@ -1558,3 +1558,7 @@ Listed by the phase where they are first needed.
 - Built: `statement_timeout_seconds` on the settings, set for the API service alone by compose (`API_STATEMENT_TIMEOUT_SECONDS`); `Resolution.requested` and `_owners` in the analytics router, `notes`, `owners_shown` and `owners_total` on the series response; `usePages` (an infinite query) and `LoadMore` on the rows dialog, the entity, device and group lists and the admin's devices; `recordsHref` and `?at=` for the links from the Data tabs, the point panel and the palette, the marked row scrolled into view; the two docs pages rewritten. Verified: ruff, mypy, the shared unit tests, frontend types, lint, catalogue, unit tests and build; a browser pass against the dev server through the Vite proxy for the marked row, both Data tabs, Load more on the all-projects device list (500 then 1,000 rows), the notes (stubbed onto the live series answer), the palette's Data button and the point panel's link landing on the marked row. Found on the way and fixed: the virtual table's sticky header was translucent, and a link's ISO window left the custom range inputs blank.
 - Remaining for the phase: the release v2.4.0 after Tim's check of the exit criteria on the dev server (SP051307's whole assignment period, the XLSX job, Rhino 14's Data tab, a track point landing on its row).
 - Exit criteria checked in a browser against the deployed site on Tim's word: SP051307's whole assignment period (4,522 rows, equal to the count, scrolled to 16 July, a row opens its source event), the XLSX both directly and through a job (4,522 rows with the metric columns), a 1s bucket over 30 days answered per 15 minutes with the note, Rhino 14's Data tab opening the records view (48 records), and the point panel's link landing on the marked row. The click on the canvas itself is not automatable; the panel it produces was verified in phase 19. Found and fixed: the Period select ran into the Timezone box.
+
+### 2026-09-09, release v2.4.0 (Tim)
+
+- Tagged v2.4.0 after CI on the release commit: phase 20 complete, the exit criteria checked against the dev server, deployed with the env-refresh playbook. The next phase is to plan with Tim from live use.
