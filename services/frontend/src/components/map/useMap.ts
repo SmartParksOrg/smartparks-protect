@@ -1,9 +1,28 @@
-import type { Map as MapLibreMap, RequestTransformFunction } from "maplibre-gl";
+import type {
+  IControl,
+  Map as MapLibreMap,
+  RequestTransformFunction,
+} from "maplibre-gl";
 import { type RefObject, useEffect, useRef, useState } from "react";
 
 import { BASEMAPS, type BasemapKey } from "@/components/map/basemap";
 import { maplibregl } from "@/components/map/maplibre";
 import { useAuthStore } from "@/stores/auth";
+
+/** An empty MapLibre control the page renders the control strip into (decision D137), so the
+ * strip stacks under the map's own buttons whatever their height. */
+class StripHost implements IControl {
+  readonly element = document.createElement("div");
+
+  onAdd(): HTMLElement {
+    this.element.className = "maplibregl-ctrl protect-strip";
+    return this.element;
+  }
+
+  onRemove(): void {
+    this.element.remove();
+  }
+}
 
 /**
  * One MapLibre map bound to a container. Tile requests to our own API get the bearer token
@@ -18,6 +37,7 @@ export function useMap(
 ) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const [ready, setReady] = useState(false);
+  const [stripHost, setStripHost] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
@@ -52,6 +72,9 @@ export function useMap(
       }),
       "top-right",
     );
+    const strip = new StripHost();
+    map.addControl(strip, "top-right");
+    setStripHost(strip.element);
     map.addControl(
       new maplibregl.ScaleControl({ unit: "metric" }),
       "bottom-left",
@@ -70,6 +93,7 @@ export function useMap(
       map.remove();
       mapRef.current = null;
       setReady(false);
+      setStripHost(null);
     };
     // the map is created once; basemap changes go through setStyle below
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,5 +108,5 @@ export function useMap(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basemap]);
 
-  return { mapRef, ready };
+  return { mapRef, ready, stripHost };
 }

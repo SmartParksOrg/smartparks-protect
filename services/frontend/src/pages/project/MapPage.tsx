@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Layers, ListTree } from "lucide-react";
+import { Layers, ListTree, Route } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { api } from "@/api/client";
@@ -66,6 +67,7 @@ import {
   revealFeature,
   revealGateway,
 } from "@/components/map/layerChoices";
+import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
 import { boundsOf } from "@/components/map/fit";
 import { GatewayPanel } from "@/components/map/GatewayPanel";
 import { LayerPanel } from "@/components/map/LayerPanel";
@@ -82,14 +84,6 @@ import { TracksCard, TrackSettingsPanel } from "@/components/map/TrackSettings";
 import { useTrackLengthLabel } from "@/components/map/useTrackLengthLabel";
 import { useMap } from "@/components/map/useMap";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useGroups } from "@/hooks/useGroups";
 import { usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
@@ -184,7 +178,12 @@ export function MapPage() {
   );
   const [basemap, setBasemap] = useState<BasemapKey>(loadBasemap);
   const container = useRef<HTMLDivElement | null>(null);
-  const { mapRef, ready } = useMap(container, basemap, [31.5, -24.9], 6);
+  const { mapRef, ready, stripHost } = useMap(
+    container,
+    basemap,
+    [31.5, -24.9],
+    6,
+  );
   const client = useQueryClient();
   const navigate = useNavigate();
   const selectedEvent = params.get("event");
@@ -235,7 +234,22 @@ export function MapPage() {
     (next: LayerChoices) => setAllLayers({ ...allLayers, [projectId]: next }),
     [allLayers, projectId, setAllLayers],
   );
-  const [panelOpen, setPanelOpen] = useState(false);
+  // the layers panel's state lives in the URL (`?layers=1`) so a link and the sweep reach it
+  const panelOpen = params.get("layers") === "1";
+  const setPanelOpen = useCallback(
+    (open: boolean) =>
+      setParams(
+        (p) => {
+          if (open) p.set("layers", "1");
+          else p.delete("layers");
+          return p;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  // the Tracks card shows while tracks are on unless folded from the strip
+  const [tracksCardHidden, setTracksCardHidden] = useState(false);
   const visibleFeatures = useMemo(
     () =>
       currentFeatures?.filter((f) =>
@@ -967,291 +981,293 @@ export function MapPage() {
     gateways.data,
   ]);
 
+  const tracksOn = trackedIds.length + trackedDeviceIds.length > 0;
+  const stripItems: StripItem[] = [
+    {
+      kind: "menu",
+      key: "basemap",
+      icon: Layers,
+      label: t("Base map"),
+      value: basemap,
+      options: Object.entries(BASEMAPS).map(([value, b]) => ({
+        value,
+        label: b.label,
+      })),
+      onChange: (v) => {
+        setBasemap(v as BasemapKey);
+        saveBasemap(v as BasemapKey);
+      },
+    },
+    {
+      key: "layers",
+      icon: ListTree,
+      label: t("Layers"),
+      active: panelOpen,
+      onClick: () => setPanelOpen(!panelOpen),
+    },
+    {
+      key: "tracks",
+      icon: Route,
+      label: tracksOn
+        ? t("Tracks, {{length}}", { length: trackLengthLabel })
+        : t("Show a track from an entity or device panel"),
+      active: tracksOn && !tracksCardHidden,
+      disabled: !tracksOn,
+      badge: trackedIds.length + trackedDeviceIds.length,
+      onClick: () => setTracksCardHidden((h) => !h),
+    },
+  ];
+
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={container} className="absolute! inset-0 z-0" />
-      {/* bounded on the right so the controls wrap on a phone instead of widening the page;
-          the map's own buttons sit in the strip that stays free at the right */}
-      <div
-        className={`absolute top-3 right-16 z-10 flex flex-col items-start gap-2 ${panelOpen ? "left-[23rem]" : "left-3"}`}
-      >
-        <div className="flex max-w-full flex-wrap items-center gap-2">
-          <Select
-            value={basemap}
-            onValueChange={(v) => {
-              setBasemap(v as BasemapKey);
-              saveBasemap(v as BasemapKey);
+      {/* the counts, the one thing left in the top left (decision D137) */}
+      <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-2">
+        {current.data && (
+          <Badge variant="secondary" className="bg-card">
+            {visibleFeatures &&
+            visibleFeatures.length !== currentFeatures?.length
+              ? `${visibleFeatures.length} / `
+              : ""}
+            {current.data.total} {t("entities")}
+            {current.data.use_tiles ? ", tiles" : ""}
+            {visibleDevices.length > 0
+              ? `, ${t("{{count}} devices", { count: visibleDevices.length })}`
+              : ""}
+          </Badge>
+        )}
+        {events.data && events.data.features.length > 0 && (
+          <Badge
+            variant="secondary"
+            className="pointer-events-auto cursor-pointer bg-card"
+            onClick={() => void navigate(`/projects/${projectId}/rules/events`)}
+          >
+            {events.data.features.length} {t("events, 24 h")}
+          </Badge>
+        )}
+      </div>
+      {/* the control strip, rendered into the map's own top right stack */}
+      {stripHost &&
+        createPortal(<ControlStrip items={stripItems} />, stripHost)}
+      {/* the right column: cards, the layers panel and the object panel open from the right edge
+          under the strip on desktop and from the bottom on a phone */}
+      <div className="pointer-events-none absolute right-14 bottom-2 left-2 z-10 flex max-h-[70%] flex-col gap-2 sm:top-3 sm:bottom-3 sm:left-auto sm:max-h-none sm:w-[22rem] [&>*]:pointer-events-auto">
+        {tracksOn && !tracksCardHidden && (
+          <TracksCard
+            count={trackedIds.length + trackedDeviceIds.length}
+            points={trackPoints}
+            length={trackLength}
+            settingsOpen={trackSettingsOpen}
+            onToggleSettings={() => setTrackSettingsOpen((o) => !o)}
+            onClear={() => {
+              setParams(
+                (p) => {
+                  p.delete("tracks");
+                  p.delete("device_tracks");
+                  return p;
+                },
+                { replace: true },
+              );
+              setTrackSettingsOpen(false);
             }}
-          >
-            <SelectTrigger
-              className="h-9 w-9 justify-center bg-card px-0 sm:w-32 sm:justify-between sm:px-3"
-              aria-label={t("Base map")}
-            >
-              <Layers className="size-4" />
-              <span className="hidden sm:inline">
-                <SelectValue />
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(BASEMAPS).map(([key, b]) => (
-                <SelectItem key={key} value={key}>
-                  {b.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant={panelOpen ? "default" : "outline"}
-            size="sm"
-            className={panelOpen ? "" : "bg-card"}
-            aria-pressed={panelOpen}
-            onClick={() => setPanelOpen((o) => !o)}
-          >
-            <ListTree className="size-4" /> {t("Layers")}
-          </Button>
-          {current.data && (
-            <Badge variant="secondary" className="bg-card">
-              {visibleFeatures &&
-              visibleFeatures.length !== currentFeatures?.length
-                ? `${visibleFeatures.length} / `
-                : ""}
-              {current.data.total} {t("entities")}
-              {current.data.use_tiles ? ", tiles" : ""}
-              {visibleDevices.length > 0
-                ? `, ${t("{{count}} devices", { count: visibleDevices.length })}`
-                : ""}
-            </Badge>
-          )}
-          {events.data && events.data.features.length > 0 && (
-            <Badge
-              variant="secondary"
-              className="bg-card cursor-pointer"
-              onClick={() =>
-                void navigate(`/projects/${projectId}/rules/events`)
-              }
-            >
-              {events.data.features.length} {t("events, 24 h")}
-            </Badge>
-          )}
-          {trackedIds.length + trackedDeviceIds.length > 0 && (
-            <TracksCard
-              count={trackedIds.length + trackedDeviceIds.length}
-              points={trackPoints}
-              length={trackLength}
-              settingsOpen={trackSettingsOpen}
-              onToggleSettings={() => setTrackSettingsOpen((o) => !o)}
-              onClear={() => {
-                setParams(
-                  (p) => {
-                    p.delete("tracks");
-                    p.delete("device_tracks");
-                    return p;
-                  },
-                  { replace: true },
+          />
+        )}
+        {trackSettingsOpen && tracksOn && (
+          <TrackSettingsPanel
+            length={trackLength}
+            onChange={setTrackLength}
+            onClose={() => setTrackSettingsOpen(false)}
+          />
+        )}
+        {panelOpen && currentFeatures && (
+          <LayerPanel
+            entities={currentFeatures.map((f) => f.properties)}
+            groups={groups.data}
+            features={features.data?.items ?? []}
+            events={(events.data?.features ?? []).map(
+              (f) => f.properties as unknown as EventFeatureProperties,
+            )}
+            gateways={gateways.data ?? []}
+            coverage={layers.coverage ? coverage.data : undefined}
+            coverageError={
+              layers.coverage && coverage.isError
+                ? coverage.error.message
+                : undefined
+            }
+            onRetryCoverage={() => void coverage.refetch()}
+            choices={layers}
+            trackedIds={trackedIds}
+            trackLabel={trackLengthLabel}
+            devices={(deviceFeatures ?? []).map((f) => f.properties)}
+            projects={
+              allProjects
+                ? (projectList.data?.items ?? []).map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                  }))
+                : undefined
+            }
+            trackedDeviceIds={trackedDeviceIds}
+            onPickDevice={(id) => {
+              selectDevice(id);
+              const f = deviceFeatures?.find(
+                (x) => x.properties.device_id === id,
+              );
+              if (f?.geometry && mapRef.current)
+                mapRef.current.easeTo({
+                  center: f.geometry.coordinates as [number, number],
+                  zoom: Math.max(mapRef.current.getZoom(), 12),
+                });
+            }}
+            onToggleDeviceTrack={(id) =>
+              setTrackedDevices(
+                trackedDeviceIds.includes(id)
+                  ? trackedDeviceIds.filter((x) => x !== id)
+                  : [...trackedDeviceIds, id],
+                trackLength,
+              )
+            }
+            onChange={setLayers}
+            onClose={() => setPanelOpen(false)}
+            onToggleTrack={(id) =>
+              setTracked(
+                trackedIds.includes(id)
+                  ? trackedIds.filter((x) => x !== id)
+                  : [...trackedIds, id],
+                trackLength,
+              )
+            }
+            onPickGateway={(id) => {
+              const g = gateways.data?.find((x) => x.id === id);
+              if (g?.geometry)
+                fitGeometry(
+                  mapRef.current,
+                  g.geometry as unknown as GeoJSON.Geometry,
                 );
-                setTrackSettingsOpen(false);
-              }}
-            />
-          )}
-        </div>
-        {trackSettingsOpen &&
-          trackedIds.length + trackedDeviceIds.length > 0 && (
-            <TrackSettingsPanel
-              length={trackLength}
-              onChange={setTrackLength}
-              onClose={() => setTrackSettingsOpen(false)}
+            }}
+            onPickEntity={(id) => {
+              select(id);
+              const f = currentFeatures.find(
+                (x) => x.properties.entity_id === id,
+              );
+              if (f)
+                mapRef.current?.easeTo({
+                  center: f.geometry.coordinates as [number, number],
+                  zoom: Math.max(mapRef.current.getZoom(), 12),
+                });
+            }}
+            onPickFeature={(id) => {
+              const f = features.data?.items.find((x) => x.id === id);
+              if (f?.geometry)
+                fitGeometry(
+                  mapRef.current,
+                  f.geometry as unknown as GeoJSON.Geometry,
+                );
+            }}
+            onPickEvent={(id) => {
+              const f = events.data?.features.find(
+                (x) =>
+                  (x.properties as unknown as EventFeatureProperties)
+                    .event_id === id,
+              );
+              if (f?.geometry.type === "Point")
+                mapRef.current?.easeTo({
+                  center: f.geometry.coordinates as [number, number],
+                  zoom: Math.max(mapRef.current.getZoom(), 12),
+                });
+            }}
+          />
+        )}
+        {selected && (
+          <EntityPanel
+            props={selected}
+            projectId={projectId}
+            allProjects={allProjects}
+            projectName={projectName}
+            now={now}
+            wasHidden={revealNote === `entity:${selected.entity_id}`}
+            onClose={() => select(null)}
+            tracked={trackedIds.includes(selected.entity_id)}
+            trackLengthLabel={trackLengthLabel}
+            track={selectedTrack}
+            onToggleTrack={() =>
+              setTracked(
+                trackedIds.includes(selected.entity_id)
+                  ? trackedIds.filter((x) => x !== selected.entity_id)
+                  : [...new Set([...trackedIds, selected.entity_id])],
+                trackLength,
+              )
+            }
+          />
+        )}
+        {!selected && selectedDevice && (
+          <DevicePanel
+            props={selectedDevice.properties}
+            projectId={projectId}
+            allProjects={allProjects}
+            projectName={projectName}
+            now={now}
+            wasHidden={
+              revealNote === `device:${selectedDevice.properties.device_id}`
+            }
+            onClose={() => selectDevice(null)}
+            tracked={trackedDeviceIds.includes(
+              selectedDevice.properties.device_id,
+            )}
+            trackLengthLabel={trackLengthLabel}
+            track={selectedDeviceTrack}
+            onToggleTrack={() =>
+              setTrackedDevices(
+                trackedDeviceIds.includes(selectedDevice.properties.device_id)
+                  ? trackedDeviceIds.filter(
+                      (x) => x !== selectedDevice.properties.device_id,
+                    )
+                  : [
+                      ...new Set([
+                        ...trackedDeviceIds,
+                        selectedDevice.properties.device_id,
+                      ]),
+                    ],
+                trackLength,
+              )
+            }
+          />
+        )}
+        {!selected && !selectedDevice && selectedGatewayId && (
+          <GatewayPanel
+            projectId={projectId}
+            gatewayId={selectedGatewayId}
+            allProjects={allProjects}
+            serverAdmin={Boolean(user?.is_superuser)}
+            now={now}
+            wasHidden={revealNote === `gateway:${selectedGatewayId}`}
+            onClose={() => selectGateway(null)}
+            choices={layers}
+            coverage={layers.coverage ? coverage.data : undefined}
+            onChange={setLayers}
+          />
+        )}
+        {!selected &&
+          !selectedDevice &&
+          !selectedGatewayId &&
+          selectedPoint && (
+            <PointPanel
+              projectId={projectId}
+              ownerId={selectedPoint.ownerId}
+              kind={
+                trackedDeviceIds.includes(selectedPoint.ownerId)
+                  ? "device"
+                  : "entity"
+              }
+              time={selectedPoint.time}
+              onClose={() => selectPoint(null)}
+              onOpenSourceEvent={(id, ingestedAt) =>
+                setSourceEvent({ id, ingestedAt })
+              }
+              onOpenTrace={setTrace}
             />
           )}
       </div>
-      {panelOpen && currentFeatures && (
-        <LayerPanel
-          entities={currentFeatures.map((f) => f.properties)}
-          groups={groups.data}
-          features={features.data?.items ?? []}
-          events={(events.data?.features ?? []).map(
-            (f) => f.properties as unknown as EventFeatureProperties,
-          )}
-          gateways={gateways.data ?? []}
-          coverage={layers.coverage ? coverage.data : undefined}
-          coverageError={
-            layers.coverage && coverage.isError
-              ? coverage.error.message
-              : undefined
-          }
-          onRetryCoverage={() => void coverage.refetch()}
-          choices={layers}
-          trackedIds={trackedIds}
-          trackLabel={trackLengthLabel}
-          devices={(deviceFeatures ?? []).map((f) => f.properties)}
-          projects={
-            allProjects
-              ? (projectList.data?.items ?? []).map((p) => ({
-                  id: p.id,
-                  name: p.name,
-                }))
-              : undefined
-          }
-          trackedDeviceIds={trackedDeviceIds}
-          onPickDevice={(id) => {
-            selectDevice(id);
-            const f = deviceFeatures?.find(
-              (x) => x.properties.device_id === id,
-            );
-            if (f?.geometry && mapRef.current)
-              mapRef.current.easeTo({
-                center: f.geometry.coordinates as [number, number],
-                zoom: Math.max(mapRef.current.getZoom(), 12),
-              });
-          }}
-          onToggleDeviceTrack={(id) =>
-            setTrackedDevices(
-              trackedDeviceIds.includes(id)
-                ? trackedDeviceIds.filter((x) => x !== id)
-                : [...trackedDeviceIds, id],
-              trackLength,
-            )
-          }
-          onChange={setLayers}
-          onClose={() => setPanelOpen(false)}
-          onToggleTrack={(id) =>
-            setTracked(
-              trackedIds.includes(id)
-                ? trackedIds.filter((x) => x !== id)
-                : [...trackedIds, id],
-              trackLength,
-            )
-          }
-          onPickGateway={(id) => {
-            const g = gateways.data?.find((x) => x.id === id);
-            if (g?.geometry)
-              fitGeometry(
-                mapRef.current,
-                g.geometry as unknown as GeoJSON.Geometry,
-              );
-          }}
-          onPickEntity={(id) => {
-            select(id);
-            const f = currentFeatures.find(
-              (x) => x.properties.entity_id === id,
-            );
-            if (f)
-              mapRef.current?.easeTo({
-                center: f.geometry.coordinates as [number, number],
-                zoom: Math.max(mapRef.current.getZoom(), 12),
-              });
-          }}
-          onPickFeature={(id) => {
-            const f = features.data?.items.find((x) => x.id === id);
-            if (f?.geometry)
-              fitGeometry(
-                mapRef.current,
-                f.geometry as unknown as GeoJSON.Geometry,
-              );
-          }}
-          onPickEvent={(id) => {
-            const f = events.data?.features.find(
-              (x) =>
-                (x.properties as unknown as EventFeatureProperties).event_id ===
-                id,
-            );
-            if (f?.geometry.type === "Point")
-              mapRef.current?.easeTo({
-                center: f.geometry.coordinates as [number, number],
-                zoom: Math.max(mapRef.current.getZoom(), 12),
-              });
-          }}
-        />
-      )}
-      {selected && (
-        <EntityPanel
-          props={selected}
-          projectId={projectId}
-          allProjects={allProjects}
-          projectName={projectName}
-          now={now}
-          wasHidden={revealNote === `entity:${selected.entity_id}`}
-          panelOpen={panelOpen}
-          onClose={() => select(null)}
-          tracked={trackedIds.includes(selected.entity_id)}
-          trackLengthLabel={trackLengthLabel}
-          track={selectedTrack}
-          onToggleTrack={() =>
-            setTracked(
-              trackedIds.includes(selected.entity_id)
-                ? trackedIds.filter((x) => x !== selected.entity_id)
-                : [...new Set([...trackedIds, selected.entity_id])],
-              trackLength,
-            )
-          }
-        />
-      )}
-      {!selected && selectedDevice && (
-        <DevicePanel
-          props={selectedDevice.properties}
-          projectId={projectId}
-          allProjects={allProjects}
-          projectName={projectName}
-          now={now}
-          wasHidden={
-            revealNote === `device:${selectedDevice.properties.device_id}`
-          }
-          panelOpen={panelOpen}
-          onClose={() => selectDevice(null)}
-          tracked={trackedDeviceIds.includes(
-            selectedDevice.properties.device_id,
-          )}
-          trackLengthLabel={trackLengthLabel}
-          track={selectedDeviceTrack}
-          onToggleTrack={() =>
-            setTrackedDevices(
-              trackedDeviceIds.includes(selectedDevice.properties.device_id)
-                ? trackedDeviceIds.filter(
-                    (x) => x !== selectedDevice.properties.device_id,
-                  )
-                : [
-                    ...new Set([
-                      ...trackedDeviceIds,
-                      selectedDevice.properties.device_id,
-                    ]),
-                  ],
-              trackLength,
-            )
-          }
-        />
-      )}
-      {!selected && !selectedDevice && selectedGatewayId && (
-        <GatewayPanel
-          projectId={projectId}
-          gatewayId={selectedGatewayId}
-          allProjects={allProjects}
-          serverAdmin={Boolean(user?.is_superuser)}
-          now={now}
-          wasHidden={revealNote === `gateway:${selectedGatewayId}`}
-          panelOpen={panelOpen}
-          onClose={() => selectGateway(null)}
-          choices={layers}
-          coverage={layers.coverage ? coverage.data : undefined}
-          onChange={setLayers}
-        />
-      )}
-      {!selected && !selectedDevice && !selectedGatewayId && selectedPoint && (
-        <PointPanel
-          projectId={projectId}
-          ownerId={selectedPoint.ownerId}
-          kind={
-            trackedDeviceIds.includes(selectedPoint.ownerId)
-              ? "device"
-              : "entity"
-          }
-          time={selectedPoint.time}
-          panelOpen={panelOpen}
-          onClose={() => selectPoint(null)}
-          onOpenSourceEvent={(id, ingestedAt) =>
-            setSourceEvent({ id, ingestedAt })
-          }
-          onOpenTrace={setTrace}
-        />
-      )}
       <SourceEventDialog
         id={sourceEvent?.id ?? null}
         ingestedAt={sourceEvent?.ingestedAt ?? null}

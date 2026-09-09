@@ -21,7 +21,6 @@ export function PointPanel({
   ownerId,
   kind,
   time,
-  panelOpen,
   onClose,
   onOpenSourceEvent,
   onOpenTrace,
@@ -30,7 +29,6 @@ export function PointPanel({
   ownerId: string;
   kind: "entity" | "device";
   time: string;
-  panelOpen: boolean;
   onClose: () => void;
   onOpenSourceEvent: (id: number, ingestedAt: string) => void;
   onOpenTrace: (traceId: string) => void;
@@ -73,7 +71,6 @@ export function PointPanel({
         </span>
       }
       onClose={onClose}
-      panelOpen={panelOpen}
       footer={
         p ? (
           <>

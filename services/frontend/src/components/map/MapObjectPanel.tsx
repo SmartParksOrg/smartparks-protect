@@ -26,7 +26,6 @@ export function MapPanel({
   picture,
   note,
   onClose,
-  panelOpen,
   children,
   footer,
 }: {
@@ -38,16 +37,12 @@ export function MapPanel({
   /** A line under the header, for example that the object was hidden until this visit. */
   note?: ReactNode;
   onClose: () => void;
-  /** The layers panel is open, so the panel moves right of it on desktop. */
-  panelOpen: boolean;
   children: ReactNode;
   footer?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
-    <aside
-      className={`absolute bottom-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80 ${panelOpen ? "left-[23rem]" : "left-3"}`}
-    >
+    <aside className="max-h-[45vh] shrink-0 overflow-y-auto rounded-lg border bg-card p-4 shadow-lg">
       <div className="flex items-start gap-2">
         {picture}
         <div className="min-w-0 flex-1">
@@ -197,7 +192,6 @@ export function EntityPanel({
   projectName,
   now,
   wasHidden,
-  panelOpen,
   onClose,
   tracked,
   trackLengthLabel,
@@ -211,7 +205,6 @@ export function EntityPanel({
   now: number;
   /** The entity was hidden in the layers panel and switched on for this visit. */
   wasHidden: boolean;
-  panelOpen: boolean;
   onClose: () => void;
   tracked: boolean;
   trackLengthLabel: string;
@@ -249,7 +242,6 @@ export function EntityPanel({
           : undefined
       }
       onClose={onClose}
-      panelOpen={panelOpen}
       footer={
         <TrackButton
           on={tracked}
@@ -319,7 +311,6 @@ export function DevicePanel({
   projectName,
   now,
   wasHidden,
-  panelOpen,
   onClose,
   tracked,
   trackLengthLabel,
@@ -332,7 +323,6 @@ export function DevicePanel({
   projectName: (id: string | null | undefined) => string;
   now: number;
   wasHidden: boolean;
-  panelOpen: boolean;
   onClose: () => void;
   tracked: boolean;
   trackLengthLabel: string;
@@ -373,7 +363,6 @@ export function DevicePanel({
           : undefined
       }
       onClose={onClose}
-      panelOpen={panelOpen}
       footer={
         <TrackButton
           on={tracked}

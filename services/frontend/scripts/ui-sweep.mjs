@@ -75,6 +75,8 @@ if (devices[0]) for (const tab of ["data", "network"]) routes.add(`/projects/${p
 if (tracked.length > 0) {
   routes.add(`/projects/${project.id}/map?entity=${tracked[0]}`);
   routes.add(`/projects/${project.id}/map?entity=${tracked[0]}&tracks=${tracked.join(",")}&track=168`);
+  // the layers panel open next to a selected entity (the right column of decision D137)
+  routes.add(`/projects/${project.id}/map?entity=${tracked[0]}&layers=1`);
 }
 
 rmSync("ui-sweep-output", { recursive: true, force: true });

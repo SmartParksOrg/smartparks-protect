@@ -29,7 +29,6 @@ export function GatewayPanel({
   serverAdmin,
   now,
   wasHidden,
-  panelOpen,
   onClose,
   choices,
   coverage,
@@ -41,7 +40,6 @@ export function GatewayPanel({
   serverAdmin: boolean;
   now: number;
   wasHidden: boolean;
-  panelOpen: boolean;
   onClose: () => void;
   choices: LayerChoices;
   coverage: CoverageResponse | undefined;
@@ -80,7 +78,6 @@ export function GatewayPanel({
           : undefined
       }
       onClose={onClose}
-      panelOpen={panelOpen}
       footer={
         <>
           <Button

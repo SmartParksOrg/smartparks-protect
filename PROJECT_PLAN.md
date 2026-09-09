@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 19 (the live map as a working tool): part a built on 2026-09-09, not committed; parts b to e open; phase 20 (explore and export from the entity or device) after it |
+| Active phase | Phase 19 (the live map as a working tool): parts a and b built on 2026-09-09 (a committed as b955252); parts c to e open; phase 20 (explore and export from the entity or device) after it |
 | Latest release | v2.2.0 (2026-09-08): phases 16 to 18 and the fixes since v2.0.0 |
 | Last session | 2026-09-09 |
-| Next item | Phase 19 part b, the control strip (D137); Tim commits part a first. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Next item | Phase 19 part c, the heatmap (D138); Tim commits part b first. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -882,7 +882,7 @@ a. Getting there and drilling down:
 
 b. Controls in one place:
 
-- [ ] The control strip: base map, layers, tracks, heatmap, draw, measure and terrain as one vertical strip of icon buttons in the top right under MapLibre's controls, one style, tooltips, the active tool filled, the badge counts kept; the Tracks and Heatmap cards and the layers panel open from the strip; the top left keeps the search box and the project name in the all scope. Phone: the strip stays vertical at the right edge and the cards open at the bottom. The sweep covers the map at the three widths with a panel and a card open.
+- [x] (2026-09-09, `ControlStrip.tsx` rendered through `createPortal` into a `StripHost` MapLibre control so it stacks under the map's own buttons; base map as a menu, Layers and Tracks with a count badge; the right column for the Tracks card, the settings, the layers panel and the object panel, a bottom sheet on a phone; `?layers=1`; the sweep route; heatmap, draw, measure and terrain join the same list in parts c to e) The control strip: base map, layers, tracks, heatmap, draw, measure and terrain as one vertical strip of icon buttons in the top right under MapLibre's controls, one style, tooltips, the active tool filled, the badge counts kept; the Tracks and Heatmap cards and the layers panel open from the strip; the top left keeps the search box and the project name in the all scope. Phone: the strip stays vertical at the right edge and the cards open at the bottom. The sweep covers the map at the three widths with a panel and a card open.
 
 c. Heatmap:
 
@@ -1501,3 +1501,9 @@ Listed by the phase where they are first needed.
 - Built part a: `GET /projects/{id}/positions/at` (`at_time` in `shared/curation/effective.py`, an index-friendly equality; the source event ingest time on position reads; in the all scope; `tests/api/test_map_point.py` and the access matrix), the reveal helpers with tests, track point and gateway click bindings with a highlighted point (tests), the panel shell with the entity, device, point and gateway bodies, `?point=` and `?revealed=` in the URL, the Data tabs' `?at=` window with the row highlighted, the Coverage tab naming a one-gateway narrowing. Checked against the dev API (the point read stubbed, since it is not deployed): the Okonjima fit, the entity, point and gateway panels, the reveal of a hidden entity with its note and the kept preference, the heard positions of one gateway, the phone width.
 - Found on the way: the preference document is bounded at 32 KB and the ops account's all-scope layer choices already take 30 KB, so the first heard-positions version (every other gateway hidden) failed to save with 422; the narrowing became one field and the bound is a risk row for part b.
 - Verified: ruff, mypy, frontend lint, types, catalogue, 54 unit tests, the build, OpenAPI regenerated. The API tests run in CI (Docker is off here). Not committed.
+
+### 2026-09-09, phase 19 part b: the control strip (Claude)
+
+- Part a committed as b955252 on Tim's word, CI green, deployed; the point read answered live on the dev server (a GNSS fix from a KPN collar carries no measurements of its own, the status message does at its own time).
+- Built part b: the strip as a MapLibre control host with the React strip portalled into it (base map menu, Layers, Tracks with the count and a fold), the right column for the Tracks card, the settings, the layers panel and the object panel (a bottom sheet on a phone), the counts alone in the top left, `?layers=1` in the URL and in the sweep. Checked against the dev API at 1440 and 390 px with tracks on, the layers panel open, the Tracks card folded and the base map menu.
+- Verified: frontend lint, types, catalogue, unit tests, the build. Not committed.

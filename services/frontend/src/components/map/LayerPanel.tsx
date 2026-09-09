@@ -1384,7 +1384,7 @@ export function LayerPanel({
   const customised = JSON.stringify(choices) !== JSON.stringify(DEFAULT_LAYERS);
   return (
     <aside
-      className="absolute inset-y-0 left-0 z-20 flex w-[22rem] max-w-full flex-col border-r bg-card text-sm shadow-lg"
+      className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card text-sm shadow-lg"
       aria-label={t("Map layers")}
     >
       <div className="flex items-center justify-between px-3 pt-3">
