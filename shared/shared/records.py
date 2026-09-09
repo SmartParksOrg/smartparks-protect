@@ -4,6 +4,7 @@ A moment is one (device, effective time); its row carries the position of that m
 the measurements by metric key and the state fields reported then."""
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -20,10 +21,12 @@ Key = tuple[uuid.UUID, datetime]
 
 @dataclass(slots=True)
 class RecordSelection:
-    """What to read: whose records, over which window; `project` is the project filter of the
-    caller's scope (a column expression) and `include_invalid` keeps curated-out rows."""
+    """What to read: whose records, over which window; `project` gives the project filter of
+    the caller's scope for a model's `project_id` column (it is called once per table read, so
+    a filter bound to one table never joins another in), and `include_invalid` keeps curated-out
+    rows."""
 
-    project: Any
+    project: Callable[[Any], Any]
     entity_ids: list[uuid.UUID]
     device_ids: list[uuid.UUID]
     since: datetime
@@ -60,7 +63,7 @@ def _owner(model: Any, selection: RecordSelection) -> Any:
 
 def conditions(model: Any, selection: RecordSelection) -> list[Any]:
     rules = [
-        selection.project,
+        selection.project(model.project_id),
         _owner(model, selection),
         in_window(model, selection.since, selection.until),
     ]
@@ -138,12 +141,12 @@ async def fill(session: AsyncSession, selection: RecordSelection, keys: list[Key
     span_from = min(t for _, t in keys)
     span_to = max(t for _, t in keys) + timedelta(microseconds=1)
     span_positions = [
-        selection.project,
+        selection.project(Position.project_id),
         Position.device_id.in_(devices),
         in_window(Position, span_from, span_to),
     ]
     span_measurements = [
-        selection.project,
+        selection.project(Measurement.project_id),
         Measurement.device_id.in_(devices),
         in_window(Measurement, span_from, span_to),
     ]

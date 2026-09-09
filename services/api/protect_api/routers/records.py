@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.deps import ScopeContext, require_scope_permission
 from shared.database import get_session
-from shared.models import Position
 from shared.permissions import Permission
 from shared.records import RecordSelection, count_keys, fill, keys_statement
 from shared.timeutil import require_aware, utc_now
@@ -129,7 +128,7 @@ async def records_count(
     count = await count_keys(
         session,
         RecordSelection(
-            context.where(Position.project_id, unassigned=True),
+            lambda column: context.where(column, unassigned=True),
             entity_ids,
             device_ids,
             since,
@@ -158,7 +157,7 @@ async def records(
     of the page's time span, read through the owner and time indexes."""
     entity_ids, device_ids, since, until = _selection(entity_id, device_id, time_from, time_to)
     selection = RecordSelection(
-        context.where(Position.project_id, unassigned=True),
+        lambda column: context.where(column, unassigned=True),
         entity_ids,
         device_ids,
         since,

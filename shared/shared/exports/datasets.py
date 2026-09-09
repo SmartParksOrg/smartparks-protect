@@ -130,7 +130,7 @@ async def load_lookups(
 
 def _record_selection(project_id: uuid.UUID, params: ExportParameters) -> RecordSelection:
     return RecordSelection(
-        project=Position.project_id == project_id,
+        project=lambda column: column == project_id,
         entity_ids=list(params.entity_ids),
         device_ids=list(params.device_ids),
         since=params.time_from,
