@@ -245,7 +245,7 @@ export function RecordsView({ projectId }: { projectId: string }) {
               })
             }
           >
-            <SelectTrigger id="rec-group">
+            <SelectTrigger id="rec-group" className="w-full">
               <SelectValue placeholder={t("Add a group")} />
             </SelectTrigger>
             <SelectContent>
@@ -265,7 +265,7 @@ export function RecordsView({ projectId }: { projectId: string }) {
             value={state.range}
             onValueChange={(v) => update({ range: v as RecordsState["range"] })}
           >
-            <SelectTrigger id="rec-range">
+            <SelectTrigger id="rec-range" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -288,7 +288,7 @@ export function RecordsView({ projectId }: { projectId: string }) {
             value={state.timezone}
             onValueChange={(v) => update({ timezone: v })}
           >
-            <SelectTrigger id="rec-tz">
+            <SelectTrigger id="rec-tz" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
