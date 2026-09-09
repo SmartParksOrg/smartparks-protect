@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(min_length=32, description="At least 32 bytes, RFC 7518 3.2")
     jwt_lifetime_seconds: int = 3600
     cors_origins: str = "http://localhost:3000"
+    maptiler_key: str | None = Field(
+        default=None,
+        description="MapTiler Cloud key for satellite imagery and terrain on the live map "
+        "(decision D141); empty keeps the free base maps only",
+    )
     public_url: str = Field(
         default="http://localhost:3000", description="Where links in emails point to"
     )

@@ -1991,6 +1991,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/map/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Map Config */
+        get: operations["map_config_api_v1_map_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/analytics/series": {
         parameters: {
             query?: never;
@@ -8014,6 +8031,11 @@ export interface components {
              * @default true
              */
             reprocess: boolean;
+        };
+        /** MapConfig */
+        MapConfig: {
+            /** Maptiler Key */
+            maptiler_key: string | null;
         };
         /** MeasurementRow */
         MeasurementRow: {
@@ -14698,6 +14720,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_config_api_v1_map_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapConfig"];
                 };
             };
         };

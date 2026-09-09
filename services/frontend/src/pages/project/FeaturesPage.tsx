@@ -16,7 +16,11 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
-import { loadBasemap } from "@/components/map/basemap";
+import {
+  basemapsFor,
+  basemapStyle,
+  loadBasemap,
+} from "@/components/map/basemap";
 import {
   createDrawSession,
   type DrawKind,
@@ -60,7 +64,12 @@ function DrawMap({
 }) {
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
-  const { mapRef, ready } = useMap(container, loadBasemap(), [31.5, -24.9], 6);
+  const { mapRef, ready } = useMap(
+    container,
+    basemapStyle(loadBasemap(), basemapsFor(null)),
+    [31.5, -24.9],
+    6,
+  );
   const session = useRef<DrawSession | null>(null);
   const drawKind: DrawKind =
     kind === "site" ? "point" : kind === "route" ? "line" : "polygon";

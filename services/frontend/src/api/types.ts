@@ -48,6 +48,7 @@ export type Position = Schemas["PositionRead"];
 export type Track = Schemas["TrackResponse"];
 export type PointRead = Schemas["PointRead"];
 export type HeatResponse = Schemas["HeatResponse"];
+export type MapConfig = Schemas["MapConfig"];
 export type CurrentState = Schemas["CurrentStateResponse"];
 export type AuditEntry = Schemas["AuditRead"];
 export type UserAdmin = Schemas["UserAdminRead"];

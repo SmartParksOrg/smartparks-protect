@@ -5,7 +5,6 @@ import type {
 } from "maplibre-gl";
 import { type RefObject, useEffect, useRef, useState } from "react";
 
-import { BASEMAPS, type BasemapKey } from "@/components/map/basemap";
 import { maplibregl } from "@/components/map/maplibre";
 import { useAuthStore } from "@/stores/auth";
 
@@ -31,7 +30,7 @@ class StripHost implements IControl {
  */
 export function useMap(
   container: RefObject<HTMLDivElement | null>,
-  basemap: BasemapKey,
+  style: string,
   center: [number, number],
   zoom: number,
 ) {
@@ -43,7 +42,7 @@ export function useMap(
     if (!container.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: container.current,
-      style: BASEMAPS[basemap].style,
+      style,
       center,
       zoom,
       attributionControl: { compact: true },
@@ -59,7 +58,7 @@ export function useMap(
       }) as RequestTransformFunction,
     });
     map.addControl(
-      new maplibregl.NavigationControl({ visualizePitch: false }),
+      new maplibregl.NavigationControl({ visualizePitch: true }),
       "top-right",
     );
     // "My location": the browser's geolocation, centred once with a marker; the control
@@ -103,10 +102,10 @@ export function useMap(
     const map = mapRef.current;
     if (!map || !ready) return;
     setReady(false);
-    map.setStyle(BASEMAPS[basemap].style);
+    map.setStyle(style);
     map.once("style.load", () => setReady(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basemap]);
+  }, [style]);
 
   return { mapRef, ready, stripHost };
 }

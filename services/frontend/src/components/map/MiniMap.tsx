@@ -4,7 +4,11 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router";
 
 import type { Position } from "@/api/types";
-import { loadBasemap, BASEMAPS } from "@/components/map/basemap";
+import {
+  basemapsFor,
+  basemapStyle,
+  loadBasemap,
+} from "@/components/map/basemap";
 import { maplibregl } from "@/components/map/maplibre";
 import { miniMapGeometry } from "@/components/map/miniMap";
 
@@ -50,7 +54,7 @@ export function MiniMap({
     if (!container.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: container.current,
-      style: BASEMAPS[loadBasemap()].style,
+      style: basemapStyle(loadBasemap(), basemapsFor(null)),
       center: [0, 0],
       zoom: 1,
       interactive: false,

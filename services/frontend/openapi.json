@@ -8563,6 +8563,32 @@
     }
    }
   },
+  "/api/v1/map/config": {
+   "get": {
+    "tags": [
+     "map"
+    ],
+    "summary": "Map Config",
+    "operationId": "map_config_api_v1_map_config_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MapConfig"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/projects/{project_id}/analytics/series": {
    "get": {
     "tags": [
@@ -28978,6 +29004,26 @@
      "device_id"
     ],
     "title": "LinkIdentity"
+   },
+   "MapConfig": {
+    "properties": {
+     "maptiler_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Maptiler Key"
+     }
+    },
+    "type": "object",
+    "required": [
+     "maptiler_key"
+    ],
+    "title": "MapConfig"
    },
    "MeasurementRow": {
     "properties": {

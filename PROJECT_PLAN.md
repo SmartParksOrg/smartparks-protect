@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 19 (the live map as a working tool): parts a to d built on 2026-09-09 (a to c committed, the last as 1616e26); part e open; phase 20 (explore and export from the entity or device) after it |
+| Active phase | Phase 19 (the live map as a working tool): parts a to e built on 2026-09-09 (a to d committed, the last as 8d8a7ef); the release and the live look at terrain wait for Tim's MapTiler key; phase 20 (explore and export from the entity or device) after it |
 | Latest release | v2.2.0 (2026-09-08): phases 16 to 18 and the fixes since v2.0.0 |
 | Last session | 2026-09-09 |
-| Next item | Phase 19 part e, satellite imagery and terrain (D141); Tim commits part d and the heatmap correction first. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Next item | Tim commits part e, puts a MapTiler key on the dev server (`maptiler_key` in the host vars) and looks at Satellite and 3D terrain live; then `VERSION` v2.3.0 with the changelog, and phase 20. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -898,9 +898,9 @@ d. Drawing and measuring:
 
 e. Base map:
 
-- [ ] Satellite imagery: a `satellite` entry in `BASEMAPS` behind `VITE_MAPTILER_KEY` (or the chosen provider), hidden without a key, labels as an overlay so names stay readable, the choice kept as today; the attribution as the provider requires; `.env.example` and the deployment guide.
-- [ ] 3D terrain: a Terrain switch in the strip that adds the DEM source (`setTerrain` with an exaggeration of 1.3, a hillshade layer under the data layers), allows pitch and shows the pitch control while on, off again cleanly on switch off and on base map change; kept per user; on a phone the switch stays available with the same tiles.
-- [ ] Docs: `docs/administration/pages.md` (the live map row: panels, tools, terrain), `DEVELOPERS.md` (the panel, the heat endpoint, the draw module, terrain), the changelog; a user page `docs/administration/live-map.md` with the tools in one place.
+- [x] (2026-09-09, `MAPTILER_KEY` on the server served by `GET /map/config` rather than a `VITE_` variable, since the frontend image is built once for every server; MapTiler's `hybrid` style as Satellite through `basemapsFor`, tested; hidden without a key) Satellite imagery: a `satellite` entry in `BASEMAPS` behind `VITE_MAPTILER_KEY` (or the chosen provider), hidden without a key, labels as an overlay so names stay readable, the choice kept as today; the attribution as the provider requires; `.env.example` and the deployment guide.
+- [x] (2026-09-09, `terrain.ts` over MapTiler's `terrain-rgb-v2` tiles, the switch in the strip when the server has a key, the preference `terrain`, the pitch on the compass; the live look waits for Tim's key on the dev server) 3D terrain: a Terrain switch in the strip that adds the DEM source (`setTerrain` with an exaggeration of 1.3, a hillshade layer under the data layers), allows pitch and shows the pitch control while on, off again cleanly on switch off and on base map change; kept per user; on a phone the switch stays available with the same tiles.
+- [x] (2026-09-09; the tools are described in the live map row of `pages.md` and per mechanism in `DEVELOPERS.md`, the separate user page waits for the screenshots after Tim's key is in) Docs: `docs/administration/pages.md` (the live map row: panels, tools, terrain), `DEVELOPERS.md` (the panel, the heat endpoint, the draw module, terrain), the changelog; a user page `docs/administration/live-map.md` with the tools in one place.
 
 Release:
 
@@ -990,7 +990,7 @@ Listed by the phase where they are first needed.
 - [ ] Phase 9: a ChatGPT account with Developer mode (Pro or Business) to connect https://dev-protect.smartparks.org/mcp; Claude was verified on 2026-09-04.
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work. (Built from documentation on 2026-09-04; the card and the adapter wait for a collar and an account.)
-- [ ] Phase 19: the provider of satellite imagery and terrain tiles (proposed MapTiler, one key for both), or the choice to run terrain on the free tiles without imagery.
+- [ ] Phase 19: a MapTiler Cloud key for the dev server (decided D141: MapTiler for both; `maptiler_key` in the vaulted host vars, restricted to dev-protect.smartparks.org at MapTiler), so Satellite and 3D terrain can be looked at live.
 - [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access. (2026-09-04: WildlifeNL's API is open source and the connector is built; FerusTracker's contract is the Node-RED flow Tim shared and the connector is built; Movebank became an export format. Still needed for live checks: a The Things Stack application, an Actility ThingPark deployment, an EarthRanger site with a token, WildlifeNL's API URL with a data-system account, FerusTracker's site value, and a CRA IoT account with a LoRa device.)
 
 ## Session log
@@ -1523,3 +1523,9 @@ Listed by the phase where they are first needed.
 - Built the proximity condition first: `near` left the reserved types, `NearCondition` (metres plus features by id or type, or entities), the evaluator's distances (haversine to entities, a local planar projection to features) with the nearest distance as the event's value, `entity_points` on the data access live and in replay, the `near_site` template, schema and evaluator tests (21 pass), the builder's row, the rules page opening the editor from `?new=<template>&feature=<id>`.
 - Then drawing and measuring: terra-draw installed with its MapLibre adapter (MIT, versions pinned), `draw.ts` as one session for the live map and the Features page, the Draw and Measure buttons in the strip, the bar with the running length or area, Save as feature into the existing endpoint with the new feature selected on the map, sites as points, a click on a feature opening its panel with Create rule. `lib/geodesy.ts` tested against known values.
 - Verified: ruff, mypy, the shared rule tests, frontend lint, types, catalogue, 64 unit tests, the build, OpenAPI regenerated. Browser check against the dev API: a polygon drawn with four clicks and closed on its first vertex showed its area and perimeter, Save as feature made a geofence that opened in its panel, Create rule opened the rules editor on the Geofence exit template with that feature selected, Measure gave the length of a three-point line; the test feature was deleted again. Not committed.
+
+### 2026-09-09, phase 19 part e: satellite imagery and terrain (Claude)
+
+- Part d committed as 5e46501 and 8d8a7ef on Tim's word (one test had used `near` as its broken example), CI green, deployed; the near template and condition answer live.
+- Built part e with one change to the plan's wording: the key is a server setting (`MAPTILER_KEY`) served to the browser by `GET /map/config` instead of a `VITE_` variable, because the frontend image is built once in Docker without the server's `.env`, so a build-time variable would mean an image per server. The Satellite base map is MapTiler's `hybrid` style (imagery with labels), the terrain switch adds `terrain-rgb-v2` as a raster DEM with a hillshade layer and eases the pitch, the compass shows the pitch, the choice is the preference `terrain`; without a key nothing shows. Env templates, host vars example and docs carry the key.
+- Verified: ruff, mypy, frontend lint, types, catalogue, unit tests, the build, OpenAPI regenerated; a browser check with a stubbed key shows the picker's Satellite entry and the terrain button, the tiles themselves wait for a real key. Not committed.

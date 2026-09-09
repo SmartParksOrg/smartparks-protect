@@ -1,6 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Flame, Layers, ListTree, PenLine, Route, Ruler } from "lucide-react";
+import {
+  Flame,
+  Layers,
+  ListTree,
+  Mountain,
+  PenLine,
+  Route,
+  Ruler,
+} from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -23,10 +31,16 @@ import {
 } from "@/components/devices/ProvenancePanel";
 import {
   type BasemapKey,
-  BASEMAPS,
+  basemapsFor,
+  basemapStyle,
   loadBasemap,
   saveBasemap,
 } from "@/components/map/basemap";
+import {
+  setTerrain,
+  TERRAIN_PITCH,
+  terrainTileJson,
+} from "@/components/map/terrain";
 import {
   bindDeviceClicks,
   bindEntityClicks,
@@ -111,6 +125,7 @@ import { usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { useNow } from "@/hooks/useNow";
 import { useIsPhone } from "@/hooks/useMediaQuery";
+import { useMapConfig } from "@/hooks/useMapConfig";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
 import { isAllProjects } from "@/lib/scope";
 import { canAdmin, useProjectRole, useProjects } from "@/hooks/useProjects";
@@ -200,10 +215,14 @@ export function MapPage() {
     [params],
   );
   const [basemap, setBasemap] = useState<BasemapKey>(loadBasemap);
+  // satellite imagery and terrain need the server's MapTiler key (decision D141)
+  const { maptilerKey } = useMapConfig();
+  const basemaps = useMemo(() => basemapsFor(maptilerKey), [maptilerKey]);
+  const [terrainOn, setTerrainOn] = usePreference<boolean>("terrain", false);
   const container = useRef<HTMLDivElement | null>(null);
   const { mapRef, ready, stripHost } = useMap(
     container,
-    basemap,
+    basemapStyle(basemap, basemaps),
     [31.5, -24.9],
     6,
   );
@@ -705,6 +724,22 @@ export function MapPage() {
     ensureEventLayers(map);
   }, [mapRef, ready]);
 
+  // terrain on top of any base map; a style change drops it, so it is applied again on ready
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setTerrain(
+      map,
+      terrainOn && maptilerKey ? terrainTileJson(maptilerKey) : null,
+    );
+  }, [mapRef, ready, terrainOn, maptilerKey]);
+  const toggleTerrain = () => {
+    const map = mapRef.current;
+    const next = !terrainOn;
+    setTerrainOn(next);
+    map?.easeTo({ pitch: next ? TERRAIN_PITCH : 0, duration: 600 });
+  };
+
   // the heatmap's points and paint
   useEffect(() => {
     const map = mapRef.current;
@@ -1183,7 +1218,7 @@ export function MapPage() {
       icon: Layers,
       label: t("Base map"),
       value: basemap,
-      options: Object.entries(BASEMAPS).map(([value, b]) => ({
+      options: Object.entries(basemaps).map(([value, b]) => ({
         value,
         label: b.label,
       })),
@@ -1229,6 +1264,17 @@ export function MapPage() {
       active: tool === "measure",
       onClick: () => (tool === "measure" ? endTool() : setTool("measure")),
     },
+    ...(maptilerKey
+      ? [
+          {
+            key: "terrain",
+            icon: Mountain,
+            label: terrainOn ? t("Flat map") : t("3D terrain"),
+            active: terrainOn,
+            onClick: toggleTerrain,
+          } satisfies StripItem,
+        ]
+      : []),
     {
       key: "heat",
       icon: Flame,

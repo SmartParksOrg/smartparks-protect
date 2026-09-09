@@ -42,3 +42,4 @@ chirpstack_api_secret: "CHANGE_ME"   # only with the chirpstack profile
 # backup_retention_full: 4
 # backup_object_prefix: "{{ inventory_hostname }}"
 # otel_exporter_otlp_endpoint: ""    # http://lgtm:4318 with compose_profiles: "observability"
+# maptiler_key: ""                   # satellite imagery and 3D terrain on the live map (decision D141)

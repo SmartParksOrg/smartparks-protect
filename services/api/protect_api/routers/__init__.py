@@ -30,6 +30,7 @@ from protect_api.routers.ingest import router as ingest_router
 from protect_api.routers.integrations import router as integrations_router
 from protect_api.routers.log_files import router as log_files_router
 from protect_api.routers.map import router as map_router
+from protect_api.routers.map_config import router as map_config_router
 from protect_api.routers.mcp_actions import admin_router as admin_ai_policy_router
 from protect_api.routers.mcp_actions import router as mcp_actions_router
 from protect_api.routers.network import router as network_router
@@ -54,6 +55,7 @@ for router in (
     data_router,
     network_router,
     map_router,
+    map_config_router,
     analytics_router,
     exports_router,
     rules_router,
