@@ -139,7 +139,8 @@ async def test_automatic_bucket_and_layouts(client, db):
 
 
 async def test_bounds_and_validation(client, db):
-    admin, project, _entity, _source, _device, _ = await _setup(client, db)
+    admin, project, entity, source, _device, _ = await _setup(client, db)
+    await _measurements(db, project, entity, _device, source)
     h = admin.headers
     window = f"&from={_ts(T0)}&to={_ts(T0 + timedelta(days=30))}"
     # a bucket too fine answers with the finest that fits and says so (decision D148)
@@ -187,7 +188,8 @@ async def test_more_owners_than_fit_answer_with_the_first_by_name(client, db):
     """Two metrics leave room for ten owners under MAX_SERIES (decision D148): eleven entities
     give the first ten by name and a note, and the eleventh, the one with data, is the one
     left out, so the series list is empty rather than the request refused."""
-    admin, project, entity, _source, _device, _ = await _setup(client, db)
+    admin, project, entity, source, device, _ = await _setup(client, db)
+    await _measurements(db, project, entity, device, source)
     h = admin.headers
     for i in range(10):
         created = await client.post(
