@@ -19,7 +19,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import ColumnElement
 
@@ -624,7 +624,10 @@ async def heat_points(
     """The positions behind the heatmap (decision D138): the newest `limit` in the viewport and
     the look-back window, of the given entities and devices, or of the whole scope when neither
     is given. Bare points; the client weighs and draws them. Effective times and coordinates,
-    invalid rows left out (architecture 28)."""
+    invalid rows left out (architecture 28). The scan runs per device (the devices seen in the
+    window, or the ones asked for) through the device and time index of the compressed chunks: a
+    bounding-box scan over every chunk of the window decompresses them all (21 s for a week in
+    the all scope on the dev server, 0.6 s this way)."""
     if len(entity_id or []) > MAX_HEAT_IDS or len(device_id or []) > MAX_HEAT_IDS:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -632,30 +635,69 @@ async def heat_points(
         )
     until = utc_now()
     since = until - timedelta(hours=hours)
-    conditions: list[Any] = [
-        context.where(Position.project_id, unassigned=True),
-        in_window(Position, since, until),
-        visible(Position),
-    ]
-    owners: list[Any] = []
-    if entity_id:
-        owners.append(Position.entity_id.in_(entity_id))
-    if device_id:
-        owners.append(Position.device_id.in_(device_id))
-    if owners:
-        conditions.append(or_(*owners))
-    box = _bbox(bbox)
-    if box is not None:
-        conditions.append(func.ST_Intersects(effective_geom(), func.ST_MakeEnvelope(*box, 4326)))
+    box = _bbox(bbox) or (-180.0, -90.0, 180.0, 90.0)
+    params: dict[str, Any] = {
+        "project_id": context.project_id,
+        "since": since,
+        "until": until,
+        "west": box[0],
+        "south": box[1],
+        "east": box[2],
+        "north": box[3],
+        "limit": limit,
+    }
+    # the devices to scan: the ones asked for, the ones tracking the entities asked for (their
+    # positions are then filtered on the entity), else every device seen in the window
+    if entity_id or device_id:
+        owner = []
+        if entity_id:
+            params["entity_ids"] = list(entity_id)
+            owner.append("p.entity_id = ANY(CAST(:entity_ids AS uuid[]))")
+        if device_id:
+            params["device_ids"] = list(device_id)
+            owner.append("p.device_id = ANY(CAST(:device_ids AS uuid[]))")
+        owner_filter = " AND (" + " OR ".join(owner) + ")"
+        devices = """
+            SELECT DISTINCT s.device_id FROM device_current_state s
+            WHERE s.last_seen_at >= :since
+              AND (s.device_id = ANY(CAST(:all_device_ids AS uuid[]))
+                   OR s.device_id IN (
+                       SELECT a.device_id FROM device_entity_assignments a
+                       WHERE a.entity_id = ANY(CAST(:all_entity_ids AS uuid[]))
+                         AND a.validity && tstzrange(:since, :until)))"""
+        params["all_device_ids"] = list(device_id or [])
+        params["all_entity_ids"] = list(entity_id or [])
+    else:
+        owner_filter = ""
+        devices = "SELECT s.device_id FROM device_current_state s WHERE s.last_seen_at >= :since"
+    project_filter = "AND p.project_id = :project_id" if context.project_id is not None else ""
+    per_device = f"""
+        SELECT COALESCE(p.curated_geom, p.geom) AS geom, COALESCE(p.curated_time, p.time) AS t
+        FROM positions p
+        WHERE p.device_id = d.device_id AND p.valid {project_filter} {owner_filter}
+          AND ((p.curated_time IS NULL AND p.time >= :since AND p.time < :until)
+               OR (p.curated_time IS NOT NULL AND p.curated_time >= :since
+                   AND p.curated_time < :until))
+          AND ST_Intersects(COALESCE(p.curated_geom, p.geom),
+                            ST_MakeEnvelope(:west, :south, :east, :north, 4326))"""
     total = int(
-        await session.scalar(select(func.count()).select_from(Position).where(*conditions)) or 0
+        await session.scalar(
+            text(
+                f"WITH d AS ({devices}) SELECT COALESCE(SUM(n), 0) FROM d "
+                f"JOIN LATERAL (SELECT count(*) AS n FROM ({per_device}) q) c ON true"
+            ),
+            params,
+        )
+        or 0
     )
     rows = (
         await session.execute(
-            select(func.ST_AsGeoJSON(effective_geom()))
-            .where(*conditions)
-            .order_by(effective_time(Position).desc())
-            .limit(limit)
+            text(
+                f"WITH d AS ({devices}) SELECT ST_AsGeoJSON(q.geom) FROM d "
+                f"JOIN LATERAL ({per_device} ORDER BY t DESC LIMIT :limit) q ON true "
+                f"ORDER BY q.t DESC LIMIT :limit"
+            ),
+            params,
         )
     ).all()
     import json
