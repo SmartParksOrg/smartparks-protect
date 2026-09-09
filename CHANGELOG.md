@@ -4,7 +4,14 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- Rock7 RockBLOCK adapter (decision D156) for the Iridium modems still on Rock 7 Core: deliveries as a form or JSON through the source's webhook URL, commands through the MT web service with the portal login, the answer read by code, a connection probe; the ingest route accepts form-encoded bodies.
+
+### Changed
+
+- Explore after the first test on a phone: the chart is one graph with a series per metric and owner and a "Right axis" picker for a secondary axis (the one grid per metric read as a dashboard); the table keeps its own touch scrolling; and the app takes the browser's dynamic viewport height, so the bottom of every page is in view on a phone with the address bar shown.
+- The Cloudloop management sync joins things with their subscribers and hardware, so a thing is listed as its IMEI with its name, description and last seen and the thing id as an attribute (decision D157); the device sync keeps case sensitive platform ids as they are.
 
 ## v2.5.0, 2026-09-09
 

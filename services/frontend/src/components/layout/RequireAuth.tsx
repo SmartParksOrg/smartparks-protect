@@ -12,15 +12,25 @@ export function RequireAuth() {
   const location = useLocation();
 
   useEffect(() => {
-    if (token && status !== "authenticated" && status !== "loading") void loadMe();
+    if (token && status !== "authenticated" && status !== "loading")
+      void loadMe();
   }, [token, status, loadMe]);
 
   if (!token || status === "expired" || status === "anonymous") {
     const from = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/login?from=${from}${status === "expired" ? "&expired=1" : ""}`} replace />;
+    return (
+      <Navigate
+        to={`/login?from=${from}${status === "expired" ? "&expired=1" : ""}`}
+        replace
+      />
+    );
   }
   if (status === "loading" || !useAuthStore.getState().user) {
-    return <div className="flex min-h-screen items-center justify-center text-muted-foreground">{t("Loading…")}</div>;
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
+        {t("Loading…")}
+      </div>
+    );
   }
   return <Outlet />;
 }

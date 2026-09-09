@@ -192,10 +192,12 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D149 | Load more | Every list that stopped at the first 500 rows with a note to search (the rows behind a bucket, entities, devices, groups, the server admin's devices) loads the next page on "Load more" and says how many rows it holds; the pages stay in the query cache | The bound per request stays, the person reaches every row. Decided by Tim on 2026-09-09. |
 | D150 | Explore as one page | The Records and Analysis tabs merge into Explore with a mode switch (table, chart, map) in the URL; today's Analysis tab becomes the chart mode; saved views carry the mode and the dashboards' saved view tiles open through it | One selection looked at three ways is one page. Decided by Tim on 2026-09-09. |
 | D151 | The canvas | The page fills with the chart or the map, a compact selection strip at the top (entities and devices, period, timezone, mode), the records table as a drawer pulled up from the bottom with its height remembered per user, a bottom sheet on a phone; the table mode fills the page with the table | The live map showed that a full canvas with controls at the edges is how a person looks closely. Decided by Tim on 2026-09-09. |
-| D152 | Chart kinds | A line over time per metric and owner by default, chosen from the selection, with a switch to scatter, bar, histogram and state timeline; the metrics on the chart are the loaded columns with a picker; above the canvas bound the chart draws from the aggregate read with the finest bucket that fits and says so | A sensible default and a switch, not a form. Decided by Tim on 2026-09-09. |
+| D152 | Chart kinds | One graph: a line per metric and owner over time, the chosen metrics on a secondary axis at the right, with a switch to scatter, bar, histogram (the first metric) and state timeline; the metrics on the chart are the loaded columns with a picker; above the canvas bound the chart draws from the aggregate read with the finest bucket that fits and says so | A sensible default and a switch, not a form. Decided by Tim on 2026-09-09; amended the same day after his first test: one grid per metric read as a dashboard, one graph with a secondary axis is what he wants. |
 | D153 | Map mode | The live map's components over the selection's period (the tracks and points of the loaded records, the features, the coverage layer) with a time slider that moves the marked moment along the tracks; tracks coloured by a metric and the heatmap over the period are left out of this phase | The slider is the analysis gesture the live map lacks; the rest waits for a need. Decided by Tim on 2026-09-09. |
 | D154 | Linked hover | One marked moment across chart, drawer and map, all three ways, kept in the URL as `at` so a link reproduces it | The three views are one selection. Decided by Tim on 2026-09-09. |
 | D155 | Canvas bound | Up to 50,000 loaded rows draw raw points on the chart and the map; above, the chart uses the aggregate read with the finest bucket that fits and the map the track read, with a note; the selection keeps the 500 owners bound of the records read | Bounded per request, unbounded in experience (D143). Decided by Tim on 2026-09-09. |
+| D156 | Rock7 RockBLOCK adapter | A `rock7` adapter for the modems still on Rock 7 Core: deliveries as a form or JSON through the source's webhook URL with the token in it, commands through the MT web service with the portal login as the source's credentials, no device list (Rock7 has none), a connection test through the empty-message probe | Some Iridium devices stay on the older platform; the adapter is small because the Cloudloop route already carries the same frames. Built from the docs (Ground Control, fetched 2026-09-09). Decided by Tim on 2026-09-09. |
+| D157 | One Cloudloop account for every project | The Cloudloop data source stays a server-admin object with the token in its credentials; devices are attributed to projects by their assignments and members see only their projects' devices, commands are judged in the device's project; the management sync joins things with subscribers and hardware so a thing is listed as its IMEI with its name | The platform's model already scopes what Cloudloop cannot; no per-project Cloudloop accounts or groups are needed for access. Decided with Tim on 2026-09-09. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -341,7 +343,7 @@ smartparks-protect/
 │           ├── base.py
 │           ├── registry.py
 │           ├── transports/  # mqtt, http, websocket, polling
-│           └── adapters/    # chirpstack, kpn_thingpark, loriot, tts, actility, cra_iot, traccar, cloudloop, addaxai_connect
+│           └── adapters/    # chirpstack, kpn_thingpark, loriot, tts, actility, cra_iot, traccar, cloudloop, rock7, addaxai_connect
 ├── tests/
 │   ├── fixtures/payloads/   # recorded real payloads per adapter and driver
 │   └── <package>/           # one directory per package, mirrors CI matrix
@@ -1012,6 +1014,20 @@ Release:
 
 ---
 
+### Connectivity follow-ups: Cloudloop live and Rock7 (2026-09-09)
+
+**Goal.** The Iridium path in use: the Cloudloop account Smart Parks has (one account, every project) connected to the dev server and proven live, and the modems still on Rock 7 Core reachable through an adapter of their own.
+
+**Deliverables.**
+
+- [x] (2026-09-09, `CloudloopManagement.list_devices`) The Cloudloop management sync joins things with their SBD subscribers and hardware: a thing is listed as its IMEI with its subscriber's name, description and last seen, the thing id as an attribute; the device sync keeps case sensitive platform ids as they are (only hex ids are upper cased).
+- [x] (2026-09-09, `shared/connectivity/adapters/rock7`, `tests/shared/test_rock7_adapter.py`, `tests/api/test_rock7_webhook.py`, `docs/integrations/rock7/`) The Rock7 adapter (decision D156): the delivery fields as a form or JSON (the ingest route reads form bodies now), the MT call with the login and the answer read by code, the connection probe.
+- [ ] Live on the dev server: the Cloudloop data source with the token, one HTTP destination (JSON Lingo) on one thing group pointed at the webhook URL, Cloudloop's destination test, then on Tim's word one command to one collar. The same for a Rock7 delivery group when a modem is at hand.
+
+**Exit criteria.** A Cloudloop message from a collar appears as a source event on the Iridium channel with its records decoded, and a command sent from the device page reaches `queued` with Cloudloop's message id.
+
+---
+
 ## Continuous work in every phase
 
 - [ ] Keep `CHANGELOG.md` Unreleased current.
@@ -1637,3 +1653,12 @@ Listed by the phase where they are first needed.
 ### 2026-09-09, release v2.5.0 (Tim)
 
 - Tagged v2.5.0 after CI on the release commit: phase 21 complete, the exit criteria checked against the dev server, deployed with the env-refresh playbook. Phase 22 (Analysis as modules) is next, its open questions first.
+
+### 2026-09-09, Cloudloop live and Rock7 (Claude and Tim)
+
+- Tim's questions on Cloudloop: one account for every project, how to test, and an adapter for the modems still on Rock 7 Core. The scope question is answered by the platform's model (D157). The API token he obtained from Ground Control support works: ping, ten things, nine Iridium SBD hardware units, subscribers named like the collars, eleven thing groups and fourteen HTTP destinations pointing at the Node-RED pipeline; the token is in `~/.config/smartparks-protect/cloudloop.env`, never in the repo, to be regenerated since it passed through chat.
+- Built: the management sync join (a thing listed as its IMEI with its name), the device sync keeping case sensitive ids, form bodies on the ingest route, and the Rock7 adapter from the Ground Control docs with its tests and page. Left: the live steps on the dev server.
+
+### 2026-09-09, Explore on the phone and one graph (Claude and Tim)
+
+- Tim's first test of Explore on a phone: the table would not scroll, the chart's one grid per metric was not what he wanted (one graph, the person chooses the variables, a secondary axis when needed), and every page lost its bottom under the browser's address bar. Fixed: the app's height is the dynamic viewport (`h-dvh`) so the page ends where the browser shows it, the table keeps its own touch scrolling (`touch-pan-x`, `touch-pan-y`, `overscroll-contain`), and the chart is one graph with one series per metric and owner and a "Right axis" picker for the metrics on a secondary axis (`?y2=`, D152 amended). Measured on a phone viewport: the 24 hour selection he looked at had twelve rows, which fit the table, so the sideways scroll was the one that failed, most likely to the page scrolling under the address bar.

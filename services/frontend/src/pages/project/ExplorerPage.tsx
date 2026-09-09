@@ -559,7 +559,11 @@ export function ExplorerPage() {
                 placeholder={t("Metrics")}
                 label={t("metrics")}
                 className="h-8 w-40"
-                maxSelected={state.chart === "scatter" ? 1 : 8}
+                maxSelected={
+                  state.chart === "scatter" || state.chart === "histogram"
+                    ? 1
+                    : 8
+                }
               />
               {state.chart === "scatter" && (
                 <Select
@@ -578,6 +582,22 @@ export function ExplorerPage() {
                   </SelectContent>
                 </Select>
               )}
+              {state.chart !== "scatter" &&
+                state.chart !== "histogram" &&
+                metricsOnChart.length > 1 && (
+                  <MultiSelect
+                    options={chartOptions.filter((o) =>
+                      metricsOnChart.includes(o.value),
+                    )}
+                    value={state.secondary.filter((m) =>
+                      metricsOnChart.includes(m),
+                    )}
+                    onChange={(v) => update({ secondary: v })}
+                    placeholder={t("Right axis")}
+                    label={t("on the right axis")}
+                    className="h-8 w-36"
+                  />
+                )}
               <Select
                 value={state.chart}
                 onValueChange={(v) => update({ chart: v as ChartType })}
@@ -754,6 +774,7 @@ export function ExplorerPage() {
                           )?.label ?? null)
                         : null
                     }
+                    secondary={state.secondary}
                     timezone={state.timezone}
                     marked={hover === null ? null : marked}
                     pinned={pinned}

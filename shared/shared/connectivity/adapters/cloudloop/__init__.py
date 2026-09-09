@@ -23,7 +23,12 @@ and its public Postman collection (https://api.cloudloop.com/swagger/postman_col
   is reported by the platform's LingoDelivery statuses (`DELIVERY_SUBMITTED`,
   `DELIVERY_ERROR`, `iridiumSbdMt` values), not available through a pull endpoint.
 - Things: `Data/GetThings` lists the account's things with `id`, `supportsSbd`,
-  `subscriberSbd`, `account`; a thing's name and IMEI belong to its subscriber and hardware.
+  `subscriberSbd`, `account`; a thing's name and IMEI belong to its subscriber and hardware:
+  `Sbd/GetSubscribers` (`id`, `name`, `description`, `hardware`, `lastSeen`) and
+  `Hardware/GetHardwares` (`id`, `imei`, `type`, `serial`), joined by the management sync.
+  Seen live on 2026-09-09 with Smart Parks' account: `Platform/Ping` answers `{"ping":
+  "pong"}`, thing ids are 32 case sensitive characters, the console is at
+  `https://console.cloudloop.com/?DashboardAccount/:account/:<account id>`.
 
 An OpenCollar with a RockBLOCK sends its satellite buffer as stacked stored records
 (`[port][msg_id][len][data][timestamp]`, wiki satellite page); the payload is passed to the
@@ -302,32 +307,59 @@ class CloudloopCommands:
         }
 
 
+def _items(body: Any, key: str) -> list[dict[str, Any]]:
+    items = body.get(key) if isinstance(body, dict) else None
+    return [i for i in (items or []) if isinstance(i, dict) and i.get("id")]
+
+
 class CloudloopManagement:
     def __init__(self, source: DataSourceContext) -> None:
         self.source = source
 
     async def list_devices(self) -> list[dict[str, Any]]:
-        body = await CloudloopClient(self.source).call("Data/GetThings")
-        things = body.get("things") if isinstance(body, dict) else None
-        return [
-            {
-                "external_id": str(thing["id"]),
-                "identity_type": THING_IDENTITY_TYPE,
-                "name": None,
-                "attributes": {
-                    k: v
-                    for k, v in {
-                        "thing_id": thing.get("id"),
-                        "subscriber_sbd": thing.get("subscriberSbd"),
-                        "supports_sbd": thing.get("supportsSbd"),
-                        "account_id": thing.get("account"),
-                    }.items()
-                    if v not in (None, "")
-                },
+        """The account's things joined with their SBD subscribers (the name and description
+        Cloudloop shows) and hardware (the IMEI), as seen live on 2026-09-09: a thing with a
+        known IMEI is listed as the `imei` identity messages use, with the thing id as an
+        attribute, so linking it once serves both the inbound path and commands; a thing
+        without hardware keeps the thing id as its identity."""
+        client = CloudloopClient(self.source)
+        things = _items(await client.call("Data/GetThings"), "things")
+        subscribers = {
+            s["id"]: s for s in _items(await client.call("Sbd/GetSubscribers"), "subscribers")
+        }
+        hardwares = {
+            h["id"]: h for h in _items(await client.call("Hardware/GetHardwares"), "hardwares")
+        }
+        listed = []
+        for thing in things:
+            subscriber = subscribers.get(str(thing.get("subscriberSbd") or ""))
+            hardware = hardwares.get(str((subscriber or {}).get("hardware") or ""))
+            imei = str((hardware or {}).get("imei") or "").strip()
+            attributes = {
+                k: v
+                for k, v in {
+                    "thing_id": thing.get("id"),
+                    "subscriber_sbd": thing.get("subscriberSbd"),
+                    "supports_sbd": thing.get("supportsSbd"),
+                    "account_id": thing.get("account"),
+                    "imei": imei or None,
+                    "subscriber_id": (subscriber or {}).get("id"),
+                    "description": (subscriber or {}).get("description"),
+                    "last_seen": (subscriber or {}).get("lastSeen"),
+                    "hardware_type": (hardware or {}).get("type"),
+                    "serial": (hardware or {}).get("serial"),
+                }.items()
+                if v not in (None, "")
             }
-            for thing in (things or [])
-            if isinstance(thing, dict) and thing.get("id")
-        ]
+            listed.append(
+                {
+                    "external_id": imei or str(thing["id"]),
+                    "identity_type": IDENTITY_TYPE if imei else THING_IDENTITY_TYPE,
+                    "name": (subscriber or {}).get("name") or None,
+                    "attributes": attributes,
+                }
+            )
+        return listed
 
     async def test_connection(self) -> dict[str, Any]:
         body = await CloudloopClient(self.source).call("Platform/Ping")
@@ -342,7 +374,7 @@ class CloudloopAdapter:
     acquisition_channel: ClassVar[AcquisitionChannel] = AcquisitionChannel.IRIDIUM
     config_example: ClassVar[dict[str, Any]] = {
         "allowed_source_ips": list(SOURCE_ADDRESSES),
-        "web_url": "https://data.cloudloop.com",
+        "web_url": "https://console.cloudloop.com",
     }
     credentials_schema: ClassVar[dict[str, str]] = {
         "token": "Cloudloop API token (for commands and the thing list; not needed for inbound)"

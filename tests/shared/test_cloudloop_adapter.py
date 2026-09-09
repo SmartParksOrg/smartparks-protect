@@ -180,6 +180,8 @@ async def test_management_lists_things_and_pings(monkeypatch):
         if request.url.path.endswith("Platform/Ping"):
             return httpx.Response(200, json={"pong": True})
         if request.url.path.endswith("Data/GetThings"):
+            # the shapes seen live on 2026-09-09: a thing with a subscriber and hardware, and
+            # one without hardware
             return httpx.Response(
                 200,
                 json={
@@ -189,6 +191,42 @@ async def test_management_lists_things_and_pings(monkeypatch):
                             "id": "DanGRxQrXpzkPJEgyKnydwYZbqmDagNA",
                             "subscriberSbd": "KXeNzdgDqZwrQBbNoDjBxMLlmoGpaOAR",
                             "account": "ejoGRxQrXpzkPJngbjBydwYZbqmDagNA",
+                        },
+                        {
+                            "supportsSbd": True,
+                            "id": "pwjgJyDQqreRkExweelWAGYmVlazNdOM",
+                            "subscriberSbd": "obXGALqOdlzpaErOqvJBNkwRPZgJjmyr",
+                            "account": "ejoGRxQrXpzkPJngbjBydwYZbqmDagNA",
+                        },
+                    ]
+                },
+            )
+        if request.url.path.endswith("Sbd/GetSubscribers"):
+            return httpx.Response(
+                200,
+                json={
+                    "subscribers": [
+                        {
+                            "id": "KXeNzdgDqZwrQBbNoDjBxMLlmoGpaOAR",
+                            "name": "SP051255",
+                            "description": "ElephantFree",
+                            "hardware": "OVdRxQrXpzkPJEgyKnydwYZbqmDagNAy",
+                            "lastSeen": "2024-02-17T05:17:33",
+                            "account": "ejoGRxQrXpzkPJngbjBydwYZbqmDagNA",
+                        }
+                    ]
+                },
+            )
+        if request.url.path.endswith("Hardware/GetHardwares"):
+            return httpx.Response(
+                200,
+                json={
+                    "hardwares": [
+                        {
+                            "id": "OVdRxQrXpzkPJEgyKnydwYZbqmDagNAy",
+                            "imei": "300234065366010",
+                            "type": "IRIDIUM_SBD",
+                            "serial": None,
                         }
                     ]
                 },
@@ -200,16 +238,32 @@ async def test_management_lists_things_and_pings(monkeypatch):
     things = await management.list_devices()
     assert things == [
         {
-            "external_id": "DanGRxQrXpzkPJEgyKnydwYZbqmDagNA",
-            "identity_type": "cloudloop_thing",
-            "name": None,
+            "external_id": "300234065366010",
+            "identity_type": "imei",
+            "name": "SP051255",
             "attributes": {
                 "thing_id": "DanGRxQrXpzkPJEgyKnydwYZbqmDagNA",
                 "subscriber_sbd": "KXeNzdgDqZwrQBbNoDjBxMLlmoGpaOAR",
                 "supports_sbd": True,
                 "account_id": "ejoGRxQrXpzkPJngbjBydwYZbqmDagNA",
+                "imei": "300234065366010",
+                "subscriber_id": "KXeNzdgDqZwrQBbNoDjBxMLlmoGpaOAR",
+                "description": "ElephantFree",
+                "last_seen": "2024-02-17T05:17:33",
+                "hardware_type": "IRIDIUM_SBD",
             },
-        }
+        },
+        {
+            "external_id": "pwjgJyDQqreRkExweelWAGYmVlazNdOM",
+            "identity_type": "cloudloop_thing",
+            "name": None,
+            "attributes": {
+                "thing_id": "pwjgJyDQqreRkExweelWAGYmVlazNdOM",
+                "subscriber_sbd": "obXGALqOdlzpaErOqvJBNkwRPZgJjmyr",
+                "supports_sbd": True,
+                "account_id": "ejoGRxQrXpzkPJngbjBydwYZbqmDagNA",
+            },
+        },
     ]
     assert (await management.test_connection())["ok"] is True
     with pytest.raises(ApplicationError) as excinfo:

@@ -1,6 +1,7 @@
 """Data sources (external platform accounts) and their external identities. Server admin only in
 phase 1; credentials are written, never read back."""
 
+import re
 import uuid
 from datetime import datetime, timedelta
 from typing import Any
@@ -682,13 +683,15 @@ async def sync_devices(
         ) from error
     created = updated = 0
     for item in listed:
-        external_id = (
-            str(item.get("external_id") or item.get("devEui") or item.get("dev_eui") or "")
-            .strip()
-            .upper()
-        )
+        external_id = str(
+            item.get("external_id") or item.get("devEui") or item.get("dev_eui") or ""
+        ).strip()
         if not external_id:
             continue
+        # hex identifiers (DevEUIs) are stored upper case; a platform's own ids (Cloudloop's
+        # case sensitive thing ids) stay as they are
+        if re.fullmatch(r"[0-9a-fA-F]+", external_id):
+            external_id = external_id.upper()
         attributes = {**dict(item.get("attributes") or {})}
         if item.get("name"):
             attributes["name"] = item["name"]

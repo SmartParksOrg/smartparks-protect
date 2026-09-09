@@ -30,14 +30,23 @@ export function AppLayout() {
   }, [projectId, loadIcons]);
   // the all scope (decision D116) has the monitoring pages only; any other project page
   // opened with it goes to the map
-  const allScopePage = /^\/projects\/all\/([a-z/]*)/.exec(location.pathname)?.[1] ?? null;
+  const allScopePage =
+    /^\/projects\/all\/([a-z/]*)/.exec(location.pathname)?.[1] ?? null;
   if (
     allScopePage !== null &&
-    !["map", "entities", "devices", "alerts", "rules/events", "network/traffic", "network/gateways"].includes(allScopePage)
+    ![
+      "map",
+      "entities",
+      "devices",
+      "alerts",
+      "rules/events",
+      "network/traffic",
+      "network/gateways",
+    ].includes(allScopePage)
   )
     return <Navigate to={`/projects/${ALL_PROJECTS}/map`} replace />;
   return (
-    <div className="flex h-screen">
+    <div className="flex h-dvh">
       <CommandPalette />
       <aside
         className={`hidden w-64 shrink-0 border-r bg-card ${sidebarHidden ? "" : "lg:block"}`}

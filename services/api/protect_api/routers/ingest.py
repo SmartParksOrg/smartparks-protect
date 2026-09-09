@@ -5,6 +5,7 @@ to the platform's source addresses (`allowed_source_ips` in the source config)."
 
 import uuid
 from typing import Any
+from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -21,6 +22,8 @@ from shared.models import DataSource
 from shared.trace import ApplicationError
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
+
+FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 
 
 def client_address(request: Request) -> str:
@@ -75,12 +78,22 @@ async def ingest_http(
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN, f"Address {caller} may not post to this source"
             )
-    try:
-        body: Any = await request.json()
-    except ValueError:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, "Body is not valid JSON"
-        ) from None
+    body: Any
+    if request.headers.get("content-type", "").split(";")[0].strip() == FORM_CONTENT_TYPE:
+        # Rock7 posts its fields as a form (and Cloudloop's Core shape may too): one value each
+        body = {
+            key: values[-1]
+            for key, values in parse_qs(
+                (await request.body()).decode("utf-8", errors="replace"), keep_blank_values=True
+            ).items()
+        }
+    else:
+        try:
+            body = await request.json()
+        except ValueError:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "Body is not valid JSON"
+            ) from None
     context = data_source_context(source)
     headers = dict(request.headers)
     # Without a valid bearer, a platform that signed the push itself is checked by the adapter

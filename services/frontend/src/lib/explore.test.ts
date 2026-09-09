@@ -80,16 +80,17 @@ describe("explore state", () => {
   });
   it("round-trips the chart's own state on top of the selection", () => {
     const params = new URLSearchParams(
-      "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&bucket=1h&agg=max",
+      "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&y2=activity&bucket=1h&agg=max",
     );
     const state = readExploreState(params);
+    expect(state.secondary).toEqual(["activity"]);
     expect(state.metrics).toEqual(["battery_voltage"]);
     expect(state.chart).toBe("scatter");
     expect(state.xMetric).toBe("device_temperature");
     expect(state.bucket).toBe("1h");
     expect(state.aggregates).toEqual(["max"]);
     expect(writeExploreState(state).toString()).toBe(
-      "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&bucket=1h&agg=max",
+      "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&y2=activity&bucket=1h&agg=max",
     );
   });
   it("writes only what differs from the defaults", () => {

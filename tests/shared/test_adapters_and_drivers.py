@@ -39,6 +39,7 @@ def test_registries():
         "traccar",
         "addaxai_connect",
         "cloudloop",
+        "rock7",
         "webble",
         "log_file",
         "tts",

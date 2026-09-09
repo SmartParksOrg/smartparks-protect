@@ -44,15 +44,17 @@ const PALETTE = [
 const MARK = "#B86B5C";
 
 /**
- * The chart of the Explore canvas (decisions D152 and D154): one grid per metric with a shared
- * time axis, one series per owner in the owner's colour, or one scatter of a metric against
- * another. Hovering reports the moment under the pointer; a moment marked elsewhere (the
- * drawer, the map) shows here as the axis pointer, and the pinned moment as a line.
+ * The chart of the Explore canvas (decisions D152 and D154): one graph with one series per
+ * metric and owner over a shared time axis, the chosen metrics on a secondary axis at the
+ * right, or one scatter of a metric against another. Hovering reports the moment under the
+ * pointer; a moment marked elsewhere (the drawer, the map) shows here as the axis pointer, and
+ * the pinned moment as a line.
  */
 export function ExploreChart({
   groups,
   kind,
   xLabel,
+  secondary = [],
   timezone,
   marked,
   pinned,
@@ -61,6 +63,8 @@ export function ExploreChart({
 }: {
   groups: ChartGroup[];
   kind: ChartType;
+  /** The metric keys drawn against the right axis. */
+  secondary?: string[];
   /** The x axis label of a scatter chart. */
   xLabel?: string | null;
   timezone: string;
@@ -139,10 +143,10 @@ export function ExploreChart({
     const instance = chart.current;
     if (!instance) return;
     instance.setOption(
-      buildOption(groups, kind, xLabel ?? null, timezone, pinned),
+      buildOption(groups, kind, xLabel ?? null, secondary, timezone, pinned),
       true,
     );
-  }, [groups, kind, xLabel, timezone, pinned]);
+  }, [groups, kind, xLabel, secondary, timezone, pinned]);
 
   useEffect(() => {
     const instance = chart.current;
@@ -153,8 +157,7 @@ export function ExploreChart({
     }
     const x = instance.convertToPixel({ xAxisIndex: 0 }, marked);
     if (typeof x !== "number" || !Number.isFinite(x)) return;
-    const top = (instance.getHeight() * gridTop(0, groups.length)) / 100 + 4;
-    instance.dispatchAction({ type: "showTip", x, y: top });
+    instance.dispatchAction({ type: "showTip", x, y: 48 });
   }, [marked, groups, kind]);
 
   return (
@@ -169,17 +172,6 @@ export function ExploreChart({
 
 function isTimeAxis(kind: ChartType): boolean {
   return kind === "line" || kind === "bar" || kind === "state";
-}
-
-const LEGEND_PCT = 7;
-const FOOT_PCT = 10;
-
-function gridTop(index: number, count: number): number {
-  return LEGEND_PCT + (index * (100 - LEGEND_PCT - FOOT_PCT)) / count;
-}
-
-function gridHeight(count: number): number {
-  return (100 - LEGEND_PCT - FOOT_PCT) / count - 5;
 }
 
 function owners(groups: ChartGroup[]): Map<string, number> {
@@ -199,6 +191,7 @@ function buildOption(
   groups: ChartGroup[],
   kind: ChartType,
   xLabel: string | null,
+  secondary: string[],
   timezone: string,
   pinned: number | null,
 ): echarts.EChartsCoreOption {
@@ -225,7 +218,7 @@ function buildOption(
     const group = groups[0];
     return {
       ...base,
-      grid: { left: 64, right: 24, top: 40, bottom: 48 },
+      grid: { left: 64, right: 24, top: 64, bottom: 48 },
       tooltip: {
         trigger: "item",
         formatter: (params: unknown) => {
@@ -250,78 +243,80 @@ function buildOption(
     };
   }
 
-  const count = groups.length;
-  const grids = groups.map((_, i) => ({
+  const grid = {
     left: 64,
-    right: 24,
-    top: `${gridTop(i, count)}%`,
-    height: `${gridHeight(count)}%`,
-  }));
+    right: secondary.length ? 64 : 24,
+    top: 64,
+    bottom: 48,
+  };
+  const many = groups.some((g) => g.series.length > 1);
+  const nameOf = (g: ChartGroup, name: string) =>
+    many || groups.length === 1
+      ? groups.length === 1
+        ? name
+        : `${g.label} · ${name}`
+      : g.label;
 
   if (kind === "histogram") {
-    const series: unknown[] = [];
-    const xAxis: unknown[] = [];
-    const yAxis: unknown[] = [];
-    groups.forEach((g, i) => {
-      const values = g.series.flatMap((s) => s.data.map((d) => d[1]));
-      const { edges, counts } = histogram(values);
-      xAxis.push({
-        type: "category",
-        gridIndex: i,
-        data: edges.map((e) =>
-          Number.isInteger(e) ? String(e) : e.toFixed(2),
-        ),
-        name: g.unit ?? undefined,
-      });
-      yAxis.push({ type: "value", gridIndex: i, name: g.label });
-      series.push({
-        type: "bar",
-        name: g.label,
-        xAxisIndex: i,
-        yAxisIndex: i,
-        data: counts,
-        itemStyle: { color: PALETTE[i % PALETTE.length] },
-      });
-    });
+    // the distribution of the first metric; the others would need their own bins
+    const group = groups[0];
+    const values = group.series.flatMap((s) => s.data.map((d) => d[1]));
+    const { edges, counts } = histogram(values);
     return {
       ...base,
       legend: { show: false },
       tooltip: { trigger: "item" },
-      grid: grids,
-      xAxis,
-      yAxis,
-      series,
+      grid,
+      xAxis: {
+        type: "category",
+        data: edges.map((e) =>
+          Number.isInteger(e) ? String(e) : e.toFixed(2),
+        ),
+        name: group.unit ? `${group.label} (${group.unit})` : group.label,
+      },
+      yAxis: { type: "value", name: "count" },
+      series: [{ type: "bar", name: group.label, data: counts }],
     };
   }
 
-  const xAxis = groups.map((_, i) => ({
-    type: "time",
-    gridIndex: i,
-    axisLabel: {
-      formatter: timeLabel,
-      show: i === count - 1,
-      hideOverlap: true,
+  const onRight = (g: ChartGroup) => secondary.includes(g.metric);
+  const axisName = (side: ChartGroup[]) =>
+    [
+      ...new Set(
+        side.map((g) => (g.unit ? `${g.label} (${g.unit})` : g.label)),
+      ),
+    ].join(", ");
+  const left = groups.filter((g) => !onRight(g));
+  const right = groups.filter(onRight);
+  const yAxis: unknown[] = [
+    {
+      type: "value",
+      name: axisName(left),
+      nameTextStyle: { align: "left", fontSize: 11 },
+      scale: kind !== "bar",
     },
-    axisPointer: { label: { show: i === count - 1 } },
-  }));
-  const yAxis = groups.map((g, i) => ({
-    type: "value",
-    gridIndex: i,
-    name: g.unit ? `${g.label} (${g.unit})` : g.label,
-    nameTextStyle: { align: "left", fontSize: 11 },
-    scale: kind !== "bar",
-  }));
-  const series = groups.flatMap((g, i) =>
-    g.series.map((s, j) => {
+  ];
+  if (right.length)
+    yAxis.push({
+      type: "value",
+      name: axisName(right),
+      nameTextStyle: { align: "right", fontSize: 11 },
+      position: "right",
+      scale: kind !== "bar",
+      splitLine: { show: false },
+    });
+  let index = 0;
+  const series = groups.flatMap((g) =>
+    g.series.map((s) => {
+      const colour = PALETTE[index++ % PALETTE.length];
       const common = {
-        name: s.name,
-        xAxisIndex: i,
-        yAxisIndex: i,
+        name: nameOf(g, s.name),
+        yAxisIndex: onRight(g) && right.length ? 1 : 0,
         data: s.data,
-        itemStyle: { color: colourOf(s.ownerId) },
-        lineStyle: { color: colourOf(s.ownerId) },
+        itemStyle: { color: colour },
+        lineStyle: { color: colour },
         markLine:
-          pinned !== null && j === 0
+          pinned !== null && index === 1
             ? {
                 silent: true,
                 symbol: "none",
@@ -354,22 +349,14 @@ function buildOption(
       trigger: "axis",
       valueFormatter: (v: unknown) => valueText(v, null),
     },
-    axisPointer: {
-      link: [{ xAxisIndex: "all" }],
-      label: { backgroundColor: "#52735E" },
+    axisPointer: { label: { backgroundColor: "#52735E" } },
+    grid,
+    xAxis: {
+      type: "time",
+      axisLabel: { formatter: timeLabel, hideOverlap: true },
     },
-    grid: grids,
-    xAxis,
     yAxis,
-    dataZoom: [
-      { type: "inside", xAxisIndex: groups.map((_, i) => i) },
-      {
-        type: "slider",
-        xAxisIndex: groups.map((_, i) => i),
-        height: 16,
-        bottom: 6,
-      },
-    ],
+    dataZoom: [{ type: "inside" }, { type: "slider", height: 16, bottom: 6 }],
     series,
   };
 }

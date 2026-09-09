@@ -86,6 +86,7 @@ nav:
       - Traccar: integrations/traccar/index.md
       - AddaxAI Connect: integrations/addaxai-connect/index.md
       - Cloudloop (Iridium): integrations/cloudloop/index.md
+      - Rock7 RockBLOCK (Iridium): integrations/rock7/index.md
       - Gateways and connectivity: integrations/gateways.md
       - Outbound integrations: integrations/outbound.md
       - EarthRanger via Gundi: integrations/earthranger-gundi/index.md

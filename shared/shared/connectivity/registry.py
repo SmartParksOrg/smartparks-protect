@@ -14,6 +14,7 @@ from shared.connectivity.adapters.kpn_thingpark import KpnThingParkAdapter
 from shared.connectivity.adapters.log_file import LogFileAdapter
 from shared.connectivity.adapters.loriot import LoriotAdapter
 from shared.connectivity.adapters.netmore import NetmoreAdapter
+from shared.connectivity.adapters.rock7 import Rock7Adapter
 from shared.connectivity.adapters.traccar import TraccarAdapter
 from shared.connectivity.adapters.tts import TtsAdapter
 from shared.connectivity.adapters.webble import WebBleAdapter
@@ -35,6 +36,7 @@ ADAPTERS: dict[str, Adapter] = {
         TraccarAdapter(),
         AddaxAiConnectAdapter(),
         CloudloopAdapter(),
+        Rock7Adapter(),
         WebBleAdapter(),
         LogFileAdapter(),
     )

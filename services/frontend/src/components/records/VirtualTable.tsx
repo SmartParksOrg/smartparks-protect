@@ -60,7 +60,7 @@ export function VirtualTable({
   return (
     <div
       ref={parent}
-      className="overflow-auto rounded-md border"
+      className="touch-pan-x touch-pan-y overscroll-contain overflow-auto rounded-md border"
       style={{ height }}
       onMouseLeave={() => onRowHover?.(null)}
     >

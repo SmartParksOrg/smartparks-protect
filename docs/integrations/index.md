@@ -12,6 +12,7 @@
 - [Traccar](traccar/index.md): the non-LoRaWAN tracking source over its websocket, with the command proof of concept.
 - [AddaxAI Connect](addaxai-connect/index.md): camera trap detections as `SPECIES_DETECTION` events, polled with a cursor.
 - [Cloudloop (Iridium)](cloudloop/index.md): RockBLOCK satellite messages over a webhook, commands as SBD messages.
+- [Rock7 RockBLOCK (Iridium)](rock7/index.md): the older RockBLOCK platform, for the modems still registered there; deliveries as a form or JSON, commands through the MT web service.
 - [Gateways and connectivity](gateways.md): the gateway registry and the coverage analysis per device.
 - [Outbound integrations](outbound.md): durable deliveries with retries, backfill and a delivery log; webhook and MQTT targets.
 - [EarthRanger via Gundi](earthranger-gundi/index.md): positions as observations and events as EarthRanger events.

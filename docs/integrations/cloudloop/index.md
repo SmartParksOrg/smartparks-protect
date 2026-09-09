@@ -6,7 +6,9 @@ Iridium Short Burst Data; Cloudloop delivers every message to a webhook and rela
 back (architecture 25.9, decision D78).
 
 Built from the Cloudloop knowledge base and its public Postman collection (fetched
-2026-09-04). Live verification waits for a Cloudloop account with an enrolled RockBLOCK.
+2026-09-04); the API calls were confirmed against Smart Parks' account on 2026-09-09 (ping,
+things, subscribers, hardware, groups and destinations). Live verification of the webhook and
+of a command waits for a destination pointed at the server.
 
 ## Setup
 
@@ -54,13 +56,19 @@ collar's answer arrives as a later message and confirms the command through the 
 interpreter.
 
 A route needs the thing id: from the first message's identity attributes, or from the
-management sync (`Data/GetThings`, identities of type `cloudloop_thing`) linked to the device.
+management sync linked to the device.
 
 ## Identity mapping
 
 - `imei` (15 digits): the hardware, from every message. Preferred identity.
-- `cloudloop_thing` (32 characters, case sensitive): Cloudloop's device object. Listed by the
-  management sync; usable as a route once linked.
+- `cloudloop_thing` (32 characters, case sensitive): Cloudloop's device object, listed by the
+  management sync only for a thing without hardware.
+
+The management sync (Sync devices on the data source) joins `Data/GetThings` with
+`Sbd/GetSubscribers` (the name and description shown in Cloudloop, the last seen time) and
+`Hardware/GetHardwares` (the IMEI): a thing with a known IMEI is listed as the `imei` identity
+its messages use, named after its subscriber, with the thing id as an attribute, so linking it
+once serves the inbound path and commands before any message arrives.
 
 ## Timestamps
 
@@ -78,4 +86,4 @@ message; both are provenance. The canonical time comes from the record inside th
   and the thing identity is not linked; run the management sync and link the thing.
 - `Cloudloop refused the token`: the API token is wrong or was regenerated.
 - The deep link path (`{web_url}/things/{thing_id}`) is a guess until seen live and can be
-  overridden on the data source.
+  overridden on the data source; the console lives at `https://console.cloudloop.com`.
