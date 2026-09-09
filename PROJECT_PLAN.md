@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 20 (explore and export from the entity or device) released as v2.4.0 on 2026-09-09; the next phase is to plan with Tim |
-| Latest release | v2.4.0 (2026-09-09): phase 20, explore and export from the entity or device |
+| Active phase | Phase 21 (Explore as one canvas) released as v2.5.0 on 2026-09-09; phase 22 (Analysis as modules) is next, its module list to specify with the users |
+| Latest release | v2.5.0 (2026-09-09): phase 21, Explore as one canvas |
 | Last session | 2026-09-09 |
-| Next item | Phase 21 (Explore as one canvas): ask its decisions, then build the canvas and the modes. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Next item | Phase 22 (Analysis as modules): answer its open questions with Tim (the first module, the result's life, who runs analyses), then the framework and the first module. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -261,7 +261,7 @@ From architecture section 2, used when reviewing a change. These are never done;
 | v2.2.0 | 17, 18 | ChirpStack applications connected from the tenant (D125 to D132), simple first with the Overview, Data and Network tabs (D133, D134), and the fixes since v2.0.0 |
 | v2.3.0 (2026-09-09) | 19 | The live map as a working tool: panels on every dot, links that make the object visible, one control strip, heatmaps per entity and device, drawing and measuring with features that start rules, the proximity condition, satellite imagery and terrain |
 | v2.4.0 (2026-09-09) | 20 | Explore and export from the entity or device: the records view, paging with progress instead of refusals, the records export, links from the Data tabs and the map, the bounds that answer, a statement timeout on the API |
-| v2.5.0 | 21 | Explore as one canvas: table, chart and map as three views of one selection, the table as a drawer, hover linked across the views, several devices side by side |
+| v2.5.0 (2026-09-09) | 21 | Explore as one canvas: table, chart and map as three views of one selection, the table as a drawer, hover linked across the views, several devices side by side, the time slider on the map |
 | v2.6.0 | 22 | Analysis as modules: a framework for computed results (selection, parameters, a job, a stored result with map, chart and table blocks) and the first module |
 
 ## Architecture coverage map
@@ -987,9 +987,9 @@ Release:
 
 Release:
 
-- [ ] `VERSION` v2.5.0 with the changelog and the release process.
+- [x] (2026-09-09) `VERSION` v2.5.0 with the changelog and the release process.
 
-**Exit criteria.** On the dev server: SP051307 and a second collar of the same project on one chart of battery voltage over their last month; the same selection in map mode with both tracks and the slider moving the marked moment along them; hovering a point on the chart marks the row in the drawer and the point on the map; a saved view of the old Analysis tab opens in chart mode; a track point clicked on the live map lands in Explore with the row marked in the drawer.
+**Exit criteria (every item checked in a browser against the dev server on 2026-09-09; the canvas click itself by hand).** On the dev server: SP051307 and a second collar of the same project on one chart of battery voltage over their last month; the same selection in map mode with both tracks and the slider moving the marked moment along them; hovering a point on the chart marks the row in the drawer and the point on the map; a saved view of the old Analysis tab opens in chart mode; a track point clicked on the live map lands in Explore with the row marked in the drawer.
 
 ---
 
@@ -1633,3 +1633,7 @@ Listed by the phase where they are first needed.
 - Built: `lib/explore.ts` (the state over the records state, the chart groups from the loaded rows and from the aggregate read, the tracks of the rows, the nearest row to a moment), the strip, the drawer, the chart (ECharts, one grid per metric with linked axes and one colour per owner; the hover and the click converted from pixels, so they work between the points too), the map (the live map's layer helpers over the period, the time slider, the ringed points at the moment) and the page that holds one marked moment for the three views. The records view and the sparklines of phase 20 are gone; the drill-down dialog of the old Analysis tab too, since the rows behind the chart are the drawer now (the rows read stays for other clients).
 - Verified: frontend types, lint, catalogue, unit tests (`lib/explore.test.ts`) and build; a browser pass through the Vite proxy against the dev server with SP051307 and SP051440 over seven days: the chart with a legend per owner, a hover marking and scrolling the drawer's row, a click pinning `at`, the scatter, the map with both tracks and the slider pinning the moment, the drawer folding, a v2.4.0 analysis link opening the chart, and a records link with a moment marking the row in the table. Found and fixed on the way: the map canvas kept its first size until a resize observer followed the container, the drawer's fold button lost its click to the drag handle's pointer capture, and the chart's zoom bar and the map's slider sat under the drawer until the canvas content ended where the drawer starts.
 - Exit criteria checked in a browser against the deployed site on Tim's word: SP051307 and SP051440 on one battery chart over 30 days (2,285 records), the same selection on the map with the slider pinning a moment, a chart hover marking and scrolling the drawer's row and a click pinning it, a saved view in the v2.4.0 shape opening on the Chart tab, and the point panel's link landing on the marked row. The canvas click itself stays by hand. Fixed on the way: overlapping time labels on the chart's axis.
+
+### 2026-09-09, release v2.5.0 (Tim)
+
+- Tagged v2.5.0 after CI on the release commit: phase 21 complete, the exit criteria checked against the dev server, deployed with the env-refresh playbook. Phase 22 (Analysis as modules) is next, its open questions first.

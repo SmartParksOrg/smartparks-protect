@@ -4,6 +4,12 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+Nothing yet.
+
+## v2.5.0, 2026-09-09
+
+Phase 21, Explore as one canvas (decisions D150 to D155), built the same day on Tim's look at v2.4.0: the sparkline tiles were a dashboard, not a close look, and the Analysis tab in its corner a third way of exploring the same data. Explore is now one selection looked at three ways, table, chart and map, on a canvas that fills the page with the rows in a drawer, one marked moment linking the views. The computed analyses (home range, vehicle checks, contact tracing, heart rate) are the next phase's page.
+
 ### Changed
 
 - Explore as one canvas (phase 21, decisions D150 to D155): the Records and Analysis tabs of the Data explorer are one page with a mode switch. The strip at the top holds the selection (entities, devices, a group, the period, the timezone) and the mode: the table fills the page, the chart draws one grid per metric with a shared time axis and one line per entity or device so two collars compare on one canvas (line, scatter of one metric against another, bar, histogram and state timeline), and the map shows the tracks of the period with a time slider that moves the marked moment along them. Under the chart or the map the rows sit in a drawer pulled up by its handle to a height kept per user. Hovering a point on the chart, a row in the drawer or a point on the map marks the same moment in every view, and a click pins it into the link. Above 50,000 records the chart reads buckets and the map the decimated tracks, with a note, while the drawer keeps loading the rows. Saved views keep the mode; views saved with the Analysis tab open in chart mode, and the sparkline tiles of v2.4.0 are gone.
