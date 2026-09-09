@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { RecordRow } from "@/api/types";
 import {
+  axisIndexOf,
   boundsOfTracks,
   chartGroups,
   chartMetrics,
@@ -10,6 +11,7 @@ import {
   readExploreState,
   scatterGroup,
   tracksOf,
+  unitAxes,
   writeExploreState,
 } from "@/lib/explore";
 import { columnsOf } from "@/lib/records";
@@ -80,17 +82,16 @@ describe("explore state", () => {
   });
   it("round-trips the chart's own state on top of the selection", () => {
     const params = new URLSearchParams(
-      "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&y2=activity&bucket=1h&agg=max",
+      "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&bucket=1h&agg=max",
     );
     const state = readExploreState(params);
-    expect(state.secondary).toEqual(["activity"]);
     expect(state.metrics).toEqual(["battery_voltage"]);
     expect(state.chart).toBe("scatter");
     expect(state.xMetric).toBe("device_temperature");
     expect(state.bucket).toBe("1h");
     expect(state.aggregates).toEqual(["max"]);
     expect(writeExploreState(state).toString()).toBe(
-      "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&y2=activity&bucket=1h&agg=max",
+      "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&bucket=1h&agg=max",
     );
   });
   it("writes only what differs from the defaults", () => {
@@ -124,6 +125,14 @@ describe("explore data", () => {
       [Date.parse("2026-04-01T02:00:00Z"), 3.9],
     ]);
     expect(groups[1].series.map((s) => s.data[0][1])).toEqual([1, 0]);
+  });
+  it("puts the first unit on the left axis and the others on the right", () => {
+    const groups = chartGroups(ROWS, ["battery_voltage", "gnss_fix"], columns);
+    const units = unitAxes(groups);
+    expect(units).toEqual(["V", "gnss_fix"]);
+    expect(axisIndexOf(groups[0], units)).toBe(0);
+    expect(axisIndexOf(groups[1], units)).toBe(1);
+    expect(unitAxes([])).toEqual([]);
   });
   it("pairs two metrics of the same moment for a scatter", () => {
     const group = scatterGroup(ROWS, "gnss_fix", "battery_voltage", columns)!;

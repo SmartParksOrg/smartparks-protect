@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Bookmark,
   ChartLine,
+  ChevronDown,
+  ChevronUp,
   Download,
   Map as MapIcon,
   Table2,
@@ -68,6 +70,7 @@ import {
   CHART_TYPES,
   type ChartType,
   formatInZone,
+  RANGE_PRESETS,
 } from "@/lib/analytics";
 import {
   CANVAS_BOUND,
@@ -242,6 +245,8 @@ export function ExplorerPage() {
   const shown = columns.filter((c) => !hiddenColumns.includes(c.key));
 
   // the marked moment (decision D154): a hover is transient, a click pins it into the URL
+  // the selection strip folds once a selection exists, first on a phone; a choice sticks
+  const [stripChoice, setStripChoice] = useState<boolean | null>(null);
   const [hovered, setHovered] = useState<{
     ms: number;
     source: "chart" | "map" | "table";
@@ -426,6 +431,26 @@ export function ExplorerPage() {
     setParams(next);
   }
 
+  const stripOpen = stripChoice ?? !(phone && selection !== null);
+  const summary = useMemo(() => {
+    const chosen = [
+      ...state.entities.map((id) => names.get(id) ?? id.slice(0, 8)),
+      ...state.devices.map((id) => names.get(id) ?? id.slice(0, 8)),
+    ];
+    const who =
+      chosen.length === 0
+        ? t("Nothing selected")
+        : chosen.length <= 2
+          ? chosen.join(", ")
+          : `${chosen.slice(0, 2).join(", ")} +${chosen.length - 2}`;
+    const period =
+      state.range === "custom"
+        ? t("Custom range")
+        : state.range === "assignment"
+          ? t("Since the device was assigned")
+          : RANGE_PRESETS[state.range].label;
+    return `${who} · ${period} · ${state.timezone}`;
+  }, [state, names, t]);
   const loaded = records.rows.length;
   const percent = total ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
   const progress = (
@@ -503,200 +528,217 @@ export function ExplorerPage() {
     label: c.label,
   }));
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b bg-card px-3 py-2 text-sm">
-        <SelectionStrip
-          state={state}
-          entities={entities.data?.items ?? []}
-          devices={devices.data?.items ?? []}
-          groups={groups.data ?? []}
-          oneEntity={oneEntity !== null}
-          onChange={(patch) => update(patch)}
+  const tools = (
+    <>
+      {state.mode === "table" && (
+        <MultiSelect
+          options={columns.map((c) => ({ value: c.key, label: c.label }))}
+          value={shown.map((c) => c.key)}
+          onChange={(visible) =>
+            setHiddenColumns(
+              columns.filter((c) => !visible.includes(c.key)).map((c) => c.key),
+            )
+          }
+          placeholder={t("Columns")}
+          label={t("columns")}
+          className="h-8 w-36"
         />
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Tabs
-            value={state.mode}
-            onValueChange={(v) => update({ mode: v as ExploreMode })}
-          >
-            <TabsList className="h-8">
-              <TabsTrigger value="table" className="h-7 gap-1 px-2">
-                <Table2 className="size-4" />
-                <span className="hidden sm:inline">{t("Table")}</span>
-              </TabsTrigger>
-              <TabsTrigger value="chart" className="h-7 gap-1 px-2">
-                <ChartLine className="size-4" />
-                <span className="hidden sm:inline">{t("Chart")}</span>
-              </TabsTrigger>
-              <TabsTrigger value="map" className="h-7 gap-1 px-2">
-                <MapIcon className="size-4" />
-                <span className="hidden sm:inline">{t("Map")}</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {state.mode === "table" && (
-            <MultiSelect
-              options={columns.map((c) => ({ value: c.key, label: c.label }))}
-              value={shown.map((c) => c.key)}
-              onChange={(visible) =>
-                setHiddenColumns(
-                  columns
-                    .filter((c) => !visible.includes(c.key))
-                    .map((c) => c.key),
-                )
-              }
-              placeholder={t("Columns")}
-              label={t("columns")}
-              className="h-8 w-36"
-            />
-          )}
-          {state.mode === "chart" && (
-            <>
-              <MultiSelect
-                options={chartOptions}
-                value={metricsOnChart}
-                onChange={(v) => update({ metrics: v })}
-                placeholder={t("Metrics")}
-                label={t("metrics")}
-                className="h-8 w-40"
-                maxSelected={
-                  state.chart === "scatter" || state.chart === "histogram"
-                    ? 1
-                    : 8
-                }
-              />
-              {state.chart === "scatter" && (
-                <Select
-                  value={state.xMetric ?? metricsOnChart[1] ?? ""}
-                  onValueChange={(v) => update({ xMetric: v })}
-                >
-                  <SelectTrigger className="h-8 w-40" aria-label={t("X axis")}>
-                    <SelectValue placeholder={t("X axis")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {chartOptions.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {state.chart !== "scatter" &&
-                state.chart !== "histogram" &&
-                metricsOnChart.length > 1 && (
-                  <MultiSelect
-                    options={chartOptions.filter((o) =>
-                      metricsOnChart.includes(o.value),
-                    )}
-                    value={state.secondary.filter((m) =>
-                      metricsOnChart.includes(m),
-                    )}
-                    onChange={(v) => update({ secondary: v })}
-                    placeholder={t("Right axis")}
-                    label={t("on the right axis")}
-                    className="h-8 w-36"
-                  />
-                )}
-              <Select
-                value={state.chart}
-                onValueChange={(v) => update({ chart: v as ChartType })}
-              >
-                <SelectTrigger
-                  className="h-8 w-36"
-                  aria-label={t("Chart kind")}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CHART_TYPES.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {t(CHART_LABELS[k])}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {aggregated && (
-                <Select
-                  value={state.bucket}
-                  onValueChange={(v) => update({ bucket: v })}
-                >
-                  <SelectTrigger className="h-8 w-28" aria-label={t("Bucket")}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BUCKETS.map((b) => (
-                      <SelectItem key={b} value={b}>
-                        {b === "auto"
-                          ? t("Automatic")
-                          : b === "all"
-                            ? t("Whole range")
-                            : b}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Select
-                value={currentView?.id ?? "none"}
-                onValueChange={(id) => {
-                  const v = views.data?.items.find((x) => x.id === id);
-                  if (v) applyView(v);
-                }}
-              >
-                <SelectTrigger
-                  className="h-8 w-36"
-                  aria-label={t("Saved views")}
-                >
-                  <SelectValue placeholder={t("Saved views")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none" disabled>
-                    {views.data?.items.length
-                      ? t("Saved views")
-                      : t("No saved views yet")}
+      )}
+      {state.mode === "chart" && (
+        <>
+          <MultiSelect
+            options={chartOptions}
+            value={metricsOnChart}
+            onChange={(v) => update({ metrics: v })}
+            placeholder={t("Metrics")}
+            label={t("metrics")}
+            className="h-8 w-40"
+            maxSelected={
+              state.chart === "scatter" || state.chart === "histogram" ? 1 : 8
+            }
+          />
+          {state.chart === "scatter" && (
+            <Select
+              value={state.xMetric ?? metricsOnChart[1] ?? ""}
+              onValueChange={(v) => update({ xMetric: v })}
+            >
+              <SelectTrigger className="h-8 w-40" aria-label={t("X axis")}>
+                <SelectValue placeholder={t("X axis")} />
+              </SelectTrigger>
+              <SelectContent>
+                {chartOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
                   </SelectItem>
-                  {views.data?.items.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={() => setSaveOpen(true)}
-                disabled={!selection}
-                aria-label={t("Save view")}
-              >
-                <Bookmark className="size-4" />
-              </Button>
-              {currentView &&
-                (currentView.created_by === user?.id || canAdmin(role)) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    aria-label={t("Delete saved view")}
-                    onClick={() => deleteView.mutate(currentView.id)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                )}
-            </>
+                ))}
+              </SelectContent>
+            </Select>
           )}
+          <Select
+            value={state.chart}
+            onValueChange={(v) => update({ chart: v as ChartType })}
+          >
+            <SelectTrigger className="h-8 w-36" aria-label={t("Chart kind")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CHART_TYPES.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {t(CHART_LABELS[k])}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {aggregated && (
+            <Select
+              value={state.bucket}
+              onValueChange={(v) => update({ bucket: v })}
+            >
+              <SelectTrigger className="h-8 w-28" aria-label={t("Bucket")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BUCKETS.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {b === "auto"
+                      ? t("Automatic")
+                      : b === "all"
+                        ? t("Whole range")
+                        : b}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Select
+            value={currentView?.id ?? "none"}
+            onValueChange={(id) => {
+              const v = views.data?.items.find((x) => x.id === id);
+              if (v) applyView(v);
+            }}
+          >
+            <SelectTrigger className="h-8 w-36" aria-label={t("Saved views")}>
+              <SelectValue placeholder={t("Saved views")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none" disabled>
+                {views.data?.items.length
+                  ? t("Saved views")
+                  : t("No saved views yet")}
+              </SelectItem>
+              {views.data?.items.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {v.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"
             className="h-8"
-            onClick={() => setExportOpen(true)}
+            onClick={() => setSaveOpen(true)}
             disabled={!selection}
+            aria-label={t("Save view")}
           >
-            <Download className="size-4" /> {t("Export")}
+            <Bookmark className="size-4" />
           </Button>
+          {currentView &&
+            (currentView.created_by === user?.id || canAdmin(role)) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                aria-label={t("Delete saved view")}
+                onClick={() => deleteView.mutate(currentView.id)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )}
+        </>
+      )}
+    </>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="border-b bg-card px-3 py-2 text-sm">
+        {/* the header row stays; the selection and the tools fold away once a selection is
+            made, so the table, the chart and the map get the room (folded first on a phone) */}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            aria-expanded={stripOpen}
+            aria-label={
+              stripOpen ? t("Fold the selection") : t("Unfold the selection")
+            }
+            onClick={() => setStripChoice(!stripOpen)}
+          >
+            {stripOpen ? (
+              <ChevronUp className="size-4" />
+            ) : (
+              <ChevronDown className="size-4" />
+            )}
+          </Button>
+          {!stripOpen && (
+            <button
+              type="button"
+              className="min-w-0 truncate text-left"
+              title={summary}
+              onClick={() => setStripChoice(true)}
+            >
+              {summary}
+            </button>
+          )}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Tabs
+              value={state.mode}
+              onValueChange={(v) => update({ mode: v as ExploreMode })}
+            >
+              <TabsList className="h-8">
+                <TabsTrigger value="table" className="h-7 gap-1 px-2">
+                  <Table2 className="size-4" />
+                  <span className="hidden sm:inline">{t("Table")}</span>
+                </TabsTrigger>
+                <TabsTrigger value="chart" className="h-7 gap-1 px-2">
+                  <ChartLine className="size-4" />
+                  <span className="hidden sm:inline">{t("Chart")}</span>
+                </TabsTrigger>
+                <TabsTrigger value="map" className="h-7 gap-1 px-2">
+                  <MapIcon className="size-4" />
+                  <span className="hidden sm:inline">{t("Map")}</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setExportOpen(true)}
+              disabled={!selection}
+              aria-label={t("Export")}
+            >
+              <Download className="size-4" />
+              <span className="hidden sm:inline">{t("Export")}</span>
+            </Button>
+          </div>
         </div>
+        {stripOpen && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <SelectionStrip
+              state={state}
+              entities={entities.data?.items ?? []}
+              devices={devices.data?.items ?? []}
+              groups={groups.data ?? []}
+              oneEntity={oneEntity !== null}
+              onChange={(patch) => update(patch)}
+            />
+            {tools}
+          </div>
+        )}
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -737,64 +779,65 @@ export function ExplorerPage() {
                 <div className="relative min-h-0 flex-1">{table}</div>
               </div>
             )}
-            <div
-              className="absolute inset-x-0 top-0"
-              style={{
-                bottom:
-                  state.mode === "table"
-                    ? 0
-                    : drawerSpace(drawerOpen, drawerHeight, phone),
-              }}
-            >
-              {state.mode === "chart" &&
-                (groupsOnChart.length === 0 ? (
-                  <div className="absolute inset-0 flex items-center justify-center p-6">
-                    <EmptyState
-                      icon={ChartLine}
-                      title={
-                        records.status === "loading" && loaded === 0
-                          ? t("Loading…")
-                          : t("Nothing to chart yet")
+            {/* the chart or the map, ending where the drawer starts; nothing here in table
+                mode, so the table gets every touch */}
+            {state.mode !== "table" && (
+              <div
+                className="absolute inset-x-0 top-0"
+                style={{
+                  bottom: drawerSpace(drawerOpen, drawerHeight, phone),
+                }}
+              >
+                {state.mode === "chart" &&
+                  (groupsOnChart.length === 0 ? (
+                    <div className="absolute inset-0 flex items-center justify-center p-6">
+                      <EmptyState
+                        icon={ChartLine}
+                        title={
+                          records.status === "loading" && loaded === 0
+                            ? t("Loading…")
+                            : t("Nothing to chart yet")
+                        }
+                        description={t(
+                          "The chart draws the numeric metrics of the loaded rows; pick metrics in the strip once rows are here.",
+                        )}
+                      />
+                    </div>
+                  ) : (
+                    <ExploreChart
+                      groups={groupsOnChart}
+                      kind={state.chart}
+                      xLabel={
+                        state.chart === "scatter"
+                          ? (chartOptions.find(
+                              (o) =>
+                                o.value ===
+                                (state.xMetric ?? metricsOnChart[1] ?? ""),
+                            )?.label ?? null)
+                          : null
                       }
-                      description={t(
-                        "The chart draws the numeric metrics of the loaded rows; pick metrics in the strip once rows are here.",
-                      )}
+                      phone={phone}
+                      timezone={state.timezone}
+                      marked={hover === null ? null : marked}
+                      pinned={pinned}
+                      onHover={onHover}
+                      onPick={pick}
                     />
-                  </div>
-                ) : (
-                  <ExploreChart
-                    groups={groupsOnChart}
-                    kind={state.chart}
-                    xLabel={
-                      state.chart === "scatter"
-                        ? (chartOptions.find(
-                            (o) =>
-                              o.value ===
-                              (state.xMetric ?? metricsOnChart[1] ?? ""),
-                          )?.label ?? null)
-                        : null
-                    }
-                    secondary={state.secondary}
+                  ))}
+                {state.mode === "map" && (
+                  <ExploreMap
+                    tracks={tracks}
+                    features={features.data?.items ?? []}
+                    window={window}
                     timezone={state.timezone}
-                    marked={hover === null ? null : marked}
-                    pinned={pinned}
+                    marked={marked}
+                    fitKey={selectionKey}
                     onHover={onHover}
                     onPick={pick}
                   />
-                ))}
-              {state.mode === "map" && (
-                <ExploreMap
-                  tracks={tracks}
-                  features={features.data?.items ?? []}
-                  window={window}
-                  timezone={state.timezone}
-                  marked={marked}
-                  fitKey={selectionKey}
-                  onHover={onHover}
-                  onPick={pick}
-                />
-              )}
-            </div>
+                )}
+              </div>
+            )}
             {state.mode !== "table" && aggregated && (
               <div className="pointer-events-none absolute top-3 right-14 left-3 z-10 flex justify-end">
                 <span className="pointer-events-auto rounded-md border bg-card/95 px-2 py-1 text-xs text-muted-foreground">

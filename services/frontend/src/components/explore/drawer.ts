@@ -8,5 +8,5 @@ export function drawerSpace(
   phone: boolean,
 ): number | string {
   if (!open) return HANDLE;
-  return phone ? "45%" : height + HANDLE;
+  return phone ? "55%" : height + HANDLE;
 }

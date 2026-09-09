@@ -38,8 +38,6 @@ export interface ExploreState extends RecordsState {
   chart: ChartType;
   /** The metric on the x axis of a scatter chart; null means time. */
   xMetric: string | null;
-  /** Metrics drawn against the secondary (right) axis. */
-  secondary: string[];
   bucket: string;
   aggregates: Aggregate[];
 }
@@ -67,7 +65,6 @@ export function readExploreState(params: URLSearchParams): ExploreState {
       ? chart
       : "line") as ChartType,
     xMetric: params.get("x"),
-    secondary: params.getAll("y2"),
     bucket: params.get("bucket") ?? "auto",
     aggregates: agg.length ? agg : DEFAULT_AGGREGATES,
   };
@@ -79,7 +76,6 @@ export function writeExploreState(state: ExploreState): URLSearchParams {
   for (const m of state.metrics) params.append("metric", m);
   if (state.chart !== "line") params.set("chart", state.chart);
   if (state.xMetric) params.set("x", state.xMetric);
-  for (const m of state.secondary) params.append("y2", m);
   if (state.bucket !== "auto") params.set("bucket", state.bucket);
   if (state.aggregates.join(",") !== DEFAULT_AGGREGATES.join(","))
     for (const a of state.aggregates) params.append("agg", a);
@@ -213,6 +209,22 @@ export function scatterGroup(
     unit: y.unit ?? null,
     series: [...series.values()],
   };
+}
+
+/** The units on the chart in the order the metrics come: the first is the left axis, every
+ * other unit shares the right axis (the way Grafana assigns axes by unit). A metric without a
+ * unit counts as its own unit, named by the metric. */
+export function unitAxes(groups: ChartGroup[]): string[] {
+  const units: string[] = [];
+  for (const g of groups) {
+    const unit = g.unit ?? g.label;
+    if (!units.includes(unit)) units.push(unit);
+  }
+  return units;
+}
+
+export function axisIndexOf(group: ChartGroup, units: string[]): 0 | 1 {
+  return units.indexOf(group.unit ?? group.label) <= 0 ? 0 : 1;
 }
 
 /** The aggregate read as chart groups, for a selection above the canvas bound. */
