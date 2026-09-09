@@ -25,6 +25,7 @@ FORMATS_BY_DATASET: dict[ExportDataset, frozenset[ExportFormat]] = {
     ExportDataset.POSITIONS: frozenset(ExportFormat),  # also GeoJSON and GPX
     ExportDataset.MOVEBANK_EVENTS: _TABULAR,
     ExportDataset.MOVEBANK_REFERENCE: _TABULAR,
+    ExportDataset.RECORDS: _TABULAR,
 }
 
 
@@ -53,6 +54,8 @@ class ExportParameters(BaseModel):
         description="Add is_curated, curated_fields, curation_reason, original and effective "
         "time and value, curated_by, curated_at and curation_job_id columns",
     )
+    # records: wide (a column per metric, the default) or long (a row per value)
+    records_layout: Literal["wide", "long"] = "wide"
     # aggregates only
     bucket: str | None = Field(
         default=None, description="Ladder key, `all`, or empty for automatic"

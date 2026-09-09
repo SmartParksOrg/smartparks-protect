@@ -46,6 +46,7 @@ from shared.models import (
     Project,
     SourceEvent,
 )
+from shared.records import RecordSelection, fill, keys_statement, metric_keys, state_keys
 
 # Movebank's import format (decision D85): the attribute names of the Movebank attribute
 # dictionary as they appear in Movebank CSV files; Movebank's import dialog maps columns to
@@ -96,23 +97,45 @@ YIELD_PER = 2_000
 
 @dataclass
 class Lookups:
-    """Names for identifiers, loaded once per export. Bounded by the registries, not the data."""
+    """Names for identifiers, loaded once per export. Bounded by the registries, not the data.
+    A records export (decision D144) also learns its wide columns here: the metric keys and the
+    state fields the selection reports in the window."""
 
     entities: dict[uuid.UUID, str] = field(default_factory=dict)
     devices: dict[uuid.UUID, str] = field(default_factory=dict)
     metrics: dict[str, Metric] = field(default_factory=dict)
+    record_metrics: list[str] = field(default_factory=list)
+    record_state_keys: list[str] = field(default_factory=list)
 
 
-async def load_lookups(session: AsyncSession, project_id: uuid.UUID) -> Lookups:
+async def load_lookups(
+    session: AsyncSession, project_id: uuid.UUID, params: ExportParameters | None = None
+) -> Lookups:
     entities = await session.execute(
         select(Entity.id, Entity.name).where(Entity.project_id == project_id)
     )
     devices = await session.execute(select(Device.id, Device.name))
     metrics = (await session.scalars(select(Metric))).all()
-    return Lookups(
+    lookups = Lookups(
         entities={row[0]: row[1] for row in entities.all()},
         devices={row[0]: row[1] for row in devices.all()},
         metrics={m.key: m for m in metrics},
+    )
+    if params is not None and params.dataset is ExportDataset.RECORDS:
+        selection = _record_selection(project_id, params)
+        lookups.record_metrics = await metric_keys(session, selection)
+        lookups.record_state_keys = await state_keys(session, selection)
+    return lookups
+
+
+def _record_selection(project_id: uuid.UUID, params: ExportParameters) -> RecordSelection:
+    return RecordSelection(
+        project=Position.project_id == project_id,
+        entity_ids=list(params.entity_ids),
+        device_ids=list(params.device_ids),
+        since=params.time_from,
+        until=params.time_to,
+        include_invalid=params.view == "original",
     )
 
 
@@ -162,6 +185,27 @@ def columns(params: ExportParameters, lookups: Lookups) -> list[str]:
         cols += ["value", "data_source_id", "source_event_id", "trace_id", "valid"]
         if params.curation_metadata:
             cols += CURATION_COLUMNS
+        return cols
+    if params.dataset is ExportDataset.RECORDS:
+        cols = ["time", "time_utc", "entity_id"]
+        cols += ["entity_name"] if names else []
+        cols += ["device_id"]
+        cols += ["device_name"] if names else []
+        if params.records_layout == "long":
+            cols += ["field", "value", "unit", "source_event_id", "trace_id"]
+            return cols
+        cols += [
+            "latitude",
+            "longitude",
+            "altitude_m",
+            "speed_mps",
+            "heading_deg",
+            "accuracy_m",
+            "satellites",
+        ]
+        cols += [f"m_{key}" for key in lookups.record_metrics]
+        cols += [f"s_{key}" for key in lookups.record_state_keys]
+        cols += ["source_event_id", "trace_id"]
         return cols
     if params.dataset is ExportDataset.SOURCE_EVENTS:
         cols = ["ingested_at", "network_received_at", "device_id"]
@@ -272,6 +316,9 @@ def count_statement(project_id: uuid.UUID, params: ExportParameters) -> Select[A
             .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
             .where(Entity.project_id == project_id)
         )
+    if params.dataset is ExportDataset.RECORDS:
+        keys = keys_statement(_record_selection(project_id, params)).subquery("k")
+        return select(func.count()).select_from(keys)
     return None
 
 
@@ -299,9 +346,89 @@ async def stream_rows(
     elif params.dataset is ExportDataset.MOVEBANK_REFERENCE:
         async for row in _movebank_reference(session, project_id, params, lookups):
             yield row
+    elif params.dataset is ExportDataset.RECORDS:
+        async for row in _records(session, project_id, params, lookups):
+            yield row
     else:
         async for row in _aggregates(session, project_id, params, lookups):
             yield row
+
+
+RECORD_PAGE = 1000
+
+
+async def _records(
+    session: AsyncSession, project_id: uuid.UUID, params: ExportParameters, lookups: Lookups
+) -> AsyncIterator[dict[str, Any]]:
+    """One row per moment of the selection, oldest first (decision D144): the moments stream
+    from the union of position and measurement times and are filled a page at a time, the way
+    the records read works, so the export stays flat in memory whatever its size."""
+    selection = _record_selection(project_id, params)
+    keys = keys_statement(selection).subquery("k")
+    statement = select(keys.c.device_id, keys.c.t).order_by(keys.c.t, keys.c.device_id)
+    result = await session.stream(statement.execution_options(yield_per=YIELD_PER))
+    page: list[tuple[uuid.UUID, datetime]] = []
+
+    async def rows_of(page_keys: list[tuple[uuid.UUID, datetime]]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for r in await fill(session, selection, page_keys):
+            base = {
+                "time": _iso(r.time, params),
+                "time_utc": _utc(r.time),
+                "entity_id": r.entity_id,
+                "entity_name": r.entity_name,
+                "device_id": r.device_id,
+                "device_name": r.device_name,
+                "source_event_id": r.source_event_id,
+                "trace_id": r.trace_id,
+            }
+            if params.records_layout == "long":
+                fields: list[tuple[str, Any, str | None]] = []
+                if r.position is not None:
+                    fields += [
+                        ("latitude", r.lat, None),
+                        ("longitude", r.lon, None),
+                        ("altitude_m", r.position.altitude_m, "m"),
+                        ("speed_mps", r.position.speed_mps, "m/s"),
+                        ("heading_deg", r.position.heading_deg, "deg"),
+                        ("accuracy_m", r.position.accuracy_m, "m"),
+                        ("satellites", r.position.satellites, None),
+                    ]
+                fields += [
+                    (key, value, (lookups.metrics[key].unit if key in lookups.metrics else None))
+                    for key, value in r.measurements.items()
+                ]
+                fields += [(f"state.{key}", value, None) for key, value in (r.state or {}).items()]
+                for name, value, unit in fields:
+                    if value is None:
+                        continue
+                    out.append({**base, "field": name, "value": value, "unit": unit})
+                continue
+            row = {
+                **base,
+                "latitude": r.lat,
+                "longitude": r.lon,
+                "altitude_m": r.position.altitude_m if r.position else None,
+                "speed_mps": r.position.speed_mps if r.position else None,
+                "heading_deg": r.position.heading_deg if r.position else None,
+                "accuracy_m": r.position.accuracy_m if r.position else None,
+                "satellites": r.position.satellites if r.position else None,
+            }
+            for key in lookups.record_metrics:
+                row[f"m_{key}"] = r.measurements.get(key)
+            for key in lookups.record_state_keys:
+                row[f"s_{key}"] = (r.state or {}).get(key)
+            out.append(row)
+        return out
+
+    async for device_id, t in result:
+        page.append((device_id, t))
+        if len(page) >= RECORD_PAGE:
+            for row in await rows_of(page):
+                yield row
+            page = []
+    for row in await rows_of(page):
+        yield row
 
 
 async def _positions(

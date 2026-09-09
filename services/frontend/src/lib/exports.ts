@@ -2,12 +2,31 @@
 import type { Aggregate, RangePreset } from "@/lib/analytics";
 
 export const DATASETS = {
-  positions: { label: "Positions", formats: ["csv", "xlsx", "json", "geojson", "gpx"] },
+  records: {
+    label: "Records (one row per moment)",
+    formats: ["csv", "xlsx", "json"],
+  },
+  positions: {
+    label: "Positions",
+    formats: ["csv", "xlsx", "json", "geojson", "gpx"],
+  },
   measurements: { label: "Measurements", formats: ["csv", "xlsx", "json"] },
-  aggregates: { label: "Aggregates (Data Explorer series)", formats: ["csv", "xlsx", "json"] },
-  source_events: { label: "Source events (raw)", formats: ["csv", "xlsx", "json"] },
-  movebank_events: { label: "Movebank event data (positions)", formats: ["csv", "xlsx", "json"] },
-  movebank_reference: { label: "Movebank reference data (animals, tags, deployments)", formats: ["csv", "xlsx", "json"] },
+  aggregates: {
+    label: "Aggregates (Data Explorer series)",
+    formats: ["csv", "xlsx", "json"],
+  },
+  source_events: {
+    label: "Source events (raw)",
+    formats: ["csv", "xlsx", "json"],
+  },
+  movebank_events: {
+    label: "Movebank event data (positions)",
+    formats: ["csv", "xlsx", "json"],
+  },
+  movebank_reference: {
+    label: "Movebank reference data (animals, tags, deployments)",
+    formats: ["csv", "xlsx", "json"],
+  },
 } as const;
 export type Dataset = keyof typeof DATASETS;
 
@@ -18,6 +37,7 @@ export interface ExportPreset {
   from?: string;
   to?: string;
   entityIds?: string[];
+  deviceIds?: string[];
   metricKeys?: string[];
   bucket?: string;
   aggregates?: Aggregate[];

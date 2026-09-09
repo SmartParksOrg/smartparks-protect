@@ -2008,6 +2008,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/records/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Records Count
+         * @description How many records the selection has in the window: the progress bar's total.
+         */
+        get: operations["records_count_api_v1_projects__project_id__records_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Records
+         * @description One page of records of the selected entities and devices in the window, newest first.
+         *     The page's moments come from a union of position and measurement times, keyset-paged on
+         *     `(time, device)`; the rows are then filled from the positions, measurements and state history
+         *     of the page's time span, read through the owner and time indexes.
+         */
+        get: operations["records_api_v1_projects__project_id__records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/analytics/series": {
         parameters: {
             query?: never;
@@ -6932,7 +6975,7 @@ export interface components {
          * @description What an export contains (architecture 14, data level).
          * @enum {string}
          */
-        ExportDataset: "source_events" | "positions" | "measurements" | "aggregates" | "movebank_events" | "movebank_reference";
+        ExportDataset: "source_events" | "positions" | "measurements" | "aggregates" | "movebank_events" | "movebank_reference" | "records";
         /**
          * ExportFormat
          * @enum {string}
@@ -7042,6 +7085,12 @@ export interface components {
              * @default false
              */
             curation_metadata: boolean;
+            /**
+             * Records Layout
+             * @default wide
+             * @enum {string}
+             */
+            records_layout: "wide" | "long";
             /**
              * Bucket
              * @description Ladder key, `all`, or empty for automatic
@@ -8997,6 +9046,109 @@ export interface components {
             curation_version: number;
             /** Corrections */
             corrections: components["schemas"]["CorrectionRead"][];
+        };
+        /** RecordPosition */
+        RecordPosition: {
+            /** Id */
+            id: number;
+            /** Lat */
+            lat: number;
+            /** Lon */
+            lon: number;
+            /** Altitude M */
+            altitude_m: number | null;
+            /** Speed Mps */
+            speed_mps: number | null;
+            /** Heading Deg */
+            heading_deg: number | null;
+            /** Accuracy M */
+            accuracy_m: number | null;
+            /** Satellites */
+            satellites: number | null;
+            /** Valid */
+            valid: boolean;
+            /** Curated Fields */
+            curated_fields?: string[];
+            /** Source Event Id */
+            source_event_id: number | null;
+            /** Source Event Ingested At */
+            source_event_ingested_at: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+        };
+        /**
+         * RecordRow
+         * @description One moment of one device: the effective time, the position if the moment has one, the
+         *     measurements by metric key (effective values) and the state fields reported then.
+         */
+        RecordRow: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string | null;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Entity Name */
+            entity_name: string | null;
+            /** Project Id */
+            project_id: string | null;
+            position: components["schemas"]["RecordPosition"] | null;
+            /** Measurements */
+            measurements: {
+                [key: string]: number | boolean | string | {
+                    [key: string]: unknown;
+                } | null;
+            };
+            /** State */
+            state: {
+                [key: string]: unknown;
+            } | null;
+            /** Source Event Id */
+            source_event_id: number | null;
+            /** Source Event Ingested At */
+            source_event_ingested_at: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+        };
+        /** RecordsCount */
+        RecordsCount: {
+            /** Count */
+            count: number;
+            /**
+             * Time From
+             * Format: date-time
+             */
+            time_from: string;
+            /**
+             * Time To
+             * Format: date-time
+             */
+            time_to: string;
+        };
+        /** RecordsPage */
+        RecordsPage: {
+            /** Items */
+            items: components["schemas"]["RecordRow"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /**
+             * Time From
+             * Format: date-time
+             */
+            time_from: string;
+            /**
+             * Time To
+             * Format: date-time
+             */
+            time_to: string;
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -14744,6 +14896,85 @@ export interface operations {
             };
         };
     };
+    records_count_api_v1_projects__project_id__records_count_get: {
+        parameters: {
+            query?: {
+                entity_id?: string[] | null;
+                device_id?: string[] | null;
+                from?: string | null;
+                to?: string | null;
+                /** @description Also rows marked invalid by curation */
+                include_invalid?: boolean;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordsCount"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    records_api_v1_projects__project_id__records_get: {
+        parameters: {
+            query?: {
+                entity_id?: string[] | null;
+                device_id?: string[] | null;
+                from?: string | null;
+                to?: string | null;
+                /** @description Also rows marked invalid by curation */
+                include_invalid?: boolean;
+                limit?: number;
+                /** @description From the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordsPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     series_api_v1_projects__project_id__analytics_series_get: {
         parameters: {
             query: {
@@ -15089,6 +15320,7 @@ export interface operations {
                 view?: "effective" | "original";
                 /** @description Add is_curated, curated_fields, curation_reason, original and effective time and value, curated_by, curated_at and curation_job_id columns */
                 curation_metadata?: boolean;
+                records_layout?: "wide" | "long";
                 /** @description Ladder key, `all`, or empty for automatic */
                 bucket?: string | null;
                 aggregates?: components["schemas"]["Aggregate"][];

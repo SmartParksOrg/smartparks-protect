@@ -107,7 +107,7 @@ async def run_export(session: AsyncSession, job: ExportJob) -> None:
 
     path = None
     try:
-        lookups = await load_lookups(session, project_id)
+        lookups = await load_lookups(session, project_id, params)
         with tempfile.NamedTemporaryFile(suffix=f".{job.format}", delete=False) as handle:
             path = handle.name
             sink = cast(BinaryIO, handle)
@@ -194,7 +194,7 @@ async def direct_export(
     """Stream a small export. Formats that are complete only at the end (XLSX) go through a
     temporary file; the rest are yielded as they are written."""
     try:
-        lookups = await load_lookups(session, project_id)
+        lookups = await load_lookups(session, project_id, params)
         if params.format is ExportFormat.XLSX:
             with tempfile.TemporaryFile(suffix=".xlsx") as handle:
                 await _write_all(session, project_id, params, lookups, cast(BinaryIO, handle))

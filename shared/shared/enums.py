@@ -240,6 +240,7 @@ class ExportDataset(StrEnum):
     AGGREGATES = "aggregates"  # bucketed series, same query as the Data Explorer
     MOVEBANK_EVENTS = "movebank_events"  # positions in Movebank's import format (D85)
     MOVEBANK_REFERENCE = "movebank_reference"  # animals, tags and deployments for Movebank
+    RECORDS = "records"  # one row per device timestamp with the values of that moment (D144)
 
 
 class ExportStatus(StrEnum):

@@ -36,6 +36,7 @@ from protect_api.routers.mcp_actions import router as mcp_actions_router
 from protect_api.routers.network import router as network_router
 from protect_api.routers.platform import router as platform_router
 from protect_api.routers.projects import router as projects_router
+from protect_api.routers.records import router as records_router
 from protect_api.routers.rules import router as rules_router
 from protect_api.routers.search import router as search_router
 
@@ -56,6 +57,7 @@ for router in (
     network_router,
     map_router,
     map_config_router,
+    records_router,
     analytics_router,
     exports_router,
     rules_router,

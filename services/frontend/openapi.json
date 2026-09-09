@@ -8589,6 +8589,304 @@
     ]
    }
   },
+  "/api/v1/projects/{project_id}/records/count": {
+   "get": {
+    "tags": [
+     "records"
+    ],
+    "summary": "Records Count",
+    "description": "How many records the selection has in the window: the progress bar's total.",
+    "operationId": "records_count_api_v1_projects__project_id__records_count_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "entity_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     },
+     {
+      "name": "include_invalid",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Also rows marked invalid by curation",
+       "default": false,
+       "title": "Include Invalid"
+      },
+      "description": "Also rows marked invalid by curation"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RecordsCount"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/records": {
+   "get": {
+    "tags": [
+     "records"
+    ],
+    "summary": "Records",
+    "description": "One page of records of the selected entities and devices in the window, newest first.\nThe page's moments come from a union of position and measurement times, keyset-paged on\n`(time, device)`; the rows are then filled from the positions, measurements and state history\nof the page's time span, read through the owner and time indexes.",
+    "operationId": "records_api_v1_projects__project_id__records_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "entity_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date-time"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     },
+     {
+      "name": "include_invalid",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Also rows marked invalid by curation",
+       "default": false,
+       "title": "Include Invalid"
+      },
+      "description": "Also rows marked invalid by curation"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 1000,
+       "minimum": 1,
+       "default": 1000,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "From the previous page",
+       "title": "Cursor"
+      },
+      "description": "From the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RecordsPage"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/analytics/series": {
    "get": {
     "tags": [
@@ -9608,6 +9906,20 @@
        "title": "Curation Metadata"
       },
       "description": "Add is_curated, curated_fields, curation_reason, original and effective time and value, curated_by, curated_at and curation_job_id columns"
+     },
+     {
+      "name": "records_layout",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "wide",
+        "long"
+       ],
+       "type": "string",
+       "default": "wide",
+       "title": "Records Layout"
+      }
      },
      {
       "name": "bucket",
@@ -25903,7 +26215,8 @@
      "measurements",
      "aggregates",
      "movebank_events",
-     "movebank_reference"
+     "movebank_reference",
+     "records"
     ],
     "title": "ExportDataset",
     "description": "What an export contains (architecture 14, data level)."
@@ -26185,6 +26498,15 @@
       "title": "Curation Metadata",
       "description": "Add is_curated, curated_fields, curation_reason, original and effective time and value, curated_by, curated_at and curation_job_id columns",
       "default": false
+     },
+     "records_layout": {
+      "type": "string",
+      "enum": [
+       "wide",
+       "long"
+      ],
+      "title": "Records Layout",
+      "default": "wide"
      },
      "bucket": {
       "anyOf": [
@@ -31913,6 +32235,362 @@
     ],
     "title": "RecordHistory",
     "description": "A record's effective and original values with every correction on it."
+   },
+   "RecordPosition": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "lat": {
+      "type": "number",
+      "title": "Lat"
+     },
+     "lon": {
+      "type": "number",
+      "title": "Lon"
+     },
+     "altitude_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Altitude M"
+     },
+     "speed_mps": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Speed Mps"
+     },
+     "heading_deg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Heading Deg"
+     },
+     "accuracy_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Accuracy M"
+     },
+     "satellites": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Satellites"
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid"
+     },
+     "curated_fields": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Curated Fields"
+     },
+     "source_event_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Id"
+     },
+     "source_event_ingested_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Ingested At"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "lat",
+     "lon",
+     "altitude_m",
+     "speed_mps",
+     "heading_deg",
+     "accuracy_m",
+     "satellites",
+     "valid",
+     "source_event_id",
+     "source_event_ingested_at",
+     "trace_id"
+    ],
+    "title": "RecordPosition"
+   },
+   "RecordRow": {
+    "properties": {
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "position": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RecordPosition"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "measurements": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Measurements"
+     },
+     "state": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State"
+     },
+     "source_event_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Id"
+     },
+     "source_event_ingested_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Ingested At"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time",
+     "device_id",
+     "device_name",
+     "entity_id",
+     "entity_name",
+     "project_id",
+     "position",
+     "measurements",
+     "state",
+     "source_event_id",
+     "source_event_ingested_at",
+     "trace_id"
+    ],
+    "title": "RecordRow",
+    "description": "One moment of one device: the effective time, the position if the moment has one, the\nmeasurements by metric key (effective values) and the state fields reported then."
+   },
+   "RecordsCount": {
+    "properties": {
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     },
+     "time_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time From"
+     },
+     "time_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time To"
+     }
+    },
+    "type": "object",
+    "required": [
+     "count",
+     "time_from",
+     "time_to"
+    ],
+    "title": "RecordsCount"
+   },
+   "RecordsPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/RecordRow"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     },
+     "time_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time From"
+     },
+     "time_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time To"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "next_cursor",
+     "time_from",
+     "time_to"
+    ],
+    "title": "RecordsPage"
    },
    "RegisterRequest": {
     "properties": {
