@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 19 (the live map as a working tool) complete and live on the dev server on 2026-09-09 (last commit 7d97ff5); the v2.3.0 release is next; phase 20 (explore and export from the entity or device) after it |
-| Latest release | v2.2.0 (2026-09-08): phases 16 to 18 and the fixes since v2.0.0 |
+| Active phase | Phase 19 released as v2.3.0 on 2026-09-09; phase 20 (explore and export from the entity or device) is next; phase 20 (explore and export from the entity or device) after it |
+| Latest release | v2.3.0 (2026-09-09): phase 19, the live map as a working tool |
 | Last session | 2026-09-09 |
-| Next item | `VERSION` v2.3.0 with the changelog on Tim's word (phase 19 complete and live), then phase 20. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Next item | Phase 20: ask its decisions, then the records read. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -245,7 +245,7 @@ From architecture section 2, used when reviewing a change. These are never done;
 | v2.0.0 | 15 | Correctness and usability from the first live days (D97) |
 | (folded into v2.2.0) | 16 | The device layer on the map and the all-projects scope for server admins (D111 to D118); v2.1.0 was never tagged |
 | v2.2.0 | 17, 18 | ChirpStack applications connected from the tenant (D125 to D132), simple first with the Overview, Data and Network tabs (D133, D134), and the fixes since v2.0.0 |
-| v2.3.0 | 19 | The live map as a working tool: panels on every dot, links that make the object visible, one control strip, heatmap, drawing and measuring, satellite imagery and terrain |
+| v2.3.0 (2026-09-09) | 19 | The live map as a working tool: panels on every dot, links that make the object visible, one control strip, heatmaps per entity and device, drawing and measuring with features that start rules, the proximity condition, satellite imagery and terrain |
 | v2.4.0 | 20 | Explore and export from the entity or device: the records view, paging with progress instead of refusals, the records export |
 
 ## Architecture coverage map
@@ -904,9 +904,9 @@ e. Base map:
 
 Release:
 
-- [ ] `VERSION` v2.3.0 with the changelog and the release process.
+- [x] (2026-09-09) `VERSION` v2.3.0 with the changelog and the release process.
 
-**Exit criteria.** On the dev server in project Smart Parks: switching to Demo park and back fits the map to each project's animals and collars; a "show on map" link from the entity page lands on an entity that was hidden in the layers panel and shows it; a click on a track point opens its panel with the measurements of that fix and leads to the device's Data tab at that time; a click on a KPN gateway opens its panel and "Show heard positions" draws only its dots; the top right strip holds every control and the top left only the search; a heatmap over 30 days of SP051307 changes with the radius and sensitivity sliders; a polygon drawn on the map becomes a geofence and "Create rule" opens the editor with the geofence exit template on it; a line's length and a polygon's area read correctly against a known distance; the satellite base map with terrain shows the hills of the park in 3D on a phone.
+**Exit criteria (every item checked on the dev server on 2026-09-09 as the parts landed; the terrain on a phone with the same tiles is left to Tim's next look).** On the dev server in project Smart Parks: switching to Demo park and back fits the map to each project's animals and collars; a "show on map" link from the entity page lands on an entity that was hidden in the layers panel and shows it; a click on a track point opens its panel with the measurements of that fix and leads to the device's Data tab at that time; a click on a KPN gateway opens its panel and "Show heard positions" draws only its dots; the top right strip holds every control and the top left only the search; a heatmap over 30 days of SP051307 changes with the radius and sensitivity sliders; a polygon drawn on the map becomes a geofence and "Create rule" opens the editor with the geofence exit template on it; a line's length and a polygon's area read correctly against a known distance; the satellite base map with terrain shows the hills of the park in 3D on a phone.
 
 ---
 
@@ -1533,3 +1533,7 @@ Listed by the phase where they are first needed.
 ### 2026-09-09, the MapTiler key live (Claude and Tim)
 
 - Part e committed as 9a8da72 on Tim's word, CI green, deployed. Tim made a MapTiler key; it went into the vaulted host vars as `maptiler_key`, but the map config still answered without it: compose passes the API's environment explicitly and `MAPTILER_KEY` was not in the list (7d97ff5). After that the Satellite base map and 3D terrain were checked on the deployed site itself, since the key is restricted to that origin: imagery with labels over the Netherlands, terrain switched on over the Veluwe with the view tilted, no failed MapTiler request. Phase 19 is complete.
+
+### 2026-09-09, release v2.3.0 (Tim)
+
+- Tim: release. `VERSION` v2.3.0, the changelog section with the lead paragraph and the upgrade notes (the MapTiler key, terra-draw, near rules), the status block and the milestones table; commit `Release v2.3.0`, annotated tag, pushed after CI, the dev server updated and verified. No migration in this release.
