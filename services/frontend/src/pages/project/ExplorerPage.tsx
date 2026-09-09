@@ -1,39 +1,42 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
-import { Bookmark, ChartLine, Download, Trash2 } from "lucide-react";
+import {
+  Bookmark,
+  ChartLine,
+  Download,
+  Map as MapIcon,
+  Table2,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
+  Device,
   Entity,
-  MeasurementRow,
-  MetricWithData,
+  EntityAssignment,
+  Feature,
+  Metric,
   Page as PageType,
+  RecordRow,
   SavedView,
   SeriesResponse,
+  Track,
 } from "@/api/types";
 import { ExportDialog } from "@/components/analytics/ExportDialog";
-import { RecordsView } from "@/components/records/RecordsView";
 import { MultiSelect } from "@/components/analytics/MultiSelect";
-import { SeriesChart } from "@/components/analytics/SeriesChart";
 import { Callout } from "@/components/common/Callout";
-import { LoadMore } from "@/components/data/LoadMore";
 import { EmptyState } from "@/components/common/EmptyState";
-import { Field } from "@/components/common/FormField";
-import { Page, PageHeader } from "@/components/common/PageHeader";
-import { DataTable } from "@/components/data/DataTable";
-import {
-  CuratedBadge,
-  CurateDialog,
-  RecordHistoryDialog,
-} from "@/components/curation/CurationDialogs";
-import {
-  SourceEventDialog,
-  TraceDialog,
-} from "@/components/devices/ProvenancePanel";
+import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
+import { Drawer } from "@/components/explore/Drawer";
+import { drawerSpace } from "@/components/explore/drawer";
+import { ExploreChart } from "@/components/explore/ExploreChart";
+import { ExploreMap } from "@/components/explore/ExploreMap";
+import { SelectionStrip } from "@/components/explore/SelectionStrip";
+import type { TrackLayer } from "@/components/map/layers";
+import { VirtualTable } from "@/components/records/VirtualTable";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,116 +55,61 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Field } from "@/components/common/FormField";
+import { useGroups } from "@/hooks/useGroups";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { usePages } from "@/hooks/usePages";
+import { usePreference } from "@/hooks/usePreference";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
-import { type CurationTarget } from "@/lib/curation";
+import { useRecords } from "@/hooks/useRecords";
 import {
-  type Aggregate,
-  AGGREGATES,
-  browserTimezone,
   BUCKETS,
   bucketLabel,
   CHART_TYPES,
   type ChartType,
   formatInZone,
-  type LongRow,
-  RANGE_PRESETS,
-  type RangePreset,
-  rangeFor,
-  seriesLabel,
-  TIMEZONES,
-  toLongRows,
 } from "@/lib/analytics";
-import { type ExportPreset } from "@/lib/exports";
+import {
+  CANVAS_BOUND,
+  chartableColumns,
+  chartGroups,
+  chartMetrics,
+  type ExploreMode,
+  type ExploreState,
+  groupsFromSeries,
+  nearestRowTime,
+  paramsOfView,
+  readExploreState,
+  scatterGroup,
+  tracksOf,
+  viewOfParams,
+  writeExploreState,
+} from "@/lib/explore";
+import { columnsOf, windowFor } from "@/lib/records";
 import { useAuthStore } from "@/stores/auth";
 
-/** Everything the explorer shows comes from the URL, so a view is a URL and a saved view is
- * its search parameters (decision D42). */
-interface ExplorerState {
-  metrics: string[];
-  entities: string[];
-  range: RangePreset;
-  bucket: string;
-  aggregates: Aggregate[];
-  chart: ChartType;
-  timezone: string;
-}
+const CHART_LABELS: Record<ChartType, string> = {
+  line: "Line",
+  scatter: "Scatter",
+  bar: "Bar",
+  histogram: "Histogram",
+  state: "State timeline",
+};
 
-function readState(params: URLSearchParams): ExplorerState {
-  const agg = params
-    .getAll("agg")
-    .filter((a): a is Aggregate =>
-      (AGGREGATES as readonly string[]).includes(a),
-    );
-  const range = params.get("range") ?? "7d";
-  const chart = params.get("chart") ?? "line";
-  return {
-    metrics: params.getAll("metric"),
-    entities: params.getAll("entity"),
-    range: (range in RANGE_PRESETS ? range : "7d") as RangePreset,
-    bucket: params.get("bucket") ?? "auto",
-    aggregates: agg.length ? agg : ["mean", "min", "max", "count"],
-    chart: ((CHART_TYPES as readonly string[]).includes(chart)
-      ? chart
-      : "line") as ChartType,
-    timezone: params.get("tz") ?? browserTimezone(),
-  };
-}
-
-function writeState(state: ExplorerState): URLSearchParams {
-  const params = new URLSearchParams();
-  params.set("mode", "analysis");
-  for (const m of state.metrics) params.append("metric", m);
-  for (const e of state.entities) params.append("entity", e);
-  params.set("range", state.range);
-  if (state.bucket !== "auto") params.set("bucket", state.bucket);
-  for (const a of state.aggregates) params.append("agg", a);
-  params.set("chart", state.chart);
-  params.set("tz", state.timezone);
-  return params;
-}
-
+/**
+ * Explore as one canvas (phase 21, decisions D150 to D155): one selection of entities and
+ * devices over a period, looked at as a table, a chart or a map. The rows load page after page
+ * into the drawer whatever the mode; the chart and the map draw from them up to the canvas
+ * bound and from the aggregate and track reads above it. One marked moment links the views.
+ */
 export function ExplorerPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const role = useProjectRole(projectId);
   const user = useAuthStore((s) => s.user);
+  const phone = useIsPhone();
   const [params, setParams] = useSearchParams();
-  // the records view first (decision D145); the analysis view is `?mode=analysis`
-  const mode = params.get("mode") === "analysis" ? "analysis" : "records";
-  const setMode = (next: "records" | "analysis") =>
-    setParams((p) => {
-      p.set("mode", next);
-      return p;
-    });
-  const state = useMemo(() => readState(params), [params]);
-  const update = useCallback(
-    (patch: Partial<ExplorerState>) =>
-      setParams(writeState({ ...readState(params), ...patch })),
-    [params, setParams],
-  );
-  const [drill, setDrill] = useState<LongRow | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [saveOpen, setSaveOpen] = useState(false);
 
-  const window = useMemo(() => rangeFor(state.range), [state.range]);
-  const metrics = useQuery({
-    queryKey: queryKeys.analyticsMetrics(projectId, { range: "1y" }),
-    queryFn: () =>
-      api.get<MetricWithData[]>(
-        `/api/v1/projects/${projectId}/analytics/metrics`,
-        { query: rangeFor("1y") },
-      ),
-  });
-  const entities = useQuery({
-    queryKey: queryKeys.entities(projectId),
-    queryFn: () =>
-      api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, {
-        query: { limit: 500 },
-      }),
-  });
   const views = useQuery({
     queryKey: queryKeys.savedViews(projectId),
     queryFn: () =>
@@ -170,73 +118,272 @@ export function ExplorerPage() {
         { query: { limit: 200 } },
       ),
   });
+  const viewId = params.get("view");
+  const currentView = views.data?.items.find((v) => v.id === viewId);
+  // a dashboard tile links with the view id alone: its parameters are the state then
+  const effective = useMemo(
+    () =>
+      currentView && !params.has("mode")
+        ? paramsOfView(currentView.view as Record<string, string[]>)
+        : params,
+    [currentView, params],
+  );
+  const state = useMemo(() => readExploreState(effective), [effective]);
+  const update = useCallback(
+    (patch: Partial<ExploreState>, replace = false) =>
+      setParams(
+        writeExploreState({ ...readExploreState(effective), ...patch }),
+        {
+          replace,
+        },
+      ),
+    [effective, setParams],
+  );
 
+  const entities = useQuery({
+    queryKey: queryKeys.entities(projectId),
+    queryFn: () =>
+      api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, {
+        query: { limit: 500 },
+      }),
+  });
+  const devices = useQuery({
+    queryKey: queryKeys.devices({ projectId, records: true }),
+    queryFn: () =>
+      api.get<PageType<Device>>("/api/v1/devices", {
+        query: { project_id: projectId, limit: 500 },
+      }),
+  });
+  const groups = useGroups(projectId);
+  const metrics = useQuery({
+    queryKey: queryKeys.metrics,
+    queryFn: () =>
+      api.get<PageType<Metric>>("/api/v1/metrics", { query: { limit: 500 } }),
+  });
+  const features = useQuery({
+    queryKey: queryKeys.features(projectId),
+    queryFn: () =>
+      api.get<PageType<Feature>>(`/api/v1/projects/${projectId}/features`, {
+        query: { limit: 500 },
+      }),
+    enabled: state.mode === "map",
+  });
+  const oneEntity =
+    state.entities.length === 1 && state.devices.length === 0
+      ? state.entities[0]
+      : null;
+  const assignments = useQuery({
+    queryKey: queryKeys.entityAssignments(projectId, {
+      entityId: oneEntity,
+      records: true,
+    }),
+    queryFn: () =>
+      api.get<PageType<EntityAssignment>>(
+        `/api/v1/projects/${projectId}/entity-assignments`,
+        { query: { entity_id: oneEntity, limit: 500 } },
+      ),
+    enabled: oneEntity !== null,
+  });
+  const assignedSince = useMemo(() => {
+    const starts = (assignments.data?.items ?? [])
+      .map((a) => a.valid_from)
+      .sort();
+    return starts.length ? starts[0] : null;
+  }, [assignments.data]);
+  const window = useMemo(
+    () => windowFor(state, assignedSince),
+    [state, assignedSince],
+  );
+  const selection = useMemo(
+    () =>
+      state.entities.length + state.devices.length > 0
+        ? {
+            entities: state.entities,
+            devices: state.devices,
+            from: window.from,
+            to: window.to,
+          }
+        : null,
+    [state.entities, state.devices, window],
+  );
+  const selectionKey = JSON.stringify(selection);
+  const records = useRecords(projectId, selection);
+
+  const names = useMemo(
+    () =>
+      new Map([
+        ...(entities.data?.items ?? []).map((e) => [e.id, e.name] as const),
+        ...(devices.data?.items ?? []).map((d) => [d.id, d.name] as const),
+      ]),
+    [entities.data, devices.data],
+  );
+  const metricLabels = useMemo(
+    () =>
+      new Map(
+        (metrics.data?.items ?? []).map((m) => [
+          m.key,
+          { label: m.label, unit: m.unit ?? null },
+        ]),
+      ),
+    [metrics.data],
+  );
+  const labelsOnly = useMemo(
+    () => new Map([...metricLabels].map(([k, v]) => [k, v.label])),
+    [metricLabels],
+  );
+  const columns = useMemo(
+    () => columnsOf(records.rows, metricLabels),
+    [records.rows, metricLabels],
+  );
+  const [hiddenColumns, setHiddenColumns] = usePreference<string[]>(
+    "records_hidden_columns",
+    [],
+  );
+  const shown = columns.filter((c) => !hiddenColumns.includes(c.key));
+
+  // the marked moment (decision D154): a hover is transient, a click pins it into the URL
+  const [hovered, setHovered] = useState<{
+    ms: number;
+    source: "chart" | "map" | "table";
+  } | null>(null);
+  const hover = hovered?.ms ?? null;
+  const pinned = state.at ? Date.parse(state.at) : null;
+  const marked = hover ?? pinned;
+  const markedRowTime = useMemo(
+    () => (marked === null ? null : nearestRowTime(records.rows, marked)),
+    [records.rows, marked],
+  );
+  const pick = useCallback(
+    (ms: number) => update({ at: new Date(ms).toISOString() }, true),
+    [update],
+  );
+  const onHover = useCallback(
+    (ms: number | null) =>
+      setHovered(
+        ms === null
+          ? null
+          : { ms, source: state.mode === "map" ? "map" : "chart" },
+      ),
+    [state.mode],
+  );
+
+  // above the canvas bound the chart takes the aggregate read and the map the track read
+  const total = records.total;
+  const aggregated = total !== null && total > CANVAS_BOUND;
+  const metricsOnChart = useMemo(
+    () => chartMetrics(state.metrics, columns),
+    [state.metrics, columns],
+  );
   const seriesQuery = useMemo(() => {
+    if (!aggregated || state.mode !== "chart") return null;
     const q = new URLSearchParams();
-    for (const m of state.metrics) q.append("metric", m);
-    for (const e of state.entities) q.append("entity_id", e);
+    const keys = state.metrics.length ? state.metrics : metricsOnChart;
+    for (const m of keys) q.append("metric", m);
+    if (state.entities.length)
+      for (const e of state.entities) q.append("entity_id", e);
+    else {
+      for (const d of state.devices) q.append("device_id", d);
+      q.set("group_by", "device");
+    }
     q.set("from", window.from);
     q.set("to", window.to);
     if (state.bucket !== "auto") q.set("bucket", state.bucket);
     for (const a of state.aggregates) q.append("agg", a);
     q.set("layout", "series");
-    return q.toString();
-  }, [state, window]);
+    return keys.length ? q.toString() : null;
+  }, [aggregated, state, metricsOnChart, window]);
   const series = useQuery({
     queryKey: queryKeys.analyticsSeries(projectId, { q: seriesQuery }),
     queryFn: () =>
       api.get<SeriesResponse>(
         `/api/v1/projects/${projectId}/analytics/series?${seriesQuery}`,
       ),
-    enabled: mode === "analysis" && state.metrics.length > 0,
+    enabled: seriesQuery !== null,
     placeholderData: (previous) => previous,
   });
+  const owners = useMemo(
+    () => [
+      ...state.entities.map((id) => ({ entity_id: id })),
+      ...state.devices.map((id) => ({ device_id: id })),
+    ],
+    [state.entities, state.devices],
+  );
+  const trackReads = useQuery({
+    queryKey: queryKeys.track(projectId, {
+      owners,
+      from: window.from,
+      to: window.to,
+      explore: true,
+    }),
+    queryFn: () =>
+      Promise.all(
+        owners.map((owner) =>
+          api.get<Track>(`/api/v1/projects/${projectId}/tracks`, {
+            query: {
+              ...owner,
+              from: window.from,
+              to: window.to,
+              max_points: 5000,
+            },
+          }),
+        ),
+      ),
+    enabled: aggregated && state.mode === "map" && owners.length > 0,
+  });
 
-  const names = useMemo(
-    () => new Map((entities.data?.items ?? []).map((e) => [e.id, e.name])),
-    [entities.data],
-  );
-  const metricLabels = useMemo(
-    () => new Map((metrics.data ?? []).map((m) => [m.key, m.label])),
-    [metrics.data],
-  );
-  const labels = useCallback(
-    (index: number) =>
-      series.data?.series?.[index]
-        ? seriesLabel(series.data.series[index], names, metricLabels)
-        : "",
-    [series.data, names, metricLabels],
-  );
-  const rows = useMemo(
-    () => (series.data ? toLongRows(series.data, names) : []),
-    [series.data, names],
-  );
-  const primary = state.aggregates[0] ?? "mean";
-  const unit =
-    state.metrics.length === 1
-      ? metrics.data?.find((m) => m.key === state.metrics[0])?.unit
-      : null;
+  const groupsOnChart = useMemo(() => {
+    if (state.chart === "scatter") {
+      const y = metricsOnChart[0];
+      const x = state.xMetric ?? metricsOnChart[1] ?? y;
+      const group = x && y ? scatterGroup(records.rows, x, y, columns) : null;
+      return group ? [group] : [];
+    }
+    if (aggregated)
+      return series.data
+        ? groupsFromSeries(
+            series.data,
+            names,
+            labelsOnly,
+            state.aggregates[0] ?? "mean",
+          )
+        : [];
+    return chartGroups(records.rows, metricsOnChart, columns);
+  }, [
+    state.chart,
+    state.xMetric,
+    state.aggregates,
+    aggregated,
+    series.data,
+    names,
+    labelsOnly,
+    records.rows,
+    metricsOnChart,
+    columns,
+  ]);
+  const tracks = useMemo<TrackLayer[]>(() => {
+    if (aggregated)
+      return (trackReads.data ?? []).map((track, i) => ({
+        entityId: track.entity_id ?? track.device_id ?? String(i),
+        kind: track.entity_id ? "entity" : "device",
+        geometry: track.geometry as unknown as GeoJSON.Geometry,
+        times: track.times,
+      }));
+    return tracksOf(records.rows);
+  }, [aggregated, trackReads.data, records.rows]);
 
-  const columns: ColumnDef<LongRow, unknown>[] = [
-    {
-      header: t("Time"),
-      accessorKey: "time",
-      cell: ({ getValue }) => formatInZone(getValue<string>(), state.timezone),
-    },
-    {
-      header: t("Metric"),
-      accessorKey: "metric_key",
-      cell: ({ getValue }) =>
-        metricLabels.get(getValue<string>()) ?? getValue<string>(),
-    },
-    { header: t("Entity"), accessorKey: "owner_name" },
-    ...state.aggregates.map((a): ColumnDef<LongRow, unknown> => ({
-      id: a,
-      header: a,
-      accessorFn: (r) => r.values[a] ?? null,
-      cell: ({ getValue }) => formatNumber(getValue<number | null>()),
-    })),
-  ];
+  const [drawerHeight, setDrawerHeight] = usePreference<number>(
+    "explore_drawer_height",
+    280,
+  );
+  const [drawerOpen, setDrawerOpen] = usePreference<boolean>(
+    "explore_drawer_open",
+    true,
+  );
+  const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
+    null,
+  );
+  const [exportOpen, setExportOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
 
   const saveView = useMutationToast({
     mutationFn: (name: string) =>
@@ -245,13 +392,8 @@ export function ExplorerPage() {
         {
           body: {
             name,
-            view: Object.fromEntries(
-              Array.from(writeState(state).keys()).map((k) => [
-                k,
-                writeState(state).getAll(k),
-              ]),
-            ),
-            schema_version: 1,
+            view: viewOfParams(writeExploreState(state)),
+            schema_version: 2,
           },
         },
       ),
@@ -278,66 +420,203 @@ export function ExplorerPage() {
         return p;
       }),
   });
-  const currentView = views.data?.items.find(
-    (v) => v.id === params.get("view"),
-  );
-
   function applyView(view: SavedView) {
-    const next = new URLSearchParams();
-    for (const [key, values] of Object.entries(
-      view.view as Record<string, string[]>,
-    ))
-      for (const v of values) next.append(key, v);
+    const next = paramsOfView(view.view as Record<string, string[]>);
     next.set("view", view.id);
     setParams(next);
   }
 
-  const exportPreset: ExportPreset = {
-    dataset: "aggregates",
-    metricKeys: state.metrics,
-    entityIds: state.entities,
-    from: window.from,
-    to: window.to,
-    bucket: state.bucket === "auto" ? undefined : state.bucket,
-    aggregates: state.aggregates,
-    timezone: state.timezone,
-  };
+  const loaded = records.rows.length;
+  const percent = total ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+  const progress = (
+    <>
+      <div className="h-2 w-32 shrink-0 overflow-hidden rounded bg-muted sm:w-48">
+        <div
+          className="h-2 bg-primary transition-[width]"
+          style={{ width: `${records.status === "done" ? 100 : percent}%` }}
+        />
+      </div>
+      <span className="truncate text-muted-foreground">
+        {total === null
+          ? t("Counting…")
+          : records.status === "done"
+            ? t("{{count}} records", { count: loaded })
+            : t("{{loaded}} of {{total}} records", { loaded, total })}
+      </span>
+      {records.status === "loading" && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            records.stop();
+          }}
+        >
+          {t("Stop")}
+        </Button>
+      )}
+      {(records.status === "stopped" || records.status === "error") && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            records.restart();
+          }}
+        >
+          {t("Load again")}
+        </Button>
+      )}
+      {markedRowTime && (
+        <span className="hidden truncate text-xs text-muted-foreground md:inline">
+          {formatInZone(markedRowTime, state.timezone)}
+          {state.at && hover === null ? ` · ${t("pinned")}` : ""}
+        </span>
+      )}
+    </>
+  );
+
+  const table = (
+    <VirtualTable
+      rows={records.rows}
+      columns={shown}
+      timezone={state.timezone}
+      height="100%"
+      highlightTime={markedRowTime}
+      follow={hovered?.source !== "table"}
+      onRowHover={(row) =>
+        setHovered(row ? { ms: Date.parse(row.time), source: "table" } : null)
+      }
+      onRowClick={(row: RecordRow) => {
+        if (row.source_event_id != null && row.source_event_ingested_at)
+          setEvent({
+            id: row.source_event_id,
+            ingestedAt: row.source_event_ingested_at,
+          });
+      }}
+    />
+  );
+  const chartOptions = chartableColumns(columns).map((c) => ({
+    value: c.key.slice(2),
+    label: c.label,
+  }));
 
   return (
-    <>
-      <PageHeader
-        title={t("Data explorer")}
-        description={
-          mode === "records"
-            ? t(
-                "Everything an entity or a device produced, one row per moment; the Analysis tab aggregates and compares",
-              )
-            : t(
-                "Server side aggregates of the project's measurements; drill down to the rows and source events behind a bucket",
-              )
-        }
-        actions={
-          mode === "records" ? (
-            <Tabs
-              value={mode}
-              onValueChange={(v) => setMode(v as "records" | "analysis")}
-            >
-              <TabsList>
-                <TabsTrigger value="records">{t("Records")}</TabsTrigger>
-                <TabsTrigger value="analysis">{t("Analysis")}</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          ) : (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-center gap-2 border-b bg-card px-3 py-2 text-sm">
+        <SelectionStrip
+          state={state}
+          entities={entities.data?.items ?? []}
+          devices={devices.data?.items ?? []}
+          groups={groups.data ?? []}
+          oneEntity={oneEntity !== null}
+          onChange={(patch) => update(patch)}
+        />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Tabs
+            value={state.mode}
+            onValueChange={(v) => update({ mode: v as ExploreMode })}
+          >
+            <TabsList className="h-8">
+              <TabsTrigger value="table" className="h-7 gap-1 px-2">
+                <Table2 className="size-4" />
+                <span className="hidden sm:inline">{t("Table")}</span>
+              </TabsTrigger>
+              <TabsTrigger value="chart" className="h-7 gap-1 px-2">
+                <ChartLine className="size-4" />
+                <span className="hidden sm:inline">{t("Chart")}</span>
+              </TabsTrigger>
+              <TabsTrigger value="map" className="h-7 gap-1 px-2">
+                <MapIcon className="size-4" />
+                <span className="hidden sm:inline">{t("Map")}</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {state.mode === "table" && (
+            <MultiSelect
+              options={columns.map((c) => ({ value: c.key, label: c.label }))}
+              value={shown.map((c) => c.key)}
+              onChange={(visible) =>
+                setHiddenColumns(
+                  columns
+                    .filter((c) => !visible.includes(c.key))
+                    .map((c) => c.key),
+                )
+              }
+              placeholder={t("Columns")}
+              label={t("columns")}
+              className="h-8 w-36"
+            />
+          )}
+          {state.mode === "chart" && (
             <>
-              <Tabs
-                value={mode}
-                onValueChange={(v) => setMode(v as "records" | "analysis")}
+              <MultiSelect
+                options={chartOptions}
+                value={metricsOnChart}
+                onChange={(v) => update({ metrics: v })}
+                placeholder={t("Metrics")}
+                label={t("metrics")}
+                className="h-8 w-40"
+                maxSelected={state.chart === "scatter" ? 1 : 8}
+              />
+              {state.chart === "scatter" && (
+                <Select
+                  value={state.xMetric ?? metricsOnChart[1] ?? ""}
+                  onValueChange={(v) => update({ xMetric: v })}
+                >
+                  <SelectTrigger className="h-8 w-40" aria-label={t("X axis")}>
+                    <SelectValue placeholder={t("X axis")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chartOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select
+                value={state.chart}
+                onValueChange={(v) => update({ chart: v as ChartType })}
               >
-                <TabsList>
-                  <TabsTrigger value="records">{t("Records")}</TabsTrigger>
-                  <TabsTrigger value="analysis">{t("Analysis")}</TabsTrigger>
-                </TabsList>
-              </Tabs>
+                <SelectTrigger
+                  className="h-8 w-36"
+                  aria-label={t("Chart kind")}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CHART_TYPES.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {t(CHART_LABELS[k])}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {aggregated && (
+                <Select
+                  value={state.bucket}
+                  onValueChange={(v) => update({ bucket: v })}
+                >
+                  <SelectTrigger className="h-8 w-28" aria-label={t("Bucket")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BUCKETS.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {b === "auto"
+                          ? t("Automatic")
+                          : b === "all"
+                            ? t("Whole range")
+                            : b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Select
                 value={currentView?.id ?? "none"}
                 onValueChange={(id) => {
@@ -345,14 +624,17 @@ export function ExplorerPage() {
                   if (v) applyView(v);
                 }}
               >
-                <SelectTrigger className="w-48" aria-label={t("Saved views")}>
+                <SelectTrigger
+                  className="h-8 w-36"
+                  aria-label={t("Saved views")}
+                >
                   <SelectValue placeholder={t("Saved views")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none" disabled>
                     {views.data?.items.length
-                      ? "Saved views"
-                      : "No saved views yet"}
+                      ? t("Saved views")
+                      : t("No saved views yet")}
                   </SelectItem>
                   {views.data?.items.map((v) => (
                     <SelectItem key={v.id} value={v.id}>
@@ -363,241 +645,191 @@ export function ExplorerPage() {
               </Select>
               <Button
                 variant="outline"
+                size="sm"
+                className="h-8"
                 onClick={() => setSaveOpen(true)}
-                disabled={state.metrics.length === 0}
+                disabled={!selection}
+                aria-label={t("Save view")}
               >
-                <Bookmark className="size-4" /> {t("Save view")}
+                <Bookmark className="size-4" />
               </Button>
               {currentView &&
                 (currentView.created_by === user?.id || canAdmin(role)) && (
                   <Button
                     variant="outline"
-                    size="icon"
+                    size="sm"
+                    className="h-8"
                     aria-label={t("Delete saved view")}
                     onClick={() => deleteView.mutate(currentView.id)}
                   >
                     <Trash2 className="size-4" />
                   </Button>
                 )}
-              <Button
-                onClick={() => setExportOpen(true)}
-                disabled={state.metrics.length === 0}
-              >
-                <Download className="size-4" /> {t("Export")}
-              </Button>
             </>
-          )
-        }
-      />
-      <Page>
-        {mode === "records" && <RecordsView projectId={projectId} />}
-        {mode === "analysis" && (
-          <>
-            <Button
-              variant="outline"
-              className="w-full justify-between sm:hidden"
-              aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen((o) => !o)}
-            >
-              <span>{filtersOpen ? t("Hide filters") : t("Filters")}</span>
-              <span className="truncate text-xs font-normal text-muted-foreground">
-                {t("{{count}} metrics", { count: state.metrics.length })},{" "}
-                {RANGE_PRESETS[state.range].label}
-              </span>
-            </Button>
-            <div
-              className={`${filtersOpen ? "grid" : "hidden sm:grid"} gap-3 md:grid-cols-3 xl:grid-cols-6`}
-            >
-              <Field label={t("Metrics")} htmlFor="metrics">
-                <MultiSelect
-                  options={(metrics.data ?? []).map((m) => ({
-                    value: m.key,
-                    label:
-                      m.category === "uncategorized"
-                        ? `${m.label} (${t("not defined yet")})`
-                        : m.label,
-                    hint: m.unit ?? undefined,
-                  }))}
-                  value={state.metrics}
-                  onChange={(v) => update({ metrics: v })}
-                  placeholder={t("Choose metrics")}
-                  label={t("metrics")}
-                  className="w-full"
-                  maxSelected={20}
-                />
-              </Field>
-              <Field
-                label={t("Entities")}
-                htmlFor="entities"
-                hint={state.entities.length === 0 ? "All entities" : undefined}
-              >
-                <MultiSelect
-                  options={(entities.data?.items ?? []).map((e) => ({
-                    value: e.id,
-                    label: e.name,
-                  }))}
-                  value={state.entities}
-                  onChange={(v) => update({ entities: v })}
-                  placeholder={t("All entities")}
-                  label={t("entities")}
-                  className="w-full"
-                  maxSelected={20}
-                />
-              </Field>
-              <Field label={t("Range")} htmlFor="range">
-                <Select
-                  value={state.range}
-                  onValueChange={(v) => update({ range: v as RangePreset })}
-                >
-                  <SelectTrigger id="range">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(RANGE_PRESETS).map(([k, p]) => (
-                      <SelectItem key={k} value={k}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field
-                label={t("Bucket")}
-                htmlFor="bucket"
-                hint={
-                  series.data
-                    ? `${series.data.automatic_bucket ? "automatic, " : ""}${bucketLabel(series.data.bucket_seconds)}`
-                    : undefined
-                }
-              >
-                <Select
-                  value={state.bucket}
-                  onValueChange={(v) => update({ bucket: v })}
-                >
-                  <SelectTrigger id="bucket">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BUCKETS.map((b) => (
-                      <SelectItem key={b} value={b}>
-                        {b === "auto"
-                          ? "Automatic"
-                          : b === "all"
-                            ? "Whole range"
-                            : b}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field
-                label={t("Aggregates")}
-                htmlFor="aggregates"
-                hint={`Chart shows ${primary}`}
-              >
-                <MultiSelect
-                  options={AGGREGATES.map((a) => ({ value: a, label: a }))}
-                  value={state.aggregates}
-                  onChange={(v) =>
-                    update({
-                      aggregates: v.length ? (v as Aggregate[]) : ["mean"],
-                    })
-                  }
-                  placeholder={t("Aggregates")}
-                  label={t("aggregates")}
-                  className="w-full"
-                />
-              </Field>
-              <Field label={t("Timezone")} htmlFor="tz">
-                <Select
-                  value={state.timezone}
-                  onValueChange={(v) => update({ timezone: v })}
-                >
-                  <SelectTrigger id="tz">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[...new Set([browserTimezone(), ...TIMEZONES])].map(
-                      (z) => (
-                        <SelectItem key={z} value={z}>
-                          {z}
-                        </SelectItem>
-                      ),
-                    )}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setExportOpen(true)}
+            disabled={!selection}
+          >
+            <Download className="size-4" /> {t("Export")}
+          </Button>
+        </div>
+      </div>
 
-            {state.metrics.length === 0 ? (
-              <EmptyState
-                icon={ChartLine}
-                title={t("Choose a metric to start")}
-                description={t(
-                  "Metrics with data in the last year are listed. Pick entities to compare, or leave the field empty for the whole project.",
+      <div className="relative min-h-0 flex-1">
+        {!selection ? (
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <EmptyState
+              icon={ChartLine}
+              title={t("Choose an entity or a device to start")}
+              description={t(
+                "Every record they produced in the period follows: as a table, on a chart, or on the map, one row per moment.",
+              )}
+            />
+          </div>
+        ) : (
+          <>
+            {state.mode === "table" && (
+              <div className="absolute inset-0 flex flex-col gap-2 p-2">
+                {records.error && (
+                  <Callout kind="error">{records.error}</Callout>
                 )}
-              />
-            ) : (
-              <>
-                {series.error && (
-                  <Callout kind="error">{series.error.message}</Callout>
-                )}
-                {series.data?.notes?.map((note) => (
-                  <Callout key={note} kind="info">
-                    {note}
+                {state.at && (
+                  <Callout kind="info">
+                    {t("Around {{time}}: the row at that moment is marked.", {
+                      time: formatInZone(state.at, state.timezone),
+                    })}{" "}
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => update({ at: null }, true)}
+                    >
+                      {t("Forget the moment")}
+                    </button>
                   </Callout>
-                ))}
-                <div className="rounded-md border p-2">
-                  <Tabs
-                    value={state.chart}
-                    onValueChange={(v) => update({ chart: v as ChartType })}
-                  >
-                    <TabsList>
-                      {CHART_TYPES.map((t) => (
-                        <TabsTrigger key={t} value={t} className="capitalize">
-                          {t === "state" ? "State timeline" : t}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </Tabs>
-                  <SeriesChart
-                    response={series.data}
-                    type={state.chart}
-                    aggregate={primary}
-                    timezone={state.timezone}
-                    labels={labels}
-                    unit={unit}
-                  />
+                )}
+                <div className="flex shrink-0 items-center gap-3 text-sm">
+                  {progress}
                 </div>
-                <DataTable
-                  columns={columns}
-                  data={rows}
-                  isLoading={series.isPending}
-                  emptyMessage={t("No measurements in this range.")}
-                  onRowClick={setDrill}
-                  footer={
-                    series.data &&
-                    `${rows.length} rows, ${series.data.series?.length ?? 0} series, bucket ${bucketLabel(series.data.bucket_seconds)}`
-                  }
+                <div className="relative min-h-0 flex-1">{table}</div>
+              </div>
+            )}
+            <div
+              className="absolute inset-x-0 top-0"
+              style={{
+                bottom:
+                  state.mode === "table"
+                    ? 0
+                    : drawerSpace(drawerOpen, drawerHeight, phone),
+              }}
+            >
+              {state.mode === "chart" &&
+                (groupsOnChart.length === 0 ? (
+                  <div className="absolute inset-0 flex items-center justify-center p-6">
+                    <EmptyState
+                      icon={ChartLine}
+                      title={
+                        records.status === "loading" && loaded === 0
+                          ? t("Loading…")
+                          : t("Nothing to chart yet")
+                      }
+                      description={t(
+                        "The chart draws the numeric metrics of the loaded rows; pick metrics in the strip once rows are here.",
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <ExploreChart
+                    groups={groupsOnChart}
+                    kind={state.chart}
+                    xLabel={
+                      state.chart === "scatter"
+                        ? (chartOptions.find(
+                            (o) =>
+                              o.value ===
+                              (state.xMetric ?? metricsOnChart[1] ?? ""),
+                          )?.label ?? null)
+                        : null
+                    }
+                    timezone={state.timezone}
+                    marked={hover === null ? null : marked}
+                    pinned={pinned}
+                    onHover={onHover}
+                    onPick={pick}
+                  />
+                ))}
+              {state.mode === "map" && (
+                <ExploreMap
+                  tracks={tracks}
+                  features={features.data?.items ?? []}
+                  window={window}
+                  timezone={state.timezone}
+                  marked={marked}
+                  fitKey={selectionKey}
+                  onHover={onHover}
+                  onPick={pick}
                 />
-              </>
+              )}
+            </div>
+            {state.mode !== "table" && aggregated && (
+              <div className="pointer-events-none absolute top-3 right-14 left-3 z-10 flex justify-end">
+                <span className="pointer-events-auto rounded-md border bg-card/95 px-2 py-1 text-xs text-muted-foreground">
+                  {state.mode === "chart"
+                    ? series.data
+                      ? t(
+                          "Above {{bound}} records: buckets of {{bucket}}; the drawer keeps loading the rows.",
+                          {
+                            bound: CANVAS_BOUND.toLocaleString(),
+                            bucket: bucketLabel(series.data.bucket_seconds),
+                          },
+                        )
+                      : t("Above {{bound}} records: the chart reads buckets.", {
+                          bound: CANVAS_BOUND.toLocaleString(),
+                        })
+                    : t(
+                        "Above {{bound}} records: the tracks are decimated to 5,000 points each.",
+                        { bound: CANVAS_BOUND.toLocaleString() },
+                      )}
+                </span>
+              </div>
+            )}
+            {state.mode !== "table" && (
+              <Drawer
+                height={drawerHeight}
+                onHeight={setDrawerHeight}
+                open={drawerOpen}
+                onOpen={setDrawerOpen}
+                phone={phone}
+                bar={progress}
+              >
+                <div className="absolute inset-0 p-2">{table}</div>
+              </Drawer>
             )}
           </>
         )}
-      </Page>
-      <DrillDownDialog
-        projectId={projectId}
-        row={drill}
-        bucketSeconds={series.data?.bucket_seconds ?? 0}
-        timezone={state.timezone}
-        onClose={() => setDrill(null)}
-        canCurate={canAdmin(role)}
-      />
+      </div>
+
       <ExportDialog
         projectId={projectId}
         open={exportOpen}
         onOpenChange={setExportOpen}
-        preset={exportPreset}
+        preset={{
+          dataset: "records",
+          entityIds: state.entities,
+          deviceIds: state.devices,
+          from: window.from,
+          to: window.to,
+          timezone: state.timezone,
+          layout: "wide",
+        }}
+      />
+      <SourceEventDialog
+        id={event?.id ?? null}
+        ingestedAt={event?.ingestedAt ?? null}
+        onClose={() => setEvent(null)}
       />
       <SaveViewDialog
         open={saveOpen}
@@ -605,220 +837,7 @@ export function ExplorerPage() {
         onSave={(name) => saveView.mutate(name)}
         pending={saveView.isPending}
       />
-    </>
-  );
-}
-
-function formatNumber(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "";
-  return Number.isInteger(value) ? String(value) : value.toFixed(3);
-}
-
-/** The normalized rows behind one bucket, each linking to its source event. */
-function DrillDownDialog({
-  projectId,
-  row,
-  bucketSeconds,
-  timezone,
-  onClose,
-  canCurate,
-}: {
-  projectId: string;
-  row: LongRow | null;
-  bucketSeconds: number;
-  timezone: string;
-  onClose: () => void;
-  canCurate: boolean;
-}) {
-  const { t } = useTranslation();
-  const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
-    null,
-  );
-  const [trace, setTrace] = useState<string | null>(null);
-  const [curating, setCurating] = useState<CurationTarget | null>(null);
-  const [history, setHistory] = useState<CurationTarget | null>(null);
-  const from = row?.time;
-  const to = row
-    ? new Date(
-        new Date(row.time).getTime() + Math.max(bucketSeconds, 1) * 1000,
-      ).toISOString()
-    : undefined;
-  const rows = usePages<MeasurementRow>({
-    queryKey: queryKeys.analyticsRows(projectId, {
-      metric: row?.metric_key,
-      owner: row?.owner_id,
-      from,
-      to,
-    }),
-    fetchPage: (cursor) =>
-      api.get<PageType<MeasurementRow>>(
-        `/api/v1/projects/${projectId}/analytics/rows`,
-        {
-          query: {
-            metric: row?.metric_key,
-            entity_id: row?.owner_id ?? undefined,
-            from,
-            to,
-            limit: 500,
-            cursor,
-          },
-        },
-      ),
-    enabled: row !== null,
-  });
-  const columns: ColumnDef<MeasurementRow, unknown>[] = [
-    {
-      header: t("Time"),
-      accessorKey: "time",
-      cell: ({ getValue }) =>
-        formatInZone(getValue<string>(), timezone, { timeStyle: "medium" }),
-    },
-    {
-      header: t("Value"),
-      accessorKey: "value",
-      cell: ({ getValue, row: r }) => {
-        const v = getValue<unknown>();
-        return (
-          <span className="inline-flex items-center gap-1">
-            {typeof v === "number" ? formatNumber(v) : JSON.stringify(v)}
-            <CuratedBadge
-              curatedFields={r.original.curated_fields ?? []}
-              valid={r.original.valid ?? true}
-              onClick={() =>
-                setHistory({
-                  target_type: "measurement",
-                  target_id: r.original.id,
-                  target_time: r.original.original_time,
-                })
-              }
-            />
-          </span>
-        );
-      },
-    },
-    {
-      header: t("Device"),
-      accessorKey: "device_id",
-      cell: ({ getValue }) => getValue<string>().slice(0, 8),
-    },
-    {
-      header: t("Source event"),
-      accessorKey: "source_event_id",
-      cell: ({ row: r }) =>
-        r.original.source_event_id ? (
-          <Button
-            variant="link"
-            size="sm"
-            className="h-auto p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              setEvent({
-                id: r.original.source_event_id!,
-                ingestedAt: r.original.source_event_ingested_at!,
-              });
-            }}
-          >
-            {t("open")}
-          </Button>
-        ) : (
-          ""
-        ),
-    },
-    {
-      header: t("Trace"),
-      accessorKey: "trace_id",
-      cell: ({ row: r }) =>
-        r.original.trace_id ? (
-          <Button
-            variant="link"
-            size="sm"
-            className="h-auto p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              setTrace(r.original.trace_id!);
-            }}
-          >
-            {t("view")}
-          </Button>
-        ) : (
-          ""
-        ),
-    },
-    ...(canCurate
-      ? [
-          {
-            id: "curate",
-            header: "",
-            cell: ({ row: r }: { row: { original: MeasurementRow } }) => (
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurating({
-                    target_type: "measurement",
-                    target_id: r.original.id,
-                    target_time: r.original.original_time,
-                  });
-                }}
-              >
-                {t("curate")}
-              </Button>
-            ),
-          } as ColumnDef<MeasurementRow, unknown>,
-        ]
-      : []),
-  ];
-  return (
-    <>
-      <Dialog open={row !== null} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{t("Rows behind the bucket")}</DialogTitle>
-            <DialogDescription>
-              {row &&
-                `${row.metric_key}${row.owner_name ? ` · ${row.owner_name}` : ""}, from ${formatInZone(row.time, timezone)} for ${bucketLabel(bucketSeconds)}`}
-            </DialogDescription>
-          </DialogHeader>
-          <DataTable
-            columns={columns}
-            data={rows.items}
-            isLoading={rows.isPending}
-            emptyMessage={t(
-              "No rows in this range. Widen the period or pick another metric.",
-            )}
-            footer={
-              <LoadMore
-                count={rows.items.length}
-                hasMore={rows.hasMore}
-                isLoading={rows.isLoadingMore}
-                onLoadMore={rows.loadMore}
-              />
-            }
-          />
-        </DialogContent>
-      </Dialog>
-      <SourceEventDialog
-        id={event?.id ?? null}
-        ingestedAt={event?.ingestedAt ?? null}
-        onClose={() => setEvent(null)}
-      />
-      <TraceDialog traceId={trace} onClose={() => setTrace(null)} />
-      <CurateDialog
-        projectId={projectId}
-        target={curating}
-        onClose={() => {
-          setCurating(null);
-          rows.refetch();
-        }}
-      />
-      <RecordHistoryDialog
-        projectId={projectId}
-        target={history}
-        onClose={() => setHistory(null)}
-      />
-    </>
+    </div>
   );
 }
 
@@ -842,7 +861,7 @@ function SaveViewDialog({
           <DialogTitle>{t("Save this view")}</DialogTitle>
           <DialogDescription>
             {t(
-              "Metrics, entities, range, bucket, aggregates and chart, shared with the project.",
+              "The selection, the period, the mode and the chart, shared with the project.",
             )}
           </DialogDescription>
         </DialogHeader>

@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | Phase 20 (explore and export from the entity or device) released as v2.4.0 on 2026-09-09; the next phase is to plan with Tim |
 | Latest release | v2.4.0 (2026-09-09): phase 20, explore and export from the entity or device |
 | Last session | 2026-09-09 |
-| Next item | Plan the next phase with Tim from live use. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Next item | Phase 21 (Explore as one canvas): ask its decisions, then build the canvas and the modes. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -190,6 +190,12 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D147 | Statement timeout on the API | The API's PostgreSQL connections carry `statement_timeout`, 120 s by default (`API_STATEMENT_TIMEOUT_SECONDS`, the proxy's patience; `STATEMENT_TIMEOUT_SECONDS` in the API service's environment, 0 for none); the workers run their jobs unbounded | Two queries of requests the proxy had given up on ran for over twenty minutes on the dev server; a bounded request (13.10) should stop in the database too. Decided by Tim on 2026-09-09. |
 | D148 | Bounds answer, never refuse | A bucket too fine for the range answers with the finest bucket that fits; more owners than fit under `MAX_SERIES` answer with the first that fit by name; grouping by device without a filter covers the devices assigned to the project today; the response carries `notes`, `owners_shown` and `owners_total` and the explorer shows the notes | A bound on a request is an architecture rule, a wall in front of the user is not (D143). Decided by Tim on 2026-09-09. |
 | D149 | Load more | Every list that stopped at the first 500 rows with a note to search (the rows behind a bucket, entities, devices, groups, the server admin's devices) loads the next page on "Load more" and says how many rows it holds; the pages stay in the query cache | The bound per request stays, the person reaches every row. Decided by Tim on 2026-09-09. |
+| D150 | Explore as one page | The Records and Analysis tabs merge into Explore with a mode switch (table, chart, map) in the URL; today's Analysis tab becomes the chart mode; saved views carry the mode and the dashboards' saved view tiles open through it | One selection looked at three ways is one page. Decided by Tim on 2026-09-09. |
+| D151 | The canvas | The page fills with the chart or the map, a compact selection strip at the top (entities and devices, period, timezone, mode), the records table as a drawer pulled up from the bottom with its height remembered per user, a bottom sheet on a phone; the table mode fills the page with the table | The live map showed that a full canvas with controls at the edges is how a person looks closely. Decided by Tim on 2026-09-09. |
+| D152 | Chart kinds | A line over time per metric and owner by default, chosen from the selection, with a switch to scatter, bar, histogram and state timeline; the metrics on the chart are the loaded columns with a picker; above the canvas bound the chart draws from the aggregate read with the finest bucket that fits and says so | A sensible default and a switch, not a form. Decided by Tim on 2026-09-09. |
+| D153 | Map mode | The live map's components over the selection's period (the tracks and points of the loaded records, the features, the coverage layer) with a time slider that moves the marked moment along the tracks; tracks coloured by a metric and the heatmap over the period are left out of this phase | The slider is the analysis gesture the live map lacks; the rest waits for a need. Decided by Tim on 2026-09-09. |
+| D154 | Linked hover | One marked moment across chart, drawer and map, all three ways, kept in the URL as `at` so a link reproduces it | The three views are one selection. Decided by Tim on 2026-09-09. |
+| D155 | Canvas bound | Up to 50,000 loaded rows draw raw points on the chart and the map; above, the chart uses the aggregate read with the finest bucket that fits and the map the track read, with a note; the selection keeps the 500 owners bound of the records read | Bounded per request, unbounded in experience (D143). Decided by Tim on 2026-09-09. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -255,6 +261,8 @@ From architecture section 2, used when reviewing a change. These are never done;
 | v2.2.0 | 17, 18 | ChirpStack applications connected from the tenant (D125 to D132), simple first with the Overview, Data and Network tabs (D133, D134), and the fixes since v2.0.0 |
 | v2.3.0 (2026-09-09) | 19 | The live map as a working tool: panels on every dot, links that make the object visible, one control strip, heatmaps per entity and device, drawing and measuring with features that start rules, the proximity condition, satellite imagery and terrain |
 | v2.4.0 (2026-09-09) | 20 | Explore and export from the entity or device: the records view, paging with progress instead of refusals, the records export, links from the Data tabs and the map, the bounds that answer, a statement timeout on the API |
+| v2.5.0 | 21 | Explore as one canvas: table, chart and map as three views of one selection, the table as a drawer, hover linked across the views, several devices side by side |
+| v2.6.0 | 22 | Analysis as modules: a framework for computed results (selection, parameters, a job, a stored result with map, chart and table blocks) and the first module |
 
 ## Architecture coverage map
 
@@ -952,6 +960,58 @@ Release:
 
 ---
 
+### Phase 21: Explore as one canvas (v2.5.0)
+
+**Goal.** The Explore page is one selection looked at three ways. Table, chart and map are modes of the same loaded records, switched with one control, on a canvas that takes the whole page the way the live map does, with the table as a drawer at the bottom when the chart or the map is up. Hovering a point marks the same moment in every view. Several entities and devices sit in one selection, so two collars' battery or two animals' tracks compare on one chart or one map. Nothing on this page computes anything new: it shows what the collars produced.
+
+**Why here.** Tim's look at v2.4.0 on 2026-09-09: the records table is right, the sparkline tiles next to it are a dashboard, not a way to look closely, and the Analysis tab in its corner is a third, unrelated way of exploring the same data. Explore should make the three views one thing, and the computed analyses (home range, vehicle checks, contact tracing, heart rate) belong to a page of their own, phase 22, specified with the users who need them.
+
+**Order.** The canvas and the mode switch first with the table as the drawer (the records view moves into it unchanged), then the chart mode from the loaded records with the aggregate read above a size, then the map mode from the live map's components over the period, then the linked hover, then the exports and saved views following the modes. Each item with tests, docs and changelog, committed on Tim's word.
+
+**Decisions to ask before building (proposed answers first).**
+
+- One page: the Records and Analysis tabs merge into Explore with a mode switch (table, chart, map) on the strip; today's Analysis tab (metrics, buckets, aggregates, the comparison charts) becomes the chart mode; saved views carry the mode and the dashboards' saved view tiles keep working through it. Proposed: yes.
+- The canvas: the page is the canvas, the selection bar is a compact strip at the top (entities and devices, period, timezone, mode), the table is a drawer at the bottom pulled up by a handle and remembered per user, the chart and the map fill the rest; on a phone the drawer is a bottom sheet. Proposed: yes.
+- Chart kinds and who chooses: a line over time per metric and owner as the default, with a switch to scatter (one metric against another), bar, histogram and state timeline; the metrics on the chart are the loaded columns with a picker, up to a bound; above a size of rows the chart draws from the aggregate read with the finest bucket that fits and says so. Proposed: the tool picks the default from the selection, the person switches.
+- Linked hover: a hovered point in the chart marks the same moment in the table and on the map, and a hovered row or map point marks it in the chart; the marked moment is the `at` of the URL, so a link reproduces it. Proposed: yes, all three ways.
+- Map mode: the live map's components over the period of the selection (the tracks and points of the loaded records, the features, the coverage layer), a time slider that moves the marked moment along the tracks, tracks coloured by a chosen metric, and the heatmap over the period; the live map itself stays as it is for now. Proposed: yes, the slider and the colouring in this phase, the heatmap over the period as a switch.
+- Bounds: the chart and the map draw from the loaded rows up to a bound of rows per owner and switch to the aggregate read and the track read above it, with a note; the selection keeps the 500 owners bound of the records read. Proposed: yes, 50,000 loaded rows on the canvas.
+
+**Deliverables.**
+
+- [x] (2026-09-09, `lib/explore.ts`, `ExplorerPage.tsx`, `components/explore/{SelectionStrip,Drawer}.tsx`) The canvas: Explore as one route with the mode in the URL, the strip with the selection, the drawer with the records table (the virtualized table and its progress unchanged), the choice of drawer height per user, the bottom sheet on a phone; the Records and Analysis tabs and their URLs open as the table and the chart.
+- [x] (2026-09-09, `ExploreChart.tsx`, one grid per metric with linked axes) Chart mode: the chart kinds from the loaded records with the metric picker, the switch to the aggregate read above the bound with the note, the legend per owner, the comparison of several owners on one chart; the exports and the saved views of the Analysis tab carried over.
+- [x] (2026-09-09, `ExploreMap.tsx`) Map mode: the live map's components over the period, the tracks and points of the loaded records, the time slider (decision D153; the colouring by metric and the heatmap over the period left for a later phase).
+- [x] (2026-09-09) Linked hover: one marked moment across chart, table and map, in the URL as `at` when clicked.
+- [x] (2026-09-09) Docs: `docs/analytics/data-explorer.md` around the three modes, `DEVELOPERS.md` (the canvas, the shared selection and the marked moment), the changelog.
+
+Release:
+
+- [ ] `VERSION` v2.5.0 with the changelog and the release process.
+
+**Exit criteria.** On the dev server: SP051307 and a second collar of the same project on one chart of battery voltage over their last month; the same selection in map mode with both tracks and the slider moving the marked moment along them; hovering a point on the chart marks the row in the drawer and the point on the map; a saved view of the old Analysis tab opens in chart mode; a track point clicked on the live map lands in Explore with the row marked in the drawer.
+
+---
+
+### Phase 22: Analysis as modules (v2.6.0)
+
+**Goal.** A page that computes what the data does not say by itself. Each computation is a module with its own inputs, method and result: a selection and a period, parameters, a bounded run as a job in a worker the way exports run, a stored result reproducible from its parameters, and a result page of map, chart and table blocks. Results become things a dashboard tile can show and a rule can react to later.
+
+**Why here.** Tim's list of 2026-09-09: home range for animals, vehicle checks (speeding, leaving the road), contact tracing between animals or devices, heart rate monitoring for collars that report it. They differ in method and users, and share the framework. The page will matter to different users for different reasons, so the module list is specified with them.
+
+**Open questions, to answer before the decisions.**
+
+- Which module first. Home range and contact tracing need only the positions we hold; speeding needs positions and a speed limit per area; leaving the road needs a road network we do not hold (a data source decision); heart rate needs a collar that reports it.
+- The result's life: kept until deleted like a saved view, or expiring like an export file; re-run on new data by hand, on a schedule, or by a rule.
+- Who runs analyses: every member, or a permission of its own.
+- The method choices worth exposing per module (a hull or a density contour for home range; the distance and the minimum duration for a contact).
+
+**Shape to specify.** `analysis_modules` as code (a registry with a key, a label, a parameter schema, a runner), `analysis_runs` as rows (project, module, parameters, status, progress, result document, created by, timestamps) with the run in the export worker or a worker of its own, `GET /projects/{id}/analyses` and the run's read and download, a result page with blocks the frontend draws from the document, and the first module end to end. Decisions and deliverables follow the module list.
+
+**Exit criteria.** To write with the first module.
+
+---
+
 ## Continuous work in every phase
 
 - [ ] Keep `CHANGELOG.md` Unreleased current.
@@ -1562,3 +1622,13 @@ Listed by the phase where they are first needed.
 ### 2026-09-09, release v2.4.0 (Tim)
 
 - Tagged v2.4.0 after CI on the release commit: phase 20 complete, the exit criteria checked against the dev server, deployed with the env-refresh playbook. The next phase is to plan with Tim from live use.
+
+### 2026-09-09, phases 21 and 22 planned (Claude and Tim)
+
+- Tim's look at v2.4.0: the sparkline tiles are a dashboard, not a close look, and the Analysis tab in its corner is a third way of exploring the same data. Agreed: Explore becomes one canvas with table, chart and map as modes of one selection (phase 21), and Analysis becomes a page of computed modules, home range, vehicle checks, contact tracing and heart rate among the candidates, specified with the users who need them (phase 22). Both written into the plan with phase 21's decisions ready to ask.
+- Six decisions asked and taken (D150 to D155): one page with three modes, the canvas with the strip and the drawer, chart kinds with a default and a switch, map mode with the time slider only, the linked hover all three ways, 50,000 rows on the canvas before the aggregate and track reads take over.
+
+### 2026-09-09, phase 21: Explore as one canvas (Claude)
+
+- Built: `lib/explore.ts` (the state over the records state, the chart groups from the loaded rows and from the aggregate read, the tracks of the rows, the nearest row to a moment), the strip, the drawer, the chart (ECharts, one grid per metric with linked axes and one colour per owner; the hover and the click converted from pixels, so they work between the points too), the map (the live map's layer helpers over the period, the time slider, the ringed points at the moment) and the page that holds one marked moment for the three views. The records view and the sparklines of phase 20 are gone; the drill-down dialog of the old Analysis tab too, since the rows behind the chart are the drawer now (the rows read stays for other clients).
+- Verified: frontend types, lint, catalogue, unit tests (`lib/explore.test.ts`) and build; a browser pass through the Vite proxy against the dev server with SP051307 and SP051440 over seven days: the chart with a legend per owner, a hover marking and scrolling the drawer's row, a click pinning `at`, the scatter, the map with both tracks and the slider pinning the moment, the drawer folding, a v2.4.0 analysis link opening the chart, and a records link with a moment marking the row in the table. Found and fixed on the way: the map canvas kept its first size until a resize observer followed the container, the drawer's fold button lost its click to the drag handle's pointer capture, and the chart's zoom bar and the map's slider sat under the drawer until the canvas content ended where the drawer starts.

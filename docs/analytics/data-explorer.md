@@ -1,8 +1,8 @@
 # Data explorer
 
-The Data explorer answers two questions. The Records tab answers the simplest one first: everything an entity or a device produced between two moments, one row per moment with the position and every value of that moment (phase 20, decisions D142 to D146). The Analysis tab is the metric-first side (architecture 12): pick metrics, entities or devices and a time range, and get series, tables and statistics aggregated in the API. Neither tab ever asks the browser to hold more than it needs: every request is bounded (architecture 13.10), and a bound answers with a page or a coarser bucket, never with a refusal (decision D143).
+Explore is one selection looked at three ways (phase 21, decisions D150 to D155). A person picks entities and devices, a period and a timezone in the strip at the top, and the canvas below shows everything they produced as a table, a chart or a map, switched with one control. The rows load page after page whatever the mode, and under the chart or the map they sit in a drawer at the bottom, pulled up by its handle to the height a person likes. One marked moment links the views: hovering a point on the chart, a row in the drawer or a point on the map marks the same moment everywhere, and a click pins it into the link (`?at=`). Every request is bounded (architecture 13.10), and a bound answers with a page or a coarser bucket, never with a refusal (decision D143).
 
-## Records
+## The records read
 
 `GET /api/v1/projects/{project_id}/records` and `GET /api/v1/projects/{project_id}/records/count`
 
@@ -15,11 +15,21 @@ The Data explorer answers two questions. The Records tab answers the simplest on
 
 A record is one moment of one device: the effective time, the position of that moment if there is one (latitude, longitude, altitude, speed, heading, accuracy, satellites, the curated fields), the measurements by metric key with their effective values, the state fields reported then, the entity and project the moment is attributed to, and the source event and trace behind it. The moments come from a union of the position and measurement times of the selection, newest first, paged on a `time, device` cursor; the count is a separate call for the progress bar. The reserved project id `all` works for server admins.
 
-In the app, the Records tab opens with the object picker (entities and devices, several at once, a group as a shortcut), the period (the presets, a custom range, or since the device was assigned when one entity is chosen) and the timezone. The rows load page after page with a progress bar against the count and a Stop button, into a virtualized table that scrolls a year of a collar as one list. The columns are every metric and state field with data in the selection, all on, with a column picker kept per user. "Charts and map" adds a small chart per numeric column (click to enlarge) and the loaded track on a small map; the first look is the table alone. A row opens its source event. "Export" hands the selection to the export dialog (see [Export](export.md)), and "Analyse these" carries it into the Analysis tab.
+## The three modes
 
-Links land here from the rest of the app (decision D145): "All records" on the Data tab of an entity or a device, "Every record at this time" on the map's track point panel, and the Data button on the entity and device hits of the search palette. A link with a moment (`?at=`) opens the twelve hours around it with that row marked and scrolled into view.
+**Table.** The virtualized table of the loaded rows, one row per moment, that scrolls a year of a collar as one list. The columns are every metric and state field with data in the selection, all on, with a column picker kept per user. A row opens its source event.
 
-## Analysis
+**Chart.** One grid per metric with a shared time axis and one line per entity or device in its own colour, so two collars compare on one canvas. The metrics on the chart are the loaded columns with a picker (the first four numeric ones by default); the kind switches between line, scatter (one metric against another, per owner), bar, histogram and state timeline. Above 50,000 records the chart draws from the aggregate series read (below) with the finest bucket that fits and says so; the drawer keeps loading the rows.
+
+**Map.** The tracks of the selection over the period with the project's features, and a time slider that moves the marked moment along the tracks, the point of every track at that moment ringed. Above 50,000 records the tracks come from the track read, decimated to 5,000 points each.
+
+"Export" hands the selection to the export dialog (see [Export](export.md)). Saved views keep the selection, the period, the mode and the chart (decision D42); a dashboard's saved view tile opens the explorer on it, and views saved with the Analysis tab of v2.4.0 open in chart mode.
+
+Links land here from the rest of the app (decision D145): "All records" on the Data tab of an entity or a device, "Every record at this time" on the live map's track point panel, and the Data button on the entity and device hits of the search palette. A link with a moment opens the twelve hours around it with that row marked and scrolled into view.
+
+## The aggregate reads
+
+The chart above the canvas bound, the dashboards' saved view tiles and the aggregates export read these.
 
 ### Series
 
@@ -44,7 +54,7 @@ Empty buckets are not filled in. A chart that needs gaps shown draws them from t
 
 `GET /api/v1/projects/{project_id}/analytics/rows?metric=...&entity_id=...&from=...&to=...`
 
-The normalized measurement rows behind a bucket, paginated with a cursor; the app loads the next page on "Load more" (decision D149). Each row carries `source_event_id` and `trace_id`, so the next step down is the source event detail (`/api/v1/source-events/{id}`) and the processing trace.
+The normalized measurement rows behind a bucket, paginated with a cursor. In the app the rows behind the chart are the drawer; this read serves other clients. Each row carries `source_event_id` and `trace_id`, so the next step down is the source event detail (`/api/v1/source-events/{id}`) and the processing trace.
 
 ### Metrics with data
 
@@ -61,6 +71,7 @@ The metrics that have measurements in the project within the range (default 30 d
 | Bound | Value | When it is reached |
 | --- | --- | --- |
 | Records per page | 1,000 | The next page follows; the app loads them in sequence with progress. |
+| Rows drawn on the canvas | 50,000 | The chart reads buckets and the map the decimated tracks, with a note. |
 | Entities or devices per records request | 500 each | 422. |
 | Points per series | 5,000 | The finest bucket that fits answers, with a note. |
 | Series per request | 20 | The first owners that fit by name answer, with a note and the counts. |

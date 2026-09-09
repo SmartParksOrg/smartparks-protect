@@ -49,7 +49,7 @@ export function readRecordsState(params: URLSearchParams): RecordsState {
 
 export function writeRecordsState(state: RecordsState): URLSearchParams {
   const params = new URLSearchParams();
-  params.set("mode", "records");
+  params.set("mode", "table");
   for (const e of state.entities) params.append("entity", e);
   for (const d of state.devices) params.append("device", d);
   params.set("range", state.range);

@@ -22,16 +22,21 @@ export function VirtualTable({
   columns,
   timezone,
   onRowClick,
+  onRowHover,
   highlightTime = null,
+  follow = true,
   height = 480,
 }: {
   rows: RecordRow[];
   columns: RecordColumn[];
   timezone: string;
   onRowClick?: (row: RecordRow) => void;
-  /** The moment a link came from: its row is marked and scrolled into view once it loads. */
+  /** The pointer over a row, or over none (decision D154). */
+  onRowHover?: (row: RecordRow | null) => void;
+  /** The marked moment: its row is marked and, with `follow`, scrolled into view. */
   highlightTime?: string | null;
-  height?: number;
+  follow?: boolean;
+  height?: number | string;
 }) {
   const parent = useRef<HTMLDivElement | null>(null);
   const virtualizer = useVirtualizer({
@@ -46,16 +51,18 @@ export function VirtualTable({
     : -1;
   const scrolledFor = useRef<number | null>(null);
   useEffect(() => {
-    if (highlightIndex < 0 || scrolledFor.current === highlightMs) return;
+    if (!follow || highlightIndex < 0 || scrolledFor.current === highlightMs)
+      return;
     scrolledFor.current = highlightMs;
     virtualizer.scrollToIndex(highlightIndex, { align: "center" });
-  }, [highlightIndex, highlightMs, virtualizer]);
+  }, [follow, highlightIndex, highlightMs, virtualizer]);
   const width = columns.reduce((n, c) => n + cellWidth(c), 0);
   return (
     <div
       ref={parent}
       className="overflow-auto rounded-md border"
       style={{ height }}
+      onMouseLeave={() => onRowHover?.(null)}
     >
       <div style={{ minWidth: width }}>
         <div
@@ -94,6 +101,7 @@ export function VirtualTable({
                   height: ROW_HEIGHT,
                 }}
                 onClick={() => onRowClick?.(row)}
+                onMouseEnter={() => onRowHover?.(row)}
               >
                 {columns.map((c) => (
                   <div

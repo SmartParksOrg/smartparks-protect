@@ -65,7 +65,7 @@ describe("records state", () => {
       at: null,
     });
     expect(writeRecordsState(state).toString()).toBe(
-      "mode=records&entity=e1&entity=e2&device=d1&range=custom&from=2026-04-01T00%3A00&to=2026-04-02T00%3A00&tz=UTC",
+      "mode=table&entity=e1&entity=e2&device=d1&range=custom&from=2026-04-01T00%3A00&to=2026-04-02T00%3A00&tz=UTC",
     );
     expect(readRecordsState(new URLSearchParams("range=nonsense")).range).toBe(
       "7d",
@@ -171,7 +171,7 @@ describe("records links", () => {
     });
     const params = new URLSearchParams(href.split("?")[1]);
     expect(href.startsWith("/projects/p1/analyze/explorer?")).toBe(true);
-    expect(params.get("mode")).toBe("records");
+    expect(params.get("mode")).toBe("table");
     expect(params.getAll("device")).toEqual(["d1"]);
     expect(params.get("range")).toBe("custom");
     expect(params.get("from")).toBe("2026-09-04T00:00:00.000Z");
