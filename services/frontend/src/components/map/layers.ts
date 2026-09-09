@@ -9,6 +9,7 @@ import {
   ensureMarkerImage,
   type MarkerState,
 } from "@/components/icons/markers";
+import { intensityFor, radiusExpression } from "@/components/map/heat";
 
 export const SOURCES = {
   entities: "entities",
@@ -18,6 +19,7 @@ export const SOURCES = {
   events: "events",
   gateways: "gateways",
   coverage: "coverage",
+  heat: "heat",
 } as const;
 
 /** Glyphs the OpenFreeMap styles serve; the MapLibre default (Open Sans) is not among them. */
@@ -852,4 +854,75 @@ export function setCoverage(
 ): void {
   const source = map.getSource(SOURCES.coverage) as GeoJSONSource | undefined;
   source?.setData({ type: "FeatureCollection", features });
+}
+
+/** The heatmap (decision D138): one MapLibre heatmap layer over the positions of the shown
+ * entities and devices, under every marker layer. The radius and intensity are set with
+ * `setHeatPaint` from the settings card. */
+export function ensureHeatLayer(map: MapLibreMap): void {
+  if (map.getSource(SOURCES.heat)) return;
+  map.addSource(SOURCES.heat, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  const before = map.getLayer("coverage-hex")
+    ? "coverage-hex"
+    : map.getLayer("gateway-markers")
+      ? "gateway-markers"
+      : "entity-clusters";
+  map.addLayer(
+    {
+      id: "heat",
+      type: "heatmap",
+      source: SOURCES.heat,
+      paint: {
+        "heatmap-weight": 1,
+        "heatmap-intensity": intensityFor(3),
+        "heatmap-radius": radiusExpression(250, 0),
+        "heatmap-opacity": 0.75,
+        // transparent, then the brand greens, sand and coral, the destructive red at the top
+        "heatmap-color": [
+          "interpolate",
+          ["linear"],
+          ["heatmap-density"],
+          0,
+          "rgba(144, 174, 155, 0)",
+          0.2,
+          "rgba(144, 174, 155, 0.6)",
+          0.45,
+          "#52735E",
+          0.7,
+          "#C6B187",
+          0.9,
+          "#EDA08F",
+          1,
+          "#A13D2D",
+        ],
+      },
+    },
+    before,
+  );
+}
+
+export function setHeatPoints(
+  map: MapLibreMap,
+  features: GeoJSON.Feature[],
+): void {
+  const source = map.getSource(SOURCES.heat) as GeoJSONSource | undefined;
+  source?.setData({ type: "FeatureCollection", features });
+}
+
+export function setHeatPaint(
+  map: MapLibreMap,
+  radiusMetres: number,
+  latitude: number,
+  sensitivity: number,
+): void {
+  if (!map.getLayer("heat")) return;
+  map.setPaintProperty(
+    "heat",
+    "heatmap-radius",
+    radiusExpression(radiusMetres, latitude),
+  );
+  map.setPaintProperty("heat", "heatmap-intensity", intensityFor(sensitivity));
 }

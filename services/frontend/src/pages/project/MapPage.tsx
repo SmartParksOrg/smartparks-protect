@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Layers, ListTree, Route } from "lucide-react";
+import { Flame, Layers, ListTree, Route } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +13,7 @@ import type {
   CurrentState,
   Feature,
   Gateway,
+  HeatResponse,
   Page as PageType,
   Track,
 } from "@/api/types";
@@ -40,6 +41,7 @@ import {
   ensureFeatureLayers,
   ensureCoverageLayers,
   ensureGatewayLayers,
+  ensureHeatLayer,
   ensureTrackLayers,
   type EventFeatureProperties,
   setCoverage,
@@ -48,6 +50,8 @@ import {
   setEvents,
   setFeatures,
   setGateways,
+  setHeatPaint,
+  setHeatPoints,
   setSelectedTrackPoint,
   setTracks,
   SOURCES,
@@ -69,6 +73,14 @@ import {
 } from "@/components/map/layerChoices";
 import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
 import { boundsOf } from "@/components/map/fit";
+import {
+  DEFAULT_HEAT,
+  type HeatScope,
+  type HeatSettings,
+  heatScopeOf,
+  parseHeatSettings,
+} from "@/components/map/heat";
+import { HeatCard, HeatSettingsPanel } from "@/components/map/HeatSettings";
 import { GatewayPanel } from "@/components/map/GatewayPanel";
 import { LayerPanel } from "@/components/map/LayerPanel";
 import { DevicePanel, EntityPanel } from "@/components/map/MapObjectPanel";
@@ -250,6 +262,67 @@ export function MapPage() {
   );
   // the Tracks card shows while tracks are on unless folded from the strip
   const [tracksCardHidden, setTracksCardHidden] = useState(false);
+  // the heatmap (decision D138): `heat=1` switches it on, its settings travel in the URL and
+  // the last settings are the per-user default
+  const heatOn = params.get("heat") === "1";
+  const [preferredHeat, setPreferredHeat] = usePreference<HeatSettings>(
+    "heat_settings",
+    DEFAULT_HEAT,
+  );
+  const heat = useMemo(
+    () => parseHeatSettings(params, preferredHeat),
+    [params, preferredHeat],
+  );
+  const heatScope: HeatScope = heatScopeOf(params);
+  const [heatSettingsOpen, setHeatSettingsOpen] = useState(false);
+  const [heatCardHidden, setHeatCardHidden] = useState(false);
+  const setHeatOn = useCallback(
+    (on: boolean) =>
+      setParams(
+        (p) => {
+          if (on) p.set("heat", "1");
+          else
+            for (const k of [
+              "heat",
+              "heat_radius",
+              "heat_sensitivity",
+              "heat_hours",
+              "heat_scope",
+            ])
+              p.delete(k);
+          return p;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const setHeat = useCallback(
+    (next: HeatSettings) => {
+      setPreferredHeat(next);
+      setParams(
+        (p) => {
+          p.set("heat_radius", String(next.radius_m));
+          p.set("heat_sensitivity", String(next.sensitivity));
+          p.set("heat_hours", String(next.hours));
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setParams, setPreferredHeat],
+  );
+  const setHeatScope = useCallback(
+    (next: HeatScope) =>
+      setParams(
+        (p) => {
+          if (next === "selected") p.set("heat_scope", "selected");
+          else p.delete("heat_scope");
+          return p;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
   const visibleFeatures = useMemo(
     () =>
       currentFeatures?.filter((f) =>
@@ -301,6 +374,63 @@ export function MapPage() {
         signal,
       }),
     enabled: layers.coverage && viewport !== null,
+    retry: false,
+    placeholderData: (previous) => previous,
+    refetchInterval: 120_000,
+  });
+  // what the heatmap covers: the shown entities and devices (their ids when few enough to
+  // send, else the whole scope), or the selected one
+  const heatIds = useMemo(() => {
+    if (heatScope === "selected") {
+      if (selectedId) return { entity_id: [selectedId], device_id: [] };
+      if (selectedDeviceId)
+        return { entity_id: [], device_id: [selectedDeviceId] };
+    }
+    const entityIds = (visibleFeatures ?? []).map(
+      (f) => f.properties.entity_id,
+    );
+    const deviceIds = (deviceFeatures ?? [])
+      .filter((f) => isDeviceShown(f.properties.device_id, layers))
+      .map((f) => f.properties.device_id);
+    const everyEntity =
+      currentFeatures !== undefined &&
+      entityIds.length === currentFeatures.length;
+    return {
+      entity_id:
+        everyEntity && deviceIds.length === 0 ? [] : entityIds.slice(0, 500),
+      device_id: deviceIds.slice(0, 500),
+      everything: everyEntity && deviceIds.length === 0,
+    };
+  }, [
+    heatScope,
+    selectedId,
+    selectedDeviceId,
+    visibleFeatures,
+    deviceFeatures,
+    currentFeatures,
+    layers,
+  ]);
+  const heatParams = useMemo(
+    () => ({
+      bbox: viewport?.bbox,
+      hours: heat.hours,
+      entity_id: heatIds.entity_id,
+      device_id: heatIds.device_id,
+    }),
+    [viewport, heat.hours, heatIds],
+  );
+  const heatPoints = useQuery({
+    queryKey: queryKeys.heat(projectId, heatParams),
+    queryFn: ({ signal }) =>
+      api.get<HeatResponse>(`/api/v1/projects/${projectId}/map/heat`, {
+        query: heatParams,
+        signal,
+      }),
+    enabled:
+      heatOn &&
+      viewport !== null &&
+      (heatIds.entity_id.length + heatIds.device_id.length > 0 ||
+        Boolean(heatIds.everything)),
     retry: false,
     placeholderData: (previous) => previous,
     refetchInterval: 120_000,
@@ -553,9 +683,27 @@ export function MapPage() {
     ensureFeatureLayers(map);
     ensureGatewayLayers(map);
     ensureCoverageLayers(map);
+    ensureHeatLayer(map);
     ensureTrackLayers(map);
     ensureEventLayers(map);
   }, [mapRef, ready]);
+
+  // the heatmap's points and paint
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setHeatPoints(
+      map,
+      heatOn && heatPoints.data
+        ? (heatPoints.data.features as unknown as GeoJSON.Feature[])
+        : [],
+    );
+  }, [mapRef, ready, heatOn, heatPoints.data]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setHeatPaint(map, heat.radius_m, map.getCenter().lat, heat.sensitivity);
+  }, [mapRef, ready, heat.radius_m, heat.sensitivity, viewport]);
 
   // clicks, rebound whenever the URL writers change: `setParams` carries the current pathname,
   // and the map outlives a switch to another project on this page, so a handler bound once
@@ -1016,6 +1164,21 @@ export function MapPage() {
       badge: trackedIds.length + trackedDeviceIds.length,
       onClick: () => setTracksCardHidden((h) => !h),
     },
+    {
+      key: "heat",
+      icon: Flame,
+      label: heatOn ? t("Hide the heatmap") : t("Show the heatmap"),
+      active: heatOn,
+      onClick: () => {
+        if (heatOn) {
+          setHeatOn(false);
+          setHeatSettingsOpen(false);
+        } else {
+          setHeatOn(true);
+          setHeatCardHidden(false);
+        }
+      },
+    },
   ];
 
   return (
@@ -1077,6 +1240,30 @@ export function MapPage() {
             length={trackLength}
             onChange={setTrackLength}
             onClose={() => setTrackSettingsOpen(false)}
+          />
+        )}
+        {heatOn && !heatCardHidden && (
+          <HeatCard
+            points={heatPoints.data?.returned ?? 0}
+            total={heatPoints.data?.total ?? 0}
+            hours={heat.hours}
+            loading={heatPoints.isPending && heatPoints.fetchStatus !== "idle"}
+            settingsOpen={heatSettingsOpen}
+            onToggleSettings={() => setHeatSettingsOpen((o) => !o)}
+            onClear={() => {
+              setHeatOn(false);
+              setHeatSettingsOpen(false);
+            }}
+          />
+        )}
+        {heatOn && heatSettingsOpen && (
+          <HeatSettingsPanel
+            settings={heat}
+            scope={heatScope}
+            hasSelection={Boolean(selectedId || selectedDeviceId)}
+            onChange={setHeat}
+            onScopeChange={setHeatScope}
+            onClose={() => setHeatSettingsOpen(false)}
           />
         )}
         {panelOpen && currentFeatures && (

@@ -1965,6 +1965,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/map/heat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Heat Points
+         * @description The positions behind the heatmap (decision D138): the newest `limit` in the viewport and
+         *     the look-back window, of the given entities and devices, or of the whole scope when neither
+         *     is given. Bare points; the client weighs and draws them. Effective times and coordinates,
+         *     invalid rows left out (architecture 28).
+         */
+        get: operations["heat_points_api_v1_projects__project_id__map_heat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/analytics/series": {
         parameters: {
             query?: never;
@@ -7353,6 +7376,27 @@ export interface components {
             level?: string | null;
             /** At */
             at?: string | null;
+        };
+        /**
+         * HeatResponse
+         * @description The points of the heatmap layer: bare positions, the newest first up to a cap.
+         */
+        HeatResponse: {
+            /**
+             * Type
+             * @default FeatureCollection
+             */
+            type: string;
+            /** Hours */
+            hours: number;
+            /** Total */
+            total: number;
+            /** Returned */
+            returned: number;
+            /** Features */
+            features: {
+                [key: string]: unknown;
+            }[];
         };
         /** ImportResult */
         ImportResult: {
@@ -14589,6 +14633,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PointRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    heat_points_api_v1_projects__project_id__map_heat_get: {
+        parameters: {
+            query?: {
+                /** @description west,south,east,north in WGS84 */
+                bbox?: string | null;
+                hours?: number;
+                /** @description Positions of these entities */
+                entity_id?: string[] | null;
+                /** @description Positions of these devices */
+                device_id?: string[] | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeatResponse"];
                 };
             };
             /** @description Validation Error */

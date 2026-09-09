@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 19 (the live map as a working tool): parts a and b built on 2026-09-09 (a committed as b955252); parts c to e open; phase 20 (explore and export from the entity or device) after it |
+| Active phase | Phase 19 (the live map as a working tool): parts a to c built on 2026-09-09 (a and b committed as b955252 and 81e8f60); parts d and e open; phase 20 (explore and export from the entity or device) after it |
 | Latest release | v2.2.0 (2026-09-08): phases 16 to 18 and the fixes since v2.0.0 |
 | Last session | 2026-09-09 |
-| Next item | Phase 19 part c, the heatmap (D138); Tim commits part b first. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Next item | Phase 19 part d, drawing and measuring (D139 to D141); Tim commits part c first. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -886,8 +886,8 @@ b. Controls in one place:
 
 c. Heatmap:
 
-- [ ] `GET /projects/{id}/map/heat` (viewport, `hours`, entity and device ids, the newest `MAX_POINTS` in view, the all scope through `require_scope_permission`, effective times and positions through the curation layer); tests for the bound, the window and a 403.
-- [ ] The heatmap layer in `layers.ts` (`ensureHeatLayer`, `setHeatPoints`), radius in metres to pixels per zoom, sensitivity as intensity and weight, hidden below the shown layers; the Heatmap card (`HeatSettings.tsx`) with the sliders (radius 10 m to 5 km, sensitivity Low to High, look-back 1 hour to 90 days with the quick picks), the URL parameters and the per-user default (`heat_settings` in the preference document); the objects it covers are the shown entities and devices, or the selected one when the card says so.
+- [x] (2026-09-09, `heat_points` in `routers/map.py`, `tests/api/test_map_heat.py`, the access matrix) `GET /projects/{id}/map/heat` (viewport, `hours`, entity and device ids, the newest `MAX_POINTS` in view, the all scope through `require_scope_permission`, effective times and positions through the curation layer); tests for the bound, the window and a 403.
+- [x] (2026-09-09, `heat.ts` with tests, `HeatSettings.tsx`, the strip button, the card and the settings in the right column; checked against the dev API with the points stubbed from the real tracks at 1440 and 390 px) The heatmap layer in `layers.ts` (`ensureHeatLayer`, `setHeatPoints`), radius in metres to pixels per zoom, sensitivity as intensity and weight, hidden below the shown layers; the Heatmap card (`HeatSettings.tsx`) with the sliders (radius 10 m to 5 km, sensitivity Low to High, look-back 1 hour to 90 days with the quick picks), the URL parameters and the per-user default (`heat_settings` in the preference document); the objects it covers are the shown entities and devices, or the selected one when the card says so.
 
 d. Drawing and measuring:
 
@@ -1507,3 +1507,9 @@ Listed by the phase where they are first needed.
 - Part a committed as b955252 on Tim's word, CI green, deployed; the point read answered live on the dev server (a GNSS fix from a KPN collar carries no measurements of its own, the status message does at its own time).
 - Built part b: the strip as a MapLibre control host with the React strip portalled into it (base map menu, Layers, Tracks with the count and a fold), the right column for the Tracks card, the settings, the layers panel and the object panel (a bottom sheet on a phone), the counts alone in the top left, `?layers=1` in the URL and in the sweep. Checked against the dev API at 1440 and 390 px with tracks on, the layers panel open, the Tracks card folded and the base map menu.
 - Verified: frontend lint, types, catalogue, unit tests, the build. Not committed.
+
+### 2026-09-09, phase 19 part c: the heatmap (Claude)
+
+- Part b committed as 81e8f60 on Tim's word, CI green, deployed and verified.
+- Built part c: the heat endpoint (bounded to the newest ten thousand positions in view, at most 500 entity and 500 device ids or the whole scope, the all scope, tested), the heatmap layer with the radius in metres converted to pixels per zoom at the map's latitude and the sensitivity as intensity (`heat.ts`, tested), the Heatmap card and its settings panel with sliders next to the Tracks card, the strip button, the URL parameters and the per-user default. Checked against the dev API with the endpoint stubbed from the real tracks at 1440 and 390 px.
+- Verified: ruff, mypy, frontend lint, types, catalogue, unit tests, the build, OpenAPI regenerated. Not committed.

@@ -20,6 +20,7 @@ export const queryKeys = {
   mapDevices: (projectId: string) => ["projects", projectId, "map", "devices"] as const,
   track: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "track", params] as const,
   pointAt: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "point", params] as const,
+  heat: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "map", "heat", params] as const,
   positions: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "positions", params] as const,
   traffic: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "traffic", params] as const,
   sourceTraffic: (sourceId: string, params: Record<string, unknown>) => ["data-sources", sourceId, "traffic", params] as const,

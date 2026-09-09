@@ -146,6 +146,7 @@ ALL_SCOPE_READS: dict[str, dict[str, str]] = {
     "/api/v1/projects/{project_id}/map/current": {},
     "/api/v1/projects/{project_id}/map/tiles/{z}/{x}/{y}.mvt": {},
     "/api/v1/projects/{project_id}/map/devices": {},
+    "/api/v1/projects/{project_id}/map/heat": {},
     "/api/v1/projects/{project_id}/map/events": {},
     "/api/v1/projects/{project_id}/tracks": {"entity_id": str(uuid.uuid4())},
     "/api/v1/projects/{project_id}/positions/at": {

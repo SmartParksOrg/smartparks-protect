@@ -9,6 +9,8 @@
   reachable through the positions endpoint.
 - `GET /projects/{id}/positions/at`: the position of an entity or device at one device time with
   the measurements of that moment, what a click on a track point opens (phase 19).
+- `GET /projects/{id}/map/heat`: the positions behind the heatmap (decision D138): the newest
+  `MAX_HEAT_POINTS` in the viewport and window for the given entities and devices.
 """
 
 import uuid
@@ -17,7 +19,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
-from sqlalchemy import func, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import ColumnElement
 
@@ -59,6 +61,9 @@ MAX_FEATURES = 5000
 TILE_THRESHOLD = 2000
 MAX_TRACK_POINTS = 10000
 DEFAULT_TRACK_POINTS = 5000
+MAX_HEAT_POINTS = 10000
+MAX_HEAT_HOURS = 24 * 90
+MAX_HEAT_IDS = 500
 
 
 class CurrentStateResponse(BaseModel):
@@ -81,6 +86,16 @@ class TrackResponse(BaseModel):
     times: list[datetime]
     first_position_id: int | None
     last_position_id: int | None
+
+
+class HeatResponse(BaseModel):
+    """The points of the heatmap layer: bare positions, the newest first up to a cap."""
+
+    type: str = "FeatureCollection"
+    hours: int
+    total: int
+    returned: int
+    features: list[dict[str, Any]]
 
 
 class PointMeasurement(BaseModel):
@@ -593,4 +608,63 @@ async def position_at(
         device_name=device_name,
         entity_name=entity_name,
         measurements=measurements,
+    )
+
+
+@router.get("/map/heat", response_model=HeatResponse)
+async def heat_points(
+    bbox: str | None = Query(None, description="west,south,east,north in WGS84"),
+    hours: int = Query(24, ge=1, le=MAX_HEAT_HOURS),
+    entity_id: list[uuid.UUID] | None = Query(None, description="Positions of these entities"),
+    device_id: list[uuid.UUID] | None = Query(None, description="Positions of these devices"),
+    limit: int = Query(MAX_HEAT_POINTS, ge=1, le=MAX_HEAT_POINTS),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> HeatResponse:
+    """The positions behind the heatmap (decision D138): the newest `limit` in the viewport and
+    the look-back window, of the given entities and devices, or of the whole scope when neither
+    is given. Bare points; the client weighs and draws them. Effective times and coordinates,
+    invalid rows left out (architecture 28)."""
+    if len(entity_id or []) > MAX_HEAT_IDS or len(device_id or []) > MAX_HEAT_IDS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"At most {MAX_HEAT_IDS} entities and {MAX_HEAT_IDS} devices per request",
+        )
+    until = utc_now()
+    since = until - timedelta(hours=hours)
+    conditions: list[Any] = [
+        context.where(Position.project_id, unassigned=True),
+        in_window(Position, since, until),
+        visible(Position),
+    ]
+    owners: list[Any] = []
+    if entity_id:
+        owners.append(Position.entity_id.in_(entity_id))
+    if device_id:
+        owners.append(Position.device_id.in_(device_id))
+    if owners:
+        conditions.append(or_(*owners))
+    box = _bbox(bbox)
+    if box is not None:
+        conditions.append(func.ST_Intersects(effective_geom(), func.ST_MakeEnvelope(*box, 4326)))
+    total = int(
+        await session.scalar(select(func.count()).select_from(Position).where(*conditions)) or 0
+    )
+    rows = (
+        await session.execute(
+            select(func.ST_AsGeoJSON(effective_geom()))
+            .where(*conditions)
+            .order_by(effective_time(Position).desc())
+            .limit(limit)
+        )
+    ).all()
+    import json
+
+    return HeatResponse(
+        hours=hours,
+        total=total,
+        returned=len(rows),
+        features=[
+            {"type": "Feature", "geometry": json.loads(row[0]), "properties": {}} for row in rows
+        ],
     )

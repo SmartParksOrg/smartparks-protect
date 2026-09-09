@@ -8429,6 +8429,140 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/map/heat": {
+   "get": {
+    "tags": [
+     "map"
+    ],
+    "summary": "Heat Points",
+    "description": "The positions behind the heatmap (decision D138): the newest `limit` in the viewport and\nthe look-back window, of the given entities and devices, or of the whole scope when neither\nis given. Bare points; the client weighs and draws them. Effective times and coordinates,\ninvalid rows left out (architecture 28).",
+    "operationId": "heat_points_api_v1_projects__project_id__map_heat_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "bbox",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "west,south,east,north in WGS84",
+       "title": "Bbox"
+      },
+      "description": "west,south,east,north in WGS84"
+     },
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 2160,
+       "minimum": 1,
+       "default": 24,
+       "title": "Hours"
+      }
+     },
+     {
+      "name": "entity_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Positions of these entities",
+       "title": "Entity Id"
+      },
+      "description": "Positions of these entities"
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Positions of these devices",
+       "title": "Device Id"
+      },
+      "description": "Positions of these devices"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 10000,
+       "minimum": 1,
+       "default": 10000,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HeatResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/analytics/series": {
    "get": {
     "tags": [
@@ -27052,6 +27186,44 @@
      "kind"
     ],
     "title": "HealthValue"
+   },
+   "HeatResponse": {
+    "properties": {
+     "type": {
+      "type": "string",
+      "title": "Type",
+      "default": "FeatureCollection"
+     },
+     "hours": {
+      "type": "integer",
+      "title": "Hours"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "returned": {
+      "type": "integer",
+      "title": "Returned"
+     },
+     "features": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Features"
+     }
+    },
+    "type": "object",
+    "required": [
+     "hours",
+     "total",
+     "returned",
+     "features"
+    ],
+    "title": "HeatResponse",
+    "description": "The points of the heatmap layer: bare positions, the newest first up to a cap."
    },
    "ImportResult": {
     "properties": {
