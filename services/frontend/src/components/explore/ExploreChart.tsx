@@ -297,7 +297,11 @@ function buildOption(
   const xAxis = groups.map((_, i) => ({
     type: "time",
     gridIndex: i,
-    axisLabel: { formatter: timeLabel, show: i === count - 1 },
+    axisLabel: {
+      formatter: timeLabel,
+      show: i === count - 1,
+      hideOverlap: true,
+    },
     axisPointer: { label: { show: i === count - 1 } },
   }));
   const yAxis = groups.map((g, i) => ({
