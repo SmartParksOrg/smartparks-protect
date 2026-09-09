@@ -25,7 +25,7 @@ A record is one moment of one device: the effective time, the position of that m
 
 "Export" hands the selection to the export dialog (see [Export](export.md)). Saved views keep the selection, the period, the mode and the chart (decision D42); a dashboard's saved view tile opens the explorer on it, and views saved with the Analysis tab of v2.4.0 open in chart mode.
 
-Links land here from the rest of the app (decision D145): "All records" on the Data tab of an entity or a device, "Every record at this time" on the live map's track point panel, and the Data button on the entity and device hits of the search palette. A link with a moment opens the twelve hours around it with that row marked and scrolled into view.
+Links land here from the rest of the app (decision D145): "All records" on the Data tab of an entity or a device, "Every record at this time" on the live map's track point panel, and the Data button on the entity and device hits of the search palette. A link with a moment opens the twelve hours around it with that row marked and scrolled into view; the mark clears when the selection or the period changes.
 
 ## The aggregate reads
 

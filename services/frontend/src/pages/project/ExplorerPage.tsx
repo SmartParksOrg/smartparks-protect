@@ -734,7 +734,7 @@ export function ExplorerPage() {
               devices={devices.data?.items ?? []}
               groups={groups.data ?? []}
               oneEntity={oneEntity !== null}
-              onChange={(patch) => update(patch)}
+              onChange={(patch) => update({ ...patch, at: null })}
             />
             {tools}
           </div>
@@ -758,20 +758,6 @@ export function ExplorerPage() {
               <div className="absolute inset-0 flex flex-col gap-2 p-2">
                 {records.error && (
                   <Callout kind="error">{records.error}</Callout>
-                )}
-                {state.at && (
-                  <Callout kind="info">
-                    {t("Around {{time}}: the row at that moment is marked.", {
-                      time: formatInZone(state.at, state.timezone),
-                    })}{" "}
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={() => update({ at: null }, true)}
-                    >
-                      {t("Forget the moment")}
-                    </button>
-                  </Callout>
                 )}
                 <div className="flex shrink-0 items-center gap-3 text-sm">
                   {progress}

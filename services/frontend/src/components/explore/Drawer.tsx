@@ -2,7 +2,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { HANDLE } from "@/components/explore/drawer";
+import { drawerSpace, HANDLE } from "@/components/explore/drawer";
 import { Button } from "@/components/ui/button";
 
 const MIN_HEIGHT = 120;
@@ -71,7 +71,7 @@ export function Drawer({
       ref={element}
       className="absolute right-0 bottom-0 left-0 z-20 flex flex-col border-t bg-card shadow-[0_-4px_12px_rgba(0,0,0,0.08)]"
       style={{
-        height: open ? (phone ? "45%" : shown + HANDLE) : HANDLE,
+        height: drawerSpace(open, shown, phone),
         transition: dragging === null ? "height 120ms ease-out" : undefined,
       }}
     >
