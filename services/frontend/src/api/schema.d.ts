@@ -1977,7 +1977,10 @@ export interface paths {
          * @description The positions behind the heatmap (decision D138): the newest `limit` in the viewport and
          *     the look-back window, of the given entities and devices, or of the whole scope when neither
          *     is given. Bare points; the client weighs and draws them. Effective times and coordinates,
-         *     invalid rows left out (architecture 28).
+         *     invalid rows left out (architecture 28). The scan runs per device (the devices seen in the
+         *     window, or the ones asked for) through the device and time index of the compressed chunks: a
+         *     bounding-box scan over every chunk of the window decompresses them all (21 s for a week in
+         *     the all scope on the dev server, 0.6 s this way).
          */
         get: operations["heat_points_api_v1_projects__project_id__map_heat_get"];
         put?: never;

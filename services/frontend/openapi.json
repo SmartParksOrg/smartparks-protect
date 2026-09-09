@@ -8435,7 +8435,7 @@
      "map"
     ],
     "summary": "Heat Points",
-    "description": "The positions behind the heatmap (decision D138): the newest `limit` in the viewport and\nthe look-back window, of the given entities and devices, or of the whole scope when neither\nis given. Bare points; the client weighs and draws them. Effective times and coordinates,\ninvalid rows left out (architecture 28).",
+    "description": "The positions behind the heatmap (decision D138): the newest `limit` in the viewport and\nthe look-back window, of the given entities and devices, or of the whole scope when neither\nis given. Bare points; the client weighs and draws them. Effective times and coordinates,\ninvalid rows left out (architecture 28). The scan runs per device (the devices seen in the\nwindow, or the ones asked for) through the device and time index of the compressed chunks: a\nbounding-box scan over every chunk of the window decompresses them all (21 s for a week in\nthe all scope on the dev server, 0.6 s this way).",
     "operationId": "heat_points_api_v1_projects__project_id__map_heat_get",
     "security": [
      {
