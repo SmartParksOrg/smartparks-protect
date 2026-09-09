@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Flame, Layers, ListTree, Route } from "lucide-react";
+import { Flame, Layers, ListTree, PenLine, Route, Ruler } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -31,6 +31,7 @@ import {
   bindDeviceClicks,
   bindEntityClicks,
   bindEventClicks,
+  bindFeatureClicks,
   bindGatewayClicks,
   bindTrackPointClicks,
   type DeviceFeatureProperties,
@@ -72,12 +73,21 @@ import {
   revealGateway,
 } from "@/components/map/layerChoices";
 import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
+import {
+  createDrawSession,
+  type DrawKind,
+  type DrawSession,
+} from "@/components/map/draw";
+import {
+  DrawBar,
+  SaveFeatureDialog,
+  type SaveFeatureValues,
+} from "@/components/map/DrawBar";
+import { FeaturePanel } from "@/components/map/FeaturePanel";
 import { boundsOf } from "@/components/map/fit";
 import {
   DEFAULT_HEAT,
-  type HeatScope,
   type HeatSettings,
-  heatScopeOf,
   parseHeatSettings,
 } from "@/components/map/heat";
 import { HeatCard, HeatSettingsPanel } from "@/components/map/HeatSettings";
@@ -103,7 +113,8 @@ import { useNow } from "@/hooks/useNow";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
 import { isAllProjects } from "@/lib/scope";
-import { useProjects } from "@/hooks/useProjects";
+import { canAdmin, useProjectRole, useProjects } from "@/hooks/useProjects";
+import { useMutationToast } from "@/hooks/useMutationToast";
 import { useAuthStore } from "@/stores/auth";
 import { useProjectStore } from "@/stores/project";
 
@@ -262,9 +273,18 @@ export function MapPage() {
   );
   // the Tracks card shows while tracks are on unless folded from the strip
   const [tracksCardHidden, setTracksCardHidden] = useState(false);
-  // the heatmap (decision D138): `heat=1` switches it on, its settings travel in the URL and
-  // the last settings are the per-user default
-  const heatOn = params.get("heat") === "1";
+  // heatmaps (decision D138): switched on per entity and device like the tracks (`?heat=` and
+  // `?device_heat=` list them); the settings travel in the URL and the last ones are the
+  // per-user default, one setting for every heatmap on the map
+  const heatIds = useMemo(
+    () => (params.get("heat") ?? "").split(",").filter(Boolean),
+    [params],
+  );
+  const heatDeviceIds = useMemo(
+    () => (params.get("device_heat") ?? "").split(",").filter(Boolean),
+    [params],
+  );
+  const heatOn = heatIds.length + heatDeviceIds.length > 0;
   const [preferredHeat, setPreferredHeat] = usePreference<HeatSettings>(
     "heat_settings",
     DEFAULT_HEAT,
@@ -273,22 +293,18 @@ export function MapPage() {
     () => parseHeatSettings(params, preferredHeat),
     [params, preferredHeat],
   );
-  const heatScope: HeatScope = heatScopeOf(params);
   const [heatSettingsOpen, setHeatSettingsOpen] = useState(false);
   const [heatCardHidden, setHeatCardHidden] = useState(false);
-  const setHeatOn = useCallback(
-    (on: boolean) =>
+  const setHeatLists = useCallback(
+    (entityIds: string[], deviceIds: string[]) =>
       setParams(
         (p) => {
-          if (on) p.set("heat", "1");
-          else
-            for (const k of [
-              "heat",
-              "heat_radius",
-              "heat_sensitivity",
-              "heat_hours",
-              "heat_scope",
-            ])
+          if (entityIds.length > 0) p.set("heat", entityIds.join(","));
+          else p.delete("heat");
+          if (deviceIds.length > 0) p.set("device_heat", deviceIds.join(","));
+          else p.delete("device_heat");
+          if (entityIds.length + deviceIds.length === 0)
+            for (const k of ["heat_radius", "heat_sensitivity", "heat_hours"])
               p.delete(k);
           return p;
         },
@@ -296,6 +312,25 @@ export function MapPage() {
       ),
     [setParams],
   );
+  // plain functions: they close over the lists, which change with the URL
+  const toggleHeat = (entityId: string) => {
+    setHeatLists(
+      heatIds.includes(entityId)
+        ? heatIds.filter((x) => x !== entityId)
+        : [...heatIds, entityId],
+      heatDeviceIds,
+    );
+    setHeatCardHidden(false);
+  };
+  const toggleDeviceHeat = (deviceId: string) => {
+    setHeatLists(
+      heatIds,
+      heatDeviceIds.includes(deviceId)
+        ? heatDeviceIds.filter((x) => x !== deviceId)
+        : [...heatDeviceIds, deviceId],
+    );
+    setHeatCardHidden(false);
+  };
   const setHeat = useCallback(
     (next: HeatSettings) => {
       setPreferredHeat(next);
@@ -310,18 +345,6 @@ export function MapPage() {
       );
     },
     [setParams, setPreferredHeat],
-  );
-  const setHeatScope = useCallback(
-    (next: HeatScope) =>
-      setParams(
-        (p) => {
-          if (next === "selected") p.set("heat_scope", "selected");
-          else p.delete("heat_scope");
-          return p;
-        },
-        { replace: true },
-      ),
-    [setParams],
   );
   const visibleFeatures = useMemo(
     () =>
@@ -378,46 +401,14 @@ export function MapPage() {
     placeholderData: (previous) => previous,
     refetchInterval: 120_000,
   });
-  // what the heatmap covers: the shown entities and devices (their ids when few enough to
-  // send, else the whole scope), or the selected one
-  const heatIds = useMemo(() => {
-    if (heatScope === "selected") {
-      if (selectedId) return { entity_id: [selectedId], device_id: [] };
-      if (selectedDeviceId)
-        return { entity_id: [], device_id: [selectedDeviceId] };
-    }
-    const entityIds = (visibleFeatures ?? []).map(
-      (f) => f.properties.entity_id,
-    );
-    const deviceIds = (deviceFeatures ?? [])
-      .filter((f) => isDeviceShown(f.properties.device_id, layers))
-      .map((f) => f.properties.device_id);
-    const everyEntity =
-      currentFeatures !== undefined &&
-      entityIds.length === currentFeatures.length;
-    return {
-      entity_id:
-        everyEntity && deviceIds.length === 0 ? [] : entityIds.slice(0, 500),
-      device_id: deviceIds.slice(0, 500),
-      everything: everyEntity && deviceIds.length === 0,
-    };
-  }, [
-    heatScope,
-    selectedId,
-    selectedDeviceId,
-    visibleFeatures,
-    deviceFeatures,
-    currentFeatures,
-    layers,
-  ]);
   const heatParams = useMemo(
     () => ({
       bbox: viewport?.bbox,
       hours: heat.hours,
-      entity_id: heatIds.entity_id,
-      device_id: heatIds.device_id,
+      entity_id: heatIds,
+      device_id: heatDeviceIds,
     }),
-    [viewport, heat.hours, heatIds],
+    [viewport, heat.hours, heatIds, heatDeviceIds],
   );
   const heatPoints = useQuery({
     queryKey: queryKeys.heat(projectId, heatParams),
@@ -426,11 +417,7 @@ export function MapPage() {
         query: heatParams,
         signal,
       }),
-    enabled:
-      heatOn &&
-      viewport !== null &&
-      (heatIds.entity_id.length + heatIds.device_id.length > 0 ||
-        Boolean(heatIds.everything)),
+    enabled: heatOn && viewport !== null,
     retry: false,
     placeholderData: (previous) => previous,
     refetchInterval: 120_000,
@@ -548,6 +535,7 @@ export function MapPage() {
     "device",
     "gateway",
     "point",
+    "feature",
     "revealed",
   ] as const;
   const selectOnly = useCallback(
@@ -581,6 +569,35 @@ export function MapPage() {
       selectOnly("point", ownerId && time ? `${ownerId},${time}` : null),
     [selectOnly],
   );
+  const selectFeature = useCallback(
+    (id: string | null) => selectOnly("feature", id),
+    [selectOnly],
+  );
+
+  // drawing and measuring (decisions D139 and D141): a tool is transient, not in the URL
+  const role = useProjectRole(projectId);
+  const canEdit = canAdmin(role) || Boolean(user?.is_superuser);
+  const [tool, setTool] = useState<"draw" | "measure" | null>(null);
+  const [drawKind, setDrawKind] = useState<DrawKind>("polygon");
+  const [drawn, setDrawn] = useState<GeoJSON.Geometry | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const drawSession = useRef<DrawSession | null>(null);
+  const endTool = useCallback(() => {
+    setTool(null);
+    setSaveOpen(false);
+  }, []);
+  const createFeature = useMutationToast({
+    mutationFn: (values: SaveFeatureValues) =>
+      api.post<Feature>(`/api/v1/projects/${projectId}/features`, {
+        body: { ...values, geometry: drawn },
+      }),
+    invalidate: [queryKeys.features(projectId)],
+    success: t("Feature created"),
+    onSuccess: (created) => {
+      endTool();
+      selectFeature(created.id);
+    },
+  });
 
   // live updates: patch the cached current state and refetch tracks
   useProjectStream(projectId, (message) => {
@@ -750,12 +767,16 @@ export function MapPage() {
     const unbindPoints = bindTrackPointClicks(map, (props) =>
       selectPoint(props.owner_id, props.time),
     );
+    const unbindFeatures = tool
+      ? () => undefined
+      : bindFeatureClicks(map, (props) => selectFeature(props.id));
     return () => {
       unbindEntities();
       unbindDevices();
       unbindEvents();
       unbindGateways();
       unbindPoints();
+      unbindFeatures();
     };
   }, [
     mapRef,
@@ -764,8 +785,30 @@ export function MapPage() {
     selectDevice,
     selectGateway,
     selectPoint,
+    selectFeature,
     setParams,
+    tool,
   ]);
+
+  // the draw session lives while a tool is on; a change of kind restarts the drawing
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !tool) return;
+    const session = createDrawSession(map, setDrawn);
+    drawSession.current = session;
+    session.begin(drawKind);
+    return () => {
+      session.destroy();
+      drawSession.current = null;
+      setDrawn(null);
+    };
+    // the kind is applied through `begin` in changeDrawKind, not by recreating the session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapRef, ready, tool]);
+  const changeDrawKind = (kind: DrawKind) => {
+    setDrawKind(kind);
+    drawSession.current?.begin(kind);
+  };
 
   // the clicked track point stays highlighted while its panel is open
   useEffect(() => {
@@ -1077,6 +1120,9 @@ export function MapPage() {
   const selected = currentFeatures?.find(
     (f) => f.properties.entity_id === selectedId,
   )?.properties;
+  const selectedFeature = featureParamValue
+    ? features.data?.items.find((f) => f.id === featureParamValue)
+    : undefined;
   const selectedDevice = deviceFeatures?.find(
     (f) => f.properties.device_id === selectedDeviceId,
   );
@@ -1165,19 +1211,34 @@ export function MapPage() {
       onClick: () => setTracksCardHidden((h) => !h),
     },
     {
+      key: "draw",
+      icon: PenLine,
+      label: canEdit
+        ? tool === "draw"
+          ? t("Stop drawing")
+          : t("Draw a feature")
+        : t("Drawing features needs the project admin role"),
+      active: tool === "draw",
+      disabled: !canEdit,
+      onClick: () => (tool === "draw" ? endTool() : setTool("draw")),
+    },
+    {
+      key: "measure",
+      icon: Ruler,
+      label: tool === "measure" ? t("Stop measuring") : t("Measure"),
+      active: tool === "measure",
+      onClick: () => (tool === "measure" ? endTool() : setTool("measure")),
+    },
+    {
       key: "heat",
       icon: Flame,
-      label: heatOn ? t("Hide the heatmap") : t("Show the heatmap"),
-      active: heatOn,
-      onClick: () => {
-        if (heatOn) {
-          setHeatOn(false);
-          setHeatSettingsOpen(false);
-        } else {
-          setHeatOn(true);
-          setHeatCardHidden(false);
-        }
-      },
+      label: heatOn
+        ? t("Heatmaps")
+        : t("Show a heatmap from an entity or device panel"),
+      active: heatOn && !heatCardHidden,
+      disabled: !heatOn,
+      badge: heatIds.length + heatDeviceIds.length,
+      onClick: () => setHeatCardHidden((h) => !h),
     },
   ];
 
@@ -1215,6 +1276,16 @@ export function MapPage() {
       {/* the right column: cards, the layers panel and the object panel open from the right edge
           under the strip on desktop and from the bottom on a phone */}
       <div className="pointer-events-none absolute right-14 bottom-2 left-2 z-10 flex max-h-[70%] flex-col gap-2 sm:top-3 sm:bottom-3 sm:left-auto sm:max-h-none sm:w-[22rem] [&>*]:pointer-events-auto">
+        {tool && (
+          <DrawBar
+            purpose={tool}
+            kind={drawKind}
+            geometry={drawn}
+            onKind={changeDrawKind}
+            onSave={() => setSaveOpen(true)}
+            onCancel={endTool}
+          />
+        )}
         {tracksOn && !tracksCardHidden && (
           <TracksCard
             count={trackedIds.length + trackedDeviceIds.length}
@@ -1244,6 +1315,7 @@ export function MapPage() {
         )}
         {heatOn && !heatCardHidden && (
           <HeatCard
+            count={heatIds.length + heatDeviceIds.length}
             points={heatPoints.data?.returned ?? 0}
             capped={heatPoints.data?.capped ?? false}
             devicesScanned={heatPoints.data?.devices_scanned ?? 0}
@@ -1253,7 +1325,7 @@ export function MapPage() {
             settingsOpen={heatSettingsOpen}
             onToggleSettings={() => setHeatSettingsOpen((o) => !o)}
             onClear={() => {
-              setHeatOn(false);
+              setHeatLists([], []);
               setHeatSettingsOpen(false);
             }}
           />
@@ -1261,10 +1333,7 @@ export function MapPage() {
         {heatOn && heatSettingsOpen && (
           <HeatSettingsPanel
             settings={heat}
-            scope={heatScope}
-            hasSelection={Boolean(selectedId || selectedDeviceId)}
             onChange={setHeat}
-            onScopeChange={setHeatScope}
             onClose={() => setHeatSettingsOpen(false)}
           />
         )}
@@ -1287,6 +1356,10 @@ export function MapPage() {
             choices={layers}
             trackedIds={trackedIds}
             trackLabel={trackLengthLabel}
+            heatIds={heatIds}
+            heatDeviceIds={heatDeviceIds}
+            onToggleHeat={toggleHeat}
+            onToggleDeviceHeat={toggleDeviceHeat}
             devices={(deviceFeatures ?? []).map((f) => f.properties)}
             projects={
               allProjects
@@ -1379,6 +1452,8 @@ export function MapPage() {
             tracked={trackedIds.includes(selected.entity_id)}
             trackLengthLabel={trackLengthLabel}
             track={selectedTrack}
+            heat={heatIds.includes(selected.entity_id)}
+            onToggleHeat={() => toggleHeat(selected.entity_id)}
             onToggleTrack={() =>
               setTracked(
                 trackedIds.includes(selected.entity_id)
@@ -1405,6 +1480,10 @@ export function MapPage() {
             )}
             trackLengthLabel={trackLengthLabel}
             track={selectedDeviceTrack}
+            heat={heatDeviceIds.includes(selectedDevice.properties.device_id)}
+            onToggleHeat={() =>
+              toggleDeviceHeat(selectedDevice.properties.device_id)
+            }
             onToggleTrack={() =>
               setTrackedDevices(
                 trackedDeviceIds.includes(selectedDevice.properties.device_id)
@@ -1456,7 +1535,28 @@ export function MapPage() {
               onOpenTrace={setTrace}
             />
           )}
+        {!selected &&
+          !selectedDevice &&
+          !selectedGatewayId &&
+          !selectedPoint &&
+          selectedFeature && (
+            <FeaturePanel
+              feature={selectedFeature}
+              projectId={projectId}
+              canWriteRules={canEdit}
+              wasHidden={revealNote === `feature:${selectedFeature.id}`}
+              onClose={() => selectFeature(null)}
+            />
+          )}
       </div>
+      <SaveFeatureDialog
+        open={saveOpen}
+        geometry={drawn}
+        pending={createFeature.isPending}
+        error={createFeature.error?.message ?? null}
+        onOpenChange={setSaveOpen}
+        onSave={(values) => createFeature.mutate(values)}
+      />
       <SourceEventDialog
         id={sourceEvent?.id ?? null}
         ingestedAt={sourceEvent?.ingestedAt ?? null}

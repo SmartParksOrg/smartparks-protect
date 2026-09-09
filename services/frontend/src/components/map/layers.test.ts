@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   bindEntityClicks,
   bindEventClicks,
+  bindFeatureClicks,
   bindGatewayClicks,
   bindTrackPointClicks,
   trackPointKey,
@@ -118,6 +119,26 @@ describe("map click binding", () => {
     expect(count()).toBe(3);
     unbindGateways();
     unbindPoints();
+    expect(count()).toBe(0);
+  });
+
+  it("binds the feature click on the fill, line and point layers and unbinds it", () => {
+    const { map, fire, count } = fakeMap();
+    const seen: string[] = [];
+    const unbind = bindFeatureClicks(map, (props) => seen.push(props.id));
+    fire("features-fill", {
+      features: [
+        { properties: { id: "f1", name: "Fence", feature_type: "geofence" } },
+      ],
+    });
+    fire("features-point", {
+      features: [
+        { properties: { id: "f2", name: "Camp", feature_type: "site" } },
+      ],
+    });
+    expect(seen).toEqual(["f1", "f2"]);
+    expect(count()).toBe(3);
+    unbind();
     expect(count()).toBe(0);
   });
 });

@@ -36,6 +36,8 @@ const conditionSchema = z.object({
   for_seconds: z.number().int().min(60),
   aggregate: z.string(),
   seconds: z.number().int().min(60),
+  meters: z.number().min(1).max(100000),
+  entity_ids: z.array(z.string()),
 });
 const schema = z.object({
   name: z.string().min(1).max(200),
@@ -93,6 +95,10 @@ interface Props {
   rule: Rule | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Open on this template (a link from the map, phase 19). */
+  initialTemplate?: string;
+  /** With this feature selected in the template's spatial or near condition. */
+  initialFeatureId?: string;
 }
 
 /**
@@ -100,7 +106,7 @@ interface Props {
  * of leaves; documents with nesting the form cannot show are edited as JSON. Editing an
  * existing rule saves a new version; name, description and enabled are patched separately.
  */
-export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
+export function RuleEditor({ projectId, rule, open, onOpenChange, initialTemplate, initialFeatureId }: Props) {
   const { t } = useTranslation();
   const base = `/api/v1/projects/${projectId}/rules`;
   const templates = useQuery({ queryKey: queryKeys.ruleTemplates(projectId), queryFn: () => api.get<RuleTemplate[]>(`${base}/templates`), enabled: open });
@@ -108,7 +114,7 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
   const features = useQuery({ queryKey: queryKeys.features(projectId), queryFn: () => api.get<PageType<Feature>>(`/api/v1/projects/${projectId}/features`, { query: { limit: 500 } }), enabled: open });
   const metrics = useQuery({ queryKey: queryKeys.metrics, queryFn: () => api.get<PageType<Metric>>("/api/v1/metrics", { query: { limit: 500 } }), enabled: open });
   const versions = useQuery({ queryKey: queryKeys.ruleVersions(projectId, rule?.id ?? ""), queryFn: () => api.get<RuleVersion[]>(`${base}/${rule?.id}/versions`), enabled: open && Boolean(rule) });
-  const [template, setTemplate] = useState<string>("");
+  const [template, setTemplate] = useState<string>(initialTemplate ?? "");
   const [json, setJson] = useState<string | null>(null);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [replay, setReplay] = useState<ReplayResult | null>(null);
@@ -120,11 +126,17 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
     if (!open) return;
     const chosen = templates.data?.find((t) => t.key === template) ?? null;
     const { values, json: rawJson } = toForm(rule, rule ? null : chosen);
+    if (!rule && initialFeatureId && template === initialTemplate) {
+      // a link from a feature on the map: the template's first spatial or near condition takes
+      // that feature instead of every feature of its type
+      const index = values.conditions.findIndex((c) => c.type === "spatial" || c.type === "near");
+      if (index >= 0) values.conditions[index] = { ...values.conditions[index], feature_ids: [initialFeatureId], feature_type: "" };
+    }
     form.reset(values);
     setJson(rawJson);
     setJsonError(null);
     setReplay(null);
-  }, [open, rule, template, templates.data, form]);
+  }, [open, rule, template, templates.data, form, initialTemplate, initialFeatureId]);
 
   const metricOptions = [...DERIVED_METRICS, ...(metrics.data?.items.map((m) => m.key) ?? [])];
   const invalidate = [queryKeys.rules(projectId), queryKeys.ruleVersions(projectId, rule?.id ?? "")];
@@ -270,6 +282,24 @@ export function RuleEditor({ projectId, rule, open, onOpenChange }: Props) {
                               </Select>
                               <div className="flex flex-wrap gap-1">
                                 {features.data?.items.map((f) => { const on = form.watch(`conditions.${index}.feature_ids`).includes(f.id); return <Button key={f.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => { const current = form.getValues(`conditions.${index}.feature_ids`); form.setValue(`conditions.${index}.feature_ids`, on ? current.filter((x) => x !== f.id) : [...current, f.id]); }}>{f.name}</Button>; })}
+                              </div>
+                            </>
+                          )}
+                          {type === "near" && (
+                            <>
+                              <span className="text-xs text-muted-foreground">{t("within")}</span>
+                              <Input className={NUMBER} type="number" aria-label={t("Metres")} {...form.register(`conditions.${index}.meters`, { valueAsNumber: true })} />
+                              <span className="text-xs text-muted-foreground">{t("m of")}</span>
+                              <Select value={form.watch(`conditions.${index}.feature_ids`).length > 0 ? "selected" : form.watch(`conditions.${index}.feature_type`) || "none"} onValueChange={(v) => { if (v === "selected") return; form.setValue(`conditions.${index}.feature_type`, v === "none" ? "" : v); form.setValue(`conditions.${index}.feature_ids`, []); }}>
+                                <SelectTrigger className="h-8 w-36" aria-label={t("Feature type")}><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="none">{t("no feature type")}</SelectItem>{FEATURE_TYPES.map((f) => <SelectItem key={f} value={f}>{t("every")} {f}</SelectItem>)}<SelectItem value="selected" disabled>{t("selected features")}</SelectItem></SelectContent>
+                              </Select>
+                              <div className="flex flex-wrap gap-1">
+                                {features.data?.items.map((f) => { const on = form.watch(`conditions.${index}.feature_ids`).includes(f.id); return <Button key={f.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => { const current = form.getValues(`conditions.${index}.feature_ids`); form.setValue(`conditions.${index}.feature_ids`, on ? current.filter((x) => x !== f.id) : [...current, f.id]); if (!on) form.setValue(`conditions.${index}.feature_type`, ""); }}>{f.name}</Button>; })}
+                              </div>
+                              <span className="text-xs text-muted-foreground">{t("or of the entities")}</span>
+                              <div className="flex flex-wrap gap-1">
+                                {entities.data?.items.map((e) => { const on = form.watch(`conditions.${index}.entity_ids`).includes(e.id); return <Button key={e.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7" onClick={() => { const current = form.getValues(`conditions.${index}.entity_ids`); form.setValue(`conditions.${index}.entity_ids`, on ? current.filter((x) => x !== e.id) : [...current, e.id]); }}>{e.name}</Button>; })}
                               </div>
                             </>
                           )}

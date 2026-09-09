@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -29,8 +29,26 @@ export function RulesPage() {
   const admin = canAdmin(role);
   const base = `/api/v1/projects/${projectId}/rules`;
   const rules = useQuery({ queryKey: queryKeys.rules(projectId), queryFn: () => api.get<PageType<Rule>>(base, { query: { limit: 500 } }) });
+  // a link from the map (phase 19): `?new=<template>&feature=<id>` opens the editor on that
+  // template with the feature selected; the editor stays open until closed
+  const [params, setParams] = useSearchParams();
+  const linkedTemplate = params.get("new") ?? undefined;
+  const linkedFeature = params.get("feature") ?? undefined;
   const [editing, setEditing] = useState<Rule | null>(null);
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openState || Boolean(linkedTemplate);
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    if (!next && linkedTemplate)
+      setParams(
+        (p) => {
+          p.delete("new");
+          p.delete("feature");
+          return p;
+        },
+        { replace: true },
+      );
+  };
   const [removing, setRemoving] = useState<Rule | null>(null);
   const toggle = useMutationToast({
     mutationFn: ({ rule, enabled }: { rule: Rule; enabled: boolean }) => api.patch<Rule>(`${base}/${rule.id}`, { body: { enabled } }),
@@ -61,7 +79,7 @@ export function RulesPage() {
         {rules.error && <Callout kind="error">{rules.error.message}</Callout>}
         <DataTable columns={columns} data={rules.data?.items} searchable isLoading={rules.isPending} emptyMessage={t("No rules yet. Start from a template: geofence exit, speed limit, no data, battery low.")} onRowClick={(r) => { setEditing(r); setOpen(true); }} />
       </Page>
-      <RuleEditor projectId={projectId} rule={editing} open={open} onOpenChange={setOpen} />
+      <RuleEditor key={linkedTemplate ?? "editor"} projectId={projectId} rule={editing} open={open} onOpenChange={setOpen} initialTemplate={linkedTemplate} initialFeatureId={linkedFeature} />
       <ConfirmDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={`Delete rule ${removing?.name ?? ""}?`} description={t("Events created by this rule keep their reference to it, but the rule and its versions are gone.")} confirmLabel={t("Delete")} pending={remove.isPending} onConfirm={() => removing && remove.mutate(removing)} />
     </>
   );

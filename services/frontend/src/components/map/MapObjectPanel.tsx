@@ -185,6 +185,28 @@ export function TrackButton({
   );
 }
 
+/** A Show the heatmap button (decision D138): per entity and device, like the track. */
+export function HeatButton({
+  on,
+  onToggle,
+}: {
+  on: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Button
+      variant={on ? "default" : "outline"}
+      size="sm"
+      className="h-8"
+      aria-pressed={on}
+      onClick={onToggle}
+    >
+      {on ? t("Hide the heatmap") : t("Show the heatmap")}
+    </Button>
+  );
+}
+
 export function EntityPanel({
   props,
   projectId,
@@ -197,6 +219,8 @@ export function EntityPanel({
   trackLengthLabel,
   track,
   onToggleTrack,
+  heat,
+  onToggleHeat,
 }: {
   props: EntityFeatureProperties;
   projectId: string;
@@ -210,6 +234,8 @@ export function EntityPanel({
   trackLengthLabel: string;
   track?: { returned_points: number; total_points: number };
   onToggleTrack: () => void;
+  heat: boolean;
+  onToggleHeat: () => void;
 }) {
   const { t } = useTranslation();
   const project = projectFor(projectId, props.project_id);
@@ -243,13 +269,16 @@ export function EntityPanel({
       }
       onClose={onClose}
       footer={
-        <TrackButton
-          on={tracked}
-          lengthLabel={trackLengthLabel}
-          returned={track?.returned_points}
-          total={track?.total_points}
-          onToggle={onToggleTrack}
-        />
+        <>
+          <TrackButton
+            on={tracked}
+            lengthLabel={trackLengthLabel}
+            returned={track?.returned_points}
+            total={track?.total_points}
+            onToggle={onToggleTrack}
+          />
+          <HeatButton on={heat} onToggle={onToggleHeat} />
+        </>
       }
     >
       <HealthRows
@@ -316,6 +345,8 @@ export function DevicePanel({
   trackLengthLabel,
   track,
   onToggleTrack,
+  heat,
+  onToggleHeat,
 }: {
   props: DeviceFeatureProperties;
   projectId: string;
@@ -328,6 +359,8 @@ export function DevicePanel({
   trackLengthLabel: string;
   track?: { returned_points: number; total_points: number };
   onToggleTrack: () => void;
+  heat: boolean;
+  onToggleHeat: () => void;
 }) {
   const { t } = useTranslation();
   const devicePath =
@@ -364,13 +397,16 @@ export function DevicePanel({
       }
       onClose={onClose}
       footer={
-        <TrackButton
-          on={tracked}
-          lengthLabel={trackLengthLabel}
-          returned={track?.returned_points}
-          total={track?.total_points}
-          onToggle={onToggleTrack}
-        />
+        <>
+          <TrackButton
+            on={tracked}
+            lengthLabel={trackLengthLabel}
+            returned={track?.returned_points}
+            total={track?.total_points}
+            onToggle={onToggleTrack}
+          />
+          <HeatButton on={heat} onToggle={onToggleHeat} />
+        </>
       }
     >
       <HealthRows

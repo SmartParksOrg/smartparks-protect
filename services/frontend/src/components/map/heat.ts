@@ -1,15 +1,15 @@
 import { clampHours, DEFAULT_TRACK_HOURS } from "@/components/map/trackLength";
 
 /** The heatmap's settings (decision D138): a radius in metres, a sensitivity from low to high
- * and a look-back in hours, carried in the URL and kept per user as the default. */
+ * and a look-back in hours, carried in the URL and kept per user as the default. A heatmap is
+ * switched on per entity and device like a track (`?heat=` and `?device_heat=` list them), and
+ * one setting applies to every heatmap on the map. */
 export interface HeatSettings {
   radius_m: number;
   /** 1 (low) to 5 (high). */
   sensitivity: number;
   hours: number;
 }
-
-export type HeatScope = "shown" | "selected";
 
 export const HEAT_MIN_RADIUS_M = 10;
 export const HEAT_MAX_RADIUS_M = 5000;
@@ -57,10 +57,6 @@ export function parseHeatSettings(
       : defaults.sensitivity,
     hours: hours ? clampHours(Number(hours)) : defaults.hours,
   };
-}
-
-export function heatScopeOf(params: URLSearchParams): HeatScope {
-  return params.get("heat_scope") === "selected" ? "selected" : "shown";
 }
 
 /** Metres per pixel of Web Mercator at a latitude and zoom. */

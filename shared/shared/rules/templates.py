@@ -71,6 +71,24 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "near_site": {
+        "name": "Near a site",
+        "description": (
+            "An entity comes within 200 metres of any site of the project "
+            "(a proximity rule, decision D140). Reminds once an hour while it stays."
+        ),
+        "document": {
+            "trigger": {"kind": "position"},
+            "conditions": {"type": "near", "meters": 200, "feature_type": "site"},
+            "cooldown_seconds": 3600,
+            "event": {
+                "event_type": "PROXIMITY",
+                "severity": "warning",
+                "title": "{entity} within {value} m of {feature}",
+                "create_alert": True,
+            },
+        },
+    },
     "battery_low": {
         "name": "Battery low",
         "description": "Battery voltage below 3.2 V. Reminds once a day while it stays low.",

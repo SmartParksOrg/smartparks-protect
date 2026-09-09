@@ -4,6 +4,7 @@ import {
   ArrowDownUp,
   ChevronDown,
   ChevronRight,
+  Flame,
   LocateFixed,
   RadioTower,
   Route,
@@ -171,6 +172,10 @@ export function LayerPanel({
   choices,
   trackedIds,
   trackLabel,
+  heatIds,
+  heatDeviceIds,
+  onToggleHeat,
+  onToggleDeviceHeat,
   devices,
   trackedDeviceIds,
   projects,
@@ -195,6 +200,11 @@ export function LayerPanel({
   onRetryCoverage?: () => void;
   choices: LayerChoices;
   trackedIds: string[];
+  /** Entities and devices with a heatmap on (decision D138), toggled per row like the track. */
+  heatIds: string[];
+  heatDeviceIds: string[];
+  onToggleHeat: (entityId: string) => void;
+  onToggleDeviceHeat: (deviceId: string) => void;
   /** The current track length, for the tooltip of the track button ("21 days"). */
   trackLabel: string;
   /** The device layer (decision D113): every device assigned to the project today. */
@@ -443,6 +453,25 @@ export function LayerPanel({
           onClick={() => onToggleTrack(m.entity_id)}
         >
           <Route className="size-4" />
+        </Button>
+        <Button
+          variant={heatIds.includes(m.entity_id) ? "default" : "ghost"}
+          size="icon"
+          className={`size-7 shrink-0 ${heatIds.includes(m.entity_id) ? "" : "text-muted-foreground"}`}
+          aria-pressed={heatIds.includes(m.entity_id)}
+          aria-label={
+            heatIds.includes(m.entity_id)
+              ? t("Hide the heatmap")
+              : t("Show the heatmap")
+          }
+          title={
+            heatIds.includes(m.entity_id)
+              ? t("Hide the heatmap")
+              : t("Show the heatmap")
+          }
+          onClick={() => onToggleHeat(m.entity_id)}
+        >
+          <Flame className="size-4" />
         </Button>
         <Locate
           label={t("Show on map")}
@@ -995,6 +1024,25 @@ export function LayerPanel({
           onClick={() => onToggleDeviceTrack(d.device_id)}
         >
           <Route className="size-4" />
+        </Button>
+        <Button
+          variant={heatDeviceIds.includes(d.device_id) ? "default" : "ghost"}
+          size="icon"
+          className={`size-7 shrink-0 ${heatDeviceIds.includes(d.device_id) ? "" : "text-muted-foreground"}`}
+          aria-pressed={heatDeviceIds.includes(d.device_id)}
+          aria-label={
+            heatDeviceIds.includes(d.device_id)
+              ? t("Hide the heatmap")
+              : t("Show the heatmap")
+          }
+          title={
+            heatDeviceIds.includes(d.device_id)
+              ? t("Hide the heatmap")
+              : t("Show the heatmap")
+          }
+          onClick={() => onToggleDeviceHeat(d.device_id)}
+        >
+          <Flame className="size-4" />
         </Button>
         {d.position_time ? (
           <Locate

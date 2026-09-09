@@ -3,9 +3,10 @@
 A rule is a JSON document validated by these models. Version 1 of the schema supports what the
 evaluator implements in phase 5: threshold, spatial ENTER/EXIT/INSIDE/OUTSIDE, speed as a
 threshold on the derived `speed_kmh` metric, FOR duration, no-data on a schedule, and window
-aggregates. NEAR, DWELL, CROSSED, baseline, correlation and event chaining are accepted by the
+aggregates, and since phase 19 NEAR (within a distance of a feature or of another entity,
+decision D140). DWELL, CROSSED, baseline, correlation and event chaining are accepted by the
 schema as reserved types so documents can be written now, but a rule that uses them cannot be
-enabled until phase 13 implements them.
+enabled until they are implemented.
 """
 
 import uuid
@@ -21,7 +22,7 @@ SCHEMA_VERSION = 1
 # Metrics an evaluator derives from a position instead of reading from the measurements table.
 DERIVED_METRICS = frozenset({"speed_kmh", "speed_mps", "altitude_m", "latitude", "longitude"})
 
-RESERVED_TYPES = ("near", "dwell", "crossed", "baseline", "correlation", "event_chain")
+RESERVED_TYPES = ("dwell", "crossed", "baseline", "correlation", "event_chain")
 
 Op = Literal["<", "<=", ">", ">=", "==", "!="]
 
@@ -87,6 +88,27 @@ class SpatialCondition(BaseModel):
         return self
 
 
+class NearCondition(BaseModel):
+    """The subject's position is within `meters` of a feature (`feature_ids`, or every feature
+    of `feature_type`) or of another entity's latest position (`entity_ids`): EarthRanger's
+    proximity analyzer (decision D140). Edge-triggered like every condition: it fires when the
+    subject comes within the distance and again only after the cooldown."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["near"]
+    meters: float = Field(gt=0, le=100_000)
+    feature_ids: list[uuid.UUID] = Field(default_factory=list)
+    feature_type: Literal["site", "zone", "geofence", "route"] | None = None
+    entity_ids: list[uuid.UUID] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _some_target(self) -> "NearCondition":
+        if not self.feature_ids and self.feature_type is None and not self.entity_ids:
+            raise ValueError("near condition needs feature_ids, feature_type or entity_ids")
+        return self
+
+
 class NoDataCondition(BaseModel):
     """The subject has not been seen for `for_seconds`. Needs a schedule trigger."""
 
@@ -110,15 +132,20 @@ class WindowCondition(BaseModel):
 
 
 class ReservedCondition(BaseModel):
-    """Accepted by the schema, rejected at activation until phase 13 implements it."""
+    """Accepted by the schema, rejected at activation until it is implemented."""
 
     model_config = ConfigDict(extra="allow")
 
-    type: Literal["near", "dwell", "crossed", "baseline", "correlation", "event_chain"]
+    type: Literal["dwell", "crossed", "baseline", "correlation", "event_chain"]
 
 
 Leaf = Annotated[
-    ThresholdCondition | SpatialCondition | NoDataCondition | WindowCondition | ReservedCondition,
+    ThresholdCondition
+    | SpatialCondition
+    | NearCondition
+    | NoDataCondition
+    | WindowCondition
+    | ReservedCondition,
     Field(discriminator="type"),
 ]
 
@@ -189,6 +216,7 @@ class RuleDocument(BaseModel):
             "no_data",
             "window",
             "spatial",
+            "near",
             "threshold",
             *RESERVED_TYPES,
         }:

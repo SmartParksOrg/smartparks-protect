@@ -56,13 +56,13 @@ def test_reserved_types_are_accepted_but_reported():
             "conditions": {
                 "all": [
                     {"type": "threshold", "metric": "speed_kmh", "op": ">", "value": 1},
-                    {"type": "near", "feature_id": "abc", "meters": 50},
+                    {"type": "dwell", "feature_id": "abc", "seconds": 50},
                 ]
             },
             "event": {"event_type": "TEST", "title": "x"},
         }
     )
-    assert doc.reserved_types() == ["near"]
+    assert doc.reserved_types() == ["dwell"]
 
 
 def test_event_type_is_upper_snake():
@@ -92,3 +92,23 @@ def test_json_schema_builds():
     schema = json_schema()
     assert "trigger" in schema["properties"]
     assert "$defs" in schema and "ThresholdCondition" in schema["$defs"]
+
+
+def test_near_is_a_real_condition_now():
+    """Decision D140: `near` is evaluated, so it is no longer reserved; it needs a target."""
+    doc = RuleDocument.model_validate(
+        {
+            "trigger": {"kind": "position"},
+            "conditions": {"type": "near", "meters": 150, "feature_type": "site"},
+            "event": {"event_type": "PROXIMITY", "title": "{entity} near {feature}"},
+        }
+    )
+    assert doc.reserved_types() == []
+    with pytest.raises(ValidationError):
+        RuleDocument.model_validate(
+            {
+                "trigger": {"kind": "position"},
+                "conditions": {"type": "near", "meters": 150},
+                "event": {"event_type": "PROXIMITY", "title": "x"},
+            }
+        )

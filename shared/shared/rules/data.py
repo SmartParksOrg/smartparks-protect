@@ -21,12 +21,13 @@ from shared.curation.effective import (
 )
 from shared.models import (
     DeviceCurrentState,
+    Entity,
     EntityCurrentState,
     Feature,
     Measurement,
     Position,
 )
-from shared.rules.evaluator import FeatureGeometry, Subject
+from shared.rules.evaluator import EntityPoint, FeatureGeometry, Subject
 from shared.timeutil import utc_now
 
 LOOKBACK = timedelta(days=7)
@@ -59,6 +60,62 @@ class SqlDataAccess:
         )
         result = row.scalar_one_or_none()
         return float(result) if result is not None else None
+
+    async def entity_points(
+        self, project_id: uuid.UUID, entity_ids: list[uuid.UUID], before: datetime
+    ) -> list[EntityPoint]:
+        """The latest positions of other entities of the project (the proximity condition,
+        decision D140): the current state live, the newest position before the sample time in
+        historical mode."""
+        if not entity_ids:
+            return []
+        points: list[EntityPoint] = []
+        if not self.historical:
+            rows = (
+                await self.session.execute(
+                    select(
+                        Entity.id,
+                        Entity.name,
+                        EntityCurrentState.latest_position,
+                        EntityCurrentState.latest_position_time,
+                    )
+                    .join(EntityCurrentState, EntityCurrentState.entity_id == Entity.id)
+                    .where(
+                        Entity.id.in_(entity_ids),
+                        Entity.project_id == project_id,
+                        EntityCurrentState.latest_position.is_not(None),
+                    )
+                )
+            ).all()
+            for entity_id, name, geom, time in rows:
+                shape = to_shape(geom)
+                points.append(EntityPoint(entity_id, name, (shape.x, shape.y), time))
+            return points
+        names = {
+            e.id: e.name
+            for e in (
+                await self.session.scalars(
+                    select(Entity).where(Entity.id.in_(entity_ids), Entity.project_id == project_id)
+                )
+            ).all()
+        }
+        for entity_id, name in names.items():
+            row = (
+                await self.session.execute(
+                    select(effective_geom(), effective_time(Position))
+                    .where(
+                        Position.entity_id == entity_id,
+                        effective_before(Position, before, before - LOOKBACK),
+                        visible(Position),
+                    )
+                    .order_by(effective_time(Position).desc())
+                    .limit(1)
+                )
+            ).first()
+            if row is not None:
+                shape = to_shape(row[0])
+                points.append(EntityPoint(entity_id, name, (shape.x, shape.y), row[1]))
+        return points
 
     async def latest_point(
         self, subject: Subject, before: datetime

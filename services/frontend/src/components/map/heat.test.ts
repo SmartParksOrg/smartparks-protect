@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   clampRadius,
   DEFAULT_HEAT,
-  heatScopeOf,
   intensityFor,
   metresPerPixel,
   parseHeatSettings,
@@ -33,10 +32,6 @@ describe("heatmap settings", () => {
     });
     expect(clampRadius(Number.NaN)).toBe(DEFAULT_HEAT.radius_m);
     expect(clampRadius(1)).toBe(10);
-    expect(heatScopeOf(new URLSearchParams("heat_scope=selected"))).toBe(
-      "selected",
-    );
-    expect(heatScopeOf(new URLSearchParams(""))).toBe("shown");
   });
 
   it("turns metres into pixels per zoom at the map's latitude", () => {

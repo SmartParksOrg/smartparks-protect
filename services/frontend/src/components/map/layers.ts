@@ -581,6 +581,21 @@ export function ensureFeatureLayers(map: MapLibreMap): void {
   );
   map.addLayer(
     {
+      id: "features-point",
+      type: "circle",
+      source: SOURCES.features,
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius": 6,
+        "circle-color": "#90AE9B",
+        "circle-stroke-color": "#52735E",
+        "circle-stroke-width": 2,
+      },
+    },
+    "entity-clusters",
+  );
+  map.addLayer(
+    {
       id: "features-label",
       type: "symbol",
       source: SOURCES.features,
@@ -598,6 +613,34 @@ export function ensureFeatureLayers(map: MapLibreMap): void {
     },
     "entity-clusters",
   );
+}
+
+export interface MapFeatureProperties {
+  id: string;
+  name: string;
+  feature_type: string;
+}
+
+const FEATURE_CLICK_LAYERS = [
+  "features-fill",
+  "features-line",
+  "features-point",
+];
+
+/** Bind the feature click (phase 19: a feature opens a panel); the returned function unbinds
+ * it. The fill, the line and the point layers all answer, whichever is under the cursor. */
+export function bindFeatureClicks(
+  map: MapLibreMap,
+  onClick: (props: MapFeatureProperties) => void,
+): () => void {
+  const handler = (e: MapLayerMouseEvent) => {
+    const feature = e.features?.[0];
+    if (feature) onClick(feature.properties as unknown as MapFeatureProperties);
+  };
+  for (const layer of FEATURE_CLICK_LAYERS) map.on("click", layer, handler);
+  return () => {
+    for (const layer of FEATURE_CLICK_LAYERS) map.off("click", layer, handler);
+  };
 }
 
 export function setFeatures(

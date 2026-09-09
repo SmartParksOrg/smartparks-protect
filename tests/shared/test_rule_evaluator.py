@@ -8,12 +8,15 @@ import pytest
 from shapely.geometry import Polygon
 
 from shared.rules.evaluator import (
+    EntityPoint,
     FeatureGeometry,
     Sample,
     Subject,
     SubjectState,
     evaluate,
     format_title,
+    metres_between,
+    metres_to_geometry,
 )
 from shared.rules.schema import RuleDocument, TriggerKind
 
@@ -52,6 +55,9 @@ class Memory:
 
     async def last_seen(self, subject, at):
         return self.seen
+
+    async def entity_points(self, project_id, entity_ids, before):
+        return [p for p in getattr(self, "others", []) if p.id in entity_ids]
 
 
 def doc(**overrides):
@@ -230,3 +236,40 @@ async def test_format_title_is_forgiving():
     )
     assert format_title("{entity} {unknown}", entity="x") == "x ?"
     assert format_title("{broken", entity="x") == "{broken"
+
+
+def test_distances_in_metres():
+    # one degree of longitude at the equator is about 111 km
+    assert round(metres_between((0, 0), (1, 0))) == 111195
+    # 0.001 degrees north of the top edge of the square: about 111 m, inside: 0
+    assert round(metres_to_geometry((0.5, 1.001), Memory().fences[0].geometry)) == 111
+    assert metres_to_geometry((0.5, 0.5), Memory().fences[0].geometry) == 0
+
+
+async def test_near_a_feature_and_near_another_entity():
+    rule = doc(
+        trigger={"kind": "position"},
+        conditions={"type": "near", "meters": 200, "feature_type": "geofence"},
+        event={"event_type": "PROXIMITY", "title": "{entity} within {value} m of {feature}"},
+    )
+    state, data = SubjectState(), Memory()
+    far = await evaluate(rule, SUBJECT, position(0.5, 1.01, 0), state, data)  # about 1.1 km
+    assert far.fire is False and far.condition is False
+    close = await evaluate(rule, SUBJECT, position(0.5, 1.001, 1), state, data)  # about 111 m
+    assert close.fire is True and close.context["feature"] == "Core area"
+    assert close.context["value"] == pytest.approx(111, abs=1)
+    assert close.context["values"]["distance_m"] == close.context["value"]
+    # still within: no second firing without a cooldown
+    assert (await evaluate(rule, SUBJECT, position(0.5, 1.0005, 2), state, data)).fire is False
+
+    other = uuid.uuid4()
+    rule = doc(
+        trigger={"kind": "position"},
+        conditions={"type": "near", "meters": 500, "entity_ids": [str(other), str(ENTITY)]},
+        event={"event_type": "PROXIMITY", "title": "{entity} near {feature}"},
+    )
+    state, data = SubjectState(), Memory()
+    data.others = [EntityPoint(other, "Lion 3", (10.0, 10.0), T0)]
+    assert (await evaluate(rule, SUBJECT, position(10.02, 10.0, 0), state, data)).fire is False
+    verdict = await evaluate(rule, SUBJECT, position(10.003, 10.0, 1), state, data)
+    assert verdict.fire is True and verdict.context["feature"] == "Lion 3"

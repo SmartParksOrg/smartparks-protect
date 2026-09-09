@@ -8,7 +8,6 @@ import {
   HEAT_MAX_SENSITIVITY,
   HEAT_MIN_RADIUS_M,
   HEAT_MIN_SENSITIVITY,
-  type HeatScope,
   type HeatSettings,
   sensitivityLabel,
 } from "@/components/map/heat";
@@ -23,8 +22,6 @@ import {
 import { useTrackLengthLabel } from "@/components/map/useTrackLengthLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -34,9 +31,10 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 
-/** What the heatmap covers while it is on: how many points over what length, the gear for
- * the settings and a way to switch it off (decision D138, the Tracks card's twin). */
+/** What is on the map while heatmaps are on: how many, how many points over what length, the
+ * gear for the settings and Clear heatmaps (decision D138, the Tracks card's twin). */
 export function HeatCard({
+  count,
   points,
   capped,
   devicesScanned,
@@ -47,6 +45,7 @@ export function HeatCard({
   onToggleSettings,
   onClear,
 }: {
+  count: number;
   points: number;
   /** More positions were in view than the cap. */
   capped: boolean;
@@ -64,7 +63,7 @@ export function HeatCard({
   return (
     <div className="flex min-h-9 max-w-full items-center gap-1 rounded-md border bg-card py-1 pr-1 pl-3 text-sm shadow-sm">
       <span className="min-w-0 flex-1 leading-tight">
-        {t("Heatmap")}
+        {t("{{count}} heatmaps", { count })}
         {", "}
         {loading
           ? t("loading…")
@@ -101,7 +100,7 @@ export function HeatCard({
         className="h-7 shrink-0"
         onClick={onClear}
       >
-        {t("Hide heatmap")}
+        {t("Clear heatmaps")}
       </Button>
     </div>
   );
@@ -109,21 +108,15 @@ export function HeatCard({
 
 type Unit = "hours" | "days";
 
-/** The heatmap's radius in metres, its sensitivity and its look-back, with sliders; and what
- * it covers: the shown entities and devices, or the selected one. */
+/** The heatmap's radius in metres, its sensitivity and its look-back, with sliders; one
+ * setting for every heatmap on the map. */
 export function HeatSettingsPanel({
   settings,
-  scope,
-  hasSelection,
   onChange,
-  onScopeChange,
   onClose,
 }: {
   settings: HeatSettings;
-  scope: HeatScope;
-  hasSelection: boolean;
   onChange: (next: HeatSettings) => void;
-  onScopeChange: (next: HeatScope) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -266,7 +259,7 @@ export function HeatSettingsPanel({
           </SelectContent>
         </Select>
       </div>
-      <div className="mb-3 flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1">
         {TRACK_QUICK_PICKS.map((pick) => (
           <QuickPick
             key={pick}
@@ -276,32 +269,6 @@ export function HeatSettingsPanel({
           />
         ))}
       </div>
-      <div className="mb-1 text-muted-foreground">{t("Covers")}</div>
-      <RadioGroup
-        value={scope}
-        onValueChange={(v) => onScopeChange(v as HeatScope)}
-        className="gap-1.5"
-      >
-        <div className="flex items-center gap-2">
-          <RadioGroupItem value="shown" id="heat-shown" />
-          <Label htmlFor="heat-shown" className="font-normal">
-            {t("The shown entities and devices")}
-          </Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem
-            value="selected"
-            id="heat-selected"
-            disabled={!hasSelection}
-          />
-          <Label
-            htmlFor="heat-selected"
-            className={`font-normal ${hasSelection ? "" : "opacity-60"}`}
-          >
-            {t("The selected entity or device")}
-          </Label>
-        </div>
-      </RadioGroup>
     </div>
   );
 }

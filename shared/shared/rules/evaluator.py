@@ -15,6 +15,7 @@ Firing semantics:
   fired and which features the subject was inside of (needed for ENTER and EXIT).
 """
 
+import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,10 +23,12 @@ from typing import Any, Protocol
 
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
+from shapely.ops import transform
 
 from shared.rules.schema import (
     AllOf,
     AnyOf,
+    NearCondition,
     NoDataCondition,
     NotOf,
     ReservedCondition,
@@ -69,6 +72,44 @@ class Sample:
     age_seconds: float = 0.0
 
 
+EARTH_RADIUS_M = 6_371_008.8
+
+
+@dataclass(slots=True)
+class EntityPoint:
+    """Another entity's latest position, for the proximity condition."""
+
+    id: uuid.UUID
+    name: str
+    point: tuple[float, float]
+    time: datetime
+
+
+def metres_between(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Great-circle distance in metres between two (lon, lat) points (haversine)."""
+    lon1, lat1, lon2, lat2 = (math.radians(v) for v in (a[0], a[1], b[0], b[1]))
+    h = (
+        math.sin((lat2 - lat1) / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    )
+    return 2 * EARTH_RADIUS_M * math.asin(math.sqrt(h))
+
+
+def metres_to_geometry(point: tuple[float, float], geometry: BaseGeometry) -> float:
+    """Distance in metres from a (lon, lat) point to a geometry: the geometry is projected onto
+    a local flat plane around the point (metres east and north), exact enough within the tens of
+    kilometres a proximity rule spans; a point inside a polygon is at distance 0."""
+    lon0, lat0 = point
+    east = 111_320.0 * math.cos(math.radians(lat0))
+    north = 110_574.0
+
+    def to_local(x: float, y: float, z: float | None = None) -> tuple[float, float]:
+        return ((x - lon0) * east, (y - lat0) * north)
+
+    local = transform(to_local, geometry)
+    return float(local.distance(Point(0.0, 0.0)))
+
+
 @dataclass(slots=True)
 class FeatureGeometry:
     id: uuid.UUID
@@ -78,6 +119,10 @@ class FeatureGeometry:
 
 
 class DataAccess(Protocol):
+    async def entity_points(
+        self, project_id: uuid.UUID, entity_ids: list[uuid.UUID], before: datetime
+    ) -> list[EntityPoint]: ...
+
     async def latest_value(
         self, subject: Subject, metric: str, before: datetime
     ) -> float | None: ...
@@ -220,6 +265,40 @@ async def _leaf(cond: Any, e: _Eval) -> bool:
             e.feature = hits[0].name
             e.values["features"] = [f.name for f in hits]
         return bool(hits)
+
+    if isinstance(cond, NearCondition):
+        point = await _point(e)
+        if point is None:
+            e.missing.append("position")
+            return False
+        nearest: tuple[float, str] | None = None
+        if cond.feature_ids or cond.feature_type is not None:
+            for f in await e.data.features(
+                e.subject.project_id, cond.feature_ids, cond.feature_type
+            ):
+                d = metres_to_geometry(point, f.geometry)
+                if nearest is None or d < nearest[0]:
+                    nearest = (d, f.name)
+        if cond.entity_ids:
+            for other in await e.data.entity_points(
+                e.subject.project_id,
+                [i for i in cond.entity_ids if i != e.subject.entity_id],
+                e.sample.time,
+            ):
+                d = metres_between(point, other.point)
+                if nearest is None or d < nearest[0]:
+                    nearest = (d, other.name)
+        if nearest is None:
+            e.missing.append("targets")
+            return False
+        distance = round(nearest[0], 1)
+        e.values["distance_m"] = distance
+        if e.metric is None:
+            e.metric, e.value = "distance_m", distance
+        if nearest[0] <= cond.meters:
+            e.feature = nearest[1]
+            return True
+        return False
 
     if isinstance(cond, NoDataCondition):
         last = await e.data.last_seen(e.subject, e.sample.time)
