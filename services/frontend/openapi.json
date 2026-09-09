@@ -8435,7 +8435,7 @@
      "map"
     ],
     "summary": "Heat Points",
-    "description": "The positions behind the heatmap (decision D138): the newest `limit` in the viewport and\nthe look-back window, of the given entities and devices, or of the whole scope when neither\nis given. Bare points; the client weighs and draws them. Effective times and coordinates,\ninvalid rows left out (architecture 28). The scan runs per device (the devices seen in the\nwindow, or the ones asked for) through the device and time index of the compressed chunks: a\nbounding-box scan over every chunk of the window decompresses them all (21 s for a week in\nthe all scope on the dev server, 0.6 s this way).",
+    "description": "The positions behind the heatmap (decision D138): the newest `limit` in the viewport and\nthe look-back window, of the given entities and devices, or of the whole scope when neither\nis given. Bare points; the client weighs and draws them. Effective times and coordinates,\ninvalid rows left out (architecture 28). Bounded twice: the scan runs per device through the\ndevice and time index of the compressed chunks (a bounding-box scan over every chunk of the\nwindow decompresses them all), for at most `MAX_HEAT_DEVICES` devices, the most recently seen\nfirst, and stops at `limit` points; the answer says how many devices it read of how many.",
     "operationId": "heat_points_api_v1_projects__project_id__map_heat_get",
     "security": [
      {
@@ -27198,13 +27198,24 @@
       "type": "integer",
       "title": "Hours"
      },
-     "total": {
-      "type": "integer",
-      "title": "Total"
-     },
      "returned": {
       "type": "integer",
       "title": "Returned"
+     },
+     "capped": {
+      "type": "boolean",
+      "title": "Capped",
+      "description": "More positions than the cap were in view"
+     },
+     "devices_scanned": {
+      "type": "integer",
+      "title": "Devices Scanned",
+      "description": "Devices whose positions were read"
+     },
+     "devices_total": {
+      "type": "integer",
+      "title": "Devices Total",
+      "description": "Devices seen in the window that qualify"
      },
      "features": {
       "items": {
@@ -27218,8 +27229,10 @@
     "type": "object",
     "required": [
      "hours",
-     "total",
      "returned",
+     "capped",
+     "devices_scanned",
+     "devices_total",
      "features"
     ],
     "title": "HeatResponse",

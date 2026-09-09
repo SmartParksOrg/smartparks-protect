@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import ColumnElement
@@ -64,6 +64,9 @@ DEFAULT_TRACK_POINTS = 5000
 MAX_HEAT_POINTS = 10000
 MAX_HEAT_HOURS = 24 * 90
 MAX_HEAT_IDS = 500
+# The devices scanned per request, most recently seen first: every device costs a scan of its
+# segment of the window, so the request stays bounded in time as well as in points.
+MAX_HEAT_DEVICES = 200
 
 
 class CurrentStateResponse(BaseModel):
@@ -93,8 +96,10 @@ class HeatResponse(BaseModel):
 
     type: str = "FeatureCollection"
     hours: int
-    total: int
     returned: int
+    capped: bool = Field(description="More positions than the cap were in view")
+    devices_scanned: int = Field(description="Devices whose positions were read")
+    devices_total: int = Field(description="Devices seen in the window that qualify")
     features: list[dict[str, Any]]
 
 
@@ -624,10 +629,10 @@ async def heat_points(
     """The positions behind the heatmap (decision D138): the newest `limit` in the viewport and
     the look-back window, of the given entities and devices, or of the whole scope when neither
     is given. Bare points; the client weighs and draws them. Effective times and coordinates,
-    invalid rows left out (architecture 28). The scan runs per device (the devices seen in the
-    window, or the ones asked for) through the device and time index of the compressed chunks: a
-    bounding-box scan over every chunk of the window decompresses them all (21 s for a week in
-    the all scope on the dev server, 0.6 s this way)."""
+    invalid rows left out (architecture 28). Bounded twice: the scan runs per device through the
+    device and time index of the compressed chunks (a bounding-box scan over every chunk of the
+    window decompresses them all), for at most `MAX_HEAT_DEVICES` devices, the most recently seen
+    first, and stops at `limit` points; the answer says how many devices it read of how many."""
     if len(entity_id or []) > MAX_HEAT_IDS or len(device_id or []) > MAX_HEAT_IDS:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -645,9 +650,19 @@ async def heat_points(
         "east": box[2],
         "north": box[3],
         "limit": limit,
+        "max_devices": MAX_HEAT_DEVICES,
     }
-    # the devices to scan: the ones asked for, the ones tracking the entities asked for (their
-    # positions are then filtered on the entity), else every device seen in the window
+    # the devices that qualify: seen in the window and, in a project, assigned to it during the
+    # window; narrowed to the ones asked for or the ones tracking the entities asked for (their
+    # positions are then filtered on the entity as well)
+    qualify = ["s.last_seen_at >= :since"]
+    if context.project_id is not None:
+        qualify.append(
+            """s.device_id IN (
+                SELECT a.device_id FROM device_project_assignments a
+                WHERE a.project_id = :project_id AND a.validity && tstzrange(:since, :until))"""
+        )
+    owner_filter = ""
     if entity_id or device_id:
         owner = []
         if entity_id:
@@ -657,45 +672,43 @@ async def heat_points(
             params["device_ids"] = list(device_id)
             owner.append("p.device_id = ANY(CAST(:device_ids AS uuid[]))")
         owner_filter = " AND (" + " OR ".join(owner) + ")"
-        devices = """
-            SELECT DISTINCT s.device_id FROM device_current_state s
-            WHERE s.last_seen_at >= :since
-              AND (s.device_id = ANY(CAST(:all_device_ids AS uuid[]))
-                   OR s.device_id IN (
-                       SELECT a.device_id FROM device_entity_assignments a
-                       WHERE a.entity_id = ANY(CAST(:all_entity_ids AS uuid[]))
-                         AND a.validity && tstzrange(:since, :until)))"""
         params["all_device_ids"] = list(device_id or [])
         params["all_entity_ids"] = list(entity_id or [])
-    else:
-        owner_filter = ""
-        devices = "SELECT s.device_id FROM device_current_state s WHERE s.last_seen_at >= :since"
-    project_filter = "AND p.project_id = :project_id" if context.project_id is not None else ""
-    per_device = f"""
-        SELECT COALESCE(p.curated_geom, p.geom) AS geom, COALESCE(p.curated_time, p.time) AS t
-        FROM positions p
-        WHERE p.device_id = d.device_id AND p.valid {project_filter} {owner_filter}
-          AND ((p.curated_time IS NULL AND p.time >= :since AND p.time < :until)
-               OR (p.curated_time IS NOT NULL AND p.curated_time >= :since
-                   AND p.curated_time < :until))
-          AND ST_Intersects(COALESCE(p.curated_geom, p.geom),
-                            ST_MakeEnvelope(:west, :south, :east, :north, 4326))"""
-    total = int(
-        await session.scalar(
-            text(
-                f"WITH d AS ({devices}) SELECT COALESCE(SUM(n), 0) FROM d "
-                f"JOIN LATERAL (SELECT count(*) AS n FROM ({per_device}) q) c ON true"
-            ),
-            params,
+        qualify.append(
+            """(s.device_id = ANY(CAST(:all_device_ids AS uuid[]))
+                OR s.device_id IN (
+                    SELECT a.device_id FROM device_entity_assignments a
+                    WHERE a.entity_id = ANY(CAST(:all_entity_ids AS uuid[]))
+                      AND a.validity && tstzrange(:since, :until)))"""
         )
-        or 0
+    qualifying = (
+        "SELECT s.device_id, s.last_seen_at FROM device_current_state s WHERE "
+        + " AND ".join(qualify)
     )
+    devices_total = int(
+        await session.scalar(text(f"SELECT count(*) FROM ({qualifying}) q"), params) or 0
+    )
+    devices_scanned = min(devices_total, MAX_HEAT_DEVICES)
+    project_filter = "AND p.project_id = :project_id" if context.project_id is not None else ""
     rows = (
         await session.execute(
             text(
-                f"WITH d AS ({devices}) SELECT ST_AsGeoJSON(q.geom) FROM d "
-                f"JOIN LATERAL ({per_device} ORDER BY t DESC LIMIT :limit) q ON true "
-                f"ORDER BY q.t DESC LIMIT :limit"
+                f"""
+                WITH d AS ({qualifying} ORDER BY s.last_seen_at DESC LIMIT :max_devices)
+                SELECT ST_AsGeoJSON(q.geom) FROM d
+                JOIN LATERAL (
+                    SELECT COALESCE(p.curated_geom, p.geom) AS geom,
+                           COALESCE(p.curated_time, p.time) AS t
+                    FROM positions p
+                    WHERE p.device_id = d.device_id AND p.valid {project_filter} {owner_filter}
+                      AND ((p.curated_time IS NULL AND p.time >= :since AND p.time < :until)
+                           OR (p.curated_time IS NOT NULL AND p.curated_time >= :since
+                               AND p.curated_time < :until))
+                      AND ST_Intersects(COALESCE(p.curated_geom, p.geom),
+                                        ST_MakeEnvelope(:west, :south, :east, :north, 4326))
+                    ORDER BY t DESC LIMIT :limit
+                ) q ON true
+                ORDER BY q.t DESC LIMIT :limit"""
             ),
             params,
         )
@@ -704,8 +717,10 @@ async def heat_points(
 
     return HeatResponse(
         hours=hours,
-        total=total,
         returned=len(rows),
+        capped=len(rows) >= limit,
+        devices_scanned=devices_scanned,
+        devices_total=devices_total,
         features=[
             {"type": "Feature", "geometry": json.loads(row[0]), "properties": {}} for row in rows
         ],

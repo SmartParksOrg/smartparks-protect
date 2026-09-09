@@ -38,7 +38,9 @@ import { Slider } from "@/components/ui/slider";
  * the settings and a way to switch it off (decision D138, the Tracks card's twin). */
 export function HeatCard({
   points,
-  total,
+  capped,
+  devicesScanned,
+  devicesTotal,
   hours,
   loading,
   settingsOpen,
@@ -46,7 +48,11 @@ export function HeatCard({
   onClear,
 }: {
   points: number;
-  total: number;
+  /** More positions were in view than the cap. */
+  capped: boolean;
+  /** The read stops at a number of devices, most recently seen first. */
+  devicesScanned: number;
+  devicesTotal: number;
   hours: number;
   loading: boolean;
   settingsOpen: boolean;
@@ -62,16 +68,21 @@ export function HeatCard({
         {", "}
         {loading
           ? t("loading…")
-          : points < total
-            ? t("the newest {{count}} of {{total}} points over {{length}}", {
+          : capped
+            ? t("the newest {{count}} points over {{length}}", {
                 count: points,
-                total,
                 length: lengthLabel,
               })
             : t("{{count}} points over {{length}}", {
                 count: points,
                 length: lengthLabel,
               })}
+        {!loading && devicesScanned < devicesTotal
+          ? t(", the {{scanned}} most recently seen devices of {{total}}", {
+              scanned: devicesScanned,
+              total: devicesTotal,
+            })
+          : ""}
       </span>
       <Button
         variant={settingsOpen ? "default" : "ghost"}

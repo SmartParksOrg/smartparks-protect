@@ -91,6 +91,8 @@
   "stale,": "stale,",
   "Technical details": "Technical details",
   "The client runs on this computer (it returns to": "The client runs on this computer (it returns to",
+  "the newest {{count}} of {{total}} points over {{length}}_one": "the newest {{count}} of {{total}} points over {{length}}",
+  "the newest {{count}} of {{total}} points over {{length}}_other": "the newest {{count}} of {{total}} points over {{length}}",
   "The object was corrected after this delivery (": "The object was corrected after this delivery (",
   "This group has subgroups, so it stays at the top level": "This group has subgroups, so it stays at the top level",
   "to": "to",

@@ -1977,10 +1977,10 @@ export interface paths {
          * @description The positions behind the heatmap (decision D138): the newest `limit` in the viewport and
          *     the look-back window, of the given entities and devices, or of the whole scope when neither
          *     is given. Bare points; the client weighs and draws them. Effective times and coordinates,
-         *     invalid rows left out (architecture 28). The scan runs per device (the devices seen in the
-         *     window, or the ones asked for) through the device and time index of the compressed chunks: a
-         *     bounding-box scan over every chunk of the window decompresses them all (21 s for a week in
-         *     the all scope on the dev server, 0.6 s this way).
+         *     invalid rows left out (architecture 28). Bounded twice: the scan runs per device through the
+         *     device and time index of the compressed chunks (a bounding-box scan over every chunk of the
+         *     window decompresses them all), for at most `MAX_HEAT_DEVICES` devices, the most recently seen
+         *     first, and stops at `limit` points; the answer says how many devices it read of how many.
          */
         get: operations["heat_points_api_v1_projects__project_id__map_heat_get"];
         put?: never;
@@ -7392,10 +7392,23 @@ export interface components {
             type: string;
             /** Hours */
             hours: number;
-            /** Total */
-            total: number;
             /** Returned */
             returned: number;
+            /**
+             * Capped
+             * @description More positions than the cap were in view
+             */
+            capped: boolean;
+            /**
+             * Devices Scanned
+             * @description Devices whose positions were read
+             */
+            devices_scanned: number;
+            /**
+             * Devices Total
+             * @description Devices seen in the window that qualify
+             */
+            devices_total: number;
             /** Features */
             features: {
                 [key: string]: unknown;

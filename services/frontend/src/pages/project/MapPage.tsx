@@ -1245,7 +1245,9 @@ export function MapPage() {
         {heatOn && !heatCardHidden && (
           <HeatCard
             points={heatPoints.data?.returned ?? 0}
-            total={heatPoints.data?.total ?? 0}
+            capped={heatPoints.data?.capped ?? false}
+            devicesScanned={heatPoints.data?.devices_scanned ?? 0}
+            devicesTotal={heatPoints.data?.devices_total ?? 0}
             hours={heat.hours}
             loading={heatPoints.isPending && heatPoints.fetchStatus !== "idle"}
             settingsOpen={heatSettingsOpen}

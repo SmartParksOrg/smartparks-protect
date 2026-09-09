@@ -25,34 +25,35 @@ async def test_heat_points_by_entity_device_window_and_view(client, db, bus):  #
     everything = await client.get(base, params={"hours": 48}, headers=admin.headers)
     assert everything.status_code == 200, everything.text
     body = everything.json()
-    assert body["total"] == 5 and body["returned"] == 5
+    assert body["returned"] == 5 and body["capped"] is False
+    assert body["devices_scanned"] == 1 and body["devices_total"] == 1
     assert body["features"][0]["geometry"]["type"] == "Point"
 
     by_entity = await client.get(
         base, params={"hours": 48, "entity_id": entity["id"]}, headers=admin.headers
     )
-    assert by_entity.json()["total"] == 5
+    assert by_entity.json()["returned"] == 5
     by_device = await client.get(
         base, params={"hours": 48, "device_id": device["id"]}, headers=admin.headers
     )
-    assert by_device.json()["total"] == 5
+    assert by_device.json()["returned"] == 5
     nobody = await client.get(
         base,
         params={"hours": 48, "entity_id": "00000000-0000-0000-0000-000000000001"},
         headers=admin.headers,
     )
-    assert nobody.json()["total"] == 0
+    assert nobody.json()["returned"] == 0 and nobody.json()["devices_total"] == 0
 
     windowed = await client.get(base, params={"hours": 13}, headers=admin.headers)
-    assert windowed.json()["total"] == 3  # now, 6 h and 12 h ago
+    assert windowed.json()["returned"] == 3  # now, 6 h and 12 h ago
 
     viewed = await client.get(
         base, params={"hours": 48, "bbox": "31.45,-25,31.65,-24.8"}, headers=admin.headers
     )
-    assert viewed.json()["total"] == 2  # 31.5 and 31.6
+    assert viewed.json()["returned"] == 2  # 31.5 and 31.6
 
     capped = await client.get(base, params={"hours": 48, "limit": 2}, headers=admin.headers)
-    assert capped.json()["total"] == 5 and capped.json()["returned"] == 2
+    assert capped.json()["returned"] == 2 and capped.json()["capped"] is True
 
     too_many = await client.get(
         base,
@@ -71,4 +72,4 @@ async def test_heat_points_by_entity_device_window_and_view(client, db, bus):  #
         params={"hours": 48, "entity_id": entity["id"]},
         headers=superuser.headers,
     )
-    assert everywhere.status_code == 200 and everywhere.json()["total"] == 5
+    assert everywhere.status_code == 200 and everywhere.json()["returned"] == 5
