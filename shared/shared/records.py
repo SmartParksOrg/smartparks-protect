@@ -70,12 +70,13 @@ def conditions(model: Any, selection: RecordSelection) -> list[Any]:
 
 
 def keys_statement(selection: RecordSelection) -> CompoundSelect[Any]:
-    """The distinct (device, effective time) pairs of the selection, unordered."""
+    """The distinct (device, effective time) pairs of the selection, unordered. The time column
+    is `moment`: `t` is an attribute of SQLAlchemy's Row."""
     positions = select(
-        Position.device_id.label("device_id"), effective_time(Position).label("t")
+        Position.device_id.label("device_id"), effective_time(Position).label("moment")
     ).where(*conditions(Position, selection))
     measurements = select(
-        Measurement.device_id.label("device_id"), effective_time(Measurement).label("t")
+        Measurement.device_id.label("device_id"), effective_time(Measurement).label("moment")
     ).where(*conditions(Measurement, selection))
     return union(positions, measurements)
 
@@ -153,7 +154,7 @@ async def fill(session: AsyncSession, selection: RecordSelection, keys: list[Key
         await session.execute(
             select(
                 Position,
-                effective_time(Position).label("t"),
+                effective_time(Position).label("moment"),
                 func.ST_Y(effective_geom()).label("lat"),
                 func.ST_X(effective_geom()).label("lon"),
             )

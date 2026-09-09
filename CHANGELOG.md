@@ -4,11 +4,14 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+### Migrations
+
+- 0023 (export jobs accept the `records` dataset): the check constraint gains the value; the downgrade deletes records jobs and restores the old constraint.
+
 ### Added
 
 - The records view of the Data explorer (phase 20, decisions D142 to D146): the explorer opens on a Records tab where a person picks entities and devices (several, a group as a shortcut), a period (the presets, a custom range, or since the device was assigned) and the timezone, and gets everything they produced as one row per moment with the position and every metric and state field of that moment, newest first. The rows load page after page with a progress bar against the count and a Stop button, in a virtualized table that scrolls a year of a collar as one list; a "Charts and map" toggle adds a small chart per numeric column (click to enlarge) and the loaded track on a small map, a row opens its source event, the columns can be hidden per user, and "Analyse these" carries the selection into the Analysis tab, which is today's explorer. `GET /projects/{id}/records` and `/records/count`, paged on a time and device cursor, in the all scope too.
 - The records export (decision D144): a Records dataset in CSV, XLSX and JSON, wide (a column per metric and state field) or long (a row per value), with entities and devices as the selection; started from the records view with its selection, and when a direct download is too large the dialog starts the job by itself and shows its progress and the download inline.
-- The proximity rule template and the records view share nothing new with migrations: no migration in this release.
 
 ## v2.3.0, 2026-09-09
 

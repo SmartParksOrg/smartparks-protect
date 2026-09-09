@@ -365,7 +365,7 @@ async def _records(
     the records read works, so the export stays flat in memory whatever its size."""
     selection = _record_selection(project_id, params)
     keys = keys_statement(selection).subquery("k")
-    statement = select(keys.c.device_id, keys.c.t).order_by(keys.c.t, keys.c.device_id)
+    statement = select(keys.c.device_id, keys.c.moment).order_by(keys.c.moment, keys.c.device_id)
     result = await session.stream(statement.execution_options(yield_per=YIELD_PER))
     page: list[tuple[uuid.UUID, datetime]] = []
 

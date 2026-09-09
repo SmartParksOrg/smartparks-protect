@@ -166,25 +166,25 @@ async def records(
         include_invalid,
     )
     keys = keys_statement(selection).subquery("k")
-    statement = select(keys.c.device_id, keys.c.t)
+    statement = select(keys.c.device_id, keys.c.moment)
     if cursor is not None:
         cursor_time, cursor_device = _parse_cursor(cursor)
         statement = statement.where(
             or_(
-                keys.c.t < cursor_time,
-                and_(keys.c.t == cursor_time, keys.c.device_id < cursor_device),
+                keys.c.moment < cursor_time,
+                and_(keys.c.moment == cursor_time, keys.c.device_id < cursor_device),
             )
         )
     page = (
         await session.execute(
-            statement.order_by(keys.c.t.desc(), keys.c.device_id.desc()).limit(limit + 1)
+            statement.order_by(keys.c.moment.desc(), keys.c.device_id.desc()).limit(limit + 1)
         )
     ).all()
     more = len(page) > limit
     page = page[:limit]
     if not page:
         return RecordsPage(items=[], next_cursor=None, time_from=since, time_to=until)
-    records = await fill(session, selection, [(row.device_id, row.t) for row in page])
+    records = await fill(session, selection, [(row.device_id, row.moment) for row in page])
     items = [
         RecordRow(
             time=r.time,
@@ -221,7 +221,7 @@ async def records(
     last = page[-1]
     return RecordsPage(
         items=items,
-        next_cursor=_cursor(last.t, last.device_id) if more else None,
+        next_cursor=_cursor(last.moment, last.device_id) if more else None,
         time_from=since,
         time_to=until,
     )
