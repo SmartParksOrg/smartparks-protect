@@ -64,7 +64,7 @@ export function ExportDialog({ projectId, open, onOpenChange, preset }: Props) {
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[90vh] overflow-x-hidden overflow-y-auto sm:max-w-xl [&>*]:min-w-0 [&_button[role=combobox]]:w-full [&_button[role=combobox]]:max-w-full">
         <DialogHeader>
           <DialogTitle>{t("Export")}</DialogTitle>
           <DialogDescription>
@@ -253,13 +253,13 @@ function ExportForm({
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
         <Field label={t("Data")} htmlFor="dataset">
           <Select
             value={dataset}
             onValueChange={(v) => setDataset(v as Dataset)}
           >
-            <SelectTrigger id="dataset">
+            <SelectTrigger id="dataset" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -273,7 +273,7 @@ function ExportForm({
         </Field>
         <Field label={t("Format")} htmlFor="format">
           <Select value={format} onValueChange={setFormat}>
-            <SelectTrigger id="format">
+            <SelectTrigger id="format" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -290,7 +290,7 @@ function ExportForm({
             value={range}
             onValueChange={(v) => setRange(v as RangePreset | "custom")}
           >
-            <SelectTrigger id="range">
+            <SelectTrigger id="range" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -305,7 +305,7 @@ function ExportForm({
         </Field>
         <Field label={t("Timezone")} htmlFor="timezone">
           <Select value={timezone} onValueChange={setTimezone}>
-            <SelectTrigger id="timezone">
+            <SelectTrigger id="timezone" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -362,7 +362,7 @@ function ExportForm({
               value={layout}
               onValueChange={(v) => setLayout(v as "long" | "wide")}
             >
-              <SelectTrigger id="records-layout">
+              <SelectTrigger id="records-layout" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -427,7 +427,7 @@ function ExportForm({
           <>
             <Field label={t("Bucket")} htmlFor="bucket">
               <Select value={bucket} onValueChange={setBucket}>
-                <SelectTrigger id="bucket">
+                <SelectTrigger id="bucket" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -458,7 +458,7 @@ function ExportForm({
                 value={layout}
                 onValueChange={(v) => setLayout(v as "long" | "wide")}
               >
-                <SelectTrigger id="layout">
+                <SelectTrigger id="layout" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -486,7 +486,7 @@ function ExportForm({
       </div>
       {error && <Callout kind="error">{error}</Callout>}
       {(dataset === "positions" || dataset === "measurements") && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 [&>*]:min-w-0">
           <Field
             label={t("Values")}
             htmlFor="export-view"
@@ -498,7 +498,7 @@ function ExportForm({
               value={view}
               onValueChange={(v) => setView(v as "effective" | "original")}
             >
-              <SelectTrigger id="export-view">
+              <SelectTrigger id="export-view" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

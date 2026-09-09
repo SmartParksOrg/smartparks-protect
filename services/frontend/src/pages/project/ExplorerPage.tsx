@@ -523,6 +523,24 @@ export function ExplorerPage() {
       }}
     />
   );
+  const boundNote = !aggregated
+    ? null
+    : state.mode === "chart"
+      ? series.data
+        ? t(
+            "Above {{bound}} records: buckets of {{bucket}}; the drawer keeps loading the rows.",
+            {
+              bound: CANVAS_BOUND.toLocaleString(),
+              bucket: bucketLabel(series.data.bucket_seconds),
+            },
+          )
+        : t("Above {{bound}} records: the chart reads buckets.", {
+            bound: CANVAS_BOUND.toLocaleString(),
+          })
+      : t(
+          "Above {{bound}} records: the tracks are decimated to 5,000 points each.",
+          { bound: CANVAS_BOUND.toLocaleString() },
+        );
   const chartOptions = chartableColumns(columns).map((c) => ({
     value: c.key.slice(2),
     label: c.label,
@@ -530,7 +548,7 @@ export function ExplorerPage() {
 
   const tools = (
     <>
-      {state.mode === "table" && (
+      {state.mode === "table" && records.rows.length > 0 && (
         <MultiSelect
           options={columns.map((c) => ({ value: c.key, label: c.label }))}
           value={shown.map((c) => c.key)}
@@ -780,13 +798,24 @@ export function ExplorerPage() {
                       <EmptyState
                         icon={ChartLine}
                         title={
-                          records.status === "loading" && loaded === 0
+                          (records.status === "loading" && loaded === 0) ||
+                          (aggregated && series.isPending)
                             ? t("Loading…")
-                            : t("Nothing to chart yet")
+                            : aggregated && series.error
+                              ? t("The chart could not be read")
+                              : t("Nothing to chart yet")
                         }
-                        description={t(
-                          "The chart draws the numeric metrics of the loaded rows; pick metrics in the strip once rows are here.",
-                        )}
+                        description={
+                          aggregated && series.error
+                            ? series.error.message
+                            : aggregated
+                              ? t(
+                                  "Above the canvas bound the chart reads buckets of the chosen metrics; pick metrics in the strip.",
+                                )
+                              : t(
+                                  "The chart draws the numeric metrics of the loaded rows; pick metrics in the strip once rows are here.",
+                                )
+                        }
                       />
                     </div>
                   ) : (
@@ -803,6 +832,7 @@ export function ExplorerPage() {
                           : null
                       }
                       phone={phone}
+                      note={boundNote}
                       timezone={state.timezone}
                       marked={hover === null ? null : marked}
                       pinned={pinned}
@@ -818,32 +848,11 @@ export function ExplorerPage() {
                     timezone={state.timezone}
                     marked={marked}
                     fitKey={selectionKey}
+                    note={boundNote}
                     onHover={onHover}
                     onPick={pick}
                   />
                 )}
-              </div>
-            )}
-            {state.mode !== "table" && aggregated && (
-              <div className="pointer-events-none absolute top-3 right-14 left-3 z-10 flex justify-end">
-                <span className="pointer-events-auto rounded-md border bg-card/95 px-2 py-1 text-xs text-muted-foreground">
-                  {state.mode === "chart"
-                    ? series.data
-                      ? t(
-                          "Above {{bound}} records: buckets of {{bucket}}; the drawer keeps loading the rows.",
-                          {
-                            bound: CANVAS_BOUND.toLocaleString(),
-                            bucket: bucketLabel(series.data.bucket_seconds),
-                          },
-                        )
-                      : t("Above {{bound}} records: the chart reads buckets.", {
-                          bound: CANVAS_BOUND.toLocaleString(),
-                        })
-                    : t(
-                        "Above {{bound}} records: the tracks are decimated to 5,000 points each.",
-                        { bound: CANVAS_BOUND.toLocaleString() },
-                      )}
-                </span>
               </div>
             )}
             {state.mode !== "table" && (

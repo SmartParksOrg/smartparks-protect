@@ -48,6 +48,7 @@ export function ExploreChart({
   xLabel,
   timezone,
   phone = false,
+  note = null,
   marked,
   pinned,
   onHover,
@@ -60,6 +61,8 @@ export function ExploreChart({
   timezone: string;
   /** No zoom strip on a phone: pinch and drag zoom the chart. */
   phone?: boolean;
+  /** A line above the chips: what the canvas bound did to the chart. */
+  note?: string | null;
   /** The moment marked from another view, in ms, or null. */
   marked: number | null;
   /** The moment pinned in the URL, in ms, or null. */
@@ -182,8 +185,15 @@ export function ExploreChart({
 
   return (
     <div className="absolute inset-0 flex flex-col">
+      {note && (
+        <div className="shrink-0 px-3 pt-2 text-xs text-muted-foreground">
+          {note}
+        </div>
+      )}
       {kind !== "histogram" && lines.length > 0 && (
-        <div className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pt-2 pb-1 [scrollbar-width:none]">
+        <div
+          className={`flex shrink-0 gap-1.5 px-3 pt-2 pb-1 ${phone ? "overflow-x-auto [scrollbar-width:none]" : "flex-wrap"}`}
+        >
           {lines.map((line) => {
             const off = hidden.includes(line.key);
             return (
@@ -470,7 +480,7 @@ function buildOption(
         type: "line",
         step: "end",
         showSymbol: false,
-        areaStyle: { opacity: 0.1 },
+        areaStyle: { opacity: 0.05 },
       };
     if (kind === "bar") return { ...common, type: "bar", barMaxWidth: 10 };
     // small filled points on every moment, a little larger under the pointer; a very dense

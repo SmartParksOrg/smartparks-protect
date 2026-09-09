@@ -38,6 +38,7 @@ export function ExploreMap({
   timezone,
   marked,
   fitKey,
+  note = null,
   onHover,
   onPick,
 }: {
@@ -48,6 +49,8 @@ export function ExploreMap({
   marked: number | null;
   /** Changes when the selection changes: the map fits the tracks again. */
   fitKey: string;
+  /** Under the fit button: what the canvas bound did to the tracks. */
+  note?: string | null;
   onHover: (ms: number | null) => void;
   onPick: (ms: number) => void;
 }) {
@@ -148,7 +151,7 @@ export function ExploreMap({
   return (
     <div className="absolute inset-0">
       <div ref={container} className="absolute! inset-0 z-0" />
-      <div className="pointer-events-none absolute top-3 left-3 z-10 flex gap-2">
+      <div className="pointer-events-none absolute top-3 right-14 left-3 z-10 flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="secondary"
@@ -159,9 +162,14 @@ export function ExploreMap({
         >
           <Maximize2 className="size-4" /> {t("Fit the tracks")}
         </Button>
+        {note && (
+          <span className="pointer-events-auto rounded-md border bg-card/95 px-2 py-1 text-xs text-muted-foreground">
+            {note}
+          </span>
+        )}
       </div>
       {/* the time slider (decision D153): its moment is the marked one, released it pins */}
-      <div className="absolute right-14 bottom-3 left-3 z-10 flex items-center gap-3 rounded-md border bg-card/95 px-3 py-2 text-xs shadow">
+      <div className="absolute right-14 bottom-9 left-3 z-10 flex items-center gap-3 rounded-md border bg-card/95 px-3 py-2 text-xs shadow">
         <span className="hidden whitespace-nowrap text-muted-foreground sm:inline">
           {formatInZone(window.from, timezone)}
         </span>
