@@ -20,6 +20,9 @@ export interface LayerChoices {
   hidden_gateways: string[];
   coverage: boolean;
   coverage_hours: number;
+  /** Heard positions of one gateway alone (phase 19); null or absent means every ticked gateway.
+   * A field rather than a hidden list, so the markers stay and the preference stays small. */
+  coverage_gateway?: string | null;
   /** The device layer (decision D113) is a shown set: every device is off until switched on. */
   shown_devices: string[];
 }
@@ -410,4 +413,92 @@ export function showEntity(
       groupWasOn,
     ),
   };
+}
+
+/** A "show on map" link must land on a visible object (phase 19): the object and the layers
+ * above it are switched on and the choice is kept, so the person sees what they asked for and
+ * the panel can say it was hidden. In the all scope the project row and the per-project
+ * ungrouped layer count as layers above an entity (decision D117). */
+export function revealEntity(
+  choices: LayerChoices,
+  props: EntityFeatureProperties,
+  groups: EntityGroup[] | undefined,
+  perProject = false,
+): LayerChoices {
+  const layer = layerOf(props, perProject);
+  const above = [layer, ...ancestorIds(groups, layer)];
+  if (perProject && props.project_id)
+    above.push(projectLayerOf(props.project_id));
+  return {
+    ...choices,
+    hidden_groups: without(choices.hidden_groups, above),
+    hidden_entities: without(choices.hidden_entities, [props.entity_id]),
+  };
+}
+
+export function revealDevice(
+  choices: LayerChoices,
+  deviceId: string,
+): LayerChoices {
+  return toggleDevice(choices, deviceId, true);
+}
+
+export function revealGateway(
+  choices: LayerChoices,
+  gatewayId: string,
+): LayerChoices {
+  return {
+    ...choices,
+    gateways: true,
+    hidden_gateways: without(choices.hidden_gateways, [gatewayId]),
+  };
+}
+
+export function revealFeature(
+  choices: LayerChoices,
+  feature: { id: string; feature_type: string },
+): LayerChoices {
+  return {
+    ...choices,
+    features: true,
+    hidden_feature_types: without(choices.hidden_feature_types, [
+      feature.feature_type,
+    ]),
+    hidden_features: without(choices.hidden_features, [feature.id]),
+  };
+}
+
+/** Whether the coverage layer shows the heard positions of exactly this gateway (the gateway
+ * panel's "Show heard positions"). */
+export function isOnlyGateway(
+  choices: LayerChoices,
+  gatewayId: string,
+): boolean {
+  return choices.coverage && choices.coverage_gateway === gatewayId;
+}
+
+/** Heard positions of one gateway alone: the coverage layer on and narrowed to the gateway,
+ * which is shown as well; a second call widens the layer back to every ticked gateway. */
+export function toggleOnlyGateway(
+  choices: LayerChoices,
+  gatewayId: string,
+): LayerChoices {
+  if (isOnlyGateway(choices, gatewayId))
+    return { ...choices, coverage: true, coverage_gateway: null };
+  return {
+    ...revealGateway(choices, gatewayId),
+    coverage: true,
+    coverage_gateway: gatewayId,
+  };
+}
+
+/** The gateway ids the coverage query filters on: the one gateway, else every ticked one, else
+ * nothing (every gateway). */
+export function coverageGatewayIds(
+  choices: LayerChoices,
+  all: string[],
+): string[] | undefined {
+  if (choices.coverage_gateway) return [choices.coverage_gateway];
+  if (choices.hidden_gateways.length === 0) return undefined;
+  return all.filter((id) => !choices.hidden_gateways.includes(id));
 }

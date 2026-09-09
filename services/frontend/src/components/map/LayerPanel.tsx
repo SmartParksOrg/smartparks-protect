@@ -1204,6 +1204,22 @@ export function LayerPanel({
             </SelectContent>
           </Select>
         </Row>
+        {choices.coverage && choices.coverage_gateway && (
+          <div className="px-2 pt-1 text-xs text-muted-foreground">
+            {t("Only what {{gateway}} heard.", {
+              gateway:
+                gateways.find((g) => g.id === choices.coverage_gateway)
+                  ?.display_name ?? t("one gateway"),
+            })}{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => onChange({ ...choices, coverage_gateway: null })}
+            >
+              {t("Every gateway")}
+            </button>
+          </div>
+        )}
         {coverageOpen && choices.coverage && (
           <div className="space-y-1 px-2 py-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">

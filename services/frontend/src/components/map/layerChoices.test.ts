@@ -27,6 +27,13 @@ import {
   showAllEvents,
   showAllFeatures,
   showAllGateways,
+  revealEntity,
+  revealDevice,
+  revealGateway,
+  revealFeature,
+  isOnlyGateway,
+  toggleOnlyGateway,
+  coverageGatewayIds,
 } from "@/components/map/layerChoices";
 import type { EntityFeatureProperties } from "@/components/map/layers";
 
@@ -286,5 +293,87 @@ describe("hide all in the all scope", () => {
     expect(isVisible(entity("e3", "p2", null), hidden, groups, true)).toBe(
       false,
     );
+  });
+});
+
+describe("a show-on-map link reveals the object (phase 19)", () => {
+  const groups = [group("region"), group("herd", "region")];
+  const props = (
+    entity_id: string,
+    group_id: string | null,
+    project_id = "p",
+  ) =>
+    ({ entity_id, group_id, project_id }) as unknown as EntityFeatureProperties;
+
+  it("shows a hidden entity and the group chain above it without touching the rest", () => {
+    const hidden = {
+      ...DEFAULT_LAYERS,
+      hidden_groups: ["region", "herd", "other"],
+      hidden_entities: ["e1", "e2"],
+    };
+    const next = revealEntity(hidden, props("e1", "herd"), groups);
+    expect(isVisible(props("e1", "herd"), next, groups)).toBe(true);
+    expect(next.hidden_groups).toEqual(["other"]);
+    expect(next.hidden_entities).toEqual(["e2"]);
+  });
+
+  it("in the all scope also shows the project row and its ungrouped layer", () => {
+    const hidden = {
+      ...DEFAULT_LAYERS,
+      hidden_groups: [
+        projectLayerOf("p"),
+        ungroupedLayerOf("p"),
+        projectLayerOf("q"),
+      ],
+    };
+    const next = revealEntity(hidden, props("e1", null), groups, true);
+    expect(isVisible(props("e1", null), next, groups, true)).toBe(true);
+    expect(next.hidden_groups).toEqual([projectLayerOf("q")]);
+  });
+
+  it("puts a device in the shown set, a gateway and a feature back on their layers", () => {
+    expect(isDeviceShown("d1", revealDevice(DEFAULT_LAYERS, "d1"))).toBe(true);
+    const gateways = revealGateway(
+      { ...DEFAULT_LAYERS, gateways: false, hidden_gateways: ["g1", "g2"] },
+      "g1",
+    );
+    expect(gateways.gateways).toBe(true);
+    expect(gateways.hidden_gateways).toEqual(["g2"]);
+    const features = revealFeature(
+      {
+        ...DEFAULT_LAYERS,
+        features: false,
+        hidden_feature_types: ["geofence"],
+        hidden_features: ["f1"],
+      },
+      { id: "f1", feature_type: "geofence" },
+    );
+    expect(features.features).toBe(true);
+    expect(features.hidden_feature_types).toEqual([]);
+    expect(features.hidden_features).toEqual([]);
+  });
+});
+
+describe("heard positions of one gateway (phase 19)", () => {
+  const all = ["g1", "g2", "g3"];
+
+  it("narrows the coverage query to the gateway, shows it, and widens again", () => {
+    const start = {
+      ...DEFAULT_LAYERS,
+      gateways: false,
+      hidden_gateways: ["g2", "g3"],
+    };
+    const only = toggleOnlyGateway(start, "g2");
+    expect(only.coverage).toBe(true);
+    expect(only.gateways).toBe(true);
+    expect(only.hidden_gateways).toEqual(["g3"]);
+    expect(isOnlyGateway(only, "g2")).toBe(true);
+    expect(isOnlyGateway(only, "g1")).toBe(false);
+    expect(coverageGatewayIds(only, all)).toEqual(["g2"]);
+    const back = toggleOnlyGateway(only, "g2");
+    expect(back.coverage).toBe(true);
+    expect(back.coverage_gateway).toBeNull();
+    expect(coverageGatewayIds(back, all)).toEqual(["g1", "g2"]);
+    expect(coverageGatewayIds(DEFAULT_LAYERS, all)).toBeUndefined();
   });
 });

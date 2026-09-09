@@ -1942,6 +1942,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/positions/at": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Position At
+         * @description The position of an entity or device at one device time (the effective time, exact) and the
+         *     measurements its device reported at that moment: what a click on a track point opens. Both
+         *     lookups go through the owner and time indexes; a device with several records at one time
+         *     (a resend, a second record type) answers with the first position and every measurement.
+         */
+        get: operations["position_at_api_v1_projects__project_id__positions_at_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/analytics/series": {
         parameters: {
             query?: never;
@@ -8468,6 +8491,32 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PointMeasurement */
+        PointMeasurement: {
+            /** Metric Key */
+            metric_key: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string | null;
+            /** Value */
+            value: number | boolean | string | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * PointRead
+         * @description One position with the measurements of the same device at the same device time.
+         */
+        PointRead: {
+            position: components["schemas"]["PositionRead"];
+            /** Device Name */
+            device_name: string | null;
+            /** Entity Name */
+            entity_name: string | null;
+            /** Measurements */
+            measurements: components["schemas"]["PointMeasurement"][];
+        };
         /** PositionRead */
         PositionRead: {
             /** Id */
@@ -8502,6 +8551,8 @@ export interface components {
             data_source_id: string | null;
             /** Source Event Id */
             source_event_id: number | null;
+            /** Source Event Ingested At */
+            source_event_ingested_at?: string | null;
             /** Record Type */
             record_type: string;
             /** Geometry */
@@ -14503,6 +14554,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    position_at_api_v1_projects__project_id__positions_at_get: {
+        parameters: {
+            query: {
+                time: string;
+                entity_id?: string | null;
+                device_id?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PointRead"];
                 };
             };
             /** @description Validation Error */

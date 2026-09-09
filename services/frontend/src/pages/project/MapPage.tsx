@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Layers, ListTree, X } from "lucide-react";
+import { Layers, ListTree } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -15,8 +15,10 @@ import type {
   Page as PageType,
   Track,
 } from "@/api/types";
-import { Icon } from "@/components/icons/Icon";
-import { ObjectPicture } from "@/components/common/ObjectPicture";
+import {
+  SourceEventDialog,
+  TraceDialog,
+} from "@/components/devices/ProvenancePanel";
 import {
   type BasemapKey,
   BASEMAPS,
@@ -27,6 +29,8 @@ import {
   bindDeviceClicks,
   bindEntityClicks,
   bindEventClicks,
+  bindGatewayClicks,
+  bindTrackPointClicks,
   type DeviceFeatureProperties,
   type EntityFeatureProperties,
   ensureDeviceLayers,
@@ -43,8 +47,10 @@ import {
   setEvents,
   setFeatures,
   setGateways,
+  setSelectedTrackPoint,
   setTracks,
   SOURCES,
+  trackPointKey,
 } from "@/components/map/layers";
 import {
   DEFAULT_LAYERS,
@@ -54,8 +60,17 @@ import {
   isGatewayVisible,
   isVisible,
   type LayerChoices,
+  coverageGatewayIds,
+  revealDevice,
+  revealEntity,
+  revealFeature,
+  revealGateway,
 } from "@/components/map/layerChoices";
+import { boundsOf } from "@/components/map/fit";
+import { GatewayPanel } from "@/components/map/GatewayPanel";
 import { LayerPanel } from "@/components/map/LayerPanel";
+import { DevicePanel, EntityPanel } from "@/components/map/MapObjectPanel";
+import { PointPanel } from "@/components/map/PointPanel";
 import {
   DEFAULT_TRACK_HOURS,
   parseTrackLength,
@@ -80,10 +95,10 @@ import { usePreference } from "@/hooks/usePreference";
 import { useProjectStream } from "@/hooks/useProjectStream";
 import { useNow } from "@/hooks/useNow";
 import { useIsPhone } from "@/hooks/useMediaQuery";
-import { formatAgo, formatTime } from "@/lib/format";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
-import { isAllProjects, projectFor } from "@/lib/scope";
+import { isAllProjects } from "@/lib/scope";
 import { useProjects } from "@/hooks/useProjects";
+import { useAuthStore } from "@/stores/auth";
 import { useProjectStore } from "@/stores/project";
 
 /** Fly to a feature: a point gets a close zoom, everything else fits its bounds. */
@@ -135,6 +150,20 @@ export function MapPage() {
   const now = useNow();
   const selectedId = params.get("entity");
   const selectedDeviceId = params.get("device");
+  // a gateway or a track point selected (phase 19): `?gateway=<id>`, `?point=<owner>,<time>`
+  const selectedGatewayId = params.get("gateway");
+  const selectedPoint = useMemo(() => {
+    const raw = params.get("point");
+    if (!raw) return null;
+    const comma = raw.indexOf(",");
+    if (comma < 0) return null;
+    return { ownerId: raw.slice(0, comma), time: raw.slice(comma + 1) };
+  }, [params]);
+  const [sourceEvent, setSourceEvent] = useState<{
+    id: number;
+    ingestedAt: string;
+  } | null>(null);
+  const [trace, setTrace] = useState<string | null>(null);
   // one track length for every track: the URL has it, the last choice is the default (D109)
   const [preferredLength, setPreferredLength] = usePreference<TrackLength>(
     "track_length",
@@ -165,6 +194,7 @@ export function MapPage() {
   // panels name it; links go to the object's own project
   const allProjects = isAllProjects(projectId);
   const projectList = useProjects();
+  const user = useAuthStore((s) => s.user);
   const projectName = (id: string | null | undefined) =>
     projectList.data?.items.find((p) => p.id === id)?.name ?? "";
 
@@ -190,19 +220,16 @@ export function MapPage() {
     Record<string, Partial<LayerChoices>>
   >("map_layers", {});
   // gateways are the network, not the animals: off by default for everyone, switched on in
-  // the layers panel and remembered per user (decision D134)
-  // `?gateways=1` or `?gateway=<id>` (from the Gateways page) switches the layer on for the visit
-  const gatewayParam = params.get("gateway");
-  const gatewaysWanted =
-    gatewayParam !== null || params.get("gateways") === "1";
+  // the layers panel and remembered per user (decision D134); a `?gateways=1` or `?gateway=`
+  // link switches the layer on and keeps it (phase 19, the reveal effect below)
+  const gatewayParam = selectedGatewayId;
   const layers = useMemo<LayerChoices>(
     () => ({
       ...DEFAULT_LAYERS,
       gateways: false,
       ...allLayers[projectId],
-      ...(gatewaysWanted ? { gateways: true } : {}),
     }),
-    [allLayers, projectId, gatewaysWanted],
+    [allLayers, projectId],
   );
   const setLayers = useCallback(
     (next: LayerChoices) => setAllLayers({ ...allLayers, [projectId]: next }),
@@ -237,12 +264,11 @@ export function MapPage() {
   });
   const coverageGateways = useMemo(
     () =>
-      layers.hidden_gateways.length > 0 && gateways.data
-        ? gateways.data
-            .filter((g) => !layers.hidden_gateways.includes(g.id))
-            .map((g) => g.id)
-        : undefined,
-    [layers.hidden_gateways, gateways.data],
+      coverageGatewayIds(
+        layers,
+        (gateways.data ?? []).map((g) => g.id),
+      ),
+    [layers, gateways.data],
   );
   const coverageParams = useMemo(
     () => ({
@@ -372,31 +398,44 @@ export function MapPage() {
     [setParams, setPreferredLength],
   );
 
-  const select = useCallback(
-    (id: string | null) =>
+  // one panel at a time: selecting one kind of object clears the others
+  const SELECTION_PARAMS = [
+    "entity",
+    "device",
+    "gateway",
+    "point",
+    "revealed",
+  ] as const;
+  const selectOnly = useCallback(
+    (key: (typeof SELECTION_PARAMS)[number], value: string | null) =>
       setParams(
         (p) => {
-          if (id) p.set("entity", id);
-          else p.delete("entity");
-          p.delete("device");
+          for (const k of SELECTION_PARAMS) p.delete(k);
+          if (value) p.set(key, value);
           return p;
         },
         { replace: true },
       ),
+    // the list is a constant
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [setParams],
   );
+  const select = useCallback(
+    (id: string | null) => selectOnly("entity", id),
+    [selectOnly],
+  );
   const selectDevice = useCallback(
-    (id: string | null) =>
-      setParams(
-        (p) => {
-          if (id) p.set("device", id);
-          else p.delete("device");
-          p.delete("entity");
-          return p;
-        },
-        { replace: true },
-      ),
-    [setParams],
+    (id: string | null) => selectOnly("device", id),
+    [selectOnly],
+  );
+  const selectGateway = useCallback(
+    (id: string | null) => selectOnly("gateway", id),
+    [selectOnly],
+  );
+  const selectPoint = useCallback(
+    (ownerId: string | null, time?: string) =>
+      selectOnly("point", ownerId && time ? `${ownerId},${time}` : null),
+    [selectOnly],
   );
 
   // live updates: patch the cached current state and refetch tracks
@@ -543,12 +582,43 @@ export function MapPage() {
         { replace: true },
       ),
     );
+    const unbindGateways = bindGatewayClicks(map, (props) =>
+      selectGateway(props.gateway_id),
+    );
+    const unbindPoints = bindTrackPointClicks(map, (props) =>
+      selectPoint(props.owner_id, props.time),
+    );
     return () => {
       unbindEntities();
       unbindDevices();
       unbindEvents();
+      unbindGateways();
+      unbindPoints();
     };
-  }, [mapRef, ready, select, selectDevice, setParams]);
+  }, [
+    mapRef,
+    ready,
+    select,
+    selectDevice,
+    selectGateway,
+    selectPoint,
+    setParams,
+  ]);
+
+  // the clicked track point stays highlighted while its panel is open
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setSelectedTrackPoint(
+      map,
+      selectedPoint
+        ? trackPointKey(selectedPoint.ownerId, selectedPoint.time)
+        : null,
+    );
+  }, [mapRef, ready, selectedPoint]);
+
+  const featureParamValue = params.get("feature");
+  const featureParam = featureParamValue;
 
   // the viewport for the coverage query, settled a moment after the map stops moving
   useEffect(() => {
@@ -619,7 +689,6 @@ export function MapPage() {
     );
   }, [mapRef, ready, events.data, layers]);
 
-  const featureParam = params.get("feature");
   const fittedFeature = useRef<string | null>(null);
   useEffect(() => {
     const map = mapRef.current;
@@ -656,26 +725,112 @@ export function MapPage() {
     }
   }, [mapRef, ready, gatewayParam, gateways.data]);
 
-  const fitted = useRef(false);
-  useEffect(() => {
-    fitted.current = false; // another project: fit to its entities once they arrive
-  }, [projectId]);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !currentFeatures || !visibleFeatures) return;
+    if (!map || !ready || !visibleFeatures) return;
     void setEntities(
       map,
       visibleFeatures as unknown as GeoJSON.Feature[],
       selectedId,
     );
-    if (!fitted.current && currentFeatures.length > 0) {
-      const bounds = new maplibregl.LngLatBounds();
-      for (const f of currentFeatures)
-        bounds.extend(f.geometry.coordinates as [number, number]);
+  }, [mapRef, ready, visibleFeatures, selectedId]);
+
+  // fit to the project once per visit, to its entities and devices together (phase 19): a park
+  // whose collars have no animal yet, or hardware in the workshop, fits to the devices; without
+  // any position the view stays where it was. Waits for both reads so the fit is not to half.
+  const fittedProject = useRef<string | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || current.isPending || devices.isPending) return;
+    if (fittedProject.current === projectId) return;
+    fittedProject.current = projectId;
+    // a link to a gateway or a feature fits to that object instead
+    if (gatewayParam || featureParamValue) return;
+    const bounds = boundsOf([
+      ...(currentFeatures ?? []),
+      ...(deviceFeatures ?? []),
+    ]);
+    if (bounds)
       map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 0 });
-      fitted.current = true;
+  }, [
+    mapRef,
+    ready,
+    projectId,
+    current.isPending,
+    devices.isPending,
+    currentFeatures,
+    deviceFeatures,
+    gatewayParam,
+    featureParamValue,
+  ]);
+
+  // a "show on map" link lands on a visible object (phase 19): the object and its layer are
+  // switched on once per arrival and the choice is kept, and the panel says it was hidden
+  const revealed = useRef<string | null>(null);
+  // `?revealed=<key>` says the panel's object was hidden until this visit; the URL carries it
+  // so the note survives the re-render the layer change causes and clears with the selection
+  const revealNote = params.get("revealed");
+  useEffect(() => {
+    const key = selectedId
+      ? `entity:${selectedId}`
+      : selectedDeviceId
+        ? `device:${selectedDeviceId}`
+        : selectedGatewayId
+          ? `gateway:${selectedGatewayId}`
+          : params.get("gateways") === "1"
+            ? "gateways"
+            : featureParamValue
+              ? `feature:${featureParamValue}`
+              : null;
+    if (!key || revealed.current === key) return;
+    let next: LayerChoices | null = null;
+    if (selectedId) {
+      const f = currentFeatures?.find(
+        (x) => x.properties.entity_id === selectedId,
+      );
+      if (!currentFeatures) return; // not known yet
+      if (f && !isVisible(f.properties, layers, groups.data, allProjects))
+        next = revealEntity(layers, f.properties, groups.data, allProjects);
+    } else if (selectedDeviceId) {
+      if (!deviceFeatures) return;
+      if (!isDeviceShown(selectedDeviceId, layers))
+        next = revealDevice(layers, selectedDeviceId);
+    } else if (selectedGatewayId) {
+      if (!isGatewayVisible(selectedGatewayId, layers))
+        next = revealGateway(layers, selectedGatewayId);
+    } else if (key === "gateways") {
+      if (!layers.gateways) next = { ...layers, gateways: true };
+    } else if (featureParamValue) {
+      const f = features.data?.items.find((x) => x.id === featureParamValue);
+      if (!features.data) return;
+      if (f && !isFeatureVisible(f, layers)) next = revealFeature(layers, f);
     }
-  }, [mapRef, ready, currentFeatures, visibleFeatures, selectedId]);
+    revealed.current = key;
+    if (next) {
+      setLayers(next);
+      setParams(
+        (p) => {
+          p.set("revealed", key);
+          return p;
+        },
+        { replace: true },
+      );
+    }
+  }, [
+    params,
+    setParams,
+    selectedId,
+    selectedDeviceId,
+    selectedGatewayId,
+    featureParamValue,
+    currentFeatures,
+    deviceFeatures,
+    features.data,
+    groups.data,
+    layers,
+    allProjects,
+    setLayers,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -774,19 +929,30 @@ export function MapPage() {
   useEffect(() => {
     const map = mapRef.current;
     const key =
-      selectedId ?? (selectedDeviceId ? `device:${selectedDeviceId}` : null);
+      selectedId ??
+      (selectedDeviceId
+        ? `device:${selectedDeviceId}`
+        : selectedGatewayId
+          ? `gateway:${selectedGatewayId}`
+          : null);
     if (!map || !ready || !key || !phone) return;
     if (pannedFor.current === key) return;
     const point = selectedId
       ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)
           ?.geometry
-      : deviceFeatures?.find((f) => f.properties.device_id === selectedDeviceId)
-          ?.geometry;
+      : selectedDeviceId
+        ? deviceFeatures?.find(
+            (f) => f.properties.device_id === selectedDeviceId,
+          )?.geometry
+        : (gateways.data?.find((g) => g.id === selectedGatewayId)?.geometry as
+            GeoJSON.Point | null | undefined);
     if (!point) return;
     pannedFor.current = key;
     map.easeTo({
       center: point.coordinates as [number, number],
       offset: [0, -Math.round(map.getContainer().clientHeight * 0.2)],
+      // a gateway link fits to the gateway; this pan must not undo that zoom
+      ...(selectedGatewayId ? { zoom: Math.max(map.getZoom(), 13) } : {}),
       duration: 400,
     });
   }, [
@@ -794,9 +960,11 @@ export function MapPage() {
     ready,
     selectedId,
     selectedDeviceId,
+    selectedGatewayId,
     phone,
     currentFeatures,
     deviceFeatures,
+    gateways.data,
   ]);
 
   return (
@@ -995,296 +1163,101 @@ export function MapPage() {
         />
       )}
       {selected && (
-        <aside
-          className={`absolute bottom-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80 ${panelOpen ? "left-[23rem]" : "left-3"}`}
-        >
-          <div className="flex items-start gap-2">
-            <ObjectPicture
-              path={`/api/v1/projects/${projectId}/entities/${selected.entity_id}/picture`}
-              updatedAt={selected.picture_updated_at}
-              name={selected.name}
-              size="md"
-              fallback={
-                <Icon
-                  iconKey={selected.icon_key}
-                  className="size-7 text-primary"
-                />
-              }
-            />
-            <div className="min-w-0 flex-1">
-              <Link
-                className="block truncate font-semibold underline-offset-2 hover:underline"
-                to={`/projects/${projectFor(projectId, selected.project_id)}/entities/${selected.entity_id}`}
-              >
-                {selected.name}
-              </Link>
-              <div className="text-xs text-muted-foreground">
-                {selected.entity_type}
-                {allProjects && selected.project_id
-                  ? ` · ${projectName(selected.project_id)}`
-                  : ""}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t("Close")}
-              onClick={() => select(null)}
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">{t("Last seen")}</dt>
-            <dd title={formatTime(selected.last_seen_at)}>
-              {formatAgo(selected.last_seen_at, now)}
-            </dd>
-            <dt className="text-muted-foreground">{t("Position")}</dt>
-            <dd>{formatTime(selected.position_time)}</dd>
-            {selected.battery_voltage != null && (
-              <>
-                <dt className="text-muted-foreground">{t("Battery")}</dt>
-                <dd
-                  className={
-                    selected.health_level === "critical"
-                      ? "text-destructive"
-                      : selected.health_level === "warn"
-                        ? "text-brand-sand"
-                        : ""
-                  }
-                >
-                  {selected.battery_voltage.toFixed(2)} V
-                </dd>
-              </>
-            )}
-            {selected.last_status_at && (
-              <>
-                <dt className="text-muted-foreground">{t("Last status")}</dt>
-                <dd title={formatTime(selected.last_status_at)}>
-                  {formatAgo(selected.last_status_at, now)}
-                </dd>
-              </>
-            )}
-            <dt className="text-muted-foreground">{t("Device")}</dt>
-            <dd>
-              {selected.device_id ? (
-                <Link
-                  className="underline"
-                  to={`/projects/${projectFor(projectId, selected.project_id)}/devices/${selected.device_id}`}
-                >
-                  {t("open device")}
-                </Link>
-              ) : (
-                "none"
-              )}
-            </dd>
-            <dt className="text-muted-foreground">{t("Alerts")}</dt>
-            <dd>
-              {selected.active_alert_count > 0 ? (
-                <Link
-                  className="underline"
-                  to={`/projects/${projectId}/alerts`}
-                >
-                  {selected.active_alert_count} {t("open")}
-                </Link>
-              ) : (
-                "none"
-              )}
-            </dd>
-          </dl>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button
-              variant={
-                trackedIds.includes(selected.entity_id) ? "default" : "outline"
-              }
-              size="sm"
-              className="h-8"
-              aria-pressed={trackedIds.includes(selected.entity_id)}
-              title={t("Show the track, {{length}}", {
-                length: trackLengthLabel,
-              })}
-              onClick={() =>
-                setTracked(
-                  trackedIds.includes(selected.entity_id)
-                    ? trackedIds.filter((x) => x !== selected.entity_id)
-                    : [...new Set([...trackedIds, selected.entity_id])],
-                  trackLength,
-                )
-              }
-            >
-              {trackedIds.includes(selected.entity_id)
-                ? t("Hide the track")
-                : t("Show the track")}
-            </Button>
-            {selectedTrack && (
-              <span className="text-xs text-muted-foreground">
-                {t("{{returned}} of {{total}} points", {
-                  returned: selectedTrack.returned_points,
-                  total: selectedTrack.total_points,
-                })}
-              </span>
-            )}
-          </div>
-        </aside>
+        <EntityPanel
+          props={selected}
+          projectId={projectId}
+          allProjects={allProjects}
+          projectName={projectName}
+          now={now}
+          wasHidden={revealNote === `entity:${selected.entity_id}`}
+          panelOpen={panelOpen}
+          onClose={() => select(null)}
+          tracked={trackedIds.includes(selected.entity_id)}
+          trackLengthLabel={trackLengthLabel}
+          track={selectedTrack}
+          onToggleTrack={() =>
+            setTracked(
+              trackedIds.includes(selected.entity_id)
+                ? trackedIds.filter((x) => x !== selected.entity_id)
+                : [...new Set([...trackedIds, selected.entity_id])],
+              trackLength,
+            )
+          }
+        />
       )}
       {!selected && selectedDevice && (
-        <aside
-          className={`absolute bottom-3 right-3 z-10 max-h-[45%] overflow-y-auto rounded-lg border bg-card p-4 shadow-lg md:right-auto md:w-80 ${panelOpen ? "left-[23rem]" : "left-3"}`}
-        >
-          <div className="flex items-start gap-2">
-            <ObjectPicture
-              path={`/api/v1/devices/${selectedDevice.properties.device_id}/picture`}
-              updatedAt={selectedDevice.properties.picture_updated_at}
-              name={selectedDevice.properties.name}
-              size="md"
-              fallback={
-                <Icon
-                  iconKey={selectedDevice.properties.icon_key}
-                  className="size-7 text-primary"
-                />
-              }
-            />
-            <div className="min-w-0 flex-1">
-              <Link
-                className="block truncate font-semibold underline-offset-2 hover:underline"
-                to={
-                  allProjects && !selectedDevice.properties.project_id
-                    ? `/admin/devices/${selectedDevice.properties.device_id}`
-                    : `/projects/${projectFor(projectId, selectedDevice.properties.project_id)}/devices/${selectedDevice.properties.device_id}`
-                }
-              >
-                {selectedDevice.properties.name}
-              </Link>
-              <div className="text-xs text-muted-foreground">
-                {selectedDevice.properties.device_type}
-                {allProjects
-                  ? ` · ${
-                      selectedDevice.properties.project_id
-                        ? projectName(selectedDevice.properties.project_id)
-                        : t("Not in a project")
-                    }`
-                  : ""}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t("Close")}
-              onClick={() => selectDevice(null)}
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">{t("Last seen")}</dt>
-            <dd title={formatTime(selectedDevice.properties.last_seen_at)}>
-              {formatAgo(selectedDevice.properties.last_seen_at, now)}
-            </dd>
-            <dt className="text-muted-foreground">{t("Position")}</dt>
-            <dd>
-              {selectedDevice.properties.position_time
-                ? formatTime(selectedDevice.properties.position_time)
-                : t("none yet")}
-            </dd>
-            {selectedDevice.properties.battery_voltage != null && (
-              <>
-                <dt className="text-muted-foreground">{t("Battery")}</dt>
-                <dd
-                  className={
-                    selectedDevice.properties.health_level === "critical"
-                      ? "text-destructive"
-                      : selectedDevice.properties.health_level === "warn"
-                        ? "text-brand-sand"
-                        : ""
-                  }
-                >
-                  {selectedDevice.properties.battery_voltage.toFixed(2)} V
-                </dd>
-              </>
-            )}
-            {selectedDevice.properties.last_status_at && (
-              <>
-                <dt className="text-muted-foreground">{t("Last status")}</dt>
-                <dd
-                  title={formatTime(selectedDevice.properties.last_status_at)}
-                >
-                  {formatAgo(selectedDevice.properties.last_status_at, now)}
-                </dd>
-              </>
-            )}
-            {allProjects && !selectedDevice.properties.project_id && (
-              <>
-                <dt className="text-muted-foreground">{t("Project")}</dt>
-                <dd>
-                  <Link
-                    className="underline"
-                    to={`/admin/devices/${selectedDevice.properties.device_id}`}
-                  >
-                    {t("none, assign under Server admin")}
-                  </Link>
-                </dd>
-              </>
-            )}
-            <dt className="text-muted-foreground">{t("Entity")}</dt>
-            <dd>
-              {selectedDevice.properties.entity_id ? (
-                <Link
-                  className="underline"
-                  to={`/projects/${projectFor(projectId, selectedDevice.properties.project_id)}/entities/${selectedDevice.properties.entity_id}`}
-                >
-                  {selectedDevice.properties.entity_name}
-                </Link>
-              ) : (
-                t("none")
-              )}
-            </dd>
-          </dl>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button
-              variant={
-                trackedDeviceIds.includes(selectedDevice.properties.device_id)
-                  ? "default"
-                  : "outline"
-              }
-              size="sm"
-              className="h-8"
-              aria-pressed={trackedDeviceIds.includes(
-                selectedDevice.properties.device_id,
-              )}
-              title={t("Show the track, {{length}}", {
-                length: trackLengthLabel,
-              })}
-              onClick={() =>
-                setTrackedDevices(
-                  trackedDeviceIds.includes(selectedDevice.properties.device_id)
-                    ? trackedDeviceIds.filter(
-                        (x) => x !== selectedDevice.properties.device_id,
-                      )
-                    : [
-                        ...new Set([
-                          ...trackedDeviceIds,
-                          selectedDevice.properties.device_id,
-                        ]),
-                      ],
-                  trackLength,
-                )
-              }
-            >
-              {trackedDeviceIds.includes(selectedDevice.properties.device_id)
-                ? t("Hide the track")
-                : t("Show the track")}
-            </Button>
-            {selectedDeviceTrack && (
-              <span className="text-xs text-muted-foreground">
-                {t("{{returned}} of {{total}} points", {
-                  returned: selectedDeviceTrack.returned_points,
-                  total: selectedDeviceTrack.total_points,
-                })}
-              </span>
-            )}
-          </div>
-        </aside>
+        <DevicePanel
+          props={selectedDevice.properties}
+          projectId={projectId}
+          allProjects={allProjects}
+          projectName={projectName}
+          now={now}
+          wasHidden={
+            revealNote === `device:${selectedDevice.properties.device_id}`
+          }
+          panelOpen={panelOpen}
+          onClose={() => selectDevice(null)}
+          tracked={trackedDeviceIds.includes(
+            selectedDevice.properties.device_id,
+          )}
+          trackLengthLabel={trackLengthLabel}
+          track={selectedDeviceTrack}
+          onToggleTrack={() =>
+            setTrackedDevices(
+              trackedDeviceIds.includes(selectedDevice.properties.device_id)
+                ? trackedDeviceIds.filter(
+                    (x) => x !== selectedDevice.properties.device_id,
+                  )
+                : [
+                    ...new Set([
+                      ...trackedDeviceIds,
+                      selectedDevice.properties.device_id,
+                    ]),
+                  ],
+              trackLength,
+            )
+          }
+        />
       )}
+      {!selected && !selectedDevice && selectedGatewayId && (
+        <GatewayPanel
+          projectId={projectId}
+          gatewayId={selectedGatewayId}
+          allProjects={allProjects}
+          serverAdmin={Boolean(user?.is_superuser)}
+          now={now}
+          wasHidden={revealNote === `gateway:${selectedGatewayId}`}
+          panelOpen={panelOpen}
+          onClose={() => selectGateway(null)}
+          choices={layers}
+          coverage={layers.coverage ? coverage.data : undefined}
+          onChange={setLayers}
+        />
+      )}
+      {!selected && !selectedDevice && !selectedGatewayId && selectedPoint && (
+        <PointPanel
+          projectId={projectId}
+          ownerId={selectedPoint.ownerId}
+          kind={
+            trackedDeviceIds.includes(selectedPoint.ownerId)
+              ? "device"
+              : "entity"
+          }
+          time={selectedPoint.time}
+          panelOpen={panelOpen}
+          onClose={() => selectPoint(null)}
+          onOpenSourceEvent={(id, ingestedAt) =>
+            setSourceEvent({ id, ingestedAt })
+          }
+          onOpenTrace={setTrace}
+        />
+      )}
+      <SourceEventDialog
+        id={sourceEvent?.id ?? null}
+        ingestedAt={sourceEvent?.ingestedAt ?? null}
+        onClose={() => setSourceEvent(null)}
+      />
+      <TraceDialog traceId={trace} onClose={() => setTrace(null)} />
       <EventDetailDialog
         scope={projectId}
         eventId={selectedEvent}

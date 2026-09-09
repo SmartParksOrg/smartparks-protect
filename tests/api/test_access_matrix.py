@@ -148,6 +148,10 @@ ALL_SCOPE_READS: dict[str, dict[str, str]] = {
     "/api/v1/projects/{project_id}/map/devices": {},
     "/api/v1/projects/{project_id}/map/events": {},
     "/api/v1/projects/{project_id}/tracks": {"entity_id": str(uuid.uuid4())},
+    "/api/v1/projects/{project_id}/positions/at": {
+        "entity_id": str(uuid.uuid4()),
+        "time": "2026-01-01T00:00:00+00:00",
+    },
     "/api/v1/projects/{project_id}/entities": {},
     "/api/v1/projects/{project_id}/entity-assignments": {},
     "/api/v1/projects/{project_id}/features": {},
@@ -183,7 +187,8 @@ async def test_the_all_scope_is_for_server_admins_and_reads_only(client, db):
         response = await client.request(method, fill_all(path), params=query, headers=admin.headers)
         # a supported read of one object answers 404 for the random id the path gets
         found = is_success(response.status_code) or (
-            response.status_code == 404 and UUID_PARAMS.search(path) is not None
+            response.status_code == 404
+            and (UUID_PARAMS.search(path) is not None or path.endswith("/positions/at"))
         )
         if supported and not found:
             wrong.append(("server admin", method, path, response.status_code))

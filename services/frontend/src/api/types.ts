@@ -46,6 +46,7 @@ export type TrafficRow = Schemas["TrafficRow"];
 export type SystemHealth = Schemas["SystemHealth"];
 export type Position = Schemas["PositionRead"];
 export type Track = Schemas["TrackResponse"];
+export type PointRead = Schemas["PointRead"];
 export type CurrentState = Schemas["CurrentStateResponse"];
 export type AuditEntry = Schemas["AuditRead"];
 export type UserAdmin = Schemas["UserAdminRead"];

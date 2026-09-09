@@ -7,6 +7,8 @@
 - `GET /projects/{id}/tracks`: positions of one entity or device over a period as a LineString
   with one time per vertex, decimated to `max_points` (architecture 13.4). Raw points remain
   reachable through the positions endpoint.
+- `GET /projects/{id}/positions/at`: the position of an entity or device at one device time with
+  the measurements of that moment, what a click on a track point opens (phase 19).
 """
 
 import uuid
@@ -17,12 +19,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import ColumnElement
 
 from protect_api.deps import (
     ScopeContext,
     require_scope_permission,
 )
-from shared.curation.effective import effective_geom, effective_time, in_window, visible
+from protect_api.routers.data import PositionRead, position_read
+from shared.curation.effective import (
+    at_time,
+    effective_geom,
+    effective_time,
+    effective_value_num,
+    in_window,
+    visible,
+)
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.health import device_health
@@ -35,6 +46,8 @@ from shared.models import (
     Entity,
     EntityCurrentState,
     EntityType,
+    Measurement,
+    Metric,
     Position,
 )
 from shared.permissions import Permission
@@ -68,6 +81,22 @@ class TrackResponse(BaseModel):
     times: list[datetime]
     first_position_id: int | None
     last_position_id: int | None
+
+
+class PointMeasurement(BaseModel):
+    metric_key: str
+    label: str
+    unit: str | None
+    value: float | bool | str | dict[str, Any] | None
+
+
+class PointRead(BaseModel):
+    """One position with the measurements of the same device at the same device time."""
+
+    position: PositionRead
+    device_name: str | None
+    entity_name: str | None
+    measurements: list[PointMeasurement]
 
 
 def _bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
@@ -468,4 +497,100 @@ async def track(
         times=[r[1] for r in rows],
         first_position_id=rows[0][0] if rows else None,
         last_position_id=rows[-1][0] if rows else None,
+    )
+
+
+@router.get("/positions/at", response_model=PointRead)
+async def position_at(
+    time: datetime,
+    entity_id: uuid.UUID | None = None,
+    device_id: uuid.UUID | None = None,
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> PointRead:
+    """The position of an entity or device at one device time (the effective time, exact) and the
+    measurements its device reported at that moment: what a click on a track point opens. Both
+    lookups go through the owner and time indexes; a device with several records at one time
+    (a resend, a second record type) answers with the first position and every measurement."""
+    if (entity_id is None) == (device_id is None):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Give exactly one of entity_id or device_id"
+        )
+    when = require_aware(time)
+    owner: ColumnElement[bool] = (
+        Position.entity_id == entity_id
+        if entity_id is not None
+        else Position.device_id == device_id
+    )
+    position = await session.scalar(
+        select(Position)
+        .where(
+            context.where(Position.project_id, unassigned=True),
+            owner,
+            at_time(Position, when),
+            visible(Position),
+        )
+        .order_by(Position.id)
+        .limit(1)
+    )
+    if position is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No position at that time")
+    rows = (
+        await session.execute(
+            select(
+                Measurement.metric_key,
+                effective_value_num(),
+                Measurement.value_bool,
+                Measurement.value_text,
+                Measurement.value_json,
+            )
+            .where(
+                Measurement.device_id == position.device_id,
+                at_time(Measurement, when),
+                visible(Measurement),
+            )
+            .order_by(Measurement.metric_key, Measurement.id)
+        )
+    ).all()
+    metrics = {
+        m.key: m
+        for m in (
+            await session.scalars(select(Metric).where(Metric.key.in_({r[0] for r in rows})))
+        ).all()
+    }
+    seen: set[str] = set()
+    measurements: list[PointMeasurement] = []
+    for key, number, boolean, text_value, json_value in rows:
+        if key in seen:
+            continue
+        seen.add(key)
+        metric = metrics.get(key)
+        value: float | bool | str | dict[str, Any] | None
+        if number is not None:
+            value = number
+        elif boolean is not None:
+            value = boolean
+        elif text_value is not None:
+            value = text_value
+        else:
+            value = json_value
+        measurements.append(
+            PointMeasurement(
+                metric_key=key,
+                label=metric.label if metric else key,
+                unit=metric.unit if metric else None,
+                value=value,
+            )
+        )
+    device_name = await session.scalar(select(Device.name).where(Device.id == position.device_id))
+    entity_name = (
+        await session.scalar(select(Entity.name).where(Entity.id == position.entity_id))
+        if position.entity_id
+        else None
+    )
+    return PointRead(
+        position=position_read(position),
+        device_name=device_name,
+        entity_name=entity_name,
+        measurements=measurements,
     )

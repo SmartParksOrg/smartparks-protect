@@ -431,6 +431,69 @@ export function ensureTrackLayers(map: MapLibreMap): void {
     },
     "entity-clusters",
   );
+  // the point a person clicked (phase 19): a larger ring on top, filtered to one key
+  map.addLayer(
+    {
+      id: "track-point-selected",
+      type: "circle",
+      source: SOURCES.track,
+      filter: ["==", ["get", "key"], ""],
+      paint: {
+        "circle-radius": 7,
+        "circle-color": ["coalesce", ["get", "color"], "#2F4A3A"],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+    },
+    "entity-clusters",
+  );
+  for (const layer of ["track-points", "track-point-selected"]) {
+    map.on(
+      "mouseenter",
+      layer,
+      () => (map.getCanvas().style.cursor = "pointer"),
+    );
+    map.on("mouseleave", layer, () => (map.getCanvas().style.cursor = ""));
+  }
+}
+
+export interface TrackPointProperties {
+  /** The entity or device the track belongs to and which kind it is. */
+  owner_id: string;
+  kind: "entity" | "device";
+  time: string;
+  /** `owner_id|time`, the selection key of the point. */
+  key: string;
+  color: string;
+}
+
+export const trackPointKey = (ownerId: string, time: string): string =>
+  `${ownerId}|${time}`;
+
+/** Bind the track point click; the returned function unbinds it. */
+export function bindTrackPointClicks(
+  map: MapLibreMap,
+  onClick: (props: TrackPointProperties) => void,
+): () => void {
+  const onPoint = (e: MapLayerMouseEvent) => {
+    const feature = e.features?.[0];
+    if (feature) onClick(feature.properties as unknown as TrackPointProperties);
+  };
+  map.on("click", "track-points", onPoint);
+  map.on("click", "track-point-selected", onPoint);
+  return () => {
+    map.off("click", "track-points", onPoint);
+    map.off("click", "track-point-selected", onPoint);
+  };
+}
+
+/** Highlight one track point, or none. */
+export function setSelectedTrackPoint(
+  map: MapLibreMap,
+  key: string | null,
+): void {
+  if (!map.getLayer("track-point-selected")) return;
+  map.setFilter("track-point-selected", ["==", ["get", "key"], key ?? ""]);
 }
 
 export interface TrackLayer {
@@ -467,7 +530,13 @@ export function setTracks(map: MapLibreMap, tracks: TrackLayer[]): void {
       features.push({
         type: "Feature",
         geometry: { type: "Point", coordinates: c },
-        properties: { color, time: track.times[i] },
+        properties: {
+          color,
+          time: track.times[i],
+          owner_id: track.entityId,
+          kind: track.kind ?? "entity",
+          key: trackPointKey(track.entityId, track.times[i]),
+        },
       }),
     );
   }
@@ -675,6 +744,30 @@ export function ensureGatewayLayers(map: MapLibreMap): void {
     },
     "entity-clusters",
   );
+  map.on(
+    "mouseenter",
+    "gateway-markers",
+    () => (map.getCanvas().style.cursor = "pointer"),
+  );
+  map.on(
+    "mouseleave",
+    "gateway-markers",
+    () => (map.getCanvas().style.cursor = ""),
+  );
+}
+
+/** Bind the gateway marker click (phase 19); the returned function unbinds it. */
+export function bindGatewayClicks(
+  map: MapLibreMap,
+  onClick: (props: GatewayFeatureProperties) => void,
+): () => void {
+  const onMarker = (e: MapLayerMouseEvent) => {
+    const feature = e.features?.[0];
+    if (feature)
+      onClick(feature.properties as unknown as GatewayFeatureProperties);
+  };
+  map.on("click", "gateway-markers", onMarker);
+  return () => map.off("click", "gateway-markers", onMarker);
 }
 
 export function setGateways(

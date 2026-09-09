@@ -42,6 +42,7 @@ class PositionRead(BaseModel):
     entity_id: uuid.UUID | None
     data_source_id: uuid.UUID | None
     source_event_id: int | None
+    source_event_ingested_at: datetime | None = None
     record_type: str
     geometry: dict[str, Any] | None
     altitude_m: float | None
@@ -196,6 +197,7 @@ def position_read(position: Position) -> PositionRead:
         entity_id=position.entity_id,
         data_source_id=position.data_source_id,
         source_event_id=position.source_event_id,
+        source_event_ingested_at=position.source_event_ingested_at,
         record_type=position.record_type,
         geometry=geom_to_geojson(curated_geom if curated_geom is not None else position.geom),
         original_geometry=geom_to_geojson(position.geom) if curated_geom is not None else None,

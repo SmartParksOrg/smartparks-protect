@@ -8337,6 +8337,98 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/positions/at": {
+   "get": {
+    "tags": [
+     "map"
+    ],
+    "summary": "Position At",
+    "description": "The position of an entity or device at one device time (the effective time, exact) and the\nmeasurements its device reported at that moment: what a click on a track point opens. Both\nlookups go through the owner and time indexes; a device with several records at one time\n(a resend, a second record type) answers with the first position and every measurement.",
+    "operationId": "position_at_api_v1_projects__project_id__positions_at_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "time",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "date-time",
+       "title": "Time"
+      }
+     },
+     {
+      "name": "entity_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PointRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/analytics/series": {
    "get": {
     "tags": [
@@ -30419,6 +30511,103 @@
     ],
     "title": "PageResponse[UserAdminRead]"
    },
+   "PointMeasurement": {
+    "properties": {
+     "metric_key": {
+      "type": "string",
+      "title": "Metric Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     }
+    },
+    "type": "object",
+    "required": [
+     "metric_key",
+     "label",
+     "unit",
+     "value"
+    ],
+    "title": "PointMeasurement"
+   },
+   "PointRead": {
+    "properties": {
+     "position": {
+      "$ref": "#/components/schemas/PositionRead"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "measurements": {
+      "items": {
+       "$ref": "#/components/schemas/PointMeasurement"
+      },
+      "type": "array",
+      "title": "Measurements"
+     }
+    },
+    "type": "object",
+    "required": [
+     "position",
+     "device_name",
+     "entity_name",
+     "measurements"
+    ],
+    "title": "PointRead",
+    "description": "One position with the measurements of the same device at the same device time."
+   },
    "PositionRead": {
     "properties": {
      "id": {
@@ -30493,6 +30682,18 @@
        }
       ],
       "title": "Source Event Id"
+     },
+     "source_event_ingested_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Ingested At"
      },
      "record_type": {
       "type": "string",

@@ -4,7 +4,13 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- The live map as a working tool, part a (phase 19, decisions D135 and D136): one panel for everything a person clicks on the map. A track point opens a panel with the fix, the measurements of that moment, the entity and device it belongs to, the source event and the trace, and links to the Data tab of the entity and the device at that time (`GET /projects/{id}/positions/at`, the Data tabs take `?at=`); a gateway opens a panel with its status, the devices it heard in the last week and "Show heard positions", which narrows the coverage layer to that gateway alone and says how many positions it heard; the entity and device panels are the same component with the same header, rows and footer. A "show on map" link that lands on an object hidden in the layers panel switches the object and its layers on, keeps that choice and says so in the panel (`?revealed=`).
+
+### Fixed
+
+- Switching to a project whose entities have no position yet (collars without an animal, hardware in the workshop) left the map on the previous project: the fit on a project switch now takes the entities and the devices together and waits for both reads.
 
 ## v2.2.0, 2026-09-08
 

@@ -71,5 +71,14 @@ def before(model: Curatable, at: datetime, since: datetime | None = None) -> Col
     return or_(and_(*original), and_(*curated))
 
 
+def at_time(model: Curatable, when: datetime) -> ColumnElement[bool]:
+    """`effective time == when`, written so an uncurated row uses the time index and a curated
+    row the partial index on `curated_time` (the map's track point read)."""
+    return or_(
+        and_(model.curated_time.is_(None), model.time == when),
+        and_(model.curated_time.is_not(None), model.curated_time == when),
+    )
+
+
 def visible(model: Curatable) -> ColumnElement[bool]:
     return model.valid.is_(True)

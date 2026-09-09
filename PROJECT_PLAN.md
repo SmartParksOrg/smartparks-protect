@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phases 16, 17 and 18 released as v2.2.0 on 2026-09-08; the next phase is to be planned with Tim |
+| Active phase | Phase 19 (the live map as a working tool): part a built on 2026-09-09, not committed; parts b to e open; phase 20 (explore and export from the entity or device) after it |
 | Latest release | v2.2.0 (2026-09-08): phases 16 to 18 and the fixes since v2.0.0 |
-| Last session | 2026-09-08 |
-| Next item | Plan the next phase from the open items: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
+| Last session | 2026-09-09 |
+| Next item | Phase 19 part b, the control strip (D137); Tim commits part a first. Still open next to it: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN for the complete command timeline, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect, Traccar or Cloudloop account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -175,6 +175,13 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D132 | An Applications dialog per ChirpStack source | Lists every application with its state (posts to this source, elsewhere only, no integration), what its integration holds besides, Connect and Disconnect per row with a spinner while the platform answers, Connect the other N in sequence, Refresh; replaces the one-shot preview; Disconnect removes only this source's entry. | Tim wanted feedback per application while connecting and a way to see and undo the connections afterwards. Decided by Tim on 2026-09-08. |
 | D133 | Object pages with tabs: Overview, Data, Network | The entity page and the device page keep the operational picture on an Overview tab (state, health, the small map, assignments, actions) and put the machinery one click deeper on the same two tabs everywhere: Data (the records with their provenance links) and Network (identities, traffic, traces, commands of that object). The tab lives in the URL (`?tab=`) so links land on it. No folded sections, no switch. | Tim did not like the machinery hidden behind a global switch; a person digs deeper by clicking the thing, and the same place on every object needs no explanation. Supersedes the folds of D105. Decided by Tim on 2026-09-08. |
 | D134 | The Network section by role, the technical details switch removed | Traffic, Gateways and Trace explorer show for project admins and server admins; a viewer's sidebar has Monitor and Analyze, and reaches the traffic and traces of one device on its Network tab. The `technical_details` preference, the sidebar switch, `useTechnicalDetails` and the `TechnicalDetails` fold go; nothing in the interface depends on a preference for detail any more. | Simplicity comes from the structure of the pages, not from hiding parts of them; role is the one axis left, and it already exists. Supersedes D105. Decided by Tim on 2026-09-08. |
+| D135 | One panel on the live map | `MapObjectPanel`: one shell (picture or icon, name as a link, subtitle, rows, footer) with a body per kind, for entities, devices, track points and gateways; every body ends in links to the object's page and its Data and Network tabs | A click on anything on the map reads the same and leads to the object; four panels drifted apart before. Decided by Tim on 2026-09-09. |
+| D136 | A link reveals a hidden object and keeps it | A `?entity=`, `?device=`, `?gateway=`, `?gateways=1` or `?feature=` arrival switches the object and the layers above it on in the layer preference, once per arrival, and the panel says it was hidden (`?revealed=`) | The person asked to see it, so the choice holds after the visit; a note explains why the layers panel changed. Decided by Tim on 2026-09-09. |
+| D137 | The control strip | Base map, layers, tracks, heatmap, draw, measure and terrain as one vertical strip of square icon buttons top right under MapLibre's zoom and locate controls, one style, tooltips, the active tool filled; panels and cards open from the right edge, from the bottom on a phone; the top left keeps only the search | One place and one style for every control, and the map stays free. Decided by Tim on 2026-09-09. |
+| D138 | Heatmap | A MapLibre `heatmap` layer over the shown entities and devices from `GET /projects/{id}/map/heat` (viewport, window, the newest N points, D123 style); radius in metres converted per zoom, sensitivity Low to High as intensity and weight, look-back 1 hour to 90 days; a Heatmap card like the Tracks card, settings in the URL and kept per user | One layer for every shown object rather than one per object; the decimated track data would thin the picture over long windows. Decided by Tim on 2026-09-09. |
+| D139 | Drawing with terra-draw | The MIT drawing library terra-draw with its MapLibre adapter for point, line and polygon drawing with vertex editing on the live map and the Features page; a finished drawing saves as a feature (site, zone, geofence, route) and a geofence offers Create rule, which opens the rules editor with the geofence template on that feature | Tim chose the library over the own drawing code for editing comfort; features and rules stay the alert system, nothing new is modelled. Decided by Tim on 2026-09-09. |
+| D140 | Proximity enabled | The reserved `near` condition (D45) is enabled with the drawing tools: within N metres of a feature or another entity, with evaluator, template and tests, so a drawn point becomes a proximity alert | EarthRanger's proximity analyzer next to the geofence rules. Decided by Tim on 2026-09-09. |
+| D141 | Measuring and imagery | Distance and area with own geodesic helpers (`lib/geodesy.ts`, haversine and spherical polygon area, tested), shown live while drawing, not saved unless turned into a feature; satellite imagery and terrain tiles from MapTiler with one key (`VITE_MAPTILER_KEY`), the picker hides satellite and the terrain switch without it | No dependency for two formulas; one provider and one key for both tile kinds, a free tier for the dev server. Decided by Tim on 2026-09-09. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -238,6 +245,8 @@ From architecture section 2, used when reviewing a change. These are never done;
 | v2.0.0 | 15 | Correctness and usability from the first live days (D97) |
 | (folded into v2.2.0) | 16 | The device layer on the map and the all-projects scope for server admins (D111 to D118); v2.1.0 was never tagged |
 | v2.2.0 | 17, 18 | ChirpStack applications connected from the tenant (D125 to D132), simple first with the Overview, Data and Network tabs (D133, D134), and the fixes since v2.0.0 |
+| v2.3.0 | 19 | The live map as a working tool: panels on every dot, links that make the object visible, one control strip, heatmap, drawing and measuring, satellite imagery and terrain |
+| v2.4.0 | 20 | Explore and export from the entity or device: the records view, paging with progress instead of refusals, the records export |
 
 ## Architecture coverage map
 
@@ -251,10 +260,10 @@ Every section of the architecture document maps to at least one phase. Use this 
 | 8 LoRaWAN specialization, capabilities, traffic viewer | 3, 7 |
 | 9 Device drivers and OpenCollar | 2, 3 |
 | 10 Data model for analytics, metric registry, storage | 1, 4 |
-| 11 Monitor workspaces, live updates | 3 |
-| 12 Analyze, Data Explorer | 4 |
+| 11 Monitor workspaces, live updates | 3, 19 |
+| 12 Analyze, Data Explorer | 4, 20 |
 | 13 Scalability, geospatial serving, bounded queries | 1, 3, 4, 14 |
-| 14 Export | 4 |
+| 14 Export | 4, 20 |
 | 15 Rules and automation engine | 5 |
 | 16 Events, alerts, actions | 5 |
 | 17 Bidirectional control | 6, 7 |
@@ -842,6 +851,99 @@ Release:
 
 ---
 
+### Phase 19: the live map as a working tool (v2.3.0)
+
+**Goal.** The live map stops being a viewer and becomes the place where a ranger works: every dot on it opens a panel that leads to the object and its data, a link from anywhere lands on the object visibly, the controls sit in one place in one style, and the map gains a heatmap, drawing and measuring tools, satellite imagery and 3D terrain.
+
+**Why here.** Tim's list of 2026-09-09 after the first weeks of live use next to EarthRanger. Phases 15 to 18 put the data on the map (layers, tracks, devices, coverage, pictures, the all scope); what is missing is working with it. The device layer, the layers panel and the Tracks card are the base every item below builds on.
+
+**Order.** Getting there and drilling down first (a, small fixes that also settle the one panel pattern the later items reuse), then the control layout (b, before new controls arrive), then the heatmap (c, a layer with a settings card like Tracks), then drawing and measuring (d, a tool mode that ends in a feature and a rule), and the base map last (e, satellite imagery and terrain need a tile source and a decision on keys). Each item lands with tests, docs and changelog entry, committed on Tim's word. Decisions are asked before each part starts, the recommended answer first.
+
+**Decisions to ask before building (proposed answers first).**
+
+- Panels: one panel component for entities, devices, track points and gateways with the same header (icon or picture, name, project in the all scope), the same body (state, last seen, health where it exists) and the same footer (open the object, its Data and Network tabs, Show the track or Show heard positions), so a click on anything on the map reads the same. Proposed: yes, `MapObjectPanel` replaces the entity and device panels on the map page.
+- Visibility on arrival: a `?entity=`, `?device=`, `?feature=` or `?gateway=` link switches the object's layer and the object itself on for the visit, and keeps that choice in the layer preferences (the entity leaves the hidden set, the device joins the shown set). Proposed: keep the change, since the person asked to see it; a "hidden by the layers panel" note in the panel says what happened.
+- Control layout: the base map picker, the layers button, the Tracks card and the new heatmap, draw and measure buttons become one vertical strip of square icon buttons in the top right under MapLibre's own zoom and locate controls, in one style (the shadcn button in the card colour, 36 px, a tooltip with the name, the active one filled); the panels open from the right edge under the strip on desktop and from the bottom on a phone. Proposed: yes; the top left keeps only the search box, so the map stays free.
+- Heatmap: a MapLibre `heatmap` layer over the positions of the shown entities and devices from a new bounded endpoint `GET /projects/{id}/map/heat` (viewport, window, the newest N points per object, D123 style), radius set in metres and converted to pixels per zoom in the layer expression, sensitivity Low to High as the layer's intensity and weight, look-back from one hour to ninety days; a Heatmap card next to the Tracks card with the same slider style (`?heat=1&heat_radius=&heat_sensitivity=&heat_hours=`), the last settings kept per user. Proposed: yes, one layer for every shown object rather than one per object.
+- Drawing: the drawing code of the Features page (`DrawMap`) moves to a shared module the map page uses in a draw mode (point, line, polygon with vertex editing, escape cancels); no drawing library unless the shared code proves too small. Finishing a drawing asks for a name and a feature type (site, zone, geofence, route) and saves it as a project feature; a geofence offers "Create rule" which opens the rules editor with the geofence enter or exit template and this feature preselected. Proposed: yes, features and rules are the alert system we have, so nothing new is modelled. The reserved `near` condition (D45), EarthRanger's proximity analyzer, can be enabled in this phase as a second decision.
+- Measuring: distance along a line and area of a polygon computed with our own geodesic helpers (haversine and a spherical polygon area, tested against known values), shown live while drawing and in the panel afterwards; a measurement is not saved unless turned into a feature. Proposed: yes, no dependency.
+- Satellite and terrain: a satellite base map behind an optional key (D37 left it for later) plus a Terrain switch on top of any base map that adds a raster DEM source with MapLibre's `setTerrain` and a hillshade layer, pitch allowed while terrain is on. Proposed: MapTiler for both (satellite style and `terrain-rgb` tiles, one key in `.env` as `VITE_MAPTILER_KEY`, the picker hides the satellite entry and the terrain switch without it); the free AWS terrarium tiles are the fallback for terrain without a key. Tim chooses the provider.
+
+**Deliverables.**
+
+a. Getting there and drilling down:
+
+- [x] (2026-09-09: Okonjima and PWN have entities without a position and devices with one, so the entity-only fit left the map on the previous project; `boundsOf` in `components/map/fit.ts` takes both once both reads settled; a gateway or feature link keeps its own fit) Fit on project switch: the map fits the project's entities once per project today (the `fitted` guard on the map page), but Tim sees it not happen. Find the path where it does not (the switcher on the map page, the all scope, a project with devices and no entities, a remembered viewport) and make the fit hold on every way into the map: entities and devices with a position together, the whole extent with padding, at once when the features arrive; a project without positions keeps the previous view. A test on the fit helper.
+- [x] (2026-09-09, `revealEntity`, `revealDevice`, `revealGateway`, `revealFeature` with tests, the reveal effect on the map page, `?revealed=` for the panel's note) Show on map makes the object visible: every `?entity=`, `?device=`, `?feature=` and `?gateway=` arrival switches on the layer and the object (a hidden entity leaves the hidden set, a device joins the shown set, a gateway switches the gateway layer on and unhides itself, a feature its type), so the link never lands on an empty spot. Unit tests on `layerChoices` for the four cases.
+- [x] (2026-09-09, `bindTrackPointClicks`, `track-point-selected`, `?point=<owner>,<time>`, `PointPanel.tsx` over `GET /projects/{id}/positions/at` with `at_time` in the effective value module, `tests/api/test_map_point.py`; the Data tabs take `?at=` through `hooks/useAt.ts`) Track points open a panel: the `track-points` layer gets a click binding (`bindTrackPointClicks`, bound in an effect like the others) that opens the panel on that position: time, coordinates, speed and the measurements at that time (from `GET /projects/{id}/analytics/rows` or a new point read), the entity and device it belongs to, the source event and its trace, and links to the entity, the device and the Data tab of each with the time as the filter. The selected point is highlighted on the track.
+- [x] (2026-09-09, `bindGatewayClicks`, `GatewayPanel.tsx` over the project gateway detail with the devices heard, the deep links and the data source for server admins) Gateways open a panel: `bindGatewayClicks` on `gateway-markers`; the panel shows name, data source, status, last seen, location and its origin, receptions in the window, the devices heard, and the links to the Gateways page and the data source; `?gateway=` selects it as it fits to it today.
+- [x] (2026-09-09, `coverage_gateway` on the layer choices with `toggleOnlyGateway` and `coverageGatewayIds`, tested; a field rather than a hidden list, since the preference document is bounded at 32 KB and the dev server's all-scope entry takes 30 KB, which made the first version's save fail with 422; the Coverage tab names the narrowing with a way back) Heard positions for one gateway: the gateway panel has "Show heard positions" which switches the coverage layer on with this gateway alone in the filter (the endpoint already takes `gateway_id`), the Coverage tab reflects it, and the panel says how many positions and its share in the window.
+- [x] (2026-09-09, `MapObjectPanel.tsx` with `MapPanel`, `PanelRow`, `TrackButton`, `EntityPanel` and `DevicePanel`; the point and gateway panels in their own files on the same shell; checked against the dev API at 1440 and 390 px, the component test waits for the strip of part b, which changes the shell's placement) One panel component: `MapObjectPanel` with the four bodies (entity, device, point, gateway), phone placement kept (the map pans the object above the panel), the pictures and health lines from the existing panels; the entity and device panels are rewritten on it. Component tests per body.
+
+b. Controls in one place:
+
+- [ ] The control strip: base map, layers, tracks, heatmap, draw, measure and terrain as one vertical strip of icon buttons in the top right under MapLibre's controls, one style, tooltips, the active tool filled, the badge counts kept; the Tracks and Heatmap cards and the layers panel open from the strip; the top left keeps the search box and the project name in the all scope. Phone: the strip stays vertical at the right edge and the cards open at the bottom. The sweep covers the map at the three widths with a panel and a card open.
+
+c. Heatmap:
+
+- [ ] `GET /projects/{id}/map/heat` (viewport, `hours`, entity and device ids, the newest `MAX_POINTS` in view, the all scope through `require_scope_permission`, effective times and positions through the curation layer); tests for the bound, the window and a 403.
+- [ ] The heatmap layer in `layers.ts` (`ensureHeatLayer`, `setHeatPoints`), radius in metres to pixels per zoom, sensitivity as intensity and weight, hidden below the shown layers; the Heatmap card (`HeatSettings.tsx`) with the sliders (radius 10 m to 5 km, sensitivity Low to High, look-back 1 hour to 90 days with the quick picks), the URL parameters and the per-user default (`heat_settings` in the preference document); the objects it covers are the shown entities and devices, or the selected one when the card says so.
+
+d. Drawing and measuring:
+
+- [ ] Shared drawing module (`components/map/draw.ts`) from the Features page's `DrawMap`: point, line and polygon, vertex add, move and delete, escape cancels, enter finishes; the Features page uses it too. Unit tests over a fake map.
+- [ ] Draw mode on the live map: the Draw button starts it, a small bar says what to draw and shows the running length or area, finishing opens "Save as feature" (name, type; geofence, site, zone or route) through the existing features endpoint, the feature appears in the Features tab of the layers panel at once.
+- [ ] From a feature to a rule: the feature panel (a click on a feature on the map, the same panel component) and the save dialog offer "Create rule": the rules editor opens with the geofence enter or exit template and the feature preselected; the reserved `near` condition (proximity, D45) enabled if the decision says so, with its evaluator, template and tests.
+- [ ] Measure mode: distance along a line and area of a polygon shown live while drawing and in a small result card with copy; `lib/geodesy.ts` (haversine distance, spherical polygon area) with tests against known values; nothing is saved unless "Save as feature" is chosen.
+
+e. Base map:
+
+- [ ] Satellite imagery: a `satellite` entry in `BASEMAPS` behind `VITE_MAPTILER_KEY` (or the chosen provider), hidden without a key, labels as an overlay so names stay readable, the choice kept as today; the attribution as the provider requires; `.env.example` and the deployment guide.
+- [ ] 3D terrain: a Terrain switch in the strip that adds the DEM source (`setTerrain` with an exaggeration of 1.3, a hillshade layer under the data layers), allows pitch and shows the pitch control while on, off again cleanly on switch off and on base map change; kept per user; on a phone the switch stays available with the same tiles.
+- [ ] Docs: `docs/administration/pages.md` (the live map row: panels, tools, terrain), `DEVELOPERS.md` (the panel, the heat endpoint, the draw module, terrain), the changelog; a user page `docs/administration/live-map.md` with the tools in one place.
+
+Release:
+
+- [ ] `VERSION` v2.3.0 with the changelog and the release process.
+
+**Exit criteria.** On the dev server in project Smart Parks: switching to Demo park and back fits the map to each project's animals and collars; a "show on map" link from the entity page lands on an entity that was hidden in the layers panel and shows it; a click on a track point opens its panel with the measurements of that fix and leads to the device's Data tab at that time; a click on a KPN gateway opens its panel and "Show heard positions" draws only its dots; the top right strip holds every control and the top left only the search; a heatmap over 30 days of SP051307 changes with the radius and sensitivity sliders; a polygon drawn on the map becomes a geofence and "Create rule" opens the editor with the geofence exit template on it; a line's length and a polygon's area read correctly against a known distance; the satellite base map with terrain shows the hills of the park in 3D on a phone.
+
+---
+
+### Phase 20: explore and export from the entity or device (v2.4.0)
+
+**Goal.** The simplest question, "give me everything this collar or this animal produced between these dates", answered first and completely: a records view that starts from one or more entities or devices and a period, one row per device timestamp with the position and every metric of that moment, in a table, on charts and in an export, with no refusal because of size. The metric-first Data Explorer stays as the analysis mode on top of it.
+
+**Why here.** Tim's observation of 2026-09-09: the explorer and the export dialog think from metrics, while users think from the object and the time, which is also how the data arrives (a GNSS fix at time x with its coordinates and the metrics of that moment, a status message with its fields). The explorer also refuses too soon (a bucket over 5,000 points, series capped at 20, rows at 500, direct exports at 100,000 rows): a bound on a request is an architecture rule (13.10), a wall in front of the user is not. After phase 19 the map leads to the Data tabs at a time, so the records view is where those links should land.
+
+**Order.** The records read first (the backend shape everything else uses), then the records view in the explorer with paging and progress, then the export of the same selection, then the links from the object pages and the map, then the analysis mode kept next to it. Each item with tests, docs and changelog, committed on Tim's word.
+
+**Decisions to ask before building (proposed answers first).**
+
+- Records shape: one row per (device, device-origin time) with the position (lat, lon, altitude, accuracy, speed where present), a column per metric of that timestamp, the state fields of that timestamp, the entity and project attributed, the acquisition channel, and the source event id; produced by one keyset query over positions and measurements joined on device and effective time, newest first, bounded per page (1,000) with `next_cursor` and a separate `count` endpoint for the progress bar. Proposed: yes, `GET /projects/{id}/records` and `GET /projects/{id}/records/count`, in the all scope too.
+- Never a wall: the records view loads pages in sequence into a virtualized table with a progress bar (loaded of total, a Stop button, the pages kept in the query cache), charts draw from the loaded rows and redraw as pages arrive; above a size the view suggests an export job but keeps loading. Proposed: yes; the bound per request stays, the experience is unbounded.
+- Exports follow: a `records` dataset (wide: one row per timestamp with a column per metric; long as an option) in CSV, XLSX, JSON, GeoJSON and GPX; the export dialog starts from the records view's selection; above `DIRECT_MAX_ROWS` the dialog starts a job by itself and shows its progress inline with the download button when done, instead of refusing. Proposed: yes; the existing datasets stay for the analysis mode.
+- Selection first: the explorer opens on a Records tab with the object picker first (entities and devices, several, with search, the group as a shortcut), then the period (the presets, a custom range, the assignment period of an entity as a choice), then the columns (every metric with data for the selection, all on by default, a column picker kept per user); the Analysis tab is today's explorer (metrics, buckets, aggregates, comparisons), with "Analyse these" from the records view carrying the selection over. Proposed: yes, records is the default tab.
+- Charts in the records view: one small chart per numeric column over time for the selection (sparkline size, click to enlarge), plus the track of the rows on a small map, all from the loaded rows; the Analysis tab keeps the big ECharts views. Proposed: yes.
+
+**Deliverables.**
+
+- [ ] `GET /projects/{id}/records` and `/records/count`: the keyset query over positions and measurements (effective values through `shared/curation/effective.py`), entity and device filters, period, `channel`, `limit` up to 1,000 with `next_cursor`, wide rows with the metric keys present in the page; the count endpoint for the progress bar; the all scope through `require_scope_permission`; tests for the shape (a fix with its metrics on one row, a status record without a position on its own row), the cursor, the bounds, the curation view and a 403.
+- [ ] Records view in the explorer: the object picker (entities and devices, search, group shortcut), the period (presets, custom, an entity's assignment period), the column picker per user; pages loaded in sequence with a progress bar, count and Stop, a virtualized table (the shared table gains virtualization for this page), the per-column sparkline charts and the small map of the loaded rows; the state in the URL as today so a link and a saved view reproduce it; drill-down per row to the source event and its trace (the Decoded tab of the source event dialog).
+- [ ] The limits reworded everywhere: the analytics series answer with the coarsest bucket that fits instead of an error when the bucket is too fine (a note in the response says so), the rows dialog pages instead of stopping at 500, and every place that says "only the first N" offers the next page or the job. A test per endpoint that the answer is a page, not a refusal.
+- [ ] Export the selection: the `records` dataset in `shared/exports/datasets.py` (wide and long, the metric columns from the selection, the same effective and original views and curation metadata as positions), the writers unchanged; the export dialog starts from the records view's selection, counts first, downloads directly under the limit and starts a job above it with the progress and the download inline; the Exports page unchanged otherwise. Tests for the dataset and the automatic job.
+- [ ] Links land in records: the Data tab of the entity page and the device page opens the records view for that object (the tab keeps its own short lists as the preview), the map's track point panel links to the records view at that time with the row highlighted, the search palette's entity and device hits offer "Data".
+- [ ] Analysis mode kept: today's explorer as the Analysis tab, "Analyse these" from the records view carries entities, devices, period and metrics over; saved views carry a `mode`; the dashboards' saved view tiles unchanged.
+- [ ] Docs: `docs/analytics/data-explorer.md` rewritten around the two tabs (records first), `docs/analytics/export.md` with the records dataset and the automatic job, `DEVELOPERS.md` (the records query and its bounds, the paging pattern), the changelog.
+
+Release:
+
+- [ ] `VERSION` v2.4.0 with the changelog and the release process.
+
+**Exit criteria.** On the dev server: SP051307 with its whole assignment period gives every fix and status record of the collar as rows with the metrics of each moment, the progress bar runs to the count and the table scrolls through all of them; the same selection exports as one XLSX through a job started from the dialog without a refusal; a bucket too fine in the Analysis tab answers with a coarser bucket and a note; the Data tab of Rhino 14's entity page opens the records view on the entity; a click on a track point on the map lands on that row.
+
+---
+
 ## Continuous work in every phase
 
 - [ ] Keep `CHANGELOG.md` Unreleased current.
@@ -870,6 +972,9 @@ Release:
 | CI failures go unnoticed while pushes keep coming | A red main for hours (2026-09-07) | Check every run after a push; the credential-backed `gh api` reads the failed job's log |
 | The webhook token travels in the URL for adapters that cannot set a header | Tokens in access logs | Rotate on suspicion; keep the header form where the platform allows it |
 | A deploy restarts the API | A few seconds of 502 for incoming uplinks | Platforms retry or the uplink is lost; a rolling restart is future work |
+| The per-user preference document is bounded at 32 KB and the layer choices of the all scope grow with every hidden id (30 KB on the dev server on 2026-09-09) | A layer choice stops being saved (422) once the document is full | Phase 19 keeps new choices as small fields (`coverage_gateway`); part b should compact the hidden sets of the all scope (hide a project as one id, not its groups) or raise the bound with a note |
+| Satellite imagery and terrain tiles need a provider and a key (phase 19) | The picker and the terrain switch stay hidden on a server without one | The provider is a decision of phase 19; the base map works without it as today; the key lives in `.env`, never in the repository |
+| A heatmap or a records view over a long window asks for many rows (phases 19 and 20) | Slow requests on the compressed hypertables | Every request stays bounded (viewport and the newest N for the heatmap, a page of 1,000 for records, both scanned per device); the experience is unbounded through paging with progress, never through one large answer |
 
 ## Inputs needed from Tim
 
@@ -885,6 +990,7 @@ Listed by the phase where they are first needed.
 - [ ] Phase 9: a ChatGPT account with Developer mode (Pro or Business) to connect https://dev-protect.smartparks.org/mcp; Claude was verified on 2026-09-04.
 - [ ] Phase 8: Gundi connection and EarthRanger test site (event type `smartparks_protect_event` created there), an AddaxAI Connect viewer account on a dev server (D63), a Traccar test instance or account. Deep link paths for Traccar and AddaxAI Connect are guesses until seen live.
 - [ ] Phase 11: Cloudloop test account and an OpenCollar with BLE for WebBLE work. (Built from documentation on 2026-09-04; the card and the adapter wait for a collar and an account.)
+- [ ] Phase 19: the provider of satellite imagery and terrain tiles (proposed MapTiler, one key for both), or the choice to run terrain on the free tiles without imagery.
 - [ ] Phase 13: WildlifeNL, FerusTracker and Movebank API access. (2026-09-04: WildlifeNL's API is open source and the connector is built; FerusTracker's contract is the Node-RED flow Tim shared and the connector is built; Movebank became an export format. Still needed for live checks: a The Things Stack application, an Actility ThingPark deployment, an EarthRanger site with a token, WildlifeNL's API URL with a data-system account, FerusTracker's site value, and a CRA IoT account with a LoRa device.)
 
 ## Session log
@@ -1381,3 +1487,17 @@ Listed by the phase where they are first needed.
 ### 2026-09-08, release v2.2.0 (Tim)
 
 - Tim: release. `VERSION` v2.2.0, the changelog section with the lead paragraph, upgrade notes (a token rotation for ChirpStack sources from before, the dropped preference, gateways off by default) and migrations 0021 and 0022, the status block, the release boxes of phases 17 and 18; commit `Release v2.2.0`, annotated tag, pushed; the dev server updated and `scripts/verify-server.sh` run there.
+
+### 2026-09-09, phases 19 and 20 planned (Claude and Tim)
+
+- Tim's list after the first weeks of live use next to EarthRanger, in his words: drawing tools (points, lines, polygons that become geofences and alerts) and measuring (distance, area); 3D terrain on a satellite layer; the map centred on the project's entities on a switch; a heatmap with a settings card (radius in metres, sensitivity, look-back, sliders); track points that open a panel with links to the device, the entity and the data; a gateway panel like the entity and device panels, with the heard positions of that gateway alone; "show on map" links that make a hidden object visible; the base map picker and the layers button in one style, the layers control in the top right, minimal; and the explorer and exports thinking from the entity or device and the time instead of from metrics, never refusing because of size, with a warning and a progress indicator where it is large.
+- Checked before writing: the map fits once per project when the features arrive (the `fitted` guard on the map page), so the switch item is a defect to find rather than a feature; `track-points` and `gateway-markers` exist as layers without a click binding; the coverage endpoint already takes `gateway_id`; there is no satellite base map yet (D37 left it behind a key) and MapLibre 6 has terrain and heatmap layers built in; the Features page has its own drawing code (`DrawMap`) to share; the explorer is metric-first with the bounds at 5,000 buckets, 20 series, 500 rows and 100,000 direct export rows.
+- Written: phase 19 (the live map as a working tool, five parts in the order getting there and drilling down, the control strip, the heatmap, drawing and measuring, satellite and terrain) and phase 20 (explore and export from the entity or device: a records read, the records view with paging and progress, the records export with the automatic job, the links from the object pages and the map, the analysis mode kept), each with its decisions to ask, deliverables and exit criteria; the milestones v2.3.0 and v2.4.0, the status block, two risks, one input (the imagery provider), the coverage map. Nothing built; the decisions of phase 19 are asked when it starts.
+
+### 2026-09-09, phase 19 decisions and part a (Claude and Tim)
+
+- Seven decisions asked in two rounds and taken (D135 to D141): one panel component, a link reveals and keeps, the top right control strip, one heatmap layer over a bounded endpoint, terra-draw for drawing (Tim's choice over the own code), proximity enabled, own measuring helpers, MapTiler for imagery and terrain.
+- The fit defect found on the dev server with Playwright through the Vite proxy: Okonjima and PWN have entities without a position and only devices with one, so the entity-only fit left the map on the previous project's view. The fit now takes entities and devices together once both reads settled (`boundsOf`, tested) and keeps the view when nothing has a position; a `?gateway=` or `?feature=` link keeps its own fit.
+- Built part a: `GET /projects/{id}/positions/at` (`at_time` in `shared/curation/effective.py`, an index-friendly equality; the source event ingest time on position reads; in the all scope; `tests/api/test_map_point.py` and the access matrix), the reveal helpers with tests, track point and gateway click bindings with a highlighted point (tests), the panel shell with the entity, device, point and gateway bodies, `?point=` and `?revealed=` in the URL, the Data tabs' `?at=` window with the row highlighted, the Coverage tab naming a one-gateway narrowing. Checked against the dev API (the point read stubbed, since it is not deployed): the Okonjima fit, the entity, point and gateway panels, the reveal of a hidden entity with its note and the kept preference, the heard positions of one gateway, the phone width.
+- Found on the way: the preference document is bounded at 32 KB and the ops account's all-scope layer choices already take 30 KB, so the first heard-positions version (every other gateway hidden) failed to save with 422; the narrowing became one field and the bound is a risk row for part b.
+- Verified: ruff, mypy, frontend lint, types, catalogue, 54 unit tests, the build, OpenAPI regenerated. The API tests run in CI (Docker is off here). Not committed.

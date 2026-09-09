@@ -40,6 +40,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
+import { useAt } from "@/hooks/useAt";
 import { useTab } from "@/hooks/useTab";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
@@ -70,15 +71,22 @@ export function DevicePage() {
         query: { limit: 500 },
       }),
   });
+  const around = useAt();
   const positions = useQuery({
-    queryKey: queryKeys.positions(projectId ?? "", { deviceId, recent: true }),
+    queryKey: queryKeys.positions(projectId ?? "", {
+      deviceId,
+      recent: true,
+      at: around.at,
+    }),
     queryFn: () =>
       api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, {
-        query: {
-          device_id: deviceId,
-          limit: 10,
-          from: new Date(Date.now() - 30 * 86400_000).toISOString(),
-        },
+        query: around.at
+          ? { device_id: deviceId, limit: 50, from: around.from, to: around.to }
+          : {
+              device_id: deviceId,
+              limit: 10,
+              from: new Date(Date.now() - 30 * 86400_000).toISOString(),
+            },
       }),
     enabled: Boolean(projectId),
   });
@@ -466,16 +474,30 @@ export function DevicePage() {
                     <CardTitle>{t("Recent positions")}</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {around.at && (
+                      <div className="mb-2 text-sm text-muted-foreground">
+                        {t("Around {{time}}.", { time: formatTime(around.at) })}{" "}
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={around.clear}
+                        >
+                          {t("Show the latest instead")}
+                        </button>
+                      </div>
+                    )}
                     {positions.data?.length === 0 && (
                       <div className="text-sm text-muted-foreground">
-                        {t("No positions in the last 30 days.")}
+                        {around.at
+                          ? t("No positions within 12 hours of that time.")
+                          : t("No positions in the last 30 days.")}
                       </div>
                     )}
                     <ul className="divide-y text-sm">
                       {positions.data?.map((p) => (
                         <li
                           key={p.id}
-                          className="flex flex-wrap items-center gap-3 py-1.5"
+                          className={`flex flex-wrap items-center gap-3 py-1.5 ${around.isAt(p.time) ? "rounded bg-muted px-1 font-medium" : ""}`}
                         >
                           <span>{formatTime(p.time)}</span>
                           <span className="font-mono text-xs">
