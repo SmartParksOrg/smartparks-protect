@@ -91,6 +91,8 @@ class ExportParameters(BaseModel):
             )
         if self.dataset is ExportDataset.AGGREGATES and not self.metric_keys:
             raise ValueError("aggregates need at least one metric")
+        if self.dataset is ExportDataset.RECORDS and not (self.entity_ids or self.device_ids):
+            raise ValueError("records need at least one entity or device")
         if self.dataset is ExportDataset.SOURCE_EVENTS and self.entity_ids:
             raise ValueError("source events are per device; filter by device_ids")
         if self.dataset is ExportDataset.MOVEBANK_EVENTS and self.view == "original":

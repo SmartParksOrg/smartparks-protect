@@ -6,9 +6,12 @@ import re
 import uuid
 from datetime import UTC, datetime
 
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.dialects import postgresql
 
+from shared.enums import ExportDataset, ExportFormat
+from shared.exports import ExportParameters
 from shared.records import RecordSelection, keys_statement
 
 
@@ -46,3 +49,17 @@ def test_the_count_wraps_the_union():
     assert sql.count("UNION") == 1
     assert "measurements.device_id IN" in sql
     assert "positions.entity_id IN" in sql
+
+
+def test_a_records_export_needs_a_selection():
+    """Without an owner the union has no owner filter at all and walks the whole project: the
+    job started that way on the dev server scanned 220 million rows for nothing."""
+    values = dict(
+        dataset=ExportDataset.RECORDS,
+        format=ExportFormat.CSV,
+        time_from=datetime(2026, 8, 1, tzinfo=UTC),
+        time_to=datetime(2026, 9, 1, tzinfo=UTC),
+    )
+    with pytest.raises(ValueError, match="at least one entity or device"):
+        ExportParameters(**values)
+    assert ExportParameters(**values, device_ids=[uuid.uuid4()]).records_layout == "wide"
