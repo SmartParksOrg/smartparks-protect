@@ -39,8 +39,8 @@ echarts.use([
  * metric and owner over a shared time axis, the axes decided by unit (the first unit left,
  * the others right), markers only under the pointer, one crosshair and one value card, and
  * legend chips above that toggle lines. Hovering reports the moment under the pointer; a
- * moment marked elsewhere (the drawer, the map) shows here as the crosshair, and the pinned
- * moment as a thin dashed line.
+ * moment marked elsewhere (the drawer, the map) shows here as a thin line, and the pinned
+ * moment as a dashed one; the value card appears only under the pointer.
  */
 export function ExploreChart({
   groups,
@@ -144,22 +144,41 @@ export function ExploreChart({
     const instance = chart.current;
     if (!instance) return;
     instance.setOption(
-      buildOption(shown, groups, kind, xLabel ?? null, timezone, phone, pinned),
+      buildOption(shown, groups, kind, xLabel ?? null, timezone, phone),
       true,
     );
-  }, [shown, groups, kind, xLabel, timezone, phone, pinned]);
+  }, [shown, groups, kind, xLabel, timezone, phone]);
 
+  // the moments marked elsewhere: the pinned one as a dashed line, a hover from the drawer or
+  // the map as a thin solid one; the chart's own tooltip appears only under the pointer
   useEffect(() => {
     const instance = chart.current;
-    if (!instance || hovering.current || !isTimeAxis(kind)) return;
-    if (marked === null || shown.length === 0) {
-      instance.dispatchAction({ type: "hideTip" });
-      return;
-    }
-    const x = instance.convertToPixel({ xAxisIndex: 0 }, marked);
-    if (typeof x !== "number" || !Number.isFinite(x)) return;
-    instance.dispatchAction({ type: "showTip", x, y: 40 });
-  }, [marked, shown, kind]);
+    if (!instance || !isTimeAxis(kind) || shown.length === 0) return;
+    const data: unknown[] = [];
+    if (pinned !== null)
+      data.push({
+        xAxis: pinned,
+        lineStyle: { color: MARK, width: 1, type: "dashed", opacity: 0.8 },
+      });
+    if (marked !== null && marked !== pinned && !hovering.current)
+      data.push({
+        xAxis: marked,
+        lineStyle: { color: TEXT, width: 1, type: "solid", opacity: 0.7 },
+      });
+    instance.setOption({
+      series: [
+        {
+          markLine: {
+            silent: true,
+            symbol: "none",
+            label: { show: false },
+            animation: false,
+            data,
+          },
+        },
+      ],
+    });
+  }, [marked, pinned, shown, kind]);
 
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -272,7 +291,6 @@ function buildOption(
   xLabel: string | null,
   timezone: string,
   phone: boolean,
-  pinned: number | null,
 ): echarts.EChartsCoreOption {
   const base: echarts.EChartsCoreOption = {
     animation: false,
@@ -437,7 +455,7 @@ function buildOption(
       position: "right",
       splitLine: { show: false },
     });
-  const series = lines.map((l, i) => {
+  const series = lines.map((l) => {
     const common = {
       name: l.name,
       yAxisIndex: yAxis.length > 1 ? axisIndexOf(l.group, units) : 0,
@@ -445,21 +463,6 @@ function buildOption(
       itemStyle: { color: l.colour },
       lineStyle: { color: l.colour, width: 1.5 },
       emphasis: { focus: "none", lineStyle: { width: 2 } },
-      markLine:
-        pinned !== null && i === 0
-          ? {
-              silent: true,
-              symbol: "none",
-              lineStyle: {
-                color: MARK,
-                width: 1,
-                type: "dashed",
-                opacity: 0.8,
-              },
-              label: { show: false },
-              data: [{ xAxis: pinned }],
-            }
-          : undefined,
     };
     if (kind === "state")
       return {
