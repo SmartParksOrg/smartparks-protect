@@ -17,7 +17,7 @@ A record is one moment of one device: the effective time, the position of that m
 
 ## The three modes
 
-**Table.** The virtualized table of the loaded rows, one row per moment, that scrolls a year of a collar as one list. The columns are every metric and state field with data in the selection, all on, with a column picker kept per user. A row opens its source event.
+**Table.** The virtualized table of the loaded rows, one row per moment, that scrolls a year of a collar as one list. The columns are every metric and state field with data in the selection, all on, with a column picker kept per user. A click on a row pins its moment in every view and shows the record plainly: the time, who it belongs to, the position and the values of that moment, with the source event one link away.
 
 **Chart.** One graph with a thin line per metric and entity or device over a shared time axis, so two collars compare on one canvas. The metrics on the chart are the loaded columns with a picker (the first four numeric ones by default). The axes follow the units: the first metric's unit takes the left axis, every other unit the right one, so a temperature sits next to a voltage without a setting. Chips above the graph toggle lines, a crosshair follows the pointer with one card listing every line's value at that moment, and every moment carries a small point (a line above a thousand points shows them under the pointer only). The kind switches between line, scatter (one metric against another, per owner), bar, histogram (of the first metric) and state timeline. Above 50,000 records the chart draws from the aggregate series read (below) with the finest bucket that fits and says so; the drawer keeps loading the rows.
 

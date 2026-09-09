@@ -38,6 +38,7 @@ import { ExploreChart } from "@/components/explore/ExploreChart";
 import { ExploreMap } from "@/components/explore/ExploreMap";
 import { SelectionStrip } from "@/components/explore/SelectionStrip";
 import type { TrackLayer } from "@/components/map/layers";
+import { RecordDialog } from "@/components/records/RecordDialog";
 import { VirtualTable } from "@/components/records/VirtualTable";
 import { Button } from "@/components/ui/button";
 import {
@@ -384,6 +385,7 @@ export function ExplorerPage() {
     "explore_drawer_open",
     true,
   );
+  const [picked, setPicked] = useState<RecordRow | null>(null);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
     null,
   );
@@ -515,11 +517,9 @@ export function ExplorerPage() {
         setHovered(row ? { ms: Date.parse(row.time), source: "table" } : null)
       }
       onRowClick={(row: RecordRow) => {
-        if (row.source_event_id != null && row.source_event_ingested_at)
-          setEvent({
-            id: row.source_event_id,
-            ingestedAt: row.source_event_ingested_at,
-          });
+        // a click pins the moment in every view and shows the record plainly
+        pick(Date.parse(row.time));
+        setPicked(row);
       }}
     />
   );
@@ -874,6 +874,16 @@ export function ExplorerPage() {
           to: window.to,
           timezone: state.timezone,
           layout: "wide",
+        }}
+      />
+      <RecordDialog
+        row={picked}
+        columns={columns}
+        timezone={state.timezone}
+        onClose={() => setPicked(null)}
+        onSourceEvent={(id, ingestedAt) => {
+          setPicked(null);
+          setEvent({ id, ingestedAt });
         }}
       />
       <SourceEventDialog
