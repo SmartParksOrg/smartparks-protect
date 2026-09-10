@@ -247,11 +247,29 @@ async def test_cloudloop_webhook_with_query_token_and_address_allow_list(client,
             url, params={"token": token}, json=LINGO, headers={"X-Forwarded-For": "1.2.3.4"}
         )
     ).status_code == 403
+    # the proxy appends the peer it saw: a forged first address does not pass
+    assert (
+        await client.post(
+            url,
+            params={"token": token},
+            json=LINGO,
+            headers={"X-Forwarded-For": "35.178.100.117, 10.0.0.1"},
+        )
+    ).status_code == 403
+    # nginx's own view of the peer wins over the forwarded list
+    assert (
+        await client.post(
+            url,
+            params={"token": token},
+            json=LINGO,
+            headers={"X-Forwarded-For": "1.2.3.4", "X-Real-IP": "52.56.155.169"},
+        )
+    ).status_code == 202
     accepted = await client.post(
         url,
         params={"token": token},
         json=LINGO,
-        headers={"X-Forwarded-For": "35.178.100.117, 10.0.0.1"},
+        headers={"X-Forwarded-For": "10.0.0.1, 35.178.100.117"},
     )
     assert accepted.status_code == 202 and accepted.json()["accepted"] == 1
     identity = await db.scalar(

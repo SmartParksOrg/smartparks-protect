@@ -5,13 +5,16 @@ Built from the RockBLOCK web services documentation
 (https://docs.groundcontrol.com/iot/rockblock/web-services, fetched 2026-09-09):
 
 - Inbound (mobile-originated) messages reach a customer's server through a delivery group's
-  HTTP endpoint as `application/x-www-form-urlencoded` (`HTTP_POST`) or JSON (`HTTP_JSON`)
-  with the fields `imei`, `serial`, `momsn`, `transmit_time` (UTC as `YY-MM-DD HH:MM:SS`),
-  `iridium_latitude`, `iridium_longitude`, `iridium_cep` (an accuracy estimate in km) and
-  `data`, the payload hex encoded. The server answers 200 within three seconds; failures are
-  retried with a doubling backoff for fourteen attempts (almost six days). Rock7 sends no
-  authentication, so the source's token travels in the URL (`?token=`) and the source may
-  restrict the caller addresses (none are documented).
+  delivery address (the RockBLOCK admin, seen on 2026-09-10: a group holds RockBLOCKs, a
+  delivery address is a URL and a format, no headers; the formats offered are HTTP_JSON,
+  HTTP_POST, HTTP_THINGSPEAK, EMAIL_ROCKBLOCK, SBD_ROCKBLOCK, HTTP_POST_INSECURE and
+  HTTP_POST_GEOJSON) as `application/x-www-form-urlencoded` (`HTTP_POST`) or JSON
+  (`HTTP_JSON`) with the fields `imei`, `serial`, `momsn`, `transmit_time` (UTC as
+  `YY-MM-DD HH:MM:SS`), `iridium_latitude`, `iridium_longitude`, `iridium_cep` (an accuracy
+  estimate in km) and `data`, the payload hex encoded. The server answers 200 within three
+  seconds; failures are retried with a doubling backoff for fourteen attempts (almost six
+  days). Rock7 sends no authentication, so the source's token travels in the URL (`?token=`)
+  and the source may restrict the caller addresses (none are documented).
 - Outbound (mobile-terminated) messages: `POST https://rockblock.rock7.com/rockblock/MT`
   with `imei`, `username`, `password` (the portal login) and `data` in hex, optionally
   `flush=yes` to clear the queue first. The body answers `OK,<mtId>` or
@@ -21,8 +24,8 @@ Built from the RockBLOCK web services documentation
   session; a ring alert wakes a powered modem in coverage.
 - No API lists devices or credit: the management system is the web UI. The connection test
   sends an empty message to a placeholder IMEI and reads the failure code: 10 means the
-  login is wrong, any other code means the login was accepted (an assumption about the
-  order of Rock7's checks, to confirm live).
+  login is wrong, any other code means the login was accepted (confirmed live on 2026-09-10:
+  the right login answers `FAILED,16,No Data`).
 
 The payload is the same satellite frame the Cloudloop route carries: stacked stored records
 for the device driver, untouched, as `data_hex`. The IMEI is the device identity.
@@ -260,9 +263,11 @@ class Rock7Adapter:
         "password": "Rock7 portal password",
     }
     setup_hint: ClassVar[str] = (
-        "In the RockBLOCK management system, make a delivery group with the modems and add the "
-        "webhook URL of this source including its token as an HTTP_POST or HTTP_JSON endpoint. "
-        "The IMEI is the device identity."
+        "At rockblock.rock7.com under Delivery Groups: make a group, add the RockBLOCKs to it, "
+        "and under Delivery Addresses paste the webhook URL of this source, with its token, as "
+        "the address with the format HTTP_POST (HTTP_JSON works as well; not the GeoJSON, "
+        "ThingSpeak, email or SBD formats). There is no field for headers, which is why the "
+        "token sits in the URL. The IMEI is the device identity."
     )
     default_capabilities: ClassVar[AdapterCapabilities] = AdapterCapabilities(
         uplink=True, downlink=True
@@ -272,7 +277,8 @@ class Rock7Adapter:
             "key": "http",
             "label": "Webhook",
             "direction": "in",
-            "purpose": "A delivery group posts messages to the webhook URL with the token in it",
+            "purpose": "A delivery group's delivery address, format HTTP_POST, with the token "
+            "in the URL",
             "config_keys": [],
             "credential_keys": [],
         },

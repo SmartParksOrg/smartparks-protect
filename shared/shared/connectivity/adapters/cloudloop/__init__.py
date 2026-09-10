@@ -28,7 +28,13 @@ and its public Postman collection (https://api.cloudloop.com/swagger/postman_col
   `Hardware/GetHardwares` (`id`, `imei`, `type`, `serial`), joined by the management sync.
   Seen live on 2026-09-09 with Smart Parks' account: `Platform/Ping` answers `{"ping":
   "pong"}`, thing ids are 32 case sensitive characters, the console is at
-  `https://console.cloudloop.com/?DashboardAccount/:account/:<account id>`.
+  `https://console.cloudloop.com/?DashboardAccount/:account/:<account id>`. On 2026-09-10 a
+  destination made with `Data/CreateHttpDestination` (`CONTENT_TYPE_HTTP_LINGO`) and added to a
+  thing group delivered `Data/DoTestDestination` to the dev server from 35.178.100.117 or
+  52.56.155.169; a live Lingo document carries `identity.thingGroup` (a list) and no `sbd`
+  section for a platform test (fixtures under tests/fixtures/payloads/cloudloop/).
+  `Data/GetMessageRecordsForThing` takes times as `YYYY-MM-DD HH:MM:SS` and returns a
+  `snippet` of the first 128 bytes of each message, not the whole payload.
 
 An OpenCollar with a RockBLOCK sends its satellite buffer as stacked stored records
 (`[port][msg_id][len][data][timestamp]`, wiki satellite page); the payload is passed to the

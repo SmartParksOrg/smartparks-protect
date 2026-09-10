@@ -27,11 +27,17 @@ FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 
 
 def client_address(request: Request) -> str:
-    """The caller behind the reverse proxy: the first address of X-Forwarded-For, which the
-    frontend's nginx sets, else the socket peer."""
+    """The caller as the reverse proxy saw it: `X-Real-IP`, which nginx sets from the socket
+    (the server's `proxy_params`), else the last address of `X-Forwarded-For`, the one the
+    proxy appended (`$proxy_add_x_forwarded_for`; the frontend's nginx and the server's both
+    append), else the socket peer. The first address of the forwarded list is whatever the
+    caller sent and passed an address allow-list with a forged header (seen on 2026-09-10)."""
+    real_ip = request.headers.get("x-real-ip", "").strip()
+    if real_ip:
+        return real_ip
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.client.host if request.client else ""
 
 

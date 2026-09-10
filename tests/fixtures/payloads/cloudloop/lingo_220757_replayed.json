@@ -1,0 +1,45 @@
+{
+ "id": "eJwgzdpXVxNRnojOAvzQBMDlQGLPvAbk",
+ "receivedAt": {
+  "year": 2026,
+  "month": 4,
+  "day": 29,
+  "hour": 16,
+  "minute": 15,
+  "second": 45
+ },
+ "identity": {
+  "accountId": "JYXyvGekqxMKABvPbzWzbRDgVQZOwmdp",
+  "subscriber": {
+   "id": "obXGALqOdlzpaErOqvJBNkwRPZgJjmyr",
+   "type": "SUBSCRIBER_TYPE_SBD",
+   "description": ""
+  },
+  "hardware": {
+   "id": "oDmGzOePxrJZKWARmqjEagyQXlpAkvMw",
+   "type": "IRIDIUM_SBD",
+   "imei": "301434061403790",
+   "serial": ""
+  },
+  "identifier": "301434061403790",
+  "thingId": "pwjgJyDQqreRkExdbAEAGYmVlazNdOMX"
+ },
+ "sbd": {
+  "imei": "301434061403790",
+  "cdrReference": null,
+  "momsn": null,
+  "mtmsn": 0,
+  "sessionAt": {
+   "year": 2026,
+   "month": 4,
+   "day": 29,
+   "hour": 16,
+   "minute": 15,
+   "second": 45
+  },
+  "status": "SESSION_STATUS_OK",
+  "location": null
+ },
+ "message": "BPQOBAC1AKMAfXN/E3KZAAGNIPJpDZMO9SDyafWYc/TLCpMHAQD1IPJp",
+ "signature": ""
+}

@@ -1,0 +1,35 @@
+{
+ "id": "4187e4ac-c88a-44bb-8c93-331d46b77654",
+ "message": "MTk2NS0wNi0xNSBKb2hubnkgUHJlc2NvdHQ=",
+ "identity": {
+  "thingId": "pwjgJyDQqreRkExdbAEAGYmVlazNdOMX",
+  "hardware": {
+   "id": "oDmGzOePxrJZKWARmqjEagyQXlpAkvMw",
+   "esn": "",
+   "key": "",
+   "imei": "301434061403790",
+   "type": "HARDWARE_TYPE_UNKNOWN",
+   "serial": ""
+  },
+  "accountId": "JYXyvGekqxMKABvPbzWzbRDgVQZOwmdp",
+  "identifier": "301434061403790",
+  "subscriber": {
+   "id": "obXGALqOdlzpaErOqvJBNkwRPZgJjmyr",
+   "type": "SUBSCRIBER_TYPE_SBD",
+   "description": "CollarFree"
+  },
+  "thingGroup": [
+   "rOvMZelJoLYNkWMkMgBPRKbywQXjxGzV",
+   "oDmGzOePxrJZKWAvpAEagyQXlpAkvMwj"
+  ]
+ },
+ "signature": "",
+ "receivedAt": {
+  "day": 10,
+  "hour": 8,
+  "year": 2026,
+  "month": 9,
+  "minute": 52,
+  "second": 9
+ }
+}

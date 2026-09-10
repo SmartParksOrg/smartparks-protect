@@ -7,21 +7,31 @@ back (architecture 25.9, decision D78).
 
 Built from the Cloudloop knowledge base and its public Postman collection (fetched
 2026-09-04); the API calls were confirmed against Smart Parks' account on 2026-09-09 (ping,
-things, subscribers, hardware, groups and destinations). Live verification of the webhook and
-of a command waits for a destination pointed at the server.
+things, subscribers, hardware, groups and destinations). On 2026-09-10 the webhook path was
+proven live: a destination created through the API (`Data/CreateHttpDestination`, format
+`CONTENT_TYPE_HTTP_LINGO`, added to the All Things group with `Data/DoAddDestination`),
+Cloudloop's own `Data/DoTestDestination` delivered to the dev server through the address
+allow-list, and a real 42 byte collar message replayed through the webhook decoded into a
+GNSS fix and a status message (fixtures under `tests/fixtures/payloads/cloudloop/`). A message
+from a collar in the field and a command wait for a collar to wake.
 
 ## Setup
 
 1. Under Server admin, Data sources: New data source, adapter Cloudloop (Iridium). Config:
-   `allowed_source_ips` (Cloudloop posts from `35.178.100.117` and `52.56.155.169`; leave the
-   list empty to accept any address), `web_url` for deep links. Credentials: `token`, the
+   `allowed_source_ips` (Cloudloop posts from `35.178.100.117` and `52.56.155.169`, confirmed
+   live on 2026-09-10; leave the list empty to accept any address; the check uses the address
+   the reverse proxy saw, so a caller cannot forge it), `web_url` for deep links. Credentials: `token`, the
    account's API token (requested from Ground Control support, regenerated with
    `User/DoGenerateToken`), needed for commands and the thing list only.
 2. Copy the webhook URL shown once after saving. It carries the source's token as
    `?token=...` because Cloudloop sends no authentication header.
 3. In Cloudloop Data, add an HTTP Webhook destination with that URL and format JSON (Lingo),
-   the recommended one. Cloudloop expects HTTP 200 within five seconds and retries with
-   exponential backoff for about twelve hours.
+   the recommended one, and add it to a thing group (a group can post to several destinations,
+   so an existing pipeline keeps its own). The destination shows grey until its first delivery
+   and green after; "Send test message" on it (or `Data/DoTestDestination` with a thing) posts
+   a text payload, which arrives as a failed source event of that thing's device, the proof
+   that the URL, the token and the address list work. Cloudloop expects HTTP 200 within five
+   seconds and retries with exponential backoff for about twelve hours.
 4. The IMEI of the RockBLOCK is the device identity (type `imei`). Link it to the collar, or
    accept it from Needs attention when the first message arrives. The Cloudloop thing id
    arrives as an identity attribute with the first message; the deep link and commands use it.
@@ -69,6 +79,14 @@ The management sync (Sync devices on the data source) joins `Data/GetThings` wit
 `Hardware/GetHardwares` (the IMEI): a thing with a known IMEI is listed as the `imei` identity
 its messages use, named after its subscriber, with the thing id as an attribute, so linking it
 once serves the inbound path and commands before any message arrives.
+
+## Past messages
+
+`Data/GetMessageRecordsForThing` (times as `YYYY-MM-DD HH:MM:SS`) lists a thing's messages
+with their direction, size and a `snippet` of the first 128 bytes in hex; longer messages are
+not available in full through the API, so a replay of past data is limited to messages of at
+most 128 bytes. `Data/GetPulseRecordsForDestination` shows every delivery attempt with its
+status.
 
 ## Timestamps
 

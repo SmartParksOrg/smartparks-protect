@@ -7,7 +7,10 @@ commands through the MT web service (decision D156). New modems belong in Cloudl
 adapter is for the ones that stay.
 
 Built from the RockBLOCK web services documentation (docs.groundcontrol.com, fetched
-2026-09-09). Live verification waits for a modem in a delivery group pointed at the server.
+2026-09-09). The MT endpoint and the connection test were confirmed live with Smart Parks'
+portal login on 2026-09-10 (`FAILED,16,No Data` for the empty probe, so the login is checked
+before the message). A delivery from a modem waits for one in a delivery group pointed at the
+server.
 
 ## Setup
 
@@ -17,10 +20,15 @@ Built from the RockBLOCK web services documentation (docs.groundcontrol.com, fet
    only.
 2. Copy the webhook URL shown once after saving. It carries the source's token as
    `?token=...` because Rock7 sends no authentication.
-3. In the RockBLOCK management system, make a delivery group with the modems and add the
-   webhook URL as its endpoint, type `HTTP_POST` (a form) or `HTTP_JSON`. Rock7 expects HTTP
-   200 within three seconds and retries with a doubling backoff for fourteen attempts, almost
-   six days.
+3. At [rockblock.rock7.com](https://rockblock.rock7.com) open Delivery Groups. Make a group
+   (or use one) and add the RockBLOCKs to it from the list under the group's name. Under the
+   group's Delivery Addresses paste the webhook URL, token included, in the Address field and
+   choose the format `HTTP_POST`, then Add. `HTTP_JSON` works as well; `HTTP_POST_GEOJSON`,
+   `HTTP_THINGSPEAK`, `EMAIL_ROCKBLOCK` and `SBD_ROCKBLOCK` are other shapes the server does not
+   read, and `HTTP_POST_INSECURE` skips the certificate check and is not needed. There is no
+   field for headers, which is why the token travels in the URL. A group can have several
+   addresses, so an existing pipeline keeps its own. Rock7 expects HTTP 200 within three seconds
+   and retries with a doubling backoff for fourteen attempts, almost six days.
 4. The IMEI of the modem is the device identity (type `imei`). Link it to the collar, or
    accept it from Needs attention when the first message arrives. There is no device list to
    sync: Rock7 has no API for it.
@@ -54,13 +62,13 @@ command with the reason. A command option `flush` clears the modem's queue first
 ## Connection test
 
 Rock7 has no ping. The test sends an empty message to a placeholder IMEI and reads the
-failure code: 10 means the login is wrong, any other code means the login was accepted. That
-Rock7 checks the login before the message is an assumption from the documented codes, to
-confirm live.
+failure code: 10 means the login is wrong, any other code means the login was accepted.
+Confirmed live on 2026-09-10: the right login answers `FAILED,16,No Data`.
 
 ## Troubleshooting
 
 - 401 on the webhook: the URL lost its `?token=`; copy it again from the data source.
-- 422 `Body is not valid JSON`: the endpoint type is neither `HTTP_POST` nor `HTTP_JSON`.
+- 422 `Body is not valid JSON`, or a failed source event without an `imei`: the delivery
+  address has another format than `HTTP_POST` or `HTTP_JSON`.
 - `Rock7 refused the login`: the portal username or password is wrong or changed.
 - `insufficient credit`: top up the account; the command was not queued.

@@ -2,7 +2,9 @@
 Postman collection's endpoint forms."""
 
 import base64
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 import pytest
@@ -14,6 +16,8 @@ from shared.connectivity.adapters.cloudloop import (
     parse_lingo,
 )
 from shared.connectivity.base import AdapterCapabilities, DataSourceContext
+from shared.device_drivers.base import SourceEventData
+from shared.device_drivers.registry import DRIVERS
 from shared.enums import AcquisitionChannel, ErrorCode, IngestionMethod
 from shared.trace import ApplicationError
 from tests.shared.test_adapters_and_drivers import context as base_context
@@ -276,3 +280,57 @@ async def test_refused_token_is_an_auth_failure(monkeypatch):
     with pytest.raises(ApplicationError) as excinfo:
         await CloudloopManagement(context()).test_connection()
     assert excinfo.value.code == ErrorCode.CONNECTIVITY_AUTH_FAILED
+
+
+# Real documents, see tests/fixtures/payloads/cloudloop/README.md.
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "payloads" / "cloudloop"
+
+
+def fixture(name: str) -> dict:
+    return json.loads((FIXTURES / name).read_text())
+
+
+def test_live_destination_test_document_is_a_lingo_message():
+    """Cloudloop's own destination test as delivered on 2026-09-10: no `sbd` section, the
+    identity from the hardware block, the text payload passed on untouched."""
+    message = parse_lingo(fixture("lingo_destination_test_live.json"))
+    assert message.external_id == "301434061403790" and message.identity_type == "imei"
+    assert (
+        message.event_type == "uplink" and message.acquisition_channel == AcquisitionChannel.IRIDIUM
+    )
+    assert message.identity_attributes["thing_id"] == "pwjgJyDQqreRkExdbAEAGYmVlazNdOMX"
+    assert message.identity_attributes["description"] == "CollarFree"
+    assert bytes.fromhex(message.payload["data_hex"]) == b"1965-06-15 Johnny Prescott"
+    assert message.network_received_at == datetime(2026, 9, 10, 8, 52, 9, tzinfo=UTC)
+    assert message.satellite_delivered_at == message.network_received_at  # no session time
+
+
+def test_real_satellite_message_decodes_as_stored_records():
+    """A complete 42 byte message of collar 220757 through the adapter and the OpenCollar
+    driver: the flash storage records the satellite buffer carries, each with its own time."""
+    message = parse_lingo(fixture("lingo_220757_replayed.json"))
+    assert message.satellite_delivered_at == datetime(2026, 4, 29, 16, 15, 45, tzinfo=UTC)
+    frame = bytes.fromhex(message.payload["data_hex"])
+    assert len(frame) == 42
+    records = DRIVERS["opencollar"].decode(
+        SourceEventData(
+            id=1,
+            event_type="uplink",
+            payload=message.payload,
+            provider_metadata=message.provider_metadata,
+            network_received_at=message.network_received_at,
+            ingested_at=datetime(2026, 9, 10, tzinfo=UTC),
+            device_attributes={},
+            device_type_settings={},
+            frame=frame,
+            f_port=None,
+            acquisition_channel="iridium",
+            firmware_version=None,
+        )
+    )
+    assert [p.time for p in records.positions] == [datetime(2026, 4, 29, 15, 17, 9, tzinfo=UTC)]
+    status = [s for s in records.states if s.record_type == "status"]
+    assert status and status[0].time == datetime(2026, 4, 29, 15, 15, 25, tzinfo=UTC)
+    assert status[0].state["firmware_version"] == "7.2"
+    battery = [m for m in records.measurements if m.metric_key == "battery_voltage"]
+    assert battery and battery[0].value == 4.31
