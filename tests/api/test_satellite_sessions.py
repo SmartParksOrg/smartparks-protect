@@ -144,9 +144,14 @@ async def test_sessions_are_read_deduplicated_counted_and_mapped(client, db):
     )
     assert connectivity.status_code == 200, connectivity.text
     block = connectivity.json()["sources"][0]
-    assert block["channel"] == "iridium" and block["status"] == "online"
-    assert block["lorawan"] is None
-    assert block["iridium"]["sessions"] == 2 and block["iridium"]["duplicates"] == 1
+    statuses = [
+        (r["processing_status"], (r.get("satellite") or {}).get("sequence"))
+        for r in await traffic()
+    ]
+    detail = f"block {json.dumps(block)}; traffic {statuses}"
+    assert block["channel"] == "iridium" and block["status"] == "online", detail
+    assert block["lorawan"] is None, detail
+    assert block["iridium"]["sessions"] == 2 and block["iridium"]["duplicates"] == 1, detail
     assert block["iridium"]["missed"] == 2 and block["iridium"]["bytes"] == 2 * 168
     assert block["iridium"]["last_session"]["sequence"] == 103
 
