@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { api } from "@/api/client";
 import { Callout } from "@/components/common/Callout";
@@ -36,12 +36,9 @@ export function LocationSourceCard({
   canEdit: boolean;
 }) {
   const { t } = useTranslation();
+  // The call sites key this card on the saved values, so a save or a reload remounts it.
   const [source, setSource] = useState<Source>(value as Source);
   const [hours, setHours] = useState(String(fallbackHours));
-  useEffect(() => {
-    setSource(value as Source);
-    setHours(String(fallbackHours));
-  }, [value, fallbackHours]);
   const save = useMutationToast({
     mutationFn: () =>
       api.patch(path, {

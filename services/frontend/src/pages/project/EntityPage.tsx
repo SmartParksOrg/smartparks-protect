@@ -453,6 +453,7 @@ export function EntityPage() {
                 </CardContent>
               </Card>
               <LocationSourceCard
+                key={`${e.location_source ?? "device"}-${e.location_fallback_hours ?? 24}`}
                 path={`/api/v1/projects/${projectId}/entities/${e.id}`}
                 value={e.location_source ?? "device"}
                 fallbackHours={e.location_fallback_hours ?? 24}

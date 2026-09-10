@@ -336,6 +336,7 @@ export function DevicePage() {
                 </CardContent>
               </Card>
               <LocationSourceCard
+                key={`${d.location_source ?? "device"}-${d.location_fallback_hours ?? 24}`}
                 path={`/api/v1/devices/${d.id}`}
                 value={d.location_source ?? "device"}
                 fallbackHours={d.location_fallback_hours ?? 24}

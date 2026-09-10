@@ -55,7 +55,11 @@ async def test_sessions_are_read_deduplicated_counted_and_mapped(client, db):
     device = (
         await client.post(
             "/api/v1/devices",
-            json={"device_type_id": device_type["id"], "name": "SP051890", "status": "active"},
+            json={
+                "device_type_id": device_type["id"],
+                "name": unique_name("SP051890"),
+                "status": "active",
+            },
             headers=h,
         )
     ).json()
@@ -157,7 +161,7 @@ async def test_sessions_are_read_deduplicated_counted_and_mapped(client, db):
     body = locations.json()
     assert body["total"] == 1 and not body["capped"]
     props = body["features"][0]["properties"]
-    assert props["device_name"] == "SP051890" and props["accuracy_m"] == 4000.0
+    assert props["device_name"] == device["name"] and props["accuracy_m"] == 4000.0
     assert props["method"] == "iridium_estimate"
     outside = await client.get(
         f"/api/v1/projects/{project.id}/map/network-locations",
