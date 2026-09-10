@@ -21,6 +21,7 @@ from protect_api.deps import (
 )
 from protect_api.health_areas import AreaHealth, area_health
 from shared.bus import RedisStreamsBus, Topic, is_stale
+from shared.connectivity.satellite import SatelliteSession
 from shared.database import get_session
 from shared.device_drivers.base import lorawan_frame, raw_frame
 from shared.enums import AcquisitionChannel, ProcessingStatus, TraceStatus
@@ -58,6 +59,52 @@ class ReceptionRead(BaseModel):
     channel: int | None
 
 
+class SatelliteSessionRead(BaseModel):
+    """The Iridium session behind a satellite delivery (decision D158)."""
+
+    status: str
+    status_text: str
+    status_code: int | None = None
+    sequence: int | None = Field(default=None, description="MOMSN, the modem's session counter")
+    mt_sequence: int | None = Field(
+        default=None, description="MTMSN of the message delivered to the modem in the session"
+    )
+    latitude: float | None = None
+    longitude: float | None = None
+    cep_km: float | None = Field(default=None, description="Circular error probable, km")
+    bytes: int = 0
+    session_at: datetime | None = None
+    missed_since_last: int | None = Field(
+        default=None, description="Sessions the counter skipped since the identity's last one"
+    )
+    duplicate_of: int | None = Field(
+        default=None, description="The earlier source event this delivery repeated"
+    )
+
+
+def satellite_read(meta: dict[str, Any]) -> SatelliteSessionRead | None:
+    data = meta.get("satellite_session")
+    if not isinstance(data, dict):
+        return None
+    parsed = SatelliteSession.from_dict(data)
+    if parsed is None:
+        return None
+    return SatelliteSessionRead(
+        status=parsed.status,
+        status_text=parsed.status_text,
+        status_code=parsed.status_code,
+        sequence=parsed.sequence,
+        mt_sequence=parsed.mt_sequence,
+        latitude=parsed.latitude,
+        longitude=parsed.longitude,
+        cep_km=parsed.cep_km,
+        bytes=parsed.bytes,
+        session_at=parsed.session_at,
+        missed_since_last=data.get("missed_since_last"),
+        duplicate_of=data.get("duplicate_of"),
+    )
+
+
 class TrafficRow(BaseModel):
     source_event_id: int
     ingested_at: datetime
@@ -93,6 +140,9 @@ class TrafficRow(BaseModel):
     trace_id: uuid.UUID | None
     payload: dict[str, Any] | None
     receptions: list[ReceptionRead]
+    satellite: SatelliteSessionRead | None = Field(
+        default=None, description="The Iridium session of a satellite delivery"
+    )
 
 
 class TraceSummary(BaseModel):
@@ -301,6 +351,7 @@ async def traffic_rows(
                 error_code=event.error_code,
                 trace_id=event.trace_id,
                 payload=event.payload if include_payload else None,
+                satellite=satellite_read(meta),
                 receptions=[
                     ReceptionRead(
                         gateway_id=r.gateway_id,

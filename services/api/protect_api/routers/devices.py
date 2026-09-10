@@ -50,6 +50,7 @@ from shared.domain.health import device_health
 from shared.domain.links import resolve_links
 from shared.enums import DeviceStatus, Role
 from shared.models import (
+    ConnectivityState,
     DataSource,
     Device,
     DeviceCurrentState,
@@ -168,6 +169,18 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
             )
         ).all()
     }
+    # The last satellite session per device (decision D159), from the connectivity state of
+    # its Iridium sources; the newest session when a device has more than one.
+    satellite: dict[uuid.UUID, dict[str, Any]] = {}
+    for connectivity in (
+        await session.scalars(select(ConnectivityState).where(ConnectivityState.device_id.in_(ids)))
+    ).all():
+        info = (connectivity.attributes or {}).get("satellite")
+        if not isinstance(info, dict):
+            continue
+        known = satellite.get(connectivity.device_id)
+        if known is None or str(info.get("session_at") or "") > str(known.get("session_at") or ""):
+            satellite[connectivity.device_id] = info
     source_names: dict[uuid.UUID, list[str]] = {}
     for device_id, name in (
         await session.execute(
@@ -192,6 +205,7 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
         read.last_seen_at = state.last_seen_at
         read.health = device_health(
             getattr(driver, "health", None),
+            satellite=satellite.get(device.id),
             latest_measurements=state.latest_measurements,
             latest_state=state.latest_state,
             latest_state_time=state.latest_state_time,

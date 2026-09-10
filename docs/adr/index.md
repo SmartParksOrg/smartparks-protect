@@ -27,3 +27,5 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0019 AI clients write through one policy-gated endpoint](0019-ai-writes-through-one-policy.md)
 - [0020 Entity groups as nested folders](0020-entity-groups.md)
 - [0021 Firmware-aware device driver layouts](0021-firmware-aware-driver.md)
+- [0022 The all-projects scope](0022-all-projects-scope.md)
+- [0023 The satellite session behind an Iridium delivery](0023-satellite-session-metadata.md)

@@ -47,7 +47,7 @@ A LingoMO message becomes one source event on the Iridium channel:
 | `message` (base64) | `data_hex` for the device driver, untouched |
 | `sbd.sessionAt` | `satellite_delivered_at`, provenance only |
 | `receivedAt` | `network_received_at` |
-| `sbd.momsn`, `sbd.mtmsn`, `sbd.cdrReference`, `sbd.status`, `sbd.location` (Iridium geolocation with `cep`) | provider metadata |
+| `sbd.momsn`, `sbd.mtmsn`, `sbd.status`, `sbd.location` (Iridium geolocation with `cep`) | the satellite session (ADR 0023); `sbd.cdrReference` stays provider metadata |
 | a message without payload | event type `sbd_session`, kept raw, nothing decoded |
 
 The deprecated Core and form shapes (`imei`, `momsn`, `transmit_time`, `data` in hex) are
@@ -61,9 +61,10 @@ position with two deliveries.
 Commands over an Iridium route call `POST Data/DoSendSbdMessage` with the thing id and the
 frame `[port][msg_id][len][data]` in hex, at most 270 bytes, the framing the collar's
 satellite receive path expects (wiki satellite page). The command reaches `queued`; Cloudloop
-hands it to the collar at its next satellite session. Delivery statuses are not polled: the
-collar's answer arrives as a later message and confirms the command through the action's
-interpreter.
+hands it to the collar at its next satellite session. Delivery statuses are not polled: an
+MTMSN above zero in a later session says the modem received one queued message, which moves
+the oldest pending command to transmitted, and the collar's answer confirms it through the
+action's interpreter.
 
 A route needs the thing id: from the first message's identity attributes, or from the
 management sync linked to the device.
@@ -93,6 +94,17 @@ status.
 `sbd.sessionAt` is when the satellite session ran, `receivedAt` when Cloudloop received the
 message; both are provenance. The canonical time comes from the record inside the payload
 (research 25.3): a fix delivered days later over satellite keeps its fix time.
+
+## What the session tells you
+
+Every delivery carries the satellite session (ADR 0023): its outcome, the modem's session
+counter (MOMSN), the size, and the network's estimate of where the modem was with its error
+radius (CEP, in km). The traffic view shows them on the row, the source event dialog under
+Provenance, and the device's health card keeps the last session as a line that warns when a
+session failed or sessions went missing. The estimates the network stands by draw as circles on
+the live map ("Satellite sessions" in the Coverage tab); an estimate the network calls poor is
+kept but not drawn. A retry of a delivery the server did not acknowledge is stored as a
+duplicate, not processed twice. A fix far outside the estimate's circle is noted on the trace.
 
 ## Troubleshooting
 

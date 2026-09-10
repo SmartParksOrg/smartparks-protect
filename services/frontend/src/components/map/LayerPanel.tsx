@@ -15,6 +15,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CoverageResponse,
   EntityGroup,
+  SatelliteSessionsResponse,
   Feature,
   Gateway,
 } from "@/api/types";
@@ -167,6 +168,7 @@ export function LayerPanel({
   events,
   gateways,
   coverage,
+  satellite,
   coverageError,
   onRetryCoverage,
   choices,
@@ -195,6 +197,8 @@ export function LayerPanel({
   events: EventFeatureProperties[];
   gateways: Gateway[];
   coverage: CoverageResponse | undefined;
+  /** The satellite sessions in view (decision D158), for the count on their row. */
+  satellite?: SatelliteSessionsResponse;
   /** Why the heard positions did not load, if they did not; the panel offers a retry. */
   coverageError?: string;
   onRetryCoverage?: () => void;
@@ -1251,6 +1255,24 @@ export function LayerPanel({
               ))}
             </SelectContent>
           </Select>
+        </Row>
+        <Row depth={0}>
+          <span className="size-6 shrink-0" />
+          <Check
+            checked={Boolean(choices.satellite)}
+            label={t("Satellite sessions")}
+            onChange={(v) => onChange({ ...choices, satellite: v })}
+          />
+          <span className="min-w-0 flex-1 truncate">
+            {t("Satellite sessions")}
+          </span>
+          {choices.satellite && satellite && (
+            <span className="text-xs text-muted-foreground">
+              {satellite.capped
+                ? t("the newest {{count}}", { count: satellite.total })
+                : t("{{count}} sessions", { count: satellite.total })}
+            </span>
+          )}
         </Row>
         {choices.coverage && choices.coverage_gateway && (
           <div className="px-2 pt-1 text-xs text-muted-foreground">

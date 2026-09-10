@@ -55,6 +55,7 @@ from shared.connectivity.base import (
     EventConnector,
     InboundMessage,
 )
+from shared.connectivity.satellite import SatelliteSession, status_from_name
 from shared.connectivity.transports.http import require_object
 from shared.enums import AcquisitionChannel, ErrorCode, IngestionMethod
 from shared.logger import get_logger
@@ -172,7 +173,26 @@ def parse_lingo(body: dict[str, Any]) -> InboundMessage:
         satellite_delivered_at=session_at or received_at,
         identity_type=IDENTITY_TYPE,
         identity_attributes=attributes,
+        satellite_session=SatelliteSession(
+            status=status_from_name(sbd.get("status")) if sbd else "unknown",
+            sequence=_int(sbd.get("momsn")),
+            mt_sequence=_int(sbd.get("mtmsn")),
+            latitude=_float(location.get("latitude")),
+            longitude=_float(location.get("longitude")),
+            cep_km=_float(location.get("cep")),
+            bytes=len(data),
+            session_at=session_at or received_at,
+        )
+        if sbd or data
+        else None,
     )
+
+
+def _int(value: Any) -> int | None:
+    try:
+        return int(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def parse_core(body: dict[str, Any]) -> InboundMessage:
@@ -216,6 +236,15 @@ def parse_core(body: dict[str, Any]) -> InboundMessage:
             }.items()
             if v not in (None, "")
         },
+        satellite_session=SatelliteSession(
+            status="ok" if data else "unknown",
+            sequence=_int(body.get("momsn")),
+            latitude=_float(body.get("iridium_latitude")),
+            longitude=_float(body.get("iridium_longitude")),
+            cep_km=_float(body.get("iridium_cep") or body.get("cep")),
+            bytes=len(data),
+            session_at=transmit,
+        ),
     )
 
 

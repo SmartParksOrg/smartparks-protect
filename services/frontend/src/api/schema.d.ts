@@ -1988,6 +1988,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/map/satellite-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Satellite Sessions
+         * @description Where the Iridium network placed the scope's collars at their satellite sessions
+         *     (decision D158): one point per delivery with the estimate's circular error probable, the
+         *     newest `MAX_SATELLITE_SESSIONS` in the window and view. Sessions whose status disowns the
+         *     estimate and redeliveries are left out. The estimate is provenance, never a position.
+         */
+        get: operations["satellite_sessions_api_v1_projects__project_id__map_satellite_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/map/heat": {
         parameters: {
             query?: never;
@@ -9440,6 +9463,73 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * SatelliteSessionRead
+         * @description The Iridium session behind a satellite delivery (decision D158).
+         */
+        SatelliteSessionRead: {
+            /** Status */
+            status: string;
+            /** Status Text */
+            status_text: string;
+            /** Status Code */
+            status_code?: number | null;
+            /**
+             * Sequence
+             * @description MOMSN, the modem's session counter
+             */
+            sequence?: number | null;
+            /**
+             * Mt Sequence
+             * @description MTMSN of the message delivered to the modem in the session
+             */
+            mt_sequence?: number | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /**
+             * Cep Km
+             * @description Circular error probable, km
+             */
+            cep_km?: number | null;
+            /**
+             * Bytes
+             * @default 0
+             */
+            bytes: number;
+            /** Session At */
+            session_at?: string | null;
+            /**
+             * Missed Since Last
+             * @description Sessions the counter skipped since the identity's last one
+             */
+            missed_since_last?: number | null;
+            /**
+             * Duplicate Of
+             * @description The earlier source event this delivery repeated
+             */
+            duplicate_of?: number | null;
+        };
+        /** SatelliteSessionsResponse */
+        SatelliteSessionsResponse: {
+            /** Hours */
+            hours: number;
+            /**
+             * Total
+             * @description Sessions with a usable estimate in the window and view
+             */
+            total: number;
+            /**
+             * Capped
+             * @description True when more sessions exist than were returned
+             */
+            capped: boolean;
+            /** Features */
+            features: {
+                [key: string]: unknown;
+            }[];
+        };
         /** SavedViewCreate */
         SavedViewCreate: {
             /** Name */
@@ -9987,6 +10077,8 @@ export interface components {
             } | null;
             /** Receptions */
             receptions: components["schemas"]["ReceptionRead"][];
+            /** @description The Iridium session of a satellite delivery */
+            satellite?: components["schemas"]["SatelliteSessionRead"] | null;
         };
         /**
          * TrafficSummary
@@ -14937,6 +15029,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PointRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    satellite_sessions_api_v1_projects__project_id__map_satellite_sessions_get: {
+        parameters: {
+            query?: {
+                /** @description west,south,east,north in WGS84 */
+                bbox?: string | null;
+                hours?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SatelliteSessionsResponse"];
                 };
             };
             /** @description Validation Error */

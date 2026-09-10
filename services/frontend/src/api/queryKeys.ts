@@ -8,32 +8,54 @@ export const queryKeys = {
   organizations: ["organizations"] as const,
   project: (id: string) => ["projects", id] as const,
   members: (projectId: string) => ["projects", projectId, "members"] as const,
-  invitations: (projectId: string) => ["projects", projectId, "invitations"] as const,
+  invitations: (projectId: string) =>
+    ["projects", projectId, "invitations"] as const,
   entities: (projectId: string) => ["projects", projectId, "entities"] as const,
-  entity: (projectId: string, entityId: string) => ["projects", projectId, "entities", entityId] as const,
+  entity: (projectId: string, entityId: string) =>
+    ["projects", projectId, "entities", entityId] as const,
   features: (projectId: string) => ["projects", projectId, "features"] as const,
   groups: (projectId: string) => ["projects", projectId, "groups"] as const,
   search: (q: string) => ["search", q] as const,
-  coverage: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "coverage", params] as const,
-  entityAssignments: (projectId: string, params: Record<string, unknown> = {}) => ["projects", projectId, "entity-assignments", params] as const,
-  currentState: (projectId: string) => ["projects", projectId, "map", "current"] as const,
-  mapDevices: (projectId: string) => ["projects", projectId, "map", "devices"] as const,
-  track: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "track", params] as const,
-  pointAt: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "point", params] as const,
-  heat: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "map", "heat", params] as const,
+  coverage: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "coverage", params] as const,
+  entityAssignments: (
+    projectId: string,
+    params: Record<string, unknown> = {},
+  ) => ["projects", projectId, "entity-assignments", params] as const,
+  currentState: (projectId: string) =>
+    ["projects", projectId, "map", "current"] as const,
+  mapDevices: (projectId: string) =>
+    ["projects", projectId, "map", "devices"] as const,
+  track: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "track", params] as const,
+  pointAt: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "point", params] as const,
+  heat: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "map", "heat", params] as const,
+  satelliteSessions: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "map", "satellite-sessions", params] as const,
   mapConfig: ["map", "config"] as const,
-  recordsCount: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "records", "count", params] as const,
-  recordsPage: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "records", "page", params] as const,
-  positions: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "positions", params] as const,
-  traffic: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "traffic", params] as const,
-  sourceTraffic: (sourceId: string, params: Record<string, unknown>) => ["data-sources", sourceId, "traffic", params] as const,
+  recordsCount: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "records", "count", params] as const,
+  recordsPage: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "records", "page", params] as const,
+  positions: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "positions", params] as const,
+  traffic: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "traffic", params] as const,
+  sourceTraffic: (sourceId: string, params: Record<string, unknown>) =>
+    ["data-sources", sourceId, "traffic", params] as const,
   adminTrafficSummary: ["admin", "traffic", "summary"] as const,
-  adminTraffic: (tab: string, params: Record<string, unknown>) => ["admin", "traffic", tab, params] as const,
+  adminTraffic: (tab: string, params: Record<string, unknown>) =>
+    ["admin", "traffic", tab, params] as const,
   adminDelivery: (id: string) => ["admin", "traffic", "delivery", id] as const,
-  traces: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "traces", params] as const,
+  traces: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "traces", params] as const,
   trace: (id: string) => ["traces", id] as const,
-  sourceEvent: (id: number, ingestedAt: string) => ["source-events", id, ingestedAt] as const,
-  audit: (projectId: string | null) => ["audit", projectId ?? "server"] as const,
+  sourceEvent: (id: number, ingestedAt: string) =>
+    ["source-events", id, ingestedAt] as const,
+  audit: (projectId: string | null) =>
+    ["audit", projectId ?? "server"] as const,
   devices: (params: Record<string, unknown>) => ["devices", params] as const,
   device: (id: string) => ["devices", id] as const,
   deviceSpan: (id: string) => ["devices", id, "span"] as const,
@@ -44,59 +66,109 @@ export const queryKeys = {
   adapters: ["data-sources", "adapters"] as const,
   dataSource: (id: string) => ["data-sources", id] as const,
   dataSourceStatus: (id: string) => ["data-sources", id, "status"] as const,
-  identities: (dataSourceId: string) => ["data-sources", dataSourceId, "identities"] as const,
+  identities: (dataSourceId: string) =>
+    ["data-sources", dataSourceId, "identities"] as const,
   users: ["admin", "users"] as const,
   serverInvitations: ["admin", "invitations"] as const,
   attentionSummary: ["attention", "summary"] as const,
   unknownIdentities: ["attention", "identities"] as const,
   newMetrics: ["attention", "metrics"] as const,
   deadLetters: (topic: string) => ["attention", "dead-letters", topic] as const,
-  failedSourceEvents: (status: string) => ["attention", "source-events", status] as const,
+  failedSourceEvents: (status: string) =>
+    ["attention", "source-events", status] as const,
   systemHealth: ["system", "health"] as const,
   backupStatus: ["admin", "backups", "status"] as const,
   backupRuns: ["admin", "backups", "runs"] as const,
-  analyticsSeries: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "analytics", "series", params] as const,
-  analyticsRows: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "analytics", "rows", params] as const,
-  analyticsMetrics: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "analytics", "metrics", params] as const,
-  savedViews: (projectId: string) => ["projects", projectId, "analytics", "saved-views"] as const,
+  analyticsSeries: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "analytics", "series", params] as const,
+  analyticsRows: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "analytics", "rows", params] as const,
+  analyticsMetrics: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "analytics", "metrics", params] as const,
+  savedViews: (projectId: string) =>
+    ["projects", projectId, "analytics", "saved-views"] as const,
   exports: (projectId: string) => ["projects", projectId, "exports"] as const,
-  exportJob: (projectId: string, id: string) => ["projects", projectId, "exports", id] as const,
+  exportJob: (projectId: string, id: string) =>
+    ["projects", projectId, "exports", id] as const,
   rules: (projectId: string) => ["projects", projectId, "rules"] as const,
-  ruleVersions: (projectId: string, ruleId: string) => ["projects", projectId, "rules", ruleId, "versions"] as const,
-  ruleTemplates: (projectId: string) => ["projects", projectId, "rules", "templates"] as const,
-  events: (scope: string, params: Record<string, unknown>) => ["events", scope, params] as const,
+  ruleVersions: (projectId: string, ruleId: string) =>
+    ["projects", projectId, "rules", ruleId, "versions"] as const,
+  ruleTemplates: (projectId: string) =>
+    ["projects", projectId, "rules", "templates"] as const,
+  events: (scope: string, params: Record<string, unknown>) =>
+    ["events", scope, params] as const,
   event: (scope: string, id: string) => ["events", scope, id] as const,
-  alerts: (scope: string, params: Record<string, unknown>) => ["alerts", scope, params] as const,
+  alerts: (scope: string, params: Record<string, unknown>) =>
+    ["alerts", scope, params] as const,
   automations: (scope: string) => ["automations", scope] as const,
-  notificationTargets: (scope: string) => ["notification-targets", scope] as const,
-  notificationCapabilities: (scope: string) => ["notification-capabilities", scope] as const,
-  deliveries: (scope: string, params: Record<string, unknown>) => ["deliveries", scope, params] as const,
-  mapEvents: (projectId: string, hours: number) => ["projects", projectId, "map", "events", hours] as const,
-  deviceActions: (deviceId: string) => ["devices", deviceId, "actions"] as const,
-  deviceCommands: (deviceId: string) => ["devices", deviceId, "commands"] as const,
+  notificationTargets: (scope: string) =>
+    ["notification-targets", scope] as const,
+  notificationCapabilities: (scope: string) =>
+    ["notification-capabilities", scope] as const,
+  deliveries: (scope: string, params: Record<string, unknown>) =>
+    ["deliveries", scope, params] as const,
+  mapEvents: (projectId: string, hours: number) =>
+    ["projects", projectId, "map", "events", hours] as const,
+  deviceActions: (deviceId: string) =>
+    ["devices", deviceId, "actions"] as const,
+  deviceCommands: (deviceId: string) =>
+    ["devices", deviceId, "commands"] as const,
   command: (id: string) => ["commands", id] as const,
-  projectCommands: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "commands", params] as const,
-  downlinkQueue: (deviceId: string) => ["devices", deviceId, "downlink-queue"] as const,
+  projectCommands: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "commands", params] as const,
+  downlinkQueue: (deviceId: string) =>
+    ["devices", deviceId, "downlink-queue"] as const,
   deviceRoutes: (deviceId: string) => ["devices", deviceId, "routes"] as const,
   logFiles: (deviceId: string) => ["devices", deviceId, "log-files"] as const,
-  driverCatalog: (deviceId: string) => ["devices", deviceId, "driver-catalog"] as const,
-  recordDeliveries: (canonicalType: string, canonicalId: number) => ["record-deliveries", canonicalType, canonicalId] as const,
-  dashboards: (projectId: string) => ["projects", projectId, "dashboards"] as const,
-  dashboard: (projectId: string, id: string) => ["projects", projectId, "dashboards", id] as const,
-  projectIcons: (projectId: string) => ["projects", projectId, "icons"] as const,
+  driverCatalog: (deviceId: string) =>
+    ["devices", deviceId, "driver-catalog"] as const,
+  recordDeliveries: (canonicalType: string, canonicalId: number) =>
+    ["record-deliveries", canonicalType, canonicalId] as const,
+  dashboards: (projectId: string) =>
+    ["projects", projectId, "dashboards"] as const,
+  dashboard: (projectId: string, id: string) =>
+    ["projects", projectId, "dashboards", id] as const,
+  projectIcons: (projectId: string) =>
+    ["projects", projectId, "icons"] as const,
   aiPolicy: ["admin", "ai-policy"] as const,
-  curationSummary: (projectId: string) => ["projects", projectId, "curation", "summary"] as const,
-  corrections: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "curation", "corrections", params] as const,
-  curationJobs: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "curation", "jobs", params] as const,
-  curationJob: (projectId: string, id: string) => ["projects", projectId, "curation", "jobs", id] as const,
-  recordHistory: (projectId: string, targetType: string, targetId: number, targetTime: string) => ["projects", projectId, "curation", "history", targetType, targetId, targetTime] as const,
-  integrationConnectors: (projectId: string) => ["projects", projectId, "integrations", "connectors"] as const,
-  integrations: (projectId: string) => ["projects", projectId, "integrations"] as const,
-  integration: (projectId: string, id: string) => ["projects", projectId, "integrations", id] as const,
-  integrationDeliveries: (projectId: string, params: Record<string, unknown>) => ["projects", projectId, "integration-deliveries", params] as const,
-  integrationDelivery: (projectId: string, id: string) => ["projects", projectId, "integration-deliveries", id] as const,
-  gateways: (projectId: string, hours: number) => ["projects", projectId, "gateways", hours] as const,
-  gateway: (projectId: string, id: string, hours: number) => ["projects", projectId, "gateways", id, hours] as const,
-  connectivity: (projectId: string, hours: number) => ["projects", projectId, "connectivity", hours] as const,
+  curationSummary: (projectId: string) =>
+    ["projects", projectId, "curation", "summary"] as const,
+  corrections: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "curation", "corrections", params] as const,
+  curationJobs: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "curation", "jobs", params] as const,
+  curationJob: (projectId: string, id: string) =>
+    ["projects", projectId, "curation", "jobs", id] as const,
+  recordHistory: (
+    projectId: string,
+    targetType: string,
+    targetId: number,
+    targetTime: string,
+  ) =>
+    [
+      "projects",
+      projectId,
+      "curation",
+      "history",
+      targetType,
+      targetId,
+      targetTime,
+    ] as const,
+  integrationConnectors: (projectId: string) =>
+    ["projects", projectId, "integrations", "connectors"] as const,
+  integrations: (projectId: string) =>
+    ["projects", projectId, "integrations"] as const,
+  integration: (projectId: string, id: string) =>
+    ["projects", projectId, "integrations", id] as const,
+  integrationDeliveries: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "integration-deliveries", params] as const,
+  integrationDelivery: (projectId: string, id: string) =>
+    ["projects", projectId, "integration-deliveries", id] as const,
+  gateways: (projectId: string, hours: number) =>
+    ["projects", projectId, "gateways", hours] as const,
+  gateway: (projectId: string, id: string, hours: number) =>
+    ["projects", projectId, "gateways", id, hours] as const,
+  connectivity: (projectId: string, hours: number) =>
+    ["projects", projectId, "connectivity", hours] as const,
   dataSourceCursor: (id: string) => ["data-sources", id, "cursor"] as const,
 };

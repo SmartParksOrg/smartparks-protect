@@ -31,7 +31,8 @@ export type HealthValue = Schemas["HealthValue"];
 export type BulkCreateResult = Schemas["BulkCreateResult"];
 export type BulkAssignResult = Schemas["BulkAssignResult"];
 export type ConnectApplicationsResult = Schemas["ConnectApplicationsResult"];
-export type DisconnectApplicationsResult = Schemas["DisconnectApplicationsResult"];
+export type DisconnectApplicationsResult =
+  Schemas["DisconnectApplicationsResult"];
 export type ApplicationStatus = Schemas["ApplicationStatus"];
 export type NewMetric = Schemas["NewMetric"];
 export type NewMetricsResponse = Schemas["NewMetricsResponse"];
@@ -119,3 +120,5 @@ export interface Page<T> {
 
 export type Role = "project-viewer" | "project-admin" | "server-admin";
 export type ClockAheadDevice = Schemas["ClockAheadDevice"];
+export type SatelliteSessionsResponse = Schemas["SatelliteSessionsResponse"];
+export type SatelliteSession = Schemas["SatelliteSessionRead"];

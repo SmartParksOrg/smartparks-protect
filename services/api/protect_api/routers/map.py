@@ -28,6 +28,7 @@ from protect_api.deps import (
     require_scope_permission,
 )
 from protect_api.routers.data import PositionRead, position_read
+from shared.connectivity.satellite import ESTIMATE_STATUSES, SatelliteSession
 from shared.curation.effective import (
     at_time,
     effective_geom,
@@ -39,6 +40,7 @@ from shared.curation.effective import (
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.health import device_health
+from shared.enums import AcquisitionChannel, ProcessingStatus
 from shared.models import (
     Device,
     DeviceCurrentState,
@@ -51,6 +53,7 @@ from shared.models import (
     Measurement,
     Metric,
     Position,
+    SourceEvent,
 )
 from shared.permissions import Permission
 from shared.timeutil import require_aware, utc_now
@@ -613,6 +616,87 @@ async def position_at(
         device_name=device_name,
         entity_name=entity_name,
         measurements=measurements,
+    )
+
+
+class SatelliteSessionsResponse(BaseModel):
+    hours: int
+    total: int = Field(description="Sessions with a usable estimate in the window and view")
+    capped: bool = Field(description="True when more sessions exist than were returned")
+    features: list[dict[str, Any]]
+
+
+MAX_SATELLITE_SESSIONS = 2000
+MAX_SATELLITE_HOURS = 24 * 90
+
+
+@router.get("/map/satellite-sessions", response_model=SatelliteSessionsResponse)
+async def satellite_sessions(
+    bbox: str | None = Query(None, description="west,south,east,north in WGS84"),
+    hours: int = Query(168, ge=1, le=MAX_SATELLITE_HOURS),
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> SatelliteSessionsResponse:
+    """Where the Iridium network placed the scope's collars at their satellite sessions
+    (decision D158): one point per delivery with the estimate's circular error probable, the
+    newest `MAX_SATELLITE_SESSIONS` in the window and view. Sessions whose status disowns the
+    estimate and redeliveries are left out. The estimate is provenance, never a position."""
+    until = utc_now()
+    since = until - timedelta(hours=hours)
+    west, south, east, north = _bbox(bbox) or (-180.0, -90.0, 180.0, 90.0)
+    info = SourceEvent.provider_metadata["satellite_session"]
+    statement = (
+        select(
+            SourceEvent.id,
+            SourceEvent.device_id,
+            Device.name,
+            info,
+        )
+        .join(Device, Device.id == SourceEvent.device_id)
+        .where(
+            SourceEvent.acquisition_channel == AcquisitionChannel.IRIDIUM,
+            SourceEvent.ingested_at >= since,
+            SourceEvent.ingested_at < until,
+            SourceEvent.processing_status != ProcessingStatus.DUPLICATE,
+            info["status"].as_string().in_(sorted(ESTIMATE_STATUSES)),
+            info["latitude"].as_float().between(south, north),
+            info["longitude"].as_float().between(west, east),
+        )
+        .order_by(SourceEvent.ingested_at.desc())
+        .limit(MAX_SATELLITE_SESSIONS + 1)
+    )
+    if context.project_id is not None:
+        assigned = select(DeviceProjectAssignment.device_id).where(
+            DeviceProjectAssignment.project_id == context.project_id,
+            DeviceProjectAssignment.validity.op("@>")(until),
+        )
+        statement = statement.where(SourceEvent.device_id.in_(assigned))
+    rows = (await session.execute(statement)).all()
+    capped = len(rows) > MAX_SATELLITE_SESSIONS
+    features = []
+    for event_id, device_id, device_name, data in rows[:MAX_SATELLITE_SESSIONS]:
+        parsed = SatelliteSession.from_dict(data)
+        if parsed is None or not parsed.has_estimate:
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "id": event_id,
+                "geometry": {"type": "Point", "coordinates": [parsed.longitude, parsed.latitude]},
+                "properties": {
+                    "source_event_id": event_id,
+                    "device_id": str(device_id),
+                    "device_name": device_name,
+                    "session_at": parsed.session_at.isoformat() if parsed.session_at else None,
+                    "cep_km": parsed.cep_km,
+                    "status": parsed.status,
+                    "sequence": parsed.sequence,
+                    "bytes": parsed.bytes,
+                },
+            }
+        )
+    return SatelliteSessionsResponse(
+        hours=hours, total=len(features), capped=capped, features=features
     )
 
 

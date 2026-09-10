@@ -320,6 +320,68 @@ export function TraceTimeline({ trace }: { trace: Trace }) {
 }
 
 /** Where a record came from: data source, identity, every delivery, raw payload, trace, deep links. */
+/** The Iridium session of a satellite delivery (decision D158), from the provider metadata the
+ * ingest normalised: its outcome, its counters, the network's estimate and its error radius. */
+function satelliteRows(
+  metadata: Record<string, unknown> | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  const s = metadata?.satellite_session as
+    | {
+        status?: string;
+        status_text?: string;
+        sequence?: number | null;
+        mt_sequence?: number | null;
+        latitude?: number | null;
+        longitude?: number | null;
+        cep_km?: number | null;
+        bytes?: number;
+        missed_since_last?: number;
+        duplicate_of?: number;
+      }
+    | undefined;
+  if (!s) return null;
+  const estimate =
+    s.latitude != null && s.longitude != null
+      ? `${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}${s.cep_km != null ? ` ±${s.cep_km} km` : ""}`
+      : null;
+  return (
+    <>
+      <dt className="text-muted-foreground">{t("Session outcome")}</dt>
+      <dd>
+        {s.status_text ?? s.status}
+        {s.missed_since_last
+          ? ` · ${t("{{count}} sessions missed before it", { count: s.missed_since_last })}`
+          : ""}
+        {s.duplicate_of != null
+          ? ` · ${t("redelivery of source event {{id}}", { id: s.duplicate_of })}`
+          : ""}
+      </dd>
+      {(s.sequence != null || s.mt_sequence != null) && (
+        <>
+          <dt className="text-muted-foreground">{t("Session counters")}</dt>
+          <dd className="font-mono">
+            {s.sequence != null ? `MOMSN ${s.sequence}` : ""}
+            {s.sequence != null && s.mt_sequence != null ? " · " : ""}
+            {s.mt_sequence != null ? `MTMSN ${s.mt_sequence}` : ""}
+          </dd>
+        </>
+      )}
+      {estimate && (
+        <>
+          <dt className="text-muted-foreground">{t("Network estimate")}</dt>
+          <dd className="font-mono">
+            {estimate}
+            {s.status === "location_unacceptable"
+              ? ` (${t("poor, not shown on the map")})`
+              : ""}
+          </dd>
+        </>
+      )}
+    </>
+  );
+}
+
 export function SourceEventPanel({
   id,
   ingestedAt,
@@ -482,6 +544,7 @@ export function SourceEventPanel({
               <dd>{formatTime(e.satellite_delivered_at)}</dd>
             </>
           )}
+          {satelliteRows(e.provider_metadata, t)}
           {e.ble_synced_at && (
             <>
               <dt className="text-muted-foreground">{t("Read over BLE")}</dt>

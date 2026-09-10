@@ -14,6 +14,7 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
+from shared.connectivity.satellite import SatelliteSession
 from shared.enums import AcquisitionChannel, IngestionMethod
 
 
@@ -102,6 +103,13 @@ class InboundMessage:
     )
     gateway_receptions: list[GatewayReceptionData] = field(default_factory=list)
     gateway: GatewayUpdate | None = None
+    satellite_session: SatelliteSession | None = field(
+        default=None,
+        metadata={
+            "doc": "The Iridium session behind a satellite delivery (decision D158): status, "
+            "sequence numbers and the network's location estimate, one shape for every platform"
+        },
+    )
     device_id: uuid.UUID | None = field(
         default=None,
         metadata={

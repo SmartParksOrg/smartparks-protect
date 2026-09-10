@@ -9,7 +9,7 @@ from datetime import timedelta
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import Topic
@@ -581,6 +581,47 @@ async def interpret_device_records(
         if moved:
             messages.append(command_message(command))
     return messages
+
+
+async def apply_satellite_delivery(
+    session: AsyncSession, device: Device, event: SourceEvent, mt_sequence: int | None
+) -> list[tuple[str, dict[str, Any]]]:
+    """An Iridium session that reports an MTMSN above zero carried exactly one queued message
+    to the modem (decision D160): the oldest command pending on that route, submitted before
+    the session, is transmitted. Rock7 deliveries carry no MTMSN, so nothing moves there; the
+    collar's own answer still confirms through the action's interpreter."""
+    if not mt_sequence or mt_sequence <= 0 or event.data_source_id is None:
+        return []
+    when = event.satellite_delivered_at or event.network_received_at or event.ingested_at
+    command = await session.scalar(
+        select(Command)
+        .where(
+            Command.device_id == device.id,
+            Command.data_source_id == event.data_source_id,
+            Command.status.in_(
+                [
+                    CommandStatus.SUBMITTED,
+                    CommandStatus.ACCEPTED_BY_NETWORK,
+                    CommandStatus.QUEUED,
+                    CommandStatus.SCHEDULED,
+                ]
+            ),
+            or_(Command.submitted_at.is_(None), Command.submitted_at <= when),
+        )
+        .order_by(Command.submitted_at.nulls_last(), Command.created_at)
+        .limit(1)
+    )
+    if command is None:
+        return []
+    command.transmitted_at = command.transmitted_at or when
+    moved = await _record(
+        session,
+        command,
+        CommandStatus.TRANSMITTED,
+        "adapter:satellite_session",
+        {"mt_sequence": mt_sequence, "source_event_id": event.id},
+    )
+    return [command_message(command)] if moved else []
 
 
 async def expire_commands(session: AsyncSession) -> list[tuple[str, dict[str, Any]]]:

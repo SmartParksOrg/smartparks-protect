@@ -146,3 +146,4 @@ nav:
       - adr/0020-entity-groups.md
       - adr/0021-firmware-aware-driver.md
       - adr/0022-all-projects-scope.md
+      - adr/0023-satellite-session-metadata.md

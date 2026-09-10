@@ -11,7 +11,9 @@ Built from the RockBLOCK web services documentation
   HTTP_POST_GEOJSON) as `application/x-www-form-urlencoded` (`HTTP_POST`) or JSON
   (`HTTP_JSON`) with the fields `imei`, `serial`, `momsn`, `transmit_time` (UTC as
   `YY-MM-DD HH:MM:SS`), `iridium_latitude`, `iridium_longitude`, `iridium_cep` (an accuracy
-  estimate in km) and `data`, the payload hex encoded. The server answers 200 within three
+  estimate in km) and `data`, the payload hex encoded; the first live delivery (2026-09-10)
+  also carried `device_type` (`ROCKBLOCK`) and `iridium_session_status`, kept as provider
+  metadata, and no name: the device is named by hand. The server answers 200 within three
   seconds; failures are retried with a doubling backoff for fourteen attempts (almost six
   days). Rock7 sends no authentication, so the source's token travels in the URL (`?token=`)
   and the source may restrict the caller addresses (none are documented).
@@ -42,6 +44,7 @@ from shared.connectivity.base import (
     EventConnector,
     InboundMessage,
 )
+from shared.connectivity.satellite import SatelliteSession, status_from_code
 from shared.connectivity.transports.http import require_object
 from shared.enums import AcquisitionChannel, ErrorCode, IngestionMethod
 from shared.logger import get_logger
@@ -128,6 +131,8 @@ def parse_message(body: dict[str, Any]) -> InboundMessage:
             for k, v in {
                 "momsn": body.get("momsn"),
                 "serial": body.get("serial"),
+                "device_type": body.get("device_type"),
+                "session_status": body.get("iridium_session_status"),
                 "transmit_time": transmitted.isoformat() if transmitted else None,
                 "iridium_location": location or None,
                 "bytes": len(data),
@@ -139,7 +144,29 @@ def parse_message(body: dict[str, Any]) -> InboundMessage:
         identity_attributes={
             k: v for k, v in {"serial": body.get("serial")}.items() if v not in (None, "")
         },
+        satellite_session=SatelliteSession(
+            # `iridium_session_status` is not documented; the live deliveries carry the Iridium
+            # code (2 with a 64 km estimate on the first one). Absent, a delivery with data
+            # was a completed session.
+            status=status_from_code(body.get("iridium_session_status"))
+            if body.get("iridium_session_status") not in (None, "")
+            else ("ok" if data else "unknown"),
+            status_code=_code(body.get("iridium_session_status")),
+            sequence=_code(body.get("momsn")),
+            latitude=_float(body.get("iridium_latitude")),
+            longitude=_float(body.get("iridium_longitude")),
+            cep_km=_float(body.get("iridium_cep")),
+            bytes=len(data),
+            session_at=transmitted,
+        ),
     )
+
+
+def _code(value: Any) -> int | None:
+    try:
+        return int(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def parse_mt_response(text: str) -> str:

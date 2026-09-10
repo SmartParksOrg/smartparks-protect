@@ -22,7 +22,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
-from shared.control.commands import apply_provider_signal, interpret_device_records
+from shared.connectivity.satellite import SatelliteSession, estimate_disagreement
+from shared.control.commands import (
+    apply_provider_signal,
+    apply_satellite_delivery,
+    interpret_device_records,
+)
 from shared.device_drivers.base import (
     DecodedMeasurement,
     DecodedPosition,
@@ -99,6 +104,27 @@ def _ahead_of_delivery(event: SourceEvent, record_time: datetime) -> float:
 def event_age(record_time: datetime, ingested_at: datetime) -> float:
     """Seconds between the canonical time of a record and its arrival (architecture 25.8)."""
     return (ingested_at - record_time).total_seconds()
+
+
+def _note_estimate_disagreement(event: SourceEvent, records: DecodedRecords) -> None:
+    """A decoded fix far outside the satellite network's location estimate is worth a note on
+    the trace (decision D158): a GNSS fault, a clock fault or a collar that travelled a long
+    way between the fix and the session."""
+    satellite = SatelliteSession.from_dict((event.provider_metadata or {}).get("satellite_session"))
+    if satellite is None or not records.positions:
+        return
+    farthest = max(
+        (
+            estimate_disagreement(satellite, p.latitude, p.longitude) or 0.0
+            for p in records.positions
+        ),
+        default=0.0,
+    )
+    if farthest > 0:
+        records.notes.append(
+            f"a fix lies {farthest / 1000:.0f} km from the Iridium estimate "
+            f"(CEP {satellite.cep_km:g} km)"
+        )
 
 
 def network_event_records(event: SourceEvent, payload: dict[str, Any]) -> DecodedRecords:
@@ -272,6 +298,7 @@ async def process_source_event(
                 decoder_version=records.decoder_version,
             )
             _summarize(outcome, records)
+            _note_estimate_disagreement(event, records)
             if records.notes:
                 step.metadata["notes"] = list(records.notes)
             if records.empty:
@@ -306,6 +333,13 @@ async def process_source_event(
 
         await _update_current_state(session, event, device, records, attributions)
         outcome.messages += await interpret_device_records(session, device, driver, event, records)
+        satellite = SatelliteSession.from_dict(
+            (event.provider_metadata or {}).get("satellite_session")
+        )
+        if satellite is not None:
+            outcome.messages += await apply_satellite_delivery(
+                session, device, event, satellite.mt_sequence
+            )
     except ApplicationError as error:
         event.processing_status = ProcessingStatus.FAILED
         event.error_code = error.code
@@ -717,6 +751,12 @@ async def _update_current_state(
         connectivity.last_rssi = float(meta["best_rssi"])
     if meta.get("best_snr") is not None:
         connectivity.last_snr = float(meta["best_snr"])
+    if isinstance(meta.get("satellite_session"), dict):
+        # the last Iridium session per device and source (decision D159), read by the health
+        connectivity.attributes = {
+            **(connectivity.attributes or {}),
+            "satellite": dict(meta["satellite_session"]),
+        }
     connectivity.updated_at = now
 
     if latest_position is not None:

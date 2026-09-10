@@ -20,6 +20,7 @@ export const SOURCES = {
   gateways: "gateways",
   coverage: "coverage",
   heat: "heat",
+  satellite: "satellite",
 } as const;
 
 /** Glyphs the OpenFreeMap styles serve; the MapLibre default (Open Sans) is not among them. */
@@ -889,6 +890,64 @@ export function ensureCoverageLayers(map: MapLibreMap): void {
     },
     before,
   );
+}
+
+/** Satellite sessions (decision D158): the Iridium network's estimate of where a collar was at
+ * each session, an error circle in the sand tint with its centre, under the coverage layer. */
+export function ensureSatelliteLayers(map: MapLibreMap): void {
+  if (map.getSource(SOURCES.satellite)) return;
+  map.addSource(SOURCES.satellite, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  const before = map.getLayer("coverage-hex")
+    ? "coverage-hex"
+    : map.getLayer("gateway-markers")
+      ? "gateway-markers"
+      : "entity-clusters";
+  map.addLayer(
+    {
+      id: "satellite-circles",
+      type: "fill",
+      source: SOURCES.satellite,
+      filter: ["==", ["get", "kind"], "circle"],
+      paint: { "fill-color": "#C6B187", "fill-opacity": 0.18 },
+    },
+    before,
+  );
+  map.addLayer(
+    {
+      id: "satellite-circle-lines",
+      type: "line",
+      source: SOURCES.satellite,
+      filter: ["==", ["get", "kind"], "circle"],
+      paint: { "line-color": "#C6B187", "line-width": 1, "line-opacity": 0.8 },
+    },
+    before,
+  );
+  map.addLayer(
+    {
+      id: "satellite-centres",
+      type: "circle",
+      source: SOURCES.satellite,
+      filter: ["==", ["get", "kind"], "centre"],
+      paint: {
+        "circle-radius": 3,
+        "circle-color": "#C6B187",
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 1,
+      },
+    },
+    before,
+  );
+}
+
+export function setSatelliteSessions(
+  map: MapLibreMap,
+  features: GeoJSON.Feature[],
+): void {
+  const source = map.getSource(SOURCES.satellite) as GeoJSONSource | undefined;
+  source?.setData({ type: "FeatureCollection", features });
 }
 
 export function setCoverage(

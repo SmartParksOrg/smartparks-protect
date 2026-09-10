@@ -1,7 +1,9 @@
 """Rock7 RockBLOCK adapter (decision D156) against the documented delivery fields and the MT
 endpoint's answers (https://docs.groundcontrol.com/iot/rockblock/web-services, 2026-09-09)."""
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 import pytest
@@ -15,6 +17,8 @@ from shared.connectivity.adapters.rock7 import (
     transmit_time,
 )
 from shared.connectivity.base import AdapterCapabilities, DataSourceContext
+from shared.device_drivers.base import SourceEventData
+from shared.device_drivers.registry import DRIVERS
 from shared.enums import AcquisitionChannel, ErrorCode, IngestionMethod
 from shared.trace import ApplicationError
 from tests.shared.test_adapters_and_drivers import context as base_context
@@ -155,3 +159,41 @@ async def test_connection_probe_reads_the_login_from_the_failure_code(monkeypatc
             context(credentials={"username": "mrsmith", "password": "wrong"})
         ).test_connection()
     assert excinfo.value.code == ErrorCode.CONNECTIVITY_AUTH_FAILED
+
+
+# The first live delivery, see tests/fixtures/payloads/rock7/README.md.
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "payloads" / "rock7"
+
+
+def test_live_delivery_parses_and_decodes():
+    body = json.loads((FIXTURES / "delivery_live_sp051890.json").read_text())
+    message = parse_message(body)
+    assert message.external_id == "300434065263440" and message.identity_type == "imei"
+    assert message.satellite_delivered_at == datetime(2026, 9, 10, 10, 43, 56, tzinfo=UTC)
+    assert message.provider_metadata["session_status"] == "2"
+    assert message.provider_metadata["device_type"] == "ROCKBLOCK"
+    assert message.identity_attributes == {"serial": "204514"}
+    frame = bytes.fromhex(message.payload["data_hex"])
+    assert len(frame) == 168
+    records = DRIVERS["opencollar"].decode(
+        SourceEventData(
+            id=1,
+            event_type="uplink",
+            payload=message.payload,
+            provider_metadata=message.provider_metadata,
+            network_received_at=None,
+            ingested_at=datetime(2026, 9, 10, 10, 44, tzinfo=UTC),
+            device_attributes={},
+            device_type_settings={},
+            frame=frame,
+            f_port=None,
+            acquisition_channel="iridium",
+            firmware_version=None,
+        )
+    )
+    assert records.notes == []
+    assert [p.time for p in records.positions] == [datetime(2026, 9, 10, 9, 57, 38, tzinfo=UTC)]
+    status = [s for s in records.states if s.record_type == "status"]
+    assert status[0].state["firmware_version"] == "7.2"
+    assert status[0].state["hardware_version"] == "1.6"
+    assert {m.metric_key for m in records.measurements} >= {"battery_voltage", "gnss_fix"}

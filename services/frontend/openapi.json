@@ -8544,6 +8544,84 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/map/satellite-sessions": {
+   "get": {
+    "tags": [
+     "map"
+    ],
+    "summary": "Satellite Sessions",
+    "description": "Where the Iridium network placed the scope's collars at their satellite sessions\n(decision D158): one point per delivery with the estimate's circular error probable, the\nnewest `MAX_SATELLITE_SESSIONS` in the window and view. Sessions whose status disowns the\nestimate and redeliveries are left out. The estimate is provenance, never a position.",
+    "operationId": "satellite_sessions_api_v1_projects__project_id__map_satellite_sessions_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "bbox",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "west,south,east,north in WGS84",
+       "title": "Bbox"
+      },
+      "description": "west,south,east,north in WGS84"
+     },
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 2160,
+       "minimum": 1,
+       "default": 168,
+       "title": "Hours"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SatelliteSessionsResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/map/heat": {
    "get": {
     "tags": [
@@ -33332,6 +33410,169 @@
     ],
     "title": "RuleVersionRead"
    },
+   "SatelliteSessionRead": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "status_text": {
+      "type": "string",
+      "title": "Status Text"
+     },
+     "status_code": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status Code"
+     },
+     "sequence": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sequence",
+      "description": "MOMSN, the modem's session counter"
+     },
+     "mt_sequence": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mt Sequence",
+      "description": "MTMSN of the message delivered to the modem in the session"
+     },
+     "latitude": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latitude"
+     },
+     "longitude": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Longitude"
+     },
+     "cep_km": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cep Km",
+      "description": "Circular error probable, km"
+     },
+     "bytes": {
+      "type": "integer",
+      "title": "Bytes",
+      "default": 0
+     },
+     "session_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session At"
+     },
+     "missed_since_last": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Missed Since Last",
+      "description": "Sessions the counter skipped since the identity's last one"
+     },
+     "duplicate_of": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Duplicate Of",
+      "description": "The earlier source event this delivery repeated"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "status_text"
+    ],
+    "title": "SatelliteSessionRead",
+    "description": "The Iridium session behind a satellite delivery (decision D158)."
+   },
+   "SatelliteSessionsResponse": {
+    "properties": {
+     "hours": {
+      "type": "integer",
+      "title": "Hours"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total",
+      "description": "Sessions with a usable estimate in the window and view"
+     },
+     "capped": {
+      "type": "boolean",
+      "title": "Capped",
+      "description": "True when more sessions exist than were returned"
+     },
+     "features": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Features"
+     }
+    },
+    "type": "object",
+    "required": [
+     "hours",
+     "total",
+     "capped",
+     "features"
+    ],
+    "title": "SatelliteSessionsResponse"
+   },
    "SavedViewCreate": {
     "properties": {
      "name": {
@@ -34981,6 +35222,17 @@
       },
       "type": "array",
       "title": "Receptions"
+     },
+     "satellite": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SatelliteSessionRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The Iridium session of a satellite delivery"
      }
     },
     "type": "object",

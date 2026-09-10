@@ -9,8 +9,9 @@ adapter is for the ones that stay.
 Built from the RockBLOCK web services documentation (docs.groundcontrol.com, fetched
 2026-09-09). The MT endpoint and the connection test were confirmed live with Smart Parks'
 portal login on 2026-09-10 (`FAILED,16,No Data` for the empty probe, so the login is checked
-before the message). A delivery from a modem waits for one in a delivery group pointed at the
-server.
+before the message), and the first delivery arrived the same day: the OpenCollar Edge SP051890
+(RockBLOCK 204514) in a delivery group with the dev server's address in HTTP_POST, decoded
+into a status message and a GNSS fix (fixture under `tests/fixtures/payloads/rock7/`).
 
 ## Setup
 
@@ -30,8 +31,10 @@ server.
    addresses, so an existing pipeline keeps its own. Rock7 expects HTTP 200 within three seconds
    and retries with a doubling backoff for fourteen attempts, almost six days.
 4. The IMEI of the modem is the device identity (type `imei`). Link it to the collar, or
-   accept it from Needs attention when the first message arrives. There is no device list to
-   sync: Rock7 has no API for it.
+   accept it from Needs attention when the first message arrives. A delivery carries no name,
+   only the IMEI and the RockBLOCK serial, so a device created from Needs attention is named
+   after the IMEI until renamed; better make the device with the collar's name first and link
+   the identity to it. There is no device list to sync: Rock7 has no API for it.
 
 ## Inbound
 
@@ -43,7 +46,7 @@ A delivery becomes one source event on the Iridium channel:
 | `serial` | identity attribute |
 | `data` (hex) | `data_hex` for the device driver, untouched |
 | `transmit_time` (`YY-MM-DD HH:MM:SS`, UTC) | `satellite_delivered_at`, provenance only |
-| `momsn`, `iridium_latitude`, `iridium_longitude`, `iridium_cep` (km) | provider metadata |
+| `momsn`, `iridium_session_status`, `iridium_latitude`, `iridium_longitude`, `iridium_cep` (km) | the satellite session (ADR 0023); `device_type` stays provider metadata |
 | a message without payload | event type `sbd_session`, kept raw, nothing decoded |
 
 The OpenCollar driver reads the payload as stacked stored records, as over Cloudloop, so the
@@ -64,6 +67,17 @@ command with the reason. A command option `flush` clears the modem's queue first
 Rock7 has no ping. The test sends an empty message to a placeholder IMEI and reads the
 failure code: 10 means the login is wrong, any other code means the login was accepted.
 Confirmed live on 2026-09-10: the right login answers `FAILED,16,No Data`.
+
+## What the session tells you
+
+Every delivery carries the satellite session (ADR 0023): its outcome, the modem's session
+counter (MOMSN), the size, and the network's estimate of where the modem was with its error
+radius (CEP, in km). The traffic view shows them on the row, the source event dialog under
+Provenance, and the device's health card keeps the last session as a line that warns when a
+session failed or sessions went missing. The estimates the network stands by draw as circles on
+the live map ("Satellite sessions" in the Coverage tab); an estimate the network calls poor is
+kept but not drawn. A retry of a delivery the server did not acknowledge is stored as a
+duplicate, not processed twice. A fix far outside the estimate's circle is noted on the trace.
 
 ## Troubleshooting
 

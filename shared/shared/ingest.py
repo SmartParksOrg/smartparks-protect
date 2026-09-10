@@ -9,7 +9,7 @@ sees a message whose row is not committed yet.
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, cast
 
 from geoalchemy2.shape import from_shape
@@ -27,6 +27,7 @@ from shared.connectivity.base import (
     GatewayUpdate,
     InboundMessage,
 )
+from shared.connectivity.satellite import DELIVERED_STATUSES, SatelliteSession
 from shared.database import session_scope
 from shared.enums import ConnectivityStatus, ProcessingStatus, TraceClass
 from shared.logger import get_logger
@@ -217,6 +218,98 @@ async def resolve_identity(
     return identity
 
 
+@dataclass(slots=True)
+class SatelliteOutcome:
+    """What the ingest learned about a satellite session (decision D160): the normalised
+    session, how many sessions went missing since the identity's last one, and the earlier
+    source event this delivery repeats, if any."""
+
+    session: SatelliteSession
+    missed: int | None = None
+    duplicate_of: int | None = None
+
+    @property
+    def record(self) -> dict[str, Any]:
+        data = self.session.to_dict()
+        if self.missed is not None:
+            data["missed_since_last"] = self.missed
+        if self.duplicate_of is not None:
+            data["duplicate_of"] = self.duplicate_of
+        return data
+
+    def step_metadata(self) -> dict[str, Any]:
+        data = {
+            k: v
+            for k, v in self.record.items()
+            if k in ("status", "status_text", "sequence", "mt_sequence", "cep_km", "bytes")
+            and v is not None
+        }
+        if self.session.has_estimate:
+            data["estimate"] = [self.session.latitude, self.session.longitude]
+        if self.missed:
+            data["missed_since_last"] = self.missed
+        return data
+
+
+# A platform retries a delivery the server did not acknowledge for days (Rock7 almost six,
+# Cloudloop about twelve hours); a session with the same sequence and the same payload inside
+# this window is that retry, not a new session. Sequence numbers wrap at 65,535 and restart
+# after a modem reset, hence the payload check.
+REDELIVERY_WINDOW = timedelta(days=7)
+
+
+async def _satellite_session(
+    session: AsyncSession,
+    identity: ExternalIdentity | None,
+    message: InboundMessage,
+    digest: str,
+    now: datetime,
+) -> SatelliteOutcome | None:
+    """Duplicates and gaps of the satellite session counter (decision D160), remembered per
+    identity in its attributes under `satellite`."""
+    sat = message.satellite_session
+    if sat is None:
+        return None
+    outcome = SatelliteOutcome(session=sat)
+    if identity is None or sat.sequence is None:
+        return outcome
+    earlier = await session.scalar(
+        select(SourceEvent.id)
+        .where(
+            SourceEvent.data_source_id == identity.data_source_id,
+            SourceEvent.external_id == message.external_id,
+            SourceEvent.ingested_at >= now - REDELIVERY_WINDOW,
+            SourceEvent.payload_sha256 == digest,
+            SourceEvent.provider_metadata["satellite_session"]["sequence"].as_integer()
+            == sat.sequence,
+        )
+        .order_by(SourceEvent.ingested_at)
+        .limit(1)
+    )
+    if earlier is not None:
+        outcome.duplicate_of = int(earlier)
+        return outcome
+    memory = dict((identity.attributes or {}).get("satellite") or {})
+    last = memory.get("last_sequence")
+    if isinstance(last, int) and sat.sequence > last + 1:
+        outcome.missed = sat.sequence - last - 1
+    elif isinstance(last, int):
+        outcome.missed = 0
+    if not isinstance(last, int) or sat.sequence > last or sat.sequence < last - 1000:
+        memory.update(
+            {
+                "last_sequence": sat.sequence,
+                "last_session_at": sat.session_at.isoformat() if sat.session_at else None,
+                "last_status": sat.status,
+                "missed_total": int(memory.get("missed_total") or 0) + (outcome.missed or 0),
+            }
+        )
+        if sat.mt_sequence is not None:
+            memory["last_mt_sequence"] = sat.mt_sequence
+        identity.attributes = {**(identity.attributes or {}), "satellite": memory}
+    return outcome
+
+
 async def store_inbound(
     session: AsyncSession, source: DataSource, message: InboundMessage
 ) -> StoredEvent:
@@ -237,6 +330,12 @@ async def store_inbound(
     await tracer.start()
 
     raw = json.dumps(message.payload, default=str).encode()
+    digest = sha256(raw)
+    satellite = await _satellite_session(session, identity, message, digest, now)
+    provider_metadata = dict(message.provider_metadata)
+    if satellite is not None:
+        provider_metadata["satellite_session"] = satellite.record
+    duplicate = satellite is not None and satellite.duplicate_of is not None
     event = SourceEvent(
         ingested_at=now,
         data_source_id=source.id,
@@ -249,22 +348,26 @@ async def store_inbound(
         processing_status=ProcessingStatus.IGNORED
         if ignored
         else (
-            ProcessingStatus.RECEIVED
-            if device_id
+            ProcessingStatus.DUPLICATE
+            if duplicate
             else (
-                ProcessingStatus.PROCESSED
-                if message.gateway is not None
-                else ProcessingStatus.UNASSIGNED
+                ProcessingStatus.RECEIVED
+                if device_id
+                else (
+                    ProcessingStatus.PROCESSED
+                    if message.gateway is not None
+                    else ProcessingStatus.UNASSIGNED
+                )
             )
         ),
-        provider_metadata=message.provider_metadata,
+        provider_metadata=provider_metadata,
         network_received_at=message.network_received_at,
         satellite_delivered_at=message.satellite_delivered_at,
         ble_synced_at=message.ble_synced_at,
         file_uploaded_at=message.file_uploaded_at,
         trace_id=tracer.trace_id,
         payload_size=len(raw),
-        payload_sha256=sha256(raw),
+        payload_sha256=digest,
     )
     settings = get_settings()
     if len(raw) <= settings.payload_inline_max_bytes:
@@ -325,8 +428,16 @@ async def store_inbound(
             step.skip("unknown identity, kept for Needs Attention")
         else:
             step.output_ref = f"device:{device_id}"
+    if satellite is not None:
+        async with tracer.step(
+            "ingest", "satellite session", metadata=satellite.step_metadata()
+        ) as step:
+            if satellite.duplicate_of is not None:
+                step.skip(f"redelivery of source event {satellite.duplicate_of}, kept as duplicate")
+            elif satellite.session.status not in DELIVERED_STATUSES:
+                step.metadata["note"] = f"session {satellite.session.status_text}"
 
-    if device_id is not None and not ignored:
+    if device_id is not None and not ignored and not duplicate:
         topic, payload = (
             Topic.SOURCE_EVENT_RECEIVED,
             {
