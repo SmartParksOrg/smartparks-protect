@@ -120,6 +120,7 @@ async def records_count(
     time_from: datetime | None = Query(None, alias="from"),
     time_to: datetime | None = Query(None, alias="to"),
     include_invalid: bool = Query(False, description="Also rows marked invalid by curation"),
+    sources: str = Query("device", pattern="^(device|network|all)$"),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> RecordsCount:
@@ -134,6 +135,7 @@ async def records_count(
             since,
             until,
             include_invalid,
+            sources,
         ),
     )
     return RecordsCount(count=count, time_from=since, time_to=until)
@@ -146,6 +148,11 @@ async def records(
     time_from: datetime | None = Query(None, alias="from"),
     time_to: datetime | None = Query(None, alias="to"),
     include_invalid: bool = Query(False, description="Also rows marked invalid by curation"),
+    sources: str = Query(
+        "device",
+        pattern="^(device|network|all)$",
+        description="The device's own fixes (default), the network's locations, or both (D163)",
+    ),
     limit: int = Query(MAX_PAGE, ge=1, le=MAX_PAGE),
     cursor: str | None = Query(None, description="From the previous page"),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
@@ -163,6 +170,7 @@ async def records(
         since,
         until,
         include_invalid,
+        sources,
     )
     keys = keys_statement(selection).subquery("k")
     statement = select(keys.c.device_id, keys.c.moment)

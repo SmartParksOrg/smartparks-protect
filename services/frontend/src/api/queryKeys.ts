@@ -32,8 +32,8 @@ export const queryKeys = {
     ["projects", projectId, "point", params] as const,
   heat: (projectId: string, params: Record<string, unknown>) =>
     ["projects", projectId, "map", "heat", params] as const,
-  satelliteSessions: (projectId: string, params: Record<string, unknown>) =>
-    ["projects", projectId, "map", "satellite-sessions", params] as const,
+  networkLocations: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "map", "network-locations", params] as const,
   mapConfig: ["map", "config"] as const,
   recordsCount: (projectId: string, params: Record<string, unknown>) =>
     ["projects", projectId, "records", "count", params] as const,
@@ -59,6 +59,8 @@ export const queryKeys = {
   devices: (params: Record<string, unknown>) => ["devices", params] as const,
   device: (id: string) => ["devices", id] as const,
   deviceSpan: (id: string) => ["devices", id, "span"] as const,
+  deviceConnectivity: (id: string, hours: number) =>
+    ["devices", id, "connectivity", hours] as const,
   deviceTypes: ["device-types"] as const,
   entityTypes: ["entity-types"] as const,
   metrics: ["metrics"] as const,

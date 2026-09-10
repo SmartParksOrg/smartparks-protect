@@ -29,3 +29,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0021 Firmware-aware device driver layouts](0021-firmware-aware-driver.md)
 - [0022 The all-projects scope](0022-all-projects-scope.md)
 - [0023 The satellite session behind an Iridium delivery](0023-satellite-session-metadata.md)
+- [0024 Network health apart from device health, and the locations a network provides](0024-network-locations.md)

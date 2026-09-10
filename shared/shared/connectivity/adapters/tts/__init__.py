@@ -45,6 +45,7 @@ from shared.connectivity.base import (
     GatewayUpdate,
     InboundMessage,
 )
+from shared.connectivity.network_location import NetworkLocation
 from shared.connectivity.transports.http import require_object
 from shared.enums import AcquisitionChannel, ErrorCode, IngestionMethod
 from shared.logger import get_logger
@@ -216,11 +217,26 @@ def parse_message(source: DataSourceContext, body: Any) -> InboundMessage:
         ) or _correlation_ref(document.get("correlation_ids"))
         metadata["level"] = "ERROR"
         metadata["description"] = error.get("message_format") or error.get("name")
-    elif key == "location_solved":
+    network_location: NetworkLocation | None = None
+    if key == "location_solved":
+        # The Things Stack's solved location (decision D162): `location.source` names the
+        # solver (SOURCE_GPS is the device's own, the others the network's)
         location = _section(data, "location")
         metadata["latitude"] = location.get("latitude")
         metadata["longitude"] = location.get("longitude")
         metadata["location_source"] = location.get("source")
+        latitude, longitude = _float(location.get("latitude")), _float(location.get("longitude"))
+        if latitude is not None and longitude is not None and received is not None:
+            solver = str(location.get("source") or "SOURCE_UNKNOWN")
+            network_location = NetworkLocation(
+                latitude=latitude,
+                longitude=longitude,
+                time=received,
+                method="tts_" + solver.removeprefix("SOURCE_").lower(),
+                accuracy_m=_float(location.get("accuracy")),
+                altitude_m=_float(location.get("altitude")),
+                attributes={"source": solver},
+            )
     return InboundMessage(
         external_id=dev_eui,
         event_type=MESSAGE_KEYS[key],
@@ -229,6 +245,7 @@ def parse_message(source: DataSourceContext, body: Any) -> InboundMessage:
         ingestion_method=IngestionMethod.WEBHOOK,
         provider_metadata={k: v for k, v in metadata.items() if v is not None},
         network_received_at=received,
+        network_location=network_location,
         identity_type="dev_eui",
         identity_attributes={
             k: v
@@ -547,3 +564,10 @@ class TtsAdapter:
 
     def management_connector(self, source: DataSourceContext) -> TtsManagement:
         return TtsManagement(source)
+
+
+def _float(value: Any) -> float | None:
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None

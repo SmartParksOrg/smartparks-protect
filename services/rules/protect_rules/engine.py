@@ -17,8 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
+from shared.connectivity.network_location import NETWORK_RECORD_TYPE
 from shared.database import session_scope
-from shared.enums import ErrorCode, TraceClass
+from shared.enums import ErrorCode, LocationSource, TraceClass
 from shared.logger import get_logger
 from shared.models import (
     Device,
@@ -328,6 +329,17 @@ async def handle_position(bus: RedisStreamsBus, cache: RuleCache, payload: dict[
             entity_type_id = await session.scalar(
                 select(Entity.entity_type_id).where(Entity.id == position.entity_id)
             )
+        if position.record_type == NETWORK_RECORD_TYPE:
+            # a network's location drives rules only for an entity that opted in (D163, D164)
+            source = (
+                await session.scalar(
+                    select(Entity.location_source).where(Entity.id == position.entity_id)
+                )
+                if position.entity_id is not None
+                else None
+            )
+            if source in (None, LocationSource.DEVICE):
+                return
         point = to_shape(position.geom)
         sample = Sample(
             time=position.time,

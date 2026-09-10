@@ -110,6 +110,16 @@ class Entity(UuidPrimaryKeyMixin, TimestampMixin, Base):
         String(200), comment="Object key of the profile picture in the pictures bucket (D110)"
     )
     picture_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    location_source: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        server_default="device",
+        default="device",
+        comment="device, network or device_else_network (D164)",
+    )
+    location_fallback_hours: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="24", default=24
+    )
 
 
 class Feature(UuidPrimaryKeyMixin, TimestampMixin, Base):
@@ -176,6 +186,16 @@ class Device(UuidPrimaryKeyMixin, TimestampMixin, Base):
         String(200), comment="Object key of the profile picture in the pictures bucket (D110)"
     )
     picture_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    location_source: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        server_default="device",
+        default="device",
+        comment="device, network or device_else_network (D164)",
+    )
+    location_fallback_hours: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="24", default=24
+    )
 
 
 class DeviceProjectAssignment(UuidPrimaryKeyMixin, Base):

@@ -206,9 +206,10 @@ export function ExplorerPage() {
             devices: state.devices,
             from: window.from,
             to: window.to,
+            sources: state.sources ?? "device",
           }
         : null,
-    [state.entities, state.devices, window],
+    [state.entities, state.devices, state.sources, window],
   );
   const selectionKey = JSON.stringify(selection);
   const records = useRecords(projectId, selection);

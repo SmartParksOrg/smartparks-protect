@@ -1,6 +1,6 @@
 """The satellite session behind an Iridium delivery through the API (decisions D158 to D160):
 the session on the traffic row and the trace, a redelivery kept as a duplicate, a gap in the
-session counter, the last session as a health line, and the network's estimates on the map."""
+session counter, the sessions on the device's connectivity read, and the network's estimates on the map."""
 
 import json
 from pathlib import Path
@@ -131,34 +131,46 @@ async def test_sessions_are_read_deduplicated_counted_and_mapped(client, db):
     assert rows[0]["satellite"]["status"] == "location_unacceptable"
     assert rows[0]["satellite"]["missed_since_last"] == 2
 
-    # the device's health carries the last session as a line, warning about the gap
+    # the device's health is the device's own status: no network line (decision D161); the
+    # connectivity read carries the session per source
     read = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()
-    line = next(f for f in read["health"]["fields"] if f["key"] == "satellite_session")
-    assert "session 103" in line["text"] and "2 missed" in line["text"]
-    assert line["level"] == "warn"
+    assert all(f["key"] != "satellite_session" for f in read["health"]["fields"])
+    connectivity = await client.get(
+        f"/api/v1/devices/{device['id']}/connectivity", params={"hours": 24}, headers=h
+    )
+    assert connectivity.status_code == 200, connectivity.text
+    block = connectivity.json()["sources"][0]
+    assert block["channel"] == "iridium" and block["status"] == "online"
+    assert block["lorawan"] is None
+    assert block["iridium"]["sessions"] == 2 and block["iridium"]["duplicates"] == 1
+    assert block["iridium"]["missed"] == 2 and block["iridium"]["bytes"] == 2 * 168
+    assert block["iridium"]["last_session"]["sequence"] == 103
 
-    # the map shows the estimate the network stood by, not the disowned one
-    sessions = await client.get(
-        f"/api/v1/projects/{project.id}/map/satellite-sessions",
-        params={"hours": 24},
+    # the map shows the estimate the network stood by as a network location (D162), not the
+    # disowned one, which never became a position
+    locations = await client.get(
+        f"/api/v1/projects/{project.id}/map/network-locations",
+        params={"hours": 24 * 30},
         headers=h,
     )
-    assert sessions.status_code == 200, sessions.text
-    body = sessions.json()
+    assert locations.status_code == 200, locations.text
+    body = locations.json()
     assert body["total"] == 1 and not body["capped"]
     props = body["features"][0]["properties"]
-    assert props["device_name"] == "SP051890" and props["cep_km"] == 4.0
-    assert props["sequence"] == 100
+    assert props["device_name"] == "SP051890" and props["accuracy_m"] == 4000.0
+    assert props["method"] == "iridium_estimate"
     outside = await client.get(
-        f"/api/v1/projects/{project.id}/map/satellite-sessions",
-        params={"hours": 24, "bbox": "0,0,1,1"},
+        f"/api/v1/projects/{project.id}/map/network-locations",
+        params={"hours": 24 * 30, "bbox": "0,0,1,1"},
         headers=h,
     )
     assert outside.json()["total"] == 0
     # a viewer of another project sees nothing of this one
     other = await create_project(db)
     forbidden = await client.get(
-        f"/api/v1/projects/{other.id}/map/satellite-sessions", params={"hours": 24}, headers=h
+        f"/api/v1/projects/{other.id}/map/network-locations",
+        params={"hours": 24 * 30},
+        headers=h,
     )
     assert forbidden.status_code == 200 and forbidden.json()["total"] == 0
 

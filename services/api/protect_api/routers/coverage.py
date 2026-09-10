@@ -119,7 +119,7 @@ async def coverage(
             JOIN LATERAL (
                 SELECT p.id, p.time, p.geom, p.device_id, p.source_event_id
                 FROM positions p
-                WHERE p.device_id = d.device_id
+                WHERE p.device_id = d.device_id AND p.record_type <> 'network'
                   AND (CAST(:project_id AS uuid) IS NULL
                        OR p.project_id = CAST(:project_id AS uuid))
                   AND p.time >= :since AND p.time < :until

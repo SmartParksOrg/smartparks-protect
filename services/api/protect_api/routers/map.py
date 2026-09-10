@@ -28,19 +28,20 @@ from protect_api.deps import (
     require_scope_permission,
 )
 from protect_api.routers.data import PositionRead, position_read
-from shared.connectivity.satellite import ESTIMATE_STATUSES, SatelliteSession
+from shared.connectivity.network_location import NETWORK_RECORD_TYPE
 from shared.curation.effective import (
     at_time,
+    device_fix,
     effective_geom,
     effective_time,
     effective_value_num,
     in_window,
+    sources_filter,
     visible,
 )
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.health import device_health
-from shared.enums import AcquisitionChannel, ProcessingStatus
 from shared.models import (
     Device,
     DeviceCurrentState,
@@ -53,7 +54,6 @@ from shared.models import (
     Measurement,
     Metric,
     Position,
-    SourceEvent,
 )
 from shared.permissions import Permission
 from shared.timeutil import require_aware, utc_now
@@ -263,6 +263,7 @@ async def current_state(
                     "position_time": state.latest_position_time.isoformat()
                     if state.latest_position_time
                     else None,
+                    "position_kind": state.latest_position_kind,
                     "active_alert_count": state.active_alert_count,
                     "health_level": health.level if health else None,
                     "battery_voltage": device_state.battery_voltage if device_state else None,
@@ -392,6 +393,7 @@ async def devices_state(
                     "position_time": state.latest_position_time.isoformat()
                     if state and state.latest_position_time
                     else None,
+                    "position_kind": state.latest_position_kind if state else None,
                     "health_level": health.level if health else None,
                     "battery_voltage": state.battery_voltage if state else None,
                     "last_status_at": health.last_status_at.isoformat()
@@ -459,11 +461,17 @@ async def track(
     time_from: datetime | None = Query(None, alias="from"),
     time_to: datetime | None = Query(None, alias="to"),
     max_points: int = Query(DEFAULT_TRACK_POINTS, ge=2, le=MAX_TRACK_POINTS),
+    sources: str = Query(
+        "device",
+        pattern="^(device|network|all)$",
+        description="The device's own fixes (default), the network's locations, or both (D163)",
+    ),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> TrackResponse:
     """Track of one entity or device attributed to the project. Longer periods are decimated so
-    at most `max_points` vertices return; every vertex keeps its time. Default period: 24 hours."""
+    at most `max_points` vertices return; every vertex keeps its time. Default period: 24 hours,
+    the device's own fixes unless `sources` says otherwise."""
     if (entity_id is None) == (device_id is None):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Give exactly one of entity_id or device_id"
@@ -475,6 +483,9 @@ async def track(
         in_window(Position, time_from, time_to),
         visible(Position),
     ]
+    source_clause = sources_filter(sources)
+    if source_clause is not None:
+        conditions.append(source_clause)
     conditions.append(
         Position.entity_id == entity_id
         if entity_id is not None
@@ -553,7 +564,7 @@ async def position_at(
             at_time(Position, when),
             visible(Position),
         )
-        .order_by(Position.id)
+        .order_by(device_fix().desc(), Position.id)
         .limit(1)
     )
     if position is None:
@@ -619,83 +630,81 @@ async def position_at(
     )
 
 
-class SatelliteSessionsResponse(BaseModel):
+class NetworkLocationsResponse(BaseModel):
     hours: int
-    total: int = Field(description="Sessions with a usable estimate in the window and view")
-    capped: bool = Field(description="True when more sessions exist than were returned")
+    total: int = Field(description="Network locations in the window and view")
+    capped: bool = Field(description="True when more exist than were returned")
     features: list[dict[str, Any]]
 
 
-MAX_SATELLITE_SESSIONS = 2000
-MAX_SATELLITE_HOURS = 24 * 90
+MAX_NETWORK_LOCATIONS = 2000
+MAX_NETWORK_HOURS = 24 * 90
 
 
-@router.get("/map/satellite-sessions", response_model=SatelliteSessionsResponse)
-async def satellite_sessions(
+@router.get("/map/network-locations", response_model=NetworkLocationsResponse)
+async def network_locations(
     bbox: str | None = Query(None, description="west,south,east,north in WGS84"),
-    hours: int = Query(168, ge=1, le=MAX_SATELLITE_HOURS),
+    hours: int = Query(168, ge=1, le=MAX_NETWORK_HOURS),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
-) -> SatelliteSessionsResponse:
-    """Where the Iridium network placed the scope's collars at their satellite sessions
-    (decision D158): one point per delivery with the estimate's circular error probable, the
-    newest `MAX_SATELLITE_SESSIONS` in the window and view. Sessions whose status disowns the
-    estimate and redeliveries are left out. The estimate is provenance, never a position."""
+) -> NetworkLocationsResponse:
+    """Where the networks placed the scope's devices (decisions D162 and D163): the positions
+    of record type `network` (Iridium estimates the network stood by, ThingPark geolocation,
+    solved locations) in the window and view, newest first, with their radius. Provenance for
+    the map's "Network locations" layer, never a device's own fix."""
     until = utc_now()
     since = until - timedelta(hours=hours)
     west, south, east, north = _bbox(bbox) or (-180.0, -90.0, 180.0, 90.0)
-    info = SourceEvent.provider_metadata["satellite_session"]
     statement = (
         select(
-            SourceEvent.id,
-            SourceEvent.device_id,
-            Device.name,
-            info,
+            Position.id,
+            effective_time(Position).label("time"),
+            func.ST_X(effective_geom()).label("lon"),
+            func.ST_Y(effective_geom()).label("lat"),
+            Position.accuracy_m,
+            Position.attributes,
+            Position.device_id,
+            Position.entity_id,
+            Position.source_event_id,
+            Device.name.label("device_name"),
+            Entity.name.label("entity_name"),
         )
-        .join(Device, Device.id == SourceEvent.device_id)
+        .join(Device, Device.id == Position.device_id)
+        .outerjoin(Entity, Entity.id == Position.entity_id)
         .where(
-            SourceEvent.acquisition_channel == AcquisitionChannel.IRIDIUM,
-            SourceEvent.ingested_at >= since,
-            SourceEvent.ingested_at < until,
-            SourceEvent.processing_status != ProcessingStatus.DUPLICATE,
-            info["status"].as_string().in_(sorted(ESTIMATE_STATUSES)),
-            info["latitude"].as_float().between(south, north),
-            info["longitude"].as_float().between(west, east),
+            context.where(Position.project_id, unassigned=True),
+            Position.record_type == NETWORK_RECORD_TYPE,
+            in_window(Position, since, until),
+            visible(Position),
+            func.ST_Intersects(
+                effective_geom(), func.ST_MakeEnvelope(west, south, east, north, 4326)
+            ),
         )
-        .order_by(SourceEvent.ingested_at.desc())
-        .limit(MAX_SATELLITE_SESSIONS + 1)
+        .order_by(effective_time(Position).desc())
+        .limit(MAX_NETWORK_LOCATIONS + 1)
     )
-    if context.project_id is not None:
-        assigned = select(DeviceProjectAssignment.device_id).where(
-            DeviceProjectAssignment.project_id == context.project_id,
-            DeviceProjectAssignment.validity.op("@>")(until),
-        )
-        statement = statement.where(SourceEvent.device_id.in_(assigned))
     rows = (await session.execute(statement)).all()
-    capped = len(rows) > MAX_SATELLITE_SESSIONS
-    features = []
-    for event_id, device_id, device_name, data in rows[:MAX_SATELLITE_SESSIONS]:
-        parsed = SatelliteSession.from_dict(data)
-        if parsed is None or not parsed.has_estimate:
-            continue
-        features.append(
-            {
-                "type": "Feature",
-                "id": event_id,
-                "geometry": {"type": "Point", "coordinates": [parsed.longitude, parsed.latitude]},
-                "properties": {
-                    "source_event_id": event_id,
-                    "device_id": str(device_id),
-                    "device_name": device_name,
-                    "session_at": parsed.session_at.isoformat() if parsed.session_at else None,
-                    "cep_km": parsed.cep_km,
-                    "status": parsed.status,
-                    "sequence": parsed.sequence,
-                    "bytes": parsed.bytes,
-                },
-            }
-        )
-    return SatelliteSessionsResponse(
+    capped = len(rows) > MAX_NETWORK_LOCATIONS
+    features = [
+        {
+            "type": "Feature",
+            "id": row.id,
+            "geometry": {"type": "Point", "coordinates": [row.lon, row.lat]},
+            "properties": {
+                "position_id": row.id,
+                "time": row.time.isoformat(),
+                "accuracy_m": row.accuracy_m,
+                "method": (row.attributes or {}).get("method"),
+                "device_id": str(row.device_id),
+                "device_name": row.device_name,
+                "entity_id": str(row.entity_id) if row.entity_id else None,
+                "entity_name": row.entity_name,
+                "source_event_id": row.source_event_id,
+            },
+        }
+        for row in rows[:MAX_NETWORK_LOCATIONS]
+    ]
+    return NetworkLocationsResponse(
         hours=hours, total=len(features), capped=capped, features=features
     )
 
@@ -784,7 +793,8 @@ async def heat_points(
                     SELECT COALESCE(p.curated_geom, p.geom) AS geom,
                            COALESCE(p.curated_time, p.time) AS t
                     FROM positions p
-                    WHERE p.device_id = d.device_id AND p.valid {project_filter} {owner_filter}
+                    WHERE p.device_id = d.device_id AND p.valid AND p.record_type <> 'network'
+                      {project_filter} {owner_filter}
                       AND ((p.curated_time IS NULL AND p.time >= :since AND p.time < :until)
                            OR (p.curated_time IS NOT NULL AND p.curated_time >= :since
                                AND p.curated_time < :until))

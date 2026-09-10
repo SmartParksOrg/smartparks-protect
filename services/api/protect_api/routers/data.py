@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from protect_api.auth.users import current_active_user
 from protect_api.crud import geom_to_geojson
 from protect_api.deps import ProjectContext, accessible_project_ids, require_permission
-from shared.curation.effective import effective_time, in_window, visible
+from shared.curation.effective import effective_time, in_window, sources_filter, visible
 from shared.database import get_session
 from shared.models import ApplicationError as ApplicationErrorRow
 from shared.models import (
@@ -222,11 +222,17 @@ async def list_positions(
     time_to: datetime | None = Query(None, alias="to"),
     limit: int = Query(500, ge=1, le=MAX_POSITIONS),
     include_invalid: bool = Query(False, description="Also rows marked invalid by curation"),
+    sources: str = Query(
+        "device",
+        pattern="^(device|network|all)$",
+        description="The device's own fixes (default), the network's locations, or both (D163)",
+    ),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> list[PositionRead]:
     """Positions attributed to the project, newest first, within a time window (default the last
-    24 hours) and a row limit. Times and coordinates are the effective ones (architecture 28)."""
+    24 hours) and a row limit. Times and coordinates are the effective ones (architecture 28);
+    the device's own fixes unless `sources` asks for the network's locations."""
     time_to = require_aware(time_to) if time_to else utc_now()
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
     statement = select(Position).where(
@@ -234,6 +240,9 @@ async def list_positions(
     )
     if not include_invalid:
         statement = statement.where(visible(Position))
+    source_clause = sources_filter(sources)
+    if source_clause is not None:
+        statement = statement.where(source_clause)
     if device_id is not None:
         statement = statement.where(Position.device_id == device_id)
     if entity_id is not None:

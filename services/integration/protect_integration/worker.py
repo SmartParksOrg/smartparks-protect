@@ -88,6 +88,7 @@ async def refs_from_message(session: AsyncSession, message: Message) -> list[Obj
                 project_id=project_id,
                 entity_id=_uuid(payload.get("entity_id")),
                 device_id=_uuid(payload.get("device_id")),
+                record_type=payload.get("record_type"),
             )
         ]
     if message.topic == Topic.EVENT_CREATED:

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { circlePolygon, sessionFeatures } from "./satellite";
+import { circlePolygon, locationFeatures } from "./networkLocations";
 
 describe("circlePolygon", () => {
   it("draws a closed ring of the asked radius around the point", () => {
@@ -17,14 +17,18 @@ describe("circlePolygon", () => {
   });
 });
 
-describe("sessionFeatures", () => {
-  it("turns a session point into a circle and its centre, never smaller than half a km", () => {
-    const features = sessionFeatures([
+describe("locationFeatures", () => {
+  it("turns a location point into a circle and its centre, never smaller than half a km", () => {
+    const features = locationFeatures([
       {
         type: "Feature",
         id: 7,
         geometry: { type: "Point", coordinates: [15.1, 46.5] },
-        properties: { cep_km: 0.1, status: "ok", device_name: "SP051890" },
+        properties: {
+          accuracy_m: 100,
+          method: "iridium_estimate",
+          device_name: "SP051890",
+        },
       },
     ]);
     expect(features.map((f) => f.properties?.kind)).toEqual([

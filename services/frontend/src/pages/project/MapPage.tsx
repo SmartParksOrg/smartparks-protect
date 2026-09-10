@@ -18,7 +18,7 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
   CoverageResponse,
-  SatelliteSessionsResponse,
+  NetworkLocationsResponse,
   CurrentState,
   Feature,
   Gateway,
@@ -56,13 +56,13 @@ import {
   ensureEventLayers,
   ensureFeatureLayers,
   ensureCoverageLayers,
-  ensureSatelliteLayers,
+  ensureNetworkLocationLayers,
   ensureGatewayLayers,
   ensureHeatLayer,
   ensureTrackLayers,
   type EventFeatureProperties,
   setCoverage,
-  setSatelliteSessions,
+  setNetworkLocations,
   setDevices,
   setEntities,
   setEvents,
@@ -107,7 +107,7 @@ import {
   type HeatSettings,
   parseHeatSettings,
 } from "@/components/map/heat";
-import { sessionFeatures } from "@/components/map/satellite";
+import { locationFeatures } from "@/components/map/networkLocations";
 import { HeatCard, HeatSettingsPanel } from "@/components/map/HeatSettings";
 import { GatewayPanel } from "@/components/map/GatewayPanel";
 import { LayerPanel } from "@/components/map/LayerPanel";
@@ -424,20 +424,20 @@ export function MapPage() {
     placeholderData: (previous) => previous,
     refetchInterval: 120_000,
   });
-  // satellite sessions (decision D158): the Iridium network's location estimates over the
-  // coverage period, circles of their error radius; a small preference field switches them on
-  const satelliteParams = useMemo(
+  // network locations (decisions D162 and D163): where the networks placed the devices over the
+  // coverage period, circles of their radius; a small preference field switches them on
+  const networkLocationParams = useMemo(
     () => ({ bbox: viewport?.bbox, hours: layers.coverage_hours }),
     [viewport, layers.coverage_hours],
   );
-  const satelliteSessions = useQuery({
-    queryKey: queryKeys.satelliteSessions(projectId, satelliteParams),
+  const networkLocations = useQuery({
+    queryKey: queryKeys.networkLocations(projectId, networkLocationParams),
     queryFn: ({ signal }) =>
-      api.get<SatelliteSessionsResponse>(
-        `/api/v1/projects/${projectId}/map/satellite-sessions`,
-        { query: satelliteParams, signal },
+      api.get<NetworkLocationsResponse>(
+        `/api/v1/projects/${projectId}/map/network-locations`,
+        { query: networkLocationParams, signal },
       ),
-    enabled: Boolean(layers.satellite) && viewport !== null,
+    enabled: Boolean(layers.network_locations) && viewport !== null,
     retry: false,
     placeholderData: (previous) => previous,
     refetchInterval: 120_000,
@@ -741,7 +741,7 @@ export function MapPage() {
     ensureFeatureLayers(map);
     ensureGatewayLayers(map);
     ensureCoverageLayers(map);
-    ensureSatelliteLayers(map);
+    ensureNetworkLocationLayers(map);
     ensureHeatLayer(map);
     ensureTrackLayers(map);
     ensureEventLayers(map);
@@ -922,15 +922,15 @@ export function MapPage() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    setSatelliteSessions(
+    setNetworkLocations(
       map,
-      layers.satellite && satelliteSessions.data
-        ? sessionFeatures(
-            satelliteSessions.data.features as unknown as GeoJSON.Feature[],
+      layers.network_locations && networkLocations.data
+        ? locationFeatures(
+            networkLocations.data.features as unknown as GeoJSON.Feature[],
           )
         : [],
     );
-  }, [mapRef, ready, layers.satellite, satelliteSessions.data]);
+  }, [mapRef, ready, layers.network_locations, networkLocations.data]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1429,7 +1429,9 @@ export function MapPage() {
             )}
             gateways={gateways.data ?? []}
             coverage={layers.coverage ? coverage.data : undefined}
-            satellite={layers.satellite ? satelliteSessions.data : undefined}
+            networkLocations={
+              layers.network_locations ? networkLocations.data : undefined
+            }
             coverageError={
               layers.coverage && coverage.isError
                 ? coverage.error.message

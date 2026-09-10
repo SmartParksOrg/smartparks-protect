@@ -39,6 +39,8 @@ import { recordsHref } from "@/lib/records";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
+import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
@@ -48,7 +50,7 @@ import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
 import { useAuthStore } from "@/stores/auth";
 
-const TABS = ["overview", "data", "network"] as const;
+const TABS = ["overview", "data", "connectivity", "network"] as const;
 
 export function DevicePage() {
   const { t } = useTranslation();
@@ -111,6 +113,7 @@ export function DevicePage() {
   });
   const now = useNow();
   const [tab, setTab] = useTab(TABS);
+  const [connectivityHours, setConnectivityHours] = useState(168);
   const repairInvalidate = [
     queryKeys.device(deviceId),
     queryKeys.deviceSpan(deviceId),
@@ -308,6 +311,7 @@ export function DevicePage() {
           <TabsList>
             <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
+            <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>
             <TabsTrigger value="network">{t("Network")}</TabsTrigger>
           </TabsList>
           <TabsContent value="overview">
@@ -331,6 +335,13 @@ export function DevicePage() {
                   </dl>
                 </CardContent>
               </Card>
+              <LocationSourceCard
+                path={`/api/v1/devices/${d.id}`}
+                value={d.location_source ?? "device"}
+                fallbackHours={d.location_fallback_hours ?? 24}
+                invalidate={[queryKeys.device(d.id), ["devices"]]}
+                canEdit={Boolean(user?.is_superuser)}
+              />
               {projectId && (
                 <MiniMap
                   positions={positions.data ?? []}
@@ -395,6 +406,14 @@ export function DevicePage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+          <TabsContent value="connectivity">
+            <ConnectivityCards
+              deviceId={d.id}
+              projectId={projectId}
+              hours={connectivityHours}
+              onHoursChange={setConnectivityHours}
+            />
           </TabsContent>
           <TabsContent value="network">
             <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">

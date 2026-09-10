@@ -6,7 +6,14 @@ from pydantic import BaseModel, Field, field_validator
 
 from protect_api.schemas.common import GeoJSONGeometry, ORMModel
 from shared.domain.health import DeviceHealth
-from shared.enums import DeviceStatus, EntityGroup, EntityStatus, FeatureType, ValueType
+from shared.enums import (
+    DeviceStatus,
+    EntityGroup,
+    EntityStatus,
+    FeatureType,
+    LocationSource,
+    ValueType,
+)
 from shared.timeutil import require_aware
 
 KEY_PATTERN = "^[a-z][a-z0-9_]{1,62}$"
@@ -101,6 +108,13 @@ class EntityCreate(BaseModel):
     geometry: GeoJSONGeometry | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
     notes: str | None = None
+    location_source: LocationSource = LocationSource.DEVICE
+    location_fallback_hours: int = Field(
+        default=24,
+        ge=1,
+        le=24 * 30,
+        description="Hours without a device fix before a network location stands in (D164)",
+    )
 
 
 class EntityUpdate(BaseModel):
@@ -112,9 +126,18 @@ class EntityUpdate(BaseModel):
     geometry: GeoJSONGeometry | None = None
     attributes: dict[str, Any] | None = None
     notes: str | None = None
+    location_source: LocationSource | None = None
+    location_fallback_hours: int | None = Field(
+        default=None,
+        ge=1,
+        le=24 * 30,
+        description="Hours without a device fix before a network location stands in (D164)",
+    )
 
 
 class EntityRead(ORMModel):
+    location_source: str = "device"
+    location_fallback_hours: int = 24
     id: uuid.UUID
     project_id: uuid.UUID
     entity_type_id: uuid.UUID
@@ -199,6 +222,13 @@ class DeviceCreate(BaseModel):
     firmware_version: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
     notes: str | None = None
+    location_source: LocationSource = LocationSource.DEVICE
+    location_fallback_hours: int = Field(
+        default=24,
+        ge=1,
+        le=24 * 30,
+        description="Hours without a device fix before a network location stands in (D164)",
+    )
 
 
 class DeviceUpdate(BaseModel):
@@ -209,9 +239,18 @@ class DeviceUpdate(BaseModel):
     firmware_version: str | None = None
     attributes: dict[str, Any] | None = None
     notes: str | None = None
+    location_source: LocationSource | None = None
+    location_fallback_hours: int | None = Field(
+        default=None,
+        ge=1,
+        le=24 * 30,
+        description="Hours without a device fix before a network location stands in (D164)",
+    )
 
 
 class DeviceRead(ORMModel):
+    location_source: str = "device"
+    location_fallback_hours: int = 24
     id: uuid.UUID
     device_type_id: uuid.UUID
     name: str

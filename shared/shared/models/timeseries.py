@@ -321,6 +321,12 @@ class DeviceCurrentState(Base):
     )
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     latest_position_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    latest_position_kind: Mapped[str | None] = mapped_column(
+        String(16), comment="device or network: what the latest position is (D164)"
+    )
+    latest_fix_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="The newest device fix, whatever the latest position is"
+    )
     latest_position: Mapped[Any | None] = mapped_column(
         Geometry(geometry_type="POINT", srid=4326, spatial_index=False)
     )
@@ -359,6 +365,12 @@ class EntityCurrentState(Base):
     )
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     latest_position_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    latest_position_kind: Mapped[str | None] = mapped_column(
+        String(16), comment="device or network: what the latest position is (D164)"
+    )
+    latest_fix_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="The newest device fix, whatever the latest position is"
+    )
     latest_position: Mapped[Any | None] = mapped_column(
         Geometry(geometry_type="POINT", srid=4326, spatial_index=True)
     )

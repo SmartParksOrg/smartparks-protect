@@ -12,7 +12,7 @@ itself.
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from geoalchemy2.shape import from_shape
@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
+from shared.connectivity.network_location import NETWORK_RECORD_TYPE, NetworkLocation
 from shared.connectivity.satellite import SatelliteSession, estimate_disagreement
 from shared.control.commands import (
     apply_provider_signal,
@@ -44,6 +45,7 @@ from shared.enums import (
     AcquisitionChannel,
     ConnectivityStatus,
     ErrorCode,
+    LocationSource,
     ProcessingStatus,
     TraceStatus,
     ValueType,
@@ -55,6 +57,7 @@ from shared.models import (
     DeviceCurrentState,
     DeviceStateHistory,
     DeviceType,
+    Entity,
     EntityCurrentState,
     Event,
     Measurement,
@@ -106,6 +109,26 @@ def event_age(record_time: datetime, ingested_at: datetime) -> float:
     return (ingested_at - record_time).total_seconds()
 
 
+def _add_network_position(event: SourceEvent, records: DecodedRecords) -> None:
+    """A location the network provided (decision D162) becomes a position of its own record
+    type next to the driver's records: the radius as accuracy, the method in the attributes.
+    The canonical key keeps it apart from a device fix at the same moment."""
+    location = NetworkLocation.from_dict((event.provider_metadata or {}).get("network_location"))
+    if location is None:
+        return
+    records.positions.append(
+        DecodedPosition(
+            time=location.time,
+            latitude=location.latitude,
+            longitude=location.longitude,
+            record_type=NETWORK_RECORD_TYPE,
+            altitude_m=location.altitude_m,
+            accuracy_m=location.accuracy_m,
+            attributes={"method": location.method, **(location.attributes or {})},
+        )
+    )
+
+
 def _note_estimate_disagreement(event: SourceEvent, records: DecodedRecords) -> None:
     """A decoded fix far outside the satellite network's location estimate is worth a note on
     the trace (decision D158): a GNSS fault, a clock fault or a collar that travelled a long
@@ -117,6 +140,7 @@ def _note_estimate_disagreement(event: SourceEvent, records: DecodedRecords) -> 
         (
             estimate_disagreement(satellite, p.latitude, p.longitude) or 0.0
             for p in records.positions
+            if p.record_type != NETWORK_RECORD_TYPE
         ),
         default=0.0,
     )
@@ -297,8 +321,9 @@ async def process_source_event(
                 events=len(records.events),
                 decoder_version=records.decoder_version,
             )
-            _summarize(outcome, records)
             _note_estimate_disagreement(event, records)
+            _add_network_position(event, records)
+            _summarize(outcome, records)
             if records.notes:
                 step.metadata["notes"] = list(records.notes)
             if records.empty:
@@ -462,6 +487,7 @@ async def _write_positions(
                 {
                     "position_id": position.id,
                     "time": position.time.isoformat(),
+                    "record_type": record.record_type,
                     "device_id": str(device.id),
                     "project_id": str(attribution.project_id) if attribution.project_id else None,
                     "entity_id": str(attribution.entity_id) if attribution.entity_id else None,
@@ -679,9 +705,10 @@ async def _update_current_state(
     timely_states = [s for s in records.states if not _ahead_of_delivery(event, s.time)]
     timely_measurements = [m for m in records.measurements if not _ahead_of_delivery(event, m.time)]
     timely_events = [e for e in records.events if not _ahead_of_delivery(event, e.time)]
-    latest_position: DecodedPosition | None = max(
-        timely_positions, key=lambda p: p.time, default=None
-    )
+    fixes = [p for p in timely_positions if p.record_type != NETWORK_RECORD_TYPE]
+    network = [p for p in timely_positions if p.record_type == NETWORK_RECORD_TYPE]
+    newest_fix: DecodedPosition | None = max(fixes, key=lambda p: p.time, default=None)
+    newest_network: DecodedPosition | None = max(network, key=lambda p: p.time, default=None)
     latest_state = max(timely_states, key=lambda s: s.time, default=None)
     latest_measurements: dict[str, DecodedMeasurement] = {}
     for m in timely_measurements:
@@ -701,13 +728,9 @@ async def _update_current_state(
         session.add(current)
     if current.last_seen_at is None or seen_at > current.last_seen_at:
         current.last_seen_at = seen_at
-    if latest_position is not None and (
-        current.latest_position_time is None or latest_position.time > current.latest_position_time
-    ):
-        current.latest_position_time = latest_position.time
-        current.latest_position = from_shape(
-            Point(latest_position.longitude, latest_position.latitude), srid=4326
-        )
+    latest_position = _apply_position(
+        current, newest_fix, newest_network, device.location_source, device.location_fallback_hours
+    )
     if latest_state is not None:
         current.latest_state = {**(current.latest_state or {}), **latest_state.state}
         if current.latest_state_time is None or latest_state.time > current.latest_state_time:
@@ -759,8 +782,9 @@ async def _update_current_state(
         }
     connectivity.updated_at = now
 
-    if latest_position is not None:
-        attribution = attributions.get(latest_position.time)
+    candidate = newest_fix or newest_network
+    if candidate is not None:
+        attribution = attributions.get(candidate.time)
         if (
             attribution is not None
             and attribution.entity_id is not None
@@ -772,18 +796,65 @@ async def _update_current_state(
                     entity_id=attribution.entity_id, project_id=attribution.project_id
                 )
                 session.add(entity_state)
-            if (
-                entity_state.latest_position_time is None
-                or latest_position.time > entity_state.latest_position_time
-            ):
-                entity_state.latest_position_time = latest_position.time
-                entity_state.latest_position = from_shape(
-                    Point(latest_position.longitude, latest_position.latitude), srid=4326
-                )
+            entity = await session.get(Entity, attribution.entity_id)
+            moved = _apply_position(
+                entity_state,
+                newest_fix,
+                newest_network,
+                entity.location_source if entity else "device",
+                entity.location_fallback_hours if entity else 24,
+            )
+            if moved is not None:
                 entity_state.device_id = device.id
             if entity_state.last_seen_at is None or seen_at > entity_state.last_seen_at:
                 entity_state.last_seen_at = seen_at
             entity_state.updated_at = now
+    del latest_position
+
+
+def _apply_position(
+    state: DeviceCurrentState | EntityCurrentState,
+    newest_fix: DecodedPosition | None,
+    newest_network: DecodedPosition | None,
+    location_source: str,
+    fallback_hours: int,
+) -> DecodedPosition | None:
+    """What becomes the current position (decision D164). A device fix newer than the newest
+    fix known always wins: it moves the position whatever a network estimate showed. A network
+    location counts only when the setting says `network` (newest wins) or
+    `device_else_network` and no device fix arrived within the fallback period before it.
+    Returns the position that became current, if any."""
+    moved: DecodedPosition | None = None
+    if newest_fix is not None:
+        newer_fix = state.latest_fix_time is None or newest_fix.time > state.latest_fix_time
+        if newer_fix:
+            state.latest_fix_time = newest_fix.time
+        if newer_fix and (
+            state.latest_position_time is None
+            or newest_fix.time > state.latest_position_time
+            or state.latest_position_kind == NETWORK_RECORD_TYPE
+        ):
+            _set_position(state, newest_fix, "device")
+            moved = newest_fix
+    if newest_network is not None and location_source != LocationSource.DEVICE:
+        newer = (
+            state.latest_position_time is None or newest_network.time > state.latest_position_time
+        )
+        stale_fix = state.latest_fix_time is None or (
+            newest_network.time - state.latest_fix_time
+        ) > timedelta(hours=max(0, fallback_hours))
+        if newer and (location_source == LocationSource.NETWORK or stale_fix):
+            _set_position(state, newest_network, NETWORK_RECORD_TYPE)
+            moved = newest_network
+    return moved
+
+
+def _set_position(
+    state: DeviceCurrentState | EntityCurrentState, position: DecodedPosition, kind: str
+) -> None:
+    state.latest_position_time = position.time
+    state.latest_position = from_shape(Point(position.longitude, position.latitude), srid=4326)
+    state.latest_position_kind = kind
 
 
 async def publish_outcome(bus: RedisStreamsBus, outcome: Outcome) -> None:

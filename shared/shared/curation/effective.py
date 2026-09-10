@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import Float, Integer, and_, cast, func, or_
 from sqlalchemy.sql import ColumnElement
 
+from shared.connectivity.network_location import NETWORK_RECORD_TYPE
 from shared.models import Measurement, Position
 
 Curatable = type[Position] | type[Measurement]
@@ -82,3 +83,18 @@ def at_time(model: Curatable, when: datetime) -> ColumnElement[bool]:
 
 def visible(model: Curatable) -> ColumnElement[bool]:
     return model.valid.is_(True)
+
+
+def device_fix() -> ColumnElement[bool]:
+    """The device's own fixes, not a location the network provided (decision D163): every
+    reader takes these unless asked for `sources=network` or `all`."""
+    return Position.record_type != NETWORK_RECORD_TYPE
+
+
+def sources_filter(sources: str) -> ColumnElement[bool] | None:
+    """`device` (the default), `network` or `all` as a where clause, None for all."""
+    if sources == "all":
+        return None
+    if sources == "network":
+        return Position.record_type == NETWORK_RECORD_TYPE
+    return device_fix()

@@ -59,3 +59,11 @@ devices with their DevEUI and device id.
   wait for the first uplink.
 - `refused the API key`: the key lacks the right for that call (downlinks need traffic writing
   rights; gateways need gateway rights on a key that may see them).
+
+## Solved locations
+
+A `location_solved` message becomes a position of type `network` with the solver in its
+method (`tts_lora_rssi_geolocation`, for example) and the accuracy the stack gives (ADR 0024),
+drawn on the Coverage tab's "Network locations" layer and used as the current position only
+under the location source setting of the entity or device.
+

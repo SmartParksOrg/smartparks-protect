@@ -13,7 +13,13 @@ from sqlalchemy import func, or_, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.selectable import CompoundSelect
 
-from shared.curation.effective import effective_geom, effective_time, in_window, visible
+from shared.curation.effective import (
+    effective_geom,
+    effective_time,
+    in_window,
+    sources_filter,
+    visible,
+)
 from shared.models import Device, DeviceStateHistory, Entity, Measurement, Position
 
 Key = tuple[uuid.UUID, datetime]
@@ -32,6 +38,7 @@ class RecordSelection:
     since: datetime
     until: datetime
     include_invalid: bool = False
+    sources: str = "device"
 
 
 @dataclass(slots=True)
@@ -69,6 +76,10 @@ def conditions(model: Any, selection: RecordSelection) -> list[Any]:
     ]
     if not selection.include_invalid:
         rules.append(visible(model))
+    if model is Position:
+        clause = sources_filter(selection.sources)
+        if clause is not None:
+            rules.append(clause)
     return rules
 
 

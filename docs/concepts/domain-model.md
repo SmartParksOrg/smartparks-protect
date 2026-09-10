@@ -55,3 +55,15 @@ Every flow through the system (an inbound message, a command, an import, a deliv
 ## Roles and permissions
 
 Three tiers: server admin (an account flag), project admin and project viewer (a membership row per project). Fine-grained permission keys such as `devices:control` are defined in code and mapped from the role. See [permissions](../administration/permissions.md).
+
+## Positions and where they come from
+
+A position has a record type. The device's own fixes carry the driver's type (`gnss` for an
+OpenCollar). A location a network provides about the device, an Iridium session's estimate or
+a LoRaWAN network's geolocation, is a position of type `network` with the network's radius as
+its accuracy (ADR 0024). Every map, chart, list, rule and export shows the device's own fixes
+unless a person asks for the network's locations, and the current position of an entity or a
+device follows its location source setting: the device's fixes, the network's locations, or
+the device with the network standing in after a period without a fix. Network locations draw
+on the live map's Coverage tab as circles of their radius.
+

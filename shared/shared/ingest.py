@@ -27,6 +27,7 @@ from shared.connectivity.base import (
     GatewayUpdate,
     InboundMessage,
 )
+from shared.connectivity.network_location import NetworkLocation
 from shared.connectivity.satellite import DELIVERED_STATUSES, SatelliteSession
 from shared.database import session_scope
 from shared.enums import ConnectivityStatus, ProcessingStatus, TraceClass
@@ -335,6 +336,13 @@ async def store_inbound(
     provider_metadata = dict(message.provider_metadata)
     if satellite is not None:
         provider_metadata["satellite_session"] = satellite.record
+    network_location = message.network_location or (
+        NetworkLocation.from_satellite(satellite.session)
+        if satellite is not None and satellite.duplicate_of is None
+        else None
+    )
+    if network_location is not None:
+        provider_metadata["network_location"] = network_location.to_dict()
     duplicate = satellite is not None and satellite.duplicate_of is not None
     event = SourceEvent(
         ingested_at=now,

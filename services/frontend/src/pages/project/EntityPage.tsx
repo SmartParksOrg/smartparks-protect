@@ -35,6 +35,8 @@ import { recordsHref } from "@/lib/records";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
+import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import {
   Table,
   TableBody,
@@ -53,11 +55,12 @@ import { formatAgo, formatTime } from "@/lib/format";
 
 /** One entity: what it is, the device tracking it now with its health, and the history of the
  * devices that tracked it, with "Assign device" for project admins (decision D106). */
-const TABS = ["overview", "data", "network"] as const;
+const TABS = ["overview", "data", "connectivity", "network"] as const;
 
 export function EntityPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useTab(TABS);
+  const [connectivityHours, setConnectivityHours] = useState(168);
   const { projectId = "", entityId = "" } = useParams();
   const role = useProjectRole(projectId);
   const now = useNow();
@@ -317,6 +320,7 @@ export function EntityPage() {
           <TabsList>
             <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
+            <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>
             <TabsTrigger value="network">{t("Network")}</TabsTrigger>
           </TabsList>
           <TabsContent value="overview">
@@ -448,6 +452,13 @@ export function EntityPage() {
                   )}
                 </CardContent>
               </Card>
+              <LocationSourceCard
+                path={`/api/v1/projects/${projectId}/entities/${e.id}`}
+                value={e.location_source ?? "device"}
+                fallbackHours={e.location_fallback_hours ?? 24}
+                invalidate={[queryKeys.entity(projectId, e.id)]}
+                canEdit={admin}
+              />
               {current && <HealthCard health={device.data?.health} />}
               <Card className="lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -642,6 +653,22 @@ export function EntityPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+          <TabsContent value="connectivity">
+            {current ? (
+              <ConnectivityCards
+                deviceId={current.device_id}
+                projectId={projectId}
+                hours={connectivityHours}
+                onHoursChange={setConnectivityHours}
+              />
+            ) : (
+              <Callout kind="info">
+                {t(
+                  "No device tracks this entity today, so there is no network to report on.",
+                )}
+              </Callout>
+            )}
           </TabsContent>
           <TabsContent value="network">
             <div className="grid gap-4 [&>*]:min-w-0">

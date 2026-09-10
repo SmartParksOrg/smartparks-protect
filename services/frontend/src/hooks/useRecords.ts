@@ -10,6 +10,8 @@ export interface RecordsSelection {
   devices: string[];
   from: string;
   to: string;
+  /** device (the default) or all: whether the network's locations join the rows (D163). */
+  sources?: "device" | "all";
 }
 
 type Status = "idle" | "loading" | "stopped" | "done" | "error";
@@ -37,6 +39,7 @@ export function useRecords(
         device_id: selection.devices,
         from: selection.from,
         to: selection.to,
+        sources: selection.sources ?? "device",
       }
     : null;
   const count = useQuery({

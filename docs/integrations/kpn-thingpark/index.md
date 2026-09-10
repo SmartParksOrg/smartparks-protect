@@ -42,3 +42,13 @@ A command becomes `POST {downlink_url}?DevEUI=&FPort=&Payload=` plus `AS_ID`, `T
 - `CONNECTIVITY_AUTH_FAILED` on a command: `as_key` is wrong, or `as_id` does not match the AS ID entered in the application server's security settings ("Security Check. bad AS_ID" in ThingPark's answer).
 - `COMMAND_REJECTED` with a ThingPark message: the payload is too long for the data rate, or the device is not routed to this application server.
 - Trace Explorer: search by DevEUI; the uplink trace shows source event stored, identity resolved, driver selected, payload decoded, canonical rows written.
+
+## Network geolocation
+
+A `DevEUI_location` report (ThingPark's network geolocation, enabled per device in the KPN
+Device Manager) becomes a position of type `network` with `DevLocRadius` as its accuracy,
+`DevLocTime` as its time and the algorithm in its attributes (ADR 0024). It never replaces the
+collar's own fix on the main map: it draws on the Coverage tab's "Network locations" layer, and
+stands in for the current position only when the entity's or device's location source says so.
+The parser follows the documented fields; a live report is still to be recorded as a fixture.
+

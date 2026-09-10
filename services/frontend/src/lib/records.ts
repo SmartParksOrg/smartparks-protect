@@ -20,6 +20,8 @@ export interface RecordsState {
   timezone: string;
   // the moment a link came from (a track point, a Data tab at a time): that row is highlighted
   at?: string | null;
+  /** The device's own fixes (absent, the default) or those plus the network's locations (D163). */
+  sources?: "device" | "all";
 }
 
 const HALF_WINDOW_MS = 12 * 3600_000;
@@ -44,6 +46,7 @@ export function readRecordsState(params: URLSearchParams): RecordsState {
     to,
     timezone: params.get("tz") ?? browserTimezone(),
     at: validTime(params.get("at")),
+    ...(params.get("sources") === "all" ? { sources: "all" as const } : {}),
   };
 }
 
@@ -59,6 +62,7 @@ export function writeRecordsState(state: RecordsState): URLSearchParams {
   }
   params.set("tz", state.timezone);
   if (state.at) params.set("at", state.at);
+  if (state.sources === "all") params.set("sources", "all");
   return params;
 }
 

@@ -14,6 +14,7 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
+from shared.connectivity.network_location import NetworkLocation
 from shared.connectivity.satellite import SatelliteSession
 from shared.enums import AcquisitionChannel, IngestionMethod
 
@@ -103,6 +104,13 @@ class InboundMessage:
     )
     gateway_receptions: list[GatewayReceptionData] = field(default_factory=list)
     gateway: GatewayUpdate | None = None
+    network_location: NetworkLocation | None = field(
+        default=None,
+        metadata={
+            "doc": "A location the network provides about the device (decision D162): a "
+            "LoRaWAN network's geolocation; satellite estimates come from the session"
+        },
+    )
     satellite_session: SatelliteSession | None = field(
         default=None,
         metadata={

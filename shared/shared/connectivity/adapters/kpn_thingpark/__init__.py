@@ -43,6 +43,7 @@ from shared.connectivity.base import (
     GatewayReceptionData,
     InboundMessage,
 )
+from shared.connectivity.network_location import NetworkLocation
 from shared.connectivity.transports.http import require_object
 from shared.enums import AcquisitionChannel, ErrorCode, IngestionMethod
 from shared.logger import get_logger
@@ -221,6 +222,34 @@ def parse_event(source: DataSourceContext, body: Any) -> InboundMessage:
     if frequency:
         metadata["frequency_hz"] = round(frequency * 1_000_000)
     event_type = EVENT_TYPES[kind]
+    network_location: NetworkLocation | None = None
+    if kind == "DevEUI_location":
+        # ThingPark's network geolocation (decision D162): the fields of the location report
+        # per the LRC-AS tunnel changelog (DevLAT, DevLON, DevAlt, DevLocRadius in metres,
+        # DevLocTime, the algorithm used); a live report is still to be recorded.
+        latitude, longitude = _number(data.get("DevLAT")), _number(data.get("DevLON"))
+        located_at = parse_thingpark_time(data.get("DevLocTime")) or parse_thingpark_time(
+            data.get("Time")
+        )
+        if latitude is not None and longitude is not None and located_at is not None:
+            network_location = NetworkLocation(
+                latitude=latitude,
+                longitude=longitude,
+                time=located_at,
+                method="thingpark_geoloc",
+                accuracy_m=_number(data.get("DevLocRadius")),
+                altitude_m=_number(data.get("DevAlt")),
+                attributes={
+                    k: v
+                    for k, v in {
+                        "algorithm": data.get("NwGeolocAlgoUsed") or data.get("NwGeolocAlgo"),
+                        "altitude_radius_m": _number(data.get("DevAltRadius")),
+                        "dilution": _number(data.get("DevLocDilution")),
+                        "f_cnt_used": data.get("DevUlFCntUpUsed"),
+                    }.items()
+                    if v not in (None, "")
+                },
+            )
     if kind == "DevEUI_notification":
         # ThingPark's notification report carries `Type`; "join" is the device joining the
         # network (seen live on KPN, 2026-09-06), other types stay platform log lines.
@@ -260,6 +289,7 @@ def parse_event(source: DataSourceContext, body: Any) -> InboundMessage:
         ingestion_method=IngestionMethod.WEBHOOK,
         provider_metadata={k: v for k, v in metadata.items() if v is not None},
         network_received_at=parse_thingpark_time(data.get("Time")),
+        network_location=network_location,
         identity_type="dev_eui",
         identity_attributes={
             k: v

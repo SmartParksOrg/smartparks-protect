@@ -5,6 +5,7 @@ import csv
 import io
 import uuid
 from datetime import datetime, timedelta
+from itertools import pairwise
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
@@ -42,13 +43,15 @@ from protect_api.schemas.domain import (
 )
 from protect_api.serial import fill_serial_from_identity
 from shared.config import get_settings
+from shared.connectivity.registry import ADAPTERS
+from shared.connectivity.satellite import SatelliteSession
 from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import reattribute, resolve_attribution
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
-from shared.enums import DeviceStatus, Role
+from shared.enums import AcquisitionChannel, DeviceStatus, ProcessingStatus, Role
 from shared.models import (
     ConnectivityState,
     DataSource,
@@ -61,11 +64,14 @@ from shared.models import (
     Entity,
     EntityType,
     ExternalIdentity,
+    Gateway,
+    GatewayReception,
     Group,
     Measurement,
     Position,
     Project,
     ProjectMembership,
+    SourceEvent,
     User,
 )
 from shared.timeutil import require_aware, utc_now
@@ -169,18 +175,6 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
             )
         ).all()
     }
-    # The last satellite session per device (decision D159), from the connectivity state of
-    # its Iridium sources; the newest session when a device has more than one.
-    satellite: dict[uuid.UUID, dict[str, Any]] = {}
-    for connectivity in (
-        await session.scalars(select(ConnectivityState).where(ConnectivityState.device_id.in_(ids)))
-    ).all():
-        info = (connectivity.attributes or {}).get("satellite")
-        if not isinstance(info, dict):
-            continue
-        known = satellite.get(connectivity.device_id)
-        if known is None or str(info.get("session_at") or "") > str(known.get("session_at") or ""):
-            satellite[connectivity.device_id] = info
     source_names: dict[uuid.UUID, list[str]] = {}
     for device_id, name in (
         await session.execute(
@@ -205,7 +199,6 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
         read.last_seen_at = state.last_seen_at
         read.health = device_health(
             getattr(driver, "health", None),
-            satellite=satellite.get(device.id),
             latest_measurements=state.latest_measurements,
             latest_state=state.latest_state,
             latest_state_time=state.latest_state_time,
@@ -1205,3 +1198,301 @@ async def _import_row(session: AsyncSession, user: User, row: dict[str, str | No
         )
     await flush_or_409(session, "Import row")
     return device
+
+
+# --- Connectivity per data source (architecture 20, decision D161) ---------------------------
+
+MAX_CONNECTIVITY_HOURS = 24 * 90
+# A source that carried nothing for this long is silent; a device's cadence is not known here.
+SILENT_AFTER = timedelta(hours=24)
+# Frame counters are read from this many uplinks at most, newest first (a collar sends about a
+# hundred a day at the most).
+MAX_COUNTER_ROWS = 20000
+
+
+class LoRaWANLink(BaseModel):
+    uplinks: int = Field(description="Uplinks with a reception in the period")
+    receptions: int
+    gateway_count: int
+    best_gateway_id: uuid.UUID | None = None
+    best_gateway_name: str | None = None
+    best_gateway_share: float | None = None
+    mean_rssi: float | None = None
+    mean_snr: float | None = None
+    missed_frames: int = Field(
+        default=0, description="Gaps in the uplink frame counter over the period"
+    )
+    frames_seen: int = Field(default=0, description="Uplinks with a frame counter in the period")
+    gateways: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class IridiumLink(BaseModel):
+    last_session: dict[str, Any] | None = Field(
+        default=None, description="The last satellite session as the ingest normalised it"
+    )
+    sessions: int = Field(description="Sessions in the period, redeliveries left out")
+    bytes: int = Field(description="Bytes carried in the period")
+    missed: int = Field(description="Sessions the counter skipped in the period")
+    duplicates: int = Field(description="Redeliveries in the period")
+
+
+class SourceConnectivity(BaseModel):
+    data_source_id: uuid.UUID
+    data_source_name: str
+    adapter_key: str
+    channel: str = Field(description="lorawan, iridium, webble, log_file, api or cellular")
+    status: str = Field(description="online, silent or unknown")
+    last_contact_at: datetime | None = None
+    last_uplink_at: datetime | None = None
+    last_join_at: datetime | None = None
+    last_downlink_at: datetime | None = None
+    last_rssi: float | None = None
+    last_snr: float | None = None
+    lorawan: LoRaWANLink | None = None
+    iridium: IridiumLink | None = None
+
+
+class DeviceConnectivityRead(BaseModel):
+    device_id: uuid.UUID
+    hours: int
+    sources: list[SourceConnectivity]
+
+
+@router.get("/{device_id}/connectivity", response_model=DeviceConnectivityRead)
+async def device_connectivity(
+    device_id: uuid.UUID,
+    hours: int = Query(168, ge=1, le=MAX_CONNECTIVITY_HOURS),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceConnectivityRead:
+    """How every network the device is reachable through performs (architecture 20, decision
+    D161): per data source the connection state and the last contacts, then for a LoRaWAN
+    source the gateways heard in the period with the best one and its share, the signal and
+    the frame counter gaps, and for an Iridium source the last session, the sessions, bytes,
+    missed sessions and redeliveries of the period. Apart from the device's own health."""
+    device = await _visible_device(session, user, device_id)
+    until = utc_now()
+    since = until - timedelta(hours=hours)
+    identities = (
+        await session.scalars(
+            select(ExternalIdentity).where(
+                ExternalIdentity.device_id == device.id, ExternalIdentity.ignored.is_(False)
+            )
+        )
+    ).all()
+    source_ids = {i.data_source_id for i in identities}
+    states = {
+        c.data_source_id: c
+        for c in (
+            await session.scalars(
+                select(ConnectivityState).where(ConnectivityState.device_id == device.id)
+            )
+        ).all()
+    }
+    source_ids |= set(states)
+    if not source_ids:
+        return DeviceConnectivityRead(device_id=device.id, hours=hours, sources=[])
+    sources = {
+        s.id: s
+        for s in (
+            await session.scalars(select(DataSource).where(DataSource.id.in_(source_ids)))
+        ).all()
+    }
+    result: list[SourceConnectivity] = []
+    for source_id in sorted(source_ids, key=lambda i: sources[i].name if i in sources else ""):
+        source = sources.get(source_id)
+        if source is None:
+            continue
+        adapter = ADAPTERS.get(source.adapter_key)
+        channel = str(
+            getattr(getattr(adapter, "acquisition_channel", None), "value", None)
+            or getattr(adapter, "acquisition_channel", None)
+            or "api"
+        )
+        state = states.get(source_id)
+        contacts = [
+            t
+            for t in (
+                state.last_uplink_at if state else None,
+                state.last_join_at if state else None,
+                state.last_downlink_at if state else None,
+            )
+            if t is not None
+        ]
+        last_contact = max(contacts) if contacts else None
+        status = (
+            "unknown"
+            if last_contact is None
+            else ("online" if until - last_contact <= SILENT_AFTER else "silent")
+        )
+        block = SourceConnectivity(
+            data_source_id=source.id,
+            data_source_name=source.name,
+            adapter_key=source.adapter_key,
+            channel=channel,
+            status=status,
+            last_contact_at=last_contact,
+            last_uplink_at=state.last_uplink_at if state else None,
+            last_join_at=state.last_join_at if state else None,
+            last_downlink_at=state.last_downlink_at if state else None,
+            last_rssi=state.last_rssi if state else None,
+            last_snr=state.last_snr if state else None,
+        )
+        if channel == "lorawan":
+            block.lorawan = await _lorawan_link(session, device.id, source.id, since, until)
+        elif channel == "iridium":
+            block.iridium = await _iridium_link(session, device.id, source.id, state, since, until)
+        result.append(block)
+    return DeviceConnectivityRead(device_id=device.id, hours=hours, sources=result)
+
+
+async def _lorawan_link(
+    session: AsyncSession,
+    device_id: uuid.UUID,
+    source_id: uuid.UUID,
+    since: datetime,
+    until: datetime,
+) -> LoRaWANLink:
+    rows = (
+        await session.execute(
+            select(
+                GatewayReception.gateway_id,
+                func.count().label("receptions"),
+                func.count(func.distinct(GatewayReception.source_event_id)).label("uplinks"),
+                func.avg(GatewayReception.rssi).label("mean_rssi"),
+                func.avg(GatewayReception.snr).label("mean_snr"),
+            )
+            .where(
+                GatewayReception.device_id == device_id,
+                GatewayReception.data_source_id == source_id,
+                GatewayReception.time >= since,
+                GatewayReception.time < until,
+            )
+            .group_by(GatewayReception.gateway_id)
+            .order_by(func.count().desc())
+        )
+    ).all()
+    uplinks = int(
+        await session.scalar(
+            select(func.count(func.distinct(GatewayReception.source_event_id))).where(
+                GatewayReception.device_id == device_id,
+                GatewayReception.data_source_id == source_id,
+                GatewayReception.time >= since,
+                GatewayReception.time < until,
+            )
+        )
+        or 0
+    )
+    registry = {
+        g.external_id: g
+        for g in (
+            await session.scalars(
+                select(Gateway).where(
+                    Gateway.data_source_id == source_id,
+                    Gateway.external_id.in_({r.gateway_id for r in rows} or {""}),
+                )
+            )
+        ).all()
+    }
+    counters = [
+        int(c)
+        for (c,) in (
+            await session.execute(
+                select(SourceEvent.provider_metadata["f_cnt"].as_integer())
+                .where(
+                    SourceEvent.device_id == device_id,
+                    SourceEvent.data_source_id == source_id,
+                    SourceEvent.event_type == "uplink",
+                    SourceEvent.ingested_at >= since,
+                    SourceEvent.ingested_at < until,
+                    SourceEvent.provider_metadata["f_cnt"].as_integer().is_not(None),
+                )
+                .order_by(SourceEvent.ingested_at)
+                .limit(MAX_COUNTER_ROWS)
+            )
+        ).all()
+    ]
+    missed = 0
+    for previous, current in pairwise(counters):
+        if current > previous + 1:
+            missed += current - previous - 1  # a reset (a smaller counter) is not a gap
+    total_receptions = sum(int(r.receptions) for r in rows)
+    rssi = [float(r.mean_rssi) * int(r.receptions) for r in rows if r.mean_rssi is not None]
+    snr = [float(r.mean_snr) * int(r.receptions) for r in rows if r.mean_snr is not None]
+    best = rows[0] if rows else None
+    best_gateway = registry.get(best.gateway_id) if best else None
+    return LoRaWANLink(
+        uplinks=uplinks,
+        receptions=total_receptions,
+        gateway_count=len(rows),
+        best_gateway_id=best_gateway.id if best_gateway else None,
+        best_gateway_name=(
+            (best_gateway.name_override or best_gateway.name or best_gateway.external_id)
+            if best_gateway
+            else (best.gateway_id if best else None)
+        ),
+        best_gateway_share=(
+            round(min(1.0, int(best.uplinks) / uplinks), 3) if best and uplinks else None
+        ),
+        mean_rssi=round(sum(rssi) / total_receptions, 1) if rssi else None,
+        mean_snr=round(sum(snr) / total_receptions, 1) if snr else None,
+        missed_frames=missed,
+        frames_seen=len(counters),
+        gateways=[
+            {
+                "gateway_id": str(g.id) if (g := registry.get(r.gateway_id)) else None,
+                "external_id": r.gateway_id,
+                "name": (g.name_override or g.name) if g else None,
+                "receptions": int(r.receptions),
+                "uplinks": int(r.uplinks),
+                "mean_rssi": round(float(r.mean_rssi), 1) if r.mean_rssi is not None else None,
+                "mean_snr": round(float(r.mean_snr), 1) if r.mean_snr is not None else None,
+            }
+            for r in rows
+        ],
+    )
+
+
+async def _iridium_link(
+    session: AsyncSession,
+    device_id: uuid.UUID,
+    source_id: uuid.UUID,
+    state: ConnectivityState | None,
+    since: datetime,
+    until: datetime,
+) -> IridiumLink:
+    info = SourceEvent.provider_metadata["satellite_session"]
+    rows = (
+        await session.execute(
+            select(SourceEvent.processing_status, info)
+            .where(
+                SourceEvent.device_id == device_id,
+                SourceEvent.data_source_id == source_id,
+                SourceEvent.acquisition_channel == AcquisitionChannel.IRIDIUM,
+                SourceEvent.ingested_at >= since,
+                SourceEvent.ingested_at < until,
+            )
+            .limit(MAX_COUNTER_ROWS)
+        )
+    ).all()
+    sessions = bytes_total = missed = duplicates = 0
+    for processing_status, data in rows:
+        if processing_status == ProcessingStatus.DUPLICATE:
+            duplicates += 1
+            continue
+        parsed = SatelliteSession.from_dict(data)
+        if parsed is None:
+            continue
+        sessions += 1
+        bytes_total += parsed.bytes
+        gap = data.get("missed_since_last") if isinstance(data, dict) else None
+        if isinstance(gap, int):
+            missed += gap
+    last = (state.attributes or {}).get("satellite") if state else None
+    return IridiumLink(
+        last_session=dict(last) if isinstance(last, dict) else None,
+        sessions=sessions,
+        bytes=bytes_total,
+        missed=missed,
+        duplicates=duplicates,
+    )

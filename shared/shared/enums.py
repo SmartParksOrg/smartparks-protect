@@ -48,6 +48,14 @@ class FeatureType(StrEnum):
     ROUTE = "route"
 
 
+class LocationSource(StrEnum):
+    """Which positions decide an entity's or a device's current position (decision D164)."""
+
+    DEVICE = "device"
+    NETWORK = "network"
+    DEVICE_ELSE_NETWORK = "device_else_network"
+
+
 class DeviceStatus(StrEnum):
     ACTIVE = "active"
     INVENTORY = "inventory"

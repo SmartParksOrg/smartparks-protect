@@ -13,6 +13,7 @@ from sqlalchemy import select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.curation.effective import (
+    device_fix,
     effective_geom,
     effective_number,
     effective_time,
@@ -175,6 +176,7 @@ async def replay(
                 Position.project_id == project_id,
                 in_window(Position, time_from, time_to),
                 visible(Position),
+                device_fix(),
             )
             .order_by(effective_time(Position))
             .limit(MAX_SAMPLES + 1)

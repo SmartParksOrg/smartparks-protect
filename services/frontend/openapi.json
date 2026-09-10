@@ -4154,6 +4154,67 @@
     ]
    }
   },
+  "/api/v1/devices/{device_id}/connectivity": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Connectivity",
+    "description": "How every network the device is reachable through performs (architecture 20, decision\nD161): per data source the connection state and the last contacts, then for a LoRaWAN\nsource the gateways heard in the period with the best one and its share, the signal and\nthe frame counter gaps, and for an Iridium source the last session, the sessions, bytes,\nmissed sessions and redeliveries of the period. Apart from the device's own health.",
+    "operationId": "device_connectivity_api_v1_devices__device_id__connectivity_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 2160,
+       "minimum": 1,
+       "default": 168,
+       "title": "Hours"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceConnectivityRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/entity-types": {
    "get": {
     "tags": [
@@ -7287,7 +7348,7 @@
      "data"
     ],
     "summary": "List Positions",
-    "description": "Positions attributed to the project, newest first, within a time window (default the last\n24 hours) and a row limit. Times and coordinates are the effective ones (architecture 28).",
+    "description": "Positions attributed to the project, newest first, within a time window (default the last\n24 hours) and a row limit. Times and coordinates are the effective ones (architecture 28);\nthe device's own fixes unless `sources` asks for the network's locations.",
     "operationId": "list_positions_api_v1_projects__project_id__positions_get",
     "security": [
      {
@@ -7396,6 +7457,19 @@
        "title": "Include Invalid"
       },
       "description": "Also rows marked invalid by curation"
+     },
+     {
+      "name": "sources",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(device|network|all)$",
+       "description": "The device's own fixes (default), the network's locations, or both (D163)",
+       "default": "device",
+       "title": "Sources"
+      },
+      "description": "The device's own fixes (default), the network's locations, or both (D163)"
      }
     ],
     "responses": {
@@ -8330,7 +8404,7 @@
      "map"
     ],
     "summary": "Track",
-    "description": "Track of one entity or device attributed to the project. Longer periods are decimated so\nat most `max_points` vertices return; every vertex keeps its time. Default period: 24 hours.",
+    "description": "Track of one entity or device attributed to the project. Longer periods are decimated so\nat most `max_points` vertices return; every vertex keeps its time. Default period: 24 hours,\nthe device's own fixes unless `sources` says otherwise.",
     "operationId": "track_api_v1_projects__project_id__tracks_get",
     "security": [
      {
@@ -8426,6 +8500,19 @@
        "default": 5000,
        "title": "Max Points"
       }
+     },
+     {
+      "name": "sources",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(device|network|all)$",
+       "description": "The device's own fixes (default), the network's locations, or both (D163)",
+       "default": "device",
+       "title": "Sources"
+      },
+      "description": "The device's own fixes (default), the network's locations, or both (D163)"
      }
     ],
     "responses": {
@@ -8544,14 +8631,14 @@
     }
    }
   },
-  "/api/v1/projects/{project_id}/map/satellite-sessions": {
+  "/api/v1/projects/{project_id}/map/network-locations": {
    "get": {
     "tags": [
      "map"
     ],
-    "summary": "Satellite Sessions",
-    "description": "Where the Iridium network placed the scope's collars at their satellite sessions\n(decision D158): one point per delivery with the estimate's circular error probable, the\nnewest `MAX_SATELLITE_SESSIONS` in the window and view. Sessions whose status disowns the\nestimate and redeliveries are left out. The estimate is provenance, never a position.",
-    "operationId": "satellite_sessions_api_v1_projects__project_id__map_satellite_sessions_get",
+    "summary": "Network Locations",
+    "description": "Where the networks placed the scope's devices (decisions D162 and D163): the positions\nof record type `network` (Iridium estimates the network stood by, ThingPark geolocation,\nsolved locations) in the window and view, newest first, with their radius. Provenance for\nthe map's \"Network locations\" layer, never a device's own fix.",
+    "operationId": "network_locations_api_v1_projects__project_id__map_network_locations_get",
     "security": [
      {
       "OAuth2PasswordBearer": []
@@ -8604,7 +8691,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/SatelliteSessionsResponse"
+         "$ref": "#/components/schemas/NetworkLocationsResponse"
         }
        }
       }
@@ -8890,6 +8977,17 @@
        "title": "Include Invalid"
       },
       "description": "Also rows marked invalid by curation"
+     },
+     {
+      "name": "sources",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(device|network|all)$",
+       "default": "device",
+       "title": "Sources"
+      }
      }
     ],
     "responses": {
@@ -9024,6 +9122,19 @@
        "title": "Include Invalid"
       },
       "description": "Also rows marked invalid by curation"
+     },
+     {
+      "name": "sources",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(device|network|all)$",
+       "description": "The device's own fixes (default), the network's locations, or both (D163)",
+       "default": "device",
+       "title": "Sources"
+      },
+      "description": "The device's own fixes (default), the network's locations, or both (D163)"
      },
      {
       "name": "limit",
@@ -23794,6 +23905,33 @@
     ],
     "title": "DeviceConnectivity"
    },
+   "DeviceConnectivityRead": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "hours": {
+      "type": "integer",
+      "title": "Hours"
+     },
+     "sources": {
+      "items": {
+       "$ref": "#/components/schemas/SourceConnectivity"
+      },
+      "type": "array",
+      "title": "Sources"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "hours",
+     "sources"
+    ],
+    "title": "DeviceConnectivityRead"
+   },
    "DeviceCreate": {
     "properties": {
      "device_type_id": {
@@ -23849,6 +23987,18 @@
        }
       ],
       "title": "Notes"
+     },
+     "location_source": {
+      "$ref": "#/components/schemas/LocationSource",
+      "default": "device"
+     },
+     "location_fallback_hours": {
+      "type": "integer",
+      "maximum": 720.0,
+      "minimum": 1.0,
+      "title": "Location Fallback Hours",
+      "description": "Hours without a device fix before a network location stands in (D164)",
+      "default": 24
      }
     },
     "type": "object",
@@ -24298,6 +24448,16 @@
    },
    "DeviceRead": {
     "properties": {
+     "location_source": {
+      "type": "string",
+      "title": "Location Source",
+      "default": "device"
+     },
+     "location_fallback_hours": {
+      "type": "integer",
+      "title": "Location Fallback Hours",
+      "default": 24
+     },
      "id": {
       "type": "string",
       "format": "uuid",
@@ -24786,6 +24946,30 @@
        }
       ],
       "title": "Notes"
+     },
+     "location_source": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LocationSource"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "location_fallback_hours": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 720.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location Fallback Hours",
+      "description": "Hours without a device fix before a network location stands in (D164)"
      }
     },
     "type": "object",
@@ -24793,6 +24977,16 @@
    },
    "DeviceWithAssignments": {
     "properties": {
+     "location_source": {
+      "type": "string",
+      "title": "Location Source",
+      "default": "device"
+     },
+     "location_fallback_hours": {
+      "type": "integer",
+      "title": "Location Fallback Hours",
+      "default": 24
+     },
      "id": {
       "type": "string",
       "format": "uuid",
@@ -25406,6 +25600,18 @@
        }
       ],
       "title": "Notes"
+     },
+     "location_source": {
+      "$ref": "#/components/schemas/LocationSource",
+      "default": "device"
+     },
+     "location_fallback_hours": {
+      "type": "integer",
+      "maximum": 720.0,
+      "minimum": 1.0,
+      "title": "Location Fallback Hours",
+      "description": "Hours without a device fix before a network location stands in (D164)",
+      "default": 24
      }
     },
     "type": "object",
@@ -25670,6 +25876,16 @@
    },
    "EntityRead": {
     "properties": {
+     "location_source": {
+      "type": "string",
+      "title": "Location Source",
+      "default": "device"
+     },
+     "location_fallback_hours": {
+      "type": "integer",
+      "title": "Location Fallback Hours",
+      "default": 24
+     },
      "id": {
       "type": "string",
       "format": "uuid",
@@ -26054,6 +26270,30 @@
        }
       ],
       "title": "Notes"
+     },
+     "location_source": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LocationSource"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "location_fallback_hours": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 720.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location Fallback Hours",
+      "description": "Hours without a device fix before a network location stands in (D164)"
      }
     },
     "type": "object",
@@ -29178,6 +29418,51 @@
     ],
     "title": "InvitationRead"
    },
+   "IridiumLink": {
+    "properties": {
+     "last_session": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Session",
+      "description": "The last satellite session as the ingest normalised it"
+     },
+     "sessions": {
+      "type": "integer",
+      "title": "Sessions",
+      "description": "Sessions in the period, redeliveries left out"
+     },
+     "bytes": {
+      "type": "integer",
+      "title": "Bytes",
+      "description": "Bytes carried in the period"
+     },
+     "missed": {
+      "type": "integer",
+      "title": "Missed",
+      "description": "Sessions the counter skipped in the period"
+     },
+     "duplicates": {
+      "type": "integer",
+      "title": "Duplicates",
+      "description": "Redeliveries in the period"
+     }
+    },
+    "type": "object",
+    "required": [
+     "sessions",
+     "bytes",
+     "missed",
+     "duplicates"
+    ],
+    "title": "IridiumLink"
+   },
    "JobCreate": {
     "properties": {
      "target_type": {
@@ -29535,6 +29820,116 @@
      "device_id"
     ],
     "title": "LinkIdentity"
+   },
+   "LoRaWANLink": {
+    "properties": {
+     "uplinks": {
+      "type": "integer",
+      "title": "Uplinks",
+      "description": "Uplinks with a reception in the period"
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions"
+     },
+     "gateway_count": {
+      "type": "integer",
+      "title": "Gateway Count"
+     },
+     "best_gateway_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Best Gateway Id"
+     },
+     "best_gateway_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Best Gateway Name"
+     },
+     "best_gateway_share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Best Gateway Share"
+     },
+     "mean_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Rssi"
+     },
+     "mean_snr": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Snr"
+     },
+     "missed_frames": {
+      "type": "integer",
+      "title": "Missed Frames",
+      "description": "Gaps in the uplink frame counter over the period",
+      "default": 0
+     },
+     "frames_seen": {
+      "type": "integer",
+      "title": "Frames Seen",
+      "description": "Uplinks with a frame counter in the period",
+      "default": 0
+     },
+     "gateways": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Gateways"
+     }
+    },
+    "type": "object",
+    "required": [
+     "uplinks",
+     "receptions",
+     "gateway_count"
+    ],
+    "title": "LoRaWANLink"
+   },
+   "LocationSource": {
+    "type": "string",
+    "enum": [
+     "device",
+     "network",
+     "device_else_network"
+    ],
+    "title": "LocationSource",
+    "description": "Which positions decide an entity's or a device's current position (decision D164)."
    },
    "MapConfig": {
     "properties": {
@@ -30007,6 +30402,40 @@
      "last_time"
     ],
     "title": "MetricWithData"
+   },
+   "NetworkLocationsResponse": {
+    "properties": {
+     "hours": {
+      "type": "integer",
+      "title": "Hours"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total",
+      "description": "Network locations in the window and view"
+     },
+     "capped": {
+      "type": "boolean",
+      "title": "Capped",
+      "description": "True when more exist than were returned"
+     },
+     "features": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Features"
+     }
+    },
+    "type": "object",
+    "required": [
+     "hours",
+     "total",
+     "capped",
+     "features"
+    ],
+    "title": "NetworkLocationsResponse"
    },
    "NewMetric": {
     "properties": {
@@ -33539,40 +33968,6 @@
     "title": "SatelliteSessionRead",
     "description": "The Iridium session behind a satellite delivery (decision D158)."
    },
-   "SatelliteSessionsResponse": {
-    "properties": {
-     "hours": {
-      "type": "integer",
-      "title": "Hours"
-     },
-     "total": {
-      "type": "integer",
-      "title": "Total",
-      "description": "Sessions with a usable estimate in the window and view"
-     },
-     "capped": {
-      "type": "boolean",
-      "title": "Capped",
-      "description": "True when more sessions exist than were returned"
-     },
-     "features": {
-      "items": {
-       "additionalProperties": true,
-       "type": "object"
-      },
-      "type": "array",
-      "title": "Features"
-     }
-    },
-    "type": "object",
-    "required": [
-     "hours",
-     "total",
-     "capped",
-     "features"
-    ],
-    "title": "SatelliteSessionsResponse"
-   },
    "SavedViewCreate": {
     "properties": {
      "name": {
@@ -34067,6 +34462,132 @@
      "critical"
     ],
     "title": "Severity"
+   },
+   "SourceConnectivity": {
+    "properties": {
+     "data_source_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Data Source Id"
+     },
+     "data_source_name": {
+      "type": "string",
+      "title": "Data Source Name"
+     },
+     "adapter_key": {
+      "type": "string",
+      "title": "Adapter Key"
+     },
+     "channel": {
+      "type": "string",
+      "title": "Channel",
+      "description": "lorawan, iridium, webble, log_file, api or cellular"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "online, silent or unknown"
+     },
+     "last_contact_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Contact At"
+     },
+     "last_uplink_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Uplink At"
+     },
+     "last_join_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Join At"
+     },
+     "last_downlink_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Downlink At"
+     },
+     "last_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Rssi"
+     },
+     "last_snr": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Snr"
+     },
+     "lorawan": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LoRaWANLink"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "iridium": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/IridiumLink"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "data_source_id",
+     "data_source_name",
+     "adapter_key",
+     "channel",
+     "status"
+    ],
+    "title": "SourceConnectivity"
    },
    "SourceEventRead": {
     "properties": {

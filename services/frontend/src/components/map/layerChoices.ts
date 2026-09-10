@@ -20,9 +20,9 @@ export interface LayerChoices {
   hidden_gateways: string[];
   coverage: boolean;
   coverage_hours: number;
-  /** Satellite sessions (decision D158): the Iridium network's location estimates as circles,
-   * over the coverage period; a small field so the preference stays small. */
-  satellite?: boolean;
+  /** Network locations (decisions D162 and D163): where the networks placed the devices, as
+   * circles of their radius over the coverage period; a small field so the preference stays small. */
+  network_locations?: boolean;
   /** Heard positions of one gateway alone (phase 19); null or absent means every ticked gateway.
    * A field rather than a hidden list, so the markers stay and the preference stays small. */
   coverage_gateway?: string | null;
@@ -43,7 +43,7 @@ export const DEFAULT_LAYERS: LayerChoices = {
   hidden_gateways: [],
   coverage: false,
   coverage_hours: 168,
-  satellite: false,
+  network_locations: false,
   shown_devices: [],
 };
 

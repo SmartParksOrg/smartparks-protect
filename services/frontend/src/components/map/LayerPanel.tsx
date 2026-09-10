@@ -15,7 +15,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CoverageResponse,
   EntityGroup,
-  SatelliteSessionsResponse,
+  NetworkLocationsResponse,
   Feature,
   Gateway,
 } from "@/api/types";
@@ -168,7 +168,7 @@ export function LayerPanel({
   events,
   gateways,
   coverage,
-  satellite,
+  networkLocations,
   coverageError,
   onRetryCoverage,
   choices,
@@ -197,8 +197,8 @@ export function LayerPanel({
   events: EventFeatureProperties[];
   gateways: Gateway[];
   coverage: CoverageResponse | undefined;
-  /** The satellite sessions in view (decision D158), for the count on their row. */
-  satellite?: SatelliteSessionsResponse;
+  /** The network locations in view (decision D163), for the count on their row. */
+  networkLocations?: NetworkLocationsResponse;
   /** Why the heard positions did not load, if they did not; the panel offers a retry. */
   coverageError?: string;
   onRetryCoverage?: () => void;
@@ -1259,18 +1259,18 @@ export function LayerPanel({
         <Row depth={0}>
           <span className="size-6 shrink-0" />
           <Check
-            checked={Boolean(choices.satellite)}
-            label={t("Satellite sessions")}
-            onChange={(v) => onChange({ ...choices, satellite: v })}
+            checked={Boolean(choices.network_locations)}
+            label={t("Network locations")}
+            onChange={(v) => onChange({ ...choices, network_locations: v })}
           />
           <span className="min-w-0 flex-1 truncate">
-            {t("Satellite sessions")}
+            {t("Network locations")}
           </span>
-          {choices.satellite && satellite && (
+          {choices.network_locations && networkLocations && (
             <span className="text-xs text-muted-foreground">
-              {satellite.capped
-                ? t("the newest {{count}}", { count: satellite.total })
-                : t("{{count}} sessions", { count: satellite.total })}
+              {networkLocations.capped
+                ? t("the newest {{count}}", { count: networkLocations.total })
+                : t("{{count}} locations", { count: networkLocations.total })}
             </span>
           )}
         </Row>

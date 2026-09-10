@@ -43,6 +43,8 @@ export interface EntityFeatureProperties {
   assigned_since?: string | null;
   last_seen_at: string | null;
   position_time: string | null;
+  /** device or network: what the position shown is (decision D164). */
+  position_kind?: string | null;
   active_alert_count: number;
   health_level?: string | null;
   battery_voltage?: number | null;
@@ -66,6 +68,8 @@ export interface DeviceFeatureProperties {
   project_since: string | null;
   last_seen_at: string | null;
   position_time: string | null;
+  /** device or network: what the position shown is (decision D164). */
+  position_kind?: string | null;
   health_level?: string | null;
   battery_voltage?: number | null;
   last_status_at?: string | null;
@@ -892,9 +896,10 @@ export function ensureCoverageLayers(map: MapLibreMap): void {
   );
 }
 
-/** Satellite sessions (decision D158): the Iridium network's estimate of where a collar was at
- * each session, an error circle in the sand tint with its centre, under the coverage layer. */
-export function ensureSatelliteLayers(map: MapLibreMap): void {
+/** Network locations (decisions D162 and D163): where a network placed a device (an Iridium
+ * estimate, a LoRaWAN geolocation), an error circle in the sand tint with its centre, under the
+ * coverage layer; never a device's own fix. */
+export function ensureNetworkLocationLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.satellite)) return;
   map.addSource(SOURCES.satellite, {
     type: "geojson",
@@ -942,7 +947,7 @@ export function ensureSatelliteLayers(map: MapLibreMap): void {
   );
 }
 
-export function setSatelliteSessions(
+export function setNetworkLocations(
   map: MapLibreMap,
   features: GeoJSON.Feature[],
 ): void {

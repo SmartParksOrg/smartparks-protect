@@ -73,10 +73,12 @@ Confirmed live on 2026-09-10: the right login answers `FAILED,16,No Data`.
 Every delivery carries the satellite session (ADR 0023): its outcome, the modem's session
 counter (MOMSN), the size, and the network's estimate of where the modem was with its error
 radius (CEP, in km). The traffic view shows them on the row, the source event dialog under
-Provenance, and the device's health card keeps the last session as a line that warns when a
-session failed or sessions went missing. The estimates the network stands by draw as circles on
-the live map ("Satellite sessions" in the Coverage tab); an estimate the network calls poor is
-kept but not drawn. A retry of a delivery the server did not acknowledge is stored as a
+Provenance, and the device's Connectivity tab keeps the last session with the sessions, bytes,
+missed sessions and redeliveries of the period, apart from the device's own health. An estimate the network stands by is also a position of
+type `network` with its radius as accuracy (ADR 0024): it draws as a circle on the live map
+("Network locations" in the Coverage tab), joins tracks, records and exports when asked, and
+becomes the current position of a device or an entity only under its location source setting.
+An estimate the network calls poor is kept on the session but never becomes a position. A retry of a delivery the server did not acknowledge is stored as a
 duplicate, not processed twice. A fix far outside the estimate's circle is noted on the trace.
 
 ## Troubleshooting

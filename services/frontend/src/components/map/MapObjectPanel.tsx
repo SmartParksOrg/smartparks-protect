@@ -114,6 +114,7 @@ function batteryClass(level: string | null | undefined): string {
 function HealthRows({
   lastSeenAt,
   positionTime,
+  positionKind,
   batteryVoltage,
   healthLevel,
   lastStatusAt,
@@ -121,6 +122,7 @@ function HealthRows({
 }: {
   lastSeenAt: string | null | undefined;
   positionTime: string | null | undefined;
+  positionKind?: string | null;
   batteryVoltage: number | null | undefined;
   healthLevel: string | null | undefined;
   lastStatusAt: string | null | undefined;
@@ -134,6 +136,12 @@ function HealthRows({
       </PanelRow>
       <PanelRow label={t("Position")}>
         {positionTime ? formatTime(positionTime) : t("none yet")}
+        {positionTime && positionKind === "network" && (
+          <span className="text-muted-foreground">
+            {" "}
+            · {t("network estimate")}
+          </span>
+        )}
       </PanelRow>
       {batteryVoltage != null && (
         <PanelRow label={t("Battery")} className={batteryClass(healthLevel)}>
@@ -284,6 +292,7 @@ export function EntityPanel({
       <HealthRows
         lastSeenAt={props.last_seen_at}
         positionTime={props.position_time}
+        positionKind={props.position_kind}
         batteryVoltage={props.battery_voltage}
         healthLevel={props.health_level}
         lastStatusAt={props.last_status_at}
@@ -412,6 +421,7 @@ export function DevicePanel({
       <HealthRows
         lastSeenAt={props.last_seen_at}
         positionTime={props.position_time}
+        positionKind={props.position_kind}
         batteryVoltage={props.battery_voltage}
         healthLevel={props.health_level}
         lastStatusAt={props.last_status_at}

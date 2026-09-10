@@ -1,20 +1,20 @@
-/** Satellite sessions on the map (decision D158): the Iridium network's estimate of where a
- * collar was at a session, drawn as a circle of the estimate's error radius in metres, so the
- * circle keeps its size on the ground at every zoom. The estimate is provenance, never a
- * position. */
+/** Network locations on the map (decisions D162 and D163): where a network placed a device (an
+ * Iridium estimate, a LoRaWAN geolocation), drawn as a circle of its radius in metres, so the
+ * circle keeps its size on the ground at every zoom. Never a device's own fix. */
 
 const EARTH_RADIUS_M = 6_371_008.8;
 const SEGMENTS = 48;
 
-export interface SatelliteSessionProperties {
-  source_event_id: number;
+export interface NetworkLocationProperties {
+  position_id: number;
+  time: string;
+  accuracy_m: number | null;
+  method: string | null;
   device_id: string;
   device_name: string;
-  session_at: string | null;
-  cep_km: number | null;
-  status: string;
-  sequence: number | null;
-  bytes: number;
+  entity_id: string | null;
+  entity_name: string | null;
+  source_event_id: number | null;
 }
 
 /** A polygon approximating the circle of `radiusM` metres around a point, as GeoJSON. */
@@ -44,16 +44,16 @@ export function circlePolygon(
   return { type: "Polygon", coordinates: [ring] };
 }
 
-/** The session points of the API as circle polygons plus their centres, so the map draws the
- * error circle and a dot the person can read. */
-export function sessionFeatures(points: GeoJSON.Feature[]): GeoJSON.Feature[] {
+/** The location points of the API as circle polygons plus their centres, so the map draws the
+ * radius and a dot the person can read; at least half a kilometre so a point stays visible. */
+export function locationFeatures(points: GeoJSON.Feature[]): GeoJSON.Feature[] {
   const out: GeoJSON.Feature[] = [];
   for (const point of points) {
     if (point.geometry.type !== "Point") continue;
     const [lon, lat] = point.geometry.coordinates;
     const props = (point.properties ??
-      {}) as Partial<SatelliteSessionProperties>;
-    const radiusM = Math.max(500, (props.cep_km ?? 0) * 1000);
+      {}) as Partial<NetworkLocationProperties>;
+    const radiusM = Math.max(500, props.accuracy_m ?? 0);
     out.push({
       type: "Feature",
       id: point.id,

@@ -120,5 +120,7 @@ export interface Page<T> {
 
 export type Role = "project-viewer" | "project-admin" | "server-admin";
 export type ClockAheadDevice = Schemas["ClockAheadDevice"];
-export type SatelliteSessionsResponse = Schemas["SatelliteSessionsResponse"];
+export type NetworkLocationsResponse = Schemas["NetworkLocationsResponse"];
 export type SatelliteSession = Schemas["SatelliteSessionRead"];
+export type DeviceConnectivityRead = Schemas["DeviceConnectivityRead"];
+export type SourceConnectivity = Schemas["SourceConnectivity"];

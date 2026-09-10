@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { Device, Entity, EntityGroup } from "@/api/types";
 import { MultiSelect } from "@/components/analytics/MultiSelect";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -131,6 +132,14 @@ export function SelectionStrip({
           ))}
         </SelectContent>
       </Select>
+      <label className="flex items-center gap-2 text-sm">
+        <Switch
+          checked={state.sources === "all"}
+          onCheckedChange={(v) => onChange({ sources: v ? "all" : "device" })}
+          aria-label={t("Network locations")}
+        />
+        {t("Network locations")}
+      </label>
     </div>
   );
 }

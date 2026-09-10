@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.config import get_settings
+from shared.connectivity.network_location import NETWORK_RECORD_TYPE
 from shared.enums import (
     BackfillStatus,
     DeliveryOrigin,
@@ -97,12 +98,19 @@ class ObjectRef:
     severity: str | None = None
     metric_key: str | None = None
     object_version: int = 1
+    record_type: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
 def matches(integration: Integration, ref: ObjectRef) -> bool:
     if ref.object_type not in (integration.object_types or []):
         return False
+    if (
+        ref.object_type == IntegrationObjectType.POSITION
+        and ref.record_type == NETWORK_RECORD_TYPE
+        and not (integration.config or {}).get("include_network_positions")
+    ):
+        return False  # a network's location leaves the server only when asked (decision D163)
     connector = CONNECTORS.get(integration.connector_key)
     if connector is None or ref.object_type not in connector.supports:
         return False
@@ -490,6 +498,7 @@ def _position_ref(row: Position) -> ObjectRef:
         project_id=row.project_id or uuid.UUID(int=0),
         entity_id=row.entity_id,
         device_id=row.device_id,
+        record_type=row.record_type,
     )
 
 
