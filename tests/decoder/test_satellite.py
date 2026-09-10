@@ -11,7 +11,7 @@ from protect_decoder.pipeline import process_source_event
 from shared.bus import Topic
 from shared.connectivity.satellite import SatelliteSession
 from shared.enums import AcquisitionChannel, CommandStatus, IngestionMethod
-from shared.ingest import commit_and_publish, store_inbound
+from shared.ingest import store_inbound
 from shared.models import Command, CommandExecution, ConnectivityState, ProcessingTrace
 from tests.decoder.conftest import inbound
 
@@ -40,9 +40,9 @@ def satellite_uplink(world, lat: float, lon: float, **session):
     )
 
 
-async def _process(db, bus, world, message):
+async def _process(db, world, message):
     stored = await store_inbound(db, world.source, message)
-    await commit_and_publish(db, bus, [stored])
+    await db.commit()
     outcome = await process_source_event(
         db, stored.source_event.id, stored.source_event.ingested_at
     )
@@ -50,8 +50,8 @@ async def _process(db, bus, world, message):
     return stored.source_event, outcome
 
 
-async def test_a_fix_far_from_the_estimate_is_noted_and_the_session_kept(db, bus, world):
-    event, outcome = await _process(db, bus, world, satellite_uplink(world, 47.5, 15.1))
+async def test_a_fix_far_from_the_estimate_is_noted_and_the_session_kept(db, world):
+    event, outcome = await _process(db, world, satellite_uplink(world, 47.5, 15.1))
     trace = await db.get(ProcessingTrace, outcome.trace_id)
     decoded = next(s for s in trace.compact_steps if s["operation"] == "payload decoded")
     assert "km from the Iridium estimate (CEP 4 km)" in decoded["note"]
@@ -61,13 +61,13 @@ async def test_a_fix_far_from_the_estimate_is_noted_and_the_session_kept(db, bus
     assert event.provider_metadata["satellite_session"]["status_text"] == "session completed"
 
     # a fix inside the circle says nothing
-    _, outcome = await _process(db, bus, world, satellite_uplink(world, 46.55, 15.11, sequence=11))
+    _, outcome = await _process(db, world, satellite_uplink(world, 46.55, 15.11, sequence=11))
     trace = await db.get(ProcessingTrace, outcome.trace_id)
     decoded = next(s for s in trace.compact_steps if s["operation"] == "payload decoded")
     assert "Iridium estimate" not in (decoded.get("note") or "")
 
 
-async def test_an_mtmsn_moves_the_oldest_pending_command_of_the_route(db, bus, world):
+async def test_an_mtmsn_moves_the_oldest_pending_command_of_the_route(db, world):
     older = Command(
         device_id=world.device.id,
         project_id=world.project_a.id,
@@ -96,16 +96,14 @@ async def test_an_mtmsn_moves_the_oldest_pending_command_of_the_route(db, bus, w
     await db.commit()
 
     # a session without a mobile-terminated transfer moves nothing
-    _, outcome = await _process(
-        db, bus, world, satellite_uplink(world, 46.55, 15.11, mt_sequence=0)
-    )
+    _, outcome = await _process(db, world, satellite_uplink(world, 46.55, 15.11, mt_sequence=0))
     await db.refresh(older)
     assert older.status == CommandStatus.QUEUED
     assert Topic.COMMAND_UPDATED not in [t for t, _ in outcome.messages]
 
     # one carried a message: the oldest pending command on the route was transmitted
     _, outcome = await _process(
-        db, bus, world, satellite_uplink(world, 46.55, 15.11, sequence=12, mt_sequence=7)
+        db, world, satellite_uplink(world, 46.55, 15.11, sequence=12, mt_sequence=7)
     )
     await db.refresh(older)
     await db.refresh(newer)
