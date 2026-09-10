@@ -3189,8 +3189,64 @@
          "type": "null"
         }
        ],
+       "description": "Matches the name, the serial and any identity",
        "title": "Q"
+      },
+      "description": "Matches the name, the serial and any identity"
+     },
+     {
+      "name": "data_source_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only devices with an identity (not ignored) on this data source",
+       "title": "Data Source Id"
+      },
+      "description": "Only devices with an identity (not ignored) on this data source"
+     },
+     {
+      "name": "device_type_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Type Id"
       }
+     },
+     {
+      "name": "has_entity",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "True: tracks an entity today; false: tracks none (any project)",
+       "title": "Has Entity"
+      },
+      "description": "True: tracks an entity today; false: tracks none (any project)"
      },
      {
       "name": "unassigned",
@@ -24316,6 +24372,14 @@
       ],
       "title": "Group Id",
       "description": "The group of that entity (decision D98)"
+     },
+     "data_source_names": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Data Source Names",
+      "description": "The data sources holding an identity of the device, by name"
      }
     },
     "type": "object",
@@ -24803,6 +24867,14 @@
       ],
       "title": "Group Id",
       "description": "The group of that entity (decision D98)"
+     },
+     "data_source_names": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Data Source Names",
+      "description": "The data sources holding an identity of the device, by name"
      },
      "project_assignments": {
       "items": {

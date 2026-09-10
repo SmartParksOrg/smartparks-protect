@@ -6316,6 +6316,11 @@ export interface components {
              * @description The group of that entity (decision D98)
              */
             group_id?: string | null;
+            /**
+             * Data Source Names
+             * @description The data sources holding an identity of the device, by name
+             */
+            data_source_names?: string[];
         };
         /**
          * DeviceStatus
@@ -6488,6 +6493,11 @@ export interface components {
              * @description The group of that entity (decision D98)
              */
             group_id?: string | null;
+            /**
+             * Data Source Names
+             * @description The data sources holding an identity of the device, by name
+             */
+            data_source_names?: string[];
             /** Project Assignments */
             project_assignments: components["schemas"]["ProjectAssignmentRead"][];
             /** Entity Assignments */
@@ -12054,7 +12064,13 @@ export interface operations {
             query?: {
                 project_id?: string | null;
                 status_filter?: components["schemas"]["DeviceStatus"] | null;
+                /** @description Matches the name, the serial and any identity */
                 q?: string | null;
+                /** @description Only devices with an identity (not ignored) on this data source */
+                data_source_id?: string | null;
+                device_type_id?: string | null;
+                /** @description True: tracks an entity today; false: tracks none (any project) */
+                has_entity?: boolean | null;
                 /** @description Only devices that track no entity right now (needs project_id) */
                 unassigned?: boolean;
                 /** @description Only devices whose entity today is in this group or its subgroups (needs project_id, decision D98) */

@@ -168,8 +168,20 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
             )
         ).all()
     }
+    source_names: dict[uuid.UUID, list[str]] = {}
+    for device_id, name in (
+        await session.execute(
+            select(ExternalIdentity.device_id, DataSource.name)
+            .join(DataSource, DataSource.id == ExternalIdentity.data_source_id)
+            .where(ExternalIdentity.device_id.in_(ids), ExternalIdentity.ignored.is_(False))
+            .distinct()
+            .order_by(DataSource.name)
+        )
+    ).all():
+        source_names.setdefault(device_id, []).append(name)
     for device, read in zip(devices, reads, strict=True):
         read.project_id = current_projects.get(device.id)
+        read.data_source_names = source_names.get(device.id, [])
         if device.id in tracking:
             read.entity_id, read.entity_name, read.group_id = tracking[device.id]
         state = states.get(device.id)
@@ -193,7 +205,14 @@ async def list_devices(
     page: Page = Depends(page),
     project_id: uuid.UUID | None = None,
     status_filter: DeviceStatus | None = None,
-    q: str | None = None,
+    q: str | None = Query(None, description="Matches the name, the serial and any identity"),
+    data_source_id: uuid.UUID | None = Query(
+        None, description="Only devices with an identity (not ignored) on this data source"
+    ),
+    device_type_id: uuid.UUID | None = None,
+    has_entity: bool | None = Query(
+        None, description="True: tracks an entity today; false: tracks none (any project)"
+    ),
     unassigned: bool = Query(
         False, description="Only devices that track no entity right now (needs project_id)"
     ),
@@ -272,10 +291,33 @@ async def list_devices(
         )
     if status_filter is not None:
         statement = statement.where(Device.status == status_filter)
+    if device_type_id is not None:
+        statement = statement.where(Device.device_type_id == device_type_id)
+    if data_source_id is not None:
+        statement = statement.where(
+            exists().where(
+                ExternalIdentity.device_id == Device.id,
+                ExternalIdentity.data_source_id == data_source_id,
+                ExternalIdentity.ignored.is_(False),
+            )
+        )
+    if has_entity is not None:
+        tracks = exists().where(
+            DeviceEntityAssignment.device_id == Device.id,
+            DeviceEntityAssignment.validity.op("@>")(now),
+        )
+        statement = statement.where(tracks if has_entity else ~tracks)
     if q:
         pattern = f"%{q}%"
         statement = statement.where(
-            or_(Device.name.ilike(pattern), Device.serial_number.ilike(pattern))
+            or_(
+                Device.name.ilike(pattern),
+                Device.serial_number.ilike(pattern),
+                exists().where(
+                    ExternalIdentity.device_id == Device.id,
+                    ExternalIdentity.external_id.ilike(pattern),
+                ),
+            )
         )
     rows, next_cursor = await paginate(session, Device.id, statement, page)
     return PageResponse(items=await with_state(session, list(rows)), next_cursor=next_cursor)

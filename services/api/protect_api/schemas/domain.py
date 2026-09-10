@@ -239,6 +239,10 @@ class DeviceRead(ORMModel):
     group_id: uuid.UUID | None = Field(
         default=None, description="The group of that entity (decision D98)"
     )
+    data_source_names: list[str] = Field(
+        default_factory=list,
+        description="The data sources holding an identity of the device, by name",
+    )
 
 
 class AssignmentRead(ORMModel):
