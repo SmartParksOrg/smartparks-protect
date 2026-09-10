@@ -51,7 +51,7 @@ from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import reattribute, resolve_attribution
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
-from shared.enums import AcquisitionChannel, DeviceStatus, ProcessingStatus, Role
+from shared.enums import AcquisitionChannel, DeviceStatus, Role
 from shared.models import (
     ConnectivityState,
     DataSource,
@@ -1476,8 +1476,11 @@ async def _iridium_link(
         )
     ).all()
     sessions = bytes_total = missed = duplicates = 0
-    for processing_status, data in rows:
-        if processing_status == ProcessingStatus.DUPLICATE:
+    for _processing_status, data in rows:
+        # a redelivery is the ingest's `duplicate_of` mark (decision D160); the decoder's own
+        # `duplicate` status means the records were known already, which a repeated flash
+        # buffer over another path does as well, and that session still happened
+        if isinstance(data, dict) and data.get("duplicate_of") is not None:
             duplicates += 1
             continue
         parsed = SatelliteSession.from_dict(data)
