@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from protect_api.schemas.common import GeoJSONGeometry, ORMModel
 from shared.domain.health import DeviceHealth
@@ -328,8 +328,20 @@ class ProjectAssignmentCreate(_Validity):
 
 
 class EntityAssignmentCreate(_Validity):
+    """A device starts tracking an entity of the project: an existing one by id, or a new one
+    made in the same transaction (decision D170, the device page's "Assign to entity")."""
+
     device_id: uuid.UUID
-    entity_id: uuid.UUID
+    entity_id: uuid.UUID | None = None
+    new_entity: EntityCreate | None = Field(
+        default=None, description="Create this entity and assign the device to it"
+    )
+
+    @model_validator(mode="after")
+    def _one_entity(self) -> "EntityAssignmentCreate":
+        if (self.entity_id is None) == (self.new_entity is None):
+            raise ValueError("give entity_id or new_entity, not both and not neither")
+        return self
 
 
 class AssignmentEnd(BaseModel):

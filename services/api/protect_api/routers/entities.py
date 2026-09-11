@@ -51,7 +51,7 @@ from shared.models import (
     Feature,
     Group,
 )
-from shared.permissions import Permission
+from shared.permissions import Permission, permissions_for
 from shared.timeutil import utc_now
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["entities"])
@@ -145,6 +145,14 @@ async def create_entity(
     context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> EntityRead:
+    entity = await _new_entity(session, context, body)
+    await session.commit()
+    return entity_read(entity)
+
+
+async def _new_entity(session: AsyncSession, context: ProjectContext, body: EntityCreate) -> Entity:
+    """The entity row with its audit entry, flushed and not committed: `create_entity` and the
+    assignment that makes an entity on the spot (decision D170) share it."""
     await get_or_404(session, EntityType, body.entity_type_id, "Entity type")
     await check_group(session, context, body.group_id)
     entity = Entity(
@@ -163,8 +171,7 @@ async def create_entity(
         project_id=context.project.id,
         details={"name": entity.name},
     )
-    await session.commit()
-    return entity_read(entity)
+    return entity
 
 
 @router.post("/entities/bulk-move", response_model=EntityBulkMoveResult)
@@ -478,9 +485,19 @@ async def create_entity_assignment(
     context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> EntityAssignmentRead:
-    """Assign a device to an entity of this project from `valid_from`. The device must belong to
-    the project at that moment. Overlapping assignments of the same device are rejected."""
-    await _project_entity(session, context, body.entity_id)
+    """Assign a device to an entity of this project from `valid_from`: an existing entity, or
+    a new one from `new_entity` (decision D170; the caller then needs `entities:write` too). The
+    device must belong to the project at that moment. Overlapping assignments of the same device
+    are rejected."""
+    if body.new_entity is not None:
+        allowed = permissions_for(context.role, server_admin=context.user.is_superuser)
+        if Permission.ENTITIES_WRITE not in allowed:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "Creating an entity needs entities:write"
+            )
+        entity = await _new_entity(session, context, body.new_entity)
+    else:
+        entity = await _project_entity(session, context, body.entity_id)  # type: ignore[arg-type]
     await get_or_404(session, Device, body.device_id, "Device")
     attribution = await resolve_attribution(session, body.device_id, body.valid_from)
     if attribution.project_id != context.project.id:
@@ -493,7 +510,7 @@ async def create_entity_assignment(
         )
     assignment = DeviceEntityAssignment(
         device_id=body.device_id,
-        entity_id=body.entity_id,
+        entity_id=entity.id,
         validity=Range(body.valid_from, body.valid_to, bounds="[)"),
         reason=body.reason,
         created_by_user_id=context.user.id,
@@ -513,13 +530,13 @@ async def create_entity_assignment(
         project_id=context.project.id,
         details={
             "device_id": str(body.device_id),
-            "entity_id": str(body.entity_id),
+            "entity_id": str(entity.id),
             "valid_from": body.valid_from.isoformat(),
             "reattributed": reattributed,
         },
     )
     await session.commit()
-    return assignment_read(assignment)
+    return assignment_read(assignment, entity_name=entity.name)
 
 
 @router.post(

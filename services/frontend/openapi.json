@@ -2704,7 +2704,7 @@
      "entities"
     ],
     "summary": "Create Entity Assignment",
-    "description": "Assign a device to an entity of this project from `valid_from`. The device must belong to\nthe project at that moment. Overlapping assignments of the same device are rejected.",
+    "description": "Assign a device to an entity of this project from `valid_from`: an existing entity, or\na new one from `new_entity` (decision D170; the caller then needs `entities:write` too). The\ndevice must belong to the project at that moment. Overlapping assignments of the same device\nare rejected.",
     "operationId": "create_entity_assignment_api_v1_projects__project_id__entity_assignments_post",
     "security": [
      {
@@ -25281,18 +25281,36 @@
       "title": "Device Id"
      },
      "entity_id": {
-      "type": "string",
-      "format": "uuid",
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Entity Id"
+     },
+     "new_entity": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/EntityCreate"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Create this entity and assign the device to it"
      }
     },
     "type": "object",
     "required": [
      "valid_from",
-     "device_id",
-     "entity_id"
+     "device_id"
     ],
-    "title": "EntityAssignmentCreate"
+    "title": "EntityAssignmentCreate",
+    "description": "A device starts tracking an entity of the project: an existing one by id, or a new one\nmade in the same transaction (decision D170, the device page's \"Assign to entity\")."
    },
    "EntityAssignmentExtended": {
     "properties": {

@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Plus, MapPin } from "lucide-react";
+import { Link2, Plus, MapPin } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router";
 
@@ -10,6 +10,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { isAllProjects, projectFor } from "@/lib/scope";
 import { queryKeys } from "@/api/queryKeys";
 import type {
+  EntityAssignment,
   CurrentState,
   Entity,
   EntityType,
@@ -21,6 +22,7 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
 import { LoadMore } from "@/components/data/LoadMore";
+import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { EntityDialog } from "@/components/entities/EntityDialog";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { MoveToGroupDialog } from "@/components/entities/MoveToGroupDialog";
@@ -44,6 +46,7 @@ export function EntitiesPage() {
   const [group, setGroup] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState<string[] | null>(null);
+  const [assigning, setAssigning] = useState<Entity | null>(null);
   const entities = usePages<Entity>({
     queryKey: [...queryKeys.entities(projectId), q, group],
     fetchPage: (cursor) =>
@@ -90,6 +93,24 @@ export function EntitiesPage() {
     () =>
       new Map((projectDevices.data?.items ?? []).map((d) => [d.id, d.name])),
     [projectDevices.data],
+  );
+  const assignments = useQuery({
+    queryKey: queryKeys.entityAssignments(projectId),
+    queryFn: () =>
+      api.get<PageType<EntityAssignment>>(
+        `/api/v1/projects/${projectId}/entity-assignments`,
+        { query: { limit: 500 } },
+      ),
+    enabled: Boolean(projectId) && !isAllProjects(projectId),
+  });
+  const tracked = useMemo(
+    () =>
+      new Set(
+        (assignments.data?.items ?? [])
+          .filter((a) => !a.valid_to)
+          .map((a) => a.entity_id),
+      ),
+    [assignments.data],
   );
   const lastSeen = useMemo(
     () =>
@@ -175,6 +196,18 @@ export function EntitiesPage() {
           >
             {deviceNames.get(id) ?? t("open device")}
           </Link>
+        ) : canAdmin(role) && !allProjects && assignments.data && !tracked.has(row.original.id) ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={(ev) => {
+              ev.stopPropagation();
+              setAssigning(row.original);
+            }}
+          >
+            <Link2 className="size-3.5" /> {t("Assign device")}
+          </Button>
         ) : (
           <span className="text-muted-foreground">{t("none")}</span>
         );
@@ -277,6 +310,15 @@ export function EntitiesPage() {
         open={open}
         onOpenChange={setOpen}
       />
+      {assigning && (
+        <AssignDeviceDialog
+          projectId={projectId}
+          entityId={assigning.id}
+          entityName={assigning.name}
+          open
+          onOpenChange={(o) => !o && setAssigning(null)}
+        />
+      )}
       <MoveToGroupDialog
         projectId={projectId}
         entityIds={moving ?? []}

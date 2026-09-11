@@ -554,8 +554,10 @@ export interface paths {
         put?: never;
         /**
          * Create Entity Assignment
-         * @description Assign a device to an entity of this project from `valid_from`. The device must belong to
-         *     the project at that moment. Overlapping assignments of the same device are rejected.
+         * @description Assign a device to an entity of this project from `valid_from`: an existing entity, or
+         *     a new one from `new_entity` (decision D170; the caller then needs `entities:write` too). The
+         *     device must belong to the project at that moment. Overlapping assignments of the same device
+         *     are rejected.
          */
         post: operations["create_entity_assignment_api_v1_projects__project_id__entity_assignments_post"];
         delete?: never;
@@ -6622,7 +6624,11 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** EntityAssignmentCreate */
+        /**
+         * EntityAssignmentCreate
+         * @description A device starts tracking an entity of the project: an existing one by id, or a new one
+         *     made in the same transaction (decision D170, the device page's "Assign to entity").
+         */
         EntityAssignmentCreate: {
             /**
              * Valid From
@@ -6638,11 +6644,10 @@ export interface components {
              * Format: uuid
              */
             device_id: string;
-            /**
-             * Entity Id
-             * Format: uuid
-             */
-            entity_id: string;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** @description Create this entity and assign the device to it */
+            new_entity?: components["schemas"]["EntityCreate"] | null;
         };
         /** EntityAssignmentExtended */
         EntityAssignmentExtended: {

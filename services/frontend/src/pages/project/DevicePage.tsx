@@ -39,6 +39,7 @@ import { recordsHref } from "@/lib/records";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AssignEntityDialog } from "@/components/devices/AssignEntityDialog";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { useMutationToast } from "@/hooks/useMutationToast";
@@ -63,6 +64,7 @@ export function DevicePage() {
   const [record, setRecord] = useState<number | null>(null);
   const [curating, setCurating] = useState<CurationTarget | null>(null);
   const [history, setHistory] = useState<CurationTarget | null>(null);
+  const [assigning, setAssigning] = useState(false);
   const device = useQuery({
     queryKey: queryKeys.device(deviceId),
     queryFn: () => api.get<DeviceDetail>(`/api/v1/devices/${deviceId}`),
@@ -168,6 +170,28 @@ export function DevicePage() {
   );
   const currentEntityId =
     d?.entity_assignments.find((a) => !a.valid_to)?.entity_id ?? null;
+  const currentEntityAssignment = d?.entity_assignments.find((a) => !a.valid_to) ?? null;
+  // the device's project today: the route's, or on the admin route the current assignment's
+  const deviceProjectId =
+    projectId ?? d?.project_assignments.find((a) => !a.valid_to)?.project_id ?? null;
+  const mayAssign = Boolean(deviceProjectId && (user?.is_superuser || canAdmin(role)));
+  const release = useMutationToast({
+    mutationFn: (assignmentId: string) =>
+      api.patch(`/api/v1/projects/${deviceProjectId}/entity-assignments/${assignmentId}`, {
+        body: { valid_to: new Date().toISOString() },
+      }),
+    invalidate: [
+      queryKeys.device(deviceId),
+      ...(deviceProjectId
+        ? [
+            queryKeys.entityAssignments(deviceProjectId),
+            queryKeys.devices({ projectId: deviceProjectId, unassigned: true }),
+            queryKeys.currentState(deviceProjectId),
+          ]
+        : []),
+    ],
+    success: t("Device released; it tracks nothing from now"),
+  });
   if (device.isError)
     return (
       <Page>
@@ -376,13 +400,30 @@ export function DevicePage() {
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between gap-2">
                   <CardTitle>{t("Entity assignments")}</CardTitle>
+                  {mayAssign &&
+                    (currentEntityAssignment ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={release.isPending}
+                        onClick={() => release.mutate(currentEntityAssignment.id)}
+                      >
+                        {t("Release")}
+                      </Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setAssigning(true)}>
+                        {t("Assign to entity")}
+                      </Button>
+                    ))}
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
                   {d.entity_assignments.length === 0 && (
                     <div className="text-muted-foreground">
-                      {t("Not assigned to an entity.")}
+                      {deviceProjectId
+                        ? t("Not assigned to an entity.")
+                        : t("Not assigned to an entity; it needs a project first.")}
                     </div>
                   )}
                   {d.entity_assignments.map((a) => (
@@ -635,6 +676,14 @@ export function DevicePage() {
           </TabsContent>
         </Tabs>
       </Page>
+      {deviceProjectId && (
+        <AssignEntityDialog
+          projectId={deviceProjectId}
+          device={d}
+          open={assigning}
+          onOpenChange={setAssigning}
+        />
+      )}
       <SourceEventDialog
         id={event?.id ?? null}
         ingestedAt={event?.ingestedAt ?? null}
