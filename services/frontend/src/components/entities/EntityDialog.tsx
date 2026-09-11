@@ -1,17 +1,17 @@
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { Entity, EntityType, Page } from "@/api/types";
+import type { Entity } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
+import { EntityTypeSelect } from "@/components/entities/EntityTypeSelect";
 import { GroupSelect } from "@/components/entities/GroupSelect";
-import { Icon } from "@/components/icons/Icon";
+import { IconPicker } from "@/components/icons/IconPicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 const schema = z.object({
   name: z.string().min(1, "Give the entity a name").max(200),
   entity_type_id: z.string().min(1, "Choose a type"),
+  icon_key: z.string(),
   status: z.enum(["active", "inactive", "archived"]),
   group_id: z.string(),
   latitude: z.string().optional(),
@@ -32,8 +33,7 @@ type Values = z.infer<typeof schema>;
 
 export function EntityDialog({ projectId, entity, open, onOpenChange }: { projectId: string; entity: Entity | null; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { t } = useTranslation();
-  const types = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<Page<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", entity_type_id: "", status: "active", group_id: "", latitude: "", longitude: "", notes: "" } });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", entity_type_id: "", icon_key: "", status: "active", group_id: "", latitude: "", longitude: "", notes: "" } });
 
   useEffect(() => {
     if (!open) return;
@@ -41,6 +41,7 @@ export function EntityDialog({ projectId, entity, open, onOpenChange }: { projec
     form.reset({
       name: entity?.name ?? "",
       entity_type_id: entity?.entity_type_id ?? "",
+      icon_key: entity?.icon_key ?? "",
       status: (entity?.status as Values["status"]) ?? "active",
       group_id: entity?.group_id ?? "",
       latitude: point ? String(point[1]) : "",
@@ -52,7 +53,7 @@ export function EntityDialog({ projectId, entity, open, onOpenChange }: { projec
   const save = useMutationToast({
     mutationFn: (values: Values) => {
       const geometry = values.latitude && values.longitude ? { type: "Point", coordinates: [Number(values.longitude), Number(values.latitude)] } : null;
-      const body = { name: values.name, entity_type_id: values.entity_type_id, status: values.status, group_id: values.group_id || null, notes: values.notes || null, geometry };
+      const body = { name: values.name, entity_type_id: values.entity_type_id, icon_key: values.icon_key || null, status: values.status, group_id: values.group_id || null, notes: values.notes || null, geometry };
       return entity ? api.patch<Entity>(`/api/v1/projects/${projectId}/entities/${entity.id}`, { body }) : api.post<Entity>(`/api/v1/projects/${projectId}/entities`, { body });
     },
     invalidate: [queryKeys.entities(projectId), queryKeys.currentState(projectId)],
@@ -69,15 +70,14 @@ export function EntityDialog({ projectId, entity, open, onOpenChange }: { projec
           <Field label={t("Name")} htmlFor="name" error={form.formState.errors.name?.message}>
             <Input id="name" {...form.register("name")} />
           </Field>
-          <Field label={t("Type")} htmlFor="entity_type_id" error={form.formState.errors.entity_type_id?.message}>
-            <Select value={form.watch("entity_type_id")} onValueChange={(v) => form.setValue("entity_type_id", v, { shouldValidate: true })}>
-              <SelectTrigger id="entity_type_id"><SelectValue placeholder={t("Choose a type")} /></SelectTrigger>
-              <SelectContent>
-                {types.data?.items.map((t) => (
-                  <SelectItem key={t.id} value={t.id}><span className="inline-flex items-center gap-2"><Icon iconKey={t.icon_key} className="size-4" />{t.label}</span></SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label={t("Type")} htmlFor="entity_type_id" hint={t("The kind of thing, then the species or model; the icon follows the choice")} error={form.formState.errors.entity_type_id?.message}>
+            <EntityTypeSelect id="entity_type_id" projectId={projectId} value={form.watch("entity_type_id")} onChange={(v) => form.setValue("entity_type_id", v, { shouldValidate: true })} />
+          </Field>
+          <Field label={t("Icon")} htmlFor="entity_icon" hint={t("Only when this one entity should look different from its type")}>
+            <div className="flex items-center gap-2">
+              <IconPicker id="entity_icon" value={form.watch("icon_key")} onChange={(v) => form.setValue("icon_key", v)} className="flex-1" />
+              {form.watch("icon_key") && <Button type="button" variant="ghost" size="sm" onClick={() => form.setValue("icon_key", "")}>{t("Use the type's icon")}</Button>}
+            </div>
           </Field>
           <Field label={t("Status")} htmlFor="status">
             <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v as Values["status"])}>

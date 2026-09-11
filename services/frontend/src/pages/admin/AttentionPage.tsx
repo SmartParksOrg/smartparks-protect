@@ -14,7 +14,6 @@ import type {
   ClockAheadDevice,
   DeadLetter,
   DeviceType,
-  EntityType,
   NewMetric,
   NewMetricsResponse,
   Page as PageType,
@@ -26,6 +25,7 @@ import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { EntityTypeSelect } from "@/components/entities/EntityTypeSelect";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import {
   SourceEventDialog,
@@ -301,13 +301,6 @@ function BulkCreateDialog({
         query: { limit: 500 },
       }),
   });
-  const entityTypes = useQuery({
-    queryKey: queryKeys.entityTypes,
-    queryFn: () =>
-      api.get<PageType<EntityType>>("/api/v1/entity-types", {
-        query: { limit: 500 },
-      }),
-  });
   const [typeId, setTypeId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [entityTypeId, setEntityTypeId] = useState("");
@@ -438,23 +431,14 @@ function BulkCreateDialog({
                   : t("Needs a project")
               }
             >
-              <Select
-                value={entityTypeId || "none"}
-                onValueChange={(v) => setEntityTypeId(v === "none" ? "" : v)}
+              <EntityTypeSelect
+                id="bulk-entity-type"
+                projectId={projectId || undefined}
+                value={entityTypeId}
+                onChange={setEntityTypeId}
                 disabled={!projectId}
-              >
-                <SelectTrigger id="bulk-entity-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t("No entity")}</SelectItem>
-                  {entityTypes.data?.items.map((et) => (
-                    <SelectItem key={et.id} value={et.id}>
-                      {et.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                noneLabel={t("No entity")}
+              />
             </Field>
             {projectId && entityTypeId && (
               <Field

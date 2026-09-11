@@ -40,9 +40,14 @@ TEST_SOURCE = "smartparks-protect-test"
 
 
 def subject_type_for(integration: IntegrationContext, item: DeliveryItem) -> str:
+    """The mapped sub-type, else the mapped type, else the type's own key (the standard
+    catalogue's `wildlife`, `person` and `vehicle` are EarthRanger's names), else the default."""
     mapping = integration.config.get("subject_types") or {}
-    if item.entity_type_key and isinstance(mapping, dict) and mapping.get(item.entity_type_key):
-        return str(mapping[item.entity_type_key])
+    for key in (item.entity_type_key, item.entity_type_parent_key):
+        if key and isinstance(mapping, dict) and mapping.get(key):
+            return str(mapping[key])
+    if item.entity_type_parent_key:
+        return item.entity_type_parent_key
     return str(integration.config.get("default_subject_type") or DEFAULT_SUBJECT_TYPE)
 
 

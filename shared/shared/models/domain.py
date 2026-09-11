@@ -35,6 +35,12 @@ class EntityType(UuidPrimaryKeyMixin, TimestampMixin, Base):
     label: Mapped[str] = mapped_column(String(200), nullable=False)
     group_key: Mapped[str] = mapped_column(String(32), nullable=False)
     icon_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("entity_types.id", ondelete="RESTRICT"),
+        index=True,
+        comment="A sub-type's type (decision D166); one level deep",
+    )
     attribute_schema: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb"), comment="JSON schema"
     )

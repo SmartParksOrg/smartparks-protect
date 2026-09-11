@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { AuditEntry, Organization, Project, ProjectIcon } from "@/api/types";
+import type { AuditEntry, EntityType, Organization, Page as PageType, Project, ProjectIcon } from "@/api/types";
 import { isServerAdmin, useAuthStore } from "@/stores/auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Icon } from "@/components/icons/Icon";
@@ -24,7 +24,9 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { useProject } from "@/hooks/useProjects";
 import { formatTime } from "@/lib/format";
+import { HIDDEN_TYPES_KEY, hiddenTypeIds, subtypesOf, topLevel, visibleTypes } from "@/lib/entityTypes";
 
 const schema = z.object({ name: z.string().min(1).max(200), description: z.string().optional(), timezone: z.string().min(1), curation_requires_approval: z.boolean() });
 type Values = z.infer<typeof schema>;
@@ -81,6 +83,7 @@ export function ProjectSettingsPage() {
             )}
           </CardContent>
         </Card>
+        <EntityTypesCard projectId={projectId} />
         <IconsCard projectId={projectId} />
         <Card>
           <CardHeader><CardTitle>{t("Recent changes")}</CardTitle></CardHeader>
@@ -130,6 +133,69 @@ function IconsCard({ projectId }: { projectId: string }) {
             </li>
           ))}
           {icons.data?.length === 0 && <li className="text-muted-foreground">{t("No custom icons yet.")}</li>}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Which of the server's entity types this project offers (decision D168): every type and
+ * sub-type is on by default; a switch hides one, hiding a type takes its sub-types along. The
+ * choice is `hidden_entity_type_ids` in the project's settings; entities that already have a
+ * hidden type keep it. */
+function EntityTypesCard({ projectId }: { projectId: string }) {
+  const { t } = useTranslation();
+  const { project } = useProject(projectId);
+  const types = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<PageType<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
+  const [openType, setOpenType] = useState<string | null>(null);
+  const hidden = hiddenTypeIds(project?.settings);
+  const all = types.data?.items ?? [];
+  const save = useMutationToast({
+    mutationFn: (next: Set<string>) => api.patch<Project>(`/api/v1/projects/${projectId}`, { body: { settings: { ...(project?.settings ?? {}), [HIDDEN_TYPES_KEY]: [...next] } } }),
+    invalidate: [queryKeys.project(projectId), queryKeys.projects],
+    success: t("Entity types saved"),
+  });
+  const toggle = (id: string, on: boolean) => {
+    const next = new Set(hidden);
+    if (on) next.delete(id);
+    else next.add(id);
+    save.mutate(next);
+  };
+  const visibleCount = visibleTypes(all, hidden).length;
+  return (
+    <Card>
+      <CardHeader><CardTitle>{t("Entity types")}</CardTitle></CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">{t("Every type and sub-type the server knows is offered when an entity is made; switch off what this project does not need. {{visible}} of {{total}} are on.", { visible: visibleCount, total: all.length })}</p>
+        <ul className="divide-y rounded-md border">
+          {topLevel(all).map((type) => {
+            const subtypes = subtypesOf(all, type.id);
+            const hiddenSubtypes = subtypes.filter((x) => hidden.has(x.id)).length;
+            const typeOn = !hidden.has(type.id);
+            return (
+              <li key={type.id} className="p-2">
+                <div className="flex items-center gap-3">
+                  <Switch id={`type-${type.id}`} checked={typeOn} onCheckedChange={(v) => toggle(type.id, v)} disabled={save.isPending} />
+                  <label htmlFor={`type-${type.id}`} className="inline-flex flex-1 items-center gap-2"><Icon iconKey={type.icon_key} className="size-4" />{type.label}</label>
+                  {subtypes.length > 0 && (
+                    <Button type="button" variant="ghost" size="sm" disabled={!typeOn} onClick={() => setOpenType(openType === type.id ? null : type.id)}>
+                      {hiddenSubtypes > 0 ? t("{{on}} of {{total}} sub-types", { on: subtypes.length - hiddenSubtypes, total: subtypes.length }) : t("{{count}} sub-types", { count: subtypes.length })}
+                    </Button>
+                  )}
+                </div>
+                {openType === type.id && typeOn && (
+                  <ul className="mt-2 grid gap-1 pl-9 sm:grid-cols-2 lg:grid-cols-3">
+                    {subtypes.map((sub) => (
+                      <li key={sub.id} className="flex items-center gap-2">
+                        <Switch id={`type-${sub.id}`} checked={!hidden.has(sub.id)} onCheckedChange={(v) => toggle(sub.id, v)} disabled={save.isPending} />
+                        <label htmlFor={`type-${sub.id}`} className="inline-flex min-w-0 items-center gap-2"><Icon iconKey={sub.icon_key} className="size-4" /><span className="truncate">{sub.label}</span></label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </CardContent>
     </Card>

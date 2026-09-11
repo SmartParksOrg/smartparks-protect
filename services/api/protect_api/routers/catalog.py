@@ -5,7 +5,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
@@ -52,6 +52,15 @@ async def _delete(session: AsyncSession, obj: Any, user: User, what: str, object
 # Entity types
 
 
+async def _check_parent(session: AsyncSession, parent_id: uuid.UUID) -> None:
+    """A sub-type sits under a type, never under another sub-type (decision D166)."""
+    parent = await get_or_404(session, EntityType, parent_id, "Parent entity type")
+    if parent.parent_id is not None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Sub-types go one level deep: pick a type"
+        )
+
+
 @router.get("/entity-types", response_model=PageResponse[EntityTypeRead])
 async def list_entity_types(
     page: Page = Depends(page),
@@ -70,6 +79,8 @@ async def create_entity_type(
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
 ) -> EntityType:
+    if body.parent_id is not None:
+        await _check_parent(session, body.parent_id)
     row = EntityType(**body.model_dump())
     session.add(row)
     await flush_or_409(session, "Entity type")
@@ -102,6 +113,20 @@ async def update_entity_type(
     session: AsyncSession = Depends(get_session),
 ) -> EntityType:
     row = await get_or_404(session, EntityType, entity_type_id, "Entity type")
+    if body.parent_id is not None:
+        if body.parent_id == row.id:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "A type is not its own parent"
+            )
+        await _check_parent(session, body.parent_id)
+        children = await session.scalar(
+            select(func.count()).select_from(EntityType).where(EntityType.parent_id == row.id)
+        )
+        if children:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "A type with sub-types cannot become a sub-type itself",
+            )
     changed = apply_patch(row, body)
     await record_audit(
         session,

@@ -27,11 +27,13 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 
 const KEY = /^[a-z][a-z0-9_]{1,62}$/;
 
-interface FieldSpec<T extends FieldValues> {
+interface FieldSpec<T extends FieldValues, R = unknown> {
   name: Path<T>;
   label: string;
   kind?: "text" | "textarea" | "select" | "icon";
   options?: { value: string; label: string }[];
+  /** Options read from the catalogue's own rows (a parent type), given the row being edited. */
+  optionsFrom?: (rows: R[], editing: R | null) => { value: string; label: string }[];
   hint?: string;
   /** Not editable after creation (primary keys). */
   createOnly?: boolean;
@@ -45,13 +47,15 @@ interface CatalogProps<T extends FieldValues, R> {
   idOf: (row: R) => string;
   columns: ColumnDef<R, unknown>[];
   schema: z.ZodType<T>;
-  fields: FieldSpec<T>[];
+  fields: FieldSpec<T, R>[];
   defaults: DefaultValues<T>;
   toForm: (row: R) => DefaultValues<T>;
+  /** Turns the form's values into the request body when a field needs a translation. */
+  toBody?: (values: T) => Record<string, unknown>;
 }
 
 /** One list plus dialog for every server-level catalogue: same shape, different fields. */
-function CatalogPage<T extends FieldValues, R>({ title, description, path, queryKey, idOf, columns, schema, fields, defaults, toForm }: CatalogProps<T, R>) {
+function CatalogPage<T extends FieldValues, R>({ title, description, path, queryKey, idOf, columns, schema, fields, defaults, toForm, toBody }: CatalogProps<T, R>) {
   const { t } = useTranslation();
   const rows = useQuery({ queryKey, queryFn: () => api.get<PageType<R>>(path, { query: { limit: 500 } }) });
   const [editing, setEditing] = useState<R | null>(null);
@@ -63,7 +67,7 @@ function CatalogPage<T extends FieldValues, R>({ title, description, path, query
   }, [open, editing, form, defaults, toForm]);
   const save = useMutationToast({
     mutationFn: (values: T) => {
-      const body = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v === "" ? null : v]));
+      const body = Object.fromEntries(Object.entries(toBody ? toBody(values) : values).map(([k, v]) => [k, v === "" ? null : v]));
       if (editing) {
         for (const f of fields) if (f.createOnly) delete body[f.name];
         return api.patch(`${path}/${idOf(editing)}`, { body });
@@ -92,7 +96,7 @@ function CatalogPage<T extends FieldValues, R>({ title, description, path, query
               return (
                 <Field key={String(f.name)} label={f.label} htmlFor={id} hint={f.hint} error={errors[String(f.name)]?.message}>
                   {f.kind === "textarea" ? <Textarea id={id} rows={2} {...form.register(f.name)} /> :
-                   f.kind === "select" ? <Select value={String(form.watch(f.name) ?? "")} onValueChange={(v) => form.setValue(f.name, v as never, { shouldValidate: true })} disabled={disabled}><SelectTrigger id={id}><SelectValue placeholder={t("Choose")} /></SelectTrigger><SelectContent>{f.options?.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select> :
+                   f.kind === "select" ? <Select value={String(form.watch(f.name) ?? "")} onValueChange={(v) => form.setValue(f.name, v as never, { shouldValidate: true })} disabled={disabled}><SelectTrigger id={id}><SelectValue placeholder={t("Choose")} /></SelectTrigger><SelectContent>{(f.optionsFrom ? f.optionsFrom(rows.data?.items ?? [], editing) : f.options ?? []).map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select> :
                    f.kind === "icon" ? <IconPicker id={id} value={String(form.watch(f.name) ?? "")} onChange={(v) => form.setValue(f.name, v as never, { shouldValidate: true })} /> :
                    <Input id={id} disabled={disabled} {...form.register(f.name)} />}
                 </Field>
@@ -108,17 +112,24 @@ function CatalogPage<T extends FieldValues, R>({ title, description, path, query
   );
 }
 
-const entityTypeSchema = zod.object({ key: zod.string().regex(KEY, "lowercase letters, digits, underscores"), label: zod.string().min(1), group_key: zod.enum(["tracked", "infrastructure", "environmental", "equipment", "site"]), icon_key: zod.string().min(1, "Choose an icon"), description: zod.string().optional() });
-const entityTypeDefaults: DefaultValues<zod.infer<typeof entityTypeSchema>> = { key: "", label: "", group_key: "tracked", icon_key: "wildlife.generic", description: "" };
+const NO_PARENT = "__none__";
+const entityTypeSchema = zod.object({ key: zod.string().regex(KEY, "lowercase letters, digits, underscores"), label: zod.string().min(1), parent_id: zod.string(), group_key: zod.enum(["tracked", "infrastructure", "environmental", "equipment", "site"]), icon_key: zod.string().min(1, "Choose an icon"), description: zod.string().optional() });
+const entityTypeDefaults: DefaultValues<zod.infer<typeof entityTypeSchema>> = { key: "", label: "", parent_id: NO_PARENT, group_key: "tracked", icon_key: "wildlife.generic", description: "" };
+/** Types with sub-types one level deep (decision D166): the standard catalogue seeds
+ * Wildlife, People, Vehicles, Infrastructure, Environmental sensors and Equipment with a
+ * sub-type per icon; an administrator adds more or a type of their own. */
 export function EntityTypesPage() {
   const { t } = useTranslation();
+  const types = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<PageType<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
+  const parentLabel = (id: string | null | undefined) => types.data?.items.find((x) => x.id === id)?.label ?? "";
   return (
     <CatalogPage<zod.infer<typeof entityTypeSchema>, EntityType>
-      title={t("Entity types")} description={t("Kinds of monitored objects: animals, vehicles, gates. Administrators add types without a code change.")} path="/api/v1/entity-types" queryKey={queryKeys.entityTypes} idOf={(r) => r.id}
-      columns={[{ header: t("Key"), accessorKey: "key" }, { header: t("Label"), accessorKey: "label", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={row.original.icon_key} />{row.original.label}</span> }, { header: t("Group"), accessorKey: "group_key" }, { header: t("Icon"), accessorKey: "icon_key" }]}
+      title={t("Entity types")} description={t("Kinds of monitored objects and their sub-types: Wildlife holds Elephant, Vehicles holds 4x4. A project hides what it does not need under its settings.")} path="/api/v1/entity-types" queryKey={queryKeys.entityTypes} idOf={(r) => r.id}
+      columns={[{ header: t("Key"), accessorKey: "key" }, { header: t("Label"), accessorKey: "label", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={row.original.icon_key} />{row.original.label}</span> }, { header: t("Type"), id: "parent", accessorFn: (r) => parentLabel(r.parent_id) }, { header: t("Group"), accessorKey: "group_key" }, { header: t("Icon"), accessorKey: "icon_key" }]}
       schema={entityTypeSchema}
-      fields={[{ name: "key", label: t("Key"), createOnly: true, hint: t("Stable identifier, for example rhino") }, { name: "label", label: t("Label") }, { name: "group_key", label: t("Group"), kind: "select", options: ["tracked", "infrastructure", "environmental", "equipment", "site"].map((v) => ({ value: v, label: v })) }, { name: "icon_key", label: t("Icon"), kind: "icon" }, { name: "description", label: t("Description"), kind: "textarea" }]}
-      defaults={entityTypeDefaults} toForm={(r) => ({ key: r.key, label: r.label, group_key: r.group_key as never, icon_key: r.icon_key, description: r.description ?? "" })}
+      fields={[{ name: "key", label: t("Key"), createOnly: true, hint: t("Stable identifier, for example rhino") }, { name: "label", label: t("Label") }, { name: "parent_id", label: t("Sub-type of"), kind: "select", hint: t("A type on its own, or a sub-type of one of the types"), optionsFrom: (rows, editing) => [{ value: NO_PARENT, label: t("A type on its own") }, ...rows.filter((r) => !r.parent_id && r.id !== editing?.id).sort((a, b) => a.label.localeCompare(b.label)).map((r) => ({ value: r.id, label: r.label }))] }, { name: "group_key", label: t("Group"), kind: "select", options: ["tracked", "infrastructure", "environmental", "equipment", "site"].map((v) => ({ value: v, label: v })) }, { name: "icon_key", label: t("Icon"), kind: "icon" }, { name: "description", label: t("Description"), kind: "textarea" }]}
+      defaults={entityTypeDefaults} toForm={(r) => ({ key: r.key, label: r.label, parent_id: r.parent_id ?? NO_PARENT, group_key: r.group_key as never, icon_key: r.icon_key, description: r.description ?? "" })}
+      toBody={(v) => ({ ...v, parent_id: v.parent_id === NO_PARENT ? null : v.parent_id })}
     />
   );
 }

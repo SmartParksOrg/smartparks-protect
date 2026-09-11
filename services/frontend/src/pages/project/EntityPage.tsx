@@ -52,6 +52,7 @@ import { useTab } from "@/hooks/useTab";
 import { groupPath, useGroups } from "@/hooks/useGroups";
 import { canAdmin, useProjectRole } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
+import { typePath } from "@/lib/entityTypes";
 
 /** One entity: what it is, the device tracking it now with its health, and the history of the
  * devices that tracked it, with "Assign device" for project admins (decision D106). */
@@ -241,7 +242,7 @@ export function EntityPage() {
     <>
       <PageHeader
         title={e.name}
-        description={type?.label}
+        description={typePath(types.data?.items ?? [], e.entity_type_id)}
         leading={
           <PictureEditor
             path={`/api/v1/projects/${projectId}/entities/${e.id}/picture`}
@@ -332,7 +333,7 @@ export function EntityPage() {
                 <CardContent>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                     <dt className="text-muted-foreground">{t("Type")}</dt>
-                    <dd>{type?.label ?? ""}</dd>
+                    <dd className="inline-flex items-center gap-2"><Icon iconKey={e.icon_key ?? type?.icon_key} className="size-4" />{typePath(types.data?.items ?? [], e.entity_type_id)}</dd>
                     {e.group_id && (
                       <>
                         <dt className="text-muted-foreground">{t("Group")}</dt>

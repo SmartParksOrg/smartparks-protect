@@ -311,6 +311,9 @@ async def load_item(session: AsyncSession, delivery: IntegrationDelivery) -> Del
             item.entity_name = entity.name
             item.entity_type_key = entity_type.key
             item.entity_type_label = entity_type.label
+            if entity_type.parent_id is not None:
+                parent = await session.get(EntityType, entity_type.parent_id)
+                item.entity_type_parent_key = parent.key if parent is not None else None
         if item.location is None and delivery.object_type == IntegrationObjectType.EVENT:
             current = await session.get(EntityCurrentState, entity_id)
             if current is not None and current.latest_position is not None:

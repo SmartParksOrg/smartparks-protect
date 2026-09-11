@@ -26029,6 +26029,19 @@
       "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
       "title": "Icon Key"
      },
+     "parent_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Id",
+      "description": "The type this row is a sub-type of (D166); one level deep"
+     },
      "attribute_schema": {
       "additionalProperties": true,
       "type": "object",
@@ -26077,6 +26090,18 @@
      "icon_key": {
       "type": "string",
       "title": "Icon Key"
+     },
+     "parent_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Id"
      },
      "attribute_schema": {
       "additionalProperties": true,
@@ -26149,6 +26174,18 @@
        }
       ],
       "title": "Icon Key"
+     },
+     "parent_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Id"
      },
      "attribute_schema": {
       "anyOf": [

@@ -25,6 +25,9 @@ class EntityTypeCreate(BaseModel):
     label: str = Field(min_length=1, max_length=200)
     group_key: EntityGroup
     icon_key: str = Field(pattern=ICON_PATTERN)
+    parent_id: uuid.UUID | None = Field(
+        default=None, description="The type this row is a sub-type of (D166); one level deep"
+    )
     attribute_schema: dict[str, Any] = Field(default_factory=dict)
     description: str | None = None
 
@@ -33,6 +36,7 @@ class EntityTypeUpdate(BaseModel):
     label: str | None = Field(default=None, min_length=1, max_length=200)
     group_key: EntityGroup | None = None
     icon_key: str | None = Field(default=None, pattern=ICON_PATTERN)
+    parent_id: uuid.UUID | None = None
     attribute_schema: dict[str, Any] | None = None
     description: str | None = None
 
@@ -43,6 +47,7 @@ class EntityTypeRead(ORMModel):
     label: str
     group_key: str
     icon_key: str
+    parent_id: uuid.UUID | None = None
     attribute_schema: dict[str, Any]
     description: str | None
     created_at: datetime

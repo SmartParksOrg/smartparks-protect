@@ -51,9 +51,14 @@ def _mapping(integration: IntegrationContext, key: str) -> dict[str, str]:
 
 
 def subject_type_for(integration: IntegrationContext, item: DeliveryItem) -> str:
+    """The mapped sub-type, else the mapped type, else the type's own key (the standard
+    catalogue's `wildlife`, `person` and `vehicle` are EarthRanger's names), else the default."""
     mapping = _mapping(integration, "subject_types")
-    if item.entity_type_key and mapping.get(item.entity_type_key):
-        return mapping[item.entity_type_key]
+    for key in (item.entity_type_key, item.entity_type_parent_key):
+        if key and mapping.get(key):
+            return mapping[key]
+    if item.entity_type_parent_key:
+        return item.entity_type_parent_key
     return str(integration.config.get("default_subject_type") or DEFAULT_SUBJECT_TYPE)
 
 

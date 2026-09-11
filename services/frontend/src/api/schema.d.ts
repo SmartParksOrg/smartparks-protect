@@ -6939,6 +6939,11 @@ export interface components {
             group_key: components["schemas"]["EntityGroup"];
             /** Icon Key */
             icon_key: string;
+            /**
+             * Parent Id
+             * @description The type this row is a sub-type of (D166); one level deep
+             */
+            parent_id?: string | null;
             /** Attribute Schema */
             attribute_schema?: {
                 [key: string]: unknown;
@@ -6961,6 +6966,8 @@ export interface components {
             group_key: string;
             /** Icon Key */
             icon_key: string;
+            /** Parent Id */
+            parent_id?: string | null;
             /** Attribute Schema */
             attribute_schema: {
                 [key: string]: unknown;
@@ -6980,6 +6987,8 @@ export interface components {
             group_key?: components["schemas"]["EntityGroup"] | null;
             /** Icon Key */
             icon_key?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
             /** Attribute Schema */
             attribute_schema?: {
                 [key: string]: unknown;

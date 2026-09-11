@@ -4,7 +4,7 @@ The concepts every screen and every service is built on. Table names are in `doc
 
 ## Device versus entity
 
-A **device** is hardware: an OpenCollar, a gate sensor, a weather station. It exists at server level and has no project column. An **entity** is the real-world object you care about: an animal, a vehicle, a gate, a weather station as a place. Entities belong to a project and have a type (`entity_types`) that carries the icon and an attribute schema, so administrators add new kinds of entities without a code change.
+A **device** is hardware: an OpenCollar, a gate sensor, a weather station. It exists at server level and has no project column. An **entity** is the real-world object you care about: an animal, a vehicle, a gate, a weather station as a place. Entities belong to a project and have a type (`entity_types`) that carries the icon and an attribute schema, so administrators add new kinds of entities without a code change. Types hold sub-types one level deep (ADR 0025): Wildlife holds Elephant, Vehicles holds 4x4, and an entity references the most specific row, so the icon and the EarthRanger subject subtype follow. Every server is seeded with the standard catalogue of six types and a sub-type per icon; a project hides what it does not need under Project admin, Settings, and an entity may override its type's icon.
 
 The two are linked by **assignments** with a validity range:
 

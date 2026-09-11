@@ -1,12 +1,11 @@
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api } from "@/api/client";
-import { queryKeys } from "@/api/queryKeys";
-import type { BulkAssignResult, Device, EntityType, Page as PageType } from "@/api/types";
+import type { BulkAssignResult, Device } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
+import { EntityTypeSelect } from "@/components/entities/EntityTypeSelect";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,7 +18,6 @@ import { useProjects } from "@/hooks/useProjects";
 export function BulkAssignDialog({ devices, onClose, onDone }: { devices: Device[]; onClose: () => void; onDone: () => void }) {
   const { t } = useTranslation();
   const projects = useProjects();
-  const entityTypes = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<PageType<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
   const [projectId, setProjectId] = useState("");
   const [start, setStart] = useState<"first_data" | "now">("first_data");
   const [entityTypeId, setEntityTypeId] = useState("");
@@ -61,7 +59,7 @@ export function BulkAssignDialog({ devices, onClose, onDone }: { devices: Device
               <Select value={start} onValueChange={(v) => setStart(v as "first_data" | "now")}><SelectTrigger id="bulk-assign-start"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="first_data">{t("At each device's first data")}</SelectItem><SelectItem value="now">{t("Now")}</SelectItem></SelectContent></Select>
             </Field>
             <Field label={t("Also create an entity per device")} htmlFor="bulk-assign-entity-type" hint={projectId ? t("Each device gets an entity of this type with the same name, assigned from the same time, so it shows on the map at once") : t("Needs a project")}>
-              <Select value={entityTypeId || "none"} onValueChange={(v) => setEntityTypeId(v === "none" ? "" : v)} disabled={!projectId}><SelectTrigger id="bulk-assign-entity-type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t("No entity")}</SelectItem>{entityTypes.data?.items.map((et) => <SelectItem key={et.id} value={et.id}>{et.label}</SelectItem>)}</SelectContent></Select>
+              <EntityTypeSelect id="bulk-assign-entity-type" projectId={projectId || undefined} value={entityTypeId} onChange={setEntityTypeId} disabled={!projectId} noneLabel={t("No entity")} />
             </Field>
             {projectId && entityTypeId && (
               <Field label={t("Put the entities in a group")} htmlFor="bulk-assign-group">

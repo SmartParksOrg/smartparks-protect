@@ -72,6 +72,7 @@
   "in": "in",
   "kB,": "kB,",
   "kB…": "kB…",
+  "Kinds of monitored objects: animals, vehicles, gates. Administrators add types without a code change.": "Kinds of monitored objects: animals, vehicles, gates. Administrators add types without a code change.",
   "known through another path": "known through another path",
   "Last WAL segment": "Last WAL segment",
   "LoRaWAN traffic": "LoRaWAN traffic",

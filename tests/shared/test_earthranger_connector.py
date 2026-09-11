@@ -65,6 +65,11 @@ async def test_render_observation_and_event():
     body = observation["body"]
     assert body["manufacturer_id"] == str(uuid.UUID(int=7)) and body["subject_name"] == "Rhino 14"
     assert body["subject_type"] == "rhino" and body["location"] == {"lat": -24.9, "lon": 31.5}
+    # a sub-type of the standard catalogue without a mapping sends its type's key (D166)
+    elephant = connector.render(
+        integration(), item(entity_type_key="elephant", entity_type_parent_key="wildlife")
+    )["body"]
+    assert elephant["subject_type"] == "wildlife" and elephant["subject_subtype"] == "elephant"
     assert (
         body["recorded_at"] == "2026-09-04T10:00:00+00:00"
         and body["additional"]["altitude_m"] == 300

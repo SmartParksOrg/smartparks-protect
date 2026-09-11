@@ -15,8 +15,9 @@ them, and a species falls back through its group to the generic animal (a jackal
 canid to the paw). Wildlife silhouettes face left, EarthRanger's convention for the male icon;
 there are no separate female icons.
 
-Choosing an icon: the entity type and device type dialogs under Server admin open a searchable
-list grouped by category; the search matches the label, the key and the aliases (a Latin name,
+Choosing an icon: an entity takes its sub-type's icon (Elephant, Ranger, 4x4; see the domain
+model) and may override it in its dialog; the entity type and device type dialogs under Server
+admin open a searchable list grouped by category; the search matches the label, the key and the aliases (a Latin name,
 a synonym such as "gnu" for the wildebeest). Events take their icon from the event type: geofence
 entered and exited, no data, low battery, immobility, speeding, proximity and species detection
 have one each, every other type shows the alert marker.

@@ -54,6 +54,10 @@ class DeliveryItem:
     entity_name: str | None = None
     entity_type_key: str | None = None
     entity_type_label: str | None = None
+    entity_type_parent_key: str | None = field(
+        default=None,
+        metadata={"doc": "The type a sub-type sits under (D166): wildlife for an elephant"},
+    )
     device_id: uuid.UUID | None = None
     device_name: str | None = None
     device_serial: str | None = None
