@@ -13,6 +13,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- Switching the live map to Satellite left a blank page: the network locations layer registered its source as `satellite`, the name of the raster source in MapTiler's hybrid style, so after the style change the layer took MapTiler's source for its own and the next update crashed the page before any tile arrived. The source is `network-locations` now, and a test keeps our source ids clear of the names base map styles use. Found by Tim on 2026-09-11.
 - The live map's panel showed an entity's picture as a broken image after a visit to its page: the map features date the picture as `+00:00` and the entity read as `Z`, so the picture hook took the same version for two and revoked the object URL the panel still held. One version string now, whatever the notation. Found by Tim on 2026-09-11.
 - The live map's panels showed the type's key (`four_by_four`) under the name; they show the label, with the type for a sub-type ("Vehicles · 4x4"), for entities and devices alike; the map features and the tiles carry `entity_type_label` and `device_type_label`.
 - The address allow-list of a webhook data source (`allowed_source_ips`) read the first address of `X-Forwarded-For`, which the caller supplies, so a forged header passed it from anywhere. It now takes `X-Real-IP` (the proxy's own view) or the last forwarded address, the one the proxy appends. Found on 2026-09-10 while proving the Cloudloop path live.

@@ -20,8 +20,13 @@ export const SOURCES = {
   gateways: "gateways",
   coverage: "coverage",
   heat: "heat",
-  satellite: "satellite",
+  network_locations: "network-locations",
 } as const;
+
+/** Source ids a base map style brings along; ours must never collide with them, or an ensure
+ * function skips its own source and the next `setData` hits a raster source (the blank page
+ * of 2026-09-11: MapTiler's hybrid style has a raster source named `satellite`). */
+export const BASEMAP_SOURCE_IDS = ["satellite", "maptiler_planet", "openmaptiles", "terrain", "hillshade"];
 
 /** Glyphs the OpenFreeMap styles serve; the MapLibre default (Open Sans) is not among them. */
 const FONT = ["Noto Sans Regular"];
@@ -903,8 +908,8 @@ export function ensureCoverageLayers(map: MapLibreMap): void {
  * estimate, a LoRaWAN geolocation), an error circle in the sand tint with its centre, under the
  * coverage layer; never a device's own fix. */
 export function ensureNetworkLocationLayers(map: MapLibreMap): void {
-  if (map.getSource(SOURCES.satellite)) return;
-  map.addSource(SOURCES.satellite, {
+  if (map.getSource(SOURCES.network_locations)) return;
+  map.addSource(SOURCES.network_locations, {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
   });
@@ -915,9 +920,9 @@ export function ensureNetworkLocationLayers(map: MapLibreMap): void {
       : "entity-clusters";
   map.addLayer(
     {
-      id: "satellite-circles",
+      id: "network-locations-circles",
       type: "fill",
-      source: SOURCES.satellite,
+      source: SOURCES.network_locations,
       filter: ["==", ["get", "kind"], "circle"],
       paint: { "fill-color": "#C6B187", "fill-opacity": 0.18 },
     },
@@ -925,9 +930,9 @@ export function ensureNetworkLocationLayers(map: MapLibreMap): void {
   );
   map.addLayer(
     {
-      id: "satellite-circle-lines",
+      id: "network-locations-circle-lines",
       type: "line",
-      source: SOURCES.satellite,
+      source: SOURCES.network_locations,
       filter: ["==", ["get", "kind"], "circle"],
       paint: { "line-color": "#C6B187", "line-width": 1, "line-opacity": 0.8 },
     },
@@ -935,9 +940,9 @@ export function ensureNetworkLocationLayers(map: MapLibreMap): void {
   );
   map.addLayer(
     {
-      id: "satellite-centres",
+      id: "network-locations-centres",
       type: "circle",
-      source: SOURCES.satellite,
+      source: SOURCES.network_locations,
       filter: ["==", ["get", "kind"], "centre"],
       paint: {
         "circle-radius": 3,
@@ -954,7 +959,7 @@ export function setNetworkLocations(
   map: MapLibreMap,
   features: GeoJSON.Feature[],
 ): void {
-  const source = map.getSource(SOURCES.satellite) as GeoJSONSource | undefined;
+  const source = map.getSource(SOURCES.network_locations) as GeoJSONSource | undefined;
   source?.setData({ type: "FeatureCollection", features });
 }
 

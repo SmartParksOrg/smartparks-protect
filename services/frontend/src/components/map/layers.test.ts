@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BASEMAP_SOURCE_IDS,
+  SOURCES,
   bindEntityClicks,
   bindEventClicks,
   bindFeatureClicks,
@@ -140,5 +142,11 @@ describe("map click binding", () => {
     expect(count()).toBe(3);
     unbind();
     expect(count()).toBe(0);
+  });
+});
+
+describe("source ids", () => {
+  it("never collide with a base map style's sources", () => {
+    for (const id of Object.values(SOURCES)) expect(BASEMAP_SOURCE_IDS, id).not.toContain(id);
   });
 });
