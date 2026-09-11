@@ -26,6 +26,7 @@ ALLOWED_BACKEND = (
     "shared/shared/enums.py",
     "shared/shared/device_drivers/opencollar/",
     "scripts/chirpstack_bootstrap.py",
+    "scripts/import_earthranger_icons.py",
     "scripts/simulate_opencollar.py",
     "services/api/alembic/",
 )

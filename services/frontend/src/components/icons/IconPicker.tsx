@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 const CATEGORIES: IconEntry["category"][] = ["wildlife", "person", "vehicle", "infrastructure", "device", "event"];
 
 /** Searchable choice of a registry icon key, grouped by category: the registry holds a few
- * hundred icons since the EarthRanger import (decision D165), too many for a plain select. The
+ * hundred icons since the vendored set arrived (decision D165), too many for a plain select. The
  * search matches the label, the key and the aliases (a Latin name, a common synonym). */
 export function IconPicker({ id, value, onChange, className }: { id?: string; value: string; onChange: (key: string) => void; className?: string }) {
   const { t } = useTranslation();
