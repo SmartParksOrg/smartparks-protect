@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 from sqlalchemy.sql import ColumnElement
 
 from protect_api.deps import (
@@ -122,6 +123,11 @@ class PointRead(BaseModel):
     measurements: list[PointMeasurement]
 
 
+def type_path(parent_label: str | None, label: str) -> str:
+    """ "Vehicles · 4x4" for a sub-type, the label alone for a type (decision D166)."""
+    return f"{parent_label} · {label}" if parent_label else label
+
+
 def _bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
     if bbox is None:
         return None
@@ -145,6 +151,7 @@ async def current_state(
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> CurrentStateResponse:
+    parent_type = aliased(EntityType)
     base = (
         select(
             EntityCurrentState,
@@ -158,9 +165,12 @@ async def current_state(
             func.ST_AsGeoJSON(EntityCurrentState.latest_position),
             Entity.picture_updated_at,
             Entity.project_id,
+            EntityType.label,
+            parent_type.label,
         )
         .join(Entity, Entity.id == EntityCurrentState.entity_id)
         .join(EntityType, EntityType.id == Entity.entity_type_id)
+        .outerjoin(parent_type, parent_type.id == EntityType.parent_id)
         .where(
             context.where(EntityCurrentState.project_id),
             EntityCurrentState.latest_position.is_not(None),
@@ -224,6 +234,7 @@ async def current_state(
     for row in rows:
         state, name, entity_status, icon_override, type_key, type_icon, group_key = row[:7]
         group_id, geojson, picture_updated_at, entity_project_id = row[7], row[8], row[9], row[10]
+        type_label, parent_label = row[11], row[12]
         import json
 
         device_state = device_states.get(state.device_id) if state.device_id else None
@@ -249,6 +260,7 @@ async def current_state(
                     "name": name,
                     "status": entity_status,
                     "entity_type": type_key,
+                    "entity_type_label": type_path(parent_label, type_label),
                     "group": group_key,
                     "group_id": str(group_id) if group_id else None,
                     "icon_key": icon_override or type_icon,
@@ -315,6 +327,7 @@ async def devices_state(
         DeviceType.key,
         DeviceType.icon_key,
         DeviceType.driver_key,
+        DeviceType.label,
         DeviceCurrentState,
         assigned.c.since,
         assigned.c.project_id,
@@ -358,7 +371,9 @@ async def devices_state(
             ).all()
         }
     features = []
-    for device, type_key, type_icon, driver_key, state, since, device_project_id, geojson in rows:
+    for row in rows:
+        device, type_key, type_icon, driver_key, type_label = row[:5]
+        state, since, device_project_id, geojson = row[5:9]
         health = None
         if state is not None:
             driver = DRIVERS.get(driver_key or "")
@@ -382,6 +397,7 @@ async def devices_state(
                     "serial_number": device.serial_number,
                     "status": device.status,
                     "device_type": type_key,
+                    "device_type_label": type_label,
                     "icon_key": type_icon,
                     "entity_id": str(entity[0]) if entity else None,
                     "entity_name": entity[1] if entity else None,
@@ -429,6 +445,8 @@ async def current_state_tile(
                        AS geom,
                    s.entity_id::text AS entity_id, e.name, e.status,
                    et.key AS entity_type, et.group_key AS "group",
+                   CASE WHEN pt.id IS NULL THEN et.label ELSE pt.label || ' · ' || et.label END
+                       AS entity_type_label,
                    e.group_id::text AS group_id,
                    e.project_id::text AS project_id,
                    COALESCE(e.icon_key, et.icon_key) AS icon_key,
@@ -439,6 +457,7 @@ async def current_state_tile(
             FROM entity_current_state s
             JOIN entities e ON e.id = s.entity_id
             JOIN entity_types et ON et.id = e.entity_type_id
+            LEFT JOIN entity_types pt ON pt.id = et.parent_id
             CROSS JOIN bounds
             WHERE (CAST(:project_id AS uuid) IS NULL OR s.project_id = CAST(:project_id AS uuid))
               AND s.latest_position IS NOT NULL

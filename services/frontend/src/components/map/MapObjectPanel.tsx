@@ -253,7 +253,7 @@ export function EntityPanel({
       titleTo={`/projects/${project}/entities/${props.entity_id}`}
       subtitle={
         <>
-          {props.entity_type}
+          {props.entity_type_label ?? props.entity_type}
           {allProjects && props.project_id
             ? ` · ${projectName(props.project_id)}`
             : ""}
@@ -382,7 +382,7 @@ export function DevicePanel({
       titleTo={devicePath}
       subtitle={
         <>
-          {props.device_type}
+          {props.device_type_label ?? props.device_type}
           {allProjects
             ? ` · ${props.project_id ? projectName(props.project_id) : t("Not in a project")}`
             : ""}

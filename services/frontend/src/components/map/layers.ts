@@ -33,6 +33,8 @@ export interface EntityFeatureProperties {
   name: string;
   status: string;
   entity_type: string;
+  /** "Vehicles · 4x4": the type and the sub-type by label (decision D166), for the panel. */
+  entity_type_label?: string;
   group: string;
   group_id?: string | null;
   icon_key: string;
@@ -61,6 +63,7 @@ export interface DeviceFeatureProperties {
   serial_number: string | null;
   status: string;
   device_type: string;
+  device_type_label?: string;
   icon_key: string;
   entity_id: string | null;
   entity_name: string | null;
