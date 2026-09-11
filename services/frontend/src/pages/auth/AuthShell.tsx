@@ -20,7 +20,7 @@ const BACKGROUNDS = [
 ];
 
 /** The frame of the sign-in, registration and password pages: the card over a photograph
- * with a dark wash, the way AddaxAI Connect frames its sign-in. */
+ * with a dark wash, the way the sister platform frames its sign-in. */
 export function AuthShell({
   title,
   description,
