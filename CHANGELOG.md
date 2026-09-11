@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- EarthRanger's icons (decision D165): about 350 silhouettes vendored from the open source EarthRanger server (Apache 2.0, licence text next to the files) replace and extend the registry: every wildlife species EarthRanger draws, people, vehicles, static assets, map features and report icons, normalised to one square `currentColor` shape so the marker colours apply, with fallbacks from a species to its group to the generic animal; the entity type and device type dialogs choose an icon from a searchable list grouped by category; events carry an icon per type (geofence entered and exited, no data, low battery, immobility, speeding, proximity, species detection). `scripts/import_earthranger_icons.py` adds more from the same source.
 - "Recompute attribution" on the device page's Data tab (`POST /devices/{id}/reattribute`, project admins): every record of the device gets its project and entity again from the assignments as they stand, the repair for records decoded before an assignment existed. Found through Explore, where such records draw as a second line named after the collar.
 - Rock7 RockBLOCK adapter (decision D156) for the Iridium modems still on Rock 7 Core: deliveries as a form or JSON through the source's webhook URL, commands through the MT web service with the portal login, the answer read by code, a connection probe; the ingest route accepts form-encoded bodies.
 

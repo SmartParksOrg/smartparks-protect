@@ -17,7 +17,7 @@ import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
 import { Icon } from "@/components/icons/Icon";
-import { iconKeys } from "@/components/icons/registry";
+import { IconPicker } from "@/components/icons/IconPicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -93,7 +93,7 @@ function CatalogPage<T extends FieldValues, R>({ title, description, path, query
                 <Field key={String(f.name)} label={f.label} htmlFor={id} hint={f.hint} error={errors[String(f.name)]?.message}>
                   {f.kind === "textarea" ? <Textarea id={id} rows={2} {...form.register(f.name)} /> :
                    f.kind === "select" ? <Select value={String(form.watch(f.name) ?? "")} onValueChange={(v) => form.setValue(f.name, v as never, { shouldValidate: true })} disabled={disabled}><SelectTrigger id={id}><SelectValue placeholder={t("Choose")} /></SelectTrigger><SelectContent>{f.options?.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select> :
-                   f.kind === "icon" ? <Select value={String(form.watch(f.name) ?? "")} onValueChange={(v) => form.setValue(f.name, v as never, { shouldValidate: true })}><SelectTrigger id={id}><SelectValue placeholder={t("Choose an icon")} /></SelectTrigger><SelectContent>{iconKeys.map((k) => <SelectItem key={k} value={k}><span className="inline-flex items-center gap-2"><Icon iconKey={k} className="size-4" />{k}</span></SelectItem>)}</SelectContent></Select> :
+                   f.kind === "icon" ? <IconPicker id={id} value={String(form.watch(f.name) ?? "")} onChange={(v) => form.setValue(f.name, v as never, { shouldValidate: true })} /> :
                    <Input id={id} disabled={disabled} {...form.register(f.name)} />}
                 </Field>
               );

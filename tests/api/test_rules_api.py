@@ -204,7 +204,7 @@ async def test_events_alerts_and_map_layer(client, db):
 
     layer = (await client.get(f"{base}/map/events", params={"hours": 24}, headers=h)).json()
     assert len(layer["features"]) == 1
-    assert layer["features"][0]["properties"]["icon_key"] == "event.geofence"
+    assert layer["features"][0]["properties"]["icon_key"] == "event.geofence_exit"
 
     alerts = (await client.get(f"{base}/alerts", params={"status": "open"}, headers=h)).json()
     assert (

@@ -39,17 +39,24 @@ admin_router = APIRouter(
     prefix="/admin", tags=["events"], dependencies=[Depends(require_server_admin)]
 )
 
+# The same table as `eventIcon` in the frontend's `lib/rules.ts`; the keys are registry icons.
 ICON_BY_TYPE = {
-    "GEOFENCE_ENTER": "event.geofence",
-    "GEOFENCE_EXIT": "event.geofence",
+    "GEOFENCE_ENTER": "event.geofence_enter",
+    "GEOFENCE_EXIT": "event.geofence_exit",
     "NO_DATA": "event.device_offline",
     "SPECIES_DETECTION": "event.detection",
+    "SPEED_LIMIT_VIOLATION": "event.speeding",
+    "BATTERY_LOW": "event.low_battery",
+    "POSSIBLE_IMMOBILITY": "event.immobility",
+    "PROXIMITY": "event.proximity",
 }
 
 
 def _icon(event_type: str) -> str:
     if event_type.startswith("SYSTEM_"):
         return "event.device_offline"
+    if event_type.startswith("GEOFENCE"):
+        return ICON_BY_TYPE.get(event_type, "event.geofence")
     return ICON_BY_TYPE.get(event_type, "event.alert")
 
 

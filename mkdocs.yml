@@ -106,7 +106,7 @@ nav:
       - administration/index.md
       - Permissions: administration/permissions.md
       - Notifications: administration/notifications.md
-      - Custom icons: administration/icons.md
+      - Icons: administration/icons.md
       - Organizations: administration/organizations.md
       - Pages per role: administration/pages.md
   - Operations:

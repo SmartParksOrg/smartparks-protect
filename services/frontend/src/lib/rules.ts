@@ -275,12 +275,21 @@ export function describeDocument(doc: Doc): string {
 }
 
 /** Marker icon for an event type, same mapping as the API's map layer. */
+const EVENT_ICONS: Record<string, string> = {
+  GEOFENCE_ENTER: "event.geofence_enter",
+  GEOFENCE_EXIT: "event.geofence_exit",
+  NO_DATA: "event.device_offline",
+  SPECIES_DETECTION: "event.detection",
+  SPEED_LIMIT_VIOLATION: "event.speeding",
+  BATTERY_LOW: "event.low_battery",
+  POSSIBLE_IMMOBILITY: "event.immobility",
+  PROXIMITY: "event.proximity",
+};
+
 export function eventIcon(eventType: string): string {
-  if (eventType.startsWith("GEOFENCE")) return "event.geofence";
-  if (eventType === "NO_DATA" || eventType.startsWith("SYSTEM_"))
-    return "event.device_offline";
-  if (eventType === "SPECIES_DETECTION") return "event.detection";
-  return "event.alert";
+  if (eventType.startsWith("GEOFENCE")) return EVENT_ICONS[eventType] ?? "event.geofence";
+  if (eventType.startsWith("SYSTEM_")) return "event.device_offline";
+  return EVENT_ICONS[eventType] ?? "event.alert";
 }
 
 export const hoursLabel = (seconds: number) =>
