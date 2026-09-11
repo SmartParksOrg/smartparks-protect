@@ -103,3 +103,4 @@ async def test_assign_to_a_new_entity_or_an_existing_one(client, db):
     assert overlap.status_code == 409
     detail = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()
     assert [a["entity_name"] for a in detail["entity_assignments"] if not a["valid_to"]] == [name]
+    assert [a["project_name"] for a in detail["project_assignments"]] == [project.name]

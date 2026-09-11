@@ -390,6 +390,13 @@ export function DevicePage() {
                   )}
                   {d.project_assignments.map((a) => (
                     <div key={a.id}>
+                      <Link
+                        className="underline"
+                        to={`/projects/${a.project_id}/devices/${d.id}`}
+                      >
+                        {a.project_name ?? a.project_id.slice(0, 8)}
+                      </Link>
+                      ,{" "}
                       {t("{{from}} to {{to}}", {
                         from: formatTime(a.valid_from),
                         to: a.valid_to ? formatTime(a.valid_to) : t("now"),

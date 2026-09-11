@@ -9039,6 +9039,11 @@ export interface components {
              * Format: uuid
              */
             project_id: string;
+            /**
+             * Project Name
+             * @description Filled by the device read, so the page names the project
+             */
+            project_name?: string | null;
             /** Reattributed */
             reattributed: {
                 [key: string]: number;
@@ -9075,6 +9080,11 @@ export interface components {
              * Format: uuid
              */
             project_id: string;
+            /**
+             * Project Name
+             * @description Filled by the device read, so the page names the project
+             */
+            project_name?: string | null;
         };
         /** ProjectCreate */
         ProjectCreate: {

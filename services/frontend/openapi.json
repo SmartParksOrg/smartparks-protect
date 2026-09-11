@@ -32189,6 +32189,18 @@
       "format": "uuid",
       "title": "Project Id"
      },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name",
+      "description": "Filled by the device read, so the page names the project"
+     },
      "reattributed": {
       "additionalProperties": {
        "type": "integer"
@@ -32259,6 +32271,18 @@
       "type": "string",
       "format": "uuid",
       "title": "Project Id"
+     },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name",
+      "description": "Filled by the device read, so the page names the project"
      }
     },
     "type": "object",

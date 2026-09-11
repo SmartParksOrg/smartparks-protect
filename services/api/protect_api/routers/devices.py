@@ -79,12 +79,15 @@ from shared.timeutil import require_aware, utc_now
 router = APIRouter(prefix="/devices", tags=["devices"])
 
 
-def project_assignment_read(assignment: DeviceProjectAssignment) -> ProjectAssignmentRead:
+def project_assignment_read(
+    assignment: DeviceProjectAssignment, *, project_name: str | None = None
+) -> ProjectAssignmentRead:
     valid_from, valid_to = range_bounds(assignment.validity)
     return ProjectAssignmentRead(
         id=assignment.id,
         device_id=assignment.device_id,
         project_id=assignment.project_id,
+        project_name=project_name,
         valid_from=valid_from,
         valid_to=valid_to,
         reason=assignment.reason,
@@ -444,6 +447,16 @@ async def get_device(
             )
         ).all()
     }
+    project_names = {
+        project_id: name
+        for project_id, name in (
+            await session.execute(
+                select(Project.id, Project.name).where(
+                    Project.id.in_({a.project_id for a in project_assignments})
+                )
+            )
+        ).all()
+    }
     identities = (
         await session.scalars(
             select(ExternalIdentity).where(ExternalIdentity.device_id == device.id)
@@ -464,7 +477,10 @@ async def get_device(
     ]
     return DeviceWithAssignments(
         **(await with_state(session, [device]))[0].model_dump(),
-        project_assignments=[project_assignment_read(a) for a in project_assignments],
+        project_assignments=[
+            project_assignment_read(a, project_name=project_names.get(a.project_id))
+            for a in project_assignments
+        ],
         entity_assignments=[
             assignment_read(a, entity_name=entity_names.get(a.entity_id))
             for a in entity_assignments

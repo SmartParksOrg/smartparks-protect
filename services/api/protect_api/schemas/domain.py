@@ -300,6 +300,9 @@ class AssignmentRead(ORMModel):
 
 class ProjectAssignmentRead(AssignmentRead):
     project_id: uuid.UUID
+    project_name: str | None = Field(
+        default=None, description="Filled by the device read, so the page names the project"
+    )
 
 
 class EntityAssignmentRead(AssignmentRead):
