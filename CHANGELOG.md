@@ -4,6 +4,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+### Upgrade notes
+
+- The MinIO server and client images come from `quay.io/minio/...` now: MinIO's repositories disappeared from Docker Hub on 2026-09-11 (a pull answers "access denied", the repository page 404). The tags and digests are the same; a server pulls each image once more from Quay on its next update.
+
 ### Added
 
 - Entity types with sub-types and a standard catalogue (decisions D166 to D169, ADR 0025): a type holds sub-types one level deep, every server is seeded with Wildlife, People, Vehicles, Infrastructure, Environmental sensors and Equipment and a sub-type per icon (Elephant, Ranger, 4x4, Gate, Weather station, Camera trap and about 240 more), so a new site starts complete; a project switches off what it does not need under Project admin, Settings; the entity dialog asks for the type, then a searchable sub-type with its icon, and takes an icon of its own for one entity; the bulk dialogs use the same control; the Entity types page shows and sets the type a sub-type belongs to; the EarthRanger connectors send a sub-type's type as the subject type when no mapping says otherwise. Migration 0025.

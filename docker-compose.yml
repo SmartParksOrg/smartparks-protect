@@ -82,7 +82,7 @@ services:
 
   minio:
     container_name: protect-minio
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
@@ -101,7 +101,7 @@ services:
 
   minio-init:
     container_name: protect-minio-init
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       minio:
         condition: service_healthy
@@ -301,7 +301,7 @@ services:
   # One-shot, started by scripts/backup.sh: docker compose --profile backup run --rm object-mirror
   object-mirror:
     container_name: protect-object-mirror
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
     profiles: [backup]
     depends_on:
       minio:

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Mirrors every MinIO bucket to the remote backup bucket (architecture 28.5), or back on
-# restore. Runs in the minio/mc image as the compose service `object-mirror`. Incremental: only
+# restore. Runs in the quay.io/minio/mc image as the compose service `object-mirror`. Incremental: only
 # new or changed objects are copied. Objects deleted locally stay on the remote (no --remove), so
 # a wrong deletion can be recovered; the remote bucket keeps versions where the provider supports
 # them. MIRROR_DIRECTION=restore copies the remote copy back into the local buckets.
