@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from shared.connectivity.adapters import addaxai_connect
 from shared.connectivity.adapters.addaxai_connect import (
     AddaxAiConnectAdapter,
     AddaxAiConnector,
@@ -134,6 +135,10 @@ async def test_poll_logs_in_and_moves_the_cursor(monkeypatch):
         return httpx.Response(404)
 
     _mock(monkeypatch, handler)
+    # The first poll looks back `overlap_days` from now; the fixture's captures are dated
+    # 2026-09-04, so the clock stands the day after.
+    frozen = datetime(2026, 9, 5, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr(addaxai_connect, "_now", lambda: frozen)
     store = MemoryCursorStore()
     connector = AddaxAiConnector(_source({"categories": ["animal", "person"]}, cursors=store))
     emitted = []
@@ -159,7 +164,7 @@ async def test_poll_logs_in_and_moves_the_cursor(monkeypatch):
     assert emitted == []  # nothing newer than the cursor, no rescan due
 
     # a rescan is due: the overlap window is read again, the seen image at the cursor stays out
-    store.state["last_rescan_at"] = (datetime.now(UTC) - timedelta(days=2)).isoformat()
+    store.state["last_rescan_at"] = (frozen - timedelta(days=2)).isoformat()
     await connector.poll(emit)
     assert [m.payload["events"][0]["title"] for m in emitted] == ["Person at Waterhole north"]
 

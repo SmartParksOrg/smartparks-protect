@@ -55,6 +55,14 @@ EVENT_TYPE = "SPECIES_DETECTION"
 PAGE_SIZE = 100
 MAX_PAGES = 200
 TOKEN_LIFETIME = timedelta(minutes=50)
+
+
+def _now() -> datetime:
+    """The poll's clock, one function so a test can freeze it: the first poll looks back
+    `overlap_days` from now, which a fixture with fixed capture dates outgrows."""
+    return datetime.now(UTC)
+
+
 HTTP_TIMEOUT = 30.0
 DEFAULTS: dict[str, Any] = {
     "poll_interval_seconds": 300,
@@ -323,7 +331,7 @@ class AddaxAiConnector(PollingConnector):
 
     async def poll(self, emit: Emit) -> None:
         state = await self.cursors.load()
-        now = datetime.now(UTC)
+        now = _now()
         overlap = timedelta(days=float(setting(self.source, "overlap_days")))
         reset = "since" in state
         newest = _time(state.get("since")) if reset else _time(state.get("captured_after"))
