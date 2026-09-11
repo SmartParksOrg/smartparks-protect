@@ -23,7 +23,7 @@ State colours on the map communicate status, not object type; the icon communica
 
 ## Logo
 
-`src/assets/brand/` holds `logo-stacked.svg` (emblem above wordmark), `logo-wide.svg` (emblem left of wordmark) and `logo-mark.svg` (emblem only). All use `fill="currentColor"`. Import them as React components (`import Logo from "@/assets/brand/logo-mark.svg?react"`) so `className="text-primary"` colours them; an `<img>` cannot inherit the colour. Use the mark for the sidebar and favicon, the wide logo in headers, the stacked logo on the login page.
+`src/assets/brand/` holds `logo-stacked.svg` (emblem above wordmark), `logo-wide.svg` (emblem left of wordmark) and `logo-mark.svg` (emblem only), all with `fill="currentColor"`; import them as React components (`import Logo from "@/assets/brand/logo-mark.svg?react"`) so `className="text-primary"` colours them; an `<img>` cannot inherit the colour. `logo-landscape.webp` and `logo-landscape-white.webp` are Smart Parks' own landscape logo (the wide emblem over the wordmark, from the delivered `LOGO_Smartparks_1920x1080` set, brand green and white on transparent, 1600 px), used as an `<img>` where there is room for it: the sign-in card. Use the mark for the favicon, the wide logo in the sidebar's narrow header, the landscape logo where a page shows the brand large.
 
 ## Map
 

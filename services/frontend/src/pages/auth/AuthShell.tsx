@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
-import LogoStacked from "@/assets/brand/logo-stacked.svg?react";
+import logoLandscape from "@/assets/brand/logo-landscape.webp";
 import {
   Card,
   CardContent,
@@ -9,6 +9,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+/** The photographs behind the sign-in card, one picked per visit: Smart Parks landscapes by
+ * Tim van Dam, used with his permission, blurred in the file itself so the browser blurs
+ * nothing, served unhashed from `public/` so a server can swap them without a rebuild. */
+const BACKGROUNDS = [
+  "/auth-background-1.webp",
+  "/auth-background-2.webp",
+  "/auth-background-3.webp",
+  "/auth-background-4.webp",
+];
+
+/** The frame of the sign-in, registration and password pages: the card over a photograph
+ * with a dark wash, the way AddaxAI Connect frames its sign-in. */
 export function AuthShell({
   title,
   description,
@@ -20,11 +32,24 @@ export function AuthShell({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const [background] = useState(
+    () => BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)],
+  );
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-muted px-4 py-8">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <LogoStacked className="mb-2 h-24 w-auto text-primary" />
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-muted px-4 py-8">
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url('${background}')` }}
+      />
+      <div aria-hidden className="absolute inset-0 bg-black/35" />
+      <Card className="relative w-full max-w-sm bg-card/95 shadow-2xl backdrop-blur-sm">
+        <CardHeader className="justify-items-center text-center">
+          <img
+            src={logoLandscape}
+            alt="Smart Parks"
+            className="mb-2 w-56 max-w-full"
+          />
           <CardTitle>{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
