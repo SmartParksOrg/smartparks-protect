@@ -194,10 +194,16 @@ async def test_all_scope_counts_devices_in_no_project(client, db, bus):  # noqa:
     assert linked.status_code == 200, linked.text
     await _uplink(db, bus, row, external_id, [("gw-c", -92, 4.0)], datetime.now(UTC).isoformat())
 
+    # the gateway is on the project's source, so the project lists it (decision D175), but
+    # the loose device's reception is not the project's; the all scope counts it
     in_project = (await client.get(f"/api/v1/projects/{project.id}/gateways", headers=h)).json()
-    assert "gw-c" not in [g["external_id"] for g in in_project]
-    in_all = (await client.get("/api/v1/projects/all/gateways", headers=h)).json()
-    assert "gw-c" in [g["external_id"] for g in in_all]
+    by_id = {g["external_id"]: g for g in in_project}
+    assert "gw-c" in by_id and by_id["gw-c"]["receptions"] == 0
+    in_all = {
+        g["external_id"]: g
+        for g in (await client.get("/api/v1/projects/all/gateways", headers=h)).json()
+    }
+    assert in_all["gw-c"]["receptions"] == 1
     connectivity = (await client.get("/api/v1/projects/all/connectivity", headers=h)).json()
     assert loose["id"] in [c["device_id"] for c in connectivity]
 
