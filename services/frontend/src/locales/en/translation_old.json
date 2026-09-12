@@ -59,6 +59,8 @@
   "Everything an entity or a device produced, one row per moment; the Analysis tab aggregates and compares": "Everything an entity or a device produced, one row per moment; the Analysis tab aggregates and compares",
   "failed:": "failed:",
   "FCnt": "FCnt",
+  "Feed, {{count}} unread_one": "Feed, {{count}} unread",
+  "Feed, {{count}} unread_other": "Feed, {{count}} unread",
   "Filters": "Filters",
   "Folders of entities: a herd, a team, a region. Two levels deep.": "Folders of entities: a herd, a team, a region. Two levels deep.",
   "Folders of entities: a region, a herd inside it, a family inside that.": "Folders of entities: a region, a herd inside it, a family inside that.",

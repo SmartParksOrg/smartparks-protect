@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Bell,
   Compass,
   Flame,
   Layers,
@@ -96,6 +97,7 @@ import {
   shownLayerCount,
 } from "@/components/map/layerChoices";
 import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
+import { FeedPanel } from "@/components/map/FeedPanel";
 import { type LocateStatus, startLocate } from "@/components/map/locate";
 import {
   type DrawKind,
@@ -140,6 +142,12 @@ import { useNow } from "@/hooks/useNow";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useMapConfig } from "@/hooks/useMapConfig";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
+import {
+  type FeedItem,
+  feedPosition,
+  newestCreatedAt,
+  unreadCount,
+} from "@/lib/feed";
 import { circleRing } from "@/lib/geodesy";
 import { isAllProjects } from "@/lib/scope";
 import { canAdmin, useProjectRole, useProjects } from "@/hooks/useProjects";
@@ -189,6 +197,8 @@ interface DeviceFeature {
  * updates arrive over the WebSocket, a selected entity shows its panel and optional track. The
  * container has `z-0` so MapLibre's internals never paint over the app (z-index ladder).
  */
+const NO_FEED_ITEMS: FeedItem[] = [];
+
 export function MapPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
@@ -296,14 +306,57 @@ export function MapPage() {
     (open: boolean) =>
       setParams(
         (p) => {
-          if (open) p.set("layers", "1");
-          else p.delete("layers");
+          if (open) {
+            p.set("layers", "1");
+            p.delete("feed");
+          } else p.delete("layers");
           return p;
         },
         { replace: true },
       ),
     [setParams],
   );
+  // the feed (decisions D177 to D180): `?feed=1`, one of the two panels open at a time
+  const feedOpen = params.get("feed") === "1";
+  const setFeedOpen = useCallback(
+    (open: boolean) =>
+      setParams(
+        (p) => {
+          if (open) {
+            p.set("feed", "1");
+            p.delete("layers");
+          } else p.delete("feed");
+          return p;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const feed = useQuery({
+    queryKey: queryKeys.events(projectId, { limit: 100 }),
+    queryFn: () =>
+      api.get<PageType<FeedItem>>(`/api/v1/projects/${projectId}/events`, {
+        query: { limit: 100 },
+      }),
+    refetchInterval: 60_000,
+  });
+  const feedItems = feed.data?.items ?? NO_FEED_ITEMS;
+  const [feedSeen, setFeedSeen] = usePreference<Record<string, string>>(
+    "feed_seen",
+    {},
+  );
+  const seenUpTo = feedSeen[projectId] ?? null;
+  const unread = unreadCount(feedItems, seenUpTo);
+  // the rows stay marked as unread against the mark of the moment the panel opened, while
+  // the stored mark moves on so the badge clears
+  const [feedMarkAtOpen, setFeedMarkAtOpen] = useState<string | null>(null);
+  // the first visit starts at the newest item; an open panel keeps the mark at the newest
+  useEffect(() => {
+    if (!feed.data) return;
+    const newest = newestCreatedAt(feedItems) ?? new Date().toISOString();
+    if (seenUpTo === null || (feedOpen && newest > seenUpTo))
+      setFeedSeen({ ...feedSeen, [projectId]: newest });
+  }, [feed.data, feedItems, feedOpen, feedSeen, seenUpTo, projectId, setFeedSeen]);
   // the Tracks card shows while tracks are on unless folded from the strip
   const [tracksCardHidden, setTracksCardHidden] = useState(false);
   // heatmaps (decision D138): switched on per entity and device like the tracks (`?heat=` and
@@ -754,6 +807,25 @@ export function MapPage() {
       });
       void client.invalidateQueries({
         queryKey: queryKeys.currentState(projectId),
+      });
+      void client.invalidateQueries({ queryKey: ["events", projectId] });
+    }
+    // a new alert announces itself while the map is open (decision D180)
+    if (message.topic === "alert.created" && typeof message.event_id === "string") {
+      const eventId = message.event_id;
+      toast.warning(String(message.title ?? t("Alert")), {
+        description: String(message.severity ?? ""),
+        action: {
+          label: t("Show"),
+          onClick: () =>
+            setParams(
+              (p) => {
+                p.set("event", eventId);
+                return p;
+              },
+              { replace: true },
+            ),
+        },
       });
     }
   });
@@ -1387,6 +1459,36 @@ export function MapPage() {
     badge: shownLayers,
     onClick: () => setPanelOpen(!panelOpen),
   };
+  // (the count is the badge; the React compiler refuses an interpolated label from it)
+  const feedItem: StripItem = {
+    key: "feed",
+    icon: Bell,
+    label: t("Feed"),
+    active: feedOpen,
+    badge: unread,
+    onClick: () => {
+      if (!feedOpen) setFeedMarkAtOpen(seenUpTo);
+      setFeedOpen(!feedOpen);
+    },
+  };
+  const entityNameOf = (id: string | null | undefined): string | null =>
+    id
+      ? ((currentFeatures?.find((f) => f.properties.entity_id === id)?.properties
+          .name as string | undefined) ?? null)
+      : null;
+  const selectFeedItem = (item: FeedItem) => {
+    const position = feedPosition(item);
+    const map = mapRef.current;
+    if (position && map)
+      map.easeTo({ center: position, zoom: Math.max(map.getZoom(), 14) });
+    setParams(
+      (p) => {
+        p.set("event", item.id);
+        return p;
+      },
+      { replace: true },
+    );
+  };
   // zoom, north and locate, our own buttons at the bottom right (decision D173)
   const zoomItems: StripItem[] = [
     {
@@ -1426,22 +1528,10 @@ export function MapPage() {
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={container} className="absolute! inset-0 z-0" />
-      {/* the layers button and the counts in the top left (decisions D137, D174) */}
-      <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-5rem)] flex-wrap items-center gap-2 [&>*]:pointer-events-auto">
-        <ControlStrip items={[layersItem]} label={t("Layers")} className="flex" />
-        {current.data && (
-          <Badge variant="secondary" className="bg-card">
-            {visibleFeatures &&
-            visibleFeatures.length !== currentFeatures?.length
-              ? `${visibleFeatures.length} / `
-              : ""}
-            {current.data.total} {t("entities")}
-            {current.data.use_tiles ? ", tiles" : ""}
-            {visibleDevices.length > 0
-              ? `, ${t("{{count}} devices", { count: visibleDevices.length })}`
-              : ""}
-          </Badge>
-        )}
+      {/* the layers and feed buttons and the events count in the top left (decisions D137, D174, D177); the entity and device count went on 2026-09-12 at Tim's word, the layers panel carries the numbers */}
+      <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-5rem)] items-start gap-2 [&>*]:pointer-events-auto">
+        <ControlStrip items={[layersItem, feedItem]} label={t("Layers and feed")} />
+        <div className="flex flex-wrap gap-2 [&>*]:pointer-events-auto">
         {events.data && events.data.features.length > 0 && (
           <Badge
             variant="secondary"
@@ -1451,6 +1541,7 @@ export function MapPage() {
             {events.data.features.length} {t("events, 24 h")}
           </Badge>
         )}
+        </div>
       </div>
       {/* the control strips, rendered into the map's own top right and bottom right stacks */}
       {stripHost &&
@@ -1522,6 +1613,18 @@ export function MapPage() {
             settings={heat}
             onChange={setHeat}
             onClose={() => setHeatSettingsOpen(false)}
+          />
+        )}
+        {feedOpen && (
+          <FeedPanel
+            projectId={projectId}
+            items={feedItems}
+            seenUpTo={feedMarkAtOpen}
+            loading={feed.isPending}
+            canWriteAlerts={canEdit}
+            entityName={entityNameOf}
+            onSelect={selectFeedItem}
+            onClose={() => setFeedOpen(false)}
           />
         )}
         {panelOpen && currentFeatures && (
