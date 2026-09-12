@@ -20,6 +20,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- The Assign button of the device page's dialog stayed grey without a word while the entity, or the new entity's name or type, was still missing, which read as a button that cannot be pressed. It presses now and names the missing field. Found by Tim on 2026-09-12 with SP051890.
 - On a phone, the sub-type list and the icon picker did not scroll under a finger inside a dialog: the popover sits outside the dialog's scroll lock, which only lets the dialog itself scroll. Both popovers are modal now, as the project switcher already was. Found by Tim on 2026-09-12.
 - On a phone, the Assign button of the device page's dialog sat behind the on-screen keyboard after typing the new entity's name: the keyboard did not shrink the page, so the centred dialog kept its footer under the keys and the locked page could not scroll to it. The viewport now resizes with the keyboard (`interactive-widget=resizes-content`), so the dialog scrolls and the footer is reachable.
 - The device page's Project assignments card listed periods without saying which project: every assignment names its project now, linked to the device's page in that project (`project_name` on the device read). Found by Tim on 2026-09-11.

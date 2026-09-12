@@ -44,6 +44,7 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
   const [typeId, setTypeId] = useState("");
   const [groupId, setGroupId] = useState("");
   const [validFrom, setValidFrom] = useState(() => new Date().toISOString());
+  const [attempted, setAttempted] = useState(false);
   const entities = useQuery({
     queryKey: [...queryKeys.entities(projectId), "assignable", q],
     queryFn: () => api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, { query: { limit: 200, ...(q.trim() ? { q: q.trim() } : {}) } }),
@@ -61,7 +62,9 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
   }, [assignments.data]);
   const span = useQuery({ queryKey: queryKeys.deviceSpan(device.id), queryFn: () => api.get<DeviceDataSpan>(`/api/v1/devices/${device.id}/data-span`) });
   const joinedAt = device.project_assignments.find((a) => a.project_id === projectId && !a.valid_to)?.valid_from ?? null;
-  const ready = mode === "existing" ? Boolean(entityId) : Boolean(name.trim() && typeId);
+  // What still stops the assignment; shown at the field once Assign was pressed, never a silently disabled button.
+  const missing = mode === "existing" ? (entityId ? null : "entity") : !name.trim() ? "name" : !typeId ? "type" : null;
+  const ready = missing === null;
   const assign = useMutationToast({
     mutationFn: () =>
       api.post<EntityAssignment>(`/api/v1/projects/${projectId}/entity-assignments`, {
@@ -86,7 +89,7 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
         </Tabs>
         {mode === "existing" ? (
           <>
-            <Field label={t("Entity")} htmlFor="assign-entity-search" hint={t("An entity that another device tracks today keeps that device as well; release it on the entity page if it should not.")}>
+            <Field label={t("Entity")} htmlFor="assign-entity-search" hint={t("An entity that another device tracks today keeps that device as well; release it on the entity page if it should not.")} error={attempted && missing === "entity" ? t("Pick an entity from the list") : undefined}>
               <Input id="assign-entity-search" placeholder={t("Search by name")} value={q} onChange={(e) => setQ(e.target.value)} />
             </Field>
             <div className="max-h-56 overflow-y-auto rounded-md border" role="listbox" aria-label={t("Entities")}>
@@ -103,8 +106,8 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
           </>
         ) : (
           <>
-            <Field label={t("Name")} htmlFor="new-entity-name"><Input id="new-entity-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={device.name} /></Field>
-            <Field label={t("Type")} htmlFor="new-entity-type" hint={t("The kind of thing, then the species or model; the icon follows the choice")}>
+            <Field label={t("Name")} htmlFor="new-entity-name" error={attempted && missing === "name" ? t("Give the entity a name") : undefined}><Input id="new-entity-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={device.name} /></Field>
+            <Field label={t("Type")} htmlFor="new-entity-type" hint={t("The kind of thing, then the species or model; the icon follows the choice")} error={attempted && missing === "type" ? t("Choose a type") : undefined}>
               <EntityTypeSelect id="new-entity-type" projectId={projectId} value={typeId} onChange={setTypeId} />
             </Field>
             <Field label={t("Group")} htmlFor="new-entity-group"><GroupSelect id="new-entity-group" projectId={projectId} mode="choice" value={groupId} onChange={setGroupId} /></Field>
@@ -119,7 +122,7 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>{t("Cancel")}</Button>
-        <Button type="button" disabled={!ready || span.isPending || assign.isPending} onClick={() => assign.mutate()}>{assign.isPending ? t("Assigning…") : t("Assign")}</Button>
+        <Button type="button" disabled={span.isPending || assign.isPending} onClick={() => (ready ? assign.mutate() : setAttempted(true))}>{assign.isPending ? t("Assigning…") : t("Assign")}</Button>
       </DialogFooter>
     </>
   );
