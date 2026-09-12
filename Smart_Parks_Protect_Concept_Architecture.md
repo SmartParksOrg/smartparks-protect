@@ -1,5 +1,7 @@
 # Smart Parks Protect
 
+> Historical: this is the concept the work started from (draft v16, August 2026). The built system is described in `DEVELOPERS.md`, `PROJECT_PLAN.md` (decisions and phases) and the docs site; where they differ from this document, they are right.
+
 ## Conceptual Architecture & Development Specification
 
 SMART PARKS PROTECT

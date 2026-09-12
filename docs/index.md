@@ -2,7 +2,7 @@
 
 Smart Parks Protect is a self-hosted operational data platform for Smart Parks deployments. It ingests data from field devices and IoT platforms, normalizes it into one domain of entities, devices, positions, measurements and events, and makes that data useful through a live map, a Data Explorer, exports, a rules engine, device control and outbound integrations such as EarthRanger.
 
-Status: released, v2.0.0 on 2026-09-06, with phases 16 to 18 live on the dev server since; see `CHANGELOG.md`. Follow `PROJECT_PLAN.md` in the repository for what is being built and in which order.
+Status: released, v2.5.0 on 2026-09-09; phases 23 to 25 (connectivity and network locations, the live map's controls and its feed) and the health dot are on the dev server ahead of v2.6.0; see `CHANGELOG.md`. Follow `PROJECT_PLAN.md` in the repository for what is being built and in which order.
 
 ## Where to look
 

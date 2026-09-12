@@ -1,9 +1,11 @@
 #!/bin/bash
-# Proves the backups restore (architecture 28.10): builds a second compose project next to the
-# running one with the newest database backup and every archived WAL segment, migrates it, starts
-# the API, checks health and row counts, checks that referenced objects exist in the backup
-# bucket, records the result in backup_runs of the production stack, and removes everything.
-#   scripts/restore-verify.sh            # scheduled weekly by Ansible
+# Proves the backups restore (architecture 28.10): starts a second compose project next to the
+# running one with the newest database backup and every archived WAL segment, running the
+# production stack's migrate and api images by name (docker/backup/verify.yml) so the test
+# migrates with the code that is live, starts the API, checks health and row counts, checks that
+# referenced objects exist in the backup bucket, records the result in backup_runs of the
+# production stack, and removes everything.
+#   scripts/restore-verify.sh            # scheduled weekly by Ansible, logs/restore-verify.log
 # Needs about twice the database size in free disk space for the duration of the run.
 set -uo pipefail
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"

@@ -36,6 +36,8 @@ bash scripts/verify-server.sh                    # containers, migrations, healt
 
 No monitoring stack beyond System Health and no intrusion detection beyond fail2ban on SSH. Backups are configured through the `BACKUP_*` host vars (the [backup and recovery guide](../operations/backup-and-recovery.md)); a server without them has no backup. The daily `scripts/security-status.sh` publishes the security check result to Redis for the health page.
 
+Two optional touches. Set `maptiler_key` in the host vars to add the Satellite base map and 3D terrain to the live map; without it the map offers the free base maps only. The sign-in, registration and password pages sit on one of four Smart Parks landscapes, picked at random per visit; they are served unhashed from `services/frontend/public/auth-background-1.webp` to `-4.webp`, blurred in the files themselves, so a server can put its own pictures there and restart the frontend without a rebuild.
+
 ## Updating
 
 See the [update guide](../operations/update-guide.md).

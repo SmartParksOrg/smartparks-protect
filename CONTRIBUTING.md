@@ -42,7 +42,7 @@ A change is done when all of these hold:
 
 ## Adding an adapter or a driver
 
-Extension documentation lives under `docs/integrations/` and `docs/devices/`. Start from the skeletons in `examples/` once they exist (phase 2). Every adapter and driver ships with fixtures, a runbook and an entry in the registry.
+Extension documentation lives under `docs/integrations/` and `docs/devices/`. Start from the skeletons in `examples/`. Every adapter and driver ships with fixtures, a runbook and an entry in the registry.
 
 ## Reporting bugs
 

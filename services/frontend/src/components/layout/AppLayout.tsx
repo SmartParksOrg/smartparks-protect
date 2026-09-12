@@ -16,7 +16,9 @@ import { useLayoutStore } from "@/stores/layout";
 /**
  * Fixed sidebar from 1024 px, a drawer below. The shell is exactly one viewport high and the main
  * area scrolls, so a page that wants the full height (the map) gets it with `flex-1` and pages
- * with long content scroll inside `main` (z-index ladder: map 0, sticky bar 30, drawer 50).
+ * with long content scroll inside `main` (z-index ladder: map 0, sticky bar 30, drawer 50). The
+ * phone header carries the landscape logo with the product name, and the health dot (decision
+ * D181) sits in the top right corner of the content on every page.
  */
 export function AppLayout() {
   const { t } = useTranslation();

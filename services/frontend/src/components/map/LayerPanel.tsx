@@ -159,8 +159,9 @@ function Locate({ onClick, label }: { onClick: () => void; label: string }) {
   );
 }
 
-/** The map's layers (decision D98): entities in their groups however deep, features and recent
- * events, each with search, show and hide per row, and a way to the object on the map. */
+/** The map's layers (decisions D98, D174): entities in their groups however deep, devices,
+ * features, recent events and coverage, one tab each with search, show and hide per row, a fold
+ * toggle and one show-or-hide toggle, and a way to the object on the map. */
 export function LayerPanel({
   entities,
   groups,

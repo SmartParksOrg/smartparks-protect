@@ -20,7 +20,8 @@ model) and may override it in its dialog; the entity type and device type dialog
 admin open a searchable list grouped by category; the search matches the label, the key and the aliases (a Latin name,
 a synonym such as "gnu" for the wildebeest). Events take their icon from the event type: geofence
 entered and exited, no data, low battery, immobility, speeding, proximity and species detection
-have one each, every other type shows the alert marker.
+have one each; any other geofence type takes the generic geofence marker, system events take the
+no-data marker, and everything else shows the alert marker.
 
 Adding icons: `scripts/import_earthranger_icons.py` lists every vendored icon with its source
 file at a pinned commit of the EarthRanger repository; add a line, run the script (it downloads,

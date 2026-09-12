@@ -17,7 +17,8 @@ import { projectFor } from "@/lib/scope";
  * One panel for everything a person clicks on the live map (phase 19): the same header (picture
  * or icon, name as a link, a subtitle), a body of label and value rows, and a footer with the
  * actions. Entities, devices, track points and gateways each fill it with their own body, so a
- * click on anything reads the same and leads to the object.
+ * click on anything reads the same and leads to the object. `TrackButton` and `HeatButton` are
+ * the icon toggles the entity and device panels carry, the same ones as the layers panel's rows.
  */
 export function MapPanel({
   title,

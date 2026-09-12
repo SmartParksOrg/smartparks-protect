@@ -28,7 +28,7 @@ import { featureTypesFor } from "@/components/map/featureTools";
 import { formatArea, formatLength, measure } from "@/lib/geodesy";
 
 /**
- * The bar of the draw and measure modes (decisions D139, D141, D171): what to draw, the length,
+ * The bar of the draw and measure modes (decisions D139, D171, D172): what to draw, the length,
  * area or radius of the shape while it is drawn and after, and the way out: Save as feature for
  * a drawing, Done for a measurement, which is kept nowhere.
  */

@@ -3,7 +3,8 @@
 Gateways are separate objects from devices (architecture 20, decision D66). The registry is
 server level: one row per (data source, provider gateway id) with a name, location, state,
 last seen, the platform's latest counters and provider diagnostics as attributes. A project
-sees the gateways that received its devices' uplinks.
+sees every gateway of the data sources its devices have an identity on, whether or not that
+gateway heard one of them (decision D175, ADR 0027); the all-projects scope sees the whole registry.
 
 ## Where rows come from
 
@@ -12,16 +13,22 @@ sees the gateways that received its devices' uplinks.
 - Gateway events: the ChirpStack adapter subscribes to `gateway/+/event/stats` (counters and
   location) and `gateway/+/state/conn` (online, offline). They are stored as source events
   without a device and update the registry; nothing is published on the bus.
-- Sync: Server admin, Data sources, Sync gateways reads the platform's gateway list through
-  the adapter's management connector (names, descriptions, locations, states). Public networks
-  without a gateway API (KPN, Netmore, akenza) only ever show what receptions reveal.
+- Sync: the ingest service reads every listing adapter's gateway list through the adapter's
+  management connector (names, descriptions, locations, states) two minutes after start and
+  every 24 hours after that, per data source with its API channel switched on, logging and
+  skipping a source that fails (decision D176); Server admin, Data sources, Sync gateways does
+  the same read immediately for one source. Public networks without a gateway API (KPN,
+  Netmore, akenza) only ever show what receptions reveal.
 
 Administrators can override the name and location of a gateway under `PATCH /admin/gateways/{id}`.
 
 ## Screens
 
-Network, Gateways lists the gateways that heard the project's devices in the window, busiest
-first: state, source, receptions, devices, mean RSSI and SNR, last reception, location. The
+Network, Gateways lists every gateway of the project's data sources: the ones that heard the
+project's devices in the window busiest first with state, source, receptions, devices, mean
+RSSI and SNR, last reception and location, then the ones that heard nothing, most recently
+seen first; a source filter narrows the list to one network and the footer says how many heard
+nothing in the window. The
 detail shows the platform counters, links to the platform (when the data source has a gateway
 link template), diagnostics and the devices heard.
 

@@ -192,12 +192,16 @@ interface DeviceFeature {
   properties: DeviceFeatureProperties;
 }
 
+const NO_FEED_ITEMS: FeedItem[] = [];
+
 /**
  * Live map (architecture 11 and 13). Entities come from the current-state endpoint (bounded),
- * updates arrive over the WebSocket, a selected entity shows its panel and optional track. The
- * container has `z-0` so MapLibre's internals never paint over the app (z-index ladder).
+ * updates arrive over the WebSocket, and the page drives every layer (entities, devices,
+ * features, events, gateways, coverage, network locations, tracks and heatmaps), the two
+ * control strips (the tools top right, zoom and locate bottom right), the Layers and Feed
+ * buttons top left, the draw and measure session and the object panels. The container has
+ * `z-0` so MapLibre's internals never paint over the app (z-index ladder).
  */
-const NO_FEED_ITEMS: FeedItem[] = [];
 
 export function MapPage() {
   const { t } = useTranslation();

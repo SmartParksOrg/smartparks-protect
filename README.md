@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/assets/logo-stacked.svg" alt="Smart Parks" width="220">
+  <img src="docs/assets/logo-landscape.webp" alt="Smart Parks" width="220">
 </p>
 
 # Smart Parks Protect
 
 Self-hosted operational data platform for [Smart Parks](https://www.smartparks.org) deployments. It connects field devices and IoT platforms to one Smart Parks domain and makes that data useful: a live map, analysis and export, a rules engine that turns observations into events and alerts, device control, and durable integrations with systems such as EarthRanger.
 
-**Status: v2.0.0 released on 2026-09-06**, with the device layer, the all-projects scope, ChirpStack onboarding from the tenant and the simple-first pages live on the development server since; see `CHANGELOG.md`.
+**Status: v2.5.0 released on 2026-09-09**, with connectivity and network locations, the live map's controls and its feed, the entity type catalogue and the health dot live on the development server since, ahead of v2.6.0; see `CHANGELOG.md`.
 
 ## Core concepts
 
@@ -24,11 +24,17 @@ Self-hosted operational data platform for [Smart Parks](https://www.smartparks.o
 - **All projects at once for server admins.** The live map, the lists and the network pages over every project, read-only, with devices in no project visible until assigned.
 - **Bulk onboarding and assignment.** Unknown identities become devices in one go, and a selection of devices joins a project from its first data, with an entity each if wanted.
 - **ChirpStack onboarding from the tenant.** One tenant API key connects every application of a ChirpStack to the platform's webhook, over native gRPC or grpc-web, application by application and undoable.
-- **Simple first.** Every page shows the operational picture; the machinery sits one click deeper on the Data and Network tabs of an entity or device.
+- **Simple first.** Every page shows the operational picture; the machinery sits one click deeper on the Data, Connectivity and Network tabs of an entity or device.
+- **Entity types with sub-types.** Every server starts with the standard catalogue (wildlife, people, vehicles, infrastructure, environmental sensors, equipment and about 240 sub-types with their icons); a project hides what it does not need. The icons are the EarthRanger set, Apache 2.0, vendored with their licence.
+- **The live map is a tool.** Draw a point, line, polygon or circle into a feature, measure with a running length or area, follow your own position, switch base maps and terrain, and see the network's gateways, coverage and locations as layers.
+- **A feed on the map.** Alerts and events of the project under the Layers button, unread per person, a toast when an alert fires while the map is open.
+- **Network health apart from device health.** Every device has a Connectivity tab per data source, the Gateways page lists a project's whole network with what hears and what is silent, and the gateway list is synced from the platforms daily.
+- **A health dot on every page.** Green while every worker reports and no system alert is open, slow to turn amber, red only when the server stops answering.
+- **Notifications by email and Telegram.** Automations send alerts to a mailbox or a chat; an SMTP server is optional configuration.
 
 ## Documentation
 
-- [`Smart_Parks_Protect_Concept_Architecture.md`](Smart_Parks_Protect_Concept_Architecture.md): the concept architecture (draft v16), the source for everything here.
+- [`Smart_Parks_Protect_Concept_Architecture.md`](Smart_Parks_Protect_Concept_Architecture.md): the original concept architecture (draft v16, August 2026) the work started from; the built system is described in `DEVELOPERS.md`, `PROJECT_PLAN.md` and the docs site.
 - [`PROJECT_PLAN.md`](PROJECT_PLAN.md): phases, decisions, definition of done, session log.
 - [`DEVELOPERS.md`](DEVELOPERS.md): how the code works today.
 - [`CONVENTIONS.md`](CONVENTIONS.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md): how we work.
@@ -56,6 +62,10 @@ scripts/dev.sh simulate --application-id <id printed by the bootstrap> --count 2
 The simulator publishes OpenCollar uplinks the way ChirpStack does: a GNSS position per uplink and a status message every fifth. Open the live map of Demo park and watch the rhino move. Traffic, traces and health are under Network and Server admin. Without `--demo` you create the project, types, device and entity yourself under Server admin, or accept the unknown DevEUI from Needs attention.
 
 Endpoints: API docs <http://localhost:8000/api/docs>, health <http://localhost:8000/api/health>, ChirpStack <http://localhost:8080> (admin / admin), MinIO console <http://localhost:9001>.
+
+## Branding a server
+
+The sign-in, registration and password pages sit on one of four Smart Parks landscapes, served unhashed from `services/frontend/public/auth-background-1.webp` to `-4.webp`, so a server can put its own pictures there and restart the frontend without a rebuild. The logos live in `services/frontend/src/assets/brand/`.
 
 ## Relationship to AddaxAI Connect
 

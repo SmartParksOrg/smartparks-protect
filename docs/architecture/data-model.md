@@ -1,6 +1,6 @@
 # Data model
 
-Schema as of migration 0001. Every time column is `TIMESTAMPTZ` in UTC. Domain objects have UUID primary keys; time-series rows have `bigint` identities with a composite primary key that includes the time column (decision D31).
+Schema as of migration 0001, the base every later migration builds on; the head is 0025 (`services/api/alembic/versions/`), which added among other things `entity_types.parent_id` (ADR 0025), `location_source` and `location_fallback_hours` on entities and devices with the `network` record type (ADR 0024), the satellite session columns (ADR 0023), entity groups (ADR 0020) and `backup_runs` (ADR 0016). Every time column is `TIMESTAMPTZ` in UTC. Domain objects have UUID primary keys; time-series rows have `bigint` identities with a composite primary key that includes the time column (decision D31).
 
 ## Access control
 
@@ -54,7 +54,7 @@ Current state lives in regular tables that are updated in the same transaction a
 
 ## Indexes
 
-From measured needs only, as the architecture asks. Migration 0001 creates: time plus device, entity and project on positions and measurements (with metric key), GiST on every geometry, unique canonical key plus time on positions and measurements, and the lookups that the admin API and the pipeline use (external id per source, processing status, trace id). BRIN indexes on time are added in phase 4 once the benchmark shows where they pay off.
+From measured needs only, as the architecture asks. Migration 0001 creates: time plus device, entity and project on positions and measurements (with metric key), GiST on every geometry, unique canonical key plus time on positions and measurements, and the lookups that the admin API and the pipeline use (external id per source, processing status, trace id). BRIN indexes on time were held back for the phase 4 benchmark to justify; it did not (every read path stayed inside budget at 0.2 of the envelope), so there are none. They remain the first thing to try if a time scan becomes expensive.
 
 ## Enumerations
 

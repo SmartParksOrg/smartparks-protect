@@ -63,6 +63,8 @@ function Item({
   );
 }
 
+/** The navigation column: the landscape logo with the product name, the project switcher, the
+ * pages of the project and of the server for those who may see them, and the account. */
 export function Sidebar({
   onNavigate,
   collapsible = false,

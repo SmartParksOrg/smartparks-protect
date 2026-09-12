@@ -1,6 +1,8 @@
-/** Distances and areas on the sphere for the map's measuring tool (decision D141): a haversine
- * for lengths and the spherical excess formula for polygon areas, both on the mean earth
- * radius. Coordinates are [longitude, latitude] in degrees, as GeoJSON has them. */
+/** Distances and areas on the sphere for the map's measuring tool (decisions D139, D171): a
+ * haversine for lengths and the spherical excess formula for polygon areas, both on the mean
+ * earth radius, plus the centre of a drawn circle (D172) and the ring of a radius (the circle
+ * feature and the Locate accuracy ring, D173). Coordinates are [longitude, latitude] in
+ * degrees, as GeoJSON has them. */
 
 export const EARTH_RADIUS_M = 6_371_008.8;
 

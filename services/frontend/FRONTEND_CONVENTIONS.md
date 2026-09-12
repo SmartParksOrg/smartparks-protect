@@ -4,7 +4,7 @@ Rules for `services/frontend`. They exist so every screen behaves the same on a 
 
 ## Stack
 
-React 19, Vite, TypeScript strict, Tailwind 4, shadcn/ui (Radix), TanStack Query, Zustand, React Hook Form with Zod, React Router 7, MapLibre GL JS, Apache ECharts, Vitest, Playwright. `npm run build` runs the type check first; a type error fails the build and the Docker image.
+React 19, Vite, TypeScript strict, Tailwind 4, shadcn/ui (Radix), TanStack Query, Zustand, React Hook Form with Zod, React Router 8, MapLibre GL JS 6, Apache ECharts 6, terra-draw, Vitest, Playwright. `npm run build` runs the type check first; a type error fails the build and the Docker image.
 
 ## Colour system
 
@@ -23,11 +23,11 @@ State colours on the map communicate status, not object type; the icon communica
 
 ## Logo
 
-`src/assets/brand/` holds `logo-stacked.svg` (emblem above wordmark), `logo-wide.svg` (emblem left of wordmark) and `logo-mark.svg` (emblem only), all with `fill="currentColor"`; import them as React components (`import Logo from "@/assets/brand/logo-mark.svg?react"`) so `className="text-primary"` colours them; an `<img>` cannot inherit the colour. `logo-landscape.webp` and `logo-landscape-white.webp` are Smart Parks' own landscape logo (the wide emblem over the wordmark, from the delivered `LOGO_Smartparks_1920x1080` set, brand green and white on transparent, 1600 px), used as an `<img>` where there is room for it: the sign-in card. Use the mark for the favicon, the wide logo in the sidebar's narrow header, the landscape logo where a page shows the brand large.
+`src/assets/brand/` holds `logo-stacked.svg` (emblem above wordmark), `logo-wide.svg` (emblem left of wordmark) and `logo-mark.svg` (emblem only), all with `fill="currentColor"`; import them as React components (`import Logo from "@/assets/brand/logo-mark.svg?react"`) so `className="text-primary"` colours them; an `<img>` cannot inherit the colour. `logo-landscape.webp` and `logo-landscape-white.webp` are Smart Parks' own landscape logo (the wide emblem over the wordmark, from the delivered `LOGO_Smartparks_1920x1080` set, brand green and white on transparent, 1600 px), the brand in the app: the sidebar header and the phone header, each with the product name beside it, and the sign-in card, always as an `<img>`. `logo-mark.svg` is the favicon (`public/favicon.svg`); `logo-wide.svg` and `logo-stacked.svg` are kept and imported by nothing today. Import an SVG as a component (`…svg?react`) when it must inherit `currentColor`; an `<img>` cannot.
 
 ## Map
 
-- One `useMap` hook per map. The MapLibre worker is bundled by Vite (`?worker&url`) and registered with `setWorkerUrl`; do not import MapLibre elsewhere.
+- One `useMap` hook per full map. MapLibre is imported only through `components/map/maplibre.ts`, which bundles the worker with Vite (`?worker&url`) and registers it with `setWorkerUrl`; `MiniMap.tsx` is the one place that builds a map itself, because it wants no gestures, no controls and no strip hosts.
 - Symbol layers use `text-font: ["Noto Sans Regular"]`, the glyphs OpenFreeMap serves. The MapLibre default font is not available there.
 - Marker images come from `components/icons/markers.ts`; never hand-build marker images in a page.
 
@@ -35,7 +35,7 @@ State colours on the map communicate status, not object type; the icon communica
 
 - ECharts through `echarts/core` with only the charts and components a screen uses registered (`components/analytics/SeriesChart.tsx`); never import the full `echarts` bundle.
 - One chart instance per mount, resized by a `ResizeObserver`, options rebuilt from data in an effect; the component owns no data fetching.
-- Series colours come from the brand palette in `SeriesChart.tsx`; a chart never invents colours.
+- Series colours come from the brand palettes in `components/analytics/SeriesChart.tsx` (the analytics charts) and `lib/chartStyle.ts` (the explore canvas); a chart never invents colours.
 - The Data Explorer state lives in the URL (`pages/project/ExplorerPage.tsx`), so a saved view is its search parameters and a link reproduces a view.
 
 ## Z-index ladder
@@ -46,14 +46,13 @@ Do not invent z-index values. Pick the layer; ties are broken by DOM order.
 | --- | --- | --- |
 | Map | 0 | Every map container gets an explicit `z-0` so its internal layers cannot paint over the app. MapLibre's stylesheet sets `position: relative` on its container, so a container that must fill its parent uses `absolute!` (Tailwind important) or an explicit height |
 | In-page sticky | 10 to 30 | Sticky table headers, filter bars, mobile top bar at 30 |
-| Backdrop | 40 | Sidebar drawer backdrop |
+| Content corner | 40 | The system health dot over the page content |
 | App overlays | 50 | Sidebar drawer, dialogs, sheets, dropdowns, popovers, select menus |
-| Fullscreen map | 70 | Map in fullscreen mode |
 | Toasts | 100 | Always on top |
 
 ## Responsive rules
 
-- Target viewports: phone 390 px, tablet 768 px, desktop 1440 px. The screenshot sweep (phase 3) opens every route at all three.
+- Target viewports: phone 390 px, tablet 768 px, desktop 1440 px. The screenshot sweep (`npm run sweep`) opens every route at all three.
 - The page body never scrolls horizontally. Wide content (tables, charts, code) scrolls inside its own `overflow-x-auto` container. A card or grid item that holds such content needs `min-w-0` (the shared `Card` has it), otherwise the intrinsic width of a table with non-wrapping headers widens the page and clips everything at the edge; the sweep does not catch this because `main` scrolls, so measure `main.scrollWidth` when in doubt.
 - Branch on width with `useIsPhone()` from `hooks/useMediaQuery.ts` or Tailwind's `sm:` classes, never with `window.innerWidth` in render. Long labels on phone buttons wrap (`h-auto whitespace-normal`) rather than overflow.
 - Charts that become unreadable when squeezed get a minimum drawn width and scroll.
@@ -63,7 +62,7 @@ Do not invent z-index values. Pick the layer; ties are broken by DOM order.
 ## State
 
 - Filters and selection live in the URL (`useSearchParams`). The URL is the only state for anything a user might bookmark or share.
-- Server data lives in TanStack Query. Query keys come from a `queryKeys` factory (phase 1), never inline arrays.
+- Server data lives in TanStack Query. Query keys come from the `queryKeys` factory in `src/api/queryKeys.ts`, never inline arrays.
 - Client state that must outlive a component (auth, selected project, long-running uploads) lives in a Zustand store. Do not use React Context for these.
 
 ## Forms
@@ -72,7 +71,7 @@ React Hook Form with a Zod schema per form. The schema is the single place for c
 
 ## API access
 
-A typed `fetch` wrapper in `src/api/client.ts` (phase 1) attaches the token, returns typed errors and never redirects with `window.location`. Domain modules (`src/api/devices.ts`, ...) export plain objects of functions. Types are generated from the API's OpenAPI schema.
+A typed `fetch` wrapper in `src/api/client.ts` attaches the token, returns typed errors and never redirects with `window.location`. Pages and hooks call it directly inside a TanStack Query `queryFn`, with the key from `src/api/queryKeys.ts` and the types from `src/api/types.ts`, aliases over the generated `schema.d.ts`; there are no per-domain API modules.
 
 ## Components
 
@@ -84,7 +83,7 @@ A typed `fetch` wrapper in `src/api/client.ts` (phase 1) attaches the token, ret
 ## Testing
 
 - Vitest with Testing Library for components and hooks. A test per component that has logic.
-- Playwright smoke (phase 3) logs in and opens every route at the three viewports, fails on console errors and horizontal overflow.
+- Playwright smoke logs in and opens every route at the three viewports, fails on console errors and horizontal overflow.
 
 ## Text people read
 

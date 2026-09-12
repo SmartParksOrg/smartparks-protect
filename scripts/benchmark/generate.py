@@ -12,8 +12,8 @@ jitter; positions walk around a home range inside one of eight parks; four measu
 with every position (battery, temperature, activity, satellites). Rows go in with COPY, in
 time blocks (oldest first, decision D91) from several connections, and `--compress` compresses
 the chunks behind the write frontier so the disk holds compressed history plus one block. Raw
-source events are not generated: they would
-double the volume and the ingest benchmark produces real ones.
+source events are not generated: they would double the volume and the ingest benchmark
+produces real ones.
 
 Everything the generator creates is named `bench-...` or lives in a `Benchmark ...` project,
 so `--reset` can remove it again.

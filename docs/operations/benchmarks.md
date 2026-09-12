@@ -1,12 +1,12 @@
 # Benchmarks
 
-Results of `scripts/benchmark/run.py` against `scripts/benchmark/generate.py` data on the dev server (DigitalOcean, 4 vCPU, 8 GB, ams3). Budgets come from architecture 13.7 and 13.8; they are development budgets, not service levels. Rerun both scripts to refresh this page.
+Results of `scripts/benchmark/run.py` against `scripts/benchmark/generate.py` data, measured on the dev server (DigitalOcean, 4 vCPU, 8 GB, ams3) on 2026-09-05. The dataset was removed from the dev server on 2026-09-12, so this page is the record of that run; to refresh it, regenerate the data locally or on a throwaway server (`uv run scripts/benchmark/generate.py --scale 0.2`, `--reset` removes it again) and rerun `run.py`. Budgets come from architecture 13.7 and 13.8; they are development budgets, not service levels.
 
 Last run: 2026-09-05 09:26 UTC.
 
 ## Dataset
 
-| | Whole database | Benchmark project |
+| The dataset of the run (2026-09-05; none of these rows exist any more) | Whole database | Benchmark project |
 | --- | --- | --- |
 | Project | all | Benchmark Kruger |
 | Devices | 2,001 | |

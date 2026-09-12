@@ -1,5 +1,6 @@
-"""Gateways and connectivity health (architecture 20, decision D66): the registry per project
-(gateways that received the project's devices), gateway detail with per-device statistics,
+"""Gateways and connectivity health (architecture 20, decisions D66 and D175): the registry per
+project (every gateway of the sources the project's devices have an identity on, the hearing
+ones first), gateway detail with per-device statistics,
 gateway diversity and best-gateway analysis per device, and the server-level registry with
 administrator overrides."""
 

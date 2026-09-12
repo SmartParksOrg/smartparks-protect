@@ -1,7 +1,8 @@
 """Ingest service: runs the event connector of every enabled data source whose adapter has one
 (MQTT, polling, websocket). Push sources arrive through the API. Data sources are re-read every
 minute so a new or changed source starts without a restart. Every received message becomes a
-source event and a bus message.
+source event and a bus message. The service also reads every listing adapter's gateway list
+two minutes after start and daily (the gateway sync, decision D176).
 """
 
 import asyncio

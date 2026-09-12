@@ -149,3 +149,6 @@ nav:
       - adr/0023-satellite-session-metadata.md
       - adr/0024-network-locations.md
       - adr/0025-entity-type-catalogue.md
+      - adr/0026-draw-and-measure-one-engine.md
+      - adr/0027-gateways-page-scope-and-daily-sync.md
+      - adr/0028-live-map-feed-and-health-dot.md

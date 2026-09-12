@@ -75,7 +75,7 @@ Rules are JSON documents validated by `shared/rules/schema.py`; the JSON schema 
 
 ## Events and alerts
 
-An event is a fact: a geofence exit, a low battery, a species detection from a device or an integration. An alert is an event that needs a person; it is open, acknowledged or resolved, with the actor, time and a note recorded. Alerts live in the Alerts inbox; every event has a detail page with its context, alert and the deliveries of the automations that acted on it. Events with a location show on the live map for the last 24 hours with the event marker family, so an event never looks like an entity.
+An event is a fact: a geofence exit, a low battery, a species detection from a device or an integration. An alert is an event that needs a person; it is open, acknowledged or resolved, with the actor, time and a note recorded. Alerts live in the Alerts inbox; every event has a detail page with its context, alert and the deliveries of the automations that acted on it, and in the live map's feed, where an open alert can be acknowledged from its row and a new one announces itself with a toast while the map is open (ADR 0028). Events with a location show on the live map for the last 24 hours with the event marker family, so an event never looks like an entity.
 
 Late data: every event carries the age of the sample that produced it. Rules evaluate offloaded history for completeness; [automations](automations.md) skip events older than their freshness bound so a log upload never pages anyone about last month.
 

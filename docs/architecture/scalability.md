@@ -1,6 +1,6 @@
 # Scalability
 
-What the phase 4 benchmark showed, what it means for the reference envelope (architecture 13.1: 25,000 devices, 250 million positions, one billion measurements, 250 source events per second sustained), and what was changed because of it. The numbers are from `docs/operations/benchmarks.md`; rerun the scripts to refresh them.
+What the phase 4 benchmark showed, what it means for the reference envelope (architecture 13.1: 25,000 devices, 250 million positions, one billion measurements, 250 source events per second sustained), and what was changed because of it. The numbers are from `docs/operations/benchmarks.md`; measured on 2026-09-05; the dataset was removed from the dev server on 2026-09-12, so refreshing them means regenerating it with `scripts/benchmark/generate.py` first.
 
 ## Dataset
 

@@ -1,5 +1,6 @@
 """Network section: LoRaWAN traffic (architecture 8.3), trace search (26.3) and system health
-(26.2, basic). Traffic and traces are read per project; health is server admin."""
+(26.2, basic). Traffic and traces are read per project; `/system/health` is server admin,
+`/system/status` (the health dot, decision D181) is any signed-in account."""
 
 import uuid
 from collections.abc import Sequence

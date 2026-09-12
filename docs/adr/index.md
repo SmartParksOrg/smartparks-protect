@@ -8,7 +8,7 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 | --- | --- | --- |
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | accepted |
 | [0002](0002-start-from-scratch.md) | Start from scratch, reuse AddaxAI Connect patterns | accepted |
-| [0003](0003-postgresql-timescaledb-postgis.md) | PostgreSQL 17 with TimescaleDB and PostGIS from migration 1 | accepted, gate in phase 4 |
+| [0003](0003-postgresql-timescaledb-postgis.md) | PostgreSQL 17 with TimescaleDB and PostGIS from migration 1 | accepted, confirmed at the phase 4 gate on 2026-09-03 |
 | [0004](0004-redis-streams-event-bus.md) | Redis Streams as the event bus | accepted |
 | [0005](0005-backend-and-frontend-stack.md) | Backend and frontend stack | accepted |
 | [0006](0006-schema-versioning.md) | Schema versioning for bus messages, webhooks and API responses | accepted |
@@ -31,3 +31,6 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0023 The satellite session behind an Iridium delivery](0023-satellite-session-metadata.md)
 - [0024 Network health apart from device health, and the locations a network provides](0024-network-locations.md)
 - [0025 Entity types with sub-types and a standard catalogue](0025-entity-type-catalogue.md)
+- [0026 One drawing engine for draw and measure, and a circle as a polygon that remembers its centre and radius](0026-draw-and-measure-one-engine.md)
+- [0027 The Gateways page shows a project's whole network, and the gateway list is synced daily](0027-gateways-page-scope-and-daily-sync.md)
+- [0028 The live map's feed, unread as a seen-up-to time per person, and a health dot slow to worry](0028-live-map-feed-and-health-dot.md)

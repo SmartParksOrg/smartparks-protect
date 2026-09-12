@@ -12,11 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 /**
- * The map's control strip (phase 19, decision D137): one vertical column of square icon buttons
- * in the top right under MapLibre's own zoom and locate controls, rendered into a MapLibre
- * control host so it stacks with them at any height. One style for every control: the card
+ * The map's control strip (phase 19, decision D137): one column of square icon buttons,
+ * rendered into a MapLibre control host top right (the tools), bottom right (zoom, north and
+ * Locate, decision D173) or straight into the page top left (Layers and Feed, decision D174). One style for every control: the card
  * colour, a tooltip with the name, the active one filled, a count badge where a control has one.
- * Later parts add rows (heatmap, draw, measure, terrain) without touching the layout.
  */
 export interface StripButton {
   kind?: "button";
