@@ -13,18 +13,34 @@ from sqlalchemy import select
 from shared.bus import RedisStreamsBus
 from shared.connectivity.base import InboundMessage
 from shared.connectivity.channels import channel_enabled, stream_channel_key
+from shared.connectivity.gateway_sync import sync_all_gateways
 from shared.connectivity.registry import ADAPTERS
 from shared.connectivity.state import report_connector
 from shared.database import session_scope
 from shared.ingest import commit_and_publish, data_source_context, store_inbound
 from shared.logger import get_logger
 from shared.models import DataSource
+from shared.timeutil import utc_now
 from shared.worker import Worker
 
 log = get_logger("ingest")
 
 RELOAD_SECONDS = 60
 RESTART_SECONDS = 10
+GATEWAY_SYNC_SECONDS = 24 * 3600
+GATEWAY_SYNC_FIRST_DELAY = 120
+
+
+async def gateway_sync_loop() -> None:
+    """The gateway sync (decision D176) once after start, then daily."""
+    await asyncio.sleep(GATEWAY_SYNC_FIRST_DELAY)
+    while True:
+        try:
+            async with session_scope() as session:
+                await sync_all_gateways(session, utc_now())
+        except Exception:
+            log.error("gateway sync pass failed", exc_info=True)
+        await asyncio.sleep(GATEWAY_SYNC_SECONDS)
 
 
 class ConnectorRunner:
@@ -108,6 +124,7 @@ def main() -> None:
     worker = Worker("ingest")
     runner = ConnectorRunner(worker.bus)
     worker.background(runner.run)
+    worker.background(gateway_sync_loop)
     asyncio.run(worker.run())
 
 

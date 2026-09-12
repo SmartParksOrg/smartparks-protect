@@ -110,6 +110,8 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
                     status="offline",
                     latitude=-24.7,
                     longitude=31.3,
+                    # a row made from a reception had no attributes document yet (2026-09-12)
+                    attributes={"description": "on the water tower"},
                 ),
                 GatewayUpdate(gateway_id="gw-c", name="Spare", status="unknown"),
             ]
@@ -128,7 +130,14 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     ).json()
     by_id = {g["external_id"]: g for g in registry["items"]}
     assert by_id["gw-b"]["name"] == "South mast" and by_id["gw-b"]["status"] == "offline"
+    assert by_id["gw-b"]["attributes"] == {"description": "on the water tower"}
     assert by_id["gw-c"]["status"] == "unknown" and by_id["gw-c"]["geometry"] is None
+    # the project page lists every gateway of its sources: the silent one last, with nothing
+    # heard (decision D175); another project's sources stay out
+    listed = (await client.get(f"{base}/gateways", headers=h)).json()
+    assert [g["external_id"] for g in listed] == ["gw-a", "gw-b", "gw-c"]
+    assert listed[2]["display_name"] == "Spare" and listed[2]["receptions"] == 0
+    assert (await client.get(f"/api/v1/projects/{other.id}/gateways", headers=h)).json() == []
 
     generic = await client.post(
         "/api/v1/data-sources",
@@ -138,6 +147,12 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     assert (
         await client.post(f"/api/v1/data-sources/{generic.json()['id']}/sync-gateways", headers=h)
     ).status_code == 422
+    # the daily pass (decision D176) takes every source that lists gateways and skips the rest
+    from shared.connectivity.gateway_sync import sync_all_gateways
+    from shared.timeutil import utc_now
+
+    passed = await sync_all_gateways(db, utc_now(), require_channel=False)
+    assert passed.get(source["name"]) == 2 and generic.json()["name"] not in passed
 
     # viewers cannot reach the server registry
     from shared.enums import Role

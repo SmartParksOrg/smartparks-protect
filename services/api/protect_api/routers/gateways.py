@@ -4,7 +4,7 @@ gateway diversity and best-gateway analysis per device, and the server-level reg
 administrator overrides."""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -30,7 +30,7 @@ from protect_api.schemas.integrations import (
 )
 from shared.database import get_session
 from shared.domain.links import resolve_links
-from shared.models import DataSource, Device, Gateway, GatewayReception
+from shared.models import DataSource, Device, ExternalIdentity, Gateway, GatewayReception
 from shared.permissions import Permission
 from shared.timeutil import utc_now
 
@@ -127,27 +127,32 @@ async def project_gateways(
     limit: int = Query(200, ge=1, le=500),
     session: AsyncSession = Depends(get_session),
 ) -> list[GatewayRead]:
-    """Gateways that received the project's devices in the window, busiest first."""
+    """Every gateway of the data sources the project's devices have an identity on (decision
+    D175): the ones that received the project's devices in the window busiest first, then the
+    silent ones, most recently seen first; the all scope lists the whole registry."""
     since, until = _window(hours)
     device_ids = await _scope_device_ids(session, context, since, until)
     stats = await _reception_stats(session, device_ids, since, until)
-    if not stats:
-        return []
-    gateways = (
-        await session.scalars(
-            select(Gateway).where(
-                Gateway.data_source_id.in_({k[0] for k in stats}),
-                Gateway.external_id.in_({k[1] for k in stats}),
+    statement = select(Gateway)
+    if not context.is_all:
+        if not device_ids:
+            return []
+        source_ids = set(
+            await session.scalars(
+                select(ExternalIdentity.data_source_id)
+                .where(ExternalIdentity.device_id.in_(device_ids))
+                .distinct()
             )
-        )
-    ).all()
+        ) | {k[0] for k in stats}
+        statement = statement.where(Gateway.data_source_id.in_(source_ids))
+    gateways = (await session.scalars(statement)).all()
     sources = await _sources(session, {g.data_source_id for g in gateways})
     items = [
         gateway_read(g, sources.get(g.data_source_id), stats.get((g.data_source_id, g.external_id)))
         for g in gateways
-        if (g.data_source_id, g.external_id) in stats
     ]
-    items.sort(key=lambda g: g.receptions, reverse=True)
+    floor = datetime.min.replace(tzinfo=UTC)
+    items.sort(key=lambda g: (g.receptions, g.last_seen_at or floor), reverse=True)
     return items[:limit]
 
 

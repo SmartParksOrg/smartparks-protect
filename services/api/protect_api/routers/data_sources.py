@@ -29,11 +29,12 @@ from protect_api.schemas.integrations import CursorReset, GatewaySyncResult
 from shared.config import get_settings
 from shared.connectivity.base import AdapterCapabilities, DataSourceContext
 from shared.connectivity.channels import api_channel_key, channel_enabled
+from shared.connectivity.gateway_sync import gateway_lister, sync_source_gateways
 from shared.connectivity.registry import ADAPTERS, channels_of, describe_adapter
 from shared.connectivity.state import read_api_test, read_connector, report_api_test
 from shared.connectivity.transports.http import hash_token, new_webhook_token
 from shared.database import get_session
-from shared.ingest import apply_gateway_update, data_source_context
+from shared.ingest import data_source_context
 from shared.models import (
     Command,
     DataSource,
@@ -734,36 +735,30 @@ async def sync_gateways(
 ) -> GatewaySyncResult:
     """Read the platform's gateway list into the registry: names, locations, states."""
     source = await get_or_404(session, DataSource, data_source_id, "Data source")
-    adapter = ADAPTERS.get(source.adapter_key)
-    factory = getattr(adapter, "management_connector", None)
-    connector = factory(data_source_context(source)) if factory else None
-    lister = getattr(connector, "list_gateway_updates", None)
+    lister = gateway_lister(source)
     if lister is None:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "this data source's adapter does not list gateways",
         )
     try:
-        updates = await lister()
+        synced = await sync_source_gateways(session, source, lister, utc_now())
     except ApplicationError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
     except httpx.HTTPError as error:
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, f"platform unreachable: {error}"
         ) from error
-    now = utc_now()
-    for update in updates:
-        await apply_gateway_update(session, source.id, update, now)
     await record_audit(
         session,
         user=user,
         action="data_source.gateways_synced",
         object_type="data_source",
         object_id=str(source.id),
-        details={"synced": len(updates)},
+        details={"synced": synced},
     )
     await session.commit()
-    return GatewaySyncResult(synced=len(updates))
+    return GatewaySyncResult(synced=synced)
 
 
 @router.get("/{data_source_id}", response_model=DataSourceRead)

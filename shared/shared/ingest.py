@@ -137,6 +137,8 @@ async def apply_gateway_update(
             external_id=gateway_id,
             first_seen_at=seen,
             status=ConnectivityStatus.UNKNOWN,
+            stats={},
+            attributes={},
         )
         session.add(gateway)
     if gateway.last_seen_at is None or seen > gateway.last_seen_at:
@@ -170,11 +172,13 @@ async def apply_gateway_update(
             gateway.location_at = seen
             if update.altitude_m is not None:
                 gateway.altitude_m = float(update.altitude_m)
+    # a row created from a reception earlier in this session still reads the column defaults
+    # as None until it is refreshed, so the merges start from an empty document
     if update.stats:
-        gateway.stats = {**gateway.stats, **update.stats}
+        gateway.stats = {**(gateway.stats or {}), **update.stats}
         gateway.last_stats_at = seen
     if update.attributes:
-        gateway.attributes = {**gateway.attributes, **update.attributes}
+        gateway.attributes = {**(gateway.attributes or {}), **update.attributes}
     await session.flush()
     return gateway
 

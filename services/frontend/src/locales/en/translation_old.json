@@ -87,6 +87,7 @@
   "No devices are assigned to this project.": "No devices are assigned to this project.",
   "No entities yet.": "No entities yet.",
   "No features yet.": "No features yet.",
+  "No gateway received this project's devices in the window. Gateways appear from the receptions a network reports; the platform's gateway list can be synced under Server admin, Data sources.": "No gateway received this project's devices in the window. Gateways appear from the receptions a network reports; the platform's gateway list can be synced under Server admin, Data sources.",
   "No groups yet. Groups let you filter the lists and show or hide parts of the map.": "No groups yet. Groups let you filter the lists and show or hide parts of the map.",
   "No measurements in this range.": "No measurements in this range.",
   "No members yet.": "No members yet.",
@@ -129,6 +130,7 @@
   "sites, zones, geofences, routes": "sites, zones, geofences, routes",
   "SNR": "SNR",
   "stale,": "stale,",
+  "Tap the centre, then tap again at the radius; Escape cancels.": "Tap the centre, then tap again at the radius; Escape cancels.",
   "Technical details": "Technical details",
   "The client runs on this computer (it returns to": "The client runs on this computer (it returns to",
   "the newest {{count}} of {{total}} points over {{length}}_one": "the newest {{count}} of {{total}} points over {{length}}",
@@ -144,6 +146,7 @@
   "Valid from": "Valid from",
   "view": "view",
   "When": "When",
+  "Which gateways hear this project's devices, and how well every device is covered. Network health is not device health: a device can be healthy but poorly connected.": "Which gateways hear this project's devices, and how well every device is covered. Network health is not device health: a device can be healthy but poorly connected.",
   "Workers without a heartbeat for 15 minutes:": "Workers without a heartbeat for 15 minutes:",
   "Would": "Would"
 }

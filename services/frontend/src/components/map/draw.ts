@@ -105,6 +105,8 @@ export function createDrawSession(
       }),
       new TerraDrawCircleMode({
         segments: 64,
+        // a drag from the centre on a phone, a click, a move and a click with a mouse
+        drawInteraction: "click-move-or-drag",
         keyEvents: { cancel: "Escape", finish: "Enter" },
         styles: {
           fillColor: LIGHT,

@@ -96,7 +96,7 @@ export function DrawBar({
             ? t("Tap the map to place the point.")
             : kind === "circle"
               ? t(
-                  "Tap the centre, then tap again at the radius; Escape cancels.",
+                  "Drag from the centre to the radius, or click the centre, move and click again; Escape cancels.",
                 )
               : t(
                   "Tap the map to add vertices, tap the last one again or press Enter to finish, Escape to cancel.",

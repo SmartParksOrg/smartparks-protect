@@ -9,6 +9,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 - The MinIO server and client images come from `quay.io/minio/...` now: MinIO's repositories disappeared from Docker Hub on 2026-09-11 (a pull answers "access denied", the repository page 404). The tags and digests are the same; a server pulls each image once more from Quay on its next update.
 
 ### Added
+- Gateways page (decisions D175, D176): every gateway of the data sources the project's devices use, the ones that heard nothing in the window last with a count in the footer, a source filter, and the platform's gateway list (names, locations, states) read daily by the ingest service as well as on Sync gateways.
 - Live map, the controls (phase 24, decisions D171 to D174): Draw and Measure place a marker on every tap, show the length, area or radius while drawing, let vertices be dragged before the shape is kept, and offer a circle, saved as a polygon that remembers its centre and radius and is named with it in the feature panel; zoom, reset north and Locate are the map's own buttons at the bottom right, one size with the rest, and Locate is a toggle that follows the device's position until pressed again; the Layers button is the filled green one top left with the count of layers showing something; 3D terrain sits under the base map, the Tracks and Heatmaps buttons show only while a track or a heatmap is on; the layers panel's tabs scroll on a phone.
 
 - The sign-in card carries Smart Parks' landscape logo (the wide emblem over the wordmark, from the delivered logo set) instead of the stacked one, and sits centred; the card header had been a grid that left the logo at the start.
@@ -20,6 +21,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 - Rock7 RockBLOCK adapter (decision D156) for the Iridium modems still on Rock 7 Core: deliveries as a form or JSON through the source's webhook URL, commands through the MT web service with the portal login, the answer read by code, a connection probe; the ingest route accepts form-encoded bodies.
 
 ### Fixed
+- Sync gateways on a data source crashed with a 500 when a gateway row had been created from a reception in the same run (its attributes read as None before a refresh); the merge starts from an empty document now.
+- A circle drawn with two taps on a phone had no radius; the circle mode takes a drag from the centre as well.
 
 - The new entity made from the device page starts with the device's name filled in, not only shown as a placeholder, so a collar named after its animal needs no typing.
 - The Assign button of the device page's dialog stayed grey without a word while the entity, or the new entity's name or type, was still missing, which read as a button that cannot be pressed. It presses now and names the missing field. Found by Tim on 2026-09-12 with SP051890.

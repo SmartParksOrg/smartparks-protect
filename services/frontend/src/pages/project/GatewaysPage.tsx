@@ -64,6 +64,8 @@ export function GatewaysPage() {
   const tab =
     params.get("tab") === "connectivity" ? "connectivity" : "gateways";
   const hours = Number(params.get("hours") ?? 24) || 24;
+  // the source filter (Tim, 2026-09-12): one data source's gateways, or all of them
+  const sourceFilter = params.get("source") ?? "all";
   const base = `/api/v1/projects/${projectId}`;
   const gateways = useQuery({
     queryKey: queryKeys.gateways(projectId, hours),
@@ -80,6 +82,19 @@ export function GatewaysPage() {
     enabled: tab === "connectivity",
     refetchInterval: 30_000,
   });
+  const sources = Array.from(
+    new Map(
+      (gateways.data ?? []).map((g) => [
+        g.data_source_id,
+        g.data_source_name ?? g.data_source_id,
+      ]),
+    ),
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+  const shown =
+    sourceFilter === "all"
+      ? gateways.data
+      : gateways.data?.filter((g) => g.data_source_id === sourceFilter);
+  const silent = shown?.filter((g) => g.receptions === 0).length ?? 0;
   const [selected, setSelected] = useState<Gateway | null>(null);
   const detail = useQuery({
     queryKey: queryKeys.gateway(projectId, selected?.id ?? "", hours),
@@ -205,7 +220,7 @@ export function GatewaysPage() {
       <PageHeader
         title={t("Gateways")}
         description={t(
-          "Which gateways hear this project's devices, and how well every device is covered. Network health is not device health: a device can be healthy but poorly connected.",
+          "The gateways of this project's networks, which of them hear its devices, and how well every device is covered. Network health is not device health: a device can be healthy but poorly connected.",
         )}
         actions={
           <Button asChild variant="outline" size="sm">
@@ -259,6 +274,33 @@ export function GatewaysPage() {
               ))}
             </SelectContent>
           </Select>
+          {tab === "gateways" && sources.length > 1 && (
+            <Select
+              value={sourceFilter}
+              onValueChange={(v) =>
+                setParams(
+                  (p) => {
+                    if (v === "all") p.delete("source");
+                    else p.set("source", v);
+                    return p;
+                  },
+                  { replace: true },
+                )
+              }
+            >
+              <SelectTrigger className="w-48" aria-label={t("Source")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All sources")}</SelectItem>
+                {sources.map(([id, name]) => (
+                  <SelectItem key={id} value={id}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         {(gateways.error ?? connectivity.error) && (
           <Callout kind="error">
@@ -268,15 +310,21 @@ export function GatewaysPage() {
         {tab === "gateways" ? (
           <DataTable
             columns={columns}
-            data={gateways.data}
+            data={shown}
             searchable
             isLoading={gateways.isPending}
             emptyMessage={t(
-              "No gateway received this project's devices in the window. Gateways appear from the receptions a network reports; the platform's gateway list can be synced under Server admin, Data sources.",
+              "No gateway known for this project's data sources yet. Gateways appear from the receptions a network reports and from the platform's gateway list, read every day and on Sync gateways under Server admin, Data sources.",
             )}
             onRowClick={(g) => setSelected(g)}
             footer={
-              gateways.data && `${gateways.data.length} gateways, busiest first`
+              shown &&
+              (silent > 0
+                ? t(
+                    "{{count}} gateways, busiest first; {{silent}} heard none of the project's devices in the window",
+                    { count: shown.length, silent },
+                  )
+                : t("{{count}} gateways, busiest first", { count: shown.length }))
             }
           />
         ) : (
