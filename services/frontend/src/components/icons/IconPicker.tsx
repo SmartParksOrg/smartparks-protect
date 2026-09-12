@@ -27,7 +27,7 @@ export function IconPicker({ id, value, onChange, className }: { id?: string; va
   };
   const chosen = value ? registry[value] : undefined;
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button id={id} type="button" variant="outline" role="combobox" aria-expanded={open} className={cn("w-full justify-between font-normal", className)}>
           <span className={cn("inline-flex min-w-0 items-center gap-2", !chosen && "text-muted-foreground")}>

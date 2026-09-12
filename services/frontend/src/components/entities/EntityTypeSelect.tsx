@@ -44,7 +44,7 @@ export function EntityTypeSelect({ id, projectId, value, onChange, disabled, non
           ))}
         </SelectContent>
       </Select>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal>
         <PopoverTrigger asChild>
           <Button id={`${id}-subtype`} type="button" variant="outline" role="combobox" aria-expanded={open} aria-label={t("Sub-type")} disabled={disabled || !typeId || subtypes.length === 0} className="w-full justify-between font-normal">
             <span className={cn("inline-flex min-w-0 items-center gap-2", !chosenSubtype && "text-muted-foreground")}>
