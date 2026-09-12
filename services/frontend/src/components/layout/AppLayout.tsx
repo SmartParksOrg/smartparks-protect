@@ -85,7 +85,8 @@ export function AppLayout() {
           >
             <Menu className="size-5" />
           </Button>
-          <img src={logoLandscape} alt={t("Smart Parks Protect")} className="h-7 w-auto" />
+          <img src={logoLandscape} alt="" className="h-7 w-auto" />
+          <span className="font-medium">{t("Smart Parks Protect")}</span>
           <HealthDot className="ml-auto" />
         </header>
         {/* the health dot in the top right corner of the content (decision D181), inside the

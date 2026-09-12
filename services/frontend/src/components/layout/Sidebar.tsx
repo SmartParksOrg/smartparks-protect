@@ -80,8 +80,11 @@ export function Sidebar({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center px-4 py-4">
-        <img src={logoLandscape} alt={t("Smart Parks Protect")} className="h-12 w-auto" />
+      <div className="flex items-center gap-2 px-4 py-4">
+        <img src={logoLandscape} alt="" className="h-10 w-auto" />
+        <span className="text-sm font-semibold leading-tight">
+          {t("Smart Parks Protect")}
+        </span>
         {collapsible && (
           <Button
             variant="ghost"
