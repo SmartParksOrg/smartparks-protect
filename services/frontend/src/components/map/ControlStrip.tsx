@@ -27,6 +27,8 @@ export interface StripButton {
   disabled?: boolean;
   /** A small count on the button, for example the number of tracks on. */
   badge?: number;
+  /** The one filled button when not active as well (the Layers button, decision D174). */
+  emphasis?: boolean;
   onClick: () => void;
 }
 
@@ -50,9 +52,9 @@ function StripButtonView({ item }: { item: StripButton }) {
     <span className="relative">
       <Button
         type="button"
-        variant={item.active ? "default" : "outline"}
+        variant={item.active || item.emphasis ? "default" : "outline"}
         size="icon"
-        className={item.active ? "size-9 rounded-md shadow-sm" : BUTTON}
+        className={item.active || item.emphasis ? "size-9 rounded-md shadow-sm" : BUTTON}
         aria-label={item.label}
         aria-pressed={item.active}
         title={item.label}
@@ -105,16 +107,20 @@ function StripMenuView({ item }: { item: StripMenu }) {
 export function ControlStrip({
   items,
   children,
+  label,
+  className = "flex flex-col gap-1.5",
 }: {
   items: StripItem[];
   children?: ReactNode;
+  label?: string;
+  className?: string;
 }) {
   const { t } = useTranslation();
   return (
     <div
-      className="flex flex-col gap-1.5"
+      className={className}
       role="toolbar"
-      aria-label={t("Map tools")}
+      aria-label={label ?? t("Map tools")}
       aria-orientation="vertical"
     >
       {items.map((item) =>

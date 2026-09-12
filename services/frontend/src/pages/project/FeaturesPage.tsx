@@ -76,7 +76,7 @@ function DrawMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    const s = createDrawSession(map, onChange);
+    const s = createDrawSession(map, (state) => onChange(state.geometry));
     session.current = s;
     s.begin(drawKind);
     return () => {

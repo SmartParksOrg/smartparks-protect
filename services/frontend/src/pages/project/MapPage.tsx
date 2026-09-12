@@ -1,15 +1,20 @@
 import { useTranslation } from "react-i18next";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Compass,
   Flame,
   Layers,
   ListTree,
+  LocateFixed,
+  Minus,
   Mountain,
   PenLine,
+  Plus,
   Route,
   Ruler,
 } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
+import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -76,24 +81,28 @@ import {
   trackPointKey,
 } from "@/components/map/layers";
 import {
+  coverageGatewayIds,
   DEFAULT_LAYERS,
+  isDeviceShown,
   isEventVisible,
   isFeatureVisible,
-  isDeviceShown,
   isGatewayVisible,
   isVisible,
   type LayerChoices,
-  coverageGatewayIds,
   revealDevice,
   revealEntity,
   revealFeature,
   revealGateway,
+  shownLayerCount,
 } from "@/components/map/layerChoices";
 import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
+import { type LocateStatus, startLocate } from "@/components/map/locate";
 import {
-  createDrawSession,
   type DrawKind,
   type DrawSession,
+  type DrawState,
+  EMPTY_DRAW,
+  createDrawSession,
 } from "@/components/map/draw";
 import {
   DrawBar,
@@ -131,6 +140,7 @@ import { useNow } from "@/hooks/useNow";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useMapConfig } from "@/hooks/useMapConfig";
 import { EventDetailDialog } from "@/pages/project/EventsPage";
+import { circleRing } from "@/lib/geodesy";
 import { isAllProjects } from "@/lib/scope";
 import { canAdmin, useProjectRole, useProjects } from "@/hooks/useProjects";
 import { useMutationToast } from "@/hooks/useMutationToast";
@@ -224,7 +234,7 @@ export function MapPage() {
   const basemaps = useMemo(() => basemapsFor(maptilerKey), [maptilerKey]);
   const [terrainOn, setTerrainOn] = usePreference<boolean>("terrain", false);
   const container = useRef<HTMLDivElement | null>(null);
-  const { mapRef, ready, stripHost } = useMap(
+  const { mapRef, ready, stripHost, zoomHost } = useMap(
     container,
     basemapStyle(basemap, basemaps),
     [31.5, -24.9],
@@ -620,7 +630,7 @@ export function MapPage() {
   const canEdit = canAdmin(role) || Boolean(user?.is_superuser);
   const [tool, setTool] = useState<"draw" | "measure" | null>(null);
   const [drawKind, setDrawKind] = useState<DrawKind>("polygon");
-  const [drawn, setDrawn] = useState<GeoJSON.Geometry | null>(null);
+  const [drawn, setDrawn] = useState<DrawState>(EMPTY_DRAW);
   const [saveOpen, setSaveOpen] = useState(false);
   const drawSession = useRef<DrawSession | null>(null);
   const endTool = useCallback(() => {
@@ -628,9 +638,25 @@ export function MapPage() {
     setSaveOpen(false);
   }, []);
   const createFeature = useMutationToast({
+    // a circle is kept as its polygon with the centre and radius in the attributes (D172)
     mutationFn: (values: SaveFeatureValues) =>
       api.post<Feature>(`/api/v1/projects/${projectId}/features`, {
-        body: { ...values, geometry: drawn },
+        body: drawn.circle
+          ? {
+              ...values,
+              geometry: {
+                type: "Polygon",
+                coordinates: [
+                  circleRing(drawn.circle.centre, drawn.circle.radius_m),
+                ],
+              },
+              attributes: {
+                shape: "circle",
+                centre: drawn.circle.centre,
+                radius_m: Math.round(drawn.circle.radius_m),
+              },
+            }
+          : { ...values, geometry: drawn.geometry },
       }),
     invalidate: [queryKeys.features(projectId)],
     success: t("Feature created"),
@@ -858,7 +884,7 @@ export function MapPage() {
     return () => {
       session.destroy();
       drawSession.current = null;
-      setDrawn(null);
+      setDrawn(EMPTY_DRAW);
     };
     // the kind is applied through `begin` in changeDrawKind, not by recreating the session
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -867,6 +893,34 @@ export function MapPage() {
     setDrawKind(kind);
     drawSession.current?.begin(kind);
   };
+
+  // Locate (decision D173): a toggle that watches the browser's position and follows it
+  const [locate, setLocate] = useState<LocateStatus>("off");
+  const locateSession = useRef<ReturnType<typeof startLocate> | null>(null);
+  const toggleLocate = useCallback(() => {
+    const map = mapRef.current;
+    if (locateSession.current) {
+      locateSession.current.stop();
+      locateSession.current = null;
+      return;
+    }
+    if (!map) return;
+    locateSession.current = startLocate(map, setLocate);
+  }, [mapRef]);
+  useEffect(() => {
+    if (locate === "denied") {
+      locateSession.current?.stop();
+      locateSession.current = null;
+      toast.error(t("Your position is not available; check the browser's location permission"));
+    }
+  }, [locate, t]);
+  useEffect(
+    () => () => {
+      locateSession.current?.stop();
+      locateSession.current = null;
+    },
+    [ready],
+  );
 
   // the clicked track point stays highlighted while its panel is open
   useEffect(() => {
@@ -1247,6 +1301,8 @@ export function MapPage() {
   ]);
 
   const tracksOn = trackedIds.length + trackedDeviceIds.length > 0;
+  // the layout of the controls (decision D174): base map with terrain under it, draw and
+  // measure, then tracks and heatmaps only while one is on
   const stripItems: StripItem[] = [
     {
       kind: "menu",
@@ -1263,24 +1319,17 @@ export function MapPage() {
         saveBasemap(v as BasemapKey);
       },
     },
-    {
-      key: "layers",
-      icon: ListTree,
-      label: t("Layers"),
-      active: panelOpen,
-      onClick: () => setPanelOpen(!panelOpen),
-    },
-    {
-      key: "tracks",
-      icon: Route,
-      label: tracksOn
-        ? t("Tracks, {{length}}", { length: trackLengthLabel })
-        : t("Show a track from an entity or device panel"),
-      active: tracksOn && !tracksCardHidden,
-      disabled: !tracksOn,
-      badge: trackedIds.length + trackedDeviceIds.length,
-      onClick: () => setTracksCardHidden((h) => !h),
-    },
+    ...(maptilerKey
+      ? [
+          {
+            key: "terrain",
+            icon: Mountain,
+            label: terrainOn ? t("Flat map") : t("3D terrain"),
+            active: terrainOn,
+            onClick: toggleTerrain,
+          } satisfies StripItem,
+        ]
+      : []),
     {
       key: "draw",
       icon: PenLine,
@@ -1300,35 +1349,86 @@ export function MapPage() {
       active: tool === "measure",
       onClick: () => (tool === "measure" ? endTool() : setTool("measure")),
     },
-    ...(maptilerKey
+    ...(tracksOn
       ? [
           {
-            key: "terrain",
-            icon: Mountain,
-            label: terrainOn ? t("Flat map") : t("3D terrain"),
-            active: terrainOn,
-            onClick: toggleTerrain,
+            key: "tracks",
+            icon: Route,
+            label: t("Tracks, {{length}}", { length: trackLengthLabel }),
+            active: !tracksCardHidden,
+            badge: trackedIds.length + trackedDeviceIds.length,
+            onClick: () => setTracksCardHidden((h) => !h),
           } satisfies StripItem,
         ]
       : []),
+    ...(heatOn
+      ? [
+          {
+            key: "heat",
+            icon: Flame,
+            label: t("Heatmaps"),
+            active: !heatCardHidden,
+            badge: heatIds.length + heatDeviceIds.length,
+            onClick: () => setHeatCardHidden((h) => !h),
+          } satisfies StripItem,
+        ]
+      : []),
+  ];
+  const shownLayers = shownLayerCount(layers, {
+    entities: visibleFeatures?.length ?? 0,
+    devices: visibleDevices.length,
+  });
+  const layersItem: StripItem = {
+    key: "layers",
+    icon: ListTree,
+    label: t("Layers"),
+    active: panelOpen,
+    emphasis: true,
+    badge: shownLayers,
+    onClick: () => setPanelOpen(!panelOpen),
+  };
+  // zoom, north and locate, our own buttons at the bottom right (decision D173)
+  const zoomItems: StripItem[] = [
     {
-      key: "heat",
-      icon: Flame,
-      label: heatOn
-        ? t("Heatmaps")
-        : t("Show a heatmap from an entity or device panel"),
-      active: heatOn && !heatCardHidden,
-      disabled: !heatOn,
-      badge: heatIds.length + heatDeviceIds.length,
-      onClick: () => setHeatCardHidden((h) => !h),
+      key: "zoom-in",
+      icon: Plus,
+      label: t("Zoom in"),
+      onClick: () => mapRef.current?.zoomIn(),
+    },
+    {
+      key: "zoom-out",
+      icon: Minus,
+      label: t("Zoom out"),
+      onClick: () => mapRef.current?.zoomOut(),
+    },
+    {
+      key: "north",
+      icon: Compass,
+      label: t("Reset north"),
+      onClick: () => mapRef.current?.easeTo({ bearing: 0, pitch: 0 }),
+    },
+    {
+      key: "locate",
+      icon: LocateFixed,
+      label:
+        locate === "off" || locate === "denied"
+          ? t("Follow my position")
+          : locate === "waiting"
+            ? t("Waiting for a position")
+            : locate === "tracking"
+              ? t("Following stopped by a pan; press again to stop showing the position")
+              : t("Stop following my position"),
+      active: locate === "waiting" || locate === "following" || locate === "tracking",
+      onClick: toggleLocate,
     },
   ];
 
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={container} className="absolute! inset-0 z-0" />
-      {/* the counts, the one thing left in the top left (decision D137) */}
-      <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-2">
+      {/* the layers button and the counts in the top left (decisions D137, D174) */}
+      <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-5rem)] flex-wrap items-center gap-2 [&>*]:pointer-events-auto">
+        <ControlStrip items={[layersItem]} label={t("Layers")} className="flex" />
         {current.data && (
           <Badge variant="secondary" className="bg-card">
             {visibleFeatures &&
@@ -1352,9 +1452,14 @@ export function MapPage() {
           </Badge>
         )}
       </div>
-      {/* the control strip, rendered into the map's own top right stack */}
+      {/* the control strips, rendered into the map's own top right and bottom right stacks */}
       {stripHost &&
         createPortal(<ControlStrip items={stripItems} />, stripHost)}
+      {zoomHost &&
+        createPortal(
+          <ControlStrip items={zoomItems} label={t("Zoom and position")} />,
+          zoomHost,
+        )}
       {/* the right column: cards, the layers panel and the object panel open from the right edge
           under the strip on desktop and from the bottom on a phone */}
       <div className="pointer-events-none absolute right-14 bottom-2 left-2 z-10 flex max-h-[70%] flex-col gap-2 sm:top-3 sm:bottom-3 sm:left-auto sm:max-h-none sm:w-[22rem] [&>*]:pointer-events-auto">
@@ -1362,7 +1467,7 @@ export function MapPage() {
           <DrawBar
             purpose={tool}
             kind={drawKind}
-            geometry={drawn}
+            state={drawn}
             onKind={changeDrawKind}
             onSave={() => setSaveOpen(true)}
             onCancel={endTool}
@@ -1636,7 +1741,7 @@ export function MapPage() {
       </div>
       <SaveFeatureDialog
         open={saveOpen}
-        geometry={drawn}
+        geometry={drawn.geometry}
         pending={createFeature.isPending}
         error={createFeature.error?.message ?? null}
         onOpenChange={setSaveOpen}

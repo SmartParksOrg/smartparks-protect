@@ -33,11 +33,24 @@ export function FeaturePanel({
     geometry?.type === "Point"
       ? (geometry.coordinates as [number, number])
       : null;
+  // a circle is a polygon that remembers its radius (decision D172)
+  const attributes = (feature.attributes ?? {}) as Record<string, unknown>;
+  const radius =
+    attributes.shape === "circle" && typeof attributes.radius_m === "number"
+      ? attributes.radius_m
+      : null;
   return (
     <MapPanel
       title={feature.name}
       titleTo={`/projects/${projectId}/admin/features`}
-      subtitle={feature.feature_type}
+      subtitle={
+        radius != null
+          ? t("{{type}}, circle of {{radius}}", {
+              type: feature.feature_type,
+              radius: formatLength(radius),
+            })
+          : feature.feature_type
+      }
       picture={
         <span className="flex size-9 items-center justify-center rounded-md bg-muted">
           <Layers className="size-5 text-primary" />
@@ -68,11 +81,22 @@ export function FeaturePanel({
           </span>
         </PanelRow>
       )}
+      {radius != null && (
+        <PanelRow label={t("Radius")}>{formatLength(radius)}</PanelRow>
+      )}
       {m.area_m2 != null && (
         <PanelRow label={t("Area")}>{formatArea(m.area_m2)}</PanelRow>
       )}
       {m.length_m != null && (
-        <PanelRow label={m.area_m2 != null ? t("Perimeter") : t("Length")}>
+        <PanelRow
+          label={
+            radius != null
+              ? t("Circumference")
+              : m.area_m2 != null
+                ? t("Perimeter")
+                : t("Length")
+          }
+        >
           {formatLength(m.length_m)}
         </PanelRow>
       )}

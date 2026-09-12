@@ -1489,20 +1489,20 @@ export function LayerPanel({
         }}
         className="px-3 pt-1"
       >
-        <TabsList className="w-full">
-          <TabsTrigger value="entities" className="flex-1">
+        <TabsList className="w-full justify-start overflow-x-auto sm:justify-stretch">
+          <TabsTrigger value="entities" className="flex-1 shrink-0">
             {t("Entities")}
           </TabsTrigger>
-          <TabsTrigger value="devices" className="flex-1">
+          <TabsTrigger value="devices" className="flex-1 shrink-0">
             {t("Devices")}
           </TabsTrigger>
-          <TabsTrigger value="features" className="flex-1">
+          <TabsTrigger value="features" className="flex-1 shrink-0">
             {t("Features")}
           </TabsTrigger>
-          <TabsTrigger value="events" className="flex-1">
+          <TabsTrigger value="events" className="flex-1 shrink-0">
             {t("Events")}
           </TabsTrigger>
-          <TabsTrigger value="coverage" className="flex-1">
+          <TabsTrigger value="coverage" className="flex-1 shrink-0">
             {t("Coverage")}
           </TabsTrigger>
         </TabsList>

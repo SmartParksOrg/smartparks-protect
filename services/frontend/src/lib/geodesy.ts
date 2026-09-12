@@ -93,3 +93,42 @@ export function measure(geometry: GeoJSON.Geometry | null): {
   }
   return {};
 }
+
+/** The centre of a ring as the mean of its vertices (the last one repeats the first). */
+export function polygonCentre(ring: [number, number][]): [number, number] {
+  const points = ring.length > 1 ? ring.slice(0, -1) : ring;
+  const n = Math.max(points.length, 1);
+  return [
+    points.reduce((sum, [lon]) => sum + lon, 0) / n,
+    points.reduce((sum, [, lat]) => sum + lat, 0) / n,
+  ];
+}
+
+/** A circle on the sphere as a closed ring of `segments` points, for accuracy rings and circle
+ * features (decision D172). */
+export function circleRing(
+  centre: [number, number],
+  radiusMetres: number,
+  segments = 64,
+): [number, number][] {
+  const [lon, lat] = centre;
+  const latR = (lat * Math.PI) / 180;
+  const lonR = (lon * Math.PI) / 180;
+  const d = radiusMetres / EARTH_RADIUS_M;
+  const ring: [number, number][] = [];
+  for (let i = 0; i <= segments; i++) {
+    const bearing = (2 * Math.PI * (i % segments)) / segments;
+    const lat2 = Math.asin(
+      Math.sin(latR) * Math.cos(d) + Math.cos(latR) * Math.sin(d) * Math.cos(bearing),
+    );
+    const lon2 =
+      lonR +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(d) * Math.cos(latR),
+        Math.cos(d) - Math.sin(latR) * Math.sin(lat2),
+      );
+    ring.push([(lon2 * 180) / Math.PI, (lat2 * 180) / Math.PI]);
+  }
+  return ring;
+}
+

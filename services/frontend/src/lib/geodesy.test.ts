@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  distanceMetres,
-  formatArea,
-  formatLength,
-  lengthMetres,
-  measure,
-  ringAreaSquareMetres,
-} from "@/lib/geodesy";
+import { circleRing, distanceMetres, formatArea, formatLength, lengthMetres, measure, polygonCentre, ringAreaSquareMetres } from "@/lib/geodesy";
 
 describe("geodesy", () => {
   it("measures distances against known values", () => {
@@ -94,3 +87,17 @@ describe("geodesy", () => {
     expect(polygon.length_m).toBeCloseTo(111_195 * 4, -3);
   });
 });
+
+describe("circleRing", () => {
+  it("draws a closed ring at the radius around the centre", () => {
+    const centre: [number, number] = [31.5, -24.9];
+    const ring = circleRing(centre, 500, 32);
+    expect(ring).toHaveLength(33);
+    expect(ring[0]).toEqual(ring[32]);
+    for (const point of ring) expect(distanceMetres(centre, point)).toBeCloseTo(500, 0);
+    const [lon, lat] = polygonCentre(ring);
+    expect(lon).toBeCloseTo(31.5, 4);
+    expect(lat).toBeCloseTo(-24.9, 4);
+  });
+});
+

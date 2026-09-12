@@ -16,9 +16,9 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 23 (connectivity per device and network locations) built and deployed on 2026-09-10 (commit 275f210), its exit criteria to check on the dev server, then release v2.6.0; phase 22 (Analysis as modules) follows as v2.7.0 |
+| Active phase | Phase 24 (the live map's controls, second pass, D171 to D174) in progress on 2026-09-12; phase 23 built and deployed, its exit criteria to check on the dev server, then release v2.6.0; phase 22 (Analysis as modules) follows as v2.7.0 |
 | Latest release | v2.5.0 (2026-09-09): phase 21, Explore as one canvas |
-| Last session | 2026-09-11 |
+| Last session | 2026-09-12 |
 | Next item | Phase 23 exit criteria on the dev server (the Connectivity tab of SP051890 and a KPN collar, the first network position after the deploy on the Network locations layer, an entity set to "device, else network", a Rock7 redelivery reaching no integration twice, a live ThingPark location report as a fixture once a KPN collar has geolocation on), then release v2.6.0; one Request status to SP051890 over Rock7 on Tim's word; the port 4 message id 0x0E question if it shows up live; then phase 22 (Analysis as modules), its open questions first. Still open: onboard and assign the KPN collars and LoRaNAM's other applications, Request status through KPN, the map using the vector tiles above the threshold, the live stages that wait for accounts |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); Cloudloop and Rock7 are connected to the dev server (2026-09-10) but no Iridium collar has spoken since 2026-07-10, so a field message and a command wait; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
@@ -211,6 +211,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D168 | Hiding types per project | `hidden_entity_type_ids` in the project's settings, switches per type and sub-type under Project admin, Settings; hiding a type takes its sub-types; the entity dialog and the bulk dialogs offer the rest; an entity that already has a hidden type keeps it | One server serves parks on two continents; each hides what it does not have. Decided by Tim on 2026-09-11. |
 | D169 | The entity dialog | Type as a short select, then a searchable sub-type with its icon (or the type alone), the icon following the choice; an optional icon of the entity's own through the picker (`icon_key`, the column that existed without a way to set it) | The person picks the animal, not an icon; the override is for the odd one out. Decided by Tim on 2026-09-11. |
 | D170 | Assigning from either side | The device page assigns its device to an existing entity or a new one made in the same call (`new_entity` on the entity assignment create, the caller needs `entities:write` as well) with the guided start, and releases it; the entities list assigns a device to an entity nothing tracks, through the entity page's dialog | Tim: a person holding a collar starts from the device, a person looking at the herd from the animal; both paths end in the same assignment. Decided by Tim on 2026-09-11. |
+| D171 | Draw and Measure, two buttons on one engine | Both tools show a marker on every vertex from the first tap, let vertices be dragged once the shape is closed and before it is saved, update the length, area or radius live while drawing, and offer point, line, polygon and circle; Measure ends with Done and keeps nothing, Draw ends with Save as feature | Tim's list of 2026-09-12: the first tap showed nothing, the distance came only at the end; two buttons keep the intent clear. Decided by Tim on 2026-09-12. |
+| D172 | A circle is a polygon that remembers its centre and radius | Drawn from the centre with the radius dragged or tapped; saved as a 64-point polygon feature (geofence or zone) with `shape: circle`, `centre` and `radius_m` in its attributes, so the panel names the radius and every reader keeps working | No schema change, the rules' geofence and proximity checks and the exports see a polygon. Decided by Tim on 2026-09-12. |
+| D173 | Zoom and locate as our own strip at the bottom right | MapLibre's navigation and geolocate controls are gone; zoom in, zoom out, reset north and Locate are the strip's own 36 px buttons in a second host at the bottom right above the scale; Locate is a toggle: on, the browser's position is watched and the map follows each fix with a dot and an accuracy ring, a pan by the person stops the following but keeps the dot, pressing again switches it off | One size and one style for every button on the map, and a toggle that keeps tracking, as Tim asked. Decided by Tim on 2026-09-12. |
+| D174 | The layout of the map's controls | Layers is the one filled brand-green button, top left beside the counts; the top right strip holds base map with terrain under it, then draw and measure, then the Tracks and Heatmaps buttons only while a track or a heatmap is on, next to each other; the layers panel's tabs scroll sideways on a phone instead of overflowing | Tim's list: the controls that belong together sit together, nothing shows while it has nothing to show, and the layers button stands out. Decided by Tim on 2026-09-12. |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -1064,6 +1068,23 @@ Part b, network locations (D162 to D164):
 
 ---
 
+### Phase 24: the live map's controls, second pass (v2.6.0)
+
+**Goal.** The tools a ranger uses on the live map behave like tools: a marker for every tap, shapes that can be adjusted before they are kept, distances that update while drawing, a circle, and controls that sit where they belong and show only when they have something to show.
+
+**Why here.** Tim's list of 2026-09-12 after testing the dev server: the measure tool showed no marker on the first tap and no distance until the end; the Tracks and Heatmaps buttons stood in the strip with nothing to show; terrain sat away from the base map; zoom and locate were MapLibre's own buttons in another size; the layers button did not stand out; the layers panel's tabs overflowed a phone. Decisions D171 to D174.
+
+**Deliverables.**
+
+- [x] Draw and Measure on one engine (D171): coordinate markers on every vertex, editable vertices, live length, area and radius from the shape in progress, a circle mode (D172) saved as a polygon with its centre and radius, the feature panel naming a circle's radius; unit tests for the circle geometry.
+- [x] Our own zoom and locate strip at the bottom right (D173): zoom in, zoom out, reset north, Locate as a toggle over `navigator.geolocation` with a dot and an accuracy ring; MapLibre's navigation and geolocate controls removed.
+- [x] The layout (D174): Layers filled and top left, terrain under the base map, Tracks and Heatmaps only while on and adjacent, one button size everywhere, the layers panel's tabs scrolling on a phone.
+- [x] Docs: the live map row of `docs/administration/pages.md`, `DEVELOPERS.md`, the changelog.
+
+**Exit criteria.** On a phone against the dev server: a measurement of a line shows a dot at the first tap and the running length while the finger moves; a circle drawn from a water point becomes a geofence with its radius named in the panel; zoom, north and locate sit bottom right at the same size as the strip, and Locate follows the phone until pressed again; the Tracks button appears only once a track is on; the layers panel's five tabs reach by scrolling.
+
+---
+
 ### Connectivity follow-ups: Cloudloop live and Rock7 (2026-09-09)
 
 **Goal.** The Iridium path in use: the Cloudloop account Smart Parks has (one account, every project) connected to the dev server and proven live, and the modems still on Rock 7 Core reachable through an adapter of their own.
@@ -1763,4 +1784,11 @@ Listed by the phase where they are first needed.
 - Tim: the Assign button stayed unclickable for SP051890. The server had never received a POST, and the screenshot's pixels showed the button greyed: it was disabled by its own readiness rule (a name and a type, or a chosen entity) and said nothing. The button is enabled now and a press with something missing marks the field ("Give the entity a name", "Choose a type", "Pick an entity from the list"); checked on an emulated phone.
 - Tim: the new entity's name on the device dialog was a placeholder, not a value. It is the device's name now, editable.
 - Tim asked to set up and test system mail through protect@smartparks.org (TransIP). Login verified from this machine on smtp.transip.email, 465 with SSL and 587 with STARTTLS; the settings and the password went into the vaulted host vars of the dev server only (`mail_server`, `mail_port` 465, `mail_username`, `mail_password`, `mail_from`), nothing in the repository. After the env refresh the capabilities read `mail_configured: true`, a server-level email target for Tim was made and its test send answered "sent" with "mail sent" in the API log. The dev server stays in `development`, so only the addresses in `dev_notify_emails` receive mail.
+
+### 2026-09-12, the live map's controls, second pass (Claude and Tim)
+
+- Tim's list after testing the dev server: no marker on the first tap of a measurement and no distance until the end, the Tracks and Heatmaps buttons standing with nothing to show, terrain away from the base map, MapLibre's zoom and locate in another size, a Layers button that did not stand out, the layers panel's tabs overflowing a phone. Four decisions asked and answered (D171 to D174): two buttons on one engine, a circle as a polygon that remembers its centre and radius, our own zoom and locate strip, the Layers button filled green with the shown count. Phase 24.
+- Built: `draw.ts` reports a `DrawState` (finished, live, circle) on every terra-draw change, with coordinate markers and editable vertices and a circle mode; `DrawBar` measures the live shape and shows a radius and circumference for a circle; a circle is saved as a 64-point polygon with `shape`, `centre` and `radius_m` in the attributes (checked end to end on the dev server: 65 points, radius 9,205 m, the panel reading "geofence, circle of 9.21 km"); `locate.ts` replaces the geolocate control (a dot, an accuracy ring, following until a pan or a second press); `useMap` adds a second strip host bottom right; the map page lays the controls out per D174 and the layers panel's tab list scrolls.
+- Checked with Playwright against the dev server, desktop and Pixel 7: every button 36 by 36, no MapLibre control left, the running length after the first tap and a move, the Tracks button appearing once a track is on, the tab list wider than its box so it scrolls; frontend typecheck, lint, tests (97) and build green.
+- Open: the exit criteria of phases 23 and 24 on Tim's phone against the dev server, then release v2.6.0.
 

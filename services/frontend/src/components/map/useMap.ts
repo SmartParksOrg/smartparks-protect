@@ -8,8 +8,8 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import { maplibregl } from "@/components/map/maplibre";
 import { useAuthStore } from "@/stores/auth";
 
-/** An empty MapLibre control the page renders the control strip into (decision D137), so the
- * strip stacks under the map's own buttons whatever their height. */
+/** An empty MapLibre control the page renders a control strip into (decisions D137, D173):
+ * the tools top right, zoom and locate bottom right above the attribution. */
 class StripHost implements IControl {
   readonly element = document.createElement("div");
 
@@ -37,6 +37,7 @@ export function useMap(
   const mapRef = useRef<MapLibreMap | null>(null);
   const [ready, setReady] = useState(false);
   const [stripHost, setStripHost] = useState<HTMLElement | null>(null);
+  const [zoomHost, setZoomHost] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
@@ -57,23 +58,13 @@ export function useMap(
         return { url };
       }) as RequestTransformFunction,
     });
-    map.addControl(
-      new maplibregl.NavigationControl({ visualizePitch: true }),
-      "top-right",
-    );
-    // "My location": the browser's geolocation, centred once with a marker; the control
-    // explains a refused permission itself (phase 15).
-    map.addControl(
-      new maplibregl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: false,
-        showUserLocation: true,
-      }),
-      "top-right",
-    );
+    // zoom, north and locate are the page's own buttons in the bottom right host (D173)
     const strip = new StripHost();
     map.addControl(strip, "top-right");
     setStripHost(strip.element);
+    const corner = new StripHost();
+    map.addControl(corner, "bottom-right");
+    setZoomHost(corner.element);
     map.addControl(
       new maplibregl.ScaleControl({ unit: "metric" }),
       "bottom-left",
@@ -93,6 +84,7 @@ export function useMap(
       mapRef.current = null;
       setReady(false);
       setStripHost(null);
+      setZoomHost(null);
     };
     // the map is created once; basemap changes go through setStyle below
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,5 +99,5 @@ export function useMap(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [style]);
 
-  return { mapRef, ready, stripHost };
+  return { mapRef, ready, stripHost, zoomHost };
 }

@@ -506,3 +506,19 @@ export function coverageGatewayIds(
   if (choices.hidden_gateways.length === 0) return undefined;
   return all.filter((id) => !choices.hidden_gateways.includes(id));
 }
+
+/** How many of the panel's five layers show something (the Layers button's count, decision
+ * D174): entities and devices when any is in view, features, events and coverage when on. */
+export function shownLayerCount(
+  choices: LayerChoices,
+  inView: { entities: number; devices: number },
+): number {
+  return [
+    inView.entities > 0,
+    inView.devices > 0,
+    choices.features,
+    choices.events,
+    choices.coverage || choices.gateways || Boolean(choices.network_locations),
+  ].filter(Boolean).length;
+}
+
