@@ -135,6 +135,7 @@
   "Tap the centre, then tap again at the radius; Escape cancels.": "Tap the centre, then tap again at the radius; Escape cancels.",
   "Technical details": "Technical details",
   "The client runs on this computer (it returns to": "The client runs on this computer (it returns to",
+  "The last answer came {{ago}}. The page keeps trying every minute.": "The last answer came {{ago}}. The page keeps trying every minute.",
   "the newest {{count}} of {{total}} points over {{length}}_one": "the newest {{count}} of {{total}} points over {{length}}",
   "the newest {{count}} of {{total}} points over {{length}}_other": "the newest {{count}} of {{total}} points over {{length}}",
   "The object was corrected after this delivery (": "The object was corrected after this delivery (",

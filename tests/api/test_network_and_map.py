@@ -196,6 +196,18 @@ async def test_traffic_traces_and_health(client, db, bus):
         "integration",
     }
     assert any(s["id"] == source["id"] and s["events_last_hour"] == 2 for s in body["data_sources"])
+    # the health dot's summary (decision D181) is for every signed-in account and reads the
+    # workers and the lingering system alerts only
+    from shared.enums import Role
+    from tests.api.conftest import project_actor
+
+    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    status = await client.get("/api/v1/system/status", headers=viewer.headers)
+    assert status.status_code == 200, status.text
+    summary = status.json()
+    assert summary["level"] in ("ok", "degraded") and summary["checked_at"]
+    assert all("worker" in r or "system alert" in r for r in summary["reasons"])
+    assert (await client.get("/api/v1/system/status")).status_code == 401
 
 
 def _tile(lon: float, lat: float, zoom: int) -> tuple[int, int]:

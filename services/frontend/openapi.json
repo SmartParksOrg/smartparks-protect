@@ -8148,6 +8148,33 @@
     }
    }
   },
+  "/api/v1/system/status": {
+   "get": {
+    "tags": [
+     "network"
+    ],
+    "summary": "System Status",
+    "description": "The health dot's summary, deliberately slow to worry (decision D181).",
+    "operationId": "system_status_api_v1_system_status_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SystemStatus"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/system/health": {
    "get": {
     "tags": [
@@ -35221,6 +35248,33 @@
      "data_sources"
     ],
     "title": "SystemHealth"
+   },
+   "SystemStatus": {
+    "properties": {
+     "level": {
+      "type": "string",
+      "title": "Level"
+     },
+     "reasons": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Reasons"
+     },
+     "checked_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Checked At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "level",
+     "checked_at"
+    ],
+    "title": "SystemStatus",
+    "description": "What the health dot shows every signed-in account (decision D181): green while every\nworker reported within the stale window and no system alert is open; amber once a worker\nhas been silent past the window or a system alert has stayed open over 30 minutes."
    },
    "TestSendResult": {
     "properties": {

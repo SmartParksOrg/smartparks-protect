@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.deps import (
     ProjectContext,
@@ -21,11 +22,13 @@ from protect_api.deps import (
 )
 from protect_api.health_areas import AreaHealth, area_health
 from shared.bus import RedisStreamsBus, Topic, is_stale
+from shared.config import get_settings
 from shared.connectivity.satellite import SatelliteSession
 from shared.database import get_session
 from shared.device_drivers.base import lorawan_frame, raw_frame
-from shared.enums import AcquisitionChannel, ProcessingStatus, TraceStatus
+from shared.enums import AcquisitionChannel, AlertStatus, ProcessingStatus, TraceStatus
 from shared.models import (
+    Alert,
     DataSource,
     Device,
     DeviceProjectAssignment,
@@ -433,6 +436,53 @@ async def search_traces(
         )
         for t, code in rows
     ]
+
+
+class SystemStatus(BaseModel):
+    """What the health dot shows every signed-in account (decision D181): green while every
+    worker reported within the stale window and no system alert is open; amber once a worker
+    has been silent past the window or a system alert has stayed open over 30 minutes."""
+
+    level: str  # ok | degraded
+    reasons: list[str] = Field(default_factory=list)
+    checked_at: datetime
+
+
+SYSTEM_ALERT_GRACE = timedelta(minutes=30)
+
+
+@router.get("/system/status", response_model=SystemStatus)
+async def system_status(
+    _: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> SystemStatus:
+    """The health dot's summary, deliberately slow to worry (decision D181)."""
+    now = utc_now()
+    heartbeats = await bus.heartbeats()
+    reasons = [
+        f"the {name} worker has not reported for over "
+        f"{get_settings().heartbeat_stale_minutes} minutes"
+        for name in WORKERS
+        if is_stale(heartbeats.get(name), now)
+    ]
+    lingering = (
+        await session.scalar(
+            select(func.count())
+            .select_from(Alert)
+            .where(
+                Alert.project_id.is_(None),
+                Alert.status == AlertStatus.OPEN,
+                Alert.created_at <= now - SYSTEM_ALERT_GRACE,
+            )
+        )
+        or 0
+    )
+    if lingering:
+        reasons.append(
+            f"{lingering} system alert{'s' if lingering != 1 else ''} open for over 30 minutes"
+        )
+    return SystemStatus(level="degraded" if reasons else "ok", reasons=reasons, checked_at=now)
 
 
 @router.get("/system/health", response_model=SystemHealth)

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { X } from "lucide-react";
+import { Flame, Route, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -157,7 +157,8 @@ function HealthRows({
   );
 }
 
-/** A Show the track button with the count of points behind it. */
+/** The track toggle of a panel: the same icon button as the layers panel's rows, with the
+ * count of points beside it. */
 export function TrackButton({
   on,
   lengthLabel,
@@ -176,13 +177,18 @@ export function TrackButton({
     <>
       <Button
         variant={on ? "default" : "outline"}
-        size="sm"
-        className="h-8"
+        size="icon"
+        className="size-8"
         aria-pressed={on}
-        title={t("Show the track, {{length}}", { length: lengthLabel })}
+        aria-label={on ? t("Hide the track") : t("Show the track")}
+        title={
+          on
+            ? t("Hide the track")
+            : t("Show the track, {{length}}", { length: lengthLabel })
+        }
         onClick={onToggle}
       >
-        {on ? t("Hide the track") : t("Show the track")}
+        <Route className="size-4" />
       </Button>
       {returned != null && total != null && (
         <span className="text-xs text-muted-foreground">
@@ -193,7 +199,7 @@ export function TrackButton({
   );
 }
 
-/** A Show the heatmap button (decision D138): per entity and device, like the track. */
+/** The heatmap toggle of a panel (decision D138): per entity and device, like the track. */
 export function HeatButton({
   on,
   onToggle,
@@ -205,12 +211,14 @@ export function HeatButton({
   return (
     <Button
       variant={on ? "default" : "outline"}
-      size="sm"
-      className="h-8"
+      size="icon"
+      className="size-8"
       aria-pressed={on}
+      aria-label={on ? t("Hide the heatmap") : t("Show the heatmap")}
+      title={on ? t("Hide the heatmap") : t("Show the heatmap")}
       onClick={onToggle}
     >
-      {on ? t("Hide the heatmap") : t("Show the heatmap")}
+      <Flame className="size-4" />
     </Button>
   );
 }

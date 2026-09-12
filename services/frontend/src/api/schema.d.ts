@@ -1891,6 +1891,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * System Status
+         * @description The health dot's summary, deliberately slow to worry (decision D181).
+         */
+        get: operations["system_status_api_v1_system_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -10109,6 +10129,23 @@ export interface components {
             /** Data Sources */
             data_sources: components["schemas"]["SourceHealth"][];
         };
+        /**
+         * SystemStatus
+         * @description What the health dot shows every signed-in account (decision D181): green while every
+         *     worker reported within the stale window and no system alert is open; amber once a worker
+         *     has been silent past the window or a system alert has stayed open over 30 minutes.
+         */
+        SystemStatus: {
+            /** Level */
+            level: string;
+            /** Reasons */
+            reasons?: string[];
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+        };
         /** TestSendResult */
         TestSendResult: {
             /** Status */
@@ -15111,6 +15148,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    system_status_api_v1_system_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
                 };
             };
         };

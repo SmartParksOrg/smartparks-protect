@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Languages, LogOut, PanelLeftClose, Plug, Search } from "lucide-react";
 import { Link, NavLink, useParams } from "react-router";
 
-import LogoWide from "@/assets/brand/logo-wide.svg?react";
+import logoLandscape from "@/assets/brand/logo-landscape.webp";
 import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
 import {
   sectionsFor,
@@ -81,7 +81,7 @@ export function Sidebar({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center px-4 py-4">
-        <LogoWide className="h-8 w-auto text-primary" />
+        <img src={logoLandscape} alt={t("Smart Parks Protect")} className="h-12 w-auto" />
         {collapsible && (
           <Button
             variant="ghost"

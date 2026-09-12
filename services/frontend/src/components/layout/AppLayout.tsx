@@ -3,8 +3,9 @@ import { Menu, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router";
 
-import LogoMark from "@/assets/brand/logo-mark.svg?react";
+import logoLandscape from "@/assets/brand/logo-landscape.webp";
 import { CommandPalette } from "@/components/layout/CommandPalette";
+import { HealthDot } from "@/components/layout/HealthDot";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -74,7 +75,7 @@ export function AppLayout() {
           <Sidebar onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-card px-3 py-2 lg:hidden">
           <Button
             variant="ghost"
@@ -84,9 +85,12 @@ export function AppLayout() {
           >
             <Menu className="size-5" />
           </Button>
-          <LogoMark className="h-6 w-auto text-primary" />
-          <span className="font-medium">{t("Smart Parks Protect")}</span>
+          <img src={logoLandscape} alt={t("Smart Parks Protect")} className="h-7 w-auto" />
+          <HealthDot className="ml-auto" />
         </header>
+        {/* the health dot in the top right corner of the content (decision D181), inside the
+            10 px margin the map keeps around its strip */}
+        <HealthDot className="absolute top-0 right-0 z-40 hidden lg:flex" />
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <Outlet />
         </main>

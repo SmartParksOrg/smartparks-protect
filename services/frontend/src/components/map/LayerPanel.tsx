@@ -349,7 +349,8 @@ export function LayerPanel({
       </Button>
     );
   };
-  /** The footer every tab shares: what is shown, fold all, show all, hide all. */
+  /** The footer every tab shares: what is shown, fold all, and one toggle that hides all
+   * while anything is shown and shows all otherwise (Tim, 2026-09-12). */
   const footer = (
     keys: string[],
     shown: number,
@@ -365,17 +366,10 @@ export function LayerPanel({
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-xs"
-          onClick={showAll}
+          disabled={total === 0}
+          onClick={shown > 0 ? hideAll : showAll}
         >
-          {t("Show all")}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs"
-          onClick={hideAll}
-        >
-          {t("Hide all")}
+          {shown > 0 ? t("Hide all") : t("Show all")}
         </Button>
       </span>
     </div>
