@@ -4,7 +4,7 @@ locations and states. The button on a data source and the ingest service's daily
 
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any
+from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,8 +33,8 @@ def gateway_lister(source: DataSource, *, require_channel: bool = False) -> List
         return None
     factory = getattr(adapter, "management_connector", None)
     connector = factory(data_source_context(source)) if factory else None
-    lister: Any = getattr(connector, "list_gateway_updates", None)
-    return lister
+    lister = getattr(connector, "list_gateway_updates", None)
+    return None if lister is None else cast(Lister, lister)
 
 
 async def sync_source_gateways(
