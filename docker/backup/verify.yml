@@ -28,10 +28,17 @@ services:
     ports: !reset []
   minio-init:
     container_name: protect-verify-minio-init
+  # The migrate and api services run the production stack's images by name: a second
+  # compose project builds its own images once and never again, so the restore test of
+  # 2026-09-07 migrated with a week-old image and failed on a revision it did not know.
   migrate:
     container_name: protect-verify-migrate
+    image: ${PRODUCTION_COMPOSE_PROJECT:-smartparks-protect}-migrate:latest
+    pull_policy: never
   api:
     container_name: protect-verify-api
+    image: ${PRODUCTION_COMPOSE_PROJECT:-smartparks-protect}-api:latest
+    pull_policy: never
     ports: !reset []
     environment:
       PUBLIC_URL: http://verify.invalid

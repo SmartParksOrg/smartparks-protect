@@ -24,6 +24,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- The weekly restore test failed since 2026-09-07 with "migrations failed": the verification compose project had built its own `migrate` and `api` images on 2026-09-04 and kept them, so the restored database was migrated with code that did not know the newer revisions. The verify stack runs the production images by name now, and the migration output stays in `logs/restore-verify.log`.
 - Sync gateways on a data source crashed with a 500 when a gateway row had been created from a reception in the same run (its attributes read as None before a refresh); the merge starts from an empty document now.
 - A circle drawn with two taps on a phone had no radius; the circle mode takes a drag from the centre as well.
 - The new entity made from the device page starts with the device's name filled in, not only shown as a placeholder, so a collar named after its animal needs no typing.

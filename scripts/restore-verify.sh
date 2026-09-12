@@ -51,7 +51,9 @@ done
 "${V[@]}" exec -T postgres psql -U "$PGUSER" -d "$PGDB" -Atc 'select pg_is_in_recovery()' 2>/dev/null | grep -q f || fail "WAL replay did not finish in ten minutes"
 
 log "migrations and API"
-"${V[@]}" run --rm migrate > /dev/null 2>&1 || fail "migrations failed on the restored database"
+# the migration output stays in the log: a failure here said nothing on 2026-09-07
+"${V[@]}" run --rm migrate 2>&1 | grep -v -E ' (Creating|Created|Removing|Removed)$' | tail -n 40
+test "${PIPESTATUS[0]}" = 0 || fail "migrations failed on the restored database"
 "${V[@]}" up -d --wait api > /dev/null 2>&1 || fail "the API did not become healthy on the restored database"
 health="$("${V[@]}" exec -T api python -c 'import urllib.request; print(urllib.request.urlopen("http://localhost:8000/api/health", timeout=10).read().decode())' 2>/dev/null)"
 echo "$health" | grep -q '"ok"' || fail "health check failed: $health"

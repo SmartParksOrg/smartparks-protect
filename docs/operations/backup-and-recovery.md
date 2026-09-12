@@ -53,7 +53,7 @@ Every run writes a row to `backup_runs` with its duration, size, label and error
 
 `scripts/restore-verify.sh` proves the backups without touching the running server: it starts a second compose project (`smartparks-protect-verify`, no host ports, its own volumes, WAL archiving off), restores the newest backup and replays every archived segment into it, runs the migrations, starts the API, checks health and row counts, checks that the objects the restored database references exist in the backup bucket, records the result as a `restore_test` run, and removes the project again. It needs free disk space of about twice the database size while it runs.
 
-A failed restore test is a critical finding: the backups may not be usable. Read `logs/restore-verify.log`, fix the cause, and run the script by hand until it passes.
+A failed restore test is a critical finding: the backups may not be usable. Read `logs/restore-verify.log` (the migration output is kept there), fix the cause, and run the script by hand until it passes. The verification stack runs the production stack's `migrate` and `api` images by name (`docker/backup/verify.yml`), so the test always migrates with the code that is live; a second compose project would otherwise build its own images once and keep them.
 
 ## Point in time
 
