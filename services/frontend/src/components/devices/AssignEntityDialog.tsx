@@ -40,7 +40,7 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [q, setQ] = useState("");
   const [entityId, setEntityId] = useState("");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(device.name); // the collar's name is the usual entity name; overwrite it if not
   const [typeId, setTypeId] = useState("");
   const [groupId, setGroupId] = useState("");
   const [validFrom, setValidFrom] = useState(() => new Date().toISOString());
@@ -106,7 +106,7 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
           </>
         ) : (
           <>
-            <Field label={t("Name")} htmlFor="new-entity-name" error={attempted && missing === "name" ? t("Give the entity a name") : undefined}><Input id="new-entity-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={device.name} /></Field>
+            <Field label={t("Name")} htmlFor="new-entity-name" error={attempted && missing === "name" ? t("Give the entity a name") : undefined}><Input id="new-entity-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
             <Field label={t("Type")} htmlFor="new-entity-type" hint={t("The kind of thing, then the species or model; the icon follows the choice")} error={attempted && missing === "type" ? t("Choose a type") : undefined}>
               <EntityTypeSelect id="new-entity-type" projectId={projectId} value={typeId} onChange={setTypeId} />
             </Field>
