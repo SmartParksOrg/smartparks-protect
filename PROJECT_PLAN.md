@@ -1941,6 +1941,7 @@ Listed by the phase where they are first needed.
 ### 2026-09-13, the location source applies at once (Claude and Tim)
 
 - Tim set the animal SP040078 to "network" and saw no position. The setting is applied by the decoder when a position arrives and by the rebuild after a reattribution or a curation; a PATCH of the setting rebuilt nothing, and the collar's uplinks repeat the same solved estimate, so no new position ever arrived. Fixed: `update_entity` and `update_device` call `recompute_current_state` when `location_source` or `location_fallback_hours` changed (the entity with the device tracking it today, the device with the entity it tracks today; `recompute_current_state` takes a null device for an entity without one). The API test on network locations now expects the setting change alone to move the current position.
+- Committed as 6daa708, CI green, deployed. Proven on the dev server: switching the animal SP040078 to "device" removes its position from the map at once, switching back to "network" restores the estimate with its 455 m accuracy, no reattribute needed.
 
 ### 2026-09-13, the live map's panels on a phone (Claude and Tim)
 
