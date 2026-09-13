@@ -3,6 +3,7 @@
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
@@ -419,13 +420,19 @@ async def create_invitation_row(
     invited_by: User,
     role_id: uuid.UUID | None = None,
     scope: dict[str, list[str]] | None = None,
+    memberships: list[dict[str, Any]] | None = None,
+    project_names: list[str] | None = None,
 ) -> InvitationRead:
+    """One invitation row and its mail. A project invitation names `project`; a server admin's
+    invitation may carry `memberships` (checked by the caller) and the names of their projects
+    for the mail (decision D190)."""
     invitation = Invitation(
         email=email.lower(),
         project_id=project.id if project else None,
         role=role,
         role_id=role_id,
         scope=scope,
+        memberships=memberships,
         server_admin=server_admin,
         token=secrets.token_urlsafe(32),
         invited_by_user_id=invited_by.id,
@@ -445,6 +452,7 @@ async def create_invitation_row(
             "role": role,
             "role_id": str(role_id) if role_id else None,
             "scope": scope,
+            "memberships": memberships,
             "server_admin": server_admin,
         },
     )
@@ -452,7 +460,7 @@ async def create_invitation_row(
     sent = await get_mailer().send_invitation(
         invitation.email,
         invitation.token,
-        project_name=project.name if project else None,
+        project_names=[project.name] if project else list(project_names or []),
         invited_by=invited_by.full_name or invited_by.email,
     )
     _allowed, reason = allowed_recipient(invitation.email)

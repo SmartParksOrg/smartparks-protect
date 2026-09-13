@@ -6572,8 +6572,9 @@
     "tags": [
      "admin"
     ],
-    "summary": "Invite Server Admin",
-    "operationId": "invite_server_admin_api_v1_admin_invitations_post",
+    "summary": "Invite Person",
+    "description": "Invite a person as server admin and/or into any projects at once (decision D190). An\naddress that already has an account gets the memberships (and the flag) straight away and\nno mail; the projects it is already in are left as they are.",
+    "operationId": "invite_person_api_v1_admin_invitations_post",
     "security": [
      {
       "OAuth2PasswordBearer": []
@@ -6584,7 +6585,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/ServerAdminInvitationCreate"
+        "$ref": "#/components/schemas/ServerInvitationCreate"
        }
       }
      }
@@ -6595,7 +6596,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/InvitationRead"
+         "$ref": "#/components/schemas/ServerInvitationResult"
         }
        }
       }
@@ -29927,6 +29928,14 @@
       ],
       "title": "Project Name"
      },
+     "project_names": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Project Names",
+      "default": []
+     },
      "expires_at": {
       "type": "string",
       "format": "date-time",
@@ -29943,6 +29952,47 @@
      "expires_at"
     ],
     "title": "InvitationInfo"
+   },
+   "InvitationMembership": {
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "role": {
+      "$ref": "#/components/schemas/Role",
+      "default": "project-viewer"
+     },
+     "role_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role Id"
+     },
+     "scope": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MemberScope"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "project_id"
+    ],
+    "title": "InvitationMembership",
+    "description": "One membership an invitation creates at registration (decision D190)."
    },
    "InvitationRead": {
     "properties": {
@@ -29999,6 +30049,20 @@
         "type": "null"
        }
       ]
+     },
+     "memberships": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/InvitationMembership"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Memberships"
      },
      "server_admin": {
       "type": "boolean",
@@ -35431,19 +35495,69 @@
     "title": "SeriesResponse",
     "description": "The series, and what the bounds did to the request (decision D148): `notes` says when a\ncoarser bucket answers a bucket too fine for the range, or when only the first owners that\nfit under MAX_SERIES are shown (`owners_shown` of `owners_total`)."
    },
-   "ServerAdminInvitationCreate": {
+   "ServerInvitationCreate": {
     "properties": {
      "email": {
       "type": "string",
       "format": "email",
       "title": "Email"
+     },
+     "server_admin": {
+      "type": "boolean",
+      "title": "Server Admin",
+      "default": false
+     },
+     "memberships": {
+      "items": {
+       "$ref": "#/components/schemas/InvitationMembership"
+      },
+      "type": "array",
+      "maxItems": 100,
+      "title": "Memberships"
      }
     },
     "type": "object",
     "required": [
      "email"
     ],
-    "title": "ServerAdminInvitationCreate"
+    "title": "ServerInvitationCreate",
+    "description": "A server admin's invitation: server admin or not, and memberships in any projects."
+   },
+   "ServerInvitationResult": {
+    "properties": {
+     "invitation": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/InvitationRead"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Id"
+     },
+     "added_projects": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Added Projects"
+     }
+    },
+    "type": "object",
+    "title": "ServerInvitationResult",
+    "description": "What a server admin's invitation did: an invitation mailed (or its link to share), or\nfor an address that already has an account, the memberships added straight away."
    },
    "Severity": {
     "type": "string",

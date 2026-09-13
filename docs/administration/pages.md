@@ -49,7 +49,11 @@ sources, Gateways, Audit, AI policy, catalogues). The project pages are the same
 to check what a ranger sees, sign in as one.
 
 Server admin, Users lists every account with its active and server admin switches and the
-open server admin invitations. A row opens the account's page: the email and name (each with
+open invitations. Its invite form takes one address, a Server admin box and a row per project
+(project, role built in or custom, what the person sees): one mail with one link, and
+registration creates every membership at once (decision D190). An address that already has an
+account gets the memberships straight away and no mail; the form says so and links to the
+account. A row opens the account's page: the email and name (each with
 its own Save), the switches (one's own are changed by another server admin), last login and
 created, a "Send password reset" button that mails the person the same link as the sign-in
 page's forgot-password, "Add to a project" with a role, and the memberships across every

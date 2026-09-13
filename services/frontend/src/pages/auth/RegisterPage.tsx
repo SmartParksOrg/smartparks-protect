@@ -60,7 +60,7 @@ export function RegisterPage() {
   return (
     <AuthShell
       title={t("Create your account")}
-      description={info ? (info.server_admin ? "You are invited as server admin" : `You are invited to ${info.project_name ?? "a project"} as ${info.role?.replace("project-", "")}`) : undefined}
+      description={info ? registrationOffer(info) : undefined}
     >
       <form className="flex flex-col gap-4" onSubmit={form.handleSubmit((v) => register.mutate(v))} noValidate>
         <div className="flex flex-col gap-2">
@@ -86,4 +86,12 @@ export function RegisterPage() {
       </form>
     </AuthShell>
   );
+}
+
+/** What the link offers: server admin, the projects, or both (decision D190). */
+function registrationOffer(info: InvitationInfo): string {
+  const names = info.project_names?.length ? info.project_names : info.project_name ? [info.project_name] : [];
+  const projects = names.length === 0 ? "" : names.length === 1 && info.role ? `${names[0]} as ${info.role.replace("project-", "")}` : names.join(", ");
+  if (info.server_admin) return projects ? `You are invited as server admin and to ${projects}` : "You are invited as server admin";
+  return `You are invited to ${projects || "a project"}`;
 }

@@ -1462,8 +1462,13 @@ export interface paths {
         /** List Server Invitations */
         get: operations["list_server_invitations_api_v1_admin_invitations_get"];
         put?: never;
-        /** Invite Server Admin */
-        post: operations["invite_server_admin_api_v1_admin_invitations_post"];
+        /**
+         * Invite Person
+         * @description Invite a person as server admin and/or into any projects at once (decision D190). An
+         *     address that already has an account gets the memberships (and the flag) straight away and
+         *     no mail; the projects it is already in are left as they are.
+         */
+        post: operations["invite_person_api_v1_admin_invitations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8235,10 +8240,31 @@ export interface components {
             /** Project Name */
             project_name: string | null;
             /**
+             * Project Names
+             * @default []
+             */
+            project_names: string[];
+            /**
              * Expires At
              * Format: date-time
              */
             expires_at: string;
+        };
+        /**
+         * InvitationMembership
+         * @description One membership an invitation creates at registration (decision D190).
+         */
+        InvitationMembership: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** @default project-viewer */
+            role: components["schemas"]["Role"];
+            /** Role Id */
+            role_id?: string | null;
+            scope?: components["schemas"]["MemberScope"] | null;
         };
         /** InvitationRead */
         InvitationRead: {
@@ -8256,6 +8282,8 @@ export interface components {
             /** Role Id */
             role_id?: string | null;
             scope?: components["schemas"]["MemberScope"] | null;
+            /** Memberships */
+            memberships?: components["schemas"]["InvitationMembership"][] | null;
             /** Server Admin */
             server_admin: boolean;
             /**
@@ -10166,13 +10194,35 @@ export interface components {
                 [key: string]: unknown;
             }[] | unknown[][] | null;
         };
-        /** ServerAdminInvitationCreate */
-        ServerAdminInvitationCreate: {
+        /**
+         * ServerInvitationCreate
+         * @description A server admin's invitation: server admin or not, and memberships in any projects.
+         */
+        ServerInvitationCreate: {
             /**
              * Email
              * Format: email
              */
             email: string;
+            /**
+             * Server Admin
+             * @default false
+             */
+            server_admin: boolean;
+            /** Memberships */
+            memberships?: components["schemas"]["InvitationMembership"][];
+        };
+        /**
+         * ServerInvitationResult
+         * @description What a server admin's invitation did: an invitation mailed (or its link to share), or
+         *     for an address that already has an account, the memberships added straight away.
+         */
+        ServerInvitationResult: {
+            invitation?: components["schemas"]["InvitationRead"] | null;
+            /** User Id */
+            user_id?: string | null;
+            /** Added Projects */
+            added_projects?: string[];
         };
         /**
          * Severity
@@ -14737,7 +14787,7 @@ export interface operations {
             };
         };
     };
-    invite_server_admin_api_v1_admin_invitations_post: {
+    invite_person_api_v1_admin_invitations_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -14746,7 +14796,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ServerAdminInvitationCreate"];
+                "application/json": components["schemas"]["ServerInvitationCreate"];
             };
         };
         responses: {
@@ -14756,7 +14806,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InvitationRead"];
+                    "application/json": components["schemas"]["ServerInvitationResult"];
                 };
             };
             /** @description Validation Error */

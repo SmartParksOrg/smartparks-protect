@@ -1,5 +1,6 @@
 """Auth endpoints under /api/v1/auth and /api/v1/users."""
 
+import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -63,12 +64,17 @@ async def invitation_info(
         project_name = await session.scalar(
             select(Project.name).where(Project.id == invitation.project_id)
         )
+    ids = [uuid.UUID(m["project_id"]) for m in invitation.memberships or []]
+    names = (
+        list(await session.scalars(select(Project.name).where(Project.id.in_(ids)))) if ids else []
+    )
     return InvitationInfo(
         email=invitation.email,
         server_admin=invitation.server_admin,
         role=invitation.role,
         project_id=invitation.project_id,
         project_name=project_name,
+        project_names=([project_name] if project_name else []) + sorted(names),
         expires_at=invitation.expires_at,
     )
 
@@ -112,6 +118,18 @@ async def register(
                 role=Role(invitation.role),
                 role_id=invitation.role_id,
                 scope=invitation.scope,
+                added_by_user_id=invitation.invited_by_user_id,
+            )
+        )
+    # a server admin's invitation for several projects at once (decision D190)
+    for m in invitation.memberships or []:
+        session.add(
+            ProjectMembership(
+                user_id=user.id,
+                project_id=uuid.UUID(m["project_id"]),
+                role=Role(m["role"]),
+                role_id=uuid.UUID(m["role_id"]) if m.get("role_id") else None,
+                scope=m.get("scope"),
                 added_by_user_id=invitation.invited_by_user_id,
             )
         )

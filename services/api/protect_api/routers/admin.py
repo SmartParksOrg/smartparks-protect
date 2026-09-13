@@ -1,6 +1,7 @@
 """Server administration: accounts, server admin invitations, the global audit log."""
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -13,7 +14,7 @@ from protect_api.auth.users import get_user_manager
 from protect_api.crud import apply_patch, flush_or_409, get_or_404
 from protect_api.deps import require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
-from protect_api.routers.projects import create_invitation_row
+from protect_api.routers.projects import _check_role_id, _check_scope, create_invitation_row
 from protect_api.schemas.access import (
     AuditRead,
     InvitationRead,
@@ -21,7 +22,8 @@ from protect_api.schemas.access import (
     OrganizationCreate,
     OrganizationRead,
     OrganizationUpdate,
-    ServerAdminInvitationCreate,
+    ServerInvitationCreate,
+    ServerInvitationResult,
     UserAdminDetail,
     UserAdminMembership,
     UserAdminRead,
@@ -177,15 +179,103 @@ async def list_server_invitations(
     )
 
 
-@router.post("/invitations", response_model=InvitationRead, status_code=status.HTTP_201_CREATED)
-async def invite_server_admin(
-    body: ServerAdminInvitationCreate,
+@router.post(
+    "/invitations", response_model=ServerInvitationResult, status_code=status.HTTP_201_CREATED
+)
+async def invite_person(
+    body: ServerInvitationCreate,
     admin: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
-) -> InvitationRead:
-    return await create_invitation_row(
-        session, email=body.email, project=None, role=None, server_admin=True, invited_by=admin
+) -> ServerInvitationResult:
+    """Invite a person as server admin and/or into any projects at once (decision D190). An
+    address that already has an account gets the memberships (and the flag) straight away and
+    no mail; the projects it is already in are left as they are."""
+    if not body.server_admin and not body.memberships:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose server admin or at least one project"
+        )
+    project_ids = [m.project_id for m in body.memberships]
+    if len(set(project_ids)) != len(project_ids):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A project is listed twice")
+    projects = {
+        p.id: p for p in await session.scalars(select(Project).where(Project.id.in_(project_ids)))
+    }
+    rows: list[dict[str, Any]] = []
+    for m in body.memberships:
+        if m.project_id not in projects:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown project {m.project_id}")
+        custom = await _check_role_id(session, m.project_id, m.role_id)
+        scope = await _check_scope(session, m.project_id, m.scope)
+        rows.append(
+            {
+                "project_id": str(m.project_id),
+                "role": m.role.value,
+                "role_id": str(custom.id) if custom else None,
+                "scope": scope,
+            }
+        )
+    names = sorted(projects[m.project_id].name for m in body.memberships)
+
+    user = await session.scalar(select(User).where(User.email == body.email.lower()))
+    if user is None:
+        invitation = await create_invitation_row(
+            session,
+            email=body.email,
+            project=None,
+            role=None,
+            server_admin=body.server_admin,
+            invited_by=admin,
+            memberships=rows or None,
+            project_names=names,
+        )
+        return ServerInvitationResult(invitation=invitation)
+
+    existing = set(
+        await session.scalars(
+            select(ProjectMembership.project_id).where(ProjectMembership.user_id == user.id)
+        )
     )
+    added: list[str] = []
+    for m, row in zip(body.memberships, rows, strict=True):
+        if m.project_id in existing:
+            continue
+        membership = ProjectMembership(
+            user_id=user.id,
+            project_id=m.project_id,
+            role=m.role,
+            role_id=uuid.UUID(row["role_id"]) if row["role_id"] else None,
+            scope=row["scope"],
+            added_by_user_id=admin.id,
+        )
+        session.add(membership)
+        await session.flush()
+        await record_audit(
+            session,
+            user=admin,
+            action="member.added",
+            object_type="membership",
+            object_id=str(membership.id),
+            project_id=m.project_id,
+            details={
+                "user_id": str(user.id),
+                "role": row["role"],
+                "role_id": row["role_id"],
+                "scope": row["scope"],
+            },
+        )
+        added.append(projects[m.project_id].name)
+    if body.server_admin and not user.is_superuser:
+        user.is_superuser = True
+        await record_audit(
+            session,
+            user=admin,
+            action="user.updated",
+            object_type="user",
+            object_id=str(user.id),
+            details={"is_superuser": True},
+        )
+    await session.commit()
+    return ServerInvitationResult(user_id=user.id, added_projects=sorted(added))
 
 
 @router.delete("/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)

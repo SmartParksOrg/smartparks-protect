@@ -53,7 +53,7 @@ Assigning a device to a project needs server admin or `devices:write` in that pr
 
 ## Registration
 
-Nobody can register without an invitation. Server admins invite server admins; members with `members:write` invite members of their project, with a role and, when wanted, a scope, which the new account receives. The invitation link proves ownership of the email address, so accounts are verified on creation. Invitations expire (168 hours by default) and can be revoked before use.
+Nobody can register without an invitation. Server admins invite a person as server admin and/or into any projects at once, each with a role and, when wanted, a scope (decision D190); members with `members:write` invite members of their own project, with a role and, when wanted, a scope. The new account receives every membership the invitation carries. The invitation link proves ownership of the email address, so accounts are verified on creation. Invitations expire (168 hours by default) and can be revoked before use.
 
 ## Audit
 

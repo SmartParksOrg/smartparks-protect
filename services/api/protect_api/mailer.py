@@ -31,7 +31,7 @@ class Mailer:
         return await send_email(to, subject, text, html)
 
     async def send_invitation(
-        self, to: str, token: str, *, project_name: str | None, invited_by: str | None
+        self, to: str, token: str, *, project_names: list[str], invited_by: str | None
     ) -> bool:
         link = f"{self.settings.public_url}/register?token={token}"
         return await self.send(
@@ -39,7 +39,7 @@ class Mailer:
             "You are invited to Smart Parks Protect",
             "invitation",
             link=link,
-            project_name=project_name,
+            project_names=project_names,
             invited_by=invited_by,
         )
 

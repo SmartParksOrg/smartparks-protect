@@ -139,8 +139,21 @@ class InvitationCreate(BaseModel):
     scope: MemberScope | None = None
 
 
-class ServerAdminInvitationCreate(BaseModel):
+class InvitationMembership(BaseModel):
+    """One membership an invitation creates at registration (decision D190)."""
+
+    project_id: uuid.UUID
+    role: Role = Role.PROJECT_VIEWER
+    role_id: uuid.UUID | None = None
+    scope: MemberScope | None = None
+
+
+class ServerInvitationCreate(BaseModel):
+    """A server admin's invitation: server admin or not, and memberships in any projects."""
+
     email: EmailStr
+    server_admin: bool = False
+    memberships: list[InvitationMembership] = Field(default_factory=list, max_length=100)
 
 
 class InvitationRead(ORMModel):
@@ -150,6 +163,7 @@ class InvitationRead(ORMModel):
     role: str | None
     role_id: uuid.UUID | None = None
     scope: MemberScope | None = None
+    memberships: list[InvitationMembership] | None = None
     server_admin: bool
     expires_at: datetime
     used_at: datetime | None
@@ -168,6 +182,15 @@ class UserAdminRead(ORMModel):
     is_superuser: bool
     created_at: datetime
     last_login_at: datetime | None
+
+
+class ServerInvitationResult(BaseModel):
+    """What a server admin's invitation did: an invitation mailed (or its link to share), or
+    for an address that already has an account, the memberships added straight away."""
+
+    invitation: InvitationRead | None = None
+    user_id: uuid.UUID | None = None
+    added_projects: list[str] = Field(default_factory=list)
 
 
 class UserAdminMembership(BaseModel):

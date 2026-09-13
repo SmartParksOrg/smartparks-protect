@@ -124,8 +124,10 @@ class ProjectMembership(UuidPrimaryKeyMixin, TimestampMixin, Base):
 class Invitation(UuidPrimaryKeyMixin, TimestampMixin, Base):
     """Registration is by invitation only. The token proves ownership of the email address.
 
-    `project_id` and `role` are null for a server admin invitation. An email can hold several
-    invitations over time (unlike AddaxAI Connect, where the email is unique).
+    `project_id` and `role` are null for a server admin invitation. A server admin's invitation
+    may carry `memberships` instead: a list of project, role, custom role and scope, every one
+    of them created at registration (decision D190). An email can hold several invitations
+    over time (unlike AddaxAI Connect, where the email is unique).
     """
 
     __tablename__ = "invitations"
@@ -140,6 +142,8 @@ class Invitation(UuidPrimaryKeyMixin, TimestampMixin, Base):
         Uuid, ForeignKey("project_roles.id", ondelete="SET NULL")
     )
     scope: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    #: [{"project_id", "role", "role_id", "scope"}, ...] for a server admin's invitation.
+    memberships: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     server_admin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )

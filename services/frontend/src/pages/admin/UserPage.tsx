@@ -7,12 +7,13 @@ import { Link, useParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { ProjectRole, UserAdminDetail, UserAdminMembership } from "@/api/types";
+import type { UserAdminDetail, UserAdminMembership } from "@/api/types";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
-import { CUSTOM, roleBody, roleValue, scopeSummary } from "@/components/members/roles";
+import { roleBody, roleValue, scopeSummary } from "@/components/members/roles";
+import { RoleSelect } from "@/components/members/RoleSelect";
 import { ScopeDialog } from "@/components/members/scope";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useProjects } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
-import { BUILTIN_ROLES, roleLabel } from "@/lib/permissions";
+import { BUILTIN_ROLES } from "@/lib/permissions";
 import { useAuthStore } from "@/stores/auth";
 
 /**
@@ -233,25 +234,4 @@ function AccountField({ id, label, type = "text", value, onSave, pending }: { id
 /** The role select of one membership: the built-in roles and the project's custom roles. */
 function MembershipRole({ membership, onChange }: { membership: UserAdminMembership; onChange: (body: Record<string, unknown>) => void }) {
   return <RoleSelect projectId={membership.project_id} value={roleValue(membership)} onChange={(v) => onChange(roleBody(v))} className="h-8 w-44" />;
-}
-
-function RoleSelect({ id, projectId, value, onChange, className }: { id?: string; projectId: string | null; value: string; onChange: (value: string) => void; className?: string }) {
-  const { t } = useTranslation();
-  const roles = useQuery({
-    queryKey: queryKeys.roles(projectId ?? ""),
-    queryFn: () => api.get<ProjectRole[]>(`/api/v1/projects/${projectId}/roles`),
-    enabled: !!projectId,
-  });
-  const options = [
-    ...BUILTIN_ROLES.map((r) => ({ value: r, label: roleLabel(r) })),
-    ...(roles.data ?? []).map((r) => ({ value: `${CUSTOM}${r.id}`, label: r.name })),
-  ];
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger id={id} className={className ?? "w-44"} aria-label={t("Role")}><SelectValue /></SelectTrigger>
-      <SelectContent>
-        {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  );
 }

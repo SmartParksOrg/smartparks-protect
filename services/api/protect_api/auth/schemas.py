@@ -53,6 +53,8 @@ class InvitationInfo(BaseModel):
     role: str | None
     project_id: uuid.UUID | None
     project_name: str | None
+    #: Every project the invitation opens (the single one, or the memberships list; D190).
+    project_names: list[str] = []
     expires_at: datetime
 
 
