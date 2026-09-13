@@ -125,3 +125,6 @@ export type SatelliteSession = Schemas["SatelliteSessionRead"];
 export type DeviceConnectivityRead = Schemas["DeviceConnectivityRead"];
 export type SourceConnectivity = Schemas["SourceConnectivity"];
 export type DeviceStateRead = Schemas["DeviceStateRead"];
+export type ProjectRole = Schemas["ProjectRoleRead"];
+export type MemberScope = Schemas["MemberScope"];
+export type PermissionCatalogue = Schemas["PermissionCatalogue"];

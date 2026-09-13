@@ -892,6 +892,32 @@
     ]
    }
   },
+  "/api/v1/permissions": {
+   "get": {
+    "tags": [
+     "permissions"
+    ],
+    "summary": "Permission Catalogue",
+    "operationId": "permission_catalogue_api_v1_permissions_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PermissionCatalogue"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/projects": {
    "get": {
     "tags": [
@@ -1628,6 +1654,233 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/roles": {
+   "get": {
+    "tags": [
+     "projects"
+    ],
+    "summary": "List Roles",
+    "description": "The project's custom roles with how many members hold each; the built-in roles come\nfrom `GET /permissions`.",
+    "operationId": "list_roles_api_v1_projects__project_id__roles_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ProjectRoleRead"
+         },
+         "title": "Response List Roles Api V1 Projects  Project Id  Roles Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "projects"
+    ],
+    "summary": "Create Role",
+    "operationId": "create_role_api_v1_projects__project_id__roles_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectRoleCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectRoleRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/roles/{role_id}": {
+   "patch": {
+    "tags": [
+     "projects"
+    ],
+    "summary": "Update Role",
+    "operationId": "update_role_api_v1_projects__project_id__roles__role_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "role_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Role Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectRoleUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectRoleRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "projects"
+    ],
+    "summary": "Delete Role",
+    "description": "A role in use cannot be deleted: give its members another role first.",
+    "operationId": "delete_role_api_v1_projects__project_id__roles__role_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "role_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Role Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -21023,6 +21276,31 @@
     "title": "BrowserResult",
     "description": "What the browser reports after executing a WebBLE command."
    },
+   "BuiltinRole": {
+    "properties": {
+     "key": {
+      "$ref": "#/components/schemas/Role"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "permissions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Permissions"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "permissions"
+    ],
+    "title": "BuiltinRole"
+   },
    "BulkAssign": {
     "properties": {
      "device_ids": {
@@ -29473,13 +29751,35 @@
       "title": "Email"
      },
      "role": {
-      "$ref": "#/components/schemas/Role"
+      "$ref": "#/components/schemas/Role",
+      "default": "project-viewer"
+     },
+     "role_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role Id"
+     },
+     "scope": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MemberScope"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",
     "required": [
-     "email",
-     "role"
+     "email"
     ],
     "title": "InvitationCreate"
    },
@@ -29578,6 +29878,28 @@
        }
       ],
       "title": "Role"
+     },
+     "role_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role Id"
+     },
+     "scope": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MemberScope"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "server_admin": {
       "type": "boolean",
@@ -30317,13 +30639,35 @@
       "title": "Email"
      },
      "role": {
-      "$ref": "#/components/schemas/Role"
+      "$ref": "#/components/schemas/Role",
+      "default": "project-viewer"
+     },
+     "role_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role Id"
+     },
+     "scope": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MemberScope"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",
     "required": [
-     "email",
-     "role"
+     "email"
     ],
     "title": "MemberCreate"
    },
@@ -30357,6 +30701,40 @@
      "role": {
       "$ref": "#/components/schemas/Role"
      },
+     "role_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role Id"
+     },
+     "role_name": {
+      "type": "string",
+      "title": "Role Name",
+      "default": ""
+     },
+     "permissions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Permissions"
+     },
+     "scope": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MemberScope"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "created_at": {
       "type": "string",
       "format": "date-time",
@@ -30374,16 +30752,76 @@
     ],
     "title": "MemberRead"
    },
-   "MemberUpdate": {
+   "MemberScope": {
     "properties": {
-     "role": {
-      "$ref": "#/components/schemas/Role"
+     "groups": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 200,
+      "title": "Groups"
+     },
+     "entities": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Entities"
+     },
+     "devices": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Devices"
      }
     },
     "type": "object",
-    "required": [
-     "role"
-    ],
+    "title": "MemberScope",
+    "description": "What a member sees (decision D186): groups with everything below them, single entities\nand single devices; an empty scope means the whole project."
+   },
+   "MemberUpdate": {
+    "properties": {
+     "role": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Role"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "role_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role Id"
+     },
+     "scope": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MemberScope"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
     "title": "MemberUpdate"
    },
    "MetricCreate": {
@@ -31908,6 +32346,51 @@
     ],
     "title": "PageResponse[UserAdminRead]"
    },
+   "PermissionArea": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "permissions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Permissions"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "permissions"
+    ],
+    "title": "PermissionArea"
+   },
+   "PermissionCatalogue": {
+    "properties": {
+     "areas": {
+      "items": {
+       "$ref": "#/components/schemas/PermissionArea"
+      },
+      "type": "array",
+      "title": "Areas"
+     },
+     "roles": {
+      "items": {
+       "$ref": "#/components/schemas/BuiltinRole"
+      },
+      "type": "array",
+      "title": "Roles"
+     }
+    },
+    "type": "object",
+    "required": [
+     "areas",
+     "roles"
+    ],
+    "title": "PermissionCatalogue"
+   },
    "PointMeasurement": {
     "properties": {
      "metric_key": {
@@ -32680,6 +33163,149 @@
     ],
     "title": "ProjectRead"
    },
+   "ProjectRoleCreate": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "permissions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "title": "Permissions"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "ProjectRoleCreate"
+   },
+   "ProjectRoleRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "permissions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Permissions"
+     },
+     "members": {
+      "type": "integer",
+      "title": "Members",
+      "default": 0
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "name",
+     "description",
+     "permissions",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "ProjectRoleRead"
+   },
+   "ProjectRoleUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 80,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "permissions": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array",
+        "maxItems": 50
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Permissions"
+     }
+    },
+    "type": "object",
+    "title": "ProjectRoleUpdate"
+   },
    "ProjectUpdate": {
     "properties": {
      "name": {
@@ -32829,6 +33455,18 @@
      "role": {
       "type": "string",
       "title": "Role"
+     },
+     "permissions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Permissions"
+     },
+     "scope_limited": {
+      "type": "boolean",
+      "title": "Scope Limited",
+      "default": false
      }
     },
     "type": "object",
@@ -33713,10 +34351,12 @@
     "type": "string",
     "enum": [
      "project-viewer",
+     "project-operator",
+     "project-analyst",
      "project-admin"
     ],
     "title": "Role",
-    "description": "Project roles. Server admin is `User.is_superuser`, not a membership row."
+    "description": "The built-in project roles (decision D185), each a superset of the one before; a custom\nrole is a `project_roles` row the membership points at. Server admin is\n`User.is_superuser`, not a membership row."
    },
    "RouteOptionRead": {
     "properties": {

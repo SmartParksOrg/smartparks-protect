@@ -174,6 +174,7 @@ async def current_state(
         .outerjoin(parent_type, parent_type.id == EntityType.parent_id)
         .where(
             context.where(EntityCurrentState.project_id),
+            context.visibility.rows(EntityCurrentState.entity_id, EntityCurrentState.device_id),
             EntityCurrentState.latest_position.is_not(None),
         )
     )
@@ -182,6 +183,7 @@ async def current_state(
         .select_from(EntityCurrentState)
         .where(
             context.where(EntityCurrentState.project_id),
+            context.visibility.rows(EntityCurrentState.entity_id, EntityCurrentState.device_id),
             EntityCurrentState.latest_position.is_not(None),
         )
     )
@@ -319,6 +321,7 @@ async def devices_state(
         )
         .where(
             context.where(DeviceProjectAssignment.project_id),
+            context.visibility.devices(DeviceProjectAssignment.device_id),
             DeviceProjectAssignment.validity.op("@>")(now),
         )
         .subquery()
@@ -500,6 +503,7 @@ async def track(
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
     conditions = [
         context.where(Position.project_id, unassigned=True),
+        context.visibility.rows(Position.entity_id, Position.device_id),
         in_window(Position, time_from, time_to),
         visible(Position),
     ]
@@ -588,6 +592,8 @@ async def device_state(
         )
         if assigned is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found")
+    if not context.visibility.device_visible(device_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found")
     current = await session.get(DeviceCurrentState, device_id)
     if current is None or current.latest_state_time is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No status from this device yet")
@@ -646,6 +652,7 @@ async def position_at(
         select(Position)
         .where(
             context.where(Position.project_id, unassigned=True),
+            context.visibility.rows(Position.entity_id, Position.device_id),
             owner,
             at_time(Position, when),
             visible(Position),
@@ -759,6 +766,7 @@ async def network_locations(
         .outerjoin(Entity, Entity.id == Position.entity_id)
         .where(
             context.where(Position.project_id, unassigned=True),
+            context.visibility.rows(Position.entity_id, Position.device_id),
             Position.record_type == NETWORK_RECORD_TYPE,
             in_window(Position, since, until),
             visible(Position),

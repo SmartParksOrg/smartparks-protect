@@ -13,6 +13,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from protect_api.auth.users import current_active_user
 from protect_api.deps import accessible_project_ids
+from protect_api.visibility import resolve_visibility, scope_is_empty
 from shared.database import get_session
 from shared.models import (
     DataSource,
@@ -24,6 +25,7 @@ from shared.models import (
     Feature,
     Gateway,
     Project,
+    ProjectMembership,
     User,
 )
 from shared.timeutil import utc_now
@@ -134,6 +136,33 @@ async def search(
     if projects is not None:
         device_statement = device_statement.where(current.c.project_id.in_(projects))
     device_rows = (await session.execute(device_statement.limit(limit))).all()
+    # a membership with a scope (decision D186) hides the entities and devices outside it
+    if projects is not None:
+        scoped_rows = (
+            await session.execute(
+                select(ProjectMembership.project_id, ProjectMembership.scope).where(
+                    ProjectMembership.user_id == user.id, ProjectMembership.scope.is_not(None)
+                )
+            )
+        ).all()
+        visibilities = {
+            project_id: await resolve_visibility(session, project_id, scope)
+            for project_id, scope in scoped_rows
+            if not scope_is_empty(scope)
+        }
+        if visibilities:
+            entity_rows = [
+                r
+                for r in entity_rows
+                if r.project_id not in visibilities
+                or visibilities[r.project_id].entity_visible(r.id)
+            ]
+            device_rows = [
+                r
+                for r in device_rows
+                if r.project_id not in visibilities
+                or visibilities[r.project_id].device_visible(r.id)
+            ]
 
     gateway_statement = (
         select(

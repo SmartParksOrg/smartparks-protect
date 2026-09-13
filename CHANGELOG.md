@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- Roles, custom roles and a member's scope (phase 27, decisions D185 to D188, ADR 0030): four built-in roles (Viewer, Operator, Analyst, Admin) and custom roles a project admin composes from the permission keys by area; a scope per member (groups, entities, devices) the API enforces on every read, exports included; the members page with Members, Roles and Invitations, a scope picker and a role editor; invitations carrying role and scope; the interface gated by permission keys (`GET /permissions`, `/projects/{id}/roles`, `permissions` on the project list).
 - Live map panels: a button that copies the coordinates as "latitude, longitude" beside the track and heatmap toggles and in the fix panel, and the "Last status" time opens the device's newest status with every value it reported (`GET /projects/{id}/devices/{device_id}/state`).
 - Live map: the position time in an entity or device panel is a link that opens the fix of that moment, the same panel a track point opens, with the measurements, the source event and the trace.
 - Night mode (phase 26, decisions D182 to D184): a light, dark or system switch in the top bar, kept on the account and mirrored in the browser so the first paint already knows it; every surface, dialog, chart and MapLibre box follows, and the base map choice "Follows the theme" (the default) draws OpenFreeMap's Night map (its "fiord" style, dark blue-grey rather than black) at night, with Night also as an explicit choice. The top bar with the logo, the product name, the theme switch and the health dot shows on every screen size; the navigation column keeps only its collapse button.
@@ -28,6 +29,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- Viewers no longer report events or export: those belong to the Operator and Analyst roles now; a viewer who needs them gets one of those roles. Features, saved views and dashboards have their own permission keys (`features:write`, `views:write`, `dashboards:write`); dashboards and saved views no longer need project settings rights.
 - The top bar is 41 px on a phone (smaller buttons and logo, the product name on one line) and keeps its 53 px from tablet width up.
 - The landscape Smart Parks logo with the product name beside it in the navigation column and the phone header instead of the split logo; the entity and device panels on the live map carry the same track and heatmap icon toggles as the layers panel's rows; the layers panel's Show all and Hide all are one toggle per tab, like Fold all.
 - Live map: the entity and device count next to the Layers button is gone; the layers panel's tabs carry the numbers.
@@ -53,6 +55,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Migrations
 
+- 0026 (roles and scope): adds `project_roles`, `role_id` and `scope` on `project_memberships` and `invitations`, and widens the role checks to the operator and analyst roles; the downgrade maps those two back to viewer and drops the rest.
 - 0025 (entity types with sub-types, the standard catalogue): adds `entity_types.parent_id` and seeds about 250 rows; the downgrade drops the column and leaves the rows as plain types.
 - 0024 (location source): adds `location_source` and `location_fallback_hours` on entities and devices and `latest_position_kind` and `latest_fix_time` on both current states; the downgrade drops them.
 

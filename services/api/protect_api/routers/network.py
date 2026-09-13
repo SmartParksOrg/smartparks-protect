@@ -227,6 +227,8 @@ async def _scope_device_ids(
             DeviceProjectAssignment.validity.op("&&")(window)
         )
         ids |= set(await session.scalars(select(Device.id).where(Device.id.not_in(assigned))))
+    if context.visibility.limited:
+        ids &= set(context.visibility.device_ids or ())
     return list(ids)
 
 

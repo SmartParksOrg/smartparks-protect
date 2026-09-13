@@ -63,7 +63,7 @@ import { useGroups } from "@/hooks/useGroups";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePreference } from "@/hooks/usePreference";
-import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { usePermissions } from "@/hooks/useProjects";
 import { useRecords } from "@/hooks/useRecords";
 import {
   BUCKETS,
@@ -109,7 +109,7 @@ const CHART_LABELS: Record<ChartType, string> = {
 export function ExplorerPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
-  const role = useProjectRole(projectId);
+  const { can } = usePermissions(projectId);
   const user = useAuthStore((s) => s.user);
   const phone = useIsPhone();
   const [params, setParams] = useSearchParams();
@@ -667,7 +667,7 @@ export function ExplorerPage() {
             <Bookmark className="size-4" />
           </Button>
           {currentView &&
-            (currentView.created_by === user?.id || canAdmin(role)) && (
+            (currentView.created_by === user?.id || can("project:write")) && (
               <Button
                 variant="outline"
                 size="sm"

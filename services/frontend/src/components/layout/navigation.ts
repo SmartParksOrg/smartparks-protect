@@ -1,6 +1,8 @@
 /** Sidebar sections from architecture 28 (application navigation). Items without a route yet
  * render as disabled with the phase they arrive in. */
 import type { LucideIcon } from "lucide-react";
+
+import type { PermissionKey } from "@/lib/permissions";
 import {
   Activity,
   Bell,
@@ -39,7 +41,8 @@ export interface NavItem {
   /** Relative to the project route, or absolute when it starts with `/`. */
   to?: string;
   phase?: number;
-  adminOnly?: boolean;
+  /** The permission key that shows the item (decision D188). */
+  permission?: PermissionKey;
   serverAdminOnly?: boolean;
   /** Works in the all-projects scope (decision D116); the rest is per project. */
   allScope?: boolean;
@@ -48,8 +51,9 @@ export interface NavItem {
 export interface NavSection {
   label: string;
   items: NavItem[];
-  /** The whole section is for project admins and server admins (decision D134). */
-  adminOnly?: boolean;
+  /** The whole section needs this key (decision D134: the Network section is for project
+   * admins, so it asks for project settings). */
+  permission?: PermissionKey;
 }
 
 /** The sections as they apply to a scope: in the all scope only the items that work there. */
@@ -84,7 +88,7 @@ export const projectSections: NavSection[] = [
   },
   {
     label: "Network",
-    adminOnly: true,
+    permission: "project:write",
     items: [
       { label: "Traffic", allScope: true, icon: Radio, to: "network/traffic" },
       {
@@ -105,7 +109,7 @@ export const projectSections: NavSection[] = [
         label: "Automations",
         icon: Workflow,
         to: "rules/automations",
-        adminOnly: true,
+        permission: "automations:write",
       },
     ],
   },
@@ -116,7 +120,7 @@ export const projectSections: NavSection[] = [
         label: "Integrations",
         icon: Plug,
         to: "integrate/integrations",
-        adminOnly: true,
+        permission: "integrations:write",
       },
     ],
   },
@@ -129,30 +133,30 @@ export const projectSections: NavSection[] = [
   {
     label: "Project admin",
     items: [
-      { label: "Members", icon: Users, to: "admin/members", adminOnly: true },
+      { label: "Members", icon: Users, to: "admin/members", permission: "members:write" },
       {
         label: "Features",
         icon: Layers,
         to: "admin/features",
-        adminOnly: true,
+        permission: "features:write",
       },
       {
         label: "Groups",
         icon: FolderTree,
         to: "admin/groups",
-        adminOnly: true,
+        permission: "entities:write",
       },
       {
         label: "Notifications",
         icon: Send,
         to: "admin/notifications",
-        adminOnly: true,
+        permission: "project:write",
       },
       {
         label: "Settings",
         icon: Settings2,
         to: "admin/settings",
-        adminOnly: true,
+        permission: "project:write",
       },
     ],
   },

@@ -20,8 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { canAdmin, useProjectRole } from "@/hooks/useProjects";
-import { useAuthStore } from "@/stores/auth";
+import { usePermissions } from "@/hooks/useProjects";
 
 type Tile = DashboardTile;
 const KINDS: Record<Tile["kind"], string> = { saved_view: "Saved view (chart)", map: "Latest positions map", alerts: "Open alerts", events: "Recent events", entity_status: "Entity status counts" };
@@ -39,9 +38,8 @@ export function DashboardsPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
-  const role = useProjectRole(projectId);
-  const user = useAuthStore((s) => s.user);
-  const admin = canAdmin(role) || Boolean(user?.is_superuser);
+  const { can } = usePermissions(projectId);
+  const admin = can("dashboards:write");
   const base = `/api/v1/projects/${projectId}/dashboards`;
   const dashboards = useQuery({ queryKey: queryKeys.dashboards(projectId), queryFn: () => api.get<PageType<Dashboard>>(base, { query: { limit: 100 } }) });
   const views = useQuery({ queryKey: queryKeys.savedViews(projectId), queryFn: () => api.get<PageType<SavedView>>(`/api/v1/projects/${projectId}/analytics/saved-views`, { query: { limit: 200 } }) });

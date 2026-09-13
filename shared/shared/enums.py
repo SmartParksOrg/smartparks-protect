@@ -8,9 +8,13 @@ from enum import StrEnum
 
 
 class Role(StrEnum):
-    """Project roles. Server admin is `User.is_superuser`, not a membership row."""
+    """The built-in project roles (decision D185), each a superset of the one before; a custom
+    role is a `project_roles` row the membership points at. Server admin is
+    `User.is_superuser`, not a membership row."""
 
     PROJECT_VIEWER = "project-viewer"
+    PROJECT_OPERATOR = "project-operator"
+    PROJECT_ANALYST = "project-analyst"
     PROJECT_ADMIN = "project-admin"
 
 

@@ -90,6 +90,10 @@ async def coverage(
         "north": box[3],
     }
     gateway_filter = ""
+    device_filter = ""
+    if context.visibility.limited:
+        params["scope_devices"] = list(context.visibility.device_ids or ())
+        device_filter = " AND r.device_id = ANY(CAST(:scope_devices AS uuid[]))"
     if gateway_id:
         pairs = (
             await session.execute(
@@ -114,7 +118,7 @@ async def coverage(
             SELECT p.id, p.time, p.geom, r.rssi, r.gateway_id, r.data_source_id
             FROM (
                 SELECT DISTINCT r.device_id FROM gateway_receptions r
-                WHERE r.time >= :since AND r.device_id IS NOT NULL {gateway_filter}
+                WHERE r.time >= :since AND r.device_id IS NOT NULL {gateway_filter}{device_filter}
             ) d
             JOIN LATERAL (
                 SELECT p.id, p.time, p.geom, p.device_id, p.source_event_id

@@ -14,7 +14,7 @@ from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.crud import get_or_404
-from protect_api.deps import ProjectContext, require_permission
+from protect_api.deps import ProjectContext, membership_access, require_permission
 from protect_api.pagination import Page, PageResponse, page
 from protect_api.routers.devices import _visible_device
 from protect_api.schemas.control import (
@@ -43,9 +43,9 @@ from shared.control.commands import (
 )
 from shared.database import get_session
 from shared.domain.assignments import resolve_attribution
-from shared.enums import CommandStatus, ErrorCode, Role
+from shared.enums import CommandStatus, ErrorCode
 from shared.ingest import builtin_source, ensure_channel_identity
-from shared.models import Command, CommandExecution, Device, ProjectMembership, User
+from shared.models import Command, CommandExecution, Device, User
 from shared.permissions import Permission, permissions_for
 from shared.timeutil import utc_now
 from shared.trace import ApplicationError
@@ -63,14 +63,10 @@ async def _control_permissions(
         return attribution.project_id, permissions_for(None, server_admin=True)
     if attribution.project_id is None:
         return None, frozenset()
-    role_value = await session.scalar(
-        select(ProjectMembership.role).where(
-            ProjectMembership.user_id == user.id,
-            ProjectMembership.project_id == attribution.project_id,
-        )
-    )
-    role = Role(role_value) if role_value else None
-    return attribution.project_id, permissions_for(role, server_admin=False)
+    _role, permissions, visibility = await membership_access(session, user, attribution.project_id)
+    if not visibility.device_visible(device.id):
+        return attribution.project_id, frozenset()
+    return attribution.project_id, permissions
 
 
 @router.get("/devices/{device_id}/actions", response_model=list[ActionAvailability])

@@ -236,7 +236,9 @@ async def list_positions(
     time_to = require_aware(time_to) if time_to else utc_now()
     time_from = require_aware(time_from) if time_from else time_to - timedelta(hours=24)
     statement = select(Position).where(
-        Position.project_id == context.project.id, in_window(Position, time_from, time_to)
+        Position.project_id == context.project.id,
+        context.visibility.rows(Position.entity_id, Position.device_id),
+        in_window(Position, time_from, time_to),
     )
     if not include_invalid:
         statement = statement.where(visible(Position))
@@ -260,14 +262,19 @@ async def _device_visible(session: AsyncSession, user: User, device_id: uuid.UUI
 
     projects = await accessible_project_ids(user, session) or []
     row = await session.scalar(
-        select(DeviceProjectAssignment.id)
+        select(DeviceProjectAssignment.project_id)
         .where(
             DeviceProjectAssignment.device_id == device_id,
             DeviceProjectAssignment.project_id.in_(projects),
         )
+        .order_by(DeviceProjectAssignment.validity.desc())
         .limit(1)
     )
-    return row is not None
+    if row is None:
+        return False
+    from protect_api.visibility import visibility_for
+
+    return (await visibility_for(session, user, row)).device_visible(device_id)
 
 
 @router.get("/source-events/{source_event_id}", response_model=SourceEventRead)

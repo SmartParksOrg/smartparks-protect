@@ -94,18 +94,12 @@ async def test_a_viewer_cannot_reach_other_projects_or_the_server_admin(client, 
     assert leaks == []
 
 
-# Writes a viewer may make by design (the viewer permission set in shared/permissions.py):
-# manual events and alert handling for rangers, exports, saved views, and the read-only rule
-# test (a dry run over existing data).
+# Writes a viewer may make by design (the viewer set in shared/permissions.py, decision D185):
+# alert handling for rangers and the read-only rule test (a dry run over existing data).
+# Events, exports and saved views belong to the operator and analyst roles now.
 VIEWER_WRITES_ALLOWED = {
-    ("POST", "/api/v1/projects/{project_id}/events"),
     ("POST", "/api/v1/projects/{project_id}/alerts/{alert_id}/acknowledge"),
     ("POST", "/api/v1/projects/{project_id}/alerts/{alert_id}/resolve"),
-    ("POST", "/api/v1/projects/{project_id}/exports"),
-    ("POST", "/api/v1/projects/{project_id}/exports/{job_id}/reproduce"),
-    ("POST", "/api/v1/projects/{project_id}/analytics/saved-views"),
-    ("PATCH", "/api/v1/projects/{project_id}/analytics/saved-views/{view_id}"),
-    ("DELETE", "/api/v1/projects/{project_id}/analytics/saved-views/{view_id}"),
     ("POST", "/api/v1/projects/{project_id}/rules/{rule_id}/test"),
 }
 

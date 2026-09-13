@@ -286,7 +286,7 @@ async def list_dashboards(
 @router.post("/dashboards", response_model=DashboardRead, status_code=status.HTTP_201_CREATED)
 async def create_dashboard(
     body: DashboardCreate,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_WRITE)),
+    context: ProjectContext = Depends(require_permission(Permission.DASHBOARDS_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> Dashboard:
     dashboard = Dashboard(
@@ -333,7 +333,7 @@ async def get_dashboard(
 async def update_dashboard(
     dashboard_id: uuid.UUID,
     body: DashboardUpdate,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_WRITE)),
+    context: ProjectContext = Depends(require_permission(Permission.DASHBOARDS_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> Dashboard:
     dashboard = await _project_dashboard(session, context, dashboard_id)
@@ -358,7 +358,7 @@ async def update_dashboard(
 @router.delete("/dashboards/{dashboard_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_dashboard(
     dashboard_id: uuid.UUID,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_WRITE)),
+    context: ProjectContext = Depends(require_permission(Permission.DASHBOARDS_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     dashboard = await _project_dashboard(session, context, dashboard_id)

@@ -163,8 +163,12 @@ async def _owners(
     today, and when more would exceed the bound, the first that fit by name, with the count
     for the note. Nothing touches the hypertable here."""
     fit = max(1, MAX_SERIES // len(metrics))
+    entity_ids = context.visibility.narrow_entities(entity_ids)
+    device_ids = context.visibility.narrow_devices(device_ids)
     if group_by is GroupBy.ENTITY:
-        candidates = select(Entity.id).where(Entity.project_id == context.project.id)
+        candidates = select(Entity.id).where(
+            Entity.project_id == context.project.id, context.visibility.entities(Entity.id)
+        )
         if entity_ids:
             candidates = candidates.where(Entity.id.in_(entity_ids))
         total = int(
@@ -186,6 +190,8 @@ async def _owners(
     )
     if device_ids:
         candidates = select(Device.id).where(Device.id.in_(device_ids))
+    else:
+        candidates = candidates.where(context.visibility.devices(Device.id))
     total = int(await session.scalar(select(func.count()).select_from(candidates.subquery())) or 0)
     if device_ids and total <= fit:
         return Owners([], device_ids, total, total)
@@ -473,7 +479,7 @@ async def list_saved_views(
 @router.post("/saved-views", response_model=SavedViewRead, status_code=status.HTTP_201_CREATED)
 async def create_saved_view(
     body: SavedViewCreate,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ProjectContext = Depends(require_permission(Permission.VIEWS_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> SavedView:
     """Any member can save a view; names are unique per project."""
@@ -500,7 +506,7 @@ async def _own_or_admin(
 async def update_saved_view(
     view_id: uuid.UUID,
     body: SavedViewUpdate,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ProjectContext = Depends(require_permission(Permission.VIEWS_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> SavedView:
     view = await _own_or_admin(session, context, view_id)
@@ -513,7 +519,7 @@ async def update_saved_view(
 @router.delete("/saved-views/{view_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_saved_view(
     view_id: uuid.UUID,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ProjectContext = Depends(require_permission(Permission.VIEWS_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     view = await _own_or_admin(session, context, view_id)

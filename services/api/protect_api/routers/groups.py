@@ -14,8 +14,8 @@ from protect_api.deps import (
     require_permission,
     require_scope_permission,
 )
-from protect_api.routers.entities import group_and_subgroups
 from protect_api.schemas.domain import EntityGroupCreate, EntityGroupRead, EntityGroupUpdate
+from protect_api.visibility import group_and_subgroups
 from shared.database import get_session
 from shared.models import Entity, Group
 from shared.permissions import Permission
@@ -76,13 +76,46 @@ async def list_groups(
             )
         ).all()
     }
-    groups = (
-        await session.scalars(
-            select(Group)
-            .where(context.where(Group.project_id))
-            .order_by(Group.sort_order, Group.name)
+    groups = list(
+        (
+            await session.scalars(
+                select(Group)
+                .where(context.where(Group.project_id))
+                .order_by(Group.sort_order, Group.name)
+            )
+        ).all()
+    )
+    if context.visibility.limited:
+        # the groups in scope with their ancestors, plus the groups of single entities in
+        # scope, so the tree still renders (decision D186)
+        by_id = {g.id: g for g in groups}
+        keep: set[uuid.UUID] = set(context.visibility.group_ids or ())
+        entity_groups = await session.scalars(
+            select(Entity.group_id).where(
+                Entity.id.in_(context.visibility.entity_ids or ()), Entity.group_id.is_not(None)
+            )
         )
-    ).all()
+        keep |= {g for g in entity_groups if g is not None}
+        for start in list(keep):
+            current = by_id.get(start)
+            while current is not None and current.parent_id is not None:
+                keep.add(current.parent_id)
+                current = by_id.get(current.parent_id)
+        groups = [g for g in groups if g.id in keep]
+        counts = {
+            group_id: count
+            for group_id, count in (
+                await session.execute(
+                    select(Entity.group_id, func.count())
+                    .where(
+                        context.where(Entity.project_id),
+                        Entity.group_id.is_not(None),
+                        context.visibility.entities(Entity.id),
+                    )
+                    .group_by(Entity.group_id)
+                )
+            ).all()
+        }
     return [group_read(g, int(counts.get(g.id, 0))) for g in groups]
 
 

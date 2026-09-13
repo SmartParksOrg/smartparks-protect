@@ -110,6 +110,8 @@ async def register(
                 user_id=user.id,
                 project_id=invitation.project_id,
                 role=Role(invitation.role),
+                role_id=invitation.role_id,
+                scope=invitation.scope,
                 added_by_user_id=invitation.invited_by_user_id,
             )
         )

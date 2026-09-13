@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
@@ -25,16 +25,38 @@ from protect_api.schemas.access import (
     InvitationRead,
     MemberCreate,
     MemberRead,
+    MemberScope,
     MemberUpdate,
     ProjectCreate,
     ProjectRead,
+    ProjectRoleCreate,
+    ProjectRoleRead,
+    ProjectRoleUpdate,
     ProjectUpdate,
     ProjectWithRole,
 )
+from protect_api.visibility import scope_is_empty
 from shared.config import get_settings
 from shared.database import get_session
-from shared.models import AuditLog, Invitation, Project, ProjectMembership, User
-from shared.permissions import Permission
+from shared.enums import Role
+from shared.models import (
+    AuditLog,
+    Device,
+    DeviceProjectAssignment,
+    Entity,
+    Group,
+    Invitation,
+    Project,
+    ProjectMembership,
+    ProjectRole,
+    User,
+)
+from shared.permissions import (
+    BUILTIN_ROLE_LABELS,
+    Permission,
+    normalise_permissions,
+    permissions_for,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -54,7 +76,11 @@ async def list_projects(
             statement = statement.where(Project.organization_id == organization_id)
         rows, next_cursor = await paginate(session, Project.id, statement, page)
         items = [
-            ProjectWithRole(**ProjectRead.model_validate(p).model_dump(), role="server-admin")
+            ProjectWithRole(
+                **ProjectRead.model_validate(p).model_dump(),
+                role="server-admin",
+                permissions=sorted(permissions_for(None, server_admin=True)),
+            )
             for p in rows
         ]
         return PageResponse(items=items, next_cursor=next_cursor)
@@ -66,16 +92,42 @@ async def list_projects(
     if organization_id is not None:
         statement = statement.where(Project.organization_id == organization_id)
     rows, next_cursor = await paginate(session, Project.id, statement, page)
-    membership_rows = await session.execute(
-        select(ProjectMembership.project_id, ProjectMembership.role).where(
-            ProjectMembership.user_id == user.id
-        )
+    memberships = {
+        m.project_id: m
+        for m in (
+            await session.scalars(
+                select(ProjectMembership).where(ProjectMembership.user_id == user.id)
+            )
+        ).all()
+    }
+    custom_ids = {m.role_id for m in memberships.values() if m.role_id is not None}
+    custom = (
+        {
+            r.id: r
+            for r in (
+                await session.scalars(select(ProjectRole).where(ProjectRole.id.in_(custom_ids)))
+            ).all()
+        }
+        if custom_ids
+        else {}
     )
-    roles: dict[uuid.UUID, str] = {row[0]: row[1] for row in membership_rows.all()}
-    items = [
-        ProjectWithRole(**ProjectRead.model_validate(p).model_dump(), role=roles[p.id])
-        for p in rows
-    ]
+    items = []
+    for p in rows:
+        m = memberships[p.id]
+        role = custom.get(m.role_id) if m.role_id is not None else None
+        permissions = permissions_for(
+            Role(m.role),
+            server_admin=False,
+            custom=list(role.permissions) if role and role.project_id == p.id else None,
+        )
+        items.append(
+            ProjectWithRole(
+                **ProjectRead.model_validate(p).model_dump(),
+                role=m.role,
+                permissions=sorted(permissions),
+                scope_limited=not scope_is_empty(m.scope),
+            )
+        )
     return PageResponse(items=items, next_cursor=next_cursor)
 
 
@@ -131,15 +183,101 @@ async def update_project(
     return context.project
 
 
-def _member_read(membership: ProjectMembership, user: User) -> MemberRead:
+def _member_read(
+    membership: ProjectMembership, user: User, custom: ProjectRole | None
+) -> MemberRead:
+    permissions = permissions_for(
+        Role(membership.role),
+        server_admin=False,
+        custom=list(custom.permissions) if custom is not None else None,
+    )
+    scope = None if scope_is_empty(membership.scope) else MemberScope(**(membership.scope or {}))
     return MemberRead(
         id=membership.id,
         user_id=user.id,
         email=user.email,
         full_name=user.full_name,
-        role=membership.role,
+        role=Role(membership.role),
+        role_id=custom.id if custom is not None else None,
+        role_name=custom.name if custom is not None else BUILTIN_ROLE_LABELS[Role(membership.role)],
+        permissions=sorted(permissions),
+        scope=scope,
         created_at=membership.created_at,
     )
+
+
+async def _custom_roles(
+    session: AsyncSession, project_id: uuid.UUID, ids: set[uuid.UUID | None]
+) -> dict[uuid.UUID, ProjectRole]:
+    wanted = {i for i in ids if i is not None}
+    if not wanted:
+        return {}
+    rows = await session.scalars(
+        select(ProjectRole).where(ProjectRole.project_id == project_id, ProjectRole.id.in_(wanted))
+    )
+    return {r.id: r for r in rows}
+
+
+async def _check_role_id(
+    session: AsyncSession, project_id: uuid.UUID, role_id: uuid.UUID | None
+) -> ProjectRole | None:
+    if role_id is None:
+        return None
+    role = await session.get(ProjectRole, role_id)
+    if role is None or role.project_id != project_id:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown role for this project")
+    return role
+
+
+async def _check_scope(
+    session: AsyncSession, project_id: uuid.UUID, scope: MemberScope | None
+) -> dict[str, list[str]] | None:
+    """The scope as stored, every id checked against the project: groups and entities of the
+    project, devices assigned to it now or before. An empty scope is stored as null."""
+    if scope is None or scope.empty:
+        return None
+    if scope.groups:
+        found = set(
+            await session.scalars(
+                select(Group.id).where(Group.project_id == project_id, Group.id.in_(scope.groups))
+            )
+        )
+        if found != set(scope.groups):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "A group is not of this project"
+            )
+    if scope.entities:
+        found = set(
+            await session.scalars(
+                select(Entity.id).where(
+                    Entity.project_id == project_id, Entity.id.in_(scope.entities)
+                )
+            )
+        )
+        if found != set(scope.entities):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "An entity is not of this project"
+            )
+    if scope.devices:
+        found = set(
+            await session.scalars(
+                select(DeviceProjectAssignment.device_id)
+                .join(Device, Device.id == DeviceProjectAssignment.device_id)
+                .where(
+                    DeviceProjectAssignment.project_id == project_id,
+                    DeviceProjectAssignment.device_id.in_(scope.devices),
+                )
+            )
+        )
+        if found != set(scope.devices):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "A device was never assigned to this project"
+            )
+    return {
+        "groups": [str(i) for i in scope.groups],
+        "entities": [str(i) for i in scope.entities],
+        "devices": [str(i) for i in scope.devices],
+    }
 
 
 @router.get("/{project_id}/members", response_model=PageResponse[MemberRead])
@@ -156,8 +294,10 @@ async def list_members(
             await session.scalars(select(User).where(User.id.in_([m.user_id for m in rows])))
         ).all()
     }
+    custom = await _custom_roles(session, context.project.id, {m.role_id for m in rows})
     return PageResponse(
-        items=[_member_read(m, users[m.user_id]) for m in rows], next_cursor=next_cursor
+        items=[_member_read(m, users[m.user_id], custom.get(m.role_id)) for m in rows],
+        next_cursor=next_cursor,
     )
 
 
@@ -175,10 +315,14 @@ async def add_member(
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, "No account with this email; send an invitation"
         )
+    custom = await _check_role_id(session, context.project.id, body.role_id)
+    scope = await _check_scope(session, context.project.id, body.scope)
     membership = ProjectMembership(
         user_id=user.id,
         project_id=context.project.id,
         role=body.role,
+        role_id=custom.id if custom else None,
+        scope=scope,
         added_by_user_id=context.user.id,
     )
     session.add(membership)
@@ -190,10 +334,15 @@ async def add_member(
         object_type="membership",
         object_id=str(membership.id),
         project_id=context.project.id,
-        details={"user_id": str(user.id), "role": body.role},
+        details={
+            "user_id": str(user.id),
+            "role": body.role,
+            "role_id": str(custom.id) if custom else None,
+            "scope": scope,
+        },
     )
     await session.commit()
-    return _member_read(membership, user)
+    return _member_read(membership, user, custom)
 
 
 @router.patch("/{project_id}/members/{membership_id}", response_model=MemberRead)
@@ -206,7 +355,22 @@ async def update_member(
     membership = await get_or_404(session, ProjectMembership, membership_id, "Membership")
     if membership.project_id != context.project.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Membership not found")
-    changed = apply_patch(membership, body)
+    fields = body.model_dump(exclude_unset=True)
+    changed: dict[str, object] = {}
+    if "role" in fields and body.role is not None and membership.role != body.role:
+        membership.role = body.role
+        changed["role"] = body.role
+    if "role_id" in fields:
+        custom = await _check_role_id(session, context.project.id, body.role_id)
+        new_id = custom.id if custom else None
+        if membership.role_id != new_id:
+            membership.role_id = new_id
+            changed["role_id"] = str(new_id) if new_id else None
+    if "scope" in fields:
+        scope = await _check_scope(session, context.project.id, body.scope)
+        if membership.scope != scope:
+            membership.scope = scope
+            changed["scope"] = scope
     await record_audit(
         session,
         user=context.user,
@@ -218,7 +382,8 @@ async def update_member(
     )
     await session.commit()
     user = await get_or_404(session, User, membership.user_id, "User")
-    return _member_read(membership, user)
+    custom_role = await _check_role_id(session, context.project.id, membership.role_id)
+    return _member_read(membership, user, custom_role)
 
 
 @router.delete("/{project_id}/members/{membership_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -251,11 +416,15 @@ async def create_invitation_row(
     role: str | None,
     server_admin: bool,
     invited_by: User,
+    role_id: uuid.UUID | None = None,
+    scope: dict[str, list[str]] | None = None,
 ) -> InvitationRead:
     invitation = Invitation(
         email=email.lower(),
         project_id=project.id if project else None,
         role=role,
+        role_id=role_id,
+        scope=scope,
         server_admin=server_admin,
         token=secrets.token_urlsafe(32),
         invited_by_user_id=invited_by.id,
@@ -270,7 +439,13 @@ async def create_invitation_row(
         object_type="invitation",
         object_id=str(invitation.id),
         project_id=invitation.project_id,
-        details={"email": invitation.email, "role": role, "server_admin": server_admin},
+        details={
+            "email": invitation.email,
+            "role": role,
+            "role_id": str(role_id) if role_id else None,
+            "scope": scope,
+            "server_admin": server_admin,
+        },
     )
     await session.commit()
     sent = await get_mailer().send_invitation(
@@ -306,6 +481,8 @@ async def invite_member(
     context: ProjectContext = Depends(require_permission(Permission.MEMBERS_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> InvitationRead:
+    custom = await _check_role_id(session, context.project.id, body.role_id)
+    scope = await _check_scope(session, context.project.id, body.scope)
     return await create_invitation_row(
         session,
         email=body.email,
@@ -313,6 +490,8 @@ async def invite_member(
         role=body.role,
         server_admin=False,
         invited_by=context.user,
+        role_id=custom.id if custom else None,
+        scope=scope,
     )
 
 
@@ -354,3 +533,152 @@ async def project_audit(
         statement = statement.where(AuditLog.id < before)
     rows = await session.scalars(statement.order_by(AuditLog.id.desc()).limit(limit))
     return list(rows)
+
+
+# Custom roles (decisions D185, D187)
+
+
+def _role_read(role: ProjectRole, members: int) -> ProjectRoleRead:
+    return ProjectRoleRead(
+        id=role.id,
+        project_id=role.project_id,
+        name=role.name,
+        description=role.description,
+        permissions=sorted(role.permissions),
+        members=members,
+        created_at=role.created_at,
+        updated_at=role.updated_at,
+    )
+
+
+def _permission_keys(keys: list[str]) -> list[str]:
+    try:
+        return sorted(normalise_permissions(keys))
+    except ValueError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
+
+
+@router.get("/{project_id}/roles", response_model=list[ProjectRoleRead])
+async def list_roles(
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> list[ProjectRoleRead]:
+    """The project's custom roles with how many members hold each; the built-in roles come
+    from `GET /permissions`."""
+    roles = (
+        await session.scalars(
+            select(ProjectRole)
+            .where(ProjectRole.project_id == context.project.id)
+            .order_by(ProjectRole.name)
+        )
+    ).all()
+    counts: dict[uuid.UUID | None, int] = {
+        row[0]: int(row[1])
+        for row in (
+            await session.execute(
+                select(ProjectMembership.role_id, func.count())
+                .where(ProjectMembership.project_id == context.project.id)
+                .group_by(ProjectMembership.role_id)
+            )
+        ).all()
+    }
+    return [_role_read(r, int(counts.get(r.id, 0))) for r in roles]
+
+
+@router.post(
+    "/{project_id}/roles", response_model=ProjectRoleRead, status_code=status.HTTP_201_CREATED
+)
+async def create_role(
+    body: ProjectRoleCreate,
+    context: ProjectContext = Depends(require_permission(Permission.MEMBERS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> ProjectRoleRead:
+    role = ProjectRole(
+        project_id=context.project.id,
+        name=body.name.strip(),
+        description=body.description,
+        permissions=_permission_keys(body.permissions),
+    )
+    session.add(role)
+    await flush_or_409(session, "Role")
+    await record_audit(
+        session,
+        user=context.user,
+        action="role.created",
+        object_type="project_role",
+        object_id=str(role.id),
+        project_id=context.project.id,
+        details={"name": role.name, "permissions": role.permissions},
+    )
+    await session.commit()
+    return _role_read(role, 0)
+
+
+@router.patch("/{project_id}/roles/{role_id}", response_model=ProjectRoleRead)
+async def update_role(
+    role_id: uuid.UUID,
+    body: ProjectRoleUpdate,
+    context: ProjectContext = Depends(require_permission(Permission.MEMBERS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> ProjectRoleRead:
+    role = await get_or_404(session, ProjectRole, role_id, "Role")
+    if role.project_id != context.project.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Role not found")
+    fields = body.model_dump(exclude_unset=True)
+    changed: dict[str, object] = {}
+    if "name" in fields and body.name is not None:
+        role.name = body.name.strip()
+        changed["name"] = role.name
+    if "description" in fields:
+        role.description = body.description
+        changed["description"] = body.description
+    if "permissions" in fields and body.permissions is not None:
+        role.permissions = _permission_keys(body.permissions)
+        changed["permissions"] = role.permissions
+    await flush_or_409(session, "Role")
+    await record_audit(
+        session,
+        user=context.user,
+        action="role.updated",
+        object_type="project_role",
+        object_id=str(role.id),
+        project_id=context.project.id,
+        details=changed,
+    )
+    await session.commit()
+    members = await session.scalar(
+        select(func.count())
+        .select_from(ProjectMembership)
+        .where(ProjectMembership.role_id == role.id)
+    )
+    return _role_read(role, int(members or 0))
+
+
+@router.delete("/{project_id}/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_role(
+    role_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.MEMBERS_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """A role in use cannot be deleted: give its members another role first."""
+    role = await get_or_404(session, ProjectRole, role_id, "Role")
+    if role.project_id != context.project.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Role not found")
+    members = await session.scalar(
+        select(func.count())
+        .select_from(ProjectMembership)
+        .where(ProjectMembership.role_id == role.id)
+    )
+    if members:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{members} member(s) hold this role")
+    await session.delete(role)
+    await record_audit(
+        session,
+        user=context.user,
+        action="role.deleted",
+        object_type="project_role",
+        object_id=str(role.id),
+        project_id=context.project.id,
+        details={"name": role.name},
+    )
+    await session.commit()

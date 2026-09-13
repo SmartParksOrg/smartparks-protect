@@ -1,13 +1,13 @@
 """Access control dependencies.
 
 - `require_server_admin`: the user flag `is_superuser`.
-- `require_project_role(role)`: membership in the `{project_id}` of the path with at least that
-  role. Server admins pass everywhere.
-- `require_permission(key)`: the fine-grained variant; the role's permission set must contain it.
+- `require_permission(key)`: membership in the `{project_id}` of the path whose role (built in
+  or custom, decision D185) grants the key. Server admins pass everywhere.
 
-Every dependency returns a `ProjectContext` so endpoints know the caller's role and permissions
-without a second query. A project that does not exist is a 404 for everyone, so that the
-existence of projects is not leaked through 403 versus 404.
+Every dependency returns a `ProjectContext` so endpoints know the caller's permissions and
+visibility (the membership's scope resolved to entity and device ids, decision D186) without
+a second query. A project that does not exist is a 404 for everyone, so that the existence of
+projects is not leaked through 403 versus 404.
 """
 
 import uuid
@@ -20,12 +20,11 @@ from sqlalchemy import select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.users import current_active_user
+from protect_api.visibility import EVERYTHING, Visibility, resolve_visibility
 from shared.database import get_session
 from shared.enums import Role
-from shared.models import Project, ProjectMembership, User
+from shared.models import Project, ProjectMembership, ProjectRole, User
 from shared.permissions import Permission, permissions_for
-
-ROLE_RANK = {Role.PROJECT_VIEWER: 1, Role.PROJECT_ADMIN: 2}
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +33,7 @@ class ProjectContext:
     project: Project
     role: Role | None
     permissions: frozenset[Permission]
+    visibility: Visibility = EVERYTHING
 
     @property
     def is_server_admin(self) -> bool:
@@ -54,6 +54,7 @@ class ScopeContext:
     project: Project | None
     role: Role | None
     permissions: frozenset[Permission]
+    visibility: Visibility = EVERYTHING
 
     @property
     def is_all(self) -> bool:
@@ -100,6 +101,7 @@ async def get_scope_context(
         project=context.project,
         role=context.role,
         permissions=context.permissions,
+        visibility=context.visibility,
     )
 
 
@@ -120,6 +122,32 @@ async def require_server_admin(user: User = Depends(current_active_user)) -> Use
     return user
 
 
+async def membership_access(
+    session: AsyncSession, user: User, project_id: uuid.UUID
+) -> tuple[Role | None, frozenset[Permission], Visibility]:
+    """The caller's role, permissions and visibility in a project from the membership row:
+    a custom role's keys when the row names one, the built-in role's otherwise, and the scope
+    resolved to ids (decisions D185, D186). A server admin has everything and sees everything."""
+    if user.is_superuser:
+        return None, permissions_for(None, server_admin=True), EVERYTHING
+    membership = await session.scalar(
+        select(ProjectMembership).where(
+            ProjectMembership.user_id == user.id, ProjectMembership.project_id == project_id
+        )
+    )
+    if membership is None:
+        return None, frozenset(), EVERYTHING
+    role = Role(membership.role)
+    custom: list[str] | None = None
+    if membership.role_id is not None:
+        custom_role = await session.get(ProjectRole, membership.role_id)
+        if custom_role is not None and custom_role.project_id == project_id:
+            custom = list(custom_role.permissions)
+    permissions = permissions_for(role, server_admin=False, custom=custom)
+    visibility = await resolve_visibility(session, project_id, membership.scope)
+    return role, permissions, visibility
+
+
 async def get_project_context(
     project_id: uuid.UUID,
     user: User = Depends(current_active_user),
@@ -128,33 +156,16 @@ async def get_project_context(
     project = await session.get(Project, project_id)
     if project is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
-    role_value = await session.scalar(
-        select(ProjectMembership.role).where(
-            ProjectMembership.user_id == user.id, ProjectMembership.project_id == project_id
-        )
-    )
-    role = Role(role_value) if role_value is not None else None
+    role, permissions, visibility = await membership_access(session, user, project_id)
     if role is None and not user.is_superuser:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No access to this project")
     return ProjectContext(
         user=user,
         project=project,
         role=role,
-        permissions=permissions_for(role, server_admin=user.is_superuser),
+        permissions=permissions,
+        visibility=visibility,
     )
-
-
-def require_project_role(
-    minimum: Role,
-) -> Callable[..., Coroutine[Any, Any, ProjectContext]]:
-    async def dependency(context: ProjectContext = Depends(get_project_context)) -> ProjectContext:
-        if context.is_server_admin:
-            return context
-        if context.role is None or ROLE_RANK[context.role] < ROLE_RANK[minimum]:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, f"Role {minimum} required")
-        return context
-
-    return dependency
 
 
 def require_permission(

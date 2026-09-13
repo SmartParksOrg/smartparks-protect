@@ -6,6 +6,7 @@ from shared.models.access import (
     Organization,
     Project,
     ProjectMembership,
+    ProjectRole,
     User,
 )
 from shared.models.analytics import ExportJob, SavedView
@@ -108,6 +109,7 @@ __all__ = [
     "Project",
     "ProjectIcon",
     "ProjectMembership",
+    "ProjectRole",
     "Rule",
     "RuleState",
     "RuleVersion",

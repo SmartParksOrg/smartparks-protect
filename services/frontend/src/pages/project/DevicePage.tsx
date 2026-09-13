@@ -46,7 +46,7 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
 import { useTab } from "@/hooks/useTab";
-import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { usePermissions } from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
 import { useAuthStore } from "@/stores/auth";
@@ -57,7 +57,7 @@ export function DevicePage() {
   const { t } = useTranslation();
   const { projectId, deviceId = "" } = useParams();
   const user = useAuthStore((s) => s.user);
-  const role = useProjectRole(projectId);
+  const { can } = usePermissions(projectId);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
     null,
   );
@@ -161,7 +161,7 @@ export function DevicePage() {
   const beforeEntity = sp
     ? sp.before_entity.positions + sp.before_entity.measurements
     : 0;
-  const mayRepair = Boolean(user?.is_superuser || canAdmin(role));
+  const mayRepair = can("data:curate");
   const firstData = sp?.first_data_at ?? null;
   const projectCovered = Boolean(
     sp?.earliest_project_from &&
@@ -174,7 +174,7 @@ export function DevicePage() {
   // the device's project today: the route's, or on the admin route the current assignment's
   const deviceProjectId =
     projectId ?? d?.project_assignments.find((a) => !a.valid_to)?.project_id ?? null;
-  const mayAssign = Boolean(deviceProjectId && (user?.is_superuser || canAdmin(role)));
+  const mayAssign = Boolean(deviceProjectId && can("devices:write"));
   const release = useMutationToast({
     mutationFn: (assignmentId: string) =>
       api.patch(`/api/v1/projects/${deviceProjectId}/entity-assignments/${assignmentId}`, {
@@ -470,7 +470,7 @@ export function DevicePage() {
                 <DeviceControl
                   deviceId={d.id}
                   projectId={projectId}
-                  canFlush={canAdmin(role) || Boolean(user?.is_superuser)}
+                  canFlush={can("devices:control")}
                 />
               </div>
               <Card>
@@ -568,11 +568,11 @@ export function DevicePage() {
                 deviceId={d.id}
                 deviceName={d.name}
                 driverKey={type?.driver_key}
-                canWrite={canAdmin(role) || Boolean(user?.is_superuser)}
+                canWrite={can("devices:write")}
               />
               <LogFilesCard
                 deviceId={d.id}
-                canWrite={canAdmin(role) || Boolean(user?.is_superuser)}
+                canWrite={can("devices:write")}
               />
               {projectId && (
                 <Card className="lg:col-span-2">
@@ -633,7 +633,7 @@ export function DevicePage() {
                           />
                           <span className="ml-auto flex gap-3">
                             {projectId &&
-                              (canAdmin(role) || user?.is_superuser) && (
+                              can("devices:write") && (
                                 <Button
                                   variant="link"
                                   size="sm"

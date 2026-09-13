@@ -3,7 +3,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 
 import { AppLayout } from "@/components/layout/AppLayout";
-import { RequireAuth, RequireServerAdmin } from "@/components/layout/RequireAuth";
+import { RequireAuth, RequireProjectPermission, RequireServerAdmin } from "@/components/layout/RequireAuth";
 import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/auth/PasswordPages";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
@@ -93,10 +93,18 @@ export default function App() {
               <Route path="network/gateways" element={<GatewaysPage />} />
               <Route path="integrate/integrations" element={<IntegrationsPage />} />
               <Route path="network/traces" element={<TracesPage />} />
-              <Route path="admin/members" element={<MembersPage />} />
-              <Route path="admin/features" element={<FeaturesPage />} />
-              <Route path="admin/groups" element={<GroupsPage />} />
-              <Route path="admin/settings" element={<ProjectSettingsPage />} />
+              <Route element={<RequireProjectPermission permission="members:write" />}>
+                <Route path="admin/members" element={<MembersPage />} />
+              </Route>
+              <Route element={<RequireProjectPermission permission="features:write" />}>
+                <Route path="admin/features" element={<FeaturesPage />} />
+              </Route>
+              <Route element={<RequireProjectPermission permission="entities:write" />}>
+                <Route path="admin/groups" element={<GroupsPage />} />
+              </Route>
+              <Route element={<RequireProjectPermission permission="project:write" />}>
+                <Route path="admin/settings" element={<ProjectSettingsPage />} />
+              </Route>
             </Route>
             <Route path="/admin" element={<RequireServerAdmin />}>
               <Route index element={<Navigate to="attention" replace />} />

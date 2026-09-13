@@ -66,6 +66,26 @@ async def _project_job(
     return job
 
 
+def _in_scope(context: ProjectContext, params: ExportParameters) -> ExportParameters:
+    """The parameters cut to the caller's scope (decision D186): a selection narrowed to what
+    is visible, an empty selection replaced by the scope itself; the export worker reads the
+    lists from the job and never sees the membership."""
+    if not context.visibility.limited:
+        return params
+    entity_ids = context.visibility.narrow_entities(params.entity_ids)
+    device_ids = context.visibility.narrow_devices(params.device_ids)
+    if not entity_ids and not device_ids:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Nothing of the selection is in your scope"
+        )
+    if len(entity_ids) > 500 or len(device_ids) > 500:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Your scope holds more than 500 entities or devices; pick some for the export",
+        )
+    return params.model_copy(update={"entity_ids": entity_ids, "device_ids": device_ids})
+
+
 async def _queue(
     session: AsyncSession,
     bus: RedisStreamsBus,
@@ -73,6 +93,7 @@ async def _queue(
     params: ExportParameters,
     source_job: ExportJob | None = None,
 ) -> ExportJob:
+    params = _in_scope(context, params)
     job = ExportJob(
         project_id=context.project.id,
         created_by=context.user.id,
@@ -135,6 +156,7 @@ async def direct(
 ) -> StreamingResponse:
     """Download a small export at once (at most DIRECT_MAX_ROWS rows, architecture 13.8).
     Larger requests get 413 and should become a job."""
+    params = _in_scope(context, params)
     try:
         await check_direct_size(session, context.project.id, params)
     except ExportTooLarge as error:

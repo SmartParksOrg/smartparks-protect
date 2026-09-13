@@ -2,7 +2,7 @@
 
 What each kind of user sees. The rule behind every page (decisions D133 and D134): the entity,
 its state and the next action first; the machinery one click deeper, in the same place on
-every object. There is no switch for detail: what a person sees follows the role only.
+every object. There is no switch for detail: what a person may do follows the role (built in or composed, decision D185) and what a person sees follows the membership's scope (the whole project, or chosen groups, entities and devices, decision D186); a page, a button or a menu entry shows when the role grants its permission key.
 
 ## One click deeper
 
@@ -18,7 +18,9 @@ commands. The tab sits in the URL (`?tab=data`, `?tab=network`), so a link from 
 row, a gateway or a trace lands on the tab it means. A list shows the columns a person needs
 first; the Columns picker adds the rest, per user.
 
-## Project viewer
+## Project viewer (and every role, within its scope)
+
+A viewer sees the pages below. The Operator and Analyst roles see the same pages with more buttons on them (events, control and features; exports, saved views and dashboards); a custom role shows exactly the buttons its keys grant. A member with a scope sees the same pages with only what is in the scope on them.
 
 | Page | Shows | One click deeper |
 | --- | --- | --- |
@@ -36,7 +38,7 @@ first; the Columns picker adds the rest, per user.
 ## Project admin
 
 Everything a viewer sees, plus the Network section (Traffic, Gateways, Trace explorer), Rules,
-Automations, Integrations, Curation and the Project admin section (Members, Features, Groups,
+Automations, Integrations, Curation and the Project admin section (Members with its Roles and Invitations tabs, the scope picker and the role editor; Features, Groups,
 Notifications, Settings).
 
 ## Server admin

@@ -16,7 +16,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { RuleEditor } from "@/components/rules/RuleEditor";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { usePermissions } from "@/hooks/useProjects";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatAgo } from "@/lib/format";
 import { describeDocument } from "@/lib/rules";
@@ -25,8 +25,8 @@ import { describeDocument } from "@/lib/rules";
 export function RulesPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
-  const role = useProjectRole(projectId);
-  const admin = canAdmin(role);
+  const { can } = usePermissions(projectId);
+  const admin = can("rules:write");
   const base = `/api/v1/projects/${projectId}/rules`;
   const rules = useQuery({ queryKey: queryKeys.rules(projectId), queryFn: () => api.get<PageType<Rule>>(base, { query: { limit: 500 } }) });
   // a link from the map (phase 19): `?new=<template>&feature=<id>` opens the editor on that

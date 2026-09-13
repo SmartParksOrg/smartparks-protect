@@ -3,10 +3,9 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
-from sqlalchemy import Select, select
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
 from protect_api.audit import record_audit
 from protect_api.crud import (
@@ -41,6 +40,7 @@ from protect_api.schemas.domain import (
     FeatureRead,
     FeatureUpdate,
 )
+from protect_api.visibility import group_and_subgroups
 from shared.database import get_session
 from shared.domain.assignments import reattribute, resolve_attribution
 from shared.models import (
@@ -89,15 +89,6 @@ def assignment_read(
     )
 
 
-def group_and_subgroups(group_id: uuid.UUID) -> Select[tuple[uuid.UUID]]:
-    """The group's id and the ids of every group below it, however deep, for filters on a
-    parent group (a recursive query)."""
-    tree = select(Group.id).where(Group.id == group_id).cte("group_tree", recursive=True)
-    below = aliased(Group)
-    tree = tree.union_all(select(below.id).where(below.parent_id == tree.c.id))
-    return select(tree.c.id)
-
-
 async def check_group(
     session: AsyncSession, context: ProjectContext, group_id: uuid.UUID | None
 ) -> None:
@@ -124,7 +115,9 @@ async def list_entities(
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[EntityRead]:
-    statement = select(Entity).where(context.where(Entity.project_id))
+    statement = select(Entity).where(
+        context.where(Entity.project_id), context.visibility.entities(Entity.id)
+    )
     if entity_type_id is not None:
         statement = statement.where(Entity.entity_type_id == entity_type_id)
     if group_id is not None:
@@ -211,7 +204,7 @@ async def _project_entity(
     session: AsyncSession, context: ProjectContext, entity_id: uuid.UUID
 ) -> Entity:
     entity = await get_or_404(session, Entity, entity_id, "Entity")
-    if entity.project_id != context.project.id:
+    if entity.project_id != context.project.id or not context.visibility.entity_visible(entity.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Entity not found")
     return entity
 
@@ -353,7 +346,7 @@ async def list_features(
 @router.post("/features", response_model=FeatureRead, status_code=status.HTTP_201_CREATED)
 async def create_feature(
     body: FeatureCreate,
-    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> FeatureRead:
     feature = Feature(
@@ -398,7 +391,7 @@ async def get_feature(
 async def update_feature(
     feature_id: uuid.UUID,
     body: FeatureUpdate,
-    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> FeatureRead:
     feature = await _project_feature(session, context, feature_id)
@@ -423,7 +416,7 @@ async def update_feature(
 @router.delete("/features/{feature_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_feature(
     feature_id: uuid.UUID,
-    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     feature = await _project_feature(session, context, feature_id)
@@ -456,7 +449,12 @@ async def list_entity_assignments(
     statement = (
         select(DeviceEntityAssignment)
         .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
-        .where(context.where(Entity.project_id))
+        .where(
+            context.where(Entity.project_id),
+            context.visibility.rows(
+                DeviceEntityAssignment.entity_id, DeviceEntityAssignment.device_id
+            ),
+        )
     )
     if entity_id is not None:
         statement = statement.where(DeviceEntityAssignment.entity_id == entity_id)

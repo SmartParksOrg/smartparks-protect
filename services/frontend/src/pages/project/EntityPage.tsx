@@ -50,7 +50,7 @@ import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
 import { useTab } from "@/hooks/useTab";
 import { groupPath, useGroups } from "@/hooks/useGroups";
-import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { usePermissions } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
 import { typePath } from "@/lib/entityTypes";
 
@@ -63,7 +63,7 @@ export function EntityPage() {
   const [tab, setTab] = useTab(TABS);
   const [connectivityHours, setConnectivityHours] = useState(168);
   const { projectId = "", entityId = "" } = useParams();
-  const role = useProjectRole(projectId);
+  const { can } = usePermissions(projectId);
   const now = useNow();
   const [editing, setEditing] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -222,7 +222,7 @@ export function EntityPage() {
   const type = types.data?.items.find((x) => x.id === e?.entity_type_id);
   const groups = useGroups(projectId);
   const path = groupPath(groups.data, e?.group_id);
-  const admin = canAdmin(role);
+  const admin = can("entities:write");
   const point =
     e?.geometry?.type === "Point" ? (e.geometry.coordinates as number[]) : null;
   if (entity.isError)

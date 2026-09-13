@@ -281,6 +281,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Permission Catalogue */
+        get: operations["permission_catalogue_api_v1_permissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -413,6 +430,49 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Roles
+         * @description The project's custom roles with how many members hold each; the built-in roles come
+         *     from `GET /permissions`.
+         */
+        get: operations["list_roles_api_v1_projects__project_id__roles_get"];
+        put?: never;
+        /** Create Role */
+        post: operations["create_role_api_v1_projects__project_id__roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Role
+         * @description A role in use cannot be deleted: give its members another role first.
+         */
+        delete: operations["delete_role_api_v1_projects__project_id__roles__role_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Role */
+        patch: operations["update_role_api_v1_projects__project_id__roles__role_id__patch"];
         trace?: never;
     };
     "/api/v1/projects/{project_id}/entities": {
@@ -5099,6 +5159,14 @@ export interface components {
             /** Error Message */
             error_message?: string | null;
         };
+        /** BuiltinRole */
+        BuiltinRole: {
+            key: components["schemas"]["Role"];
+            /** Label */
+            label: string;
+            /** Permissions */
+            permissions: string[];
+        };
         /**
          * BulkAssign
          * @description Assign a selection of devices to one project at once (decision D122).
@@ -8124,7 +8192,11 @@ export interface components {
              * Format: email
              */
             email: string;
+            /** @default project-viewer */
             role: components["schemas"]["Role"];
+            /** Role Id */
+            role_id?: string | null;
+            scope?: components["schemas"]["MemberScope"] | null;
         };
         /** InvitationInfo */
         InvitationInfo: {
@@ -8160,6 +8232,9 @@ export interface components {
             project_id: string | null;
             /** Role */
             role: string | null;
+            /** Role Id */
+            role_id?: string | null;
+            scope?: components["schemas"]["MemberScope"] | null;
             /** Server Admin */
             server_admin: boolean;
             /**
@@ -8455,7 +8530,11 @@ export interface components {
              * Format: email
              */
             email: string;
+            /** @default project-viewer */
             role: components["schemas"]["Role"];
+            /** Role Id */
+            role_id?: string | null;
+            scope?: components["schemas"]["MemberScope"] | null;
         };
         /** MemberRead */
         MemberRead: {
@@ -8474,15 +8553,41 @@ export interface components {
             /** Full Name */
             full_name: string | null;
             role: components["schemas"]["Role"];
+            /** Role Id */
+            role_id?: string | null;
+            /**
+             * Role Name
+             * @default
+             */
+            role_name: string;
+            /** Permissions */
+            permissions?: string[];
+            scope?: components["schemas"]["MemberScope"] | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
         };
+        /**
+         * MemberScope
+         * @description What a member sees (decision D186): groups with everything below them, single entities
+         *     and single devices; an empty scope means the whole project.
+         */
+        MemberScope: {
+            /** Groups */
+            groups?: string[];
+            /** Entities */
+            entities?: string[];
+            /** Devices */
+            devices?: string[];
+        };
         /** MemberUpdate */
         MemberUpdate: {
-            role: components["schemas"]["Role"];
+            role?: components["schemas"]["Role"] | null;
+            /** Role Id */
+            role_id?: string | null;
+            scope?: components["schemas"]["MemberScope"] | null;
         };
         /** MetricCreate */
         MetricCreate: {
@@ -8949,6 +9054,20 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PermissionArea */
+        PermissionArea: {
+            /** Key */
+            key: string;
+            /** Permissions */
+            permissions: string[];
+        };
+        /** PermissionCatalogue */
+        PermissionCatalogue: {
+            /** Areas */
+            areas: components["schemas"]["PermissionArea"][];
+            /** Roles */
+            roles: components["schemas"]["BuiltinRole"][];
+        };
         /** PointMeasurement */
         PointMeasurement: {
             /** Metric Key */
@@ -9248,6 +9367,58 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ProjectRoleCreate */
+        ProjectRoleCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Permissions */
+            permissions?: string[];
+        };
+        /** ProjectRoleRead */
+        ProjectRoleRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Permissions */
+            permissions: string[];
+            /**
+             * Members
+             * @default 0
+             */
+            members: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ProjectRoleUpdate */
+        ProjectRoleUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Permissions */
+            permissions?: string[] | null;
+        };
         /** ProjectUpdate */
         ProjectUpdate: {
             /** Name */
@@ -9300,6 +9471,13 @@ export interface components {
             updated_at: string;
             /** Role */
             role: string;
+            /** Permissions */
+            permissions?: string[];
+            /**
+             * Scope Limited
+             * @default false
+             */
+            scope_limited: boolean;
         };
         /** QueueItem */
         QueueItem: {
@@ -9598,10 +9776,12 @@ export interface components {
         };
         /**
          * Role
-         * @description Project roles. Server admin is `User.is_superuser`, not a membership row.
+         * @description The built-in project roles (decision D185), each a superset of the one before; a custom
+         *     role is a `project_roles` row the membership points at. Server admin is
+         *     `User.is_superuser`, not a membership row.
          * @enum {string}
          */
-        Role: "project-viewer" | "project-admin";
+        Role: "project-viewer" | "project-operator" | "project-analyst" | "project-admin";
         /** RouteOptionRead */
         RouteOptionRead: {
             /**
@@ -11309,6 +11489,26 @@ export interface operations {
             };
         };
     };
+    permission_catalogue_api_v1_permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionCatalogue"];
+                };
+            };
+        };
+    };
     list_projects_api_v1_projects_get: {
         parameters: {
             query?: {
@@ -11699,6 +11899,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_roles_api_v1_projects__project_id__roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRoleRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_role_api_v1_projects__project_id__roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectRoleCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRoleRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_role_api_v1_projects__project_id__roles__role_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_role_api_v1_projects__project_id__roles__role_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectRoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRoleRead"];
                 };
             };
             /** @description Validation Error */

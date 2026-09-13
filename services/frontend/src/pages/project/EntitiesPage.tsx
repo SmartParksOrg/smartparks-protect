@@ -29,7 +29,7 @@ import { MoveToGroupDialog } from "@/components/entities/MoveToGroupDialog";
 import { Icon } from "@/components/icons/Icon";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { Button } from "@/components/ui/button";
-import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { usePermissions } from "@/hooks/useProjects";
 import { useNow } from "@/hooks/useNow";
 import { usePages } from "@/hooks/usePages";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
@@ -38,7 +38,7 @@ import { formatAgo } from "@/lib/format";
 export function EntitiesPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
-  const role = useProjectRole(projectId);
+  const { can } = usePermissions(projectId);
   const navigate = useNavigate();
   const [editing, setEditing] = useState<Entity | null>(null);
   const [open, setOpen] = useState(false);
@@ -196,7 +196,7 @@ export function EntitiesPage() {
           >
             {deviceNames.get(id) ?? t("open device")}
           </Link>
-        ) : canAdmin(role) && !allProjects && assignments.data && !tracked.has(row.original.id) ? (
+        ) : can("devices:write") && !allProjects && assignments.data && !tracked.has(row.original.id) ? (
           <Button
             size="sm"
             variant="outline"
@@ -245,7 +245,7 @@ export function EntitiesPage() {
               onChange={setGroup}
               className="h-9 w-44"
             />
-            {canAdmin(role) && (
+            {can("entities:write") && (
               <Button
                 onClick={() => {
                   setEditing(null);
@@ -259,7 +259,7 @@ export function EntitiesPage() {
         }
       />
       <Page>
-        {canAdmin(role) && selected.size > 0 && (
+        {can("entities:write") && selected.size > 0 && (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
             <span>{t("{{count}} selected", { count: selected.size })}</span>
             <Button size="sm" onClick={() => setMoving([...selected])}>
@@ -298,7 +298,7 @@ export function EntitiesPage() {
             )
           }
           selection={
-            canAdmin(role)
+            can("entities:write")
               ? { selected, onChange: setSelected, rowId: (e) => e.id }
               : undefined
           }

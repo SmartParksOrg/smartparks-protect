@@ -27,6 +27,7 @@ from protect_api.schemas.rules import (
     EventDetail,
     EventRead,
 )
+from protect_api.visibility import EVERYTHING, Visibility
 from shared.database import get_session
 from shared.enums import AlertStatus
 from shared.models import ActionDelivery, Alert, Event, User
@@ -99,10 +100,15 @@ async def list_events_for(
     time_from: datetime | None,
     time_to: datetime | None,
     all_projects: bool = False,
+    visibility: Visibility = EVERYTHING,
 ) -> PageResponse[EventRead]:
     """`project_id` None is the system scope (events of no project); `all_projects` is every
     project's events at once (decision D115), never the system ones."""
-    statement = select(Event, Alert).outerjoin(Alert, Alert.event_id == Event.id)
+    statement = (
+        select(Event, Alert)
+        .outerjoin(Alert, Alert.event_id == Event.id)
+        .where(visibility.rows(Event.entity_id, Event.device_id))
+    )
     if all_projects:
         statement = statement.where(Event.project_id.is_not(None))
     elif project_id is not None:
@@ -139,8 +145,13 @@ async def list_alerts_for(
     severity: str | None,
     entity_id: uuid.UUID | None,
     all_projects: bool = False,
+    visibility: Visibility = EVERYTHING,
 ) -> PageResponse[AlertRead]:
-    statement = select(Alert, Event).join(Event, Event.id == Alert.event_id)
+    statement = (
+        select(Alert, Event)
+        .join(Event, Event.id == Alert.event_id)
+        .where(visibility.rows(Event.entity_id, Event.device_id))
+    )
     if all_projects:
         statement = statement.where(Alert.project_id.is_not(None))
     elif project_id is not None:
@@ -251,6 +262,7 @@ async def list_events(
         time_from=time_from,
         time_to=time_to,
         all_projects=context.is_all,
+        visibility=context.visibility,
     )
 
 
@@ -282,6 +294,7 @@ async def map_events(
             .outerjoin(Alert, Alert.event_id == Event.id)
             .where(
                 context.where(Event.project_id),
+                context.visibility.rows(Event.entity_id, Event.device_id),
                 Event.geom.is_not(None),
                 Event.time >= since,
             )
@@ -330,6 +343,7 @@ async def list_alerts(
         severity=severity,
         entity_id=entity_id,
         all_projects=context.is_all,
+        visibility=context.visibility,
     )
 
 

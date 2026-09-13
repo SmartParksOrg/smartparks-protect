@@ -76,8 +76,28 @@ class Project(UuidPrimaryKeyMixin, TimestampMixin, Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ProjectRole(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """A custom role of a project (decisions D185, D187): a name and the permission keys it
+    grants. The built-in roles are code (`shared.permissions.ROLE_PERMISSIONS`)."""
+
+    __tablename__ = "project_roles"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_project_roles_name"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500))
+    permissions: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+
+
 class ProjectMembership(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    """One role per user per project. Server admins need no row."""
+    """One role per user per project (a built-in role in `role`, a custom one through
+    `role_id`, which wins when set) and an optional scope of what the member sees (decision
+    D186: `{"groups": [...], "entities": [...], "devices": [...]}`, null for everything).
+    Server admins need no row."""
 
     __tablename__ = "project_memberships"
     __table_args__ = (
@@ -92,6 +112,10 @@ class ProjectMembership(UuidPrimaryKeyMixin, TimestampMixin, Base):
         Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role: Mapped[str] = mapped_column(String(32), nullable=False)
+    role_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("project_roles.id", ondelete="SET NULL"), index=True
+    )
+    scope: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     added_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL")
     )
@@ -112,6 +136,10 @@ class Invitation(UuidPrimaryKeyMixin, TimestampMixin, Base):
         Uuid, ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     role: Mapped[str | None] = mapped_column(String(32))
+    role_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("project_roles.id", ondelete="SET NULL")
+    )
+    scope: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     server_admin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )

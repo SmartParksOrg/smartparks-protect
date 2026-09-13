@@ -20,7 +20,7 @@ from protect_api.crud import apply_patch, flush_or_409, get_or_404, range_bounds
 from protect_api.deps import accessible_project_ids, require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
-from protect_api.routers.entities import assignment_read, group_and_subgroups
+from protect_api.routers.entities import assignment_read
 from protect_api.schemas.domain import (
     AssignmentEnd,
     AssignmentStart,
@@ -42,6 +42,7 @@ from protect_api.schemas.domain import (
     RecordCounts,
 )
 from protect_api.serial import fill_serial_from_identity
+from protect_api.visibility import group_and_subgroups, visibility_for
 from shared.config import get_settings
 from shared.connectivity.registry import ADAPTERS
 from shared.connectivity.satellite import SatelliteSession
@@ -128,6 +129,19 @@ async def _visible_device(session: AsyncSession, user: User, device_id: uuid.UUI
     )
     if not assigned:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found")
+    # a member with a scope sees the device only when it is in scope in the device's current
+    # project (decision D186)
+    current_project = await session.scalar(
+        select(DeviceProjectAssignment.project_id).where(
+            DeviceProjectAssignment.device_id == device_id,
+            DeviceProjectAssignment.project_id.in_(projects or []),
+            DeviceProjectAssignment.validity.op("@>")(utc_now()),
+        )
+    )
+    if current_project is not None:
+        visibility = await visibility_for(session, user, current_project)
+        if not visibility.device_visible(device_id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found")
     return device
 
 
@@ -288,6 +302,7 @@ async def list_devices(
         ).where(
             DeviceProjectAssignment.project_id == project_id,
             DeviceProjectAssignment.validity.op("@>")(now),
+            (await visibility_for(session, user, project_id)).devices(Device.id),
         )
     elif not user.is_superuser:
         projects = await accessible_project_ids(user, session) or []

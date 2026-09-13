@@ -9,7 +9,7 @@ import {
   type NavItem,
 } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
-import { canAdmin, useProjectRole } from "@/hooks/useProjects";
+import { usePermissions } from "@/hooks/useProjects";
 import { isAllProjects } from "@/lib/scope";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
@@ -77,7 +77,7 @@ export function Sidebar({
   const { projectId } = useParams();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const role = useProjectRole(projectId);
+  const { can } = usePermissions(projectId);
 
   return (
     <div className="flex h-full flex-col">
@@ -117,9 +117,9 @@ export function Sidebar({
       <nav className="flex-1 space-y-4 overflow-y-auto px-2 pb-4">
         {projectId &&
           sectionsFor(isAllProjects(projectId)).map((section) => {
-            if (section.adminOnly && !canAdmin(role)) return null;
+            if (section.permission && !can(section.permission)) return null;
             const items = section.items.filter(
-              (item) => !item.adminOnly || canAdmin(role),
+              (item) => !item.permission || can(item.permission),
             );
             if (items.length === 0) return null;
             return (
