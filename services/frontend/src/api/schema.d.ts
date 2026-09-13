@@ -545,12 +545,12 @@ export interface paths {
         };
         /**
          * Get Entity Picture
-         * @description The entity's profile picture (decision D110), a WebP square.
+         * @description The entity's picture (decisions D110, D194), a 4:3 WebP landscape.
          */
         get: operations["get_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_get"];
         /**
          * Set Entity Picture
-         * @description Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square.
+         * @description Set the picture from a JPEG, PNG or WebP; the server keeps a 4:3 landscape (D194).
          */
         put: operations["set_entity_picture_api_v1_projects__project_id__entities__entity_id__picture_put"];
         post?: never;
