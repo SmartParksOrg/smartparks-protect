@@ -149,6 +149,7 @@ import {
   newestCreatedAt,
   unreadCount,
 } from "@/lib/feed";
+import { imprecise } from "@/lib/accuracy";
 import { circleRing } from "@/lib/geodesy";
 import { isAllProjects } from "@/lib/scope";
 import { usePermissions, useProjects } from "@/hooks/useProjects";
@@ -705,6 +706,43 @@ export function MapPage() {
     [selectOnly],
   );
 
+  const phone = useIsPhone();
+  // On a phone the panels share one short column (Tim, 2026-09-13): a selection closes the
+  // layers panel and the feed, and opening either of them clears the selection, so whatever
+  // was asked for last has the room. Desktop keeps them side by side.
+  const selectionKey = ["entity", "device", "gateway", "state", "point", "feature"]
+    .map((k) => params.get(k) ?? "")
+    .join("|");
+  const panelsBefore = useRef({ selectionKey, panelOpen, feedOpen });
+  useEffect(() => {
+    const before = panelsBefore.current;
+    panelsBefore.current = { selectionKey, panelOpen, feedOpen };
+    if (!phone) return;
+    const selected = selectionKey.replace(/\|/g, "") !== "";
+    const newSelection = selected && selectionKey !== before.selectionKey;
+    const newPanel = (panelOpen && !before.panelOpen) || (feedOpen && !before.feedOpen);
+    if (newSelection && (panelOpen || feedOpen)) {
+      setParams(
+        (p) => {
+          p.delete("layers");
+          p.delete("feed");
+          return p;
+        },
+        { replace: true },
+      );
+    } else if (newPanel && selected) {
+      setParams(
+        (p) => {
+          for (const k of SELECTION_PARAMS) p.delete(k);
+          return p;
+        },
+        { replace: true },
+      );
+    }
+    // the list is a constant
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, selectionKey, panelOpen, feedOpen, setParams]);
+
   // drawing and measuring (decisions D139 and D141): a tool is transient, not in the URL
   const { can } = usePermissions(projectId);
   const canEdit = can("features:write");
@@ -1173,8 +1211,15 @@ export function MapPage() {
     if (!map || !ready || current.isPending || devices.isPending) return;
     if (fittedProject.current === projectId) return;
     fittedProject.current = projectId;
-    // a link to a gateway or a feature fits to that object instead
+    // a link to a gateway or a feature fits to that object instead; a link to an entity or a
+    // device with an imprecise position fits its accuracy disc (the selection effect below)
     if (gatewayParam || featureParamValue) return;
+    const selectedAccuracy = selectedId
+      ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)?.properties.accuracy_m
+      : selectedDeviceId
+        ? deviceFeatures?.find((f) => f.properties.device_id === selectedDeviceId)?.properties.accuracy_m
+        : null;
+    if (imprecise(selectedAccuracy)) return;
     const bounds = boundsOf([
       ...(currentFeatures ?? []),
       ...(deviceFeatures ?? []),
@@ -1191,6 +1236,8 @@ export function MapPage() {
     deviceFeatures,
     gatewayParam,
     featureParamValue,
+    selectedId,
+    selectedDeviceId,
   ]);
 
   // a "show on map" link lands on a visible object (phase 19): the object and its layer are
@@ -1357,7 +1404,6 @@ export function MapPage() {
 
   // on a phone the selection panel covers the lower part of the map: bring the selected
   // entity into the free part once, when it is selected or first known
-  const phone = useIsPhone();
   const pannedFor = useRef<string | null>(null);
   useEffect(() => {
     const map = mapRef.current;
@@ -1368,7 +1414,7 @@ export function MapPage() {
         : selectedGatewayId
           ? `gateway:${selectedGatewayId}`
           : null);
-    if (!map || !ready || !key || !phone) return;
+    if (!map || !ready || !key) return;
     if (pannedFor.current === key) return;
     const point = selectedId
       ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)
@@ -1380,7 +1426,33 @@ export function MapPage() {
         : (gateways.data?.find((g) => g.id === selectedGatewayId)?.geometry as
             GeoJSON.Point | null | undefined);
     if (!point) return;
+    // an imprecise position (decision D193) is shown with its whole accuracy disc in view, on
+    // every screen; a precise one is panned from under the panel on a phone only
+    const accuracy = selectedId
+      ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)?.properties.accuracy_m
+      : selectedDeviceId
+        ? deviceFeatures?.find((f) => f.properties.device_id === selectedDeviceId)?.properties.accuracy_m
+        : null;
+    if (!phone && !imprecise(accuracy)) return;
     pannedFor.current = key;
+    if (imprecise(accuracy)) {
+      const [lon, lat] = point.coordinates as [number, number];
+      const dLat = (accuracy as number) / 111_320;
+      const dLon = dLat / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+      const height = map.getContainer().clientHeight;
+      map.fitBounds(
+        [
+          [lon - dLon, lat - dLat],
+          [lon + dLon, lat + dLat],
+        ],
+        {
+          padding: { top: 60, left: 40, right: 40, bottom: phone ? Math.round(height * 0.45) : 60 },
+          maxZoom: 17,
+          duration: 400,
+        },
+      );
+      return;
+    }
     map.easeTo({
       center: point.coordinates as [number, number],
       offset: [0, -Math.round(map.getContainer().clientHeight * 0.2)],

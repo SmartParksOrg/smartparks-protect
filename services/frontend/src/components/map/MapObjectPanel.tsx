@@ -1,7 +1,15 @@
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Copy, Flame, Route, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Flame,
+  Route,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 
 import { Icon } from "@/components/icons/Icon";
@@ -11,6 +19,7 @@ import type {
   EntityFeatureProperties,
 } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { imprecise } from "@/lib/accuracy";
 import { formatAgo, formatTime } from "@/lib/format";
 import { projectFor } from "@/lib/scope";
@@ -28,6 +37,7 @@ export function MapPanel({
   subtitle,
   picture,
   note,
+  summary,
   onClose,
   children,
   footer,
@@ -39,13 +49,21 @@ export function MapPanel({
   picture?: ReactNode;
   /** A line under the header, for example that the object was hidden until this visit. */
   note?: ReactNode;
+  /** The one-line state shown on a phone instead of the rows until the panel is unfolded
+   * (Tim, 2026-09-13: the rows never fit a small screen). */
+  summary?: ReactNode;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const phone = useIsPhone();
+  // unfolded for one object; a new object starts folded again without an effect
+  const [unfoldedFor, setUnfoldedFor] = useState<string | null>(null);
+  const foldable = phone && summary != null;
+  const folded = foldable && unfoldedFor !== title;
   return (
-    <aside className="max-h-[45vh] shrink-0 overflow-y-auto rounded-lg border bg-card p-4 shadow-lg">
+    <aside className="max-h-[45vh] shrink-0 overflow-y-auto rounded-lg border bg-card p-3 shadow-lg sm:p-4">
       <div className="flex items-start gap-2">
         {picture}
         <div className="min-w-0 flex-1">
@@ -63,6 +81,21 @@ export function MapPanel({
             <div className="text-xs text-muted-foreground">{subtitle}</div>
           )}
         </div>
+        {foldable && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={folded ? t("Show more") : t("Show less")}
+            aria-expanded={!folded}
+            onClick={() => setUnfoldedFor(folded ? title : null)}
+          >
+            {folded ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronUp className="size-4" />
+            )}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -72,10 +105,18 @@ export function MapPanel({
           <X className="size-4" />
         </Button>
       </div>
-      {note && <div className="mt-2 text-xs text-muted-foreground">{note}</div>}
-      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        {children}
-      </dl>
+      {folded ? (
+        <div className="mt-2 text-sm">{summary}</div>
+      ) : (
+        <>
+          {note && (
+            <div className="mt-2 text-xs text-muted-foreground">{note}</div>
+          )}
+          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+            {children}
+          </dl>
+        </>
+      )}
       {footer && (
         <div className="mt-3 flex flex-wrap items-center gap-2">{footer}</div>
       )}
@@ -129,6 +170,59 @@ export function AccuracyWarning({ accuracyM }: { accuracyM: number }) {
           { value: Math.round(accuracyM) },
         )}
       </span>
+    </div>
+  );
+}
+
+/** The folded state of an entity or device panel on a phone: seen, position (with the
+ * accuracy as a badge when it is worth a warning) and battery, on one wrapping line. */
+export function PanelSummary({
+  lastSeenAt,
+  positionTime,
+  positionKind,
+  accuracy,
+  batteryVoltage,
+  healthLevel,
+  now,
+}: {
+  lastSeenAt: string | null | undefined;
+  positionTime: string | null | undefined;
+  positionKind?: string | null;
+  accuracy?: number | null;
+  batteryVoltage: number | null | undefined;
+  healthLevel: string | null | undefined;
+  now: number;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span title={formatTime(lastSeenAt)}>
+        {t("Seen {{ago}}", { ago: formatAgo(lastSeenAt, now) })}
+      </span>
+      {positionTime && (
+        <span title={formatTime(positionTime)}>
+          {positionKind === "network"
+            ? t("Estimate {{ago}}", { ago: formatAgo(positionTime, now) })
+            : t("Fix {{ago}}", { ago: formatAgo(positionTime, now) })}
+        </span>
+      )}
+      {positionTime && imprecise(accuracy) && (
+        <span
+          className="inline-flex items-center gap-1 rounded-full bg-brand-sand/20 px-2 py-0.5 text-xs text-brand-sand"
+          title={t(
+            "Imprecise: the location is only known to about {{value}} m. The circle on the map shows the uncertainty.",
+            { value: Math.round(accuracy as number) },
+          )}
+        >
+          <AlertTriangle className="size-3" />
+          {t("±{{value}} m", { value: Math.round(accuracy as number) })}
+        </span>
+      )}
+      {batteryVoltage != null && (
+        <span className={batteryClass(healthLevel)}>
+          {batteryVoltage.toFixed(2)} V
+        </span>
+      )}
     </div>
   );
 }
@@ -378,6 +472,17 @@ export function EntityPanel({
           ? t("Hidden in the layers panel until now; it stays shown.")
           : undefined
       }
+      summary={
+        <PanelSummary
+          lastSeenAt={props.last_seen_at}
+          positionTime={props.position_time}
+          positionKind={props.position_kind}
+          accuracy={props.accuracy_m}
+          batteryVoltage={props.battery_voltage}
+          healthLevel={props.health_level}
+          now={now}
+        />
+      }
       onClose={onClose}
       footer={
         <>
@@ -517,6 +622,17 @@ export function DevicePanel({
         wasHidden
           ? t("Hidden in the layers panel until now; it stays shown.")
           : undefined
+      }
+      summary={
+        <PanelSummary
+          lastSeenAt={props.last_seen_at}
+          positionTime={props.position_time}
+          positionKind={props.position_kind}
+          accuracy={props.accuracy_m}
+          batteryVoltage={props.battery_voltage}
+          healthLevel={props.health_level}
+          now={now}
+        />
       }
       onClose={onClose}
       footer={

@@ -394,7 +394,7 @@ export function ensureAccuracyLayers(map: MapLibreMap, sourceId: string): void {
       id: `${sourceId}-fill`,
       type: "fill",
       source: sourceId,
-      paint: { "fill-color": "#90AE9B", "fill-opacity": 0.2 },
+      paint: { "fill-color": "#52735E", "fill-opacity": 0.14 },
     },
     before,
   );
@@ -403,7 +403,7 @@ export function ensureAccuracyLayers(map: MapLibreMap, sourceId: string): void {
       id: `${sourceId}-line`,
       type: "line",
       source: sourceId,
-      paint: { "line-color": "#52735E", "line-width": 1, "line-opacity": 0.7, "line-dasharray": [2, 2] },
+      paint: { "line-color": "#52735E", "line-width": 2, "line-opacity": 0.9, "line-dasharray": [3, 2] },
     },
     before,
   );
