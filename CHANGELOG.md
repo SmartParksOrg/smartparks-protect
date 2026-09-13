@@ -44,6 +44,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- KPN's network geolocation reached the platform embedded in every uplink of a device that has it on (`DevLAT`, `DevLON`, `DevLocTime`, `DevLocRadius` on the `DevEUI_uplink`, recorded live from SP040078 on 2026-09-13), not as the separate `DevEUI_location` report the adapter read; the adapter now reads the fields from both, one network position per solved location.
 - The weekly restore test failed since 2026-09-07 with "migrations failed": the verification compose project had built its own `migrate` and `api` images on 2026-09-04 and kept them, so the restored database was migrated with code that did not know the newer revisions. The verify stack runs the production images by name now, and the migration output stays in `logs/restore-verify.log`.
 - Sync gateways on a data source crashed with a 500 when a gateway row had been created from a reception in the same run (its attributes read as None before a refresh); the merge starts from an empty document now.
 - A circle drawn with two taps on a phone had no radius; the circle mode takes a drag from the centre as well.

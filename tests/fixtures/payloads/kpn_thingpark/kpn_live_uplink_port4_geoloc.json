@@ -1,0 +1,68 @@
+{
+  "DevEUI_uplink": {
+    "Late": 0,
+    "Lrrs": {
+      "Lrr": [
+        {
+          "Chain": 0,
+          "Lrrid": "FF01042B",
+          "LrrESP": -119.973228,
+          "LrrSNR": -6.0,
+          "LrrRSSI": -113.0
+        }
+      ]
+    },
+    "Time": "2026-09-13T16:41:55.629+02:00",
+    "FPort": 4,
+    "Lrcid": "0059AC01",
+    "Lrrid": "FF01042B",
+    "MType": 2,
+    "DevAlt": 0.0,
+    "DevEUI": "0016C001F004B37B",
+    "DevLAT": 52.093342,
+    "DevLON": 5.362975,
+    "FCntDn": 639,
+    "FCntUp": 28022,
+    "LrrESP": -119.973228,
+    "LrrLAT": 52.126675,
+    "LrrLON": 5.090614,
+    "LrrSNR": -6.0,
+    "SpFact": 12,
+    "Channel": "LC11",
+    "DevAddr": "152E2455",
+    "LrrRSSI": -113.0,
+    "MeanPER": 0.166667,
+    "NbTrans": 1,
+    "SubBand": "G2",
+    "TxPower": 14.0,
+    "mic_hex": "ca852f5b",
+    "ModelCfg": "0",
+    "DevLrrCnt": 1,
+    "Frequency": 865.5,
+    "CustomerID": "100006684",
+    "DevEastVel": -0.202607,
+    "DevLocTime": "2026-08-19T14:18:58.956+02:00",
+    "InstantPER": 0.0,
+    "DevNorthVel": 0.092669,
+    "payload_hex": "f40e04007702994c807486212f440000",
+    "CustomerData": {
+      "alr": {
+        "pro": "Static",
+        "ver": "1"
+      },
+      "loc": null,
+      "doms": [],
+      "name": "SP040078",
+      "tags": []
+    },
+    "DevAltRadius": 0.0,
+    "DevLocRadius": 455.046448,
+    "DynamicClass": "A",
+    "NwGeolocAlgo": 0,
+    "LostUplinksAS": 0,
+    "DevAltDilution": 0.0,
+    "DevLocDilution": 0.452809,
+    "DevUlFCntUpUsed": 27418,
+    "NwGeolocAlgoUsed": 0
+  }
+}

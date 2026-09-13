@@ -166,6 +166,35 @@ def verify_push(documents: list[Any], query: dict[str, str], as_key: str) -> boo
     return True
 
 
+def _network_location(data: dict[str, Any]) -> NetworkLocation | None:
+    """The location fields of the LRC-AS tunnel interface (DevLAT, DevLON, DevAlt, DevLocRadius
+    in metres, DevLocTime, the algorithm used), on a location report or an uplink."""
+    latitude, longitude = _number(data.get("DevLAT")), _number(data.get("DevLON"))
+    located_at = parse_thingpark_time(data.get("DevLocTime")) or parse_thingpark_time(
+        data.get("Time")
+    )
+    if latitude is None or longitude is None or located_at is None:
+        return None
+    return NetworkLocation(
+        latitude=latitude,
+        longitude=longitude,
+        time=located_at,
+        method="thingpark_geoloc",
+        accuracy_m=_number(data.get("DevLocRadius")),
+        altitude_m=_number(data.get("DevAlt")),
+        attributes={
+            k: v
+            for k, v in {
+                "algorithm": data.get("NwGeolocAlgoUsed") or data.get("NwGeolocAlgo"),
+                "altitude_radius_m": _number(data.get("DevAltRadius")),
+                "dilution": _number(data.get("DevLocDilution")),
+                "f_cnt_used": data.get("DevUlFCntUpUsed"),
+            }.items()
+            if v not in (None, "")
+        },
+    )
+
+
 def parse_event(source: DataSourceContext, body: Any) -> InboundMessage:
     document = require_object(body, "kpn_thingpark")
     kind = report_kind(document)
@@ -222,34 +251,13 @@ def parse_event(source: DataSourceContext, body: Any) -> InboundMessage:
     if frequency:
         metadata["frequency_hz"] = round(frequency * 1_000_000)
     event_type = EVENT_TYPES[kind]
-    network_location: NetworkLocation | None = None
-    if kind == "DevEUI_location":
-        # ThingPark's network geolocation (decision D162): the fields of the location report
-        # per the LRC-AS tunnel changelog (DevLAT, DevLON, DevAlt, DevLocRadius in metres,
-        # DevLocTime, the algorithm used); a live report is still to be recorded.
-        latitude, longitude = _number(data.get("DevLAT")), _number(data.get("DevLON"))
-        located_at = parse_thingpark_time(data.get("DevLocTime")) or parse_thingpark_time(
-            data.get("Time")
-        )
-        if latitude is not None and longitude is not None and located_at is not None:
-            network_location = NetworkLocation(
-                latitude=latitude,
-                longitude=longitude,
-                time=located_at,
-                method="thingpark_geoloc",
-                accuracy_m=_number(data.get("DevLocRadius")),
-                altitude_m=_number(data.get("DevAlt")),
-                attributes={
-                    k: v
-                    for k, v in {
-                        "algorithm": data.get("NwGeolocAlgoUsed") or data.get("NwGeolocAlgo"),
-                        "altitude_radius_m": _number(data.get("DevAltRadius")),
-                        "dilution": _number(data.get("DevLocDilution")),
-                        "f_cnt_used": data.get("DevUlFCntUpUsed"),
-                    }.items()
-                    if v not in (None, "")
-                },
-            )
+    # ThingPark's network geolocation (decision D162): a `DevEUI_location` report, or the same
+    # fields embedded in every uplink of a device that has geolocation on (seen live on KPN on
+    # 2026-09-13: DevLAT, DevLON, DevLocTime, DevLocRadius ride along with the uplink; the
+    # report repeats the last solved location, so the canonical key keeps one per DevLocTime).
+    network_location = (
+        _network_location(data) if kind in ("DevEUI_location", "DevEUI_uplink") else None
+    )
     if kind == "DevEUI_notification":
         # ThingPark's notification report carries `Type`; "join" is the device joining the
         # network (seen live on KPN, 2026-09-06), other types stay platform log lines.

@@ -66,7 +66,7 @@ def test_thingpark_location_report_becomes_a_network_location():
         "dilution": 1.4,
         "f_cnt_used": "812",
     }
-    # an uplink carries no network location
+    # an uplink without the location fields carries no network location
     uplink = parse_event(
         base_context("kpn_thingpark"),
         {
@@ -108,3 +108,32 @@ def test_tts_solved_location_becomes_a_network_location():
     assert location.method == "tts_lora_rssi_geolocation" and location.accuracy_m == 1200.0
     assert location.time == datetime(2026, 9, 10, 10, 0, tzinfo=UTC)
     assert location.attributes == {"source": "SOURCE_LORA_RSSI_GEOLOCATION"}
+
+
+def test_kpn_uplink_with_embedded_geolocation():
+    """KPN sends the geolocation with every uplink of a device that has it on (recorded on
+    2026-09-13 from SP040078, source event 75846 on the dev server): DevLAT, DevLON, DevLocTime
+    and DevLocRadius ride along with the frame, and the last solved location repeats on every
+    uplink until the solver runs again."""
+    import json
+    from pathlib import Path
+
+    body = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "fixtures/payloads/kpn_thingpark/kpn_live_uplink_port4_geoloc.json"
+        ).read_text()
+    )
+    message = parse_event(base_context("kpn_thingpark"), body)
+    assert message.event_type == "uplink" and message.provider_metadata["f_port"] == 4
+    location = message.network_location
+    assert location is not None
+    assert (location.latitude, location.longitude) == (52.093342, 5.362975)
+    assert location.accuracy_m == 455.046448 and location.altitude_m == 0.0
+    assert location.time == datetime(2026, 8, 19, 12, 18, 58, 956000, tzinfo=UTC)
+    assert location.method == "thingpark_geoloc"
+    assert location.attributes["dilution"] == 0.452809
+    assert location.attributes["f_cnt_used"] == 27418
+    assert location.attributes["altitude_radius_m"] == 0.0
+    # KPN sends the algorithm as 0 on this report (NwGeolocAlgoUsed), kept as it came
+    assert location.attributes["algorithm"] == 0

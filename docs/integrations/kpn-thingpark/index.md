@@ -45,10 +45,14 @@ A command becomes `POST {downlink_url}?DevEUI=&FPort=&Payload=` plus `AS_ID`, `T
 
 ## Network geolocation
 
-A `DevEUI_location` report (ThingPark's network geolocation, enabled per device in the KPN
-Device Manager) becomes a position of type `network` with `DevLocRadius` as its accuracy,
-`DevLocTime` as its time and the algorithm in its attributes (ADR 0024). It never replaces the
-collar's own fix on the main map: it draws on the Coverage tab's "Network locations" layer, and
-stands in for the current position only when the entity's or device's location source says so.
-The parser follows the documented fields; a live report is still to be recorded as a fixture.
+ThingPark's network geolocation (enabled per device in the KPN Device Manager, at a cost per
+device) becomes a position of type `network` with `DevLocRadius` as its accuracy, `DevLocTime`
+as its time and the algorithm in its attributes (ADR 0024). KPN sends it embedded in every
+uplink of such a device (`DevLAT`, `DevLON`, `DevLocTime`, `DevLocRadius` and the rest ride
+along with the frame; recorded live on 2026-09-13 from SP040078), not as a separate
+`DevEUI_location` report, which the adapter accepts as well. The last solved location repeats
+on every uplink until the solver runs again, so one position per `DevLocTime` is kept; the
+solver's time may lie weeks behind the uplink. It never replaces the collar's own fix on the
+main map: it draws on the Coverage tab's "Network locations" layer, and stands in for the
+current position only when the entity's or device's location source says so.
 

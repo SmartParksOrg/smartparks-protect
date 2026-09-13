@@ -50,5 +50,7 @@ good fix on the first live Rock7 delivery.
 - Positions written before this release are all device fixes; nothing changes for them.
 - The satellite sessions layer of ADR 0023 is replaced by the network locations layer, which
   covers LoRaWAN geolocation as well.
-- A live ThingPark location report is still to be recorded; the parser follows the documented
-  fields of the LRC-AS tunnel changelog.
+- Recorded live on 2026-09-13: KPN embeds the geolocation fields in every uplink of a device
+  that has it on (`DevLAT`, `DevLON`, `DevLocTime`, `DevLocRadius`, ...) rather than posting a
+  separate `DevEUI_location` report, and repeats the last solved location on every uplink. The
+  adapter reads the fields from both; the canonical key keeps one position per `DevLocTime`.

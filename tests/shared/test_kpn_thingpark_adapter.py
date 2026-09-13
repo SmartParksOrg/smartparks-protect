@@ -319,6 +319,7 @@ def test_registered_and_described():
     [
         ("kpn_live_uplink_port13.json", 13, "positions"),
         ("kpn_live_uplink_port4.json", 4, "measurements"),
+        ("kpn_live_uplink_port4_geoloc.json", 4, "measurements"),
     ],
 )
 def test_live_kpn_pushes_decode_with_the_opencollar_driver(name, port, kind):
