@@ -16,14 +16,16 @@ from tests.api.conftest import (
     login,
     project_actor,
 )
+from tests.conftest import unique_name
 
 pytestmark = pytest.mark.asyncio
 
 
 async def test_detail_lists_memberships_with_role_and_scope(client, db):
     admin = await actor(client, db, superuser=True)
-    first = await create_project(db, "Alpha park")
-    second = await create_project(db, "Beta park")
+    alpha, beta = unique_name("Alpha park"), unique_name("Beta park")
+    first = await create_project(db, alpha)
+    second = await create_project(db, beta)
     user = await create_user(db)
     await add_member(db, user, first, Role.PROJECT_VIEWER)
     h = admin.headers
@@ -48,11 +50,11 @@ async def test_detail_lists_memberships_with_role_and_scope(client, db):
     body = detail.json()
     assert body["email"] == user.email
     by_project = {m["project_name"]: m for m in body["memberships"]}
-    assert set(by_project) == {"Alpha park", "Beta park"}
-    assert by_project["Alpha park"]["role_name"] == "Viewer"
-    assert by_project["Alpha park"]["scope"] is None
-    assert by_project["Alpha park"]["membership_id"]
-    ranger = by_project["Beta park"]
+    assert set(by_project) == {alpha, beta}
+    assert by_project[alpha]["role_name"] == "Viewer"
+    assert by_project[alpha]["scope"] is None
+    assert by_project[alpha]["membership_id"]
+    ranger = by_project[beta]
     assert ranger["role_id"] == role["id"] and ranger["role_name"] == "Ranger"
     assert ranger["permissions"] == ["events:write", "project:read"]
 
@@ -64,7 +66,7 @@ async def test_detail_lists_memberships_with_role_and_scope(client, db):
     )
     assert narrowed.status_code == 200, narrowed.text
     again = (await client.get(f"/api/v1/admin/users/{user.id}", headers=h)).json()
-    assert {m["project_name"] for m in again["memberships"]} == {"Alpha park", "Beta park"}
+    assert {m["project_name"] for m in again["memberships"]} == {alpha, beta}
 
 
 async def test_edit_name_and_email(client, db):
@@ -139,8 +141,9 @@ async def test_server_invitation_for_several_projects(client, db):
     """A server admin's invitation carries memberships in several projects (D190): one row,
     one link, every membership created at registration, with a custom role and a scope."""
     admin = await actor(client, db, superuser=True)
-    first = await create_project(db, "Alpha park")
-    second = await create_project(db, "Beta park")
+    alpha, beta = unique_name("Alpha park"), unique_name("Beta park")
+    first = await create_project(db, alpha)
+    second = await create_project(db, beta)
     h = admin.headers
     role = (
         await client.post(
@@ -205,7 +208,7 @@ async def test_server_invitation_for_several_projects(client, db):
     ).scalar_one()
     info = await client.get("/api/v1/auth/invitation", params={"token": token})
     assert info.status_code == 200, info.text
-    assert info.json()["project_names"] == ["Alpha park", "Beta park"]
+    assert info.json()["project_names"] == sorted([alpha, beta])
     registered = await client.post(
         "/api/v1/auth/register",
         json={"token": token, "password": "Newcomer-pass-123456", "full_name": "N"},
@@ -214,9 +217,9 @@ async def test_server_invitation_for_several_projects(client, db):
     user_id = registered.json()["id"]
     detail = (await client.get(f"/api/v1/admin/users/{user_id}", headers=h)).json()
     by_project = {m["project_name"]: m for m in detail["memberships"]}
-    assert by_project["Alpha park"]["role"] == "project-analyst"
-    assert by_project["Beta park"]["role_name"] == "Ranger"
-    assert by_project["Beta park"]["scope"] is None
+    assert by_project[alpha]["role"] == "project-analyst"
+    assert by_project[beta]["role_name"] == "Ranger"
+    assert by_project[beta]["scope"] is None
     mine = (
         await client.get(
             "/api/v1/projects",
@@ -225,13 +228,14 @@ async def test_server_invitation_for_several_projects(client, db):
             },
         )
     ).json()["items"]
-    assert {p["name"] for p in mine} == {"Alpha park", "Beta park"}
+    assert {p["name"] for p in mine} == {alpha, beta}
 
 
 async def test_server_invitation_for_an_existing_account_adds_now(client, db):
     admin = await actor(client, db, superuser=True)
-    first = await create_project(db, "Alpha park")
-    second = await create_project(db, "Beta park")
+    alpha, beta = unique_name("Alpha park"), unique_name("Beta park")
+    first = await create_project(db, alpha)
+    second = await create_project(db, beta)
     user = await create_user(db)
     await add_member(db, user, first, Role.PROJECT_VIEWER)
     h = admin.headers
@@ -251,11 +255,11 @@ async def test_server_invitation_for_an_existing_account_adds_now(client, db):
     assert added.status_code == 201, added.text
     result = added.json()
     assert result["invitation"] is None and result["user_id"] == str(user.id)
-    assert result["added_projects"] == ["Beta park"]
+    assert result["added_projects"] == [beta]
     detail = (await client.get(f"/api/v1/admin/users/{user.id}", headers=h)).json()
     assert detail["is_superuser"] is True
     by_project = {m["project_name"]: m["role"] for m in detail["memberships"]}
     # the membership that existed keeps its role; the new one has the role asked
-    assert by_project == {"Alpha park": "project-viewer", "Beta park": "project-operator"}
+    assert by_project == {alpha: "project-viewer", beta: "project-operator"}
     invitations = (await client.get("/api/v1/admin/invitations", headers=h)).json()["items"]
     assert not any(i["email"] == user.email for i in invitations)
