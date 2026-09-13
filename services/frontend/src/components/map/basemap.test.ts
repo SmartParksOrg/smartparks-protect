@@ -36,7 +36,7 @@ describe("base maps", () => {
       "https://tiles.openfreemap.org/styles/positron",
     );
     expect(basemapStyle("auto", basemapsFor(null), true)).toBe(
-      "https://tiles.openfreemap.org/styles/dark",
+      "https://tiles.openfreemap.org/styles/fiord",
     );
     expect(basemapStyle("positron", basemapsFor(null), true)).toBe(
       "https://tiles.openfreemap.org/styles/positron",

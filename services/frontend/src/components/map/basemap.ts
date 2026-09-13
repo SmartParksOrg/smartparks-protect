@@ -1,7 +1,7 @@
 /** Base map styles (decision D37): OpenFreeMap vector tiles, no key. Satellite imagery with
  * labels comes from MapTiler (decision D141) when the server has a key; the picker hides it
  * otherwise, and a saved choice of it falls back to Light. The default choice follows the
- * theme (decision D184): Light by day, Dark at night; every other choice is kept as chosen. */
+ * theme (decision D184): Light by day, Night at night; every other choice is kept as chosen. */
 export interface Basemap {
   label: string;
   style: string;
@@ -24,9 +24,10 @@ export const FREE_BASEMAPS = {
     label: "Bright",
     style: "https://tiles.openfreemap.org/styles/bright",
   },
+  // OpenFreeMap's "fiord", a dark blue-grey; its "dark" style is near black (Tim, 2026-09-13)
   dark: {
-    label: "Dark",
-    style: "https://tiles.openfreemap.org/styles/dark",
+    label: "Night",
+    style: "https://tiles.openfreemap.org/styles/fiord",
   },
 } as const satisfies Record<string, Basemap>;
 
@@ -48,7 +49,7 @@ export function basemapsFor(
 }
 
 /** The style URL of a choice among the offered base maps, Light when the choice is not
- * offered; the default choice is Dark at night and Light by day. */
+ * offered; the default choice is Night at night and Light by day. */
 export function basemapStyle(
   key: string,
   maps: Record<string, Basemap>,
