@@ -99,10 +99,11 @@ async def test_password_reset_on_behalf(client, db):
     sent = await client.post(f"/api/v1/admin/users/{user.id}/password-reset", headers=h)
     assert sent.status_code == 202, sent.text
     assert sent.json() == {"status": "sent"}
-    audit = (
-        await client.get("/api/v1/admin/audit", params={"object_id": str(user.id)}, headers=h)
-    ).json()["items"]
-    assert any(row["action"] == "user.password_reset_sent" for row in audit)
+    audit = (await client.get("/api/v1/admin/audit", params={"limit": 20}, headers=h)).json()
+    assert any(
+        row["action"] == "user.password_reset_sent" and row["object_id"] == str(user.id)
+        for row in audit
+    )
 
     off = await client.patch(f"/api/v1/admin/users/{user.id}", json={"is_active": False}, headers=h)
     assert off.status_code == 200
