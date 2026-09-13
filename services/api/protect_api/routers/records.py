@@ -126,8 +126,7 @@ async def records_count(
 ) -> RecordsCount:
     """How many records the selection has in the window: the progress bar's total."""
     entity_ids, device_ids, since, until = _selection(entity_id, device_id, time_from, time_to)
-    entity_ids = context.visibility.narrow_entities(entity_ids)
-    device_ids = context.visibility.narrow_devices(device_ids)
+    entity_ids, device_ids = context.visibility.narrow(entity_ids, device_ids)
     if context.visibility.limited and not (entity_ids or device_ids):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nothing of the selection is in your scope")
     count = await count_keys(
@@ -167,8 +166,7 @@ async def records(
     `(time, device)`; the rows are then filled from the positions, measurements and state history
     of the page's time span, read through the owner and time indexes."""
     entity_ids, device_ids, since, until = _selection(entity_id, device_id, time_from, time_to)
-    entity_ids = context.visibility.narrow_entities(entity_ids)
-    device_ids = context.visibility.narrow_devices(device_ids)
+    entity_ids, device_ids = context.visibility.narrow(entity_ids, device_ids)
     if context.visibility.limited and not (entity_ids or device_ids):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nothing of the selection is in your scope")
     selection = RecordSelection(

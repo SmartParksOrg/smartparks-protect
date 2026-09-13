@@ -76,21 +76,20 @@ class Visibility:
     def device_visible(self, device_id: uuid.UUID | None) -> bool:
         return self.device_ids is None or (device_id is not None and device_id in self.device_ids)
 
-    def narrow_entities(self, wanted: list[uuid.UUID]) -> list[uuid.UUID]:
-        """A caller's own selection cut to the scope; an empty selection means everything in
-        scope, so it becomes the scope itself."""
-        if self.entity_ids is None:
-            return wanted
-        if not wanted:
-            return sorted(self.entity_ids, key=str)
-        return [i for i in wanted if i in self.entity_ids]
-
-    def narrow_devices(self, wanted: list[uuid.UUID]) -> list[uuid.UUID]:
-        if self.device_ids is None:
-            return wanted
-        if not wanted:
-            return sorted(self.device_ids, key=str)
-        return [i for i in wanted if i in self.device_ids]
+    def narrow(
+        self, entities: list[uuid.UUID], devices: list[uuid.UUID]
+    ) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
+        """A caller's own selection cut to the scope. A selection (either list) keeps only
+        what is in scope, so asking for something outside it yields nothing; no selection at
+        all means everything in scope, so both lists become the scope itself."""
+        if not self.limited:
+            return entities, devices
+        if not entities and not devices:
+            return sorted(self.entity_ids or (), key=str), sorted(self.device_ids or (), key=str)
+        return (
+            [i for i in entities if i in (self.entity_ids or ())],
+            [i for i in devices if i in (self.device_ids or ())],
+        )
 
 
 EVERYTHING = Visibility()

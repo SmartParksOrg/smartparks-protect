@@ -34,7 +34,9 @@ async def test_manual_events_icons_and_dashboards(client, db):
     admin, project, entity, _source, _device, _ = await _setup(client, db)
     h = admin.headers
     base = f"/api/v1/projects/{project.id}"
-    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    viewer = await project_actor(
+        client, db, project, Role.PROJECT_OPERATOR
+    )  # events need events:write (D185)
 
     # a viewer reports an event with a place; it appears in the list and on the map layer
     reported = await client.post(

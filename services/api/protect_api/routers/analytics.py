@@ -163,8 +163,7 @@ async def _owners(
     today, and when more would exceed the bound, the first that fit by name, with the count
     for the note. Nothing touches the hypertable here."""
     fit = max(1, MAX_SERIES // len(metrics))
-    entity_ids = context.visibility.narrow_entities(entity_ids)
-    device_ids = context.visibility.narrow_devices(device_ids)
+    entity_ids, device_ids = context.visibility.narrow(entity_ids, device_ids)
     if group_by is GroupBy.ENTITY:
         candidates = select(Entity.id).where(
             Entity.project_id == context.project.id, context.visibility.entities(Entity.id)

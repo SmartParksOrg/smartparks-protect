@@ -72,8 +72,7 @@ def _in_scope(context: ProjectContext, params: ExportParameters) -> ExportParame
     lists from the job and never sees the membership."""
     if not context.visibility.limited:
         return params
-    entity_ids = context.visibility.narrow_entities(params.entity_ids)
-    device_ids = context.visibility.narrow_devices(params.device_ids)
+    entity_ids, device_ids = context.visibility.narrow(params.entity_ids, params.device_ids)
     if not entity_ids and not device_ids:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Nothing of the selection is in your scope"

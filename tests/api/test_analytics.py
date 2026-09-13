@@ -258,7 +258,8 @@ async def test_saved_views_are_shared_and_owned(client, db):
     from tests.api.conftest import project_actor
 
     admin, project, _entity, _source, _device, _ = await _setup(client, db)
-    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    # saved views need views:write (decision D185): analysts keep them
+    viewer = await project_actor(client, db, project, Role.PROJECT_ANALYST)
     base = f"/api/v1/projects/{project.id}/analytics/saved-views"
     created = await client.post(
         base,
@@ -276,7 +277,7 @@ async def test_saved_views_are_shared_and_owned(client, db):
     assert [v["name"] for v in listed["items"]] == ["Battery last week"]
 
     # a second viewer cannot change it, the creator and a project admin can
-    other = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    other = await project_actor(client, db, project, Role.PROJECT_ANALYST)
     forbidden = await client.patch(
         f"{base}/{view['id']}", json={"name": "Mine now"}, headers=other.headers
     )
