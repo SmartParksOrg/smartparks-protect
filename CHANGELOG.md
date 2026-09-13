@@ -28,6 +28,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- The top bar is 41 px on a phone (smaller buttons and logo, the product name on one line) and keeps its 53 px from tablet width up.
 - The landscape Smart Parks logo with the product name beside it in the navigation column and the phone header instead of the split logo; the entity and device panels on the live map carry the same track and heatmap icon toggles as the layers panel's rows; the layers panel's Show all and Hide all are one toggle per tab, like Fold all.
 - Live map: the entity and device count next to the Layers button is gone; the layers panel's tabs carry the numbers.
 - Cloudloop and Rock7 proven on the dev server (2026-09-10): a destination made through the API delivered Cloudloop's test message through the allow-list, a real satellite message replayed through the webhook decoded, and the Rock7 connection test answered with the right login; the runbooks say what was seen and how to read past messages, the Rock7 setup hint and runbook follow the RockBLOCK admin's Delivery Groups page (a delivery address with the format HTTP_POST, no headers), and the live Lingo document is a fixture with tests. The first Rock7 delivery (SP051890) arrived and decoded; it is a fixture with a test, and the adapter keeps the delivery's `device_type` and `iridium_session_status` as provider metadata.

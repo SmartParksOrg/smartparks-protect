@@ -81,20 +81,23 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* the top bar on every screen size (decision D182): the brand, the health dot (D181)
             and the theme switch (D183); the navigation button only where the sidebar is a drawer */}
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-card px-3 py-2">
+        {/* 41 px on a phone, 53 px from tablet width up (Tim, 2026-09-13: every pixel of map counts) */}
+        <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-card px-2 py-1 sm:px-3 sm:py-2">
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="size-8 sm:size-9 lg:hidden"
             aria-label={t("Open navigation")}
             onClick={() => setOpen(true)}
           >
             <Menu className="size-5" />
           </Button>
-          <img src={logoLandscape} alt="" className="h-7 w-auto" />
-          <span className="font-medium">{t("Smart Parks Protect")}</span>
+          <img src={logoLandscape} alt="" className="h-6 w-auto sm:h-7" />
+          <span className="min-w-0 truncate text-sm font-medium whitespace-nowrap sm:text-base">
+            {t("Smart Parks Protect")}
+          </span>
           <span className="ml-auto flex items-center gap-1">
-            <ThemeSwitch />
+            <ThemeSwitch className="size-8 sm:size-9" />
             <HealthDot />
           </span>
         </header>

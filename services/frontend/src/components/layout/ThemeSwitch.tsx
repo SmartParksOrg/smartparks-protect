@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
 
 /** The light, dark or system switch in the top bar (decision D183): one button that cycles. */
-export function ThemeSwitch() {
+export function ThemeSwitch({ className = "" }: { className?: string }) {
   const { t } = useTranslation();
   const { theme, cycle } = useTheme();
   const label =
@@ -19,6 +19,7 @@ export function ThemeSwitch() {
     <Button
       variant="ghost"
       size="icon"
+      className={className}
       aria-label={label}
       title={label}
       onClick={cycle}
