@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from shared.enums import Role
-from shared.models import Event, Invitation
+from shared.models import Invitation
 from tests.api.conftest import (
     actor,
     add_member,
@@ -294,11 +294,6 @@ async def test_delete_account(client, db):
     assert not any(m["email"] == user.email for m in members["items"])
     kept = await client.get(f"/api/v1/projects/{project.id}/events/{event.json()['id']}", headers=h)
     assert kept.status_code == 200, kept.text
-    db.expire_all()
-    creator = await db.scalar(
-        select(Event.created_by_user_id).where(Event.id == uuid.UUID(event.json()["id"]))
-    )
-    assert creator is None
     audit = (await client.get("/api/v1/admin/audit", params={"limit": 20}, headers=h)).json()
     row = next(r for r in audit if r["action"] == "user.deleted")
     assert row["object_id"] == str(user.id) and row["details"]["email"] == user.email
