@@ -15,9 +15,11 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CoverageResponse,
   EntityGroup,
-  NetworkLocationsResponse,
+  EntityType,
   Feature,
   Gateway,
+  NetworkLocationsResponse,
+  Page as PageType,
 } from "@/api/types";
 import { Icon } from "@/components/icons/Icon";
 import {
@@ -59,6 +61,13 @@ import type {
 } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ancestorIds, groupTree } from "@/hooks/useGroups";
+
+import { useQuery } from "@tanstack/react-query";
+
+import { api } from "@/api/client";
+import { queryKeys } from "@/api/queryKeys";
 import {
   Select,
   SelectContent,
@@ -66,16 +75,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ancestorIds, groupTree } from "@/hooks/useGroups";
-
 import { useIsPhone } from "@/hooks/useMediaQuery";
+import { usePreference } from "@/hooks/usePreference";
 import { useNow } from "@/hooks/useNow";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { formatAgo, formatTime } from "@/lib/format";
 
 type Sort = "name" | "recent";
 type Tab = "entities" | "devices" | "features" | "events" | "coverage";
+
+type Grouping = "groups" | "flat" | "types" | "subtypes";
+
+/** A type or sub-type header of the entities tab: its own entities and the sub-type rows. */
+interface TypeRow {
+  id: string;
+  name: string;
+  members: EntityFeatureProperties[];
+  children: Map<string, TypeRow>;
+}
 
 interface GroupRow {
   id: string;
@@ -241,7 +258,22 @@ export function LayerPanel({
   const [tab, setTab] = useState<Tab>("entities");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
-  const [grouped, setGrouped] = useState(true);
+  // how the entities tab arranges its rows (Tim, 2026-09-13): by the project's groups, flat,
+  // by entity type, or by type and sub-type, so "Wildlife > Wolf" or "Vehicles" is one row
+  const [grouping, setGrouping] = usePreference<Grouping>(
+    "map_layers_grouping",
+    "groups",
+  );
+  const grouped = grouping === "groups";
+  const types = useQuery({
+    queryKey: queryKeys.entityTypes,
+    queryFn: () =>
+      api.get<PageType<EntityType>>("/api/v1/entity-types", {
+        query: { limit: 500 },
+      }),
+    staleTime: 5 * 60_000,
+    enabled: grouping === "types" || grouping === "subtypes",
+  });
   // every row starts folded; a search opens what it reaches
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const term = q.trim().toLowerCase();
@@ -327,6 +359,50 @@ export function LayerPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entities, groups, projects, perProject, sort, t]);
 
+  const typeRows = useMemo<TypeRow[]>(() => {
+    if (grouping !== "types" && grouping !== "subtypes") return [];
+    const byId = new Map((types.data?.items ?? []).map((x) => [x.id, x]));
+    const byKey = new Map((types.data?.items ?? []).map((x) => [x.key, x]));
+    const tops = new Map<string, TypeRow>();
+    for (const f of entities) {
+      const own = byKey.get(f.entity_type);
+      const top = own?.parent_id ? byId.get(own.parent_id) : own;
+      const topId = top?.id ?? `key:${f.entity_type}`;
+      const topName = top?.label ?? f.entity_type_label ?? f.entity_type;
+      const row = tops.get(topId) ?? {
+        id: `type:${topId}`,
+        name: topName,
+        members: [],
+        children: new Map<string, TypeRow>(),
+      };
+      tops.set(topId, row);
+      const sub = own?.parent_id ? own : null;
+      if (grouping === "subtypes" && sub) {
+        const child = row.children.get(sub.id) ?? {
+          id: `type:${sub.id}`,
+          name: sub.label,
+          members: [],
+          children: new Map<string, TypeRow>(),
+        };
+        row.children.set(sub.id, child);
+        child.members.push(f);
+      } else row.members.push(f);
+    }
+    const finish = (r: TypeRow): TypeRow => ({
+      ...r,
+      members: [...r.members].sort(order),
+      children: new Map(
+        [...r.children.values()]
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((c) => [c.id, finish(c)]),
+      ),
+    });
+    return [...tops.values()]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(finish);
+    // the order function is stable per sort
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grouping, types.data, entities, sort]);
   const flip = (id: string) =>
     setExpanded((s) => {
       const next = new Set(s);
@@ -478,6 +554,107 @@ export function LayerPanel({
     );
   };
 
+  const membersBelow = (row: TypeRow): EntityFeatureProperties[] => [
+    ...row.members,
+    ...[...row.children.values()].flatMap(membersBelow),
+  ];
+  const entityShown = (m: EntityFeatureProperties) =>
+    isGroupShown(layerOf(m, perProject), choices, groups) &&
+    !choices.hidden_entities.includes(m.entity_id);
+  const showMembers = (
+    from: LayerChoices,
+    members: EntityFeatureProperties[],
+  ) => members.reduce((c, m) => showEntity(c, m, groups, siblingsOf(m)), from);
+  const hideMembers = (
+    from: LayerChoices,
+    members: EntityFeatureProperties[],
+  ) => members.reduce((c, m) => toggleEntity(c, m.entity_id, false), from);
+  /** A type or sub-type as a folding header over its entities, with the checkbox switching
+   * every entity below it and "only" leaving only those on. */
+  const typeHeader = (row: TypeRow, depth: number): ReactNode => {
+    const below = membersBelow(row);
+    const nameMatch = matches(row.name, term);
+    const members = nameMatch
+      ? row.members
+      : row.members.filter((m) => matches(m.name, term));
+    const children = [...row.children.values()].filter(
+      (c) =>
+        nameMatch ||
+        matches(c.name, term) ||
+        membersBelow(c).some((m) => matches(m.name, term)),
+    );
+    if (term && !nameMatch && members.length === 0 && children.length === 0)
+      return null;
+    const shownBelow = below.filter(entityShown).length;
+    const open = expanded.has(row.id) || Boolean(term);
+    return (
+      <div key={row.id}>
+        <Row depth={depth} header>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0"
+            aria-label={open ? t("Collapse") : t("Expand")}
+            onClick={() => flip(row.id)}
+          >
+            {open ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronRight className="size-4" />
+            )}
+          </Button>
+          <Check
+            checked={shownBelow === below.length && below.length > 0}
+            indeterminate={shownBelow > 0 && shownBelow < below.length}
+            label={row.name}
+            onChange={(v) =>
+              onChange(
+                v ? showMembers(choices, below) : hideMembers(choices, below),
+              )
+            }
+          />
+          <span
+            className={`${nameClass} font-semibold ${shownBelow > 0 ? "" : "text-muted-foreground"}`}
+          >
+            {row.name}
+          </span>
+          <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
+            {below.length}
+          </span>
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto shrink-0 p-0 text-xs opacity-0 group-hover:opacity-100 focus:opacity-100"
+            onClick={() =>
+              onChange(
+                showMembers(
+                  hideAllEntities(
+                    choices,
+                    groups,
+                    projects?.map((p) => p.id) ?? [],
+                  ),
+                  below,
+                ),
+              )
+            }
+          >
+            {t("only")}
+          </Button>
+        </Row>
+        {open && children.map((c) => typeHeader(c, depth + 1))}
+        {open &&
+          members.map((m) =>
+            entityRow(
+              m,
+              depth + 1,
+              isGroupShown(layerOf(m, perProject), choices, groups),
+            ),
+          )}
+      </div>
+    );
+  };
+  const typeKeys = (rs: TypeRow[]): string[] =>
+    rs.flatMap((r) => [r.id, ...typeKeys([...r.children.values()])]);
   const entitiesTab = (
     <>
       <div className="flex items-center gap-1.5 px-1 pb-2">
@@ -488,15 +665,25 @@ export function LayerPanel({
           className="h-8"
           aria-label={t("Search layers")}
         />
-        <Button
-          variant={grouped ? "secondary" : "ghost"}
-          size="sm"
-          className="h-8 px-2 text-xs"
-          aria-pressed={grouped}
-          onClick={() => setGrouped((g) => !g)}
+        <Select
+          value={grouping}
+          onValueChange={(v) => setGrouping(v as Grouping)}
         >
-          {t("Grouped")}
-        </Button>
+          <SelectTrigger
+            className="h-8 w-auto shrink-0 gap-1 px-2 text-xs"
+            aria-label={t("Arrange the rows")}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="groups">{t("Grouped")}</SelectItem>
+            <SelectItem value="flat">{t("Ungrouped")}</SelectItem>
+            <SelectItem value="types">{t("Per type")}</SelectItem>
+            <SelectItem value="subtypes">
+              {t("Per type and sub-type")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Button
           variant="ghost"
           size="icon"
@@ -522,104 +709,108 @@ export function LayerPanel({
             {t("No entities with a position yet.")}
           </div>
         )}
-        {grouped
-          ? rows.map((row) => {
-              const groupMatch = matches(row.name, term);
-              const members = groupMatch
-                ? row.members
-                : row.members.filter((m) => matches(m.name, term));
-              const belowMatch =
-                term &&
-                groupTree(groups, row.id, 1).some(
-                  (r) =>
-                    matches(r.group.name, term) ||
-                    rows
-                      .find((x) => x.id === r.group.id)
-                      ?.members.some((m) => matches(m.name, term)),
-                );
-              if (term && !groupMatch && members.length === 0 && !belowMatch)
-                return null;
-              const shown = isGroupShown(row.id, choices, groups);
-              const open = expanded.has(row.id) || Boolean(term);
-              // folded above: the whole subtree goes, unless a search reaches into it
-              if (!term && row.parents.some((p) => !expanded.has(p)))
-                return null;
-              return (
-                <div key={row.id}>
-                  <Row depth={row.depth} header>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-6 shrink-0"
-                      aria-label={open ? t("Collapse") : t("Expand")}
-                      onClick={() => flip(row.id)}
-                    >
-                      {open ? (
-                        <ChevronDown className="size-4" />
-                      ) : (
-                        <ChevronRight className="size-4" />
-                      )}
-                    </Button>
-                    <Check
-                      checked={shown}
-                      label={row.name}
-                      onChange={(v) =>
-                        onChange(
-                          v
-                            ? withProjectShown(
-                                toggleGroup(choices, row.id, v, groups),
-                                row.id,
-                                groups,
-                              )
-                            : toggleGroup(choices, row.id, v, groups),
-                        )
-                      }
-                    />
-                    {row.color && (
-                      <span
-                        className="inline-block size-2.5 shrink-0 rounded-full"
-                        style={{ background: row.color }}
-                      />
-                    )}
-                    <span
-                      className={`${nameClass} font-semibold ${shown ? "" : "text-muted-foreground"}`}
-                    >
-                      {row.name}
-                    </span>
-                    <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
-                      {row.total}
-                    </span>
-                    {!row.project && (
+        {grouping === "types" || grouping === "subtypes"
+          ? typeRows.map((row) => typeHeader(row, 0))
+          : grouped
+            ? rows.map((row) => {
+                const groupMatch = matches(row.name, term);
+                const members = groupMatch
+                  ? row.members
+                  : row.members.filter((m) => matches(m.name, term));
+                const belowMatch =
+                  term &&
+                  groupTree(groups, row.id, 1).some(
+                    (r) =>
+                      matches(r.group.name, term) ||
+                      rows
+                        .find((x) => x.id === r.group.id)
+                        ?.members.some((m) => matches(m.name, term)),
+                  );
+                if (term && !groupMatch && members.length === 0 && !belowMatch)
+                  return null;
+                const shown = isGroupShown(row.id, choices, groups);
+                const open = expanded.has(row.id) || Boolean(term);
+                // folded above: the whole subtree goes, unless a search reaches into it
+                if (!term && row.parents.some((p) => !expanded.has(p)))
+                  return null;
+                return (
+                  <div key={row.id}>
+                    <Row depth={row.depth} header>
                       <Button
-                        variant="link"
-                        size="sm"
-                        className="h-auto shrink-0 p-0 text-xs opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        onClick={() =>
-                          onChange(onlyGroup(choices, row.id, groups))
-                        }
+                        variant="ghost"
+                        size="icon"
+                        className="size-6 shrink-0"
+                        aria-label={open ? t("Collapse") : t("Expand")}
+                        onClick={() => flip(row.id)}
                       >
-                        {t("only")}
+                        {open ? (
+                          <ChevronDown className="size-4" />
+                        ) : (
+                          <ChevronRight className="size-4" />
+                        )}
                       </Button>
-                    )}
-                  </Row>
-                  {open &&
-                    members.map((m) => entityRow(m, row.depth + 1, shown))}
-                </div>
-              );
-            })
-          : [...entities]
-              .filter((m) => matches(m.name, term))
-              .sort(order)
-              .map((m) =>
-                entityRow(
-                  m,
-                  0,
-                  isGroupShown(layerOf(m, perProject), choices, groups),
-                ),
-              )}
+                      <Check
+                        checked={shown}
+                        label={row.name}
+                        onChange={(v) =>
+                          onChange(
+                            v
+                              ? withProjectShown(
+                                  toggleGroup(choices, row.id, v, groups),
+                                  row.id,
+                                  groups,
+                                )
+                              : toggleGroup(choices, row.id, v, groups),
+                          )
+                        }
+                      />
+                      {row.color && (
+                        <span
+                          className="inline-block size-2.5 shrink-0 rounded-full"
+                          style={{ background: row.color }}
+                        />
+                      )}
+                      <span
+                        className={`${nameClass} font-semibold ${shown ? "" : "text-muted-foreground"}`}
+                      >
+                        {row.name}
+                      </span>
+                      <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
+                        {row.total}
+                      </span>
+                      {!row.project && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="h-auto shrink-0 p-0 text-xs opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          onClick={() =>
+                            onChange(onlyGroup(choices, row.id, groups))
+                          }
+                        >
+                          {t("only")}
+                        </Button>
+                      )}
+                    </Row>
+                    {open &&
+                      members.map((m) => entityRow(m, row.depth + 1, shown))}
+                  </div>
+                );
+              })
+            : [...entities]
+                .filter((m) => matches(m.name, term))
+                .sort(order)
+                .map((m) =>
+                  entityRow(
+                    m,
+                    0,
+                    isGroupShown(layerOf(m, perProject), choices, groups),
+                  ),
+                )}
       </div>
       {footer(
-        rows.map((r) => r.id),
+        grouping === "types" || grouping === "subtypes"
+          ? typeKeys(typeRows)
+          : rows.map((r) => r.id),
         shownCount,
         entities.length,
         () => onChange({ ...choices, hidden_groups: [], hidden_entities: [] }),
