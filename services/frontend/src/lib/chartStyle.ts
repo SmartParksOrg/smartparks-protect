@@ -18,6 +18,25 @@ export const MARK = "#B86B5C";
 export const TEXT = "#6B7280";
 export const GRID = "#E5E7EB";
 
+/** The text, grid and tooltip colours of a chart on the light or the dark theme (D183). */
+export function chartTheme(dark: boolean) {
+  return dark
+    ? {
+        text: "#9fb0a6",
+        grid: "#2d3d35",
+        tooltipBg: "rgba(26,35,32,0.96)",
+        tooltipText: "#e6ece8",
+        shadow: "0 4px 12px rgba(0,0,0,0.4)",
+      }
+    : {
+        text: TEXT,
+        grid: GRID,
+        tooltipBg: "rgba(255,255,255,0.96)",
+        tooltipText: "#111827",
+        shadow: "0 4px 12px rgba(0,0,0,0.08)",
+      };
+}
+
 export interface ChartLine {
   key: string;
   name: string;

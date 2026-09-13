@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { useMapConfig } from "@/hooks/useMapConfig";
 import { formatInZone } from "@/lib/analytics";
 import { boundsOfTracks, pointsAt } from "@/lib/explore";
+import { useTheme } from "@/hooks/useTheme";
 
 /**
  * The map of the Explore canvas (decision D153): the tracks of the selection over its period
@@ -58,9 +59,10 @@ export function ExploreMap({
   const { maptilerKey } = useMapConfig();
   const basemaps = useMemo(() => basemapsFor(maptilerKey), [maptilerKey]);
   const container = useRef<HTMLDivElement | null>(null);
+  const { resolved: resolvedTheme } = useTheme();
   const { mapRef, ready } = useMap(
     container,
-    basemapStyle(loadBasemap(), basemaps),
+    basemapStyle(loadBasemap(), basemaps, resolvedTheme === "dark"),
     [31.5, -24.9],
     6,
   );

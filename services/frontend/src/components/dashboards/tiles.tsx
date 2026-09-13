@@ -41,6 +41,7 @@ import {
   seriesLabel,
 } from "@/lib/analytics";
 import { formatAgo, formatTime } from "@/lib/format";
+import { useTheme } from "@/hooks/useTheme";
 
 interface CurrentFeature {
   geometry: { coordinates: [number, number] };
@@ -172,9 +173,10 @@ export function SavedViewTile({
 export function MapTile({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
+  const { resolved: resolvedTheme } = useTheme();
   const { mapRef, ready } = useMap(
     container,
-    basemapStyle(loadBasemap(), basemapsFor(null)),
+    basemapStyle(loadBasemap(), basemapsFor(null), resolvedTheme === "dark"),
     [31.5, -24.9],
     6,
   );

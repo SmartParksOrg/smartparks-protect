@@ -152,3 +152,4 @@ nav:
       - adr/0026-draw-and-measure-one-engine.md
       - adr/0027-gateways-page-scope-and-daily-sync.md
       - adr/0028-live-map-feed-and-health-dot.md
+      - adr/0029-one-top-bar-and-night-mode.md

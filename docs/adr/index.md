@@ -34,3 +34,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0026 One drawing engine for draw and measure, and a circle as a polygon that remembers its centre and radius](0026-draw-and-measure-one-engine.md)
 - [0027 The Gateways page shows a project's whole network, and the gateway list is synced daily](0027-gateways-page-scope-and-daily-sync.md)
 - [0028 The live map's feed, unread as a seen-up-to time per person, and a health dot slow to worry](0028-live-map-feed-and-health-dot.md)
+- [0029 One top bar on every screen, and a night mode that reaches the map](0029-one-top-bar-and-night-mode.md)

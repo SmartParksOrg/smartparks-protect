@@ -7,6 +7,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#52735E" />
     <title>Smart Parks Protect</title>
+    <!-- the theme before the first paint, from the browser's copy of the account's choice (lib/theme.ts) -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("protect-theme");
+          var dark = t === "dark" || ((t === null || t === "system") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) { document.documentElement.classList.add("dark"); document.documentElement.style.colorScheme = "dark"; }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

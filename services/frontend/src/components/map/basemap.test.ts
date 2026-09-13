@@ -9,9 +9,11 @@ import {
 describe("base maps", () => {
   it("offers satellite only with a MapTiler key", () => {
     expect(Object.keys(basemapsFor(null))).toEqual([
+      "auto",
       "liberty",
       "positron",
       "bright",
+      "dark",
     ]);
     const withKey = basemapsFor("abc");
     expect(Object.keys(withKey)).toContain("satellite");
@@ -28,4 +30,17 @@ describe("base maps", () => {
       FREE_BASEMAPS.bright.style,
     );
   });
+
+  it("follows the theme with the default choice and keeps an explicit one", () => {
+    expect(basemapStyle("auto", basemapsFor(null), false)).toBe(
+      "https://tiles.openfreemap.org/styles/positron",
+    );
+    expect(basemapStyle("auto", basemapsFor(null), true)).toBe(
+      "https://tiles.openfreemap.org/styles/dark",
+    );
+    expect(basemapStyle("positron", basemapsFor(null), true)).toBe(
+      "https://tiles.openfreemap.org/styles/positron",
+    );
+  });
 });
+

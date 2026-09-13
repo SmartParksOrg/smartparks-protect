@@ -11,6 +11,7 @@ import {
 } from "@/components/map/basemap";
 import { maplibregl } from "@/components/map/maplibre";
 import { miniMapGeometry } from "@/components/map/miniMap";
+import { useTheme } from "@/hooks/useTheme";
 
 const TRAIL = "mini-trail";
 const LATEST = "mini-latest";
@@ -50,11 +51,13 @@ export function MiniMap({
     : miniMapGeometry(positions);
   const hasGeometry = geometry !== null;
 
+  const { resolved } = useTheme();
+  const dark = resolved === "dark";
   useEffect(() => {
     if (!container.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: container.current,
-      style: basemapStyle(loadBasemap(), basemapsFor(null)),
+      style: basemapStyle(loadBasemap(), basemapsFor(null), dark),
       center: [0, 0],
       zoom: 1,
       interactive: false,
@@ -108,7 +111,7 @@ export function MiniMap({
       mapRef.current = null;
       readyRef.current = false;
     };
-  }, [hasGeometry]);
+  }, [hasGeometry, dark]);
 
   useEffect(() => {
     const map = mapRef.current;

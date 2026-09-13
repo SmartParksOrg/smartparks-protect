@@ -7,6 +7,8 @@ import { useEffect, useRef } from "react";
 
 import type { SeriesResponse } from "@/api/types";
 import { type ChartType, formatInZone, histogram } from "@/lib/analytics";
+import { useTheme } from "@/hooks/useTheme";
+import { chartTheme } from "@/lib/chartStyle";
 
 echarts.use([LineChart, BarChart, ScatterChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent, CanvasRenderer]);
 
@@ -25,6 +27,8 @@ interface Props {
 
 /** One ECharts instance per mount; options are rebuilt when the data changes. */
 export function SeriesChart({ response, type, aggregate, timezone, labels, unit, className }: Props) {
+  const { resolved } = useTheme();
+  const dark = resolved === "dark";
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
   const chart = useRef<echarts.ECharts | null>(null);
@@ -45,19 +49,22 @@ export function SeriesChart({ response, type, aggregate, timezone, labels, unit,
   useEffect(() => {
     const instance = chart.current;
     if (!instance) return;
-    instance.setOption(buildOption(response, type, aggregate, timezone, labels, unit), true);
-  }, [response, type, aggregate, timezone, labels, unit]);
+    instance.setOption(buildOption(response, type, aggregate, timezone, labels, unit, dark), true);
+  }, [response, type, aggregate, timezone, labels, unit, dark]);
 
   return <div ref={container} className={className ?? "h-80 w-full"} role="img" aria-label={t("Chart of the selected series")} />;
 }
 
-function buildOption(response: SeriesResponse | undefined, type: ChartType, aggregate: string, timezone: string, labels: (index: number) => string, unit?: string | null): echarts.EChartsCoreOption {
+function buildOption(response: SeriesResponse | undefined, type: ChartType, aggregate: string, timezone: string, labels: (index: number) => string, unit: string | null | undefined, dark: boolean): echarts.EChartsCoreOption {
   const all = response?.series ?? [];
+  const th = chartTheme(dark);
+  const axis = { axisLabel: { color: th.text }, splitLine: { lineStyle: { color: th.grid } }, nameTextStyle: { color: th.text } };
   const base: echarts.EChartsCoreOption = {
     color: PALETTE,
     animation: false,
+    textStyle: { color: th.text },
     grid: { left: 56, right: 24, top: 40, bottom: 56, containLabel: false },
-    legend: { type: "scroll", top: 4, textStyle: { fontSize: 11 } },
+    legend: { type: "scroll", top: 4, textStyle: { fontSize: 11, color: th.text } },
     tooltip: { trigger: type === "histogram" ? "item" : "axis", valueFormatter: (v: unknown) => (typeof v === "number" ? `${Number.isInteger(v) ? v : v.toFixed(3)}${unit ? ` ${unit}` : ""}` : String(v ?? "")) },
   };
   if (type === "histogram") {
@@ -66,12 +73,13 @@ function buildOption(response: SeriesResponse | undefined, type: ChartType, aggr
     return {
       ...base,
       legend: { show: false },
-      xAxis: { type: "category", data: edges.map((e) => (Number.isInteger(e) ? String(e) : e.toFixed(2))), name: unit ?? undefined },
-      yAxis: { type: "value", name: "buckets" },
+      xAxis: { ...axis, type: "category", data: edges.map((e) => (Number.isInteger(e) ? String(e) : e.toFixed(2))), name: unit ?? undefined },
+      yAxis: { ...axis, type: "value", name: "buckets" },
       series: [{ type: "bar", data: counts, name: aggregate }],
     };
   }
   const timeAxis = {
+    ...axis,
     type: "time",
     axisLabel: { formatter: (value: number) => formatInZone(new Date(value).toISOString(), timezone, { dateStyle: undefined, timeStyle: undefined, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) },
   };
@@ -86,7 +94,7 @@ function buildOption(response: SeriesResponse | undefined, type: ChartType, aggr
   return {
     ...base,
     xAxis: timeAxis,
-    yAxis: { type: "value", name: unit ?? undefined, scale: type !== "bar" },
+    yAxis: { ...axis, type: "value", name: unit ?? undefined, scale: type !== "bar" },
     dataZoom: [{ type: "inside" }, { type: "slider", height: 18, bottom: 8 }],
     series,
   };

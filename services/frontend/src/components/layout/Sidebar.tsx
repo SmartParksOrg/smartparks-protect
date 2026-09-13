@@ -2,7 +2,6 @@ import { useTranslation } from "react-i18next";
 import { Languages, LogOut, PanelLeftClose, Plug, Search } from "lucide-react";
 import { Link, NavLink, useParams } from "react-router";
 
-import logoLandscape from "@/assets/brand/logo-landscape.webp";
 import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
 import {
   sectionsFor,
@@ -63,7 +62,7 @@ function Item({
   );
 }
 
-/** The navigation column: the landscape logo with the product name, the project switcher, the
+/** The navigation column: the collapse button, the project switcher, the
  * pages of the project and of the server for those who may see them, and the account. */
 export function Sidebar({
   onNavigate,
@@ -82,16 +81,13 @@ export function Sidebar({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-4 py-4">
-        <img src={logoLandscape} alt="" className="h-10 w-auto" />
-        <span className="text-sm font-semibold leading-tight">
-          {t("Smart Parks Protect")}
-        </span>
+      {/* the brand lives in the top bar (decision D182); the column keeps only its collapse button */}
+      <div className="flex items-center justify-end px-2 pt-2">
         {collapsible && (
           <Button
             variant="ghost"
             size="icon"
-            className="ml-auto text-muted-foreground"
+            className="text-muted-foreground"
             aria-label={t("Hide navigation")}
             title={t("Hide navigation")}
             onClick={onCollapse}

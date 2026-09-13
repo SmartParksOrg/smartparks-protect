@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { useTheme } from "@/hooks/useTheme";
 
 const schema = z.object({
   name: z.string().min(1).max(200),
@@ -64,9 +65,10 @@ function DrawMap({
 }) {
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
+  const { resolved: resolvedTheme } = useTheme();
   const { mapRef, ready } = useMap(
     container,
-    basemapStyle(loadBasemap(), basemapsFor(null)),
+    basemapStyle(loadBasemap(), basemapsFor(null), resolvedTheme === "dark"),
     [31.5, -24.9],
     6,
   );

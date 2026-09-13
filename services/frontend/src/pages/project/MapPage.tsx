@@ -154,6 +154,7 @@ import { canAdmin, useProjectRole, useProjects } from "@/hooks/useProjects";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useAuthStore } from "@/stores/auth";
 import { useProjectStore } from "@/stores/project";
+import { useTheme } from "@/hooks/useTheme";
 
 /** Fly to a feature: a point gets a close zoom, everything else fits its bounds. */
 function fitGeometry(
@@ -248,9 +249,10 @@ export function MapPage() {
   const basemaps = useMemo(() => basemapsFor(maptilerKey), [maptilerKey]);
   const [terrainOn, setTerrainOn] = usePreference<boolean>("terrain", false);
   const container = useRef<HTMLDivElement | null>(null);
+  const { resolved: resolvedTheme } = useTheme();
   const { mapRef, ready, stripHost, zoomHost } = useMap(
     container,
-    basemapStyle(basemap, basemaps),
+    basemapStyle(basemap, basemaps, resolvedTheme === "dark"),
     [31.5, -24.9],
     6,
   );

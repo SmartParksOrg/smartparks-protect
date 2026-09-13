@@ -16,11 +16,11 @@ import { axisIndexOf, type ChartGroup, unitAxes } from "@/lib/explore";
 import {
   type ChartLine,
   chartLines,
-  GRID,
+  chartTheme,
   MARK,
   PALETTE,
-  TEXT,
 } from "@/lib/chartStyle";
+import { useTheme } from "@/hooks/useTheme";
 
 echarts.use([
   LineChart,
@@ -70,6 +70,8 @@ export function ExploreChart({
   onHover: (ms: number | null) => void;
   onPick: (ms: number) => void;
 }) {
+  const { resolved } = useTheme();
+  const dark = resolved === "dark";
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
   const chart = useRef<echarts.ECharts | null>(null);
@@ -147,10 +149,10 @@ export function ExploreChart({
     const instance = chart.current;
     if (!instance) return;
     instance.setOption(
-      buildOption(shown, groups, kind, xLabel ?? null, timezone, phone),
+      buildOption(shown, groups, kind, xLabel ?? null, timezone, phone, dark),
       true,
     );
-  }, [shown, groups, kind, xLabel, timezone, phone]);
+  }, [shown, groups, kind, xLabel, timezone, phone, dark]);
 
   // the moments marked elsewhere: the pinned one as a dashed line, a hover from the drawer or
   // the map as a thin solid one; the chart's own tooltip appears only under the pointer
@@ -166,7 +168,7 @@ export function ExploreChart({
     if (marked !== null && marked !== pinned && !hovering.current)
       data.push({
         xAxis: marked,
-        lineStyle: { color: TEXT, width: 1, type: "solid", opacity: 0.7 },
+        lineStyle: { color: chartTheme(dark).text, width: 1, type: "solid", opacity: 0.7 },
       });
     instance.setOption({
       series: [
@@ -181,7 +183,7 @@ export function ExploreChart({
         },
       ],
     });
-  }, [marked, pinned, shown, kind]);
+  }, [marked, pinned, shown, kind, dark]);
 
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -250,8 +252,6 @@ function valueText(value: unknown, unit: string | null): string {
   return `${text}${unit ? ` ${unit}` : ""}`;
 }
 
-const AXIS_TEXT = { color: TEXT, fontSize: 11 };
-
 function timeFormatter(span: number, timezone: string) {
   const day = 24 * 3600_000;
   return (value: number) => {
@@ -282,16 +282,17 @@ function timeFormatter(span: number, timezone: string) {
 }
 
 function card(
+  text: string,
   title: string,
   rows: { colour: string; name: string; value: string }[],
 ): string {
   const lines = rows
     .map(
       (r) =>
-        `<div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span style="width:8px;height:8px;border-radius:9999px;background:${r.colour};flex:none"></span><span style="color:${TEXT};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${r.name}</span><b style="font-variant-numeric:tabular-nums">${r.value}</b></div>`,
+        `<div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span style="width:8px;height:8px;border-radius:9999px;background:${r.colour};flex:none"></span><span style="color:${text};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${r.name}</span><b style="font-variant-numeric:tabular-nums">${r.value}</b></div>`,
     )
     .join("");
-  return `<div style="font-size:12px;min-width:160px"><div style="color:${TEXT};margin-bottom:4px">${title}</div>${lines}</div>`;
+  return `<div style="font-size:12px;min-width:160px"><div style="color:${text};margin-bottom:4px">${title}</div>${lines}</div>`;
 }
 
 function buildOption(
@@ -301,18 +302,20 @@ function buildOption(
   xLabel: string | null,
   timezone: string,
   phone: boolean,
+  dark: boolean,
 ): echarts.EChartsCoreOption {
+  const th = chartTheme(dark);
+  const AXIS_TEXT = { color: th.text, fontSize: 11 };
   const base: echarts.EChartsCoreOption = {
     animation: false,
-    textStyle: { fontFamily: "inherit" },
+    textStyle: { fontFamily: "inherit", color: th.text },
     tooltip: {
-      backgroundColor: "rgba(255,255,255,0.96)",
-      borderColor: GRID,
+      backgroundColor: th.tooltipBg,
+      borderColor: th.grid,
       borderWidth: 1,
       padding: [8, 10],
-      textStyle: { color: "#111827", fontSize: 12 },
-      extraCssText:
-        "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 8px;",
+      textStyle: { color: th.tooltipText, fontSize: 12 },
+      extraCssText: `box-shadow: ${th.shadow}; border-radius: 8px;`,
       confine: true,
     },
   };
@@ -370,7 +373,7 @@ function buildOption(
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: AXIS_TEXT,
-    splitLine: { lineStyle: { color: GRID } },
+    splitLine: { lineStyle: { color: th.grid } },
     nameTextStyle: { ...AXIS_TEXT, align: "left" },
     nameGap: 8,
   };
@@ -388,7 +391,7 @@ function buildOption(
             data: number[];
             color: string;
           };
-          return card(timeTitle(p.data[2]), [
+          return card(th.text, timeTitle(p.data[2]), [
             {
               colour: p.color,
               name: xLabel ?? "x",
@@ -503,7 +506,7 @@ function buildOption(
       axisPointer: {
         type: "line",
         snap: true,
-        lineStyle: { color: TEXT, width: 1 },
+        lineStyle: { color: th.text, width: 1 },
       },
       formatter: (params: unknown) => {
         const items = params as {
@@ -513,7 +516,7 @@ function buildOption(
           value: number[];
         }[];
         if (!items.length) return "";
-        return card(
+        return card(th.text, 
           timeTitle(items[0].value[0]),
           items.map((p) => ({
             colour: p.color,
@@ -529,7 +532,7 @@ function buildOption(
     grid,
     xAxis: {
       type: "time",
-      axisLine: { lineStyle: { color: GRID } },
+      axisLine: { lineStyle: { color: th.grid } },
       axisTick: { show: false },
       axisLabel: { ...AXIS_TEXT, formatter: timeLabel, hideOverlap: true },
       splitLine: { show: false },
@@ -544,17 +547,17 @@ function buildOption(
             type: "slider",
             height: 18,
             bottom: 8,
-            borderColor: GRID,
+            borderColor: th.grid,
             fillerColor: "rgba(82,115,94,0.12)",
             dataBackground: {
-              lineStyle: { color: GRID },
+              lineStyle: { color: th.grid },
               areaStyle: { color: "#F3F4F6" },
             },
             selectedDataBackground: {
               lineStyle: { color: "#52735E" },
               areaStyle: { color: "rgba(82,115,94,0.15)" },
             },
-            handleStyle: { borderColor: GRID },
+            handleStyle: { borderColor: th.grid },
             textStyle: AXIS_TEXT,
           },
         ],

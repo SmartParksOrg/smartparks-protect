@@ -6,7 +6,7 @@ every object. There is no switch for detail: what a person sees follows the role
 
 ## One click deeper
 
-A small health dot sits in the top right corner of the content on every page, for every signed-in account: green while every worker reports and no system alert is open, amber once one has lingered (a worker silent over 15 minutes, a system alert open over 30 minutes), red only after two polls without an answer; a click names the reason and server admins get the way to Server admin, System health.
+The top bar on every page and screen size carries the Smart Parks logo and the product name on the left and, on the right, the theme switch (light, dark or follow the device; kept on the account) and a small health dot for every signed-in account: green while every worker reports and no system alert is open, amber once one has lingered (a worker silent over 15 minutes, a system alert open over 30 minutes), red only after two polls without an answer; a click names the reason and server admins get the way to Server admin, System health.
 
 The entity page and the device page have four tabs. Overview holds what a ranger needs: the
 state, the health, a small map with the newest position, the assignments and the actions.

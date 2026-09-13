@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* the `dark` class on <html> (lib/theme.ts) keys the dark tokens and the dark: variants */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
   Smart Parks colour system. Brand colours from the architecture (section 23) and the logo files.
   Semantic tokens below feed shadcn/ui components. Change a token here, never a hex value in a
@@ -33,6 +36,41 @@
   --border: #d9e1dc;
   --input: #d9e1dc;
   --ring: var(--brand-green-light);
+}
+
+/* Night (decision D183): the same tokens on dark green-grey surfaces; the brand green
+   lightens so it keeps its contrast as the primary on a dark ground. */
+.dark {
+  --background: #121917;
+  --foreground: #e6ece8;
+  --card: #1a2320;
+  --card-foreground: #e6ece8;
+  --popover: #1a2320;
+  --popover-foreground: #e6ece8;
+  --primary: var(--brand-green-light);
+  --primary-foreground: #10201a;
+  --secondary: #3b5548;
+  --secondary-foreground: #e6ece8;
+  --muted: #22302a;
+  --muted-foreground: #9fb0a6;
+  --accent: #27362f;
+  --accent-foreground: #e6ece8;
+  --destructive: #e06c5a;
+  --destructive-foreground: #1a0f0d;
+  --border: #2d3d35;
+  --input: #2d3d35;
+  --ring: var(--brand-green-light);
+}
+
+/* MapLibre's own boxes follow the theme */
+.dark .maplibregl-ctrl-attrib,
+.dark .maplibregl-ctrl-scale {
+  background: rgba(26, 35, 32, 0.85);
+  color: #e6ece8;
+  border-color: #2d3d35;
+}
+.dark .maplibregl-ctrl-attrib a {
+  color: #e6ece8;
 }
 
 @theme inline {

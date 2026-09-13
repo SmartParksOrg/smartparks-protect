@@ -23,7 +23,7 @@ State colours on the map communicate status, not object type; the icon communica
 
 ## Logo
 
-`src/assets/brand/` holds `logo-stacked.svg` (emblem above wordmark), `logo-wide.svg` (emblem left of wordmark) and `logo-mark.svg` (emblem only), all with `fill="currentColor"`; import them as React components (`import Logo from "@/assets/brand/logo-mark.svg?react"`) so `className="text-primary"` colours them; an `<img>` cannot inherit the colour. `logo-landscape.webp` and `logo-landscape-white.webp` are Smart Parks' own landscape logo (the wide emblem over the wordmark, from the delivered `LOGO_Smartparks_1920x1080` set, brand green and white on transparent, 1600 px), the brand in the app: the sidebar header and the phone header, each with the product name beside it, and the sign-in card, always as an `<img>`. `logo-mark.svg` is the favicon (`public/favicon.svg`); `logo-wide.svg` and `logo-stacked.svg` are kept and imported by nothing today. Import an SVG as a component (`…svg?react`) when it must inherit `currentColor`; an `<img>` cannot.
+Themes: every colour comes from the tokens in `src/index.css`, which exist twice, on `:root` and under `.dark`; a component never hard-codes a surface or text colour, and where a component needs a value for a canvas or a chart it asks `useTheme().resolved` and `lib/chartStyle.ts`. Map marker halos stay white on both themes on purpose. `src/assets/brand/` holds `logo-stacked.svg` (emblem above wordmark), `logo-wide.svg` (emblem left of wordmark) and `logo-mark.svg` (emblem only), all with `fill="currentColor"`; import them as React components (`import Logo from "@/assets/brand/logo-mark.svg?react"`) so `className="text-primary"` colours them; an `<img>` cannot inherit the colour. `logo-landscape.webp` and `logo-landscape-white.webp` are Smart Parks' own landscape logo (the wide emblem over the wordmark, from the delivered `LOGO_Smartparks_1920x1080` set, brand green and white on transparent, 1600 px), the brand in the app: the sidebar header and the phone header, each with the product name beside it, and the sign-in card, always as an `<img>`. `logo-mark.svg` is the favicon (`public/favicon.svg`); `logo-wide.svg` and `logo-stacked.svg` are kept and imported by nothing today. Import an SVG as a component (`…svg?react`) when it must inherit `currentColor`; an `<img>` cannot.
 
 ## Map
 
@@ -46,7 +46,6 @@ Do not invent z-index values. Pick the layer; ties are broken by DOM order.
 | --- | --- | --- |
 | Map | 0 | Every map container gets an explicit `z-0` so its internal layers cannot paint over the app. MapLibre's stylesheet sets `position: relative` on its container, so a container that must fill its parent uses `absolute!` (Tailwind important) or an explicit height |
 | In-page sticky | 10 to 30 | Sticky table headers, filter bars, mobile top bar at 30 |
-| Content corner | 40 | The system health dot over the page content |
 | App overlays | 50 | Sidebar drawer, dialogs, sheets, dropdowns, popovers, select menus |
 | Toasts | 100 | Always on top |
 

@@ -6,6 +6,7 @@ import { Navigate, Outlet, useLocation, useParams } from "react-router";
 import logoLandscape from "@/assets/brand/logo-landscape.webp";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { HealthDot } from "@/components/layout/HealthDot";
+import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -17,8 +18,8 @@ import { useLayoutStore } from "@/stores/layout";
  * Fixed sidebar from 1024 px, a drawer below. The shell is exactly one viewport high and the main
  * area scrolls, so a page that wants the full height (the map) gets it with `flex-1` and pages
  * with long content scroll inside `main` (z-index ladder: map 0, sticky bar 30, drawer 50). The
- * phone header carries the landscape logo with the product name, and the health dot (decision
- * D181) sits in the top right corner of the content on every page.
+ * top bar on every screen size (decision D182) carries the landscape logo with the product name
+ * on the left and the theme switch (D183) and the health dot (D181) on the right.
  */
 export function AppLayout() {
   const { t } = useTranslation();
@@ -77,11 +78,14 @@ export function AppLayout() {
           <Sidebar onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-card px-3 py-2 lg:hidden">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* the top bar on every screen size (decision D182): the brand, the health dot (D181)
+            and the theme switch (D183); the navigation button only where the sidebar is a drawer */}
+        <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-card px-3 py-2">
           <Button
             variant="ghost"
             size="icon"
+            className="lg:hidden"
             aria-label={t("Open navigation")}
             onClick={() => setOpen(true)}
           >
@@ -89,11 +93,11 @@ export function AppLayout() {
           </Button>
           <img src={logoLandscape} alt="" className="h-7 w-auto" />
           <span className="font-medium">{t("Smart Parks Protect")}</span>
-          <HealthDot className="ml-auto" />
+          <span className="ml-auto flex items-center gap-1">
+            <ThemeSwitch />
+            <HealthDot />
+          </span>
         </header>
-        {/* the health dot in the top right corner of the content (decision D181), inside the
-            10 px margin the map keeps around its strip */}
-        <HealthDot className="absolute top-0 right-0 z-40 hidden lg:flex" />
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <Outlet />
         </main>
