@@ -105,7 +105,7 @@ function Row({
 }) {
   return (
     <div
-      className={`group flex min-h-9 items-center gap-2 rounded-md py-0.5 pr-1 hover:bg-muted ${header ? "bg-muted/40" : ""}`}
+      className={`group flex h-9 items-center gap-2 overflow-x-auto rounded-md pr-1 [scrollbar-width:none] hover:bg-muted sm:overflow-visible ${header ? "bg-muted/40" : ""}`}
       style={{ paddingLeft: 6 + depth * 18 }}
     >
       {children}
@@ -232,7 +232,12 @@ export function LayerPanel({
   const now = useNow();
   const phone = useIsPhone();
   // a name gets two lines on a phone, where the row has no room for an ellipsis to mean much
-  const nameClass = phone ? "line-clamp-2 leading-tight" : "truncate";
+  // on a phone a name stays on one line and the row scrolls sideways to show the rest (Tim,
+  // 2026-09-13, over wrapping); on a wider screen the name truncates in the room it has
+  const nameClass = phone
+    ? "shrink-0 whitespace-nowrap"
+    : "min-w-0 flex-1 truncate";
+  const deviceNameClass = nameClass;
   const [tab, setTab] = useState<Tab>("entities");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
@@ -416,7 +421,7 @@ export function LayerPanel({
         />
         <button
           type="button"
-          className={`min-w-0 flex-1 ${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
+          className={`${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
           onClick={() => onPickEntity(m.entity_id)}
         >
           {m.name}
@@ -577,7 +582,7 @@ export function LayerPanel({
                       />
                     )}
                     <span
-                      className={`min-w-0 flex-1 ${nameClass} font-semibold ${shown ? "" : "text-muted-foreground"}`}
+                      className={`${nameClass} font-semibold ${shown ? "" : "text-muted-foreground"}`}
                     >
                       {row.name}
                     </span>
@@ -645,9 +650,7 @@ export function LayerPanel({
             label={t("Features")}
             onChange={(v) => onChange({ ...choices, features: v })}
           />
-          <span className={`min-w-0 flex-1 ${nameClass} font-semibold`}>
-            {t("Features")}
-          </span>
+          <span className={`${nameClass} font-semibold`}>{t("Features")}</span>
           <span className="text-[11px] text-muted-foreground">
             {features.length}
           </span>
@@ -700,7 +703,7 @@ export function LayerPanel({
                   }
                 />
                 <span
-                  className={`min-w-0 flex-1 ${nameClass} font-medium capitalize ${typeOn ? "" : "text-muted-foreground"}`}
+                  className={`${nameClass} font-medium capitalize ${typeOn ? "" : "text-muted-foreground"}`}
                 >
                   {t(type)}
                 </span>
@@ -742,7 +745,7 @@ export function LayerPanel({
                       />
                       <button
                         type="button"
-                        className={`min-w-0 flex-1 ${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
+                        className={`${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
                         onClick={() => onPickFeature(f.id)}
                       >
                         {f.name}
@@ -792,7 +795,7 @@ export function LayerPanel({
             label={t("Events, 24 h")}
             onChange={(v) => onChange({ ...choices, events: v })}
           />
-          <span className={`min-w-0 flex-1 ${nameClass} font-semibold`}>
+          <span className={`${nameClass} font-semibold`}>
             {t("Events, 24 h")}
           </span>
           <span className="text-[11px] text-muted-foreground">
@@ -847,7 +850,7 @@ export function LayerPanel({
                   }
                 />
                 <span
-                  className={`min-w-0 flex-1 ${nameClass} font-medium ${typeOn ? "" : "text-muted-foreground"}`}
+                  className={`${nameClass} font-medium ${typeOn ? "" : "text-muted-foreground"}`}
                 >
                   {type}
                 </span>
@@ -867,7 +870,7 @@ export function LayerPanel({
                     />
                     <button
                       type="button"
-                      className={`min-w-0 flex-1 ${nameClass} text-left ${typeOn ? "" : "text-muted-foreground"}`}
+                      className={`${nameClass} text-left ${typeOn ? "" : "text-muted-foreground"}`}
                       onClick={() => onPickEvent(e.event_id)}
                     >
                       {e.title}
@@ -977,7 +980,7 @@ export function LayerPanel({
         />
         <button
           type="button"
-          className={`min-w-0 flex-1 ${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
+          className={`${deviceNameClass} text-left ${on ? "" : "text-muted-foreground"}`}
           title={
             d.entity_name
               ? t("Tracks {{name}}", { name: d.entity_name })
@@ -1129,7 +1132,7 @@ export function LayerPanel({
                     }
                   />
                   <span
-                    className={`min-w-0 flex-1 ${nameClass} font-semibold ${onCount > 0 ? "" : "text-muted-foreground"}`}
+                    className={`${nameClass} font-semibold ${onCount > 0 ? "" : "text-muted-foreground"}`}
                   >
                     {section.name}
                   </span>
@@ -1142,7 +1145,7 @@ export function LayerPanel({
               {open && section.unassigned.length > 0 && (
                 <Row depth={section.name ? 1 : 0} header>
                   {foldButton(`${foldKey}:u`, openU)}
-                  <span className={`min-w-0 flex-1 ${nameClass} font-semibold`}>
+                  <span className={`${nameClass} font-semibold`}>
                     {t("Without an entity")}
                   </span>
                   <span className="text-xs text-muted-foreground">
@@ -1154,7 +1157,7 @@ export function LayerPanel({
               {open && section.tracking.length > 0 && (
                 <Row depth={section.name ? 1 : 0} header>
                   {foldButton(`${foldKey}:t`, openT)}
-                  <span className={`min-w-0 flex-1 ${nameClass} font-semibold`}>
+                  <span className={`${nameClass} font-semibold`}>
                     {t("Tracking an entity")}
                   </span>
                   <span className="text-xs text-muted-foreground">
@@ -1220,7 +1223,7 @@ export function LayerPanel({
             label={t("Heard positions")}
             onChange={(v) => onChange({ ...choices, coverage: v })}
           />
-          <span className={`min-w-0 flex-1 ${nameClass} font-semibold`}>
+          <span className={`${nameClass} font-semibold`}>
             {t("Heard positions")}
           </span>
           <Select
@@ -1251,9 +1254,7 @@ export function LayerPanel({
             label={t("Network locations")}
             onChange={(v) => onChange({ ...choices, network_locations: v })}
           />
-          <span className={`min-w-0 flex-1 ${nameClass}`}>
-            {t("Network locations")}
-          </span>
+          <span className={`${nameClass}`}>{t("Network locations")}</span>
           {choices.network_locations && networkLocations && (
             <span className="text-xs text-muted-foreground">
               {networkLocations.capped
@@ -1346,9 +1347,7 @@ export function LayerPanel({
             label={t("Gateways")}
             onChange={(v) => onChange({ ...choices, gateways: v })}
           />
-          <span className={`min-w-0 flex-1 ${nameClass} font-semibold`}>
-            {t("Gateways")}
-          </span>
+          <span className={`${nameClass} font-semibold`}>{t("Gateways")}</span>
           <span className="text-[11px] text-muted-foreground">
             {placed.length}
           </span>
@@ -1394,7 +1393,7 @@ export function LayerPanel({
                   />
                   <button
                     type="button"
-                    className={`min-w-0 flex-1 ${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
+                    className={`${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
                     onClick={() => onPickGateway(g.id)}
                   >
                     {g.display_name}
