@@ -22,7 +22,10 @@ async def test_device_layer_lists_assigned_devices(client, db, bus):  # noqa: F8
     start = datetime(2026, 4, 1, tzinfo=UTC)
     for i in range(3):
         await _feed(db, bus, source["id"], external_id, start + timedelta(minutes=i), -24.9, 31.5)
-    types = (await client.get("/api/v1/device-types", headers=admin.headers)).json()["items"]
+    # the shared test database holds a device type per set-up, more than one default page
+    types = (
+        await client.get("/api/v1/device-types", params={"limit": 500}, headers=admin.headers)
+    ).json()["items"]
     device_type_id = device["device_type_id"]
     assert any(t["id"] == device_type_id for t in types)
 
