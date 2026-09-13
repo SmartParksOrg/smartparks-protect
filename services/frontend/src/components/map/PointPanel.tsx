@@ -6,7 +6,11 @@ import { Link } from "react-router";
 import { api, ApiError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { PointRead } from "@/api/types";
-import { MapPanel, PanelRow } from "@/components/map/MapObjectPanel";
+import {
+  CopyPositionButton,
+  MapPanel,
+  PanelRow,
+} from "@/components/map/MapObjectPanel";
 import { measurementText } from "@/components/map/measurementText";
 import { Button } from "@/components/ui/button";
 import { formatTime } from "@/lib/format";
@@ -75,6 +79,7 @@ export function PointPanel({
       footer={
         p ? (
           <>
+            {coordinates && <CopyPositionButton position={coordinates} />}
             {p.source_event_id != null && p.source_event_ingested_at && (
               <Button
                 variant="outline"

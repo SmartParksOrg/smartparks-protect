@@ -124,6 +124,7 @@ import { GatewayPanel } from "@/components/map/GatewayPanel";
 import { LayerPanel } from "@/components/map/LayerPanel";
 import { DevicePanel, EntityPanel } from "@/components/map/MapObjectPanel";
 import { PointPanel } from "@/components/map/PointPanel";
+import { StatePanel } from "@/components/map/StatePanel";
 import {
   DEFAULT_TRACK_HOURS,
   parseTrackLength,
@@ -213,12 +214,20 @@ export function MapPage() {
   const selectedDeviceId = params.get("device");
   // a gateway or a track point selected (phase 19): `?gateway=<id>`, `?point=<owner>,<time>`
   const selectedGatewayId = params.get("gateway");
+  // `?point=<owner>,<time>`; a `device:` prefix names a device's own fix, the older form
+  // without it is an entity's, or a device's while its track is on
   const selectedPoint = useMemo(() => {
     const raw = params.get("point");
     if (!raw) return null;
     const comma = raw.indexOf(",");
     if (comma < 0) return null;
-    return { ownerId: raw.slice(0, comma), time: raw.slice(comma + 1) };
+    const owner = raw.slice(0, comma);
+    const kind = owner.startsWith("device:") ? ("device" as const) : null;
+    return {
+      ownerId: kind ? owner.slice("device:".length) : owner,
+      kind,
+      time: raw.slice(comma + 1),
+    };
   }, [params]);
   const [sourceEvent, setSourceEvent] = useState<{
     id: number;
@@ -644,6 +653,7 @@ export function MapPage() {
     "entity",
     "device",
     "gateway",
+    "state",
     "point",
     "feature",
     "revealed",
@@ -675,12 +685,23 @@ export function MapPage() {
     [selectOnly],
   );
   const selectPoint = useCallback(
-    (ownerId: string | null, time?: string) =>
-      selectOnly("point", ownerId && time ? `${ownerId},${time}` : null),
+    (ownerId: string | null, time?: string, kind?: "entity" | "device") =>
+      selectOnly(
+        "point",
+        ownerId && time
+          ? `${kind === "device" ? "device:" : ""}${ownerId},${time}`
+          : null,
+      ),
     [selectOnly],
   );
   const selectFeature = useCallback(
     (id: string | null) => selectOnly("feature", id),
+    [selectOnly],
+  );
+  // the last status of a device (`?state=<device>`), opened from the entity and device panels
+  const selectedStateDevice = params.get("state");
+  const selectState = useCallback(
+    (id: string | null) => selectOnly("state", id),
     [selectOnly],
   );
 
@@ -1320,9 +1341,10 @@ export function MapPage() {
     ...deviceTrackData,
   ]);
 
-  const selected = currentFeatures?.find(
+  const selectedEntityFeature = currentFeatures?.find(
     (f) => f.properties.entity_id === selectedId,
-  )?.properties;
+  );
+  const selected = selectedEntityFeature?.properties;
   const selectedFeature = featureParamValue
     ? features.data?.items.find((f) => f.id === featureParamValue)
     : undefined;
@@ -1748,6 +1770,20 @@ export function MapPage() {
             now={now}
             wasHidden={revealNote === `entity:${selected.entity_id}`}
             onClose={() => select(null)}
+            onOpenPosition={() =>
+              selected.position_time &&
+              selectPoint(selected.entity_id, selected.position_time, "entity")
+            }
+            onOpenState={
+              selected.device_id
+                ? () => selectState(selected.device_id as string)
+                : undefined
+            }
+            position={
+              (selectedEntityFeature?.geometry?.coordinates as
+                | [number, number]
+                | undefined) ?? null
+            }
             tracked={trackedIds.includes(selected.entity_id)}
             trackLengthLabel={trackLengthLabel}
             track={selectedTrack}
@@ -1774,6 +1810,22 @@ export function MapPage() {
               revealNote === `device:${selectedDevice.properties.device_id}`
             }
             onClose={() => selectDevice(null)}
+            onOpenPosition={() =>
+              selectedDevice.properties.position_time &&
+              selectPoint(
+                selectedDevice.properties.device_id,
+                selectedDevice.properties.position_time,
+                "device",
+              )
+            }
+            onOpenState={() =>
+              selectState(selectedDevice.properties.device_id)
+            }
+            position={
+              (selectedDevice.geometry?.coordinates as
+                | [number, number]
+                | undefined) ?? null
+            }
             tracked={trackedDeviceIds.includes(
               selectedDevice.properties.device_id,
             )}
@@ -1817,14 +1869,29 @@ export function MapPage() {
         {!selected &&
           !selectedDevice &&
           !selectedGatewayId &&
+          !selectedPoint &&
+          selectedStateDevice && (
+            <StatePanel
+              projectId={projectId}
+              deviceId={selectedStateDevice}
+              onClose={() => selectState(null)}
+              onOpenSourceEvent={(id, ingestedAt) =>
+                setSourceEvent({ id, ingestedAt })
+              }
+            />
+          )}
+        {!selected &&
+          !selectedDevice &&
+          !selectedGatewayId &&
           selectedPoint && (
             <PointPanel
               projectId={projectId}
               ownerId={selectedPoint.ownerId}
               kind={
-                trackedDeviceIds.includes(selectedPoint.ownerId)
+                selectedPoint.kind ??
+                (trackedDeviceIds.includes(selectedPoint.ownerId)
                   ? "device"
-                  : "entity"
+                  : "entity")
               }
               time={selectedPoint.time}
               onClose={() => selectPoint(null)}

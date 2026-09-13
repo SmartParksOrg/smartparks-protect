@@ -156,6 +156,7 @@ ALL_SCOPE_READS: dict[str, dict[str, str]] = {
         "entity_id": str(uuid.uuid4()),
         "time": "2026-01-01T00:00:00+00:00",
     },
+    "/api/v1/projects/{project_id}/devices/{device_id}/state": {},
     "/api/v1/projects/{project_id}/entities": {},
     "/api/v1/projects/{project_id}/entity-assignments": {},
     "/api/v1/projects/{project_id}/features": {},

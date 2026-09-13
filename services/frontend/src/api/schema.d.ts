@@ -2013,6 +2013,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/devices/{device_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device State
+         * @description What a click on "Last status" in an entity or device panel opens: everything the device
+         *     reported in its newest status, the declared health lines first.
+         */
+        get: operations["device_state_api_v1_projects__project_id__devices__device_id__state_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/positions/at": {
         parameters: {
             query?: never;
@@ -6424,6 +6445,31 @@ export interface components {
              * @description The data sources holding an identity of the device, by name
              */
             data_source_names?: string[];
+        };
+        /**
+         * DeviceStateRead
+         * @description A device's last status (Tim, 2026-09-13): the driver's health lines with their levels,
+         *     the raw status document, and the source event it came from.
+         */
+        DeviceStateRead: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Time */
+            time: string | null;
+            health: components["schemas"]["DeviceHealth"];
+            /** State */
+            state: {
+                [key: string]: unknown;
+            };
+            /** Source Event Id */
+            source_event_id?: number | null;
+            /** Source Event Ingested At */
+            source_event_ingested_at?: string | null;
         };
         /**
          * DeviceStatus
@@ -15320,6 +15366,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_state_api_v1_projects__project_id__devices__device_id__state_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceStateRead"];
                 };
             };
             /** @description Validation Error */

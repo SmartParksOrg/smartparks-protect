@@ -124,3 +124,4 @@ export type NetworkLocationsResponse = Schemas["NetworkLocationsResponse"];
 export type SatelliteSession = Schemas["SatelliteSessionRead"];
 export type DeviceConnectivityRead = Schemas["DeviceConnectivityRead"];
 export type SourceConnectivity = Schemas["SourceConnectivity"];
+export type DeviceStateRead = Schemas["DeviceStateRead"];

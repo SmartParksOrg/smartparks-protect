@@ -81,8 +81,10 @@ export function Sidebar({
 
   return (
     <div className="flex h-full flex-col">
-      {/* the brand lives in the top bar (decision D182); the column keeps only its collapse button */}
-      <div className="flex items-center justify-end px-2 pt-2">
+      {/* the brand lives in the top bar (decision D182); the column keeps only its collapse
+          button, and the row keeps its height in the drawer so the sheet's close button has
+          room above the project switcher */}
+      <div className="flex h-12 shrink-0 items-center justify-end px-2">
         {collapsible && (
           <Button
             variant="ghost"

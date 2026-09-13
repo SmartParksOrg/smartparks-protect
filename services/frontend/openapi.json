@@ -8566,6 +8566,64 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/devices/{device_id}/state": {
+   "get": {
+    "tags": [
+     "map"
+    ],
+    "summary": "Device State",
+    "description": "What a click on \"Last status\" in an entity or device panel opens: everything the device\nreported in its newest status, the declared health lines first.",
+    "operationId": "device_state_api_v1_projects__project_id__devices__device_id__state_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceStateRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/positions/at": {
    "get": {
     "tags": [
@@ -24661,6 +24719,72 @@
      "updated_at"
     ],
     "title": "DeviceRead"
+   },
+   "DeviceStateRead": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "time": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Time"
+     },
+     "health": {
+      "$ref": "#/components/schemas/DeviceHealth"
+     },
+     "state": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "State"
+     },
+     "source_event_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Id"
+     },
+     "source_event_ingested_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Event Ingested At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_name",
+     "time",
+     "health",
+     "state"
+    ],
+    "title": "DeviceStateRead",
+    "description": "A device's last status (Tim, 2026-09-13): the driver's health lines with their levels,\nthe raw status document, and the source event it came from."
    },
    "DeviceStatus": {
     "type": "string",

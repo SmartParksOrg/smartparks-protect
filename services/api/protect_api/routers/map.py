@@ -42,12 +42,13 @@ from shared.curation.effective import (
 )
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
-from shared.domain.health import device_health
+from shared.domain.health import DeviceHealth, device_health
 from shared.models import (
     Device,
     DeviceCurrentState,
     DeviceEntityAssignment,
     DeviceProjectAssignment,
+    DeviceStateHistory,
     DeviceType,
     Entity,
     EntityCurrentState,
@@ -550,6 +551,72 @@ async def track(
         times=[r[1] for r in rows],
         first_position_id=rows[0][0] if rows else None,
         last_position_id=rows[-1][0] if rows else None,
+    )
+
+
+class DeviceStateRead(BaseModel):
+    """A device's last status (Tim, 2026-09-13): the driver's health lines with their levels,
+    the raw status document, and the source event it came from."""
+
+    device_id: uuid.UUID
+    device_name: str
+    time: datetime | None
+    health: DeviceHealth
+    state: dict[str, Any]
+    source_event_id: int | None = None
+    source_event_ingested_at: datetime | None = None
+
+
+@router.get("/devices/{device_id}/state", response_model=DeviceStateRead)
+async def device_state(
+    device_id: uuid.UUID,
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceStateRead:
+    """What a click on "Last status" in an entity or device panel opens: everything the device
+    reported in its newest status, the declared health lines first."""
+    device = await session.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found")
+    if not context.is_all:
+        assigned = await session.scalar(
+            select(DeviceProjectAssignment.id).where(
+                context.where(DeviceProjectAssignment.project_id),
+                DeviceProjectAssignment.device_id == device_id,
+                DeviceProjectAssignment.validity.op("@>")(utc_now()),
+            )
+        )
+        if assigned is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found")
+    current = await session.get(DeviceCurrentState, device_id)
+    if current is None or current.latest_state_time is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No status from this device yet")
+    device_type = await session.get(DeviceType, device.device_type_id)
+    driver = DRIVERS.get(device_type.driver_key) if device_type else None
+    health = device_health(
+        getattr(driver, "health", None),
+        latest_measurements=current.latest_measurements,
+        latest_state=current.latest_state,
+        latest_state_time=current.latest_state_time,
+        last_seen_at=current.last_seen_at,
+    )
+    row = await session.scalar(
+        select(DeviceStateHistory)
+        .where(
+            DeviceStateHistory.device_id == device_id,
+            DeviceStateHistory.time == current.latest_state_time,
+        )
+        .order_by(DeviceStateHistory.id.desc())
+        .limit(1)
+    )
+    return DeviceStateRead(
+        device_id=device.id,
+        device_name=device.name,
+        time=current.latest_state_time,
+        health=health,
+        state=dict(current.latest_state or {}),
+        source_event_id=row.source_event_id if row else None,
+        source_event_ingested_at=row.source_event_ingested_at if row else None,
     )
 
 

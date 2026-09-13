@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Flame, Route, X } from "lucide-react";
+import { Copy, Flame, Route, X } from "lucide-react";
+import { toast } from "sonner";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -120,6 +121,8 @@ function HealthRows({
   healthLevel,
   lastStatusAt,
   now,
+  onOpenPosition,
+  onOpenState,
 }: {
   lastSeenAt: string | null | undefined;
   positionTime: string | null | undefined;
@@ -128,6 +131,10 @@ function HealthRows({
   healthLevel: string | null | undefined;
   lastStatusAt: string | null | undefined;
   now: number;
+  /** Opens the fix of that moment, the panel a track point opens (Tim, 2026-09-13). */
+  onOpenPosition?: () => void;
+  /** Opens the device's last status with everything it reported (Tim, 2026-09-13). */
+  onOpenState?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -136,7 +143,20 @@ function HealthRows({
         {formatAgo(lastSeenAt, now)}
       </PanelRow>
       <PanelRow label={t("Position")}>
-        {positionTime ? formatTime(positionTime) : t("none yet")}
+        {positionTime && onOpenPosition ? (
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-primary"
+            title={t("Show this fix and the measurements of that moment")}
+            onClick={onOpenPosition}
+          >
+            {formatTime(positionTime)}
+          </button>
+        ) : positionTime ? (
+          formatTime(positionTime)
+        ) : (
+          t("none yet")
+        )}
         {positionTime && positionKind === "network" && (
           <span className="text-muted-foreground">
             {" "}
@@ -151,7 +171,18 @@ function HealthRows({
       )}
       {lastStatusAt && (
         <PanelRow label={t("Last status")} title={formatTime(lastStatusAt)}>
-          {formatAgo(lastStatusAt, now)}
+          {onOpenState ? (
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-primary"
+              title={t("Show everything the device reported in its last status")}
+              onClick={onOpenState}
+            >
+              {formatAgo(lastStatusAt, now)}
+            </button>
+          ) : (
+            formatAgo(lastStatusAt, now)
+          )}
         </PanelRow>
       )}
     </>
@@ -224,7 +255,33 @@ export function HeatButton({
   );
 }
 
+/** Copies "latitude, longitude" of a position to the clipboard (Tim, 2026-09-13). */
+export function CopyPositionButton({ position }: { position: [number, number] }) {
+  const { t } = useTranslation();
+  const text = `${position[1].toFixed(6)}, ${position[0].toFixed(6)}`;
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="size-8"
+      aria-label={t("Copy the coordinates")}
+      title={t("Copy the coordinates, latitude and longitude")}
+      onClick={() => {
+        navigator.clipboard
+          .writeText(text)
+          .then(() => toast.success(t("Copied {{text}}", { text })))
+          .catch(() => toast.error(t("The browser refused the clipboard")));
+      }}
+    >
+      <Copy className="size-4" />
+    </Button>
+  );
+}
+
 export function EntityPanel({
+  onOpenPosition,
+  onOpenState,
+  position,
   props,
   projectId,
   allProjects,
@@ -253,6 +310,10 @@ export function EntityPanel({
   onToggleTrack: () => void;
   heat: boolean;
   onToggleHeat: () => void;
+  onOpenPosition?: () => void;
+  onOpenState?: () => void;
+  /** The newest position, for the copy button. */
+  position?: [number, number] | null;
 }) {
   const { t } = useTranslation();
   const project = projectFor(projectId, props.project_id);
@@ -295,6 +356,7 @@ export function EntityPanel({
             onToggle={onToggleTrack}
           />
           <HeatButton on={heat} onToggle={onToggleHeat} />
+          {position && <CopyPositionButton position={position} />}
         </>
       }
     >
@@ -302,6 +364,8 @@ export function EntityPanel({
         lastSeenAt={props.last_seen_at}
         positionTime={props.position_time}
         positionKind={props.position_kind}
+        onOpenPosition={onOpenPosition}
+        onOpenState={onOpenState}
         batteryVoltage={props.battery_voltage}
         healthLevel={props.health_level}
         lastStatusAt={props.last_status_at}
@@ -352,6 +416,9 @@ export function EntityPanel({
 }
 
 export function DevicePanel({
+  onOpenPosition,
+  onOpenState,
+  position,
   props,
   projectId,
   allProjects,
@@ -379,6 +446,10 @@ export function DevicePanel({
   onToggleTrack: () => void;
   heat: boolean;
   onToggleHeat: () => void;
+  onOpenPosition?: () => void;
+  onOpenState?: () => void;
+  /** The newest position, for the copy button. */
+  position?: [number, number] | null;
 }) {
   const { t } = useTranslation();
   const devicePath =
@@ -424,6 +495,7 @@ export function DevicePanel({
             onToggle={onToggleTrack}
           />
           <HeatButton on={heat} onToggle={onToggleHeat} />
+          {position && <CopyPositionButton position={position} />}
         </>
       }
     >
@@ -431,6 +503,8 @@ export function DevicePanel({
         lastSeenAt={props.last_seen_at}
         positionTime={props.position_time}
         positionKind={props.position_kind}
+        onOpenPosition={onOpenPosition}
+        onOpenState={onOpenState}
         batteryVoltage={props.battery_voltage}
         healthLevel={props.health_level}
         lastStatusAt={props.last_status_at}
