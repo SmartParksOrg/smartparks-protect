@@ -2,12 +2,13 @@
 projects, name and email editing, and a password reset mail on the person's behalf."""
 
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import select
 
 from shared.enums import Role
-from shared.models import Invitation
+from shared.models import Event, Invitation
 from tests.api.conftest import (
     actor,
     add_member,
@@ -263,3 +264,60 @@ async def test_server_invitation_for_an_existing_account_adds_now(client, db):
     assert by_project == {alpha: "project-viewer", beta: "project-operator"}
     invitations = (await client.get("/api/v1/admin/invitations", headers=h)).json()["items"]
     assert not any(i["email"] == user.email for i in invitations)
+
+
+async def test_delete_account(client, db):
+    """Deleting an account (D191): memberships go, the audit row names the person, the work
+    stays unattributed; not yourself, not the last active server admin."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    user = await create_user(db)
+    await add_member(db, user, project, Role.PROJECT_OPERATOR)
+    h = admin.headers
+    member = {"Authorization": f"Bearer {await login(client, user.email)}"}
+    event = await client.post(
+        f"/api/v1/projects/{project.id}/events",
+        json={
+            "event_type": "SIGHTING",
+            "severity": "info",
+            "title": "Before the account went",
+            "time": datetime.now(UTC).isoformat(),
+        },
+        headers=member,
+    )
+    assert event.status_code == 201, event.text
+
+    gone = await client.delete(f"/api/v1/admin/users/{user.id}", headers=h)
+    assert gone.status_code == 204, gone.text
+    assert (await client.get(f"/api/v1/admin/users/{user.id}", headers=h)).status_code == 404
+    members = (await client.get(f"/api/v1/projects/{project.id}/members", headers=h)).json()
+    assert not any(m["email"] == user.email for m in members["items"])
+    kept = await client.get(f"/api/v1/projects/{project.id}/events/{event.json()['id']}", headers=h)
+    assert kept.status_code == 200, kept.text
+    db.expire_all()
+    creator = await db.scalar(
+        select(Event.created_by_user_id).where(Event.id == uuid.UUID(event.json()["id"]))
+    )
+    assert creator is None
+    audit = (await client.get("/api/v1/admin/audit", params={"limit": 20}, headers=h)).json()
+    row = next(r for r in audit if r["action"] == "user.deleted")
+    assert row["object_id"] == str(user.id) and row["details"]["email"] == user.email
+    assert row["details"]["memberships"] == 1
+    # the person can sign in no more
+    assert (
+        await client.post("/api/v1/auth/login", data={"username": user.email, "password": "x" * 12})
+    ).status_code == 400
+
+    # not yourself
+    assert (
+        await client.delete(f"/api/v1/admin/users/{admin.user.id}", headers=h)
+    ).status_code == 409
+    # not the last active server admin: a second admin deletes the first once a third exists
+    other = await actor(client, db, superuser=True)
+    third = await create_user(db, superuser=True)
+    assert (
+        await client.delete(f"/api/v1/admin/users/{admin.user.id}", headers=other.headers)
+    ).status_code == 204
+    assert (
+        await client.delete(f"/api/v1/admin/users/{third.id}", headers=other.headers)
+    ).status_code == 204

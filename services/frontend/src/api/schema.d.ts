@@ -1425,7 +1425,13 @@ export interface paths {
         get: operations["get_user_api_v1_admin_users__user_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete User
+         * @description Delete an account (decision D191): its memberships, sessions and connections go with it;
+         *     what the person did (events, curation, saved views, audit rows) stays with the user
+         *     reference cleared. Not your own account, and not the last active server admin.
+         */
+        delete: operations["delete_user_api_v1_admin_users__user_id__delete"];
         options?: never;
         head?: never;
         /** Update User */
@@ -14674,6 +14680,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserAdminDetail"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_api_v1_admin_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

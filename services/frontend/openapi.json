@@ -6446,6 +6446,46 @@
       }
      }
     }
+   },
+   "delete": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Delete User",
+    "description": "Delete an account (decision D191): its memberships, sessions and connections go with it;\nwhat the person did (events, curation, saved views, audit rows) stays with the user\nreference cleared. Not your own account, and not the last active server admin.",
+    "operationId": "delete_user_api_v1_admin_users__user_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "user_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "User Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/api/v1/admin/users/{user_id}/password-reset": {

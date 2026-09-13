@@ -56,9 +56,12 @@ account gets the memberships straight away and no mail; the form says so and lin
 account. A row opens the account's page: the email and name (each with
 its own Save), the switches (one's own are changed by another server admin), last login and
 created, a "Send password reset" button that mails the person the same link as the sign-in
-page's forgot-password, "Add to a project" with a role, and the memberships across every
+page's forgot-password, "Add to a project" with a role, the memberships across every
 project with the role (built in or the project's custom roles), what the member sees (the
-same scope picker as the project's Members page) and a remove button. The project's Members
+same scope picker as the project's Members page) and a remove button, and "Delete account"
+(decision D191): the account, its memberships and sessions go, what the person reported or
+changed stays without the attribution, the audit trail keeps the deletion; not your own
+account and not the last active server admin. The project's Members
 page keeps the project-side view of the same memberships.
 
 ## Where the machinery lives

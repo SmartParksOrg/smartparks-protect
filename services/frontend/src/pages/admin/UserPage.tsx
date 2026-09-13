@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowLeft, KeyRound, Trash2 } from "lucide-react";
+import { ArrowLeft, KeyRound, Trash2, UserX } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -35,6 +35,7 @@ import { useAuthStore } from "@/stores/auth";
 export function UserPage() {
   const { t } = useTranslation();
   const { userId = "" } = useParams();
+  const navigate = useNavigate();
   const me = useAuthStore((s) => s.user);
   const projects = useProjects();
   const user = useQuery({
@@ -76,6 +77,13 @@ export function UserPage() {
   });
   const [scoping, setScoping] = useState<UserAdminMembership | null>(null);
   const [removing, setRemoving] = useState<UserAdminMembership | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteAccount = useMutationToast({
+    mutationFn: () => api.delete(`/api/v1/admin/users/${userId}`),
+    invalidate: [queryKeys.users, queryKeys.projects],
+    success: t("Account deleted"),
+    onSuccess: () => void navigate("/admin/users", { replace: true }),
+  });
 
   const memberOf = useMemo(() => new Set((user.data?.memberships ?? []).map((m) => m.project_id)), [user.data]);
   const openProjects = (projects.data?.items ?? []).filter((p) => !memberOf.has(p.id));
@@ -159,6 +167,13 @@ export function UserPage() {
                   <dd>{formatTime(u.created_at)}</dd>
                 </dl>
                 {isMe && <p className="text-xs text-muted-foreground">{t("Your own active and server admin flags are changed by another server admin.")}</p>}
+                <div className="border-t pt-4">
+                  <Button variant="outline" size="sm" className="text-destructive" disabled={isMe} onClick={() => setDeleting(true)}>
+                    <UserX className="size-4" />
+                    {t("Delete account")}
+                  </Button>
+                  <p className="mt-1.5 text-xs text-muted-foreground">{t("The account, its memberships and sessions go. What the person reported or changed stays, no longer attributed.")}</p>
+                </div>
               </CardContent>
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
@@ -198,6 +213,15 @@ export function UserPage() {
         confirmLabel={t("Remove")}
         onConfirm={() => removing && remove.mutate(removing)}
         pending={remove.isPending}
+      />
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={t("Delete account")}
+        description={t("{{email}} is deleted with every membership and session. The audit trail keeps the deletion. This cannot be undone.", { email: u?.email ?? "" })}
+        confirmLabel={t("Delete")}
+        onConfirm={() => deleteAccount.mutate()}
+        pending={deleteAccount.isPending}
       />
       {scoping && (
         <ScopeDialog

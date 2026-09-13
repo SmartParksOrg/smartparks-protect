@@ -169,6 +169,48 @@ async def update_user(
     return await _user_detail(session, user)
 
 
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Delete an account (decision D191): its memberships, sessions and connections go with it;
+    what the person did (events, curation, saved views, audit rows) stays with the user
+    reference cleared. Not your own account, and not the last active server admin."""
+    user = await get_or_404(session, User, user_id, "User")
+    if user.id == admin.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You cannot delete your own account")
+    if user.is_superuser and user.is_active:
+        others = await session.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.is_superuser.is_(True), User.is_active.is_(True), User.id != user.id)
+        )
+        if not others:
+            raise HTTPException(status.HTTP_409_CONFLICT, "This is the last active server admin")
+    memberships = await session.scalar(
+        select(func.count())
+        .select_from(ProjectMembership)
+        .where(ProjectMembership.user_id == user.id)
+    )
+    await record_audit(
+        session,
+        user=admin,
+        action="user.deleted",
+        object_type="user",
+        object_id=str(user.id),
+        details={
+            "email": user.email,
+            "full_name": user.full_name,
+            "memberships": memberships or 0,
+            "server_admin": user.is_superuser,
+        },
+    )
+    await session.delete(user)
+    await session.commit()
+
+
 @router.get("/invitations", response_model=PageResponse[InvitationRead])
 async def list_server_invitations(
     page: Page = Depends(page), session: AsyncSession = Depends(get_session)
