@@ -6345,6 +6345,52 @@
    }
   },
   "/api/v1/admin/users/{user_id}": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Get User",
+    "operationId": "get_user_api_v1_admin_users__user_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "user_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "User Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserAdminDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
    "patch": {
     "tags": [
      "admin"
@@ -6384,7 +6430,60 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/UserAdminRead"
+         "$ref": "#/components/schemas/UserAdminDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/users/{user_id}/password-reset": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Send Password Reset",
+    "description": "Mail the person a password reset link, the same one they get from the sign-in page.",
+    "operationId": "send_password_reset_api_v1_admin_users__user_id__password_reset_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "user_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "User Id"
+      }
+     }
+    ],
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Send Password Reset Api V1 Admin Users  User Id  Password Reset Post"
         }
        }
       }
@@ -36888,6 +36987,143 @@
     ],
     "title": "UnknownIdentity"
    },
+   "UserAdminDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "full_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Full Name"
+     },
+     "is_active": {
+      "type": "boolean",
+      "title": "Is Active"
+     },
+     "is_superuser": {
+      "type": "boolean",
+      "title": "Is Superuser"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "last_login_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Login At"
+     },
+     "memberships": {
+      "items": {
+       "$ref": "#/components/schemas/UserAdminMembership"
+      },
+      "type": "array",
+      "title": "Memberships"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "email",
+     "full_name",
+     "is_active",
+     "is_superuser",
+     "created_at",
+     "last_login_at"
+    ],
+    "title": "UserAdminDetail"
+   },
+   "UserAdminMembership": {
+    "properties": {
+     "membership_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Membership Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "project_name": {
+      "type": "string",
+      "title": "Project Name"
+     },
+     "role": {
+      "$ref": "#/components/schemas/Role"
+     },
+     "role_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role Id"
+     },
+     "role_name": {
+      "type": "string",
+      "title": "Role Name",
+      "default": ""
+     },
+     "permissions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Permissions"
+     },
+     "scope": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MemberScope"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "membership_id",
+     "project_id",
+     "project_name",
+     "role",
+     "created_at"
+    ],
+    "title": "UserAdminMembership",
+    "description": "One of a person's memberships as the server admin's user page shows it (D189)."
+   },
    "UserAdminRead": {
     "properties": {
      "id": {
@@ -36971,6 +37207,30 @@
        }
       ],
       "title": "Is Superuser"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "email"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "full_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Full Name"
      }
     },
     "type": "object",

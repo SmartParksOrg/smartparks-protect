@@ -8,6 +8,7 @@ export const queryKeys = {
   organizations: ["organizations"] as const,
   project: (id: string) => ["projects", id] as const,
   members: (projectId: string) => ["projects", projectId, "members"] as const,
+  roles: (projectId: string) => ["projects", projectId, "roles"] as const,
   invitations: (projectId: string) =>
     ["projects", projectId, "invitations"] as const,
   entities: (projectId: string) => ["projects", projectId, "entities"] as const,
@@ -71,6 +72,7 @@ export const queryKeys = {
   identities: (dataSourceId: string) =>
     ["data-sources", dataSourceId, "identities"] as const,
   users: ["admin", "users"] as const,
+  user: (userId: string) => ["admin", "users", userId] as const,
   serverInvitations: ["admin", "invitations"] as const,
   attentionSummary: ["attention", "summary"] as const,
   unknownIdentities: ["attention", "identities"] as const,

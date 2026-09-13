@@ -1421,7 +1421,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get User */
+        get: operations["get_user_api_v1_admin_users__user_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1429,6 +1430,26 @@ export interface paths {
         head?: never;
         /** Update User */
         patch: operations["update_user_api_v1_admin_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Password Reset
+         * @description Mail the person a password reset link, the same one they get from the sign-in page.
+         */
+        post: operations["send_password_reset_api_v1_admin_users__user_id__password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/invitations": {
@@ -10681,6 +10702,65 @@ export interface components {
             /** Inferred Type */
             inferred_type?: string | null;
         };
+        /** UserAdminDetail */
+        UserAdminDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Superuser */
+            is_superuser: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Login At */
+            last_login_at: string | null;
+            /** Memberships */
+            memberships?: components["schemas"]["UserAdminMembership"][];
+        };
+        /**
+         * UserAdminMembership
+         * @description One of a person's memberships as the server admin's user page shows it (D189).
+         */
+        UserAdminMembership: {
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
+            role: components["schemas"]["Role"];
+            /** Role Id */
+            role_id?: string | null;
+            /**
+             * Role Name
+             * @default
+             */
+            role_name: string;
+            /** Permissions */
+            permissions?: string[];
+            scope?: components["schemas"]["MemberScope"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** UserAdminRead */
         UserAdminRead: {
             /**
@@ -10710,6 +10790,10 @@ export interface components {
             is_active?: boolean | null;
             /** Is Superuser */
             is_superuser?: boolean | null;
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name?: string | null;
         };
         /** UserRead */
         UserRead: {
@@ -14521,6 +14605,37 @@ export interface operations {
             };
         };
     };
+    get_user_api_v1_admin_users__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAdminDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_user_api_v1_admin_users__user_id__patch: {
         parameters: {
             query?: never;
@@ -14542,7 +14657,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserAdminRead"];
+                    "application/json": components["schemas"]["UserAdminDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_password_reset_api_v1_admin_users__user_id__password_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */

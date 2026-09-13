@@ -31,6 +31,7 @@ const BackupsPage = lazy(() => import("@/pages/admin/BackupsPage").then((m) => (
 const HealthPage = lazy(() => import("@/pages/admin/HealthPage").then((m) => ({ default: m.HealthPage })));
 const AdminProjectsPage = lazy(() => import("@/pages/admin/AdminProjectsPage").then((m) => ({ default: m.AdminProjectsPage })));
 const UsersPage = lazy(() => import("@/pages/admin/UsersPage").then((m) => ({ default: m.UsersPage })));
+const UserPage = lazy(() => import("@/pages/admin/UserPage").then((m) => ({ default: m.UserPage })));
 const AdminDevicesPage = lazy(() => import("@/pages/admin/AdminDevicesPage").then((m) => ({ default: m.AdminDevicesPage })));
 const DataSourcesPage = lazy(() => import("@/pages/admin/DataSourcesPage").then((m) => ({ default: m.DataSourcesPage })));
 const AdminTrafficPage = lazy(() => import("@/pages/admin/AdminTrafficPage").then((m) => ({ default: m.AdminTrafficPage })));
@@ -117,6 +118,7 @@ export default function App() {
               <Route path="notifications" element={<AdminNotificationsPage />} />
               <Route path="projects" element={<AdminProjectsPage />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="users/:userId" element={<UserPage />} />
               <Route path="devices" element={<AdminDevicesPage />} />
               <Route path="devices/:deviceId" element={<DevicePage />} />
               <Route path="data-sources" element={<DataSourcesPage />} />

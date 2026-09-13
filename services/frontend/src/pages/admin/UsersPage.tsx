@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -20,6 +21,7 @@ import { useAuthStore } from "@/stores/auth";
 export function UsersPage() {
   const { t } = useTranslation();
   const me = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
   const users = useQuery({ queryKey: queryKeys.users, queryFn: () => api.get<PageType<UserAdmin>>("/api/v1/admin/users", { query: { limit: 500 } }) });
   const invitations = useQuery({ queryKey: queryKeys.serverInvitations, queryFn: () => api.get<PageType<Invitation>>("/api/v1/admin/invitations", { query: { limit: 500 } }) });
   const [email, setEmail] = useState("");
@@ -35,8 +37,8 @@ export function UsersPage() {
   const userColumns: ColumnDef<UserAdmin, unknown>[] = [
     { header: t("Email"), accessorKey: "email" },
     { header: t("Name"), accessorKey: "full_name" },
-    { header: t("Active"), accessorKey: "is_active", cell: ({ row }) => <Switch checked={row.original.is_active} disabled={row.original.id === me?.id} onCheckedChange={(v) => update.mutate({ id: row.original.id, body: { is_active: v } })} aria-label={t("Active")} /> },
-    { header: t("Server admin"), accessorKey: "is_superuser", cell: ({ row }) => <Switch checked={row.original.is_superuser} disabled={row.original.id === me?.id} onCheckedChange={(v) => update.mutate({ id: row.original.id, body: { is_superuser: v } })} aria-label={t("Server admin")} /> },
+    { header: t("Active"), accessorKey: "is_active", cell: ({ row }) => <Switch checked={row.original.is_active} disabled={row.original.id === me?.id} onClick={(e) => e.stopPropagation()} onCheckedChange={(v) => update.mutate({ id: row.original.id, body: { is_active: v } })} aria-label={t("Active")} /> },
+    { header: t("Server admin"), accessorKey: "is_superuser", cell: ({ row }) => <Switch checked={row.original.is_superuser} disabled={row.original.id === me?.id} onClick={(e) => e.stopPropagation()} onCheckedChange={(v) => update.mutate({ id: row.original.id, body: { is_superuser: v } })} aria-label={t("Server admin")} /> },
     { header: t("Last login"), accessorKey: "last_login_at", cell: ({ getValue }) => formatAgo(getValue<string | null>()) },
     { header: t("Created"), accessorKey: "created_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
   ];
@@ -59,10 +61,10 @@ export function UsersPage() {
               <Button type="submit" disabled={!email || invite.isPending}>{t("Invite")}</Button>
             </form>
             {note && <Callout kind="warning" className="mt-3">{note}</Callout>}
-            <p className="mt-2 text-xs text-muted-foreground">{t("Project members are invited by project admins under the project's Members page.")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("Project members are invited by project admins under the project's Members page. Open an account below to manage its memberships, name, email and password.")}</p>
           </CardContent>
         </Card>
-        <DataTable columns={userColumns} data={users.data?.items} searchable isLoading={users.isPending} />
+        <DataTable columns={userColumns} data={users.data?.items} searchable isLoading={users.isPending} onRowClick={(u) => void navigate(`/admin/users/${u.id}`)} />
         <h2 className="text-base font-medium">{t("Invitations")}</h2>
         <DataTable columns={invitationColumns} data={invitations.data?.items} searchable isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
       </Page>

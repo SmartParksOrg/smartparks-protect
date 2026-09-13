@@ -13,7 +13,7 @@ A role is a named set of permissions. Four built-in roles exist on every server,
 | Viewer | membership row, `project-viewer` | Sees the project, reads traces, acknowledges and resolves alerts |
 | A custom role | `project_roles` row named by the membership | Exactly the permissions the role lists; seeing the project is always in |
 
-A user can hold different roles in different projects. Server admins need no membership.
+A user can hold different roles in different projects. Server admins need no membership. A project admin manages the project's members under Members; a server admin manages one person across every project from Server admin, Users, where the account page shows every membership with its role and scope, editable there (decision D189).
 
 ## Permission keys
 

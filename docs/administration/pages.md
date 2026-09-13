@@ -48,6 +48,15 @@ and recovery, System alerts, Automations, Notifications, Projects, Users, Device
 sources, Gateways, Audit, AI policy, catalogues). The project pages are the same as a ranger's:
 to check what a ranger sees, sign in as one.
 
+Server admin, Users lists every account with its active and server admin switches and the
+open server admin invitations. A row opens the account's page: the email and name (each with
+its own Save), the switches (one's own are changed by another server admin), last login and
+created, a "Send password reset" button that mails the person the same link as the sign-in
+page's forgot-password, "Add to a project" with a role, and the memberships across every
+project with the role (built in or the project's custom roles), what the member sees (the
+same scope picker as the project's Members page) and a remove button. The project's Members
+page keeps the project-side view of the same memberships.
+
 ## Where the machinery lives
 
 - Identities, ports and frames: the device page's Network tab and Network, Traffic.

@@ -170,6 +170,24 @@ class UserAdminRead(ORMModel):
     last_login_at: datetime | None
 
 
+class UserAdminMembership(BaseModel):
+    """One of a person's memberships as the server admin's user page shows it (D189)."""
+
+    membership_id: uuid.UUID
+    project_id: uuid.UUID
+    project_name: str
+    role: Role
+    role_id: uuid.UUID | None = None
+    role_name: str = ""
+    permissions: list[str] = Field(default_factory=list)
+    scope: MemberScope | None = None
+    created_at: datetime
+
+
+class UserAdminDetail(UserAdminRead):
+    memberships: list[UserAdminMembership] = Field(default_factory=list)
+
+
 class AuditRead(ORMModel):
     id: int
     time: datetime
