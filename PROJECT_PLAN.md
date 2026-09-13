@@ -1951,6 +1951,7 @@ Listed by the phase where they are first needed.
 ### 2026-09-13, the layers panel's arrangements (Claude and Tim)
 
 - Tim: the layers panel's "Grouped" button should be a choice between grouped, ungrouped, per type and per type and sub-type. D195. Built in `LayerPanel.tsx`: a `Grouping` preference (`map_layers_grouping`), the entity types loaded once for the type modes, `TypeRow` headers built from the feature's type key through the catalogue (a top type with its sub-types as children), `typeHeader` with fold, a checkbox over every entity below (indeterminate when some are on), the count and "only"; fold all follows the arrangement; search reaches into headers. Exercised on the local build: Vehicles and Wildlife per type, Wildlife with Cow, Jaguar and Wolf per sub-type, the Wildlife checkbox hiding and showing its four animals, on desktop and phone.
+- Committed as 05bb8cd, CI green, deployed.
 
 ### 2026-09-13, the live map's panels on a phone (Claude and Tim)
 
