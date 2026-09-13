@@ -135,5 +135,8 @@ def test_kpn_uplink_with_embedded_geolocation():
     assert location.attributes["dilution"] == 0.452809
     assert location.attributes["f_cnt_used"] == 27418
     assert location.attributes["altitude_radius_m"] == 0.0
+    assert location.attributes["altitude_dilution"] == 0.0
+    assert location.attributes["east_velocity_mps"] == -0.202607
+    assert location.attributes["north_velocity_mps"] == 0.092669
     # KPN sends the algorithm as 0 on this report (NwGeolocAlgoUsed), kept as it came
     assert location.attributes["algorithm"] == 0

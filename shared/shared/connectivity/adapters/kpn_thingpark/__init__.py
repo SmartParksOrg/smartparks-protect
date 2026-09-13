@@ -188,7 +188,11 @@ def _network_location(data: dict[str, Any]) -> NetworkLocation | None:
                 "algorithm": data.get("NwGeolocAlgoUsed") or data.get("NwGeolocAlgo"),
                 "altitude_radius_m": _number(data.get("DevAltRadius")),
                 "dilution": _number(data.get("DevLocDilution")),
+                "altitude_dilution": _number(data.get("DevAltDilution")),
                 "f_cnt_used": data.get("DevUlFCntUpUsed"),
+                # the solver's velocity estimate in metres per second, east and north
+                "east_velocity_mps": _number(data.get("DevEastVel")),
+                "north_velocity_mps": _number(data.get("DevNorthVel")),
             }.items()
             if v not in (None, "")
         },
