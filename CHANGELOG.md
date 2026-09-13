@@ -49,6 +49,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- Changing an entity's or a device's location source (or fallback hours) rebuilds its current position at once; before, the new setting waited for the next position, which never came for a collar that repeats the same network estimate.
 - A rebuild of the current position from the rows (after an assignment's reattribution or a curation) took the newest position whatever its kind and set no kind, fix time or accuracy, so a collar assigned to an animal could show a network estimate as its position with the location source still "device"; the rebuild follows the decoder's rule now (the newest device fix, the estimate only when the setting lets it stand in) and carries the kind, the fix time and the accuracy.
 - KPN's network geolocation reached the platform embedded in every uplink of a device that has it on (`DevLAT`, `DevLON`, `DevLocTime`, `DevLocRadius` on the `DevEUI_uplink`, recorded live from SP040078 on 2026-09-13), not as the separate `DevEUI_location` report the adapter read; the adapter now reads the fields from both, one network position per solved location.
 - The weekly restore test failed since 2026-09-07 with "migrations failed": the verification compose project had built its own `migrate` and `api` images on 2026-09-04 and kept them, so the restored database was migrated with code that did not know the newer revisions. The verify stack runs the production images by name now, and the migration output stays in `logs/restore-verify.log`.

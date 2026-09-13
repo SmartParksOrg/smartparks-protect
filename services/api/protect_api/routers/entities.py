@@ -41,6 +41,7 @@ from protect_api.schemas.domain import (
     FeatureUpdate,
 )
 from protect_api.visibility import group_and_subgroups
+from shared.curation.apply import recompute_current_state
 from shared.database import get_session
 from shared.domain.assignments import reattribute, resolve_attribution
 from shared.models import (
@@ -230,6 +231,16 @@ async def update_entity(
     if "group_id" in body.model_fields_set:
         await check_group(session, context, body.group_id)
     changed = apply_patch(entity, body, exclude={"geometry"})
+    if changed.keys() & {"location_source", "location_fallback_hours"}:
+        # the setting decides which positions become current (decision D164): rebuild the
+        # state now, since a collar repeating its last estimate brings nothing new to apply it
+        tracking = await session.scalar(
+            select(DeviceEntityAssignment.device_id).where(
+                DeviceEntityAssignment.entity_id == entity.id,
+                DeviceEntityAssignment.validity.op("@>")(utc_now()),
+            )
+        )
+        await recompute_current_state(session, tracking, {entity.id})
     if "geometry" in body.model_fields_set:
         entity.geom = geojson_to_geom(body.geometry.as_dict() if body.geometry else None)
         changed["geometry"] = body.geometry.as_dict() if body.geometry else None

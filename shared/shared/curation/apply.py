@@ -301,7 +301,7 @@ async def revert_correction(
 
 
 async def recompute_current_state(
-    session: AsyncSession, device_id: uuid.UUID, entity_ids: set[uuid.UUID | None]
+    session: AsyncSession, device_id: uuid.UUID | None, entity_ids: set[uuid.UUID | None]
 ) -> None:
     """The current position of the device and of every entity touched, rebuilt from the rows
     by effective time (architecture 28.8) under the location source rules of decision D164:
@@ -309,8 +309,10 @@ async def recompute_current_state(
     the newest fix time and the accuracy travel with it (D193). Last seen follows the
     effective times as well: a time correction (a device clock ahead, decision D119) must
     move it back with the records."""
-    device_state = await session.get(DeviceCurrentState, device_id)
-    if device_state is not None:
+    device_state = (
+        await session.get(DeviceCurrentState, device_id) if device_id is not None else None
+    )
+    if device_state is not None and device_id is not None:
         device = await session.get(Device, device_id)
         fix = await _newest_position(session, Position.device_id == device_id, network=False)
         estimate = await _newest_position(session, Position.device_id == device_id, network=True)
