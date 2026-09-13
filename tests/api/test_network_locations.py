@@ -207,7 +207,7 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
             if f["properties"]["entity_id"] == entity["id"]
         )
 
-    rebuilt = await client.post(f"/api/v1/devices/{device['id']}/reattribute", headers=h)
+    rebuilt = await client.post(f"/api/v1/devices/{device['id']}/reattribute", json={}, headers=h)
     assert rebuilt.status_code == 200, rebuilt.text
     props = await current_feature()
     assert props["position_kind"] == "device"
@@ -220,7 +220,7 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
         )
     ).status_code == 200
     assert (
-        await client.post(f"/api/v1/devices/{device['id']}/reattribute", headers=h)
+        await client.post(f"/api/v1/devices/{device['id']}/reattribute", json={}, headers=h)
     ).status_code == 200
     props = await current_feature()
     assert props["position_kind"] == "network" and props["accuracy_m"] == 5000.0
