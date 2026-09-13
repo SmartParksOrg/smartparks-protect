@@ -10,7 +10,7 @@ active one supersedes it, and reverting the newer one brings the older one back.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from geoalchemy2.shape import from_shape, to_shape
@@ -18,6 +18,7 @@ from shapely.geometry import Point
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.connectivity.network_location import NETWORK_RECORD_TYPE
 from shared.curation.effective import effective_time, visible
 from shared.domain.assignments import resolve_attribution
 from shared.enums import (
@@ -26,9 +27,11 @@ from shared.enums import (
     CurationTarget,
     DeliveryStatus,
     ErrorCode,
+    LocationSource,
 )
 from shared.models import (
     DataCorrection,
+    Device,
     DeviceCurrentState,
     Entity,
     EntityCurrentState,
@@ -300,26 +303,24 @@ async def revert_correction(
 async def recompute_current_state(
     session: AsyncSession, device_id: uuid.UUID, entity_ids: set[uuid.UUID | None]
 ) -> None:
-    """Latest valid position by effective time for the device and for every entity touched
-    (architecture 28.8)."""
-    latest = (
-        await session.execute(
-            select(Position.geom, Position.curated_geom, effective_time(Position))
-            .where(Position.device_id == device_id, visible(Position))
-            .order_by(effective_time(Position).desc())
-            .limit(1)
-        )
-    ).first()
+    """The current position of the device and of every entity touched, rebuilt from the rows
+    by effective time (architecture 28.8) under the location source rules of decision D164:
+    the newest device fix, or a network estimate when the setting lets it stand in; the kind,
+    the newest fix time and the accuracy travel with it (D193). Last seen follows the
+    effective times as well: a time correction (a device clock ahead, decision D119) must
+    move it back with the records."""
     device_state = await session.get(DeviceCurrentState, device_id)
     if device_state is not None:
-        if latest is None:
-            device_state.latest_position = None
-            device_state.latest_position_time = None
-        else:
-            device_state.latest_position = latest[1] if latest[1] is not None else latest[0]
-            device_state.latest_position_time = latest[2]
-        # last seen follows the effective times as well: a time correction (a device clock
-        # ahead, decision D119) must move it back with the records
+        device = await session.get(Device, device_id)
+        fix = await _newest_position(session, Position.device_id == device_id, network=False)
+        estimate = await _newest_position(session, Position.device_id == device_id, network=True)
+        _rebuild_position(
+            device_state,
+            fix,
+            estimate,
+            device.location_source if device else LocationSource.DEVICE,
+            device.location_fallback_hours if device else 24,
+        )
         last_measurement = await session.scalar(
             select(func.max(effective_time(Measurement))).where(
                 Measurement.device_id == device_id, visible(Measurement)
@@ -328,7 +329,8 @@ async def recompute_current_state(
         seen = [
             t
             for t in (
-                latest[2] if latest else None,
+                fix.time if fix else None,
+                estimate.time if estimate else None,
                 last_measurement,
                 device_state.latest_state_time,
             )
@@ -341,41 +343,109 @@ async def recompute_current_state(
     for entity_id in entity_ids:
         if entity_id is None:
             continue
-        row = (
-            await session.execute(
-                select(
-                    Position.geom,
-                    Position.curated_geom,
-                    effective_time(Position),
-                    Position.device_id,
-                )
-                .where(Position.entity_id == entity_id, visible(Position))
-                .order_by(effective_time(Position).desc())
-                .limit(1)
-            )
-        ).first()
+        entity = await session.get(Entity, entity_id)
+        if entity is None:
+            continue
+        fix = await _newest_position(session, Position.entity_id == entity_id, network=False)
+        estimate = await _newest_position(session, Position.entity_id == entity_id, network=True)
         entity_state = await session.get(EntityCurrentState, entity_id)
         if entity_state is None:
             # An entity that never received a record while assigned has no row yet; the
             # repair that gives it history must also give it a place on the map.
-            entity = await session.get(Entity, entity_id)
-            if entity is None:
-                continue
             entity_state = EntityCurrentState(entity_id=entity_id, project_id=entity.project_id)
             session.add(entity_state)
-        if row is None:
-            entity_state.latest_position = None
-            entity_state.latest_position_time = None
-        else:
-            entity_state.latest_position = row[1] if row[1] is not None else row[0]
-            entity_state.latest_position_time = row[2]
-            entity_state.device_id = row[3]
+        chosen = _rebuild_position(
+            entity_state, fix, estimate, entity.location_source, entity.location_fallback_hours
+        )
+        if chosen is not None:
+            entity_state.device_id = chosen.device_id
         last_measurement = await session.scalar(
             select(func.max(effective_time(Measurement))).where(
                 Measurement.entity_id == entity_id, visible(Measurement)
             )
         )
-        seen = [t for t in (row[2] if row else None, last_measurement) if t is not None]
+        seen = [
+            t
+            for t in (
+                fix.time if fix else None,
+                estimate.time if estimate else None,
+                last_measurement,
+            )
+            if t is not None
+        ]
         entity_state.last_seen_at = max(seen) if seen else None
         entity_state.updated_at = utc_now()
     await session.flush()
+
+
+@dataclass(frozen=True)
+class _Newest:
+    """The newest visible position of one kind: where it is, when, whose, how accurate."""
+
+    geom: Any
+    time: datetime
+    device_id: uuid.UUID
+    accuracy_m: float | None
+
+
+async def _newest_position(session: AsyncSession, owner: Any, *, network: bool) -> _Newest | None:
+    kind = (
+        Position.record_type == NETWORK_RECORD_TYPE
+        if network
+        else Position.record_type != NETWORK_RECORD_TYPE
+    )
+    row = (
+        await session.execute(
+            select(
+                Position.geom,
+                Position.curated_geom,
+                effective_time(Position),
+                Position.device_id,
+                Position.accuracy_m,
+            )
+            .where(owner, kind, visible(Position))
+            .order_by(effective_time(Position).desc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None
+    return _Newest(
+        geom=row[1] if row[1] is not None else row[0],
+        time=row[2],
+        device_id=row[3],
+        accuracy_m=row[4],
+    )
+
+
+def _rebuild_position(
+    state: DeviceCurrentState | EntityCurrentState,
+    fix: _Newest | None,
+    estimate: _Newest | None,
+    location_source: str,
+    fallback_hours: int,
+) -> _Newest | None:
+    """The decoder's rule (D164) applied to a rebuild from the rows: the newest device fix,
+    unless the setting lets a newer network estimate stand in (always for `network`, after the
+    fallback period without a fix for `device_else_network`). Returns what became current."""
+    chosen: _Newest | None = fix
+    kind: str | None = "device" if fix else None
+    if estimate is not None and location_source != LocationSource.DEVICE:
+        newer = fix is None or estimate.time > fix.time
+        stale_fix = fix is None or (estimate.time - fix.time) > timedelta(
+            hours=max(0, fallback_hours)
+        )
+        if newer and (location_source == LocationSource.NETWORK or stale_fix):
+            chosen, kind = estimate, NETWORK_RECORD_TYPE
+    state.latest_fix_time = fix.time if fix else None
+    if chosen is None:
+        state.latest_position = None
+        state.latest_position_time = None
+        state.latest_position_kind = None
+        state.latest_accuracy_m = None
+        return None
+    state.latest_position = chosen.geom
+    state.latest_position_time = chosen.time
+    state.latest_position_kind = kind
+    state.latest_accuracy_m = chosen.accuracy_m
+    return chosen

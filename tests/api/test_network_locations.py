@@ -3,6 +3,7 @@ fixes in the positions list, the tracks and the records unless asked, drawn by t
 network locations read, and the location source set per entity and per device."""
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -140,8 +141,6 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
             f"/api/v1/data-sources/{source['id']}/traffic", params={"limit": 1}, headers=h
         )
     ).json()
-    from datetime import datetime
-
     await process_source_event(
         db, accepted.json()["source_event_ids"][0], datetime.fromisoformat(rows[0]["ingested_at"])
     )
@@ -151,6 +150,7 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
     positions = f"/api/v1/projects/{project.id}/positions"
     default = (await client.get(positions, params=window, headers=h)).json()
     assert {p["record_type"] for p in default} == {"gnss"}
+    fix_time = max(p["time"] for p in default)
     network = (
         await client.get(positions, params={**window, "sources": "network"}, headers=h)
     ).json()
@@ -195,3 +195,35 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
     feature = next(f for f in current["features"] if f["properties"]["entity_id"] == entity["id"])
     assert feature["properties"]["position_kind"] == "device"
     assert "accuracy_m" in feature["properties"]
+
+    # a rebuild from the rows (an assignment's reattribution, a curation) follows the same
+    # rule: the fix stays current with its kind, the estimate stands in only when the setting
+    # says so, and the accuracy travels with whichever is shown (decisions D164, D193)
+    async def current_feature() -> dict:
+        state = (await client.get(f"/api/v1/projects/{project.id}/map/current", headers=h)).json()
+        return next(
+            f["properties"]
+            for f in state["features"]
+            if f["properties"]["entity_id"] == entity["id"]
+        )
+
+    rebuilt = await client.post(f"/api/v1/devices/{device['id']}/reattribute", headers=h)
+    assert rebuilt.status_code == 200, rebuilt.text
+    props = await current_feature()
+    assert props["position_kind"] == "device"
+    assert datetime.fromisoformat(props["position_time"]) == datetime.fromisoformat(fix_time)
+    assert (
+        await client.patch(
+            f"/api/v1/projects/{project.id}/entities/{entity['id']}",
+            json={"location_source": "network"},
+            headers=h,
+        )
+    ).status_code == 200
+    assert (
+        await client.post(f"/api/v1/devices/{device['id']}/reattribute", headers=h)
+    ).status_code == 200
+    props = await current_feature()
+    assert props["position_kind"] == "network" and props["accuracy_m"] == 5000.0
+    assert datetime.fromisoformat(props["position_time"]) == datetime.fromisoformat(
+        network[0]["time"]
+    )
