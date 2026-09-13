@@ -279,6 +279,7 @@ async def current_state(
                     if state.latest_position_time
                     else None,
                     "position_kind": state.latest_position_kind,
+                    "accuracy_m": state.latest_accuracy_m,
                     "active_alert_count": state.active_alert_count,
                     "health_level": health.level if health else None,
                     "battery_voltage": device_state.battery_voltage if device_state else None,
@@ -414,6 +415,7 @@ async def devices_state(
                     if state and state.latest_position_time
                     else None,
                     "position_kind": state.latest_position_kind if state else None,
+                    "accuracy_m": state.latest_accuracy_m if state else None,
                     "health_level": health.level if health else None,
                     "battery_voltage": state.battery_voltage if state else None,
                     "last_status_at": health.last_status_at.isoformat()
@@ -457,7 +459,8 @@ async def current_state_tile(
                    s.device_id::text AS device_id,
                    to_char(s.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
                        AS last_seen_at,
-                   s.active_alert_count
+                   s.active_alert_count,
+                   s.latest_accuracy_m AS accuracy_m
             FROM entity_current_state s
             JOIN entities e ON e.id = s.entity_id
             JOIN entity_types et ON et.id = e.entity_type_id

@@ -13,6 +13,8 @@ import {
 } from "@/components/map/MapObjectPanel";
 import { measurementText } from "@/components/map/measurementText";
 import { Button } from "@/components/ui/button";
+import { AccuracyWarning } from "@/components/map/MapObjectPanel";
+import { imprecise } from "@/lib/accuracy";
 import { formatTime } from "@/lib/format";
 import { recordsHref } from "@/lib/records";
 import { projectFor } from "@/lib/scope";
@@ -137,6 +139,7 @@ export function PointPanel({
               </span>
             )}
           </PanelRow>
+          {imprecise(p.accuracy_m) && <AccuracyWarning accuracyM={p.accuracy_m as number} />}
           {p.altitude_m != null && (
             <PanelRow label={t("Altitude")}>
               {t("{{value}} m", { value: Math.round(p.altitude_m) })}

@@ -327,6 +327,8 @@ class DeviceCurrentState(Base):
     latest_fix_time: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), comment="The newest device fix, whatever the latest position is"
     )
+    #: Accuracy in metres of the position shown, when the source gave one (decision D193).
+    latest_accuracy_m: Mapped[float | None] = mapped_column(Float)
     latest_position: Mapped[Any | None] = mapped_column(
         Geometry(geometry_type="POINT", srid=4326, spatial_index=False)
     )
@@ -371,6 +373,8 @@ class EntityCurrentState(Base):
     latest_fix_time: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), comment="The newest device fix, whatever the latest position is"
     )
+    #: Accuracy in metres of the position shown, when the source gave one (decision D193).
+    latest_accuracy_m: Mapped[float | None] = mapped_column(Float)
     latest_position: Mapped[Any | None] = mapped_column(
         Geometry(geometry_type="POINT", srid=4326, spatial_index=True)
     )

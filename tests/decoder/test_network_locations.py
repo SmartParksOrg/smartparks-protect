@@ -120,6 +120,7 @@ async def test_network_locations_stand_in_only_as_the_setting_allows(db, world):
     await db.refresh(current)
     assert current.latest_position_kind == NETWORK_RECORD_TYPE
     assert current.latest_position_time == late and current.latest_fix_time == FIX_AT
+    assert current.latest_accuracy_m == 350.0  # the estimate's radius travels with it (D193)
     entity_state = await db.get(EntityCurrentState, world.entity.id)
     await db.refresh(entity_state)
     assert entity_state.latest_position_kind == NETWORK_RECORD_TYPE

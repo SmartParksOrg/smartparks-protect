@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- The accuracy circle (decision D193): a position whose accuracy is known and above 50 m gets a translucent disc of that radius under its marker on the live map, and the entity, device and fix panels show "±n m" with a warning line; the current states keep the accuracy of the position shown and the map features carry it.
 - `MAIL_DELIVER_TO_ALL` lets a non-production server mail every recipient, for a development server that stands in for production; an invitation that was not mailed answers with the reason and the registration link, and the members and users pages show both instead of "mail is not configured".
 - Roles, custom roles and a member's scope (phase 27, decisions D185 to D188, ADR 0030): four built-in roles (Viewer, Operator, Analyst, Admin) and custom roles a project admin composes from the permission keys by area; a scope per member (groups, entities, devices) the API enforces on every read, exports included; the members page with Members, Roles and Invitations, a scope picker and a role editor; invitations carrying role and scope; the interface gated by permission keys (`GET /permissions`, `/projects/{id}/roles`, `permissions` on the project list).
 - The server admin's user page (decision D189): Server admin, Users opens an account with its memberships across every project, the role and the scope editable there, removal and "add to a project", the email and name editable, and a "Send password reset" button (`GET /admin/users/{id}`, `PATCH /admin/users/{id}` with `email` and `full_name`, `POST /admin/users/{id}/password-reset`).
@@ -33,6 +34,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- An entity's picture is a card on its page, not its icon (decision D194): the overview shows it beside the small map, the server keeps a 4:3 crop (1200 by 900) instead of a square, and the type icon stays the entity's icon in the header, the lists, the layer panel and the map panel. Pictures uploaded before this release are squares and show cropped until replaced. Device pictures are unchanged.
+- The device page leads to the entity it tracks from the top: a "Tracks <entity>" button in the header, the project and the entity as links in the Device card, and every row of the entity assignments a link, on the Server admin route as well; "Show on map" works there too.
 - A device no project holds yet is assigned from its page in one go (decision D192): "Assign to entity" asks for the project first (with the guided start) and then the animal, existing or new; the Project assignments card offers "Assign to project" alone. Before, the project had to be set in the Server admin, Devices list first and the entity button did not appear.
 - Phones: the tab rows of the entity and device pages scroll sideways instead of overrunning a 320 px screen, and the members, invitations and gateways tables hide their secondary columns on a phone.
 - Viewers no longer report events or export: those belong to the Operator and Analyst roles now; a viewer who needs them gets one of those roles. Features, saved views and dashboards have their own permission keys (`features:write`, `views:write`, `dashboards:write`); dashboards and saved views no longer need project settings rights.
@@ -62,6 +65,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Migrations
 
+- 0028 (position accuracy): adds `latest_accuracy_m` to `device_current_state` and `entity_current_state`; the downgrade drops them. Existing rows get the value with the next position.
 - 0027 (invitation memberships): adds `invitations.memberships` (JSONB, null for a project invitation); the downgrade drops it.
 - 0026 (roles and scope): adds `project_roles`, `role_id` and `scope` on `project_memberships` and `invitations`, and widens the role checks to the operator and analyst roles; the downgrade maps those two back to viewer and drops the rest.
 - 0025 (entity types with sub-types, the standard catalogue): adds `entity_types.parent_id` and seeds about 250 rows; the downgrade drops the column and leaves the rows as plain types.

@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 
 from shared.enums import Role
-from shared.pictures import PICTURE_SIZE
+from shared.pictures import PICTURE_LANDSCAPE
 from tests.api.conftest import actor, create_project, project_actor
 from tests.conftest import unique_name
 
@@ -68,7 +68,7 @@ async def test_entity_picture_lifecycle(client, db):
     assert picture.headers["content-type"] == "image/webp"
     assert picture.headers["cache-control"] == "private, max-age=86400"
     image = Image.open(io.BytesIO(picture.content))
-    assert image.format == "WEBP" and image.size == (PICTURE_SIZE, PICTURE_SIZE)
+    assert image.format == "WEBP" and image.size == PICTURE_LANDSCAPE  # 4:3 (D194)
 
     read = (
         await client.get(

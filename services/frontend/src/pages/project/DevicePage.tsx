@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, MapPin, RefreshCw, Table2 } from "lucide-react";
+import { ExternalLink, Footprints, MapPin, RefreshCw, Table2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -176,6 +176,21 @@ export function DevicePage() {
     projectId ?? d?.project_assignments.find((a) => !a.valid_to)?.project_id ?? null;
   // in a project, the project's own permission; without one, a server admin picks the project in the dialog (D192)
   const mayAssign = deviceProjectId ? can("devices:write") : Boolean(user?.is_superuser);
+  // the project an entity assignment belongs to: the project assignment covering its start
+  const projectOfAssignment = (validFrom: string): string | null =>
+    d?.project_assignments.find(
+      (p) =>
+        new Date(p.valid_from) <= new Date(validFrom) &&
+        (!p.valid_to || new Date(p.valid_to) > new Date(validFrom)),
+    )?.project_id ?? deviceProjectId;
+  const entityLink = (a: { entity_id: string; valid_from: string }): string | null => {
+    const p = projectOfAssignment(a.valid_from);
+    return p ? `/projects/${p}/entities/${a.entity_id}` : null;
+  };
+  const currentEntityLink = currentEntityAssignment ? entityLink(currentEntityAssignment) : null;
+  const currentEntityName = currentEntityAssignment
+    ? (currentEntityAssignment.entity_name ?? currentEntityAssignment.entity_id.slice(0, 8))
+    : null;
   const release = useMutationToast({
     mutationFn: (assignmentId: string) =>
       api.patch(`/api/v1/projects/${deviceProjectId}/entity-assignments/${assignmentId}`, {
@@ -231,13 +246,20 @@ export function DevicePage() {
                 </a>
               </Button>
             ))}
-            {projectId && (
+            {currentEntityLink && (
+              <Button asChild variant="outline" size="sm">
+                <Link to={currentEntityLink} title={t("Open the entity this device tracks")}>
+                  <Footprints className="size-4" /> {t("Tracks {{name}}", { name: currentEntityName })}
+                </Link>
+              </Button>
+            )}
+            {deviceProjectId && (
               <Button asChild variant="outline" size="sm">
                 <Link
                   to={
                     currentEntityId
-                      ? `/projects/${projectId}/map?entity=${currentEntityId}`
-                      : `/projects/${projectId}/map?device=${d.id}`
+                      ? `/projects/${deviceProjectId}/map?entity=${currentEntityId}`
+                      : `/projects/${deviceProjectId}/map?device=${d.id}`
                   }
                 >
                   <MapPin className="size-4" /> {t("Show on map")}
@@ -349,6 +371,24 @@ export function DevicePage() {
                 </CardHeader>
                 <CardContent>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                    <dt className="text-muted-foreground">{t("Project")}</dt>
+                    <dd>
+                      {deviceProjectId ? (
+                        <Link className="underline" to={`/projects/${deviceProjectId}/devices/${d.id}`}>
+                          {d.project_assignments.find((a) => !a.valid_to)?.project_name ?? t("a project")}
+                        </Link>
+                      ) : (
+                        t("none")
+                      )}
+                    </dd>
+                    <dt className="text-muted-foreground">{t("Tracks")}</dt>
+                    <dd>
+                      {currentEntityLink ? (
+                        <Link className="underline" to={currentEntityLink}>{currentEntityName}</Link>
+                      ) : (
+                        t("nothing")
+                      )}
+                    </dd>
                     <dt className="text-muted-foreground">{t("Serial")}</dt>
                     <dd>{d.serial_number ?? "none"}</dd>
                     <dt className="text-muted-foreground">{t("Firmware")}</dt>
@@ -441,11 +481,8 @@ export function DevicePage() {
                   )}
                   {d.entity_assignments.map((a) => (
                     <div key={a.id}>
-                      {projectId ? (
-                        <Link
-                          className="underline"
-                          to={`/projects/${projectId}/entities/${a.entity_id}`}
-                        >
+                      {entityLink(a) ? (
+                        <Link className="underline" to={entityLink(a) ?? ""}>
                           {a.entity_name ?? a.entity_id.slice(0, 8)}
                         </Link>
                       ) : (

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Copy, Flame, Route, X } from "lucide-react";
+import { AlertTriangle, Copy, Flame, Route, X } from "lucide-react";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -11,6 +11,7 @@ import type {
   EntityFeatureProperties,
 } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
+import { imprecise } from "@/lib/accuracy";
 import { formatAgo, formatTime } from "@/lib/format";
 import { projectFor } from "@/lib/scope";
 
@@ -112,11 +113,32 @@ function batteryClass(level: string | null | undefined): string {
       : "";
 }
 
+/** The note under an imprecise position (decision D193): the circle on the map is the
+ * uncertainty, and the reader should not take the point for the place. */
+export function AccuracyWarning({ accuracyM }: { accuracyM: number }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="flex items-start gap-1.5 text-xs text-brand-sand"
+      role="note"
+    >
+      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+      <span>
+        {t(
+          "Imprecise: the location is only known to about {{value}} m. The circle on the map shows the uncertainty.",
+          { value: Math.round(accuracyM) },
+        )}
+      </span>
+    </div>
+  );
+}
+
 /** The battery, last status and last seen rows shared by entities and devices. */
 function HealthRows({
   lastSeenAt,
   positionTime,
   positionKind,
+  accuracy,
   batteryVoltage,
   healthLevel,
   lastStatusAt,
@@ -127,6 +149,8 @@ function HealthRows({
   lastSeenAt: string | null | undefined;
   positionTime: string | null | undefined;
   positionKind?: string | null;
+  /** Accuracy in metres of the position shown; above the threshold the row warns (D193). */
+  accuracy?: number | null;
   batteryVoltage: number | null | undefined;
   healthLevel: string | null | undefined;
   lastStatusAt: string | null | undefined;
@@ -163,7 +187,16 @@ function HealthRows({
             · {t("network estimate")}
           </span>
         )}
+        {positionTime && accuracy != null && (
+          <span className="text-muted-foreground">
+            {" "}
+            · {t("±{{value}} m", { value: Math.round(accuracy) })}
+          </span>
+        )}
       </PanelRow>
+      {positionTime && imprecise(accuracy) && (
+        <AccuracyWarning accuracyM={accuracy as number} />
+      )}
       {batteryVoltage != null && (
         <PanelRow label={t("Battery")} className={batteryClass(healthLevel)}>
           {batteryVoltage.toFixed(2)} V
@@ -175,7 +208,9 @@ function HealthRows({
             <button
               type="button"
               className="underline underline-offset-2 hover:text-primary"
-              title={t("Show everything the device reported in its last status")}
+              title={t(
+                "Show everything the device reported in its last status",
+              )}
               onClick={onOpenState}
             >
               {formatAgo(lastStatusAt, now)}
@@ -256,7 +291,11 @@ export function HeatButton({
 }
 
 /** Copies "latitude, longitude" of a position to the clipboard (Tim, 2026-09-13). */
-export function CopyPositionButton({ position }: { position: [number, number] }) {
+export function CopyPositionButton({
+  position,
+}: {
+  position: [number, number];
+}) {
   const { t } = useTranslation();
   const text = `${position[1].toFixed(6)}, ${position[0].toFixed(6)}`;
   return (
@@ -330,15 +369,9 @@ export function EntityPanel({
         </>
       }
       picture={
-        <ObjectPicture
-          path={`/api/v1/projects/${project}/entities/${props.entity_id}/picture`}
-          updatedAt={props.picture_updated_at}
-          name={props.name}
-          size="md"
-          fallback={
-            <Icon iconKey={props.icon_key} className="size-7 text-primary" />
-          }
-        />
+        <span className="flex size-9 items-center justify-center rounded-full bg-muted">
+          <Icon iconKey={props.icon_key} className="size-5 text-primary" />
+        </span>
       }
       note={
         wasHidden
@@ -364,6 +397,7 @@ export function EntityPanel({
         lastSeenAt={props.last_seen_at}
         positionTime={props.position_time}
         positionKind={props.position_kind}
+        accuracy={props.accuracy_m}
         onOpenPosition={onOpenPosition}
         onOpenState={onOpenState}
         batteryVoltage={props.battery_voltage}
@@ -503,6 +537,7 @@ export function DevicePanel({
         lastSeenAt={props.last_seen_at}
         positionTime={props.position_time}
         positionKind={props.position_kind}
+        accuracy={props.accuracy_m}
         onOpenPosition={onOpenPosition}
         onOpenState={onOpenState}
         batteryVoltage={props.battery_voltage}

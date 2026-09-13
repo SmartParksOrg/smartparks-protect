@@ -68,7 +68,6 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ancestorIds, groupTree } from "@/hooks/useGroups";
-import { useParams } from "react-router";
 
 import { useNow } from "@/hooks/useNow";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
@@ -230,7 +229,6 @@ export function LayerPanel({
 }) {
   const { t } = useTranslation();
   const now = useNow();
-  const { projectId = "" } = useParams();
   const [tab, setTab] = useState<Tab>("entities");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
@@ -408,18 +406,9 @@ export function LayerPanel({
             )
           }
         />
-        <ObjectPicture
-          path={`/api/v1/projects/${projectId}/entities/${m.entity_id}/picture`}
-          updatedAt={m.picture_updated_at}
-          name={m.name}
-          size="xs"
-          className={on ? "" : "opacity-60"}
-          fallback={
-            <Icon
-              iconKey={m.icon_key}
-              className={`size-5 shrink-0 ${on ? "text-primary" : "text-muted-foreground"}`}
-            />
-          }
+        <Icon
+          iconKey={m.icon_key}
+          className={`size-5 shrink-0 ${on ? "text-primary" : "text-muted-foreground"}`}
         />
         <button
           type="button"

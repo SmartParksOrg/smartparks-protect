@@ -194,3 +194,4 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
     current = (await client.get(f"/api/v1/projects/{project.id}/map/current", headers=h)).json()
     feature = next(f for f in current["features"] if f["properties"]["entity_id"] == entity["id"])
     assert feature["properties"]["position_kind"] == "device"
+    assert "accuracy_m" in feature["properties"]

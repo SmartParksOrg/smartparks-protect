@@ -8,7 +8,7 @@ from datetime import datetime
 from fastapi import HTTPException, Response, UploadFile, status
 
 from shared.config import get_settings
-from shared.pictures import PICTURE_CONTENT_TYPE, PictureError, process_picture
+from shared.pictures import PICTURE_CONTENT_TYPE, PICTURE_SIZE, PictureError, process_picture
 from shared.storage import get_object, put_object, remove_object
 from shared.timeutil import utc_now
 
@@ -17,8 +17,14 @@ def picture_key(kind: str, object_id: uuid.UUID) -> str:
     return f"{kind}/{object_id}.webp"
 
 
-async def store_picture(kind: str, object_id: uuid.UUID, file: UploadFile) -> tuple[str, datetime]:
-    """The upload as a stored square; returns the object key and the time to keep on the row."""
+async def store_picture(
+    kind: str,
+    object_id: uuid.UUID,
+    file: UploadFile,
+    shape: tuple[int, int] = (PICTURE_SIZE, PICTURE_SIZE),
+) -> tuple[str, datetime]:
+    """The upload as a stored picture of `shape`; returns the object key and the time to keep
+    on the row."""
     settings = get_settings()
     data = await file.read(settings.picture_max_bytes + 1)
     if len(data) > settings.picture_max_bytes:
@@ -27,7 +33,7 @@ async def store_picture(kind: str, object_id: uuid.UUID, file: UploadFile) -> tu
             f"The picture exceeds {settings.picture_max_bytes} bytes",
         )
     try:
-        square = process_picture(data)
+        square = process_picture(data, shape)
     except PictureError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     key = picture_key(kind, object_id)

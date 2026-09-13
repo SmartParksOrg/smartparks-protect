@@ -28,7 +28,7 @@ import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { ChangeAssignmentDialog } from "@/components/entities/ChangeAssignmentDialog";
 import { EntityDialog } from "@/components/entities/EntityDialog";
 import { Icon } from "@/components/icons/Icon";
-import { PictureEditor } from "@/components/common/PictureEditor";
+import { PictureCard } from "@/components/entities/PictureCard";
 import type { EntityFeatureProperties } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
 import { recordsHref } from "@/lib/records";
@@ -244,20 +244,9 @@ export function EntityPage() {
         title={e.name}
         description={typePath(types.data?.items ?? [], e.entity_type_id)}
         leading={
-          <PictureEditor
-            path={`/api/v1/projects/${projectId}/entities/${e.id}/picture`}
-            updatedAt={e.picture_updated_at}
-            name={e.name}
-            editable={admin}
-            invalidate={[
-              queryKeys.entity(projectId, e.id),
-              queryKeys.entities(projectId),
-              queryKeys.currentState(projectId),
-            ]}
-            fallback={
-              <Icon iconKey={e.icon_key ?? type?.icon_key} className="size-6" />
-            }
-          />
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-full border text-primary">
+            <Icon iconKey={e.icon_key ?? type?.icon_key} className="size-6" />
+          </span>
         }
         actions={
           <>
@@ -388,10 +377,6 @@ export function EntityPage() {
                   </dl>
                 </CardContent>
               </Card>
-              <MiniMap
-                positions={positions.data ?? []}
-                to={`/projects/${projectId}/map?entity=${e.id}`}
-              />
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("Device")}</CardTitle>
@@ -462,6 +447,18 @@ export function EntityPage() {
                 canEdit={admin}
               />
               {current && <HealthCard health={device.data?.health} />}
+              {/* the picture and the map side by side, the same frame (decision D194) */}
+              <PictureCard
+                path={`/api/v1/projects/${projectId}/entities/${e.id}/picture`}
+                updatedAt={e.picture_updated_at}
+                name={e.name}
+                editable={admin}
+                invalidate={[queryKeys.entity(projectId, e.id), queryKeys.entities(projectId)]}
+              />
+              <MiniMap
+                positions={positions.data ?? []}
+                to={`/projects/${projectId}/map?entity=${e.id}`}
+              />
               <Card className="lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("Assignments")}</CardTitle>

@@ -27,7 +27,6 @@ import { EntityDialog } from "@/components/entities/EntityDialog";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { MoveToGroupDialog } from "@/components/entities/MoveToGroupDialog";
 import { Icon } from "@/components/icons/Icon";
-import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/useProjects";
 import { useNow } from "@/hooks/useNow";
@@ -142,18 +141,10 @@ export function EntitiesPage() {
       accessorKey: "name",
       cell: ({ row }) => (
         <span className="inline-flex items-center gap-2">
-          <ObjectPicture
-            path={`/api/v1/projects/${projectId}/entities/${row.original.id}/picture`}
-            updatedAt={row.original.picture_updated_at}
-            name={row.original.name}
-            size="xs"
-            fallback={
-              <Icon
-                iconKey={
-                  row.original.icon_key ??
-                  typeById.get(row.original.entity_type_id)?.icon_key
-                }
-              />
+          <Icon
+            iconKey={
+              row.original.icon_key ??
+              typeById.get(row.original.entity_type_id)?.icon_key
             }
           />
           {row.original.name}
@@ -196,7 +187,10 @@ export function EntitiesPage() {
           >
             {deviceNames.get(id) ?? t("open device")}
           </Link>
-        ) : can("devices:write") && !allProjects && assignments.data && !tracked.has(row.original.id) ? (
+        ) : can("devices:write") &&
+          !allProjects &&
+          assignments.data &&
+          !tracked.has(row.original.id) ? (
           <Button
             size="sm"
             variant="outline"

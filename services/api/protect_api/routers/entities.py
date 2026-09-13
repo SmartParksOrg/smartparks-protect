@@ -52,6 +52,7 @@ from shared.models import (
     Group,
 )
 from shared.permissions import Permission, permissions_for
+from shared.pictures import PICTURE_LANDSCAPE
 from shared.timeutil import utc_now
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["entities"])
@@ -252,7 +253,7 @@ async def get_entity_picture(
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    """The entity's profile picture (decision D110), a WebP square."""
+    """The entity's picture (decisions D110, D194), a 4:3 WebP landscape."""
     entity = await _project_entity(session, context, entity_id)
     return await picture_response(entity.picture_key, entity.picture_updated_at)
 
@@ -264,9 +265,11 @@ async def set_entity_picture(
     context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
     session: AsyncSession = Depends(get_session),
 ) -> EntityRead:
-    """Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square."""
+    """Set the picture from a JPEG, PNG or WebP; the server keeps a 4:3 landscape (D194)."""
     entity = await _project_entity(session, context, entity_id)
-    entity.picture_key, entity.picture_updated_at = await store_picture("entities", entity.id, file)
+    entity.picture_key, entity.picture_updated_at = await store_picture(
+        "entities", entity.id, file, PICTURE_LANDSCAPE
+    )
     await record_audit(
         session,
         user=context.user,

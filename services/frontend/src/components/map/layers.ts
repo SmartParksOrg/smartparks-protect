@@ -10,6 +10,8 @@ import {
   type MarkerState,
 } from "@/components/icons/markers";
 import { intensityFor, radiusExpression } from "@/components/map/heat";
+import { circlePolygon } from "@/components/map/networkLocations";
+import { imprecise } from "@/lib/accuracy";
 
 export const SOURCES = {
   entities: "entities",
@@ -21,6 +23,8 @@ export const SOURCES = {
   coverage: "coverage",
   heat: "heat",
   network_locations: "network-locations",
+  entity_accuracy: "entity-accuracy",
+  device_accuracy: "device-accuracy",
 } as const;
 
 /** Source ids a base map style brings along; ours must never collide with them, or an ensure
@@ -52,6 +56,8 @@ export interface EntityFeatureProperties {
   position_time: string | null;
   /** device or network: what the position shown is (decision D164). */
   position_kind?: string | null;
+  /** Accuracy in metres of the position shown, when the source gave one (D193). */
+  accuracy_m?: number | null;
   active_alert_count: number;
   health_level?: string | null;
   battery_voltage?: number | null;
@@ -78,6 +84,8 @@ export interface DeviceFeatureProperties {
   position_time: string | null;
   /** device or network: what the position shown is (decision D164). */
   position_kind?: string | null;
+  /** Accuracy in metres of the position shown, when the source gave one (D193). */
+  accuracy_m?: number | null;
   health_level?: string | null;
   battery_voltage?: number | null;
   last_status_at?: string | null;
@@ -106,6 +114,7 @@ export function stateFor(
  * effect and call the returned function in its cleanup. */
 export function ensureEntityLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.entities)) return;
+  ensureAccuracyLayers(map, SOURCES.entity_accuracy);
   map.addSource(SOURCES.entities, {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
@@ -216,6 +225,7 @@ export async function setEntities(
     });
   }
   source.setData({ type: "FeatureCollection", features: withMarkers });
+  setAccuracyCircles(map, SOURCES.entity_accuracy, features);
 }
 
 export function deviceStateFor(
@@ -237,6 +247,7 @@ export function deviceStateFor(
  * layers, which it sits beneath. */
 export function ensureDeviceLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.devices)) return;
+  ensureAccuracyLayers(map, SOURCES.device_accuracy);
   // clustered like the entities; a device cluster is the inverse of an entity cluster
   // (white with a green ring) and sits a little down and right of it, so a collar cluster
   // and its animals' cluster over the same ground both stay visible
@@ -367,6 +378,58 @@ export async function setDevices(
     });
   }
   source.setData({ type: "FeatureCollection", features: withMarkers });
+  setAccuracyCircles(map, SOURCES.device_accuracy, features);
+}
+
+/** The accuracy circle (decision D193): around a position whose accuracy is known and above
+ * the warning threshold, a translucent disc of that radius in the brand green under the
+ * markers, so an imprecise location (a network estimate, a fix taken under a poor sky) never
+ * looks as sharp as a good one. One source per marker layer, filled with the same features. */
+export function ensureAccuracyLayers(map: MapLibreMap, sourceId: string): void {
+  if (map.getSource(sourceId)) return;
+  map.addSource(sourceId, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  const before = map.getLayer("entity-clusters") ? "entity-clusters" : undefined;
+  map.addLayer(
+    {
+      id: `${sourceId}-fill`,
+      type: "fill",
+      source: sourceId,
+      paint: { "fill-color": "#90AE9B", "fill-opacity": 0.2 },
+    },
+    before,
+  );
+  map.addLayer(
+    {
+      id: `${sourceId}-line`,
+      type: "line",
+      source: sourceId,
+      paint: { "line-color": "#52735E", "line-width": 1, "line-opacity": 0.7, "line-dasharray": [2, 2] },
+    },
+    before,
+  );
+}
+
+export function setAccuracyCircles(map: MapLibreMap, sourceId: string, features: GeoJSON.Feature[]): void {
+  const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+  if (!source) return;
+  source.setData({ type: "FeatureCollection", features: accuracyCircles(features) });
+}
+
+/** The discs for the features that deserve one; exported for its test. */
+export function accuracyCircles(features: GeoJSON.Feature[]): GeoJSON.Feature[] {
+  const out: GeoJSON.Feature[] = [];
+  for (const feature of features) {
+    const props = feature.properties as { accuracy_m?: number | null } | null;
+    const radius = props?.accuracy_m;
+    if (!imprecise(radius) || feature.geometry?.type !== "Point") continue;
+    const [lon, lat] = feature.geometry.coordinates;
+    out.push({
+      type: "Feature",
+      geometry: circlePolygon(lat, lon, radius as number),
+      properties: { accuracy_m: radius },
+    });
+  }
+  return out;
 }
 
 const TRACK_COLORS = [

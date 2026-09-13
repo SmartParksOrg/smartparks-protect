@@ -855,6 +855,7 @@ def _set_position(
     state.latest_position_time = position.time
     state.latest_position = from_shape(Point(position.longitude, position.latitude), srid=4326)
     state.latest_position_kind = kind
+    state.latest_accuracy_m = position.accuracy_m
 
 
 async def publish_outcome(bus: RedisStreamsBus, outcome: Outcome) -> None:
