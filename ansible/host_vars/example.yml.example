@@ -7,6 +7,7 @@ app_environment: production
 log_level: INFO
 # git_version: main            # dev servers only
 # dev_notify_emails: "you@example.org"
+# mail_deliver_to_all: false   # true lets a development server mail everyone, like production
 
 # Secrets. `openssl rand -base64 32` for each. Losing credentials_key means re-entering every
 # data source credential.

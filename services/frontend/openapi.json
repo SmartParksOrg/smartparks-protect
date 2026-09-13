@@ -29931,6 +29931,28 @@
       "type": "boolean",
       "title": "Mail Sent",
       "default": false
+     },
+     "mail_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mail Reason"
+     },
+     "registration_link": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Registration Link"
      }
     },
     "type": "object",

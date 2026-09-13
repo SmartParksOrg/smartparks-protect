@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     dev_notify_emails: str = Field(
         default="", description="Comma separated addresses that may be emailed in development"
     )
+    mail_deliver_to_all: bool = Field(
+        default=False,
+        description="Deliver to every recipient on a non-production server too: for a "
+        "development server that stands in for production (Tim, 2026-09-13)",
+    )
     telegram_bot_token: str | None = Field(
         default=None, description="One bot per installation; chats link to targets with a code"
     )

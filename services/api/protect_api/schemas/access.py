@@ -155,6 +155,9 @@ class InvitationRead(ORMModel):
     used_at: datetime | None
     created_at: datetime
     mail_sent: bool = False
+    #: Why the mail was not sent, and the registration link to share by hand instead.
+    mail_reason: str | None = None
+    registration_link: str | None = None
 
 
 class UserAdminRead(ORMModel):

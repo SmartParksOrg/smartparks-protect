@@ -8254,6 +8254,10 @@ export interface components {
              * @default false
              */
             mail_sent: boolean;
+            /** Mail Reason */
+            mail_reason?: string | null;
+            /** Registration Link */
+            registration_link?: string | null;
         };
         /** IridiumLink */
         IridiumLink: {

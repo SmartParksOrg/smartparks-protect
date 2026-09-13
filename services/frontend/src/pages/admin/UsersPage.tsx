@@ -29,7 +29,7 @@ export function UsersPage() {
     mutationFn: () => api.post<Invitation & { mail_sent: boolean }>("/api/v1/admin/invitations", { body: { email } }),
     invalidate: [queryKeys.serverInvitations],
     success: (d) => (d.mail_sent ? "Invitation sent" : "Invitation created"),
-    onSuccess: (d) => { setEmail(""); setNote(d.mail_sent ? null : "Mail is not configured; the registration link is in the API log."); },
+    onSuccess: (d) => { setEmail(""); setNote(d.mail_sent ? null : t("The invitation was not mailed ({{reason}}). Share this registration link with the person instead: {{link}}", { reason: d.mail_reason ?? t("unknown reason"), link: d.registration_link ?? "" })); },
   });
   const revoke = useMutationToast({ mutationFn: (id: string) => api.delete(`/api/v1/admin/invitations/${id}`), invalidate: [queryKeys.serverInvitations], success: t("Invitation revoked") });
   const userColumns: ColumnDef<UserAdmin, unknown>[] = [

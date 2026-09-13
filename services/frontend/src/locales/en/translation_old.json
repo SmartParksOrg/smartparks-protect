@@ -81,6 +81,7 @@
   "known through another path": "known through another path",
   "Last WAL segment": "Last WAL segment",
   "LoRaWAN traffic": "LoRaWAN traffic",
+  "Mail is not configured on this server. Share the registration link from the server log, or configure SMTP. Invitation id {{id}}.": "Mail is not configured on this server. Share the registration link from the server log, or configure SMTP. Invitation id {{id}}.",
   "Metrics with data in the last year are listed. Pick entities to compare, or leave the field empty for the whole project.": "Metrics with data in the last year are listed. Pick entities to compare, or leave the field empty for the whole project.",
   "Metrics, entities, range, bucket, aggregates and chart, shared with the project.": "Metrics, entities, range, bucket, aggregates and chart, shared with the project.",
   "Mkomazi, Tanzania": "Mkomazi, Tanzania",

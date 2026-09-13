@@ -136,7 +136,7 @@ export function MembersPage() {
 
   const invite = useMutationToast({
     mutationFn: (values: InviteValues) =>
-      api.post<Invitation & { mail_sent: boolean }>(`${base}/invitations`, {
+      api.post<Invitation>(`${base}/invitations`, {
         body: { email: values.email, ...roleBody(values.role), scope: inviteScope },
       }),
     invalidate: [queryKeys.invitations(projectId)],
@@ -146,7 +146,10 @@ export function MembersPage() {
       setLastLink(
         data.mail_sent
           ? null
-          : t("Mail is not configured on this server. Share the registration link from the server log, or configure SMTP. Invitation id {{id}}.", { id: data.id }),
+          : t("The invitation was not mailed ({{reason}}). Share this registration link with the person instead: {{link}}", {
+              reason: data.mail_reason ?? t("unknown reason"),
+              link: data.registration_link ?? "",
+            }),
       );
     },
     success: (data) => (data.mail_sent ? t("Invitation sent") : t("Invitation created")),

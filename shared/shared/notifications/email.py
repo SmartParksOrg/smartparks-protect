@@ -1,6 +1,7 @@
 """Email over SMTP with the development guard from AddaxAI Connect: on a non-production server
-only addresses in DEV_NOTIFY_EMAILS receive mail, everything else is logged. Without SMTP
-settings every message is logged."""
+only addresses in DEV_NOTIFY_EMAILS receive mail, everything else is logged, unless
+MAIL_DELIVER_TO_ALL lifts the guard for a development server that stands in for production.
+Without SMTP settings every message is logged."""
 
 from email.message import EmailMessage
 
@@ -16,10 +17,13 @@ def allowed_recipient(to: str) -> tuple[bool, str]:
     settings = get_settings()
     if not settings.mail_configured:
         return False, "mail is not configured"
-    if settings.environment != "production":
+    if settings.environment != "production" and not settings.mail_deliver_to_all:
         if to.strip().lower() in settings.dev_notify_email_list:
             return True, ""
-        return False, "not a production server and recipient not in DEV_NOTIFY_EMAILS"
+        return False, (
+            "not a production server and recipient not in DEV_NOTIFY_EMAILS "
+            "(MAIL_DELIVER_TO_ALL lifts this)"
+        )
     return True, ""
 
 

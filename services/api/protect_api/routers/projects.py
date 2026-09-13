@@ -51,6 +51,7 @@ from shared.models import (
     ProjectRole,
     User,
 )
+from shared.notifications.email import allowed_recipient
 from shared.permissions import (
     BUILTIN_ROLE_LABELS,
     Permission,
@@ -454,9 +455,16 @@ async def create_invitation_row(
         project_name=project.name if project else None,
         invited_by=invited_by.full_name or invited_by.email,
     )
+    _allowed, reason = allowed_recipient(invitation.email)
     return InvitationRead(
-        **InvitationRead.model_validate(invitation).model_dump(exclude={"mail_sent"}),
+        **InvitationRead.model_validate(invitation).model_dump(
+            exclude={"mail_sent", "mail_reason", "registration_link"}
+        ),
         mail_sent=sent,
+        mail_reason=None if sent else reason,
+        registration_link=None
+        if sent
+        else f"{get_settings().public_url}/register?token={invitation.token}",
     )
 
 

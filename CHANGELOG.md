@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- `MAIL_DELIVER_TO_ALL` lets a non-production server mail every recipient, for a development server that stands in for production; an invitation that was not mailed answers with the reason and the registration link, and the members and users pages show both instead of "mail is not configured".
 - Roles, custom roles and a member's scope (phase 27, decisions D185 to D188, ADR 0030): four built-in roles (Viewer, Operator, Analyst, Admin) and custom roles a project admin composes from the permission keys by area; a scope per member (groups, entities, devices) the API enforces on every read, exports included; the members page with Members, Roles and Invitations, a scope picker and a role editor; invitations carrying role and scope; the interface gated by permission keys (`GET /permissions`, `/projects/{id}/roles`, `permissions` on the project list).
 - Live map panels: a button that copies the coordinates as "latitude, longitude" beside the track and heatmap toggles and in the fix panel, and the "Last status" time opens the device's newest status with every value it reported (`GET /projects/{id}/devices/{device_id}/state`).
 - Live map: the position time in an entity or device panel is a link that opens the fix of that moment, the same panel a track point opens, with the measurements, the source event and the trace.
