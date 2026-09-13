@@ -1917,3 +1917,7 @@ Listed by the phase where they are first needed.
 - After the deploy the API still refused: compose passes the mail variables to the services one by one, and the new one was missing from `docker-compose.yml` (the `.env` had it). Added beside `DEV_NOTIFY_EMAILS`, with `.env.example`.
 - Deployed (7bc4b13): an invitation to protect@smartparks.org answered `mail_sent: true` and the API logged "mail sent"; the test invitation was revoked. The dev server now mails everyone it invites.
 
+### 2026-09-13, the screens at every size (Claude and Tim)
+
+- Tim asked for the recent screens to be checked on desktop and mobile. A Playwright sweep of twelve screens (the members page's three tabs, the role editor, the scope picker, the map with the feed, an entity panel, a status panel and the layers panel, the gateways page, the device page's Connectivity tab, the health dot's popover) at 320, 390, 768 and 1280 px against the dev server: no page scrolls sideways, every dialog and popover fits, no page errors. Found and fixed: the entity and device pages' tab row (with the Connectivity tab) overran a 320 px screen (the row scrolls now, like the layers panel's), and the members, invitations and gateways tables scrolled inside their frame on a phone with every column (the secondary columns hide there now through the table's `defaultHiddenSmall`). Wide tables scrolling inside their frame is by design. The ranger.test member of the morning was gone from the members list (removed by Tim, presumably), so the scope picker was exercised on the local build.
+

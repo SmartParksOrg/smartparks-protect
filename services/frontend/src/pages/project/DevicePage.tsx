@@ -332,7 +332,7 @@ export function DevicePage() {
           value={tab}
           onValueChange={(v) => setTab(v as (typeof TABS)[number])}
         >
-          <TabsList>
+          <TabsList className="max-w-full justify-start overflow-x-auto">
             <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
             <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>

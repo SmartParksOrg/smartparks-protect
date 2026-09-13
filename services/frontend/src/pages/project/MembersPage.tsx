@@ -267,6 +267,7 @@ export function MembersPage() {
           <DataTable
             columns={memberColumns}
             data={members.data?.items}
+            defaultHiddenSmall={["full_name", "created_at"]}
             searchable
             isLoading={members.isPending}
             emptyMessage={t("No members yet. Invite someone under Invitations.")}
@@ -315,7 +316,7 @@ export function MembersPage() {
                 {lastLink && <Callout kind="warning" className="mt-3">{lastLink}</Callout>}
               </CardContent>
             </Card>
-            <DataTable columns={invitationColumns} data={invitations.data?.items} searchable isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
+            <DataTable columns={invitationColumns} data={invitations.data?.items} defaultHiddenSmall={["expires_at", "used_at"]} searchable isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
           </>
         )}
       </Page>

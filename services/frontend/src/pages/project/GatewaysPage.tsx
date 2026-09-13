@@ -311,6 +311,7 @@ export function GatewaysPage() {
           <DataTable
             columns={columns}
             data={shown}
+            defaultHiddenSmall={["signal", "last_reception_at", "location"]}
             searchable
             isLoading={gateways.isPending}
             emptyMessage={t(

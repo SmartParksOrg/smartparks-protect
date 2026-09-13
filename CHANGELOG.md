@@ -30,6 +30,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- Phones: the tab rows of the entity and device pages scroll sideways instead of overrunning a 320 px screen, and the members, invitations and gateways tables hide their secondary columns on a phone.
 - Viewers no longer report events or export: those belong to the Operator and Analyst roles now; a viewer who needs them gets one of those roles. Features, saved views and dashboards have their own permission keys (`features:write`, `views:write`, `dashboards:write`); dashboards and saved views no longer need project settings rights.
 - The top bar is 41 px on a phone (smaller buttons and logo, the product name on one line) and keeps its 53 px from tablet width up.
 - The landscape Smart Parks logo with the product name beside it in the navigation column and the phone header instead of the split logo; the entity and device panels on the live map carry the same track and heatmap icon toggles as the layers panel's rows; the layers panel's Show all and Hide all are one toggle per tab, like Fold all.
