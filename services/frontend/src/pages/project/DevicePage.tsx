@@ -64,7 +64,7 @@ export function DevicePage() {
   const [record, setRecord] = useState<number | null>(null);
   const [curating, setCurating] = useState<CurationTarget | null>(null);
   const [history, setHistory] = useState<CurationTarget | null>(null);
-  const [assigning, setAssigning] = useState(false);
+  const [assigning, setAssigning] = useState<"entity" | "project" | null>(null);
   const device = useQuery({
     queryKey: queryKeys.device(deviceId),
     queryFn: () => api.get<DeviceDetail>(`/api/v1/devices/${deviceId}`),
@@ -174,7 +174,8 @@ export function DevicePage() {
   // the device's project today: the route's, or on the admin route the current assignment's
   const deviceProjectId =
     projectId ?? d?.project_assignments.find((a) => !a.valid_to)?.project_id ?? null;
-  const mayAssign = Boolean(deviceProjectId && can("devices:write"));
+  // in a project, the project's own permission; without one, a server admin picks the project in the dialog (D192)
+  const mayAssign = deviceProjectId ? can("devices:write") : Boolean(user?.is_superuser);
   const release = useMutationToast({
     mutationFn: (assignmentId: string) =>
       api.patch(`/api/v1/projects/${deviceProjectId}/entity-assignments/${assignmentId}`, {
@@ -379,8 +380,13 @@ export function DevicePage() {
               )}
               <HealthCard health={d.health} />
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between gap-2">
                   <CardTitle>{t("Project assignments")}</CardTitle>
+                  {!deviceProjectId && user?.is_superuser && (
+                    <Button size="sm" variant="outline" onClick={() => setAssigning("project")}>
+                      {t("Assign to project")}
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
                   {d.project_assignments.length === 0 && (
@@ -420,7 +426,7 @@ export function DevicePage() {
                         {t("Release")}
                       </Button>
                     ) : (
-                      <Button size="sm" onClick={() => setAssigning(true)}>
+                      <Button size="sm" onClick={() => setAssigning("entity")}>
                         {t("Assign to entity")}
                       </Button>
                     ))}
@@ -430,7 +436,7 @@ export function DevicePage() {
                     <div className="text-muted-foreground">
                       {deviceProjectId
                         ? t("Not assigned to an entity.")
-                        : t("Not assigned to an entity; it needs a project first.")}
+                        : t("Not assigned to an entity; Assign to entity asks for the project first.")}
                     </div>
                   )}
                   {d.entity_assignments.map((a) => (
@@ -683,14 +689,13 @@ export function DevicePage() {
           </TabsContent>
         </Tabs>
       </Page>
-      {deviceProjectId && (
-        <AssignEntityDialog
-          projectId={deviceProjectId}
-          device={d}
-          open={assigning}
-          onOpenChange={setAssigning}
-        />
-      )}
+      <AssignEntityDialog
+        projectId={deviceProjectId}
+        device={d}
+        entity={assigning !== "project"}
+        open={assigning !== null}
+        onOpenChange={(open) => !open && setAssigning(null)}
+      />
       <SourceEventDialog
         id={event?.id ?? null}
         ingestedAt={event?.ingestedAt ?? null}

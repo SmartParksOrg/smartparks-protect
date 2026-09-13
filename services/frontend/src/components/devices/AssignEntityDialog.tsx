@@ -15,28 +15,41 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { useProject } from "@/hooks/useProjects";
+import { useProject, useProjects } from "@/hooks/useProjects";
 
-/** Assign a device to an entity from the device's side (decision D170): one of the project's
- * entities, or a new one made on the spot, from a start the guided field offers (D103). The
+/** Assign a device from the device's side (decisions D170, D192): to one of the project's
+ * entities or a new one made on the spot, from a start the guided field offers (D103). A device
+ * no project holds yet is asked for the project first, in the same dialog, and both
+ * assignments are made in one go; with `entity` off the dialog assigns the project alone. The
  * entity page's dialog is the same thing seen from the entity. */
-export function AssignEntityDialog({ projectId, device, open, onOpenChange }: { projectId: string; device: DeviceDetail; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function AssignEntityDialog({ projectId, device, open, onOpenChange, entity = true }: { projectId: string | null; device: DeviceDetail; open: boolean; onOpenChange: (open: boolean) => void; entity?: boolean }) {
   const { t } = useTranslation();
+  const title = entity
+    ? projectId
+      ? t("Assign {{name}} to an entity", { name: device.name })
+      : t("Assign {{name}} to a project and an entity", { name: device.name })
+    : t("Assign {{name}} to a project", { name: device.name });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{t("Assign {{name}} to an entity", { name: device.name })}</DialogTitle></DialogHeader>
-        {open && <AssignEntityForm projectId={projectId} device={device} onDone={() => onOpenChange(false)} />}
+        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+        {open && <AssignEntityForm projectId={projectId} device={device} entity={entity} onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   );
 }
 
 /** Mounted while the dialog is open, so every opening starts with nothing chosen. */
-function AssignEntityForm({ projectId, device, onDone }: { projectId: string; device: DeviceDetail; onDone: () => void }) {
+function AssignEntityForm({ projectId: fixedProjectId, device, entity: entityStep, onDone }: { projectId: string | null; device: DeviceDetail; entity: boolean; onDone: () => void }) {
   const { t } = useTranslation();
-  const { project } = useProject(projectId);
+  const projects = useProjects();
+  const [chosenProjectId, setChosenProjectId] = useState("");
+  const [projectValidFrom, setProjectValidFrom] = useState(() => new Date().toISOString());
+  const needProject = fixedProjectId === null;
+  const projectId = fixedProjectId ?? chosenProjectId;
+  const { project } = useProject(projectId || undefined);
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [q, setQ] = useState("");
   const [entityId, setEntityId] = useState("");
@@ -48,12 +61,14 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
   const entities = useQuery({
     queryKey: [...queryKeys.entities(projectId), "assignable", q],
     queryFn: () => api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, { query: { limit: 200, ...(q.trim() ? { q: q.trim() } : {}) } }),
+    enabled: Boolean(projectId) && entityStep,
   });
   const types = useQuery({ queryKey: queryKeys.entityTypes, queryFn: () => api.get<PageType<EntityType>>("/api/v1/entity-types", { query: { limit: 500 } }) });
   const iconOf = (e: Entity) => e.icon_key ?? types.data?.items.find((x) => x.id === e.entity_type_id)?.icon_key;
   const assignments = useQuery({
     queryKey: queryKeys.entityAssignments(projectId),
     queryFn: () => api.get<PageType<EntityAssignment>>(`/api/v1/projects/${projectId}/entity-assignments`, { query: { limit: 500 } }),
+    enabled: Boolean(projectId) && entityStep,
   });
   const trackedBy = useMemo(() => {
     const map = new Map<string, string>();
@@ -61,26 +76,68 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
     return map;
   }, [assignments.data]);
   const span = useQuery({ queryKey: queryKeys.deviceSpan(device.id), queryFn: () => api.get<DeviceDataSpan>(`/api/v1/devices/${device.id}/data-span`) });
-  const joinedAt = device.project_assignments.find((a) => a.project_id === projectId && !a.valid_to)?.valid_from ?? null;
+  // the project the device is in, or the one chosen here: the entity's start is bounded by it
+  const joinedAt = needProject ? projectValidFrom : (device.project_assignments.find((a) => a.project_id === projectId && !a.valid_to)?.valid_from ?? null);
   // What still stops the assignment; shown at the field once Assign was pressed, never a silently disabled button.
-  const missing = mode === "existing" ? (entityId ? null : "entity") : !name.trim() ? "name" : !typeId ? "type" : null;
+  const missingEntity = mode === "existing" ? (entityId ? null : "entity") : !name.trim() ? "name" : !typeId ? "type" : null;
+  const missing = needProject && !projectId ? "project" : entityStep ? missingEntity : null;
   const ready = missing === null;
   const assign = useMutationToast({
-    mutationFn: () =>
-      api.post<EntityAssignment>(`/api/v1/projects/${projectId}/entity-assignments`, {
+    mutationFn: async () => {
+      // the project first when the device has none; should the entity step then fail, the
+      // device is in the project and the dialog, reopened, starts from there
+      if (needProject) {
+        await api.post(`/api/v1/devices/${device.id}/project-assignments`, { body: { project_id: projectId, valid_from: projectValidFrom } });
+      }
+      if (!entityStep) return null;
+      return api.post<EntityAssignment>(`/api/v1/projects/${projectId}/entity-assignments`, {
         body: {
           device_id: device.id,
           valid_from: validFrom,
           ...(mode === "existing" ? { entity_id: entityId } : { new_entity: { name: name.trim(), entity_type_id: typeId, group_id: groupId || null } }),
         },
-      }),
-    invalidate: [queryKeys.device(device.id), queryKeys.deviceSpan(device.id), queryKeys.entities(projectId), queryKeys.entityAssignments(projectId), queryKeys.currentState(projectId), queryKeys.devices({ projectId, unassigned: true })],
-    success: (a: EntityAssignment) => t("{{device}} now tracks {{entity}}", { device: device.name, entity: a.entity_name ?? name }),
+      });
+    },
+    invalidate: [queryKeys.device(device.id), queryKeys.deviceSpan(device.id), queryKeys.devices({}), queryKeys.entities(projectId), queryKeys.entityAssignments(projectId), queryKeys.currentState(projectId), queryKeys.devices({ projectId, unassigned: true })],
+    success: (a: EntityAssignment | null) => (a ? t("{{device}} now tracks {{entity}}", { device: device.name, entity: a.entity_name ?? name }) : t("{{device}} is in {{project}} now", { device: device.name, project: project?.name ?? "" })),
     onSuccess: onDone,
   });
+  const projectStep = needProject && (
+    <>
+      <Field label={t("Project")} htmlFor="assign-project" hint={t("The device belongs to no project yet; its data is attributed to the project from the start chosen below.")} error={attempted && missing === "project" ? t("Choose a project") : undefined}>
+        <Select value={chosenProjectId} onValueChange={setChosenProjectId}>
+          <SelectTrigger id="assign-project"><SelectValue placeholder={t("Choose a project")} /></SelectTrigger>
+          <SelectContent>
+            {(projects.data?.items ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </Field>
+      {projectId && (
+        <Field label={t("In the project since")} htmlFor="project-choice" hint={t("Records before the chosen start stay without project.")}>
+          {span.isPending ? <div className="text-sm text-muted-foreground">{t("Looking up the device's data…")}</div> : <AssignmentStartField idPrefix="project" span={span.data} joinedAt={null} timeZone={project?.timezone ?? "UTC"} onChange={setProjectValidFrom} />}
+        </Field>
+      )}
+    </>
+  );
+  if (!entityStep) {
+    return (
+      <>
+        <div className="min-w-0 space-y-4">
+          {projectStep}
+          {assign.isError && <Callout kind="error">{assign.error.message}</Callout>}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onDone}>{t("Cancel")}</Button>
+          <Button type="button" disabled={span.isPending || assign.isPending} onClick={() => (ready ? assign.mutate() : setAttempted(true))}>{assign.isPending ? t("Assigning…") : t("Assign")}</Button>
+        </DialogFooter>
+      </>
+    );
+  }
   return (
     <>
       <div className="min-w-0 space-y-4">
+        {projectStep}
+        {needProject && projectId && <div className="border-t" />}
         <Tabs value={mode} onValueChange={(v) => setMode(v as "existing" | "new")}>
           <TabsList>
             <TabsTrigger value="existing">{t("An entity of the project")}</TabsTrigger>
@@ -113,7 +170,7 @@ function AssignEntityForm({ projectId, device, onDone }: { projectId: string; de
             <Field label={t("Group")} htmlFor="new-entity-group"><GroupSelect id="new-entity-group" projectId={projectId} mode="choice" value={groupId} onChange={setGroupId} /></Field>
           </>
         )}
-        {ready && (
+        {ready && projectId && (
           <Field label={t("Tracking since")} htmlFor="entity-choice" hint={t("Records before the chosen start stay without entity; the entity appears on the map with its first record from the start on.")}>
             {span.isPending ? <div className="text-sm text-muted-foreground">{t("Looking up the device's data…")}</div> : <AssignmentStartField idPrefix="entity" span={span.data} joinedAt={joinedAt} timeZone={project?.timezone ?? "UTC"} onChange={setValidFrom} />}
           </Field>

@@ -33,6 +33,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- A device no project holds yet is assigned from its page in one go (decision D192): "Assign to entity" asks for the project first (with the guided start) and then the animal, existing or new; the Project assignments card offers "Assign to project" alone. Before, the project had to be set in the Server admin, Devices list first and the entity button did not appear.
 - Phones: the tab rows of the entity and device pages scroll sideways instead of overrunning a 320 px screen, and the members, invitations and gateways tables hide their secondary columns on a phone.
 - Viewers no longer report events or export: those belong to the Operator and Analyst roles now; a viewer who needs them gets one of those roles. Features, saved views and dashboards have their own permission keys (`features:write`, `views:write`, `dashboards:write`); dashboards and saved views no longer need project settings rights.
 - The top bar is 41 px on a phone (smaller buttons and logo, the product name on one line) and keeps its 53 px from tablet width up.

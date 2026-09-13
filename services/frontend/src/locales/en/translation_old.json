@@ -102,6 +102,7 @@
   "No rows in this range. Widen the period or pick another metric.": "No rows in this range. Widen the period or pick another metric.",
   "No rows.": "No rows.",
   "No track": "No track",
+  "Not assigned to an entity; it needs a project first.": "Not assigned to an entity; it needs a project first.",
   "not defined yet": "not defined yet",
   "Nothing is changed yet. This is what Apply would do on each application's HTTP integration; other URLs and headers stay as they are.": "Nothing is changed yet. This is what Apply would do on each application's HTTP integration; other URLs and headers stay as they are.",
   "Now:": "Now:",
