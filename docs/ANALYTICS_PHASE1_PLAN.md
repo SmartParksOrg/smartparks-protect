@@ -1,6 +1,6 @@
 # Analytics phase 1 plan: movement ecology and grazing
 
-Status: proposal for review, written on 2026-09-13 on the branch `feature/analytics-movement-grazing`. Nothing in this document is implemented. Nothing here is merged into `main`.
+Status: reviewed and approved by Tim on 2026-09-14 on the branch `feature/analytics-movement-grazing`, with one change to the proposal: analyses run in a worker of their own from the start (decision A below). Implementation follows the roadmap on this branch. Nothing here is merged into `main`.
 
 Where this document lives. The repository keeps plans as phases inside `PROJECT_PLAN.md` and its conventions ask for no redundant Markdown files (`CONVENTIONS.md`, rule 8). This file is the review artefact for the analytics branch, kept apart on purpose so that `main` stays untouched while the plan is discussed. When the plan is approved, its decisions move into `PROJECT_PLAN.md` as the rewritten phase 22 (the placeholder "Analysis as modules" already reserved for this work), the architectural choice becomes ADR 0031, and the user-facing parts become `docs/analytics/movement.md` and `docs/analytics/grazing.md` in the MkDocs nav. This file is then removed or shortened to a pointer. Until then it is not in the MkDocs nav and the docs build ignores it.
 
@@ -13,7 +13,7 @@ Smart Parks Protect gains an optional analysis area with two capabilities and no
 
 Everything else stays out of scope: contact analysis, habitat selection, biodiversity, animal health, patrol, fleet, infrastructure, water, human-wildlife conflict, connectivity, ecosystem condition, conservation outcomes and any environmental data platform. The architecture leaves them possible and plans none of them. A decision gate after movement and grazing are live (section 20) decides whether native analytics grows at all.
 
-The one principle above all others: the Protect core (ingestion, decoding, the live map, entities, devices, events, rules, alerts, notifications, integrations, exports) must keep working when the analysis subsystem is disabled, absent, overloaded or broken. The design reaches that with logical isolation first: a separate Python package, separate tables, a job that runs in a worker outside the request path and outside the ingest path, explicit bounds on every input, module flags, and a permission key. A separate worker container is prepared but not started. A separate service or store is not planned.
+The one principle above all others: the Protect core (ingestion, decoding, the live map, entities, devices, events, rules, alerts, notifications, integrations, exports) must keep working when the analysis subsystem is disabled, absent, overloaded or broken. The design reaches that with logical isolation first: a separate Python package, separate tables, a job that runs in a worker of its own outside the request path and outside the ingest path, explicit bounds on every input, module flags, and a permission key. The worker is one more compose service from the same image, so it can be stopped, limited or removed without touching anything else. A separate service or store is not planned.
 
 ## 2. Current repository assessment
 
@@ -147,17 +147,17 @@ Runtime impact. The API gains one router. Its endpoints create rows, read rows a
 
 Database impact. Two new tables in the `analysis_` namespace (section 6), both ordinary tables, no hypertable, no new column on `positions`, `measurements`, `entities`, `devices` or `features`. The analysis reads `positions` through the same indexes and the same effective-time expressions as tracks and exports. Writes go only to the analysis tables. Reads in the worker use a server-side cursor with `yield_per`, a per-run statement timeout set with `SET LOCAL statement_timeout`, and the fix bound of section 14, so a run cannot hold the hypertable or the connection pool. One run holds one connection.
 
-Deployment impact. Stage 1 adds no container. The export worker subscribes to one more topic. One migration. Two settings. The existing image builds and deploys as today. Stage 2 (a dedicated worker) is one compose service reusing the same image and env anchor plus five list entries, prepared by keeping the runner in `shared/shared/analysis/` and the worker entry point trivial.
+Deployment impact. One more compose service, `analysis`, from the same image and env anchor, running `python -m protect_analysis.main`; one migration; the settings of section 16; the worker's name in the five lists that know workers (`routers/network.py` twice, `system_checks.py` twice, `scripts/verify-server.sh`), a `tests/analysis` directory and a CI matrix entry. The export worker is untouched. Stopping the `analysis` container stops analyses and nothing else.
 
 Dependency impact. numpy becomes an explicit dependency of `shared`; it is already installed in every container as shapely's dependency, so the image does not grow. No scipy, pandas, geopandas, pyproj, scikit-learn or raster library. PostGIS does the spatial work and shapely the hulls, so nothing heavy enters the API or MCP runtime. A future module that needs more must justify it at the decision gate and may then move analysis into its own image (section 4, last paragraph).
 
 Failure behaviour. A run that raises marks its own row failed with the error and does not re-raise, the way `run_export` does, so the bus does not retry a deterministic failure. A run that exceeds its timeout is cancelled by the worker and marked failed with `ANALYSIS_TIMEOUT`. A worker crash leaves the message pending; the bus reclaims it after the backoff and the run reports `failed` after the last attempt. The API reads the row; a missing or broken worker means runs stay queued and the page says so with the worker's heartbeat age, taken from the existing system status. Nothing else in the product waits for a run.
 
-Resource isolation. Concurrency is one run at a time per worker (a semaphore in the handler, independent of the bus lanes), a wall-clock timeout per run, a statement timeout per run, a maximum number of subjects, days and fixes per run, a maximum grid size for the density estimate, and cancellation checked between steps. The API keeps its 120 second statement timeout and never joins the analysis tables to the hypertables. Memory is bounded by construction: fixes stream in, per-subject arrays are freed after each subject, the density grid is at most 250 by 250 cells of float64, and a result document is capped in size before it is stored.
+Resource isolation. The runs have a process of their own, so their CPU and memory never compete with exports or curation jobs inside one container, and a compose resource limit can be put on that one service when wanted. Concurrency is one run at a time per worker (a semaphore in the handler, independent of the bus lanes), a wall-clock timeout per run, a statement timeout per run, a maximum number of subjects, days and fixes per run, a maximum grid size for the density estimate, and cancellation checked between steps. The API keeps its 120 second statement timeout and never joins the analysis tables to the hypertables. Memory is bounded by construction: fixes stream in, per-subject arrays are freed after each subject, the density grid is at most 250 by 250 cells of float64, and a result document is capped in size before it is stored.
 
 Feature disablement. `ANALYSIS_MODULES` (a comma list, default `movement,grazing`, empty disables everything) is read at startup by the API and the worker. A disabled module is absent from the module catalogue, its routes answer 404, its navigation items are hidden, and a queued run of a disabled module is marked failed with `MODULE_DISABLED` by the worker. Per project, `projects.settings.analysis_modules` (optional list) narrows the deployment's list. Per person, `analysis:run` decides who may start runs. Turning everything off leaves the navigation exactly as it is today.
 
-Moving out later. Stage 2: the compose service `analysis` runs `python -m protect_analysis.main` with the same image; the export worker stops subscribing to `analysis.requested`. Stage 3, if ever: the package `shared/shared/analysis/` reads through SQLAlchemy models only, writes only to `analysis_*` tables, and speaks to the rest through the bus and the two tables, so it can be given its own image with its own dependencies, or its own database with the two tables and a read replica of `positions`, without touching the core. This plan does not build stage 2 or 3.
+Moving out later. Stage 2 is in place from the start (the worker of its own). Stage 3, if ever: the package `shared/shared/analysis/` reads through SQLAlchemy models only, writes only to `analysis_*` tables, and speaks to the rest through the bus and the two tables, so it can be given its own image with its own dependencies, or its own database with the two tables and a read replica of `positions`, without touching the core. This plan does not build stage 2 or 3.
 
 ## 5. Proposed phase 1 architecture
 
@@ -171,7 +171,7 @@ API  routers/analyses.py  (validate, bound, narrow to scope, create row, publish
 bus  Redis stream                                          |
    |                                                       |
    v                                                       |
-export worker (stage 1)  shared/shared/analysis/runner.py  |
+analysis worker  services/analysis, shared/shared/analysis/runner.py  |
    |  reads positions (effective time and geom, device fixes, valid), features, assignments
    |  computes with PostGIS, shapely, numpy
    v
@@ -196,6 +196,8 @@ shared/shared/analysis/
     movement.py      the movement module
     grazing.py       the grazing module
   environment.py     EnvironmentalDataProvider protocol and an empty registry (section 11)
+services/analysis/protect_analysis/main.py   (the worker: subscribe, handler, cleanup loop)
+services/analysis/pyproject.toml
 services/api/protect_api/routers/analyses.py
 services/api/protect_api/schemas/analysis.py
 services/api/alembic/versions/0029_analysis_runs.py
@@ -287,10 +289,10 @@ POST .../cancel -> cancel_requested=true; queued becomes cancelled at once,
 DELETE          -> the row and its geometries go (audit "analysis.deleted")
 PATCH           -> name (keeps the run: expires_at cleared) or clears it
 POST .../rerun  -> a new queued run with the same parameters, source_run_id set
-cleanup loop    -> expired runs deleted hourly, in the export worker's existing cleanup loop
+cleanup loop    -> expired runs deleted hourly, in the analysis worker's background loop
 ```
 
-The handler in the export worker:
+The handler in the analysis worker (`services/analysis/protect_analysis/main.py`, built on `shared.worker.Worker` like the export worker):
 
 ```python
 async def on_analysis_requested(message):
@@ -542,7 +544,7 @@ MCP: no analysis tool in phase 1. A read tool that lists and reads runs is a sma
 - Migration 0029: the two tables of section 6 with their indexes and check constraints; the downgrade drops them. No change to any existing table.
 - No new index on `positions`: the run reads by `(entity_id, time)` and the containment join uses the GiST index on `geom`, both present.
 - No continuous aggregate, no materialised view, no cache table. The result document is the cache; a kept run is the saved analysis.
-- Cleanup: expired runs deleted by the export worker's hourly cleanup loop, geometries by cascade.
+- Cleanup: expired runs deleted by the analysis worker's hourly cleanup loop, geometries by cascade.
 - Size: a movement run over 25 subjects stores a document under 1 MiB and at most a few hundred geometry rows; a grazing run over 50 areas and a year stores under 2 MiB (the daily timeline is 50 by 366 numbers). The 4 MiB cap refuses anything larger with `INPUT_TOO_LARGE` and a message that suggests fewer subjects or areas.
 
 ## 14. Performance and resource isolation
@@ -570,7 +572,7 @@ Why the core stays responsive:
 
 - The API never computes; its analysis endpoints are index reads and one count under the 120 second timeout.
 - The worker reads with `yield_per` and frees per-subject arrays; the export benchmark shows the worker under 130 MiB while streaming 22 million rows, and a run reads at most 500,000.
-- One run at a time per worker; the export worker's other jobs (exports, curation) share the process but not the semaphore, so an export still runs beside an analysis. If the load shows the two competing, stage 2 moves analysis to its own container without a code change.
+- One run at a time in the analysis worker, a process of its own; exports and curation jobs keep their worker and never wait for an analysis.
 - PostgreSQL work is bounded by the statement timeout per run and by reading through the existing indexes; a containment join is limited to the run's fixes and at most 50 polygons.
 - Cancellation is checked between steps (load, steps, grid, clusters, home range, document) and the statement timeout ends a long statement.
 - Retry: a failed run is stored, never retried by the bus (the handler does not raise); a person re-runs by hand. A crash is retried by the bus reclaim up to `BUS_MAX_ATTEMPTS`.
@@ -604,11 +606,11 @@ The project list (`ProjectWithRole`) gains `analysis_modules: list[str]` compute
 - Residence time and grazing normalisation (`tests/shared/test_analysis_grazing.py`): a herd of two animals in an area of 10 hectares for 24 hours gives 48 animal-hours, 2 animal-days, 0.2 animal-days per hectare; the gap cap keeps a silent day out; weighting by an attribute doubles one animal; missing attribute values fall back to one and warn; relative pressure averages to 1 over the areas; rest days are counted.
 - Known movement examples: a fixture track recorded from a real collar (the dev server's SP051890 export, anonymised) with expected totals computed once by hand and by an independent script, kept under `tests/fixtures/analysis/`.
 - API (`tests/api/test_analyses.py`): every role against every endpoint (the access matrix gains the routes with the viewer allow-list for reads); scope narrowing on creation and on read; 422 for each bound; 404 for a disabled module; the lifecycle through the worker handler run in the test process; cancel of a queued run; rerun links the source; export in each format; the estimate's counts; list pagination.
-- Worker (`tests/export/test_analysis_worker.py`): a completed run end to end on the shared test database; a module that raises stores `ANALYSIS_FAILED` and the handler returns; a timeout stores `ANALYSIS_TIMEOUT`; a redelivered message for a completed run does nothing; a disabled module stores `MODULE_DISABLED`; an export job queued during a run still completes.
+- Worker (`tests/analysis/test_worker.py`): a completed run end to end on the shared test database; a module that raises stores `ANALYSIS_FAILED` and the handler returns; a timeout stores `ANALYSIS_TIMEOUT`; a redelivered message for a completed run does nothing; a disabled module stores `MODULE_DISABLED`; an export job queued during a run still completes.
 - Isolation (`tests/shared/test_analysis_boundary.py`): imports of the core packages do not pull `shared.analysis`; the analysis package writes only to `analysis_*` tables (checked by inspecting the statements the runner issues against a mock session in one test, and by the migration's table list in another).
 - UI (Vitest): `lib/analysis.ts` URL state round-trip, the result document parsing and chart series building, the warning texts; component tests for the run status and the warnings callout; the navigation test extended for the two items and their hiding when the module list is empty; the sweep script picks the two routes up.
 - Performance: the two benchmark runs of section 14 and the concurrent live map budget, recorded in `docs/operations/benchmarks.md`.
-- Failure isolation on the dev server before the merge: stop the export worker, queue a run, confirm the live map, ingestion and the entity page work and the run shows "waiting for the worker"; start the worker and see it complete; set `ANALYSIS_MODULES=` and confirm the navigation is unchanged from today.
+- Failure isolation on the dev server before the merge: stop the analysis worker, queue a run, confirm the live map, ingestion and the entity page work and the run shows "waiting for the worker"; start the worker and see it complete; set `ANALYSIS_MODULES=` and confirm the navigation is unchanged from today.
 
 ## 18. Implementation roadmap
 
@@ -616,7 +618,7 @@ Foundation required by movement and grazing (F), then movement (M), then grazing
 
 - F1 package, registry, base types, limits, boundary test
 - F2 migration 0029 and models
-- F3 runner in the export worker, topic, cleanup, system check registration
+- F3 the analysis worker, the runner, the topic, the cleanup loop, the registrations
 - F4 API router, schemas, permission key, flags, project list field
 - F5 frontend foundation: routes, navigation, `lib/analysis.ts`, run list, run status, warnings callout, export menu
 - F6 primitives shared by both modules: trajectory, time weights, grid residence, calendar, quality
@@ -665,17 +667,17 @@ Each task: objective, existing files, proposed files, backend, frontend, databas
 - Acceptance: `alembic upgrade head` and `downgrade -1` clean; the tables carry the indexes.
 - Priority: 1. Complexity: S.
 
-### F3 runner, topic, worker handler, cleanup
+### F3 the analysis worker, the runner, the topic, the cleanup loop
 
-- Objective: a queued run becomes a completed or failed row without the API doing any work.
-- Existing files: `shared/shared/bus.py` (`Topic`), `services/export/protect_export/main.py`, `shared/shared/exports/runner.py` (pattern), `shared/shared/exports/cleanup.py`, `services/api/protect_api/routers/network.py`, `services/rules/protect_rules/system_checks.py`, `scripts/verify-server.sh`, `shared/shared/config.py`, `.env.example`, `docker-compose.yml`, `ansible/roles/app-deploy/templates/env.j2`.
-- Proposed files: `shared/shared/analysis/runner.py`, `tests/export/test_analysis_worker.py`.
-- Backend: `Topic.ANALYSIS_REQUESTED = "analysis.requested"`; the handler with the semaphore; `run_analysis` with status, timeout, statement timeout, progress through a short session, cancellation checks, result cap, failure storage; `expire_analyses` in the cleanup loop; settings `analysis_modules`, `analysis_concurrency`, `analysis_timeout_seconds`, `analysis_statement_timeout_seconds`, `analysis_max_fixes`; the topic added to the export consumer entries in `system_checks.CONSUMERS` and `network.GROUPS` (no new worker in stage 1).
+- Objective: a queued run becomes a completed or failed row in a worker of its own, without the API doing any work.
+- Existing files: `shared/shared/bus.py` (`Topic`), `services/export/protect_export/main.py` and `services/export/pyproject.toml` (patterns), `shared/shared/exports/runner.py` (pattern), `shared/shared/worker.py`, `services/api/protect_api/routers/network.py` (`WORKERS`, `GROUPS`), `services/rules/protect_rules/system_checks.py` (`WORKERS`, `CONSUMERS`), `scripts/verify-server.sh`, `docker/python.Dockerfile` (two COPY lines), `docker-compose.yml`, `pyproject.toml` (workspace sources, dev group, mypy packages), `.github/workflows/ci.yml` (matrix), `shared/shared/config.py`, `.env.example`, `ansible/roles/app-deploy/templates/env.j2`, `docs/operations/observability.md`.
+- Proposed files: `services/analysis/pyproject.toml`, `services/analysis/protect_analysis/__init__.py`, `services/analysis/protect_analysis/main.py`, `shared/shared/analysis/runner.py`, `tests/analysis/__init__.py`, `tests/analysis/test_worker.py`.
+- Backend: `Topic.ANALYSIS_REQUESTED = "analysis.requested"`; the worker `analysis` subscribing to it with the handler and its semaphore, and a background cleanup loop; `run_analysis` with status, timeout, statement timeout, progress through a short session, cancellation checks, result cap, failure storage; `expire_analyses`; settings `analysis_modules`, `analysis_concurrency`, `analysis_timeout_seconds`, `analysis_statement_timeout_seconds`, `analysis_max_fixes`; the worker in `network.WORKERS` and `GROUPS`, `system_checks.WORKERS` and `CONSUMERS`, and the verify script; the compose service `analysis` (`*python-build`, `*python-env`, `depends_on` like the export worker); the CI matrix entry.
 - Frontend: none.
 - Database: none beyond F2.
 - Tests: section 17, worker.
 - Dependencies: F1, F2.
-- Acceptance: a run of a stub module completes in the test; a raising stub stores the failure and the handler returns; a timeout stores `ANALYSIS_TIMEOUT`; dead letters stay at zero.
+- Acceptance: a run of a stub module completes in the test; a raising stub stores the failure and the handler returns; a timeout stores `ANALYSIS_TIMEOUT`; dead letters stay at zero; `docker compose config` lists the service and `scripts/verify-server.sh` reads its heartbeat; the system status names the worker when it is silent.
 - Priority: 1. Complexity: M.
 
 ### F4 API and permissions
@@ -803,7 +805,7 @@ Each task: objective, existing files, proposed files, backend, frontend, databas
 - Objective: the evidence for the decision gate.
 - Existing files: `scripts/benchmark/run.py`, `docs/operations/benchmarks.md`, `PROJECT_PLAN.md`, `docs/adr/`.
 - Backend and scripts: the two benchmark runs and the concurrent budget check; the dev server drill of section 17.
-- Docs: phase 22 rewritten from this plan with its decisions numbered from D195, ADR 0031 "Analysis as an isolated, optional subsystem", the changelog, this file reduced to a pointer.
+- Docs: phase 22 rewritten from this plan with its decisions numbered from D196 (D195 went to the layers panel's arrangement on 2026-09-13), ADR 0031 "Analysis as an isolated, optional subsystem", the changelog, this file reduced to a pointer.
 - Acceptance: budgets met and recorded; the drill passed; the docs build; the plan and ADR merged with the code in one review.
 - Dependencies: everything above.
 - Priority: 1 before the merge. Complexity: M.
@@ -829,7 +831,7 @@ Only after that review does any further module (contact analysis, habitat, healt
 - Can Protect core run completely without analytics: yes; no core module imports the package, the routes and the sidebar disappear with `ANALYSIS_MODULES=`, and the tables are separate.
 - Does telemetry ingestion remain unchanged and non-blocking: yes; ingest and the decoder do not know the topic or the package.
 - Does analytics primarily read core data: yes; it reads positions, features, assignments and groups and writes only `analysis_*` tables.
-- Can analytics jobs fail without affecting core: yes; failures are stored on the run row, the handler never raises, and the worker's other subscriptions continue.
+- Can analytics jobs fail without affecting core: yes; failures are stored on the run row, the handler never raises, and the worker is a process of its own that nothing else waits for.
 - Can movement be disabled independently: yes, by the module list at deployment or project level.
 - Can grazing be disabled independently: yes, the same way.
 - Can environmental providers fail without affecting core or grazing level 1: yes; there are none in phase 1 and the contract makes a provider failure a warning inside a run.
@@ -842,9 +844,9 @@ Only after that review does any further module (contact analysis, habitat, healt
 - Have we avoided detailed planning for future analytics: yes; section 18 lists them in one paragraph.
 - Is all phase 1 work isolated on `feature/analytics-movement-grazing`: yes; this document is the only change, on that branch, and `main` is untouched.
 
-Decisions that need approval before implementation starts (numbered from D195 when they enter the plan):
+Decisions approved by Tim on 2026-09-14 (numbered from D196 when they enter the plan):
 
-- A. Stage 1 runs analyses in the export worker with its own concurrency of one and its own timeouts, and stage 2 (a separate container from the same image) waits for measured need. The alternative is a container from the start, at the cost of one more compose service and five list entries.
+- A. Analyses run in a worker of their own from the start: the compose service `analysis` from the same image, one run at a time, its own timeouts. Tim chose this over the proposal of sharing the export worker, for the cleaner isolation from exports and curation jobs.
 - B. A run expires after 30 days unless kept by name; a kept run is the saved analysis; re-run creates a new run linked to the old one. The alternative of saved definitions as their own table is not built.
 - C. Management areas are the project's zone and geofence features chosen per run, with an optional attribute convention for a preset; no new feature type and no project GIS layer concept in phase 1.
 - D. Flags are `ANALYSIS_MODULES` at deployment, `projects.settings.analysis_modules` per project, and the key `analysis:run` per role; no flag framework.
