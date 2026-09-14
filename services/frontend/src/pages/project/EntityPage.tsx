@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Pencil, Plus, Table2 } from "lucide-react";
+import { Footprints, MapPin, Pencil, Plus, Table2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -50,7 +50,7 @@ import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
 import { useTab } from "@/hooks/useTab";
 import { groupPath, useGroups } from "@/hooks/useGroups";
-import { usePermissions } from "@/hooks/useProjects";
+import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
 import { typePath } from "@/lib/entityTypes";
 
@@ -64,6 +64,7 @@ export function EntityPage() {
   const [connectivityHours, setConnectivityHours] = useState(168);
   const { projectId = "", entityId = "" } = useParams();
   const { can } = usePermissions(projectId);
+  const modules = useAnalysisModules(projectId);
   const now = useNow();
   const [editing, setEditing] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -260,6 +261,15 @@ export function EntityPage() {
               <Button asChild variant="outline" size="sm">
                 <Link to={`/projects/${projectId}/map?entity=${e.id}`}>
                   <MapPin className="size-4" /> {t("Show on map")}
+                </Link>
+              </Button>
+            )}
+            {modules.includes("movement") && can("analysis:run") && (
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to={`/projects/${projectId}/analyze/movement?entity=${e.id}`}
+                >
+                  <Footprints className="size-4" /> {t("Analyse movement")}
                 </Link>
               </Button>
             )}

@@ -1,5 +1,6 @@
 import type { AnalysisRun, EntityGroup } from "@/api/types";
 import { trackColor } from "@/components/map/layers";
+import type { ExportPreset } from "@/lib/exports";
 
 /** The analysis pages' shared pieces (docs/ANALYTICS_PHASE1_PLAN.md, sections 8 and 9): the
  * result document as the frontend reads it, the run states, and the form state in the URL. */
@@ -257,4 +258,17 @@ export function groupWithSubgroups(
     }
   }
   return ids;
+}
+
+/** The export dialog's preset for the raw fixes behind a result: the subjects over the main
+ * period, as GeoJSON for QGIS, R or Python (plan, section 8.9). */
+export function fixesPreset(document: ResultDocument): ExportPreset {
+  const main = document.periods.find((p) => p.key === "main");
+  return {
+    dataset: "positions",
+    format: "geojson",
+    entityIds: document.subjects.map((s) => s.id),
+    from: main?.time_from,
+    to: main?.time_to,
+  };
 }

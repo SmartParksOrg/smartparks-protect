@@ -33,6 +33,7 @@ A viewer sees the pages below. The Operator and Analyst roles see the same pages
 | Alerts, Events | The open alerts and the recent events | Nothing more |
 | Commands | The command timelines | Nothing more |
 | Data explorer, Exports, Dashboards | The data | Nothing more |
+| Movement (Analyze, when the server and the project offer the module) | The question form (animals, period, comparison, the method folded), the runs of the project and the selected run: cards per animal, the map with tracks and home range, hotspot and cluster polygons, the charts, the table, the warnings, the limitations | Run, Keep, Run again, Cancel and Delete need `analysis:run`; results are read within the member's scope; "Analyse movement" on an entity page opens the form for that animal |
 | Network: Traffic, Gateways, Trace explorer | Not in the sidebar; one device's traffic and traces are on its Network tab. Gateways lists every gateway of the data sources the project's devices use: the ones that heard the project's devices in the window busiest first, then the silent ones, with a window and a source filter; names and locations come from the platform's gateway list, read daily and on Sync gateways under Server admin, Data sources | Project admins and server admins have the section |
 
 ## Project admin

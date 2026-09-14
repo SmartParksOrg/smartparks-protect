@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api, downloadFile } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { AnalysisRun } from "@/api/types";
+import { ExportDialog } from "@/components/analytics/ExportDialog";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { RunStatus } from "@/components/analysis/RunStatus";
 import { ResultChart } from "@/components/analysis/ResultChart";
@@ -24,6 +25,7 @@ import { useNow } from "@/hooks/useNow";
 import { usePermissions } from "@/hooks/useProjects";
 import {
   documentOf,
+  fixesPreset,
   isActive,
   type ResultDocument,
   subjectColor,
@@ -71,6 +73,7 @@ export function RunView({
   ];
   const [naming, setNaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [exportingFixes, setExportingFixes] = useState(false);
   const keep = useMutationToast({
     mutationFn: (name: string | null) =>
       api.patch<AnalysisRun>(base, { body: { name } }),
@@ -193,6 +196,11 @@ export function RunView({
                 >
                   {t("Everything as JSON")}
                 </DropdownMenuItem>
+                {can("exports:create") && (
+                  <DropdownMenuItem onClick={() => setExportingFixes(true)}>
+                    {t("The fixes behind it…")}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -298,6 +306,14 @@ export function RunView({
           ))}
           {render?.after?.(document, r)}
         </>
+      )}
+      {document && exportingFixes && (
+        <ExportDialog
+          projectId={projectId}
+          open={exportingFixes}
+          onOpenChange={setExportingFixes}
+          preset={fixesPreset(document)}
+        />
       )}
       <ConfirmDialog
         open={deleting}

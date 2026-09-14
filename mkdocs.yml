@@ -99,6 +99,7 @@ nav:
       - Export: analytics/export.md
       - Data curation: analytics/curation.md
       - Dashboards: analytics/dashboards.md
+      - Movement: analytics/movement.md
   - Rules:
       - rules/index.md
       - Automations and notifications: rules/automations.md

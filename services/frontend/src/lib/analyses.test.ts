@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   comparisonOf,
   documentOf,
+  fixesPreset,
   groupWithSubgroups,
   isActive,
   movementParameters,
@@ -119,5 +120,21 @@ describe("analysis form state", () => {
     ] as Parameters<typeof groupWithSubgroups>[0];
     expect([...groupWithSubgroups(groups, "a")].sort()).toEqual(["a", "b", "c"]);
     expect([...groupWithSubgroups(groups, "d")]).toEqual(["d"]);
+  });
+  it("presets the fixes export to the subjects over the main period", () => {
+    const document = {
+      subjects: [{ id: "a", name: "A" }, { id: "b", name: "B" }],
+      periods: [
+        { key: "comparison", time_from: "2026-08-01T00:00:00Z", time_to: "2026-08-31T00:00:00Z" },
+        { key: "main", time_from: "2026-08-31T00:00:00Z", time_to: "2026-09-30T00:00:00Z" },
+      ],
+    } as unknown as Parameters<typeof fixesPreset>[0];
+    expect(fixesPreset(document)).toEqual({
+      dataset: "positions",
+      format: "geojson",
+      entityIds: ["a", "b"],
+      from: "2026-08-31T00:00:00Z",
+      to: "2026-09-30T00:00:00Z",
+    });
   });
 });

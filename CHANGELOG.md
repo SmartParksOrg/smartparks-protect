@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- Movement analysis (phase 1 of the analytics plan, decisions D196 to D203, `docs/ANALYTICS_PHASE1_PLAN.md`): Analyze, Movement asks which animals over which period, compared with the period before if wanted, and answers with distance, daily distance, speed, stationary periods, day and night, residence time and hotspots, the MCP and KDE home ranges and DBSCAN clusters, as cards per animal, a map with the tracks and the polygons in the animal's colour, six charts, one table with a mean row for groups, and warnings that say what the fixes allow; runs are computed by a worker of its own (`services/analysis`), listed with their progress, kept 30 days unless named, exported as CSV, GeoJSON or JSON with "the fixes behind it" one click away; "Analyse movement" on the entity page. The permission key `analysis:run` (Analysts and Admins) starts runs; `project:read` sees results within the scope. `ANALYSIS_MODULES` names the modules a server offers (empty hides the section), a project narrows the list with `analysis_modules` in its settings. API: `GET /analysis-modules`, `/projects/{id}/analyses` with `estimate`, `geometries` and `export`.
+- The one haversine: `shared/geodesy.py` serves the rule evaluator, the satellite module and the analyses.
 - The battery trend from the live map: the battery value in an entity or device panel (folded or unfolded) unfolds a small line of the collar's battery voltage over the last day, week or month inside the panel, with its low, high and current values, read from the analytics series on demand.
 - The layers panel arranges its entities four ways (decision D195): by the project's groups as before, ungrouped, per entity type, or per type and sub-type, so "Wildlife > Wolf" or "Vehicles" is one row whose checkbox switches every animal or vehicle below it and whose "only" leaves only those on; the choice is kept per account.
 - The accuracy circle (decision D193): the selected entity or device whose position accuracy is known and above 50 m gets a translucent disc of that radius under its marker on the live map, and the entity, device and fix panels show "±n m" with a warning line; the current states keep the accuracy of the position shown and the map features carry it.
@@ -73,6 +75,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Migrations
 
+- 0029 (analysis runs): adds `analysis_runs` and `analysis_geometries` (PostGIS, a gist index); the downgrade drops them.
 - 0028 (position accuracy): adds `latest_accuracy_m` to `device_current_state` and `entity_current_state`; the downgrade drops them. Existing rows get the value with the next position.
 - 0027 (invitation memberships): adds `invitations.memberships` (JSONB, null for a project invitation); the downgrade drops it.
 - 0026 (roles and scope): adds `project_roles`, `role_id` and `scope` on `project_memberships` and `invitations`, and widens the role checks to the operator and analyst roles; the downgrade maps those two back to viewer and drops the rest.
@@ -81,6 +84,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Upgrade notes
 
+- A new service `analysis` in `docker-compose.yml` (the same image, `python -m protect_analysis.main`); `ANALYSIS_MODULES`, `ANALYSIS_CONCURRENCY`, `ANALYSIS_TIMEOUT_SECONDS`, `ANALYSIS_STATEMENT_TIMEOUT_SECONDS` and `ANALYSIS_MAX_FIXES` in `.env` (the defaults apply when absent). The Ansible playbook writes the first three. Without the service, runs stay queued and "waiting for the worker" shows; the rest of Protect is unaffected.
 - The MinIO server and client images come from `quay.io/minio/...` now: MinIO's repositories disappeared from Docker Hub on 2026-09-11 (a pull answers "access denied", the repository page 404). The tags and digests are the same; a server pulls each image once more from Quay on its next update.
 
 ## v2.5.0, 2026-09-09
