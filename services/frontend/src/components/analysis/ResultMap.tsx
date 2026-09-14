@@ -46,8 +46,8 @@ import {
 } from "@/lib/analyses";
 
 const TRACK_POINTS = 5000;
-const HEAT_RADIUS_M = 25;
-const HEAT_SENSITIVITY = 1;
+const HEAT_RADIUS_M = 60;
+const HEAT_SENSITIVITY = 2;
 const trackData = (results: { data?: Track }[]): (Track | undefined)[] =>
   results.map((r) => r.data);
 
