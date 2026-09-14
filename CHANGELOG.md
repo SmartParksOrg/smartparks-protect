@@ -52,6 +52,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- The layers panel's tab row showed scrollbars on a desktop: the five tabs overran the panel's width by 52 px and its height by 1 px; they fit now.
 - A map panel whose rows overflowed its height painted a white block over the map below itself in Chromium (a scrolling box with a background inside the page's fixed-height panel column); the panel is a shell now and an inner transparent box scrolls.
 - Changing an entity's or a device's location source (or fallback hours) rebuilds its current position at once; before, the new setting waited for the next position, which never came for a collar that repeats the same network estimate.
 - A rebuild of the current position from the rows (after an assignment's reattribution or a curation) took the newest position whatever its kind and set no kind, fix time or accuracy, so a collar assigned to an animal could show a network estimate as its position with the location source still "device"; the rebuild follows the decoder's rule now (the newest device fix, the estimate only when the setting lets it stand in) and carries the kind, the fix time and the accuracy.

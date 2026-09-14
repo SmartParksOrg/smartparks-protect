@@ -1948,6 +1948,10 @@ Listed by the phase where they are first needed.
 - Tim: the layers panel still cut a collar's name on his phone. A serial has no space to break at, so two lines clipped it, and the tracked animal's name sat inline behind it. First fixed by breaking a serial anywhere over up to three lines; Tim preferred sideways scrolling over a wrapped name, so the phone row keeps the name on one line (`shrink-0 whitespace-nowrap`) inside a row that scrolls sideways (`overflow-x-auto`, no scrollbar drawn), the buttons at its end; a wider screen truncates as before. Measured on an iPhone 12 profile: every name whole, the rows with long names scroll by their excess and the buttons are in view at the end of the scroll.
 - Committed as a185925, CI green, deployed.
 
+### 2026-09-14, the layers panel's tab row (Claude and Tim)
+
+- Tim: the Map layers card shows a vertical and a horizontal scrollbar around the tabs on a desktop. Measured: the tab list's content was 378 by 37 px in a 326 by 36 px box, so a browser that draws scrollbars drew two. Fixed: the tab list scrolls only on a phone (its scrollbar hidden) and is `overflow-visible` from tablet width, where the five tabs shrink to fit with smaller padding and text.
+
 ### 2026-09-14, the battery trend from the panel (Claude and Tim)
 
 - Tim: a click on the battery value in the entity and device panels should show a small graph of the recent voltage. Built `components/map/BatteryTrend.tsx`: `BatteryValue` (the value as a button, a popover) and `BatteryTrend` (a 24 h, 7 d or 30 d choice, the analytics series of `battery_voltage` for the device with the mean per bucket drawn by `SeriesChart` at 112 px, the low, high and now values), mounted while the popover is open so nothing is read before the click; `HealthRows` and `PanelSummary` take `batteryProject` and `batteryDevice` from both panels.
