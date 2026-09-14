@@ -5,7 +5,6 @@ import {
   feedPosition,
   isUnread,
   newestCreatedAt,
-  titledWithSubject,
   unreadCount,
 } from "@/lib/feed";
 
@@ -58,24 +57,5 @@ describe("feed", () => {
     expect(
       feedPosition(item("q", "2026-09-12T10:00:00+00:00", { geometry: null })),
     ).toBeNull();
-  });
-  it("names the subject in front of a title that does not name it", () => {
-    expect(
-      titledWithSubject({ title: "Device rebooted", device_name: "SP051890" }),
-    ).toBe("SP051890 · Device rebooted");
-    expect(
-      titledWithSubject({
-        title: "Aldo left the reserve",
-        entity_name: "Aldo",
-        device_name: "SP1",
-      }),
-    ).toBe("Aldo left the reserve");
-    expect(
-      titledWithSubject({
-        title: "No data",
-        entity_name: null,
-        device_name: null,
-      }),
-    ).toBe("No data");
   });
 });

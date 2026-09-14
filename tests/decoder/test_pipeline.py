@@ -592,8 +592,7 @@ async def test_an_uptime_drop_is_a_reboot_event_and_the_last_reset(db, bus, worl
     event = await db.scalar(
         select(Event).where(Event.device_id == world.device.id, Event.event_type == "device_reset")
     )
-    # the device's own events carry its name in the title, so a notification names the collar
-    assert event is not None and event.title == f"{world.device.name}: Device rebooted (watchdog)"
+    assert event is not None and event.title == "Device rebooted (watchdog)"
     assert event.severity == "warning"
     current = await db.get(DeviceCurrentState, world.device.id)
     await db.refresh(current)

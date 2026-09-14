@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { type FeedItem, isUnread, titledWithSubject } from "@/lib/feed";
+import { type FeedItem, isUnread } from "@/lib/feed";
 import { formatAgo, formatTime } from "@/lib/format";
 import { eventIcon } from "@/lib/rules";
 
@@ -96,7 +96,7 @@ export function FeedPanel({
                   <span
                     className={`block truncate ${unread ? "font-semibold" : ""}`}
                   >
-                    {titledWithSubject(item)}
+                    {item.title}
                   </span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                     <StatusBadge

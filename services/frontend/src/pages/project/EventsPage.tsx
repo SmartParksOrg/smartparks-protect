@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
 
-import { titledWithSubject } from "@/lib/feed";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { RefreshCw } from "lucide-react";
@@ -60,7 +59,7 @@ export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; e
     <Dialog open={eventId !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">{d && <Icon iconKey={eventIcon(d.event.event_type)} className="size-5 text-primary" />}{d ? titledWithSubject(d.event) : "Event"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">{d && <Icon iconKey={eventIcon(d.event.event_type)} className="size-5 text-primary" />}{d?.event.title ?? "Event"}</DialogTitle>
           <DialogDescription>{d ? `${d.event.event_type} at ${formatTime(d.event.time)}` : "Loading…"}</DialogDescription>
         </DialogHeader>
         {detail.error && <Callout kind="error">{detail.error.message}</Callout>}
@@ -117,7 +116,7 @@ export function EventsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   const columns: ColumnDef<EventItem, unknown>[] = [
     ...(allProjects ? [{ id: "project", header: t("Project"), accessorFn: (e: EventItem) => projectName(e.project_id) } as ColumnDef<EventItem, unknown>] : []),
     { header: t("Time"), accessorKey: "time", cell: ({ getValue }) => <span className="whitespace-nowrap">{formatTime(getValue<string>())}</span> },
-    { header: t("Event"), accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{titledWithSubject(row.original)}</span> },
+    { header: t("Event"), accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{row.original.title}</span> },
     { header: t("Type"), accessorKey: "event_type", cell: ({ getValue }) => <code className="text-xs">{getValue<string>()}</code> },
     { header: t("Severity"), accessorKey: "severity", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
     { header: t("Alert"), accessorKey: "alert_status", cell: ({ getValue }) => <StatusBadge value={getValue<string | null>()} /> },
