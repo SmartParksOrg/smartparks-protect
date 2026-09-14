@@ -189,7 +189,7 @@ async def test_catalogue_estimate_and_the_life_of_a_run(client, db, stub):
     assert kept.json()["created_by_name"] == admin.user.email and kept.json()["shared"] is False
 
     # a run is the runner's own until shared with the project
-    other = await project_actor(client, db, project, Role.ANALYST)
+    other = await project_actor(client, db, project, Role.PROJECT_ANALYST)
     assert (await client.get(f"{base}/{run['id']}", headers=other.headers)).status_code == 404
     assert run["id"] not in {
         r["id"] for r in (await client.get(base, headers=other.headers)).json()["items"]
@@ -307,10 +307,15 @@ async def test_roles_scope_and_flags(client, db, stub, monkeypatch):
         base, json={"module": "movement", "parameters": _params(ids)}, headers=analyst.headers
     )
     assert mine.status_code == 201, mine.text
-    # the analyst may not delete the admin's run, the admin may delete the analyst's
+    # the analyst may not delete the admin's run (unseen while unshared, refused once shared),
+    # the admin may delete the analyst's
     admins = await client.post(
         base, json={"module": "movement", "parameters": _params(ids[:1])}, headers=h
     )
+    assert (
+        await client.delete(f"{base}/{admins.json()['id']}", headers=analyst.headers)
+    ).status_code == 404
+    await client.patch(f"{base}/{admins.json()['id']}", json={"shared": True}, headers=h)
     assert (
         await client.delete(f"{base}/{admins.json()['id']}", headers=analyst.headers)
     ).status_code == 403
