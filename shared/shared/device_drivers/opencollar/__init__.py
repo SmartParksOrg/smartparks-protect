@@ -192,6 +192,22 @@ def parse_firmware(version: str | None) -> tuple[int, int] | None:
     return major, minor
 
 
+UPTIME_IN_DAYS_SINCE = (4, 0)
+UPTIME_WRAP = 255
+
+
+def uptime_unit_seconds(version: str | None) -> int:
+    """Seconds per unit of the status message's uptime byte: hours before firmware 4.0.1,
+    days since (the byte carries major.minor only, so 4.0 is read as days)."""
+    parsed = parse_firmware(version)
+    return 86400 if parsed is None or parsed >= UPTIME_IN_DAYS_SINCE else 3600
+
+
+def uptime_wrap_seconds(version: str | None) -> float:
+    """Where the uptime byte wraps to zero without a reboot: 255 units."""
+    return float(UPTIME_WRAP * uptime_unit_seconds(version))
+
+
 def layout_for(version: str | None) -> Layout:
     """The layout for a firmware version; unknown means the newest."""
     parsed = parse_firmware(version)
@@ -731,6 +747,10 @@ class OpenCollarDriver:
             )
         )
 
+    def uptime_wrap_seconds(self, firmware_version: str | None) -> float:
+        """For the decoder's reboot detection: the uptime byte wraps at 255 hours or days."""
+        return uptime_wrap_seconds(firmware_version)
+
     def _decode_status(
         self, data: bytes, time: datetime, records: DecodedRecords, via: str, layout: Layout
     ) -> None:
@@ -750,13 +770,16 @@ class OpenCollarDriver:
             chg,
             features,
         ) = struct.unpack_from("<14B", data)
+        # the uptime byte counts days since firmware 4.0.1 and hours before (firmware
+        # CHANGELOG 4.0.1: "display uptime in days instead of hours"); it wraps at 255
+        reported = f"{fw_ver >> 4}.{fw_ver & 0x0F}"
         measurements = {
             "battery_voltage": (bat * 10 + 2500) / 1000,
             "device_temperature": round(_mapped(temp), 2),
             "acceleration_x": round(_mapped(acc_x), 2),
             "acceleration_y": round(_mapped(acc_y), 2),
             "acceleration_z": round(_mapped(acc_z), 2),
-            "uptime": float(uptime_days * 86400),
+            "uptime": float(uptime_days * uptime_unit_seconds(reported)),
             "lr_satellites": float(operation >> 4),
         }
         if chg:

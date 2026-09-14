@@ -347,10 +347,12 @@ async def process_source_event(
                 previous_sample(before.latest_measurements if before else None),
             )
             # a reboot from an uptime lower than the one before it (shared/domain/reboot.py)
+            wrap = getattr(driver, "uptime_wrap_seconds", None)
             records.events += detect_reboots(
                 records.measurements,
                 records.states,
                 previous_uptime(before.latest_measurements if before else None),
+                wrap(device.firmware_version) if callable(wrap) else None,
             )
             await _write_positions(session, event, device, records, outcome, attribution_at)
             await _write_measurements(session, event, device, records, outcome, attribution_at)

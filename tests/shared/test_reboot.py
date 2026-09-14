@@ -58,3 +58,14 @@ def test_the_uptime_line_warns_for_a_day_after_a_reboot():
     )
     assert reboot_note(now - timedelta(hours=30), state, now) == (None, None)
     assert reboot_note(None, state, now) == (None, None)
+
+
+def test_a_wrap_of_the_uptime_counter_is_no_reboot():
+    """An OpenCollar uptime byte goes from 255 back to 0 without a reboot (Tim, 2026-09-14)."""
+    wrap = 255 * 3600  # hours on firmware before 4.0.1
+    from_255 = detect_reboots([_uptime(T0 + timedelta(hours=1), 0)], [], (255 * 3600, T0), wrap)
+    assert from_255 == []
+    from_200 = detect_reboots([_uptime(T0 + timedelta(hours=1), 0)], [], (200 * 3600, T0), wrap)
+    assert len(from_200) == 1
+    # without a wrap known, every drop is a reboot
+    assert len(detect_reboots([_uptime(T0 + timedelta(hours=1), 0)], [], (255 * 3600, T0))) == 1

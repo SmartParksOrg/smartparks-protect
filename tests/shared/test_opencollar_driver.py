@@ -437,3 +437,24 @@ def test_flash_log_learns_the_firmware_from_its_status_records():
     records = driver.decode(channel_event("log_file", (bytes([29]) + stream).hex()))
     assert records.decoder_version == "fw4.4.3"
     assert any(s.record_type == "rf_scan" for s in records.states), records.notes
+
+
+def test_uptime_is_hours_before_firmware_4_and_days_since():
+    """Firmware CHANGELOG 4.0.1 (2023-04-11): "display uptime in days instead of hours"; the
+    byte wraps at 255 either way (Tim, 2026-09-14)."""
+    from shared.device_drivers.opencollar import uptime_unit_seconds, uptime_wrap_seconds
+
+    assert uptime_unit_seconds("2.15") == 3600 and uptime_wrap_seconds("2.15") == 255 * 3600
+    assert uptime_unit_seconds("3.9") == 3600
+    assert uptime_unit_seconds("4.0") == 86400 and uptime_unit_seconds("7.2") == 86400
+    assert uptime_unit_seconds(None) == 86400 and uptime_wrap_seconds("7.2") == 255 * 86400
+    # a status from firmware 2.15 (fw byte 0x2F) with an uptime byte of 12: twelve hours
+    old = bytes([0x04, 0x00, 0x71, 0x00, 0xB2, 12, 0x7F, 0x7E, 0x73, 0x16, 0x2F, 0x99, 0x00, 0x11])
+    records = OpenCollarDriver().decode(event(4, (bytes([0xF4, 14]) + old).hex()))
+    metrics = {m.metric_key: m.value for m in records.measurements}
+    assert metrics["uptime"] == 12 * 3600
+    assert records.states[0].state["firmware_version"] == "2.15"
+    # the same bytes from firmware 7.2 (0x72): twelve days
+    new = bytes(old[:10]) + bytes([0x72]) + bytes(old[11:])
+    records = OpenCollarDriver().decode(event(4, (bytes([0xF4, 14]) + new).hex()))
+    assert {m.metric_key: m.value for m in records.measurements}["uptime"] == 12 * 86400

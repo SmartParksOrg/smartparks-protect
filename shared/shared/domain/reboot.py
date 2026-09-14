@@ -38,10 +38,13 @@ def detect_reboots(
     measurements: Iterable[DecodedMeasurement],
     states: Iterable[DecodedState],
     previous: tuple[float, datetime] | None,
+    wrap_seconds: float | None = None,
 ) -> list[DecodedEvent]:
     """A `device_reset` event for every uptime that is lower than the one before it, in time
     order, against the state's newest first; the reason comes from the status of the same
-    moment when it carries one."""
+    moment when it carries one. A counter that wraps (an OpenCollar byte at 255 hours or
+    days, `wrap_seconds`) starts again at zero without a reboot: a drop from the last unit
+    before the wrap is not one."""
     uptimes: list[tuple[datetime, float]] = []
     for m in measurements:
         if m.metric_key == "uptime" and isinstance(m.value, int | float):
@@ -51,7 +54,8 @@ def detect_reboots(
     out: list[DecodedEvent] = []
     last = previous
     for time, value in uptimes:
-        if last is not None and time > last[1] and value < last[0]:
+        wrapped = wrap_seconds is not None and last is not None and last[0] >= wrap_seconds - 1
+        if last is not None and time > last[1] and value < last[0] and not wrapped:
             reason = reasons.get(time)
             out.append(
                 DecodedEvent(

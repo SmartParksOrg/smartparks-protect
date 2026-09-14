@@ -184,7 +184,7 @@ Source: `status.h statusData_t` (packed, 14 bytes), `status.c status_update`. Se
 | 4 | 1 | bat | battery voltage: `(mV - 2500) / 10`, 0 when below 2500 mV. Decode `bat_mV = byte * 10 + 2500`. Saturates at 5050 mV |
 | 5 | 1 | operation | bit 0 unread LR message waiting (`msg`), bit 1 PIN protection active (`locked`), bit 2 LoRaWAN join error (`err_lr_join`), bits 4 to 7 number of satellites seen in the last LR11xx GNSS scan (`lr_sat`, 0 to 15) |
 | 6 | 1 | temp | MCU/accelerometer temperature, float in range -100 to +100 mapped to 0 to 255: `byte = (t + 100) * 255 / 200`. Decode `t = byte * 200 / 255 - 100` degrees C |
-| 7 | 1 | uptime | days since boot, `k_uptime / 86400000`, u8 (wraps after 255 days) |
+| 7 | 1 | uptime | days since boot, `k_uptime / 86400000`, u8 (wraps after 255 days); hours before firmware 4.0.1 (CHANGELOG 4.0.1, 2023-04-11: "display uptime in days instead of hours"), wrapping after 255 hours |
 | 8 | 1 | acc_x | LIS2DW12 X acceleration, m/s^2, same -100..+100 mapping as temp |
 | 9 | 1 | acc_y | as above |
 | 10 | 1 | acc_z | as above (about -10 when Z points up, see wiki example) |
