@@ -99,6 +99,14 @@ export function MovementPage() {
                 projectId={projectId}
                 runId={state.run}
                 labels={labels}
+                onEdit={(r) => {
+                  select(r);
+                  if (phone) setFormOpen(true);
+                  else
+                    document
+                      .querySelector("main")
+                      ?.scrollTo({ top: 0, behavior: "smooth" });
+                }}
                 render={{
                   summary: (document) => (
                     <SubjectCards

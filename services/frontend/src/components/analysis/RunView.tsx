@@ -43,6 +43,7 @@ export function RunView({
   runId,
   labels: given,
   render,
+  onEdit,
 }: {
   projectId: string;
   runId: string;
@@ -54,6 +55,8 @@ export function RunView({
     map?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
     after?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
   };
+  /** Load the run's settings into the page's form: the way to run it again with changes. */
+  onEdit?: (run: AnalysisRun) => void;
 }) {
   const { t } = useTranslation();
   const now = useNow();
@@ -135,6 +138,11 @@ export function RunView({
               disabled={cancel.isPending}
             >
               {t("Cancel")}
+            </Button>
+          )}
+          {mayRun && onEdit && !isActive(r.status) && (
+            <Button variant="outline" size="sm" onClick={() => onEdit(r)}>
+              {t("Change settings…")}
             </Button>
           )}
           {mayRun && r.status === "completed" && naming === null && (
