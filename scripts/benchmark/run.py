@@ -38,6 +38,10 @@ BUDGETS_MS = {
     "explorer metrics with data, 30 days": 3_000,
     "explorer drill-down page": 1_000,
     "direct export, positions, csv": 10_000,
+    "analysis run, movement, 1 subject, 1 year": 120_000,
+    "analysis run, grazing, 20 animals, 10 areas, 90 days": 180_000,
+    "live map load during an analysis run": 3_000,
+    "track 30 days during an analysis run": 2_500,
 }
 
 
@@ -137,6 +141,7 @@ async def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("docs/operations/benchmarks.md"))
     parser.add_argument("--ingest-events", type=int, default=2_000)
     parser.add_argument("--export-container", default="protect-export")
+    parser.add_argument("--analysis-container", default="protect-analysis")
     parser.add_argument(
         "--where",
         default="the development machine",
@@ -145,7 +150,7 @@ async def main() -> None:
     parser.add_argument(
         "--only",
         nargs="*",
-        choices=["map", "tracks", "explorer", "exports", "ingest"],
+        choices=["map", "tracks", "explorer", "exports", "ingest", "analysis"],
         help="run only these sections (default all); use another --output to keep the full report",
     )
     args = parser.parse_args()
@@ -339,6 +344,149 @@ async def main() -> None:
         )
         if job["status"] != "done":
             bench.notes.append(f"Export job failed: {job.get('error_message')}")
+
+    # the two analysis runs of the analytics plan (section 14), the worker's memory watched,
+    # and the live map and a track read timed while the grazing run is in progress
+    if wanted("analysis"):
+        bench.refresh_token()
+        modules = bench.client.get("/analysis-modules")
+        keys = {m["key"] for m in modules.json()} if modules.status_code == 200 else set()
+        if not {"movement", "grazing"} <= keys:
+            bench.notes.append(
+                "Analysis modules are off on this server; the analysis runs were skipped."
+            )
+        else:
+            busiest = await db.fetchrow(
+                "SELECT entity_id, count(*) AS n FROM positions WHERE project_id = $1 "
+                "AND entity_id IS NOT NULL GROUP BY entity_id ORDER BY n DESC LIMIT 1",
+                pid,
+            )
+            herd = await db.fetch(
+                "SELECT entity_id FROM positions WHERE project_id = $1 AND entity_id IS NOT NULL "
+                "AND time > now() - interval '90 days' GROUP BY entity_id ORDER BY count(*) DESC LIMIT 20",
+                pid,
+            )
+            box = await db.fetchrow(
+                "SELECT ST_XMin(e) AS x0, ST_YMin(e) AS y0, ST_XMax(e) AS x1, ST_YMax(e) AS y1 FROM ("
+                "SELECT ST_Extent(geom) AS e FROM positions WHERE project_id = $1 "
+                "AND time > now() - interval '90 days') s",
+                pid,
+            )
+            zones = bench.client.get(f"/projects/{pid}/features", params={"limit": 500}).json()
+            areas = [f["id"] for f in zones["items"] if f["name"].startswith("bench-zone-")]
+            if len(areas) < 10 and box and box["x0"] is not None:
+                # ten squares over the middle of the herd's extent, kept between runs
+                w, h = (box["x1"] - box["x0"]) / 8, (box["y1"] - box["y0"]) / 8
+                for i in range(10 - len(areas)):
+                    x = box["x0"] + w * (1.5 + (i % 5))
+                    y = box["y0"] + h * (2 + (i // 5) * 3)
+                    ring = [[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]]
+                    made = bench.client.post(
+                        f"/projects/{pid}/features",
+                        json={
+                            "feature_type": "zone",
+                            "name": f"bench-zone-{len(areas) + 1}",
+                            "geometry": {"type": "Polygon", "coordinates": [ring]},
+                        },
+                    )
+                    if made.status_code < 300:
+                        areas.append(made.json()["id"])
+
+            async def run_analysis(name: str, body: dict[str, Any], during: bool) -> None:
+                stop = asyncio.Event()
+                memory_task = asyncio.get_running_loop().run_in_executor(
+                    None, container_peak_memory, args.analysis_container, stop
+                )
+                started = time.perf_counter()
+                run: dict[str, Any] = {"status": "failed"}
+                try:
+                    created = bench.client.post(f"/projects/{pid}/analyses", json=body)
+                    if created.status_code >= 300:
+                        bench.notes.append(
+                            f"{name} refused: {created.status_code} {created.text[:200]}"
+                        )
+                        return
+                    run = created.json()
+                    measured = False
+                    while run["status"] in ("queued", "running"):
+                        await asyncio.sleep(2)
+                        if during and not measured and run["status"] == "running":
+                            # the core's reads while the worker computes
+                            bench.timed(
+                                "live map load during an analysis run",
+                                "GET",
+                                f"/projects/{pid}/map/current",
+                                repeats=3,
+                            )
+                            if busiest:
+                                bench.timed(
+                                    "track 30 days during an analysis run",
+                                    "GET",
+                                    f"/projects/{pid}/tracks",
+                                    repeats=3,
+                                    params={
+                                        "entity_id": str(busiest["entity_id"]),
+                                        "from": (now - timedelta(days=30)).isoformat(),
+                                        "max_points": 5000,
+                                    },
+                                )
+                            measured = True
+                        try:
+                            polled = bench.client.get(f"/projects/{pid}/analyses/{run['id']}")
+                        except httpx.HTTPError as exc:
+                            bench.notes.append(f"poll retried after {type(exc).__name__}")
+                            await asyncio.sleep(10)
+                            continue
+                        if polled.status_code == 401:
+                            bench.refresh_token()
+                            continue
+                        if polled.status_code >= 300:
+                            continue
+                        run = polled.json()
+                finally:
+                    stop.set()
+                elapsed = (time.perf_counter() - started) * 1000
+                peaks = await memory_task
+                bench.record(
+                    name,
+                    [elapsed],
+                    rows=run.get("input_count"),
+                    status=run["status"],
+                    peak_memory_mib=max(peaks) if peaks else None,
+                    baseline_memory_mib=min(peaks) if peaks else None,
+                )
+                if run["status"] != "completed":
+                    bench.notes.append(
+                        f"{name}: {run.get('error_code')} {run.get('error_message')}"
+                    )
+
+            if busiest:
+                await run_analysis(
+                    "analysis run, movement, 1 subject, 1 year",
+                    {
+                        "module": "movement",
+                        "parameters": {
+                            "entity_ids": [str(busiest["entity_id"])],
+                            "time_from": (now - timedelta(days=365)).isoformat(),
+                            "time_to": now.isoformat(),
+                        },
+                    },
+                    during=False,
+                )
+            if herd and areas:
+                await run_analysis(
+                    "analysis run, grazing, 20 animals, 10 areas, 90 days",
+                    {
+                        "module": "grazing",
+                        "parameters": {
+                            "entity_ids": [str(r["entity_id"]) for r in herd],
+                            "feature_ids": areas[:10],
+                            "time_from": (now - timedelta(days=90)).isoformat(),
+                            "time_to": now.isoformat(),
+                        },
+                    },
+                    during=True,
+                )
 
     # ingest burst through the webhook
     if wanted("ingest"):

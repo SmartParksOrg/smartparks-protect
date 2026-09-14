@@ -156,3 +156,4 @@ nav:
       - adr/0028-live-map-feed-and-health-dot.md
       - adr/0029-one-top-bar-and-night-mode.md
       - adr/0030-roles-and-member-scope.md
+      - adr/0031-analysis-as-an-isolated-optional-subsystem.md
