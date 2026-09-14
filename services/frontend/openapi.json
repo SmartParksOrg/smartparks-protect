@@ -28343,6 +28343,17 @@
        }
       ],
       "title": "Device Name"
+     },
+     "explanation": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Explanation"
      }
     },
     "type": "object",

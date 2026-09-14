@@ -7586,6 +7586,8 @@ export interface components {
             entity_name?: string | null;
             /** Device Name */
             device_name?: string | null;
+            /** Explanation */
+            explanation?: string | null;
         };
         /**
          * ExportDataset

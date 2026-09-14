@@ -29,6 +29,7 @@ from protect_api.schemas.rules import (
 )
 from protect_api.visibility import EVERYTHING, Visibility
 from shared.database import get_session
+from shared.domain.explanations import explain_event
 from shared.enums import AlertStatus
 from shared.models import ActionDelivery, Alert, Device, Entity, Event, User
 from shared.permissions import Permission
@@ -86,6 +87,7 @@ async def with_names(session: AsyncSession, reads: list[EventRead]) -> None:
 def event_read(event: Event, alert: Alert | None) -> EventRead:
     data = EventRead.model_validate(event)
     data.geometry = geom_to_geojson(event.geom)
+    data.explanation = explain_event(event.event_type, event.context)
     if alert is not None:
         data.alert_id = alert.id
         data.alert_status = alert.status

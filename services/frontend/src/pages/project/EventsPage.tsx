@@ -73,6 +73,12 @@ export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; e
         {detail.error && <Callout kind="error">{detail.error.message}</Callout>}
         {d && (
           <div className="space-y-4 text-sm">
+            {d.event.explanation && (
+              <div className="rounded-md border bg-muted/30 p-3">
+                <div className="mb-1 font-medium">{t("What this means")}</div>
+                <p className="text-muted-foreground">{d.event.explanation}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div><span className="text-muted-foreground">{t("Severity")}</span><div><StatusBadge value={d.event.severity} /></div></div>
               <div><span className="text-muted-foreground">{t("Created")}</span><div>{formatTime(d.event.created_at)}</div></div>

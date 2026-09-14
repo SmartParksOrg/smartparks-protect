@@ -108,6 +108,8 @@ class EventRead(ORMModel):
     #: The names of the entity and the device the event is about, for the feed and the lists.
     entity_name: str | None = None
     device_name: str | None = None
+    #: What the event means, in plain words (shared/domain/explanations.py).
+    explanation: str | None = None
 
 
 class AlertRead(ORMModel):
