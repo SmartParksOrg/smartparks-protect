@@ -479,3 +479,8 @@ export function hasFormInput(state: FormState): boolean {
     state.grazing.areas.length > 0
   );
 }
+
+/** Whole days until a moment, at least one, for "expires in N days". */
+export function daysUntil(iso: string, now: number = Date.now()): number {
+  return Math.max(1, Math.ceil((Date.parse(iso) - now) / 86_400_000));
+}

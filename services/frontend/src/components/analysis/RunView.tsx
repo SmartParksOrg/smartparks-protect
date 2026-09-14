@@ -24,9 +24,10 @@ import { Switch } from "@/components/ui/switch";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAuthStore } from "@/stores/auth";
-import { formatAgo, formatTime } from "@/lib/format";
+import { formatTime } from "@/lib/format";
 import { usePermissions } from "@/hooks/useProjects";
 import {
+  daysUntil,
   documentOf,
   fixesPreset,
   isActive,
@@ -262,8 +263,8 @@ export function RunView({
         )}
         {!r.name && r.expires_at && (
           <span>
-            {t("Not saved: it expires {{when}}.", {
-              when: formatAgo(r.expires_at, now),
+            {t("Not saved: it expires in {{count}} days.", {
+              count: daysUntil(r.expires_at, now),
             })}
           </span>
         )}

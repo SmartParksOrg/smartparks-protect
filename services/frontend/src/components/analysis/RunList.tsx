@@ -22,7 +22,7 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { usePermissions } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
-import { isActive } from "@/lib/analyses";
+import { daysUntil, isActive } from "@/lib/analyses";
 import { useAuthStore } from "@/stores/auth";
 
 /** The status each run was last seen with, per page, so a run that finishes while the list
@@ -172,8 +172,8 @@ export function RunList({
                 {run.name
                   ? t("yes")
                   : run.expires_at
-                    ? t("expires {{when}}", {
-                        when: formatAgo(run.expires_at, now),
+                    ? t("expires in {{count}} days", {
+                        count: daysUntil(run.expires_at, now),
                       })
                     : t("no")}
               </TableCell>
