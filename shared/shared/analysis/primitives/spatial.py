@@ -1,13 +1,19 @@
-"""A local metric grid over a trajectory, residence time and visits per cell (plan, section
-8.2). Containment in polygons and clustering run in PostGIS and live with the modules."""
+"""A local metric grid over a trajectory, residence time and visits per cell, and what runs in
+PostGIS: DBSCAN clusters of a subject's fixes and geodesic areas (plan, section 8.2)."""
 
 from __future__ import annotations
 
+import json
 import math
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.analysis.primitives.trajectory import Trajectory
 
@@ -104,3 +110,113 @@ def hotspots(
         if held / total >= share:
             break
     return out
+
+
+@dataclass(slots=True)
+class Cluster:
+    """A DBSCAN cluster of one subject's fixes: its hull in degrees, how many fixes, the share
+    of the subject's fixes, and when it was first and last used."""
+
+    hull: dict[str, Any]
+    fixes: int
+    fix_share: float
+    first_at: datetime
+    last_at: datetime
+
+
+def utm_srid(lat: float, lon: float) -> int:
+    """The UTM zone's EPSG code for a point, for metric distances in PostGIS."""
+    zone = int((lon + 180) // 6) + 1
+    return (32600 if lat >= 0 else 32700) + min(60, max(1, zone))
+
+
+async def clusters_sql(
+    session: AsyncSession,
+    entity_id: uuid.UUID,
+    time_from: datetime,
+    time_to: datetime,
+    *,
+    eps_m: float,
+    min_points: int,
+    max_clusters: int,
+) -> list[Cluster]:
+    """`ST_ClusterDBSCAN` over the subject's device fixes in the period, in the UTM zone of
+    their centre; the largest `max_clusters` clusters with their convex hulls in degrees."""
+    centre = (
+        await session.execute(
+            text(
+                """
+                SELECT ST_Y(ST_Centroid(ST_Collect(coalesce(curated_geom, geom)))) AS lat,
+                       ST_X(ST_Centroid(ST_Collect(coalesce(curated_geom, geom)))) AS lon,
+                       count(*) AS n
+                FROM positions
+                WHERE entity_id = :entity_id
+                  AND coalesce(curated_time, time) >= :time_from
+                  AND coalesce(curated_time, time) < :time_to
+                  AND valid AND record_type <> 'network'
+                """
+            ),
+            {"entity_id": entity_id, "time_from": time_from, "time_to": time_to},
+        )
+    ).one()
+    if not centre.n or centre.n < min_points:
+        return []
+    srid = utm_srid(float(centre.lat), float(centre.lon))
+    rows = (
+        await session.execute(
+            text(
+                """
+                WITH fixes AS (
+                    SELECT ST_Transform(coalesce(curated_geom, geom), :srid) AS g,
+                           coalesce(curated_time, time) AS t
+                    FROM positions
+                    WHERE entity_id = :entity_id
+                      AND coalesce(curated_time, time) >= :time_from
+                      AND coalesce(curated_time, time) < :time_to
+                      AND valid AND record_type <> 'network'
+                ),
+                labelled AS (
+                    SELECT g, t, ST_ClusterDBSCAN(g, eps := :eps, minpoints := :min_points)
+                        OVER () AS cid
+                    FROM fixes
+                )
+                SELECT ST_AsGeoJSON(ST_Transform(ST_ConvexHull(ST_Collect(g)), 4326)) AS hull,
+                       count(*) AS n, min(t) AS first_at, max(t) AS last_at
+                FROM labelled
+                WHERE cid IS NOT NULL
+                GROUP BY cid
+                ORDER BY count(*) DESC
+                LIMIT :max_clusters
+                """
+            ),
+            {
+                "srid": srid,
+                "entity_id": entity_id,
+                "time_from": time_from,
+                "time_to": time_to,
+                "eps": eps_m,
+                "min_points": min_points,
+                "max_clusters": max_clusters,
+            },
+        )
+    ).all()
+    total = int(centre.n)
+    return [
+        Cluster(
+            hull=json.loads(r.hull),
+            fixes=int(r.n),
+            fix_share=round(int(r.n) / total, 4),
+            first_at=r.first_at,
+            last_at=r.last_at,
+        )
+        for r in rows
+    ]
+
+
+async def hectares(session: AsyncSession, geojson: dict[str, Any]) -> float:
+    """The geodesic area of a GeoJSON polygon in hectares, from PostGIS."""
+    value = await session.scalar(
+        text("SELECT ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)::geography) / 10000"),
+        {"g": json.dumps(geojson)},
+    )
+    return float(value or 0)

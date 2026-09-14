@@ -105,7 +105,7 @@ async def test_a_movement_run_over_fixes(client, db):
     read = await client.get(f"{base}/{run_id}", headers=h)
     assert read.status_code == 200, read.text
     body = read.json()
-    assert body["status"] == "completed", body
+    assert body["status"] == "completed", (body["error_code"], body["error_message"])
     assert body["input_count"] == 72 and body["excluded_count"] == 0
     document = body["result"]
     summary = document["summary"]["main"][entity["id"]]
@@ -128,11 +128,32 @@ async def test_a_movement_run_over_fixes(client, db):
             )
         )
     ).all()
-    assert len(stored) == 1 and stored[0].kind == "hotspot"
-    assert stored[0].area_m2 == pytest.approx(100 * 100, rel=0.02)
-    assert stored[0].level == pytest.approx(0.5, abs=0.05)
+    by_kind = {}
+    for row in stored:
+        by_kind.setdefault(row.kind, []).append(row)
+    assert set(by_kind) == {"hotspot", "mcp", "kde", "cluster"}, by_kind
+    hotspot = by_kind["hotspot"][0]
+    assert len(by_kind["hotspot"]) == 1
+    assert hotspot.area_m2 == pytest.approx(100 * 100, rel=0.02)
+    assert hotspot.level == pytest.approx(0.5, abs=0.05)
+    # the MCP of a straight line has no area; the KDE has, the 50 percent one inside the 95
+    assert by_kind["mcp"][0].area_m2 < 1
+    kde = {row.level: row.area_m2 for row in by_kind["kde"]}
+    assert set(kde) == {0.5, 0.95} and 0 < kde[0.5] < kde[0.95]
+    assert summary["kde95_ha"] == pytest.approx(kde[0.95] / 10_000, rel=0.01)
+    assert summary["mcp95_ha"] == 0 and summary["kde_bandwidth_m"] > 0
+    # a hundred-metre cell over hundred-metre steps: the walk and the rest are clusters
+    assert summary["cluster_count"] == len(by_kind["cluster"]) >= 1
+    assert document["geometries"] == {
+        "hotspot": 1,
+        "mcp": 1,
+        "kde": 2,
+        "cluster": len(by_kind["cluster"]),
+    }
 
-    features = await client.get(f"{base}/{run_id}/geometries", headers=h)
+    features = await client.get(
+        f"{base}/{run_id}/geometries", params={"kind": "hotspot"}, headers=h
+    )
     assert features.status_code == 200
     assert features.json()["features"][0]["properties"]["visits"] == 1
 

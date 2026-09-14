@@ -102,7 +102,13 @@ def test_the_document_holds_subjects_periods_and_the_mean_row():
             track = _straight_walk(subject.id, step_m=step_m)
             results[(period.key, subject.id)] = analyse_trajectory(track, params, period, "UTC")
     document = build_document(
-        subjects, [main, comparison], results, params, input_count=960, excluded_count=0
+        subjects,
+        [main, comparison],
+        results,
+        params,
+        input_count=960,
+        excluded_count=0,
+        geometries={"hotspot": 7},
     )
     assert ResultDocument.model_validate(document.model_dump(mode="json"))
     table = document.tables[0]
@@ -129,7 +135,7 @@ def test_the_document_holds_subjects_periods_and_the_mean_row():
         "day_night",
     }
     assert all(len(c.series) == 4 for c in document.charts)
-    assert document.geometries["hotspot"] == sum(len(m.hotspot_cells) for m in results.values())
+    assert document.geometries == {"hotspot": 7}
     assert document.provenance.parameters["max_speed_mps"] == 15
     geometries = hotspot_geometries(subjects[0], main, results[("main", a)])
     assert (
@@ -143,4 +149,7 @@ def test_the_module_is_in_the_catalogue():
     import shared.analysis.modules  # noqa: F401
     from shared.analysis import MODULES
 
-    assert MODULES["movement"].parameters is MovementParameters
+    # the boundary test re-imports the package, so compare by name, not identity
+    module = MODULES["movement"]
+    assert module.key == "movement" and module.version == "movement/1"
+    assert module.parameters.__name__ == MovementParameters.__name__

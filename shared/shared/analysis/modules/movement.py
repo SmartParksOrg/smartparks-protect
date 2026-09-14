@@ -13,7 +13,9 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 from pydantic import BaseModel, Field
+from shapely.geometry import mapping
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.analysis.base import (
     Chart,
@@ -27,9 +29,16 @@ from shared.analysis.base import (
     Table,
     Warning,
 )
-from shared.analysis.limits import MAX_FIXES_PER_SUBJECT
+from shared.analysis.limits import KDE_MAX_CELLS, MAX_FIXES_PER_SUBJECT
 from shared.analysis.parameters import CommonParameters
-from shared.analysis.primitives.spatial import LocalGrid, hotspots, residence
+from shared.analysis.primitives.homerange import isopleths, kde_grid, mcp, reference_bandwidth
+from shared.analysis.primitives.spatial import (
+    LocalGrid,
+    clusters_sql,
+    hectares,
+    hotspots,
+    residence,
+)
 from shared.analysis.primitives.timeagg import local_days, sun_class
 from shared.analysis.primitives.trajectory import (
     Steps,
@@ -48,6 +57,8 @@ METHOD_VERSION = "movement/1"
 Method = Literal["mcp", "kde", "clusters"]
 FEW_FIXES = 30
 NSD_POINTS = 500
+CLUSTER_MIN_POINTS = 5
+MAX_CLUSTERS_PER_SUBJECT = 50
 SPEED_BINS = 20
 TURNING_BINS = 16
 
@@ -274,9 +285,11 @@ def build_document(
     *,
     input_count: int,
     excluded_count: int,
+    geometries: dict[str, int] | None = None,
 ) -> ResultDocument:
     """The result document from the per-subject metrics: the summary, one table subject by
-    period, the charts, the warnings and the provenance."""
+    period, the charts, the warnings, the provenance, and the count of geometries per kind."""
+    geometries = geometries or {}
     summary: dict[str, dict[str, dict[str, float | None]]] = {}
     warnings: list[Warning] = []
     rows: list[list[Any]] = []
@@ -338,7 +351,6 @@ def build_document(
             series=series(lambda m: [m.class_km.get(k, 0.0) for k in ("day", "twilight", "night")]),
         ),
     ]
-    geometries = {"hotspot": sum(len(m.hotspot_cells) for m in results.values())}
     return ResultDocument(
         module="movement",
         method_version=METHOD_VERSION,
@@ -347,7 +359,7 @@ def build_document(
         summary=summary,
         tables=tables,
         charts=charts,
-        geometries={k: v for k, v in geometries.items() if v},
+        geometries=geometries,
         warnings=warnings,
         provenance=Provenance(
             module="movement",
@@ -375,6 +387,90 @@ def hotspot_geometries(subject: Subject, period: Period, m: SubjectMetrics) -> l
         )
         for ring, share, visits in m.hotspot_cells
     ]
+
+
+async def spatial_layers(
+    session: AsyncSession,
+    subject: Subject,
+    period: Period,
+    track: Trajectory,
+    params: MovementParameters,
+    m: SubjectMetrics,
+) -> list[Geometry]:
+    """Home range and clusters for one subject and period when the methods are on and the
+    fixes allow it (M2); the summary figures are filled in and the polygons returned."""
+    out: list[Geometry] = []
+    if len(track) < FEW_FIXES:
+        return out
+    weights = time_weights(track, params.gap_hours * 3600)
+    if "mcp" in params.methods:
+        hull = mcp(track.lat, track.lon, 95)
+        geojson = mapping(hull.geometry)
+        area = await hectares(session, geojson)
+        m.summary["mcp95_ha"] = round(area, 2)
+        out.append(
+            Geometry(
+                kind="mcp",
+                subject_id=subject.id,
+                label=f"{subject.name}: MCP 95%",
+                level=0.95,
+                geojson=geojson,
+                properties={"period": period.key, "hectares": round(area, 2)},
+            )
+        )
+    if "kde" in params.methods:
+        bandwidth = params.kde_bandwidth_m or reference_bandwidth(track.lat, track.lon)
+        kde = kde_grid(track.lat, track.lon, bandwidth, KDE_MAX_CELLS, weights)
+        m.summary["kde_bandwidth_m"] = round(bandwidth, 1)
+        for isopleth in isopleths(kde, [0.5, 0.95]):
+            geojson = mapping(isopleth.geometry)
+            area = await hectares(session, geojson)
+            percent = round(isopleth.level * 100)
+            m.summary[f"kde{percent}_ha"] = round(area, 2)
+            out.append(
+                Geometry(
+                    kind="kde",
+                    subject_id=subject.id,
+                    label=f"{subject.name}: KDE {percent}%",
+                    level=isopleth.level,
+                    geojson=geojson,
+                    properties={
+                        "period": period.key,
+                        "hectares": round(area, 2),
+                        "bandwidth_m": round(bandwidth, 1),
+                        "cell_m": round(kde.cell_m, 1),
+                    },
+                )
+            )
+    if "clusters" in params.methods:
+        found = await clusters_sql(
+            session,
+            subject.id,
+            period.time_from,
+            period.time_to,
+            eps_m=params.cell_m,
+            min_points=CLUSTER_MIN_POINTS,
+            max_clusters=MAX_CLUSTERS_PER_SUBJECT,
+        )
+        m.summary["cluster_count"] = float(len(found))
+        for i, cluster in enumerate(found, start=1):
+            out.append(
+                Geometry(
+                    kind="cluster",
+                    subject_id=subject.id,
+                    label=f"{subject.name}: cluster {i} ({cluster.fixes} fixes)",
+                    level=cluster.fix_share,
+                    geojson=cluster.hull,
+                    properties={
+                        "period": period.key,
+                        "fixes": cluster.fixes,
+                        "fix_share": cluster.fix_share,
+                        "first_at": cluster.first_at.isoformat(),
+                        "last_at": cluster.last_at.isoformat(),
+                    },
+                )
+            )
+    return out
 
 
 class MovementModule:
@@ -426,8 +522,12 @@ class MovementModule:
                 m = analyse_trajectory(track, params, period, tz or "UTC", excluded=dropped)
                 results[(period.key, subject.id)] = m
                 geometries.extend(hotspot_geometries(subject, period, m))
+                geometries.extend(await spatial_layers(session, subject, period, track, params, m))
                 done += 1
         await ctx.progress(95, "document")
+        counts: dict[str, int] = {}
+        for g in geometries:
+            counts[g.kind] = counts.get(g.kind, 0) + 1
         document = build_document(
             subjects,
             periods,
@@ -435,5 +535,6 @@ class MovementModule:
             params,
             input_count=input_count,
             excluded_count=excluded_count,
+            geometries=counts,
         )
         return RunResult(document=document, geometries=geometries)

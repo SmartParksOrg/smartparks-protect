@@ -64,7 +64,7 @@ async def load_trajectory(
     effective time keep the first and count the other as a duplicate."""
     statement = (
         select(
-            effective_time(Position).label("t"),
+            effective_time(Position).label("at"),
             func.ST_Y(effective_geom()).label("lat"),
             func.ST_X(effective_geom()).label("lon"),
             Position.accuracy_m,
@@ -90,7 +90,7 @@ async def load_trajectory(
     duplicates = 0
     last = None
     async for row in await session.stream(statement):
-        seconds = row.t.timestamp()
+        seconds = row.at.timestamp()
         if last is not None and seconds == last:
             duplicates += 1
             continue
