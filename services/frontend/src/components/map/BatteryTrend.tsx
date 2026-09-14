@@ -14,7 +14,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { chartTheme } from "@/lib/chartStyle";
 import { formatInZone } from "@/lib/analytics";
 import { browserTimezone, type RangePreset, rangeFor } from "@/lib/analytics";
-import { formatAgo } from "@/lib/format";
+import { formatAgo, formatDuration } from "@/lib/format";
 import { stillHours } from "@/lib/movement";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, CanvasRenderer]);
@@ -69,6 +69,8 @@ interface TrendSpec {
   step: number;
   /** A floor for the axis (zero for movement: a flat line at zero means still). */
   floor?: number;
+  /** A factor on the stored value before it is shown (seconds to days for the uptime). */
+  scale?: number;
   ariaLabel: string;
 }
 
@@ -164,6 +166,74 @@ export function MovementTrend({
   );
 }
 
+/** The uptime of a panel as the button that unfolds its trend; a reboot in the last day
+ * is said next to it (Tim, 2026-09-14). */
+export function UptimeValue({
+  deviceId,
+  uptimeSeconds,
+  lastResetAt,
+  now,
+  open,
+  onToggle,
+  className,
+}: {
+  deviceId: string | null | undefined;
+  uptimeSeconds: number;
+  lastResetAt: string | null | undefined;
+  now: number;
+  open: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const recent = lastResetAt && now - Date.parse(lastResetAt) < 24 * 3_600_000;
+  const label = recent
+    ? t("{{uptime}}, rebooted {{ago}}", {
+        uptime: formatDuration(uptimeSeconds),
+        ago: formatAgo(lastResetAt, now),
+      })
+    : formatDuration(uptimeSeconds);
+  if (!deviceId) return <span className={className}>{label}</span>;
+  return (
+    <button
+      type="button"
+      className={`underline underline-offset-2 hover:text-primary ${className ?? ""}`}
+      title={open ? t("Hide the uptime trend") : t("Show the uptime trend")}
+      aria-expanded={open}
+      onClick={onToggle}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** The uptime trend in days: a drop to zero is a reboot. */
+export function UptimeTrend({
+  projectId,
+  deviceId,
+}: {
+  projectId: string;
+  deviceId: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <MetricTrend
+      projectId={projectId}
+      deviceId={deviceId}
+      spec={{
+        metric: "uptime",
+        label: t("Uptime"),
+        unit: "d",
+        decimals: 1,
+        step: 1,
+        floor: 0,
+        scale: 1 / 86_400,
+        ariaLabel: t("Uptime over the period"),
+      }}
+    />
+  );
+}
+
 /** One metric of a device over the last day, week or month from the analytics series. */
 function MetricTrend({
   projectId,
@@ -201,9 +271,13 @@ function MetricTrend({
       ),
     staleTime: 60_000,
   });
-  const points = series.data?.series?.[0]?.points ?? [];
+  const scale = spec.scale ?? 1;
+  const points = (series.data?.series?.[0]?.points ?? []).map((p) => ({
+    time: p.time,
+    value: p.values.mean == null ? null : p.values.mean * scale,
+  }));
   const values = points
-    .map((p) => p.values.mean)
+    .map((p) => p.value)
     .filter((v): v is number => v != null);
   const show = (v: number) => `${v.toFixed(spec.decimals)} ${spec.unit}`;
   return (
@@ -240,8 +314,7 @@ function MetricTrend({
         <>
           <Sparkline
             points={points.map(
-              (p) =>
-                [Date.parse(p.time), p.values.mean] as [number, number | null],
+              (p) => [Date.parse(p.time), p.value] as [number, number | null],
             )}
             timezone={timezone}
             spec={spec}

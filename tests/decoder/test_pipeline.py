@@ -562,3 +562,38 @@ async def test_status_accelerometer_samples_become_activity_and_the_last_movemen
     await db.refresh(current)
     assert current.last_movement_at == datetime(2026, 5, 3, 10, tzinfo=UTC)
     assert current.latest_measurements["activity"]["value"] == 5.0
+
+
+async def test_an_uptime_drop_is_a_reboot_event_and_the_last_reset(db, bus, world):
+    """Tim (2026-09-14): a status whose uptime is lower than the one before it means the
+    device started again; a device_reset event with the reason, and last_reset_at moves."""
+    from shared.models import Event
+
+    first = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {"time": "2026-05-04T08:00:00+00:00", "measurements": {"uptime": 5 * 86400}},
+    )
+    assert first[1].status == ProcessingStatus.PROCESSED
+    rebooted = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {
+            "time": "2026-05-04T09:00:00+00:00",
+            "measurements": {"uptime": 0},
+            "state": {"reset_reason": {"watchdog": True, "pin": False}},
+        },
+    )
+    assert rebooted[1].status == ProcessingStatus.PROCESSED
+    assert rebooted[1].created["events"] == 1
+    await db.rollback()
+    event = await db.scalar(
+        select(Event).where(Event.device_id == world.device.id, Event.event_type == "device_reset")
+    )
+    assert event is not None and event.title == "Device rebooted (watchdog)"
+    assert event.severity == "warning"
+    current = await db.get(DeviceCurrentState, world.device.id)
+    await db.refresh(current)
+    assert current.last_reset_at == datetime(2026, 5, 4, 9, tzinfo=UTC)

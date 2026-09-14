@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 
 import type { RecordRow } from "@/api/types";
 import { formatInZone } from "@/lib/analytics";
+import { formatDuration } from "@/lib/format";
 import { cellOf, formatCell, type RecordColumn } from "@/lib/records";
 
 const ROW_HEIGHT = 32;
@@ -111,7 +112,9 @@ export function VirtualTable({
                   >
                     {c.key === "time"
                       ? formatInZone(row.time, timezone)
-                      : formatCell(cellOf(row, c))}
+                      : c.unit === "s" && typeof cellOf(row, c) === "number"
+                        ? formatDuration(cellOf(row, c) as number)
+                        : formatCell(cellOf(row, c))}
                   </div>
                 ))}
               </div>

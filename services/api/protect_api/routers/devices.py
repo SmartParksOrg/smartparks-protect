@@ -222,6 +222,7 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
             latest_state_time=state.latest_state_time,
             last_seen_at=state.last_seen_at,
             last_movement_at=state.last_movement_at,
+            last_reset_at=state.last_reset_at,
         )
     return reads
 

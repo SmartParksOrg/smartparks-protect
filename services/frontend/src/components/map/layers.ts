@@ -71,6 +71,9 @@ export interface EntityFeatureProperties {
    * change itself; absent for a device that reports no accelerometer. */
   last_movement_at?: string | null;
   activity?: number | null;
+  /** The uptime in seconds and the last reboot the uptime showed (Tim, 2026-09-14). */
+  uptime?: number | null;
+  last_reset_at?: string | null;
   last_status_at?: string | null;
   device_last_seen_at?: string | null;
 }
@@ -102,6 +105,9 @@ export interface DeviceFeatureProperties {
    * change itself; absent for a device that reports no accelerometer. */
   last_movement_at?: string | null;
   activity?: number | null;
+  /** The uptime in seconds and the last reboot the uptime showed (Tim, 2026-09-14). */
+  uptime?: number | null;
+  last_reset_at?: string | null;
   last_status_at?: string | null;
   picture_updated_at?: string | null;
 }

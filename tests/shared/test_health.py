@@ -112,3 +112,24 @@ def test_a_device_reporting_activity_gets_a_movement_line():
         now=now,
     )
     assert not [f for f in without.fields if f.key == "movement"]
+
+
+def test_a_reboot_in_the_last_day_warns_on_the_uptime_line():
+    from datetime import timedelta
+
+    fields = DRIVERS["opencollar"].health
+    now = datetime(2026, 9, 14, 12, tzinfo=UTC)
+    health = device_health(
+        fields,
+        latest_measurements={
+            "uptime": {"value": 0.0, "time": (now - timedelta(hours=2)).isoformat()}
+        },
+        latest_state={"reset_reason": {"watchdog": True, "pin": False}},
+        latest_state_time=now - timedelta(hours=2),
+        last_seen_at=now,
+        last_reset_at=now - timedelta(hours=2),
+        now=now,
+    )
+    uptime = next(f for f in health.fields if f.key == "uptime")
+    assert uptime.text == "0 h, rebooted 2 h ago (watchdog)" and uptime.level == "warn"
+    assert health.level == "warn"

@@ -42,6 +42,7 @@ from shared.device_drivers.base import (
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import Attribution, resolve_attribution
 from shared.domain.movement import MOVEMENT_THRESHOLD_MPS2, derive_activity, previous_sample
+from shared.domain.reboot import detect_reboots, previous_uptime
 from shared.enums import (
     AcquisitionChannel,
     ConnectivityStatus,
@@ -344,6 +345,12 @@ async def process_source_event(
             records.measurements += derive_activity(
                 records.measurements,
                 previous_sample(before.latest_measurements if before else None),
+            )
+            # a reboot from an uptime lower than the one before it (shared/domain/reboot.py)
+            records.events += detect_reboots(
+                records.measurements,
+                records.states,
+                previous_uptime(before.latest_measurements if before else None),
             )
             await _write_positions(session, event, device, records, outcome, attribution_at)
             await _write_measurements(session, event, device, records, outcome, attribution_at)
@@ -774,6 +781,9 @@ async def _update_current_state(
         current.last_movement_at is None or max(movement_times) > current.last_movement_at
     ):
         current.last_movement_at = max(movement_times)
+    reboots = [e.time for e in timely_events if e.event_type == "device_reset"]
+    if reboots and (current.last_reset_at is None or max(reboots) > current.last_reset_at):
+        current.last_reset_at = max(reboots)
     current.updated_at = now
 
     connectivity = await session.get(ConnectivityState, (device.id, event.data_source_id))

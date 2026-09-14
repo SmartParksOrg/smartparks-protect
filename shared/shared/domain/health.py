@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from shared.device_drivers.base import HealthField
 from shared.domain.movement import movement_text
+from shared.domain.reboot import reboot_note
 from shared.timeutil import utc_now
 
 LEVELS = ("ok", "warn", "critical")
@@ -85,6 +86,7 @@ def device_health(
     latest_state_time: datetime | None,
     last_seen_at: datetime | None,
     last_movement_at: datetime | None = None,
+    last_reset_at: datetime | None = None,
     now: datetime | None = None,
 ) -> DeviceHealth:
     """The health of one device from what its driver declares and the current state holds:
@@ -97,12 +99,19 @@ def device_health(
     state = latest_state or {}
     worst = -1
     if "activity" in measurements:
-        text, level, at = movement_text(last_movement_at, latest_state_time, now or utc_now())
-        if level in LEVELS:
-            worst = max(worst, LEVELS.index(level))
+        move_text, move_level, move_at = movement_text(
+            last_movement_at, latest_state_time, now or utc_now()
+        )
+        if move_level in LEVELS:
+            worst = max(worst, LEVELS.index(move_level))
         health.fields.append(
             HealthValue(
-                key="movement", label="Movement", kind="text", text=text, level=level, at=at
+                key="movement",
+                label="Movement",
+                kind="text",
+                text=move_text,
+                level=move_level,
+                at=move_at,
             )
         )
     for field in fields:
@@ -117,6 +126,13 @@ def device_health(
         if value is None:
             continue
         level = _level_of(field, value)
+        text = _text_of(field, value)
+        if field.key == "uptime":
+            # a reboot in the last day warns on the uptime line (Tim, 2026-09-14)
+            note, note_level = reboot_note(last_reset_at, state, now or utc_now())
+            if note:
+                text = f"{text}, {note}" if text else note
+                level = note_level
         if level in LEVELS:
             worst = max(worst, LEVELS.index(level))
         health.fields.append(
@@ -126,7 +142,7 @@ def device_health(
                 kind=field.kind,
                 unit=field.unit,
                 value=value if not isinstance(value, dict) else None,
-                text=_text_of(field, value),
+                text=text,
                 level=level,
                 at=at,
             )

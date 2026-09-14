@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+
+import { formatDuration } from "@/lib/format";
 import { BarChart, LineChart, ScatterChart } from "echarts/charts";
 import {
   AxisPointerComponent,
@@ -168,7 +170,12 @@ export function ExploreChart({
     if (marked !== null && marked !== pinned && !hovering.current)
       data.push({
         xAxis: marked,
-        lineStyle: { color: chartTheme(dark).text, width: 1, type: "solid", opacity: 0.7 },
+        lineStyle: {
+          color: chartTheme(dark).text,
+          width: 1,
+          type: "solid",
+          opacity: 0.7,
+        },
       });
     instance.setOption({
       series: [
@@ -243,6 +250,7 @@ function isTimeAxis(kind: ChartType): boolean {
 }
 
 function valueText(value: unknown, unit: string | null): string {
+  if (typeof value === "number" && unit === "s") return formatDuration(value);
   if (typeof value !== "number") return String(value ?? "");
   const text = Number.isInteger(value)
     ? String(value)
@@ -516,7 +524,8 @@ function buildOption(
           value: number[];
         }[];
         if (!items.length) return "";
-        return card(th.text, 
+        return card(
+          th.text,
           timeTitle(items[0].value[0]),
           items.map((p) => ({
             colour: p.color,

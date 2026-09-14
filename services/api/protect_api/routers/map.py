@@ -251,6 +251,7 @@ async def current_state(
                 latest_state_time=device_state.latest_state_time,
                 last_seen_at=device_state.last_seen_at,
                 last_movement_at=device_state.last_movement_at,
+                last_reset_at=device_state.last_reset_at,
             )
 
         features.append(
@@ -288,6 +289,10 @@ async def current_state(
                     if device_state and device_state.last_movement_at
                     else None,
                     "activity": _latest_value(device_state, "activity"),
+                    "uptime": _latest_value(device_state, "uptime"),
+                    "last_reset_at": device_state.last_reset_at.isoformat()
+                    if device_state and device_state.last_reset_at
+                    else None,
                     "last_status_at": health.last_status_at.isoformat()
                     if health and health.last_status_at
                     else None,
@@ -394,6 +399,7 @@ async def devices_state(
                 latest_state_time=state.latest_state_time,
                 last_seen_at=state.last_seen_at,
                 last_movement_at=state.last_movement_at,
+                last_reset_at=state.last_reset_at,
             )
         entity = tracking.get(device.id)
         features.append(
@@ -428,6 +434,10 @@ async def devices_state(
                     if state and state.last_movement_at
                     else None,
                     "activity": _latest_value(state, "activity"),
+                    "uptime": _latest_value(state, "uptime"),
+                    "last_reset_at": state.last_reset_at.isoformat()
+                    if state and state.last_reset_at
+                    else None,
                     "last_status_at": health.last_status_at.isoformat()
                     if health and health.last_status_at
                     else None,
@@ -626,6 +636,7 @@ async def device_state(
         latest_state_time=current.latest_state_time,
         last_seen_at=current.last_seen_at,
         last_movement_at=current.last_movement_at,
+        last_reset_at=current.last_reset_at,
     )
     row = await session.scalar(
         select(DeviceStateHistory)

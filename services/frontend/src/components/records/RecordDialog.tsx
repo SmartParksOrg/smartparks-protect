@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatInZone } from "@/lib/analytics";
+import { formatDuration } from "@/lib/format";
 import { cellOf, formatCell, type RecordColumn } from "@/lib/records";
 
 /** A value that is a JSON object or list, laid out one field per line; null otherwise. */
@@ -76,9 +77,13 @@ export function RecordDialog({
                     {structured(value)}
                   </pre>
                 ) : (
-                  <span className="break-all">{formatCell(value)}</span>
+                  <span className="break-all">
+                    {column.unit === "s" && typeof value === "number"
+                      ? formatDuration(value)
+                      : formatCell(value)}
+                  </span>
                 )}
-                {column.unit && !structured(value) ? (
+                {column.unit && column.unit !== "s" && !structured(value) ? (
                   <span className="ml-1 font-sans text-muted-foreground">
                     {column.unit}
                   </span>

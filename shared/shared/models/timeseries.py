@@ -349,6 +349,10 @@ class DeviceCurrentState(Base):
         DateTime(timezone=True),
         comment="The last status message whose accelerometer sample changed above the threshold",
     )
+    last_reset_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="The last status message whose uptime was lower than the one before it",
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

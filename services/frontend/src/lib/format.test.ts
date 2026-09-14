@@ -23,3 +23,20 @@ describe("formatTimeShort", () => {
     expect(formatTimeShort(null, now)).toBe("");
   });
 });
+
+import { formatDuration, formatMeasurement } from "./format";
+
+describe("durations", () => {
+  it("spells seconds out as days, hours, minutes", () => {
+    expect(formatDuration(432_000)).toBe("5 d 0 h");
+    expect(formatDuration(11_400)).toBe("3 h 10 min");
+    expect(formatDuration(600)).toBe("10 min");
+    expect(formatDuration(42)).toBe("42 s");
+  });
+  it("formats a measurement with its unit and a seconds metric as a duration", () => {
+    expect(formatMeasurement(432_000, "s")).toBe("5 d 0 h");
+    expect(formatMeasurement(3.6, "V")).toBe("3.60 V");
+    expect(formatMeasurement(123.456, "m")).toBe("123.5 m");
+    expect(formatMeasurement(null, "s")).toBe("");
+  });
+});

@@ -25,6 +25,8 @@ import {
   BatteryValue,
   MovementTrend,
   MovementValue,
+  UptimeTrend,
+  UptimeValue,
 } from "@/components/map/BatteryTrend";
 import { movementLevel } from "@/lib/movement";
 import { imprecise } from "@/lib/accuracy";
@@ -318,6 +320,8 @@ function HealthRows({
   lastStatusAt,
   lastMovementAt,
   activity,
+  uptime,
+  lastResetAt,
   now,
   onOpenPosition,
   onOpenState,
@@ -336,6 +340,9 @@ function HealthRows({
   /** Movement from the accelerometer (Tim, 2026-09-14): shown when the device reports it. */
   lastMovementAt?: string | null;
   activity?: number | null;
+  /** The uptime in seconds and the last reboot, when the device reports an uptime. */
+  uptime?: number | null;
+  lastResetAt?: string | null;
   now: number;
   /** Opens the fix of that moment, the panel a track point opens (Tim, 2026-09-13). */
   onOpenPosition?: () => void;
@@ -347,7 +354,10 @@ function HealthRows({
   // per object
   const [trendOpen, setTrendOpen] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
+  const [uptimeOpen, setUptimeOpen] = useState(false);
   const hasMovement = activity !== undefined && activity !== null;
+  const rebooted =
+    lastResetAt != null && now - Date.parse(lastResetAt) < 24 * 3_600_000;
   // on a phone the rows stay short (Tim, 2026-09-14): the accuracy as a badge with its
   // sentence behind a tap, and "estimate" for the position's kind
   const phone = useIsPhone();
@@ -435,6 +445,31 @@ function HealthRows({
       {hasMovement && movementOpen && batteryProject && batteryDevice && (
         <div className="col-span-2 rounded-md border bg-muted/30 p-2">
           <MovementTrend projectId={batteryProject} deviceId={batteryDevice} />
+        </div>
+      )}
+      {uptime != null && (
+        <PanelRow
+          label={t("Uptime")}
+          className={rebooted ? "text-brand-sand" : ""}
+          title={
+            lastResetAt
+              ? t("Last reboot {{when}}", { when: formatTime(lastResetAt) })
+              : undefined
+          }
+        >
+          <UptimeValue
+            deviceId={batteryProject ? batteryDevice : null}
+            uptimeSeconds={uptime}
+            lastResetAt={lastResetAt}
+            now={now}
+            open={uptimeOpen}
+            onToggle={() => setUptimeOpen((o) => !o)}
+          />
+        </PanelRow>
+      )}
+      {uptime != null && uptimeOpen && batteryProject && batteryDevice && (
+        <div className="col-span-2 rounded-md border bg-muted/30 p-2">
+          <UptimeTrend projectId={batteryProject} deviceId={batteryDevice} />
         </div>
       )}
       {lastStatusAt && (
@@ -657,6 +692,8 @@ export function EntityPanel({
         lastMovementAt={props.last_movement_at}
         activity={props.activity}
         lastStatusAt={props.last_status_at}
+        uptime={props.uptime}
+        lastResetAt={props.last_reset_at}
         now={now}
       />
       <PanelRow label={t("Device")}>
@@ -816,6 +853,8 @@ export function DevicePanel({
         lastMovementAt={props.last_movement_at}
         activity={props.activity}
         lastStatusAt={props.last_status_at}
+        uptime={props.uptime}
+        lastResetAt={props.last_reset_at}
         now={now}
       />
       {allProjects && !props.project_id && (
