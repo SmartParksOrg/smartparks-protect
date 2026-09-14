@@ -67,3 +67,48 @@ def test_a_driver_without_health_gives_last_seen_only():
         last_seen_at=NOW,
     )
     assert health.fields == [] and health.level is None and health.last_seen_at == NOW
+
+
+def test_a_device_reporting_activity_gets_a_movement_line():
+    from datetime import timedelta
+
+    fields = DRIVERS["opencollar"].health
+    now = datetime(2026, 9, 14, 12, tzinfo=UTC)
+    at = (now - timedelta(hours=1)).isoformat()
+    measurements = {
+        "battery_voltage": {"value": 3.9, "time": at},
+        "activity": {"value": 0.0, "time": at},
+    }
+    still = device_health(
+        fields,
+        latest_measurements=measurements,
+        latest_state={},
+        latest_state_time=now - timedelta(hours=1),
+        last_seen_at=now,
+        last_movement_at=now - timedelta(hours=30),
+        now=now,
+    )
+    movement = next(f for f in still.fields if f.key == "movement")
+    assert movement.text == "still for 1 d 6 h" and movement.level == "critical"
+    assert still.level == "critical"
+    moving = device_health(
+        fields,
+        latest_measurements=measurements,
+        latest_state={},
+        latest_state_time=now,
+        last_seen_at=now,
+        last_movement_at=now - timedelta(hours=1),
+        now=now,
+    )
+    assert next(f for f in moving.fields if f.key == "movement").text == "moving"
+    assert moving.level == "ok"
+    # a device without the activity metric has no movement line
+    without = device_health(
+        fields,
+        latest_measurements={"battery_voltage": {"value": 3.9, "time": at}},
+        latest_state={},
+        latest_state_time=now,
+        last_seen_at=now,
+        now=now,
+    )
+    assert not [f for f in without.fields if f.key == "movement"]

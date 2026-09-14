@@ -345,6 +345,10 @@ class DeviceCurrentState(Base):
         comment="metric key to {value, time} of the newest measurement per metric",
     )
     battery_voltage: Mapped[float | None] = mapped_column(Float)
+    last_movement_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="The last status message whose accelerometer sample changed above the threshold",
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

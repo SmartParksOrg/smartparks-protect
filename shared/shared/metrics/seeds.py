@@ -153,7 +153,8 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
         None,
         N,
         "behaviour",
-        "Device-specific activity index, normalized per driver",
+        "Change of the acceleration vector between two status messages (m/s²) for OpenCollar; "
+        "a device-specific index for other drivers",
     ),
     MetricSeed(
         "acceleration_x", "Acceleration X", "m/s²", N, "behaviour", "Acceleration along the X axis"

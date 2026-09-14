@@ -523,3 +523,42 @@ async def test_a_record_from_the_future_is_kept_invalid_and_leaves_the_current_s
     await db.rollback()
     state = await db.get(DeviceCurrentState, world.device.id)
     assert state is not None and state.latest_position_time.year == 2026
+
+
+async def test_status_accelerometer_samples_become_activity_and_the_last_movement(db, bus, world):
+    """Tim (2026-09-14): the change of the accelerometer vector between status messages is
+    stored as `activity`, and a change above the threshold moves `last_movement_at`."""
+    from shared.models import Measurement
+
+    still = {"acceleration_x": 0.0, "acceleration_y": 0.0, "acceleration_z": 9.8}
+    first = await _ingest_and_process(
+        db, bus, world, {"time": "2026-05-03T08:00:00+00:00", "measurements": still}
+    )
+    assert first[1].status == ProcessingStatus.PROCESSED
+    second = await _ingest_and_process(
+        db, bus, world, {"time": "2026-05-03T09:00:00+00:00", "measurements": still}
+    )
+    assert second[1].status == ProcessingStatus.PROCESSED
+    moved = await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {
+            "time": "2026-05-03T10:00:00+00:00",
+            "measurements": {"acceleration_x": 3.0, "acceleration_y": 4.0, "acceleration_z": 9.8},
+        },
+    )
+    assert moved[1].status == ProcessingStatus.PROCESSED
+    await db.rollback()
+    rows = (
+        await db.execute(
+            select(Measurement.time, Measurement.value_num)
+            .where(Measurement.device_id == world.device.id, Measurement.metric_key == "activity")
+            .order_by(Measurement.time)
+        )
+    ).all()
+    assert [(r.time.hour, r.value_num) for r in rows] == [(9, 0.0), (10, 5.0)]
+    current = await db.get(DeviceCurrentState, world.device.id)
+    await db.refresh(current)
+    assert current.last_movement_at == datetime(2026, 5, 3, 10, tzinfo=UTC)
+    assert current.latest_measurements["activity"]["value"] == 5.0

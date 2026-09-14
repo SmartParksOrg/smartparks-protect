@@ -41,6 +41,7 @@ from shared.device_drivers.base import (
 )
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import Attribution, resolve_attribution
+from shared.domain.movement import MOVEMENT_THRESHOLD_MPS2, derive_activity, previous_sample
 from shared.enums import (
     AcquisitionChannel,
     ConnectivityStatus,
@@ -337,6 +338,13 @@ async def process_source_event(
                     attributions[time] = await resolve_attribution(session, device.id, time)
                 return attributions[time]
 
+            # movement from the accelerometer sample of a status message: the change against
+            # the sample before it, stored as `activity` (shared/domain/movement.py)
+            before = await session.get(DeviceCurrentState, device.id)
+            records.measurements += derive_activity(
+                records.measurements,
+                previous_sample(before.latest_measurements if before else None),
+            )
             await _write_positions(session, event, device, records, outcome, attribution_at)
             await _write_measurements(session, event, device, records, outcome, attribution_at)
             await _write_states(session, event, device, records, outcome, attribution_at)
@@ -755,6 +763,17 @@ async def _update_current_state(
         latest_measurements["battery_voltage"].value, int | float
     ):
         current.battery_voltage = float(latest_measurements["battery_voltage"].value)
+    movement_times = [
+        m.time
+        for m in timely_measurements
+        if m.metric_key == "activity"
+        and isinstance(m.value, int | float)
+        and m.value >= MOVEMENT_THRESHOLD_MPS2
+    ]
+    if movement_times and (
+        current.last_movement_at is None or max(movement_times) > current.last_movement_at
+    ):
+        current.last_movement_at = max(movement_times)
     current.updated_at = now
 
     connectivity = await session.get(ConnectivityState, (device.id, event.data_source_id))

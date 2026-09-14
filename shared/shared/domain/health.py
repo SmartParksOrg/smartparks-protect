@@ -8,6 +8,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from shared.device_drivers.base import HealthField
+from shared.domain.movement import movement_text
+from shared.timeutil import utc_now
 
 LEVELS = ("ok", "warn", "critical")
 
@@ -82,15 +84,27 @@ def device_health(
     latest_state: dict[str, Any] | None,
     latest_state_time: datetime | None,
     last_seen_at: datetime | None,
+    last_movement_at: datetime | None = None,
+    now: datetime | None = None,
 ) -> DeviceHealth:
     """The health of one device from what its driver declares and the current state holds:
-    the device's own status, never the network's (architecture 20, decision D161)."""
+    the device's own status, never the network's (architecture 20, decision D161). A device
+    that reports `activity` gets a movement line: moving, or still for so long."""
     health = DeviceHealth(last_seen_at=last_seen_at, last_status_at=latest_state_time)
     if not fields:
         return health
     measurements = latest_measurements or {}
     state = latest_state or {}
     worst = -1
+    if "activity" in measurements:
+        text, level, at = movement_text(last_movement_at, latest_state_time, now or utc_now())
+        if level in LEVELS:
+            worst = max(worst, LEVELS.index(level))
+        health.fields.append(
+            HealthValue(
+                key="movement", label="Movement", kind="text", text=text, level=level, at=at
+            )
+        )
     for field in fields:
         if field.source == "state":
             value, at = state.get(field.key), latest_state_time

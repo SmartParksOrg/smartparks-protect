@@ -110,10 +110,10 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         },
     },
     "possible_immobility": {
-        "name": "Possible immobility",
+        "name": "Collar not moving",
         "description": (
-            "Average activity over six hours below 10 while the battery is fine "
-            "(architecture 15.4, without the baseline term until phase 13)."
+            "The accelerometer of the collar has not changed between status messages for "
+            "twelve hours (at least three messages), while the battery is fine. Checked hourly."
         ),
         "document": {
             "trigger": {"kind": "schedule", "every_seconds": 3600},
@@ -122,10 +122,18 @@ TEMPLATES: dict[str, dict[str, Any]] = {
                     {
                         "type": "window",
                         "metric": "activity",
-                        "aggregate": "avg",
-                        "seconds": 21_600,
+                        "aggregate": "max",
+                        "seconds": 43_200,
                         "op": "<",
-                        "value": 10,
+                        "value": 1.0,
+                    },
+                    {
+                        "type": "window",
+                        "metric": "activity",
+                        "aggregate": "count",
+                        "seconds": 43_200,
+                        "op": ">=",
+                        "value": 3,
                     },
                     {"type": "threshold", "metric": "battery_voltage", "op": ">", "value": 3.2},
                 ]
@@ -134,7 +142,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             "event": {
                 "event_type": "POSSIBLE_IMMOBILITY",
                 "severity": "critical",
-                "title": "{entity} may be immobile: activity {value} over 6 hours",
+                "title": "{entity} has not moved for 12 hours",
                 "create_alert": True,
             },
         },

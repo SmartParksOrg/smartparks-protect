@@ -20,7 +20,13 @@ import type {
 } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
 import { useIsPhone } from "@/hooks/useMediaQuery";
-import { BatteryTrend, BatteryValue } from "@/components/map/BatteryTrend";
+import {
+  BatteryTrend,
+  BatteryValue,
+  MovementTrend,
+  MovementValue,
+} from "@/components/map/BatteryTrend";
+import { movementLevel } from "@/lib/movement";
 import { imprecise } from "@/lib/accuracy";
 import { formatAgo, formatTime } from "@/lib/format";
 import { projectFor } from "@/lib/scope";
@@ -209,6 +215,8 @@ export function PanelSummary({
   batteryProject,
   batteryDevice,
   healthLevel,
+  lastMovementAt,
+  activity,
   now,
 }: {
   lastSeenAt: string | null | undefined;
@@ -220,11 +228,17 @@ export function PanelSummary({
   batteryProject?: string;
   batteryDevice?: string | null;
   healthLevel: string | null | undefined;
+  /** Movement from the accelerometer (Tim, 2026-09-14): shown when the device reports it. */
+  lastMovementAt?: string | null;
+  activity?: number | null;
   now: number;
 }) {
   const { t } = useTranslation();
-  // the battery trend unfolds inside the panel (Tim, 2026-09-14), folded again per object
+  // the battery and movement trends unfold inside the panel (Tim, 2026-09-14), folded again
+  // per object
   const [trendOpen, setTrendOpen] = useState(false);
+  const [movementOpen, setMovementOpen] = useState(false);
+  const hasMovement = activity !== undefined && activity !== null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <span title={formatTime(lastSeenAt)}>
@@ -271,6 +285,22 @@ export function PanelSummary({
             <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} />
           </div>
         )}
+      {hasMovement && (
+        <span className={batteryClass(movementLevel(lastMovementAt, now))}>
+          <MovementValue
+            deviceId={batteryProject ? batteryDevice : null}
+            lastMovementAt={lastMovementAt}
+            now={now}
+            open={movementOpen}
+            onToggle={() => setMovementOpen((o) => !o)}
+          />
+        </span>
+      )}
+      {hasMovement && movementOpen && batteryProject && batteryDevice && (
+        <div className="basis-full rounded-md border bg-muted/30 p-2">
+          <MovementTrend projectId={batteryProject} deviceId={batteryDevice} />
+        </div>
+      )}
     </div>
   );
 }
@@ -286,6 +316,8 @@ function HealthRows({
   batteryDevice,
   healthLevel,
   lastStatusAt,
+  lastMovementAt,
+  activity,
   now,
   onOpenPosition,
   onOpenState,
@@ -301,6 +333,9 @@ function HealthRows({
   batteryDevice?: string | null;
   healthLevel: string | null | undefined;
   lastStatusAt: string | null | undefined;
+  /** Movement from the accelerometer (Tim, 2026-09-14): shown when the device reports it. */
+  lastMovementAt?: string | null;
+  activity?: number | null;
   now: number;
   /** Opens the fix of that moment, the panel a track point opens (Tim, 2026-09-13). */
   onOpenPosition?: () => void;
@@ -308,8 +343,11 @@ function HealthRows({
   onOpenState?: () => void;
 }) {
   const { t } = useTranslation();
-  // the battery trend unfolds inside the panel (Tim, 2026-09-14), folded again per object
+  // the battery and movement trends unfold inside the panel (Tim, 2026-09-14), folded again
+  // per object
   const [trendOpen, setTrendOpen] = useState(false);
+  const [movementOpen, setMovementOpen] = useState(false);
+  const hasMovement = activity !== undefined && activity !== null;
   // on a phone the rows stay short (Tim, 2026-09-14): the accuracy as a badge with its
   // sentence behind a tap, and "estimate" for the position's kind
   const phone = useIsPhone();
@@ -379,6 +417,26 @@ function HealthRows({
             <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} />
           </div>
         )}
+      {hasMovement && (
+        <PanelRow
+          label={t("Movement")}
+          className={batteryClass(movementLevel(lastMovementAt, now))}
+          title={lastMovementAt ? formatTime(lastMovementAt) : undefined}
+        >
+          <MovementValue
+            deviceId={batteryProject ? batteryDevice : null}
+            lastMovementAt={lastMovementAt}
+            now={now}
+            open={movementOpen}
+            onToggle={() => setMovementOpen((o) => !o)}
+          />
+        </PanelRow>
+      )}
+      {hasMovement && movementOpen && batteryProject && batteryDevice && (
+        <div className="col-span-2 rounded-md border bg-muted/30 p-2">
+          <MovementTrend projectId={batteryProject} deviceId={batteryDevice} />
+        </div>
+      )}
       {lastStatusAt && (
         <PanelRow label={t("Last status")} title={formatTime(lastStatusAt)}>
           {onOpenState ? (
@@ -565,6 +623,8 @@ export function EntityPanel({
           batteryProject={projectFor(projectId, props.project_id)}
           batteryDevice={props.device_id}
           healthLevel={props.health_level}
+          lastMovementAt={props.last_movement_at}
+          activity={props.activity}
           now={now}
         />
       }
@@ -594,6 +654,8 @@ export function EntityPanel({
         batteryProject={projectFor(projectId, props.project_id)}
         batteryDevice={props.device_id}
         healthLevel={props.health_level}
+        lastMovementAt={props.last_movement_at}
+        activity={props.activity}
         lastStatusAt={props.last_status_at}
         now={now}
       />
@@ -720,6 +782,8 @@ export function DevicePanel({
           batteryProject={projectFor(projectId, props.project_id)}
           batteryDevice={props.device_id}
           healthLevel={props.health_level}
+          lastMovementAt={props.last_movement_at}
+          activity={props.activity}
           now={now}
         />
       }
@@ -749,6 +813,8 @@ export function DevicePanel({
         batteryProject={projectFor(projectId, props.project_id)}
         batteryDevice={props.device_id}
         healthLevel={props.health_level}
+        lastMovementAt={props.last_movement_at}
+        activity={props.activity}
         lastStatusAt={props.last_status_at}
         now={now}
       />

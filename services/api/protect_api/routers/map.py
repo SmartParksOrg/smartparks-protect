@@ -250,6 +250,7 @@ async def current_state(
                 latest_state=device_state.latest_state,
                 latest_state_time=device_state.latest_state_time,
                 last_seen_at=device_state.last_seen_at,
+                last_movement_at=device_state.last_movement_at,
             )
 
         features.append(
@@ -283,6 +284,10 @@ async def current_state(
                     "active_alert_count": state.active_alert_count,
                     "health_level": health.level if health else None,
                     "battery_voltage": device_state.battery_voltage if device_state else None,
+                    "last_movement_at": device_state.last_movement_at.isoformat()
+                    if device_state and device_state.last_movement_at
+                    else None,
+                    "activity": _latest_value(device_state, "activity"),
                     "last_status_at": health.last_status_at.isoformat()
                     if health and health.last_status_at
                     else None,
@@ -388,6 +393,7 @@ async def devices_state(
                 latest_state=state.latest_state,
                 latest_state_time=state.latest_state_time,
                 last_seen_at=state.last_seen_at,
+                last_movement_at=state.last_movement_at,
             )
         entity = tracking.get(device.id)
         features.append(
@@ -418,6 +424,10 @@ async def devices_state(
                     "accuracy_m": state.latest_accuracy_m if state else None,
                     "health_level": health.level if health else None,
                     "battery_voltage": state.battery_voltage if state else None,
+                    "last_movement_at": state.last_movement_at.isoformat()
+                    if state and state.last_movement_at
+                    else None,
+                    "activity": _latest_value(state, "activity"),
                     "last_status_at": health.last_status_at.isoformat()
                     if health and health.last_status_at
                     else None,
@@ -478,6 +488,13 @@ async def current_state_tile(
         sql, {"z": z, "x": x, "y": y, "project_id": context.project_id, "limit": MAX_FEATURES}
     )
     return Response(content=bytes(tile or b""), media_type="application/vnd.mapbox-vector-tile")
+
+
+def _latest_value(state: DeviceCurrentState | None, key: str) -> float | None:
+    """The newest value of one metric on a device's current state, for the map features."""
+    entry = (state.latest_measurements or {}).get(key) if state else None
+    value = entry.get("value") if isinstance(entry, dict) else None
+    return float(value) if isinstance(value, int | float) else None
 
 
 @router.get("/tracks", response_model=TrackResponse)
@@ -608,6 +625,7 @@ async def device_state(
         latest_state=current.latest_state,
         latest_state_time=current.latest_state_time,
         last_seen_at=current.last_seen_at,
+        last_movement_at=current.last_movement_at,
     )
     row = await session.scalar(
         select(DeviceStateHistory)

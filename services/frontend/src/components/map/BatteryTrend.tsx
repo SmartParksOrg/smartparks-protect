@@ -14,6 +14,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { chartTheme } from "@/lib/chartStyle";
 import { formatInZone } from "@/lib/analytics";
 import { browserTimezone, type RangePreset, rangeFor } from "@/lib/analytics";
+import { formatAgo } from "@/lib/format";
+import { stillHours } from "@/lib/movement";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
@@ -27,7 +29,7 @@ const RANGE_LABELS: Record<string, string> = {
 /** The battery value of an entity or device panel as a button that unfolds the recent trend
  * inside the panel (Tim, 2026-09-14): a small line of the collar's battery voltage over the
  * last day, week or month from the analytics series, so a person sees whether it drops
- * without leaving the map or covering it. */
+ * without leaving the map or covering it. The movement value below works the same way. */
 export function BatteryValue({
   deviceId,
   voltage,
@@ -57,7 +59,20 @@ export function BatteryValue({
   );
 }
 
-/** The trend itself: mounted while the popover is open, so the series is read on demand. */
+/** What one trend shows: the metric, its words and how its axis is stepped. */
+interface TrendSpec {
+  metric: string;
+  label: string;
+  unit: string;
+  decimals: number;
+  /** The axis step, so the labels never crowd. */
+  step: number;
+  /** A floor for the axis (zero for movement: a flat line at zero means still). */
+  floor?: number;
+  ariaLabel: string;
+}
+
+/** The battery trend: mounted while unfolded, so the series is read on demand. */
 export function BatteryTrend({
   projectId,
   deviceId,
@@ -66,12 +81,106 @@ export function BatteryTrend({
   deviceId: string;
 }) {
   const { t } = useTranslation();
+  return (
+    <MetricTrend
+      projectId={projectId}
+      deviceId={deviceId}
+      spec={{
+        metric: "battery_voltage",
+        label: t("Battery"),
+        unit: "V",
+        decimals: 2,
+        step: 0.05,
+        ariaLabel: t("Battery voltage over the period"),
+      }}
+    />
+  );
+}
+
+/** The movement value of a panel: moving, or still for so long, as the button that unfolds
+ * the movement trend (Tim, 2026-09-14), the same way as the battery. */
+export function MovementValue({
+  deviceId,
+  lastMovementAt,
+  now,
+  open,
+  onToggle,
+  className,
+}: {
+  deviceId: string | null | undefined;
+  lastMovementAt: string | null | undefined;
+  now: number;
+  open: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const still = stillHours(lastMovementAt, now);
+  const label = !lastMovementAt
+    ? t("no movement seen yet")
+    : still === null
+      ? t("moving, {{ago}}", { ago: formatAgo(lastMovementAt, now) })
+      : still >= 48
+        ? t("still for {{days}} d", { days: Math.floor(still / 24) })
+        : t("still for {{hours}} h", { hours: still });
+  if (!deviceId) return <span className={className}>{label}</span>;
+  return (
+    <button
+      type="button"
+      className={`underline underline-offset-2 hover:text-primary ${className ?? ""}`}
+      title={open ? t("Hide the movement trend") : t("Show the movement trend")}
+      aria-expanded={open}
+      onClick={onToggle}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** The movement trend: the change of the accelerometer between status messages, flat at
+ * zero while the collar lies still. */
+export function MovementTrend({
+  projectId,
+  deviceId,
+}: {
+  projectId: string;
+  deviceId: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <MetricTrend
+      projectId={projectId}
+      deviceId={deviceId}
+      spec={{
+        metric: "activity",
+        label: t("Movement"),
+        unit: "m/s²",
+        decimals: 1,
+        step: 0.5,
+        floor: 0,
+        ariaLabel: t("Movement over the period"),
+      }}
+    />
+  );
+}
+
+/** One metric of a device over the last day, week or month from the analytics series. */
+function MetricTrend({
+  projectId,
+  deviceId,
+  spec,
+}: {
+  projectId: string;
+  deviceId: string;
+  spec: TrendSpec;
+}) {
+  const { t } = useTranslation();
   const [range, setRange] = useState<RangePreset>("7d");
   const window = rangeFor(range);
   const timezone = browserTimezone();
   const series = useQuery({
     queryKey: queryKeys.analyticsSeries(projectId, {
-      metric: "battery_voltage",
+      metric: spec.metric,
       deviceId,
       ...window,
     }),
@@ -80,7 +189,7 @@ export function BatteryTrend({
         `/api/v1/projects/${projectId}/analytics/series`,
         {
           query: {
-            metric: "battery_voltage",
+            metric: spec.metric,
             device_id: deviceId,
             from: window.from,
             to: window.to,
@@ -96,10 +205,11 @@ export function BatteryTrend({
   const values = points
     .map((p) => p.values.mean)
     .filter((v): v is number => v != null);
+  const show = (v: number) => `${v.toFixed(spec.decimals)} ${spec.unit}`;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{t("Battery")}</span>
+        <span className="text-sm font-medium">{spec.label}</span>
         <span className="flex gap-1" role="group" aria-label={t("Period")}>
           {RANGES.map((r) => (
             <button
@@ -134,18 +244,17 @@ export function BatteryTrend({
                 [Date.parse(p.time), p.values.mean] as [number, number | null],
             )}
             timezone={timezone}
+            spec={spec}
           />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>
-              {t("Low {{value}} V", { value: Math.min(...values).toFixed(2) })}
+              {t("Low {{value}}", { value: show(Math.min(...values)) })}
             </span>
             <span>
-              {t("High {{value}} V", { value: Math.max(...values).toFixed(2) })}
+              {t("High {{value}}", { value: show(Math.max(...values)) })}
             </span>
             <span>
-              {t("Now {{value}} V", {
-                value: values[values.length - 1].toFixed(2),
-              })}
+              {t("Now {{value}}", { value: show(values[values.length - 1]) })}
             </span>
           </div>
         </>
@@ -159,11 +268,12 @@ export function BatteryTrend({
 function Sparkline({
   points,
   timezone,
+  spec,
 }: {
   points: [number, number | null][];
   timezone: string;
+  spec: TrendSpec;
 }) {
-  const { t } = useTranslation();
   const { resolved } = useTheme();
   const dark = resolved === "dark";
   const container = useRef<HTMLDivElement | null>(null);
@@ -189,10 +299,16 @@ function Sparkline({
     const values = points
       .map((p) => p[1])
       .filter((v): v is number => v != null);
-    // the axis in 0.05 V steps around the data, so the labels never crowd
-    const step = 0.05;
-    const low = Math.floor((Math.min(...values) - 0.01) / step) * step;
-    const high = Math.ceil((Math.max(...values) + 0.01) / step) * step;
+    // the axis in the spec's steps around the data, so the labels never crowd
+    const step = spec.step;
+    const low =
+      spec.floor !== undefined
+        ? spec.floor
+        : Math.floor((Math.min(...values) - step / 5) / step) * step;
+    const high = Math.max(
+      low + step,
+      Math.ceil((Math.max(...values) + step / 5) / step) * step,
+    );
     instance.setOption(
       {
         animation: false,
@@ -204,7 +320,7 @@ function Sparkline({
           formatter: (params: unknown) => {
             const p = (params as { value: [number, number | null] }[])[0];
             if (!p) return "";
-            return `${formatInZone(new Date(p.value[0]).toISOString(), timezone)}<br/>${p.value[1] == null ? "" : p.value[1].toFixed(2)} V`;
+            return `${formatInZone(new Date(p.value[0]).toISOString(), timezone)}<br/>${p.value[1] == null ? "" : p.value[1].toFixed(spec.decimals)} ${spec.unit}`;
           },
         },
         xAxis: {
@@ -221,13 +337,13 @@ function Sparkline({
         },
         yAxis: {
           type: "value",
-          min: Number(low.toFixed(2)),
-          max: Number(high.toFixed(2)),
+          min: Number(low.toFixed(3)),
+          max: Number(high.toFixed(3)),
           interval: Math.max(step, Math.round((high - low) / 2 / step) * step),
           axisLabel: {
             color: th.text,
             fontSize: 10,
-            formatter: (v: number) => v.toFixed(2),
+            formatter: (v: number) => v.toFixed(spec.decimals),
           },
           splitLine: { lineStyle: { color: th.grid } },
         },
@@ -245,13 +361,13 @@ function Sparkline({
       },
       true,
     );
-  }, [points, timezone, dark]);
+  }, [points, timezone, dark, spec]);
   return (
     <div
       ref={container}
       className="h-28 w-full"
       role="img"
-      aria-label={t("Battery voltage over the period")}
+      aria-label={spec.ariaLabel}
     />
   );
 }

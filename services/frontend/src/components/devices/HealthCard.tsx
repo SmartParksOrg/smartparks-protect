@@ -61,7 +61,7 @@ export function HealthDot({ level }: { level: string | null | undefined }) {
 /** The compact line for lists and the map: battery, temperature, uptime and firmware when present. */
 export function HealthLine({ health }: { health: DeviceHealth | null | undefined }) {
   if (!health || health.fields.length === 0) return null;
-  const wanted = ["battery_voltage", "device_temperature", "uptime", "firmware_version"];
+  const wanted = ["battery_voltage", "movement", "device_temperature", "uptime", "firmware_version"];
   const parts = wanted.map((k) => health.fields.find((f) => f.key === k)).filter((f): f is HealthValue => Boolean(f));
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 text-xs">

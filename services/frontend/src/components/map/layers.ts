@@ -67,6 +67,10 @@ export interface EntityFeatureProperties {
   active_alert_count: number;
   health_level?: string | null;
   battery_voltage?: number | null;
+  /** The last status message whose accelerometer changed (Tim, 2026-09-14), and the newest
+   * change itself; absent for a device that reports no accelerometer. */
+  last_movement_at?: string | null;
+  activity?: number | null;
   last_status_at?: string | null;
   device_last_seen_at?: string | null;
 }
@@ -94,6 +98,10 @@ export interface DeviceFeatureProperties {
   accuracy_m?: number | null;
   health_level?: string | null;
   battery_voltage?: number | null;
+  /** The last status message whose accelerometer changed (Tim, 2026-09-14), and the newest
+   * change itself; absent for a device that reports no accelerometer. */
+  last_movement_at?: string | null;
+  activity?: number | null;
   last_status_at?: string | null;
   picture_updated_at?: string | null;
 }
