@@ -62,8 +62,12 @@ def test_a_straight_walk_reproduces_its_totals():
     assert len(m.daily_km) == 11 and all(
         v == pytest.approx(12, rel=0.05) for _, v in m.daily_km[1:-1]
     )
-    assert sum(m.hour_km) == pytest.approx(s["distance_km"], rel=0.01)
-    assert sum(m.turning_hist) == 238 and m.turning_hist[8] == 238  # every turn is 0 degrees
+    assert sum(v for _, v in m.hour_km) == pytest.approx(s["distance_km"], rel=0.01)
+    assert [h for h, _ in m.hour_km] == [str(h) for h in range(24)]
+    # every turn is 0 degrees: the bin centred on 11 (from 0 to 22.5) holds them all
+    assert sum(v for _, v in m.turning_hist) == 238
+    assert dict(m.turning_hist)["11"] == 238
+    assert m.speed_hist[0][0] == 0 and sum(v for _, v in m.speed_hist) == 239
     assert m.nsd[-1][1] == pytest.approx(s["displacement_km"] ** 2, rel=0.02)
     # a walk that never lingers has hotspots over the cells it crossed, none large
     assert s["hotspot_count"] >= 1 and all(share < 0.05 for _, share, _ in m.hotspot_cells)

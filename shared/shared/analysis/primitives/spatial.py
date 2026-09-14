@@ -167,7 +167,7 @@ async def clusters_sql(
             text(
                 """
                 WITH fixes AS (
-                    SELECT ST_Transform(coalesce(curated_geom, geom), :srid) AS g,
+                    SELECT ST_Transform(coalesce(curated_geom, geom), CAST(:srid AS integer)) AS g,
                            coalesce(curated_time, time) AS t
                     FROM positions
                     WHERE entity_id = :entity_id
@@ -176,8 +176,10 @@ async def clusters_sql(
                       AND valid AND record_type <> 'network'
                 ),
                 labelled AS (
-                    SELECT g, t, ST_ClusterDBSCAN(g, eps := :eps, minpoints := :min_points)
-                        OVER () AS cid
+                    SELECT g, t,
+                           ST_ClusterDBSCAN(
+                               g, eps := CAST(:eps AS float8), minpoints := CAST(:min_points AS integer)
+                           ) OVER () AS cid
                     FROM fixes
                 )
                 SELECT ST_AsGeoJSON(ST_Transform(ST_ConvexHull(ST_Collect(g)), 4326)) AS hull,
@@ -186,7 +188,7 @@ async def clusters_sql(
                 WHERE cid IS NOT NULL
                 GROUP BY cid
                 ORDER BY count(*) DESC
-                LIMIT :max_clusters
+                LIMIT CAST(:max_clusters AS integer)
                 """
             ),
             {

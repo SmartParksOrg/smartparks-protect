@@ -108,9 +108,9 @@ class SubjectMetrics:
 
     summary: dict[str, float | None]
     daily_km: list[list[float]]  # [ms at local midnight, km]
-    speed_hist: list[float]  # counts per bin
-    hour_km: list[float]  # 24 values
-    turning_hist: list[float]  # TURNING_BINS values
+    speed_hist: list[list[Any]]  # [bin start in m/s, fixes]
+    hour_km: list[list[Any]]  # [hour of the day, km]
+    turning_hist: list[list[Any]]  # [bin centre in degrees, steps]
     nsd: list[list[float]]  # [ms, km²]
     class_km: dict[str, float]  # day, twilight, night
     warnings: list[Warning] = field(default_factory=list)
@@ -166,7 +166,7 @@ def analyse_trajectory(
     if "median_interval_s" in figures:
         summary["median_interval_min"] = round(figures["median_interval_s"] / 60, 1)
     if n == 0:
-        return SubjectMetrics(summary, [], [], [0.0] * 24, [0.0] * TURNING_BINS, [], {}, warnings)
+        return SubjectMetrics(summary, [], [], [], [], [], {}, warnings)
 
     devices = {d for d in track.device_ids}
     if len(devices) > 1:
@@ -210,8 +210,8 @@ def analyse_trajectory(
         summary["median_speed_mps"] = round(float(np.median(speeds)), 4)
         summary["p95_speed_mps"] = round(float(np.percentile(speeds, 95)), 4)
         top = max(float(np.percentile(speeds, 99)), 0.01)
-        hist, _ = np.histogram(np.clip(speeds, 0, top), bins=SPEED_BINS, range=(0, top))
-        speed_hist = [float(v) for v in hist]
+        hist, edges = np.histogram(np.clip(speeds, 0, top), bins=SPEED_BINS, range=(0, top))
+        speed_hist = [[round(float(edges[i]), 3), int(hist[i])] for i in range(SPEED_BINS)]
         figures["speed_bin_mps"] = top / SPEED_BINS
     else:
         speed_hist = []
@@ -238,22 +238,24 @@ def analyse_trajectory(
 
     # distance per local day and per hour of the day, by the step's start
     per_day: dict[Any, float] = {}
-    hour_km = [0.0] * 24
+    per_hour = [0.0] * 24
     zone = ZoneInfo(tz)
     for i in np.where(moving)[0]:
         day = days[i]
         per_day[day] = per_day.get(day, 0.0) + float(s.dist_m[i])
         hour = datetime.fromtimestamp(float(track.times[i]), tz=UTC).astimezone(zone).hour
-        hour_km[hour] += float(s.dist_m[i]) / 1000
+        per_hour[hour] += float(s.dist_m[i]) / 1000
     daily_km = [
         [_ms(datetime(d.year, d.month, d.day, tzinfo=UTC).timestamp()), round(v / 1000, 3)]
         for d, v in sorted(per_day.items())
     ]
-    hour_km = [round(v, 3) for v in hour_km]
+    hour_km = [[str(h), round(v, 3)] for h, v in enumerate(per_hour)]
 
     turns = turning_angles(s)
-    t_hist, _ = np.histogram(turns, bins=TURNING_BINS, range=(-180, 180))
-    turning_hist = [float(v) for v in t_hist]
+    t_hist, t_edges = np.histogram(turns, bins=TURNING_BINS, range=(-180, 180))
+    turning_hist = [
+        [str(int((t_edges[i] + t_edges[i + 1]) / 2)), int(t_hist[i])] for i in range(TURNING_BINS)
+    ]
 
     # residence on the grid and the hotspot cells
     metrics = SubjectMetrics(
@@ -348,7 +350,9 @@ def build_document(
             key="day_night",
             kind="stacked",
             unit="km",
-            series=series(lambda m: [m.class_km.get(k, 0.0) for k in ("day", "twilight", "night")]),
+            series=series(
+                lambda m: [[k, m.class_km.get(k, 0.0)] for k in ("day", "twilight", "night")]
+            ),
         ),
     ]
     return ResultDocument(
