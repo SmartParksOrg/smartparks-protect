@@ -10948,6 +10948,773 @@
     }
    }
   },
+  "/api/v1/analysis-modules": {
+   "get": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "List Modules",
+    "description": "The modules this deployment offers (the project's own list applies on the project).",
+    "operationId": "list_modules_api_v1_analysis_modules_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/AnalysisModuleRead"
+         },
+         "title": "Response List Modules Api V1 Analysis Modules Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analyses/estimate": {
+   "get": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Estimate",
+    "description": "What a run would read, before it is queued.",
+    "operationId": "estimate_api_v1_projects__project_id__analyses_estimate_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "module",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Module"
+      }
+     },
+     {
+      "name": "parameters",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "description": "The parameters as a JSON document",
+       "title": "Parameters"
+      },
+      "description": "The parameters as a JSON document"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AnalysisEstimate"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analyses": {
+   "get": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "List Runs",
+    "description": "The project's runs, newest first; the result document is left out here.",
+    "operationId": "list_runs_api_v1_projects__project_id__analyses_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "module",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Module"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/AnalysisStatus"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "key of the last item of the previous page",
+       "title": "Cursor"
+      },
+      "description": "key of the last item of the previous page"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PageResponse_AnalysisRunRead_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Create Run",
+    "description": "Queue a run: the parameters validated by the module, the subjects resolved and narrowed\nto the caller's scope, the bounds checked, then the row and the message.",
+    "operationId": "create_run_api_v1_projects__project_id__analyses_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AnalysisRunCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AnalysisRunRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analyses/{run_id}": {
+   "get": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Get Run",
+    "operationId": "get_run_api_v1_projects__project_id__analyses__run_id__get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AnalysisRunRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Update Run",
+    "description": "Keep the run under a name (it stops expiring), or drop the name (it expires again).",
+    "operationId": "update_run_api_v1_projects__project_id__analyses__run_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AnalysisRunUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AnalysisRunRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Delete Run",
+    "operationId": "delete_run_api_v1_projects__project_id__analyses__run_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analyses/{run_id}/cancel": {
+   "post": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Cancel Run",
+    "description": "A queued run is cancelled at once; a running one stops at its next step.",
+    "operationId": "cancel_run_api_v1_projects__project_id__analyses__run_id__cancel_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AnalysisRunRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analyses/{run_id}/rerun": {
+   "post": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Rerun",
+    "description": "A new run with the same parameters, linked to this one.",
+    "operationId": "rerun_api_v1_projects__project_id__analyses__run_id__rerun_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AnalysisRunRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analyses/{run_id}/geometries": {
+   "get": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Run Geometries",
+    "description": "The run's result geometries as a GeoJSON feature collection, by kind and subject.",
+    "operationId": "run_geometries_api_v1_projects__project_id__analyses__run_id__geometries_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "subject_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Subject Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 2000,
+       "minimum": 1,
+       "default": 2000,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Run Geometries Api V1 Projects  Project Id  Analyses  Run Id  Geometries Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/analyses/{run_id}/export": {
+   "get": {
+    "tags": [
+     "analyses"
+    ],
+    "summary": "Export Run",
+    "description": "The result to take elsewhere: the document as JSON, the geometries as GeoJSON, or one\nof the document's tables (by its key) as CSV.",
+    "operationId": "export_run_api_v1_projects__project_id__analyses__run_id__export_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "what",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(document|geometries|[a-z_]+)$",
+       "default": "document",
+       "title": "What"
+      }
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(json|geojson|csv)$",
+       "default": "json",
+       "title": "Format"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/rules/templates": {
    "get": {
     "tags": [
@@ -20223,6 +20990,355 @@
      "note"
     ],
     "title": "AlertRead"
+   },
+   "AnalysisEstimate": {
+    "properties": {
+     "module": {
+      "type": "string",
+      "title": "Module"
+     },
+     "subjects": {
+      "type": "integer",
+      "title": "Subjects"
+     },
+     "days": {
+      "type": "number",
+      "title": "Days"
+     },
+     "fixes": {
+      "type": "integer",
+      "title": "Fixes"
+     },
+     "max_subjects": {
+      "type": "integer",
+      "title": "Max Subjects"
+     },
+     "max_days": {
+      "type": "integer",
+      "title": "Max Days"
+     },
+     "max_fixes": {
+      "type": "integer",
+      "title": "Max Fixes"
+     },
+     "ok": {
+      "type": "boolean",
+      "title": "Ok"
+     },
+     "reasons": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Reasons"
+     }
+    },
+    "type": "object",
+    "required": [
+     "module",
+     "subjects",
+     "days",
+     "fixes",
+     "max_subjects",
+     "max_days",
+     "max_fixes",
+     "ok"
+    ],
+    "title": "AnalysisEstimate",
+    "description": "What a run would read, before it is queued: the counts and which bound it would cross."
+   },
+   "AnalysisModuleRead": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "version": {
+      "type": "string",
+      "title": "Version"
+     },
+     "limits": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Limits"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "version",
+     "limits"
+    ],
+    "title": "AnalysisModuleRead"
+   },
+   "AnalysisRunCreate": {
+    "properties": {
+     "module": {
+      "type": "string",
+      "maxLength": 32,
+      "title": "Module"
+     },
+     "parameters": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Parameters"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "module",
+     "parameters"
+    ],
+    "title": "AnalysisRunCreate"
+   },
+   "AnalysisRunRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "module": {
+      "type": "string",
+      "title": "Module"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "parameters": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Parameters"
+     },
+     "method_version": {
+      "type": "string",
+      "title": "Method Version"
+     },
+     "progress": {
+      "type": "integer",
+      "title": "Progress"
+     },
+     "cancel_requested": {
+      "type": "boolean",
+      "title": "Cancel Requested"
+     },
+     "input_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Input Count"
+     },
+     "excluded_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Excluded Count"
+     },
+     "result": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Result"
+     },
+     "result_version": {
+      "type": "integer",
+      "title": "Result Version"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     },
+     "created_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By User Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "source_run_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Run Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "module",
+     "status",
+     "name",
+     "parameters",
+     "method_version",
+     "progress",
+     "cancel_requested",
+     "input_count",
+     "excluded_count",
+     "result",
+     "result_version",
+     "error_code",
+     "error_message",
+     "created_by_user_id",
+     "created_at",
+     "started_at",
+     "finished_at",
+     "expires_at",
+     "source_run_id"
+    ],
+    "title": "AnalysisRunRead"
+   },
+   "AnalysisRunUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "title": "AnalysisRunUpdate"
+   },
+   "AnalysisStatus": {
+    "type": "string",
+    "enum": [
+     "queued",
+     "running",
+     "completed",
+     "failed",
+     "cancelled"
+    ],
+    "title": "AnalysisStatus",
+    "description": "The life of an analysis run (docs/ANALYTICS_PHASE1_PLAN.md, section 7)."
    },
    "ApplicationConnection": {
     "properties": {
@@ -31815,6 +32931,33 @@
     ],
     "title": "PageResponse[AlertRead]"
    },
+   "PageResponse_AnalysisRunRead_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/AnalysisRunRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items"
+    ],
+    "title": "PageResponse[AnalysisRunRead]"
+   },
    "PageResponse_AutomationRead_": {
     "properties": {
      "items": {
@@ -33692,6 +34835,13 @@
       "type": "boolean",
       "title": "Scope Limited",
       "default": false
+     },
+     "analysis_modules": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Analysis Modules"
      }
     },
     "type": "object",

@@ -27,7 +27,8 @@ export type PermissionKey =
   | "traces:read"
   | "exports:create"
   | "views:write"
-  | "dashboards:write";
+  | "dashboards:write"
+  | "analysis:run";
 
 export const BUILTIN_ROLES = [
   "project-viewer",
@@ -107,6 +108,7 @@ export function permissionLabel(key: string): string {
     "exports:create": t("Export data"),
     "views:write": t("Keep saved views"),
     "dashboards:write": t("Build dashboards"),
+    "analysis:run": t("Run analyses"),
     "devices:control": t("Send commands to devices"),
     "devices:control_high_impact": t("Send high-impact commands"),
     "members:write": t("Manage members and roles"),
@@ -135,6 +137,7 @@ export function permissionHint(key: string): string {
     "exports:create": t("Export jobs and direct downloads."),
     "views:write": t("Saved views on the explore page."),
     "dashboards:write": t("Dashboards of the project."),
+    "analysis:run": t("Movement and grazing analyses and their kept results."),
     "devices:control": t("Status and position requests and settings."),
     "devices:control_high_impact": t("Commands that change how a device behaves for good."),
     "members:write": t("Invite people, set roles and scopes, compose roles."),

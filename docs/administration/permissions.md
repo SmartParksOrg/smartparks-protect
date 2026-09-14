@@ -30,6 +30,7 @@ Endpoints declare the key they need. The role decides whether the caller has it.
 | Exports and analysis | `exports:create` | | | yes | yes |
 | Exports and analysis | `views:write` | | | yes | yes |
 | Exports and analysis | `dashboards:write` | | | yes | yes |
+| Exports and analysis | `analysis:run` | | | yes | yes |
 | Entities and devices | `entities:write`, `devices:write` | | | | yes |
 | Data quality | `data:curate`, `data:curate_bulk`, `data:approve`, `data:revert` | | | | yes |
 | Rules and automations | `rules:write`, `automations:write` | | | | yes |

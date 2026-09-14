@@ -35,6 +35,7 @@ class Permission(StrEnum):
     EXPORTS_CREATE = "exports:create"
     VIEWS_WRITE = "views:write"
     DASHBOARDS_WRITE = "dashboards:write"
+    ANALYSIS_RUN = "analysis:run"
 
 
 #: The keys grouped by area, in the order the role editor shows them. `project:read` is in
@@ -59,7 +60,12 @@ AREAS: tuple[tuple[str, tuple[Permission, ...]], ...] = (
     ("integrations", (Permission.INTEGRATIONS_WRITE,)),
     (
         "exports_and_analysis",
-        (Permission.EXPORTS_CREATE, Permission.VIEWS_WRITE, Permission.DASHBOARDS_WRITE),
+        (
+            Permission.EXPORTS_CREATE,
+            Permission.VIEWS_WRITE,
+            Permission.DASHBOARDS_WRITE,
+            Permission.ANALYSIS_RUN,
+        ),
     ),
     ("control", (Permission.DEVICES_CONTROL, Permission.DEVICES_CONTROL_HIGH_IMPACT)),
     ("members_and_settings", (Permission.MEMBERS_WRITE, Permission.PROJECT_WRITE)),
@@ -77,6 +83,7 @@ _ANALYST = _OPERATOR | {
     Permission.EXPORTS_CREATE,
     Permission.VIEWS_WRITE,
     Permission.DASHBOARDS_WRITE,
+    Permission.ANALYSIS_RUN,
 }
 
 #: The built-in roles, each a superset of the one before (decision D185).

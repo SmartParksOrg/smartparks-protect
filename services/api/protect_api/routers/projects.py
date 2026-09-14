@@ -37,6 +37,7 @@ from protect_api.schemas.access import (
     ProjectWithRole,
 )
 from protect_api.visibility import scope_is_empty
+from shared.analysis import project_modules
 from shared.config import get_settings
 from shared.database import get_session
 from shared.enums import Role
@@ -82,6 +83,7 @@ async def list_projects(
                 **ProjectRead.model_validate(p).model_dump(),
                 role="server-admin",
                 permissions=sorted(permissions_for(None, server_admin=True)),
+                analysis_modules=project_modules(get_settings(), p.settings),
             )
             for p in rows
         ]
@@ -128,6 +130,7 @@ async def list_projects(
                 role=m.role,
                 permissions=sorted(permissions),
                 scope_limited=not scope_is_empty(m.scope),
+                analysis_modules=project_modules(get_settings(), p.settings),
             )
         )
     return PageResponse(items=items, next_cursor=next_cursor)

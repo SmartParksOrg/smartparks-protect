@@ -79,6 +79,8 @@ class ProjectWithRole(ProjectRead):
     permissions: list[str] = Field(default_factory=list)
     #: Whether a scope limits what the caller sees.
     scope_limited: bool = False
+    #: The analysis modules the project offers (docs/ANALYTICS_PHASE1_PLAN.md, section 16).
+    analysis_modules: list[str] = Field(default_factory=list)
 
 
 class ProjectRoleRead(ORMModel):

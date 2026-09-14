@@ -2466,6 +2466,174 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis-modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Modules
+         * @description The modules this deployment offers (the project's own list applies on the project).
+         */
+        get: operations["list_modules_api_v1_analysis_modules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analyses/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estimate
+         * @description What a run would read, before it is queued.
+         */
+        get: operations["estimate_api_v1_projects__project_id__analyses_estimate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analyses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Runs
+         * @description The project's runs, newest first; the result document is left out here.
+         */
+        get: operations["list_runs_api_v1_projects__project_id__analyses_get"];
+        put?: never;
+        /**
+         * Create Run
+         * @description Queue a run: the parameters validated by the module, the subjects resolved and narrowed
+         *     to the caller's scope, the bounds checked, then the row and the message.
+         */
+        post: operations["create_run_api_v1_projects__project_id__analyses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analyses/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["get_run_api_v1_projects__project_id__analyses__run_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Run */
+        delete: operations["delete_run_api_v1_projects__project_id__analyses__run_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Run
+         * @description Keep the run under a name (it stops expiring), or drop the name (it expires again).
+         */
+        patch: operations["update_run_api_v1_projects__project_id__analyses__run_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analyses/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Run
+         * @description A queued run is cancelled at once; a running one stops at its next step.
+         */
+        post: operations["cancel_run_api_v1_projects__project_id__analyses__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analyses/{run_id}/rerun": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rerun
+         * @description A new run with the same parameters, linked to this one.
+         */
+        post: operations["rerun_api_v1_projects__project_id__analyses__run_id__rerun_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analyses/{run_id}/geometries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Geometries
+         * @description The run's result geometries as a GeoJSON feature collection, by kind and subject.
+         */
+        get: operations["run_geometries_api_v1_projects__project_id__analyses__run_id__geometries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analyses/{run_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Run
+         * @description The result to take elsewhere: the document as JSON, the geometries as GeoJSON, or one
+         *     of the document's tables (by its key) as CSV.
+         */
+        get: operations["export_run_api_v1_projects__project_id__analyses__run_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/rules/templates": {
         parameters: {
             query?: never;
@@ -4732,6 +4900,123 @@ export interface components {
             /** Time */
             time?: string | null;
         };
+        /**
+         * AnalysisEstimate
+         * @description What a run would read, before it is queued: the counts and which bound it would cross.
+         */
+        AnalysisEstimate: {
+            /** Module */
+            module: string;
+            /** Subjects */
+            subjects: number;
+            /** Days */
+            days: number;
+            /** Fixes */
+            fixes: number;
+            /** Max Subjects */
+            max_subjects: number;
+            /** Max Days */
+            max_days: number;
+            /** Max Fixes */
+            max_fixes: number;
+            /** Ok */
+            ok: boolean;
+            /** Reasons */
+            reasons?: string[];
+        };
+        /** AnalysisModuleRead */
+        AnalysisModuleRead: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Version */
+            version: string;
+            /** Limits */
+            limits: {
+                [key: string]: number;
+            };
+        };
+        /** AnalysisRunCreate */
+        AnalysisRunCreate: {
+            /** Module */
+            module: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Name */
+            name?: string | null;
+        };
+        /** AnalysisRunRead */
+        AnalysisRunRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Module */
+            module: string;
+            /** Status */
+            status: string;
+            /** Name */
+            name: string | null;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Method Version */
+            method_version: string;
+            /** Progress */
+            progress: number;
+            /** Cancel Requested */
+            cancel_requested: boolean;
+            /** Input Count */
+            input_count: number | null;
+            /** Excluded Count */
+            excluded_count: number | null;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
+            /** Result Version */
+            result_version: number;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Source Run Id */
+            source_run_id: string | null;
+        };
+        /** AnalysisRunUpdate */
+        AnalysisRunUpdate: {
+            /** Name */
+            name?: string | null;
+        };
+        /**
+         * AnalysisStatus
+         * @description The life of an analysis run (docs/ANALYTICS_PHASE1_PLAN.md, section 7).
+         * @enum {string}
+         */
+        AnalysisStatus: "queued" | "running" | "completed" | "failed" | "cancelled";
         /** ApplicationConnection */
         ApplicationConnection: {
             /** Application Id */
@@ -8917,6 +9202,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PageResponse[AnalysisRunRead] */
+        PageResponse_AnalysisRunRead_: {
+            /** Items */
+            items: components["schemas"]["AnalysisRunRead"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** PageResponse[AutomationRead] */
         PageResponse_AutomationRead_: {
             /** Items */
@@ -9537,6 +9829,8 @@ export interface components {
              * @default false
              */
             scope_limited: boolean;
+            /** Analysis Modules */
+            analysis_modules?: string[];
         };
         /** QueueItem */
         QueueItem: {
@@ -16655,6 +16949,379 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExportJobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_modules_api_v1_analysis_modules_get: {
+        parameters: {
+            query: {
+                project_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisModuleRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estimate_api_v1_projects__project_id__analyses_estimate_get: {
+        parameters: {
+            query: {
+                module: string;
+                /** @description The parameters as a JSON document */
+                parameters: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisEstimate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_v1_projects__project_id__analyses_get: {
+        parameters: {
+            query?: {
+                module?: string | null;
+                status?: components["schemas"]["AnalysisStatus"] | null;
+                limit?: number;
+                /** @description key of the last item of the previous page */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse_AnalysisRunRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_run_api_v1_projects__project_id__analyses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalysisRunCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_api_v1_projects__project_id__analyses__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_run_api_v1_projects__project_id__analyses__run_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_run_api_v1_projects__project_id__analyses__run_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalysisRunUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_run_api_v1_projects__project_id__analyses__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rerun_api_v1_projects__project_id__analyses__run_id__rerun_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_geometries_api_v1_projects__project_id__analyses__run_id__geometries_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                subject_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_run_api_v1_projects__project_id__analyses__run_id__export_get: {
+        parameters: {
+            query?: {
+                what?: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

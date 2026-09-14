@@ -7,6 +7,7 @@ from protect_api.oauth.routes import router as oauth_router
 from protect_api.realtime import router as realtime_router
 from protect_api.routers.admin import router as admin_router
 from protect_api.routers.admin_traffic import router as admin_traffic_router
+from protect_api.routers.analyses import router as analyses_router
 from protect_api.routers.analytics import router as analytics_router
 from protect_api.routers.attention import router as attention_router
 from protect_api.routers.automations import admin_router as admin_automations_router
@@ -62,6 +63,7 @@ for router in (
     records_router,
     analytics_router,
     exports_router,
+    analyses_router,
     rules_router,
     events_router,
     admin_events_router,

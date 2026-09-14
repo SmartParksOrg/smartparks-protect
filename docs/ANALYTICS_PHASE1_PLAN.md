@@ -294,13 +294,14 @@ cleanup loop    -> expired runs deleted hourly, in the analysis worker's backgro
 
 The handler in the analysis worker (`services/analysis/protect_analysis/main.py`, built on `shared.worker.Worker` like the export worker):
 
-```python
+```
 async def on_analysis_requested(message):
-    async with ANALYSIS_SLOT:                      # asyncio.Semaphore(settings.analysis_concurrency)
+    async with ANALYSIS_SLOT:  # asyncio.Semaphore(settings.analysis_concurrency)
         async with session_scope() as session:
             run = await session.get(AnalysisRun, run_id)
-            if run is None or run.status != "queued": return   # idempotent on redelivery
-            await run_analysis(session, run)      # never raises; stores failure on the row
+            if run is None or run.status != "queued":
+                return  # idempotent on redelivery
+            await run_analysis(session, run)  # never raises; stores failure on the row
 ```
 
 `run_analysis` sets `SET LOCAL statement_timeout` to `analysis_statement_timeout_seconds` on the session, wraps the module's `run` in `asyncio.wait_for(..., analysis_timeout_seconds)`, passes a `progress(percent, step)` callback that writes through its own short session (the streaming session cannot commit, the export runner notes why), and checks `cancel_requested` between steps through that same short session.
@@ -496,14 +497,17 @@ Phase 1 needs one GIS input: management polygons, which are project features. No
 
 For later levels, `shared/shared/analysis/environment.py` defines the boundary without implementing a provider:
 
-```python
+```
 class EnvironmentalDataProvider(Protocol):
-    key: str                      # "project_layers", "sentinel_ndvi", ...
-    layers: tuple[str, ...]       # what it can answer: "vegetation_class", "ndvi", ...
-    async def sample(self, layer: str, geometries: Sequence[BaseGeometry],
-                     period: Period, project_id: UUID) -> LayerSample: ...
+    key: str  # "project_layers", "sentinel_ndvi", ...
+    layers: tuple[str, ...]  # what it can answer: "vegetation_class", "ndvi", ...
 
-PROVIDERS: dict[str, EnvironmentalDataProvider] = {}   # empty in phase 1
+    async def sample(
+        self, layer: str, geometries: Sequence[BaseGeometry], period: Period, project_id: UUID
+    ) -> LayerSample: ...
+
+
+PROVIDERS: dict[str, EnvironmentalDataProvider] = {}  # empty in phase 1
 ```
 
 Rules recorded now so the first provider does not couple a module to a source:
@@ -815,6 +819,7 @@ Each task: objective, existing files, proposed files, backend, frontend, databas
 - F1 done on 2026-09-14: `shared/shared/analysis/` (`__init__.py` registry and `enabled_modules`, `base.py` contract, `limits.py`, `environment.py` provider boundary), `Settings.analysis_modules`, `tests/shared/test_analysis_boundary.py` (no core module imports the package, the setting gates the catalogue, no provider in phase 1). mypy strict clean.
 - F2 done on 2026-09-14: `AnalysisStatus` and `AnalysisModuleKey` enums, `shared/shared/models/analysis.py` (`AnalysisRun`, `AnalysisGeometry`), migration `0029_analysis_runs.py`, `tests/api/test_analysis_models.py` (round trip, the area from PostGIS, cascade). The migration runs up and down in CI's test session.
 - F3 done on 2026-09-14: the worker `services/analysis` (`protect_analysis.main`, one run at a time, an hourly cleanup), `shared/shared/analysis/runner.py` (`run_analysis` with the statement timeout, the wall clock, progress and cancellation through a short session, the result cap, the geometries with their area from PostGIS, every outcome stored on the row; `expire_analyses`), `Topic.ANALYSIS_REQUESTED`, the settings `ANALYSIS_CONCURRENCY`, `ANALYSIS_TIMEOUT_SECONDS`, `ANALYSIS_STATEMENT_TIMEOUT_SECONDS`, `ANALYSIS_MAX_FIXES` (compose, `.env.example`, `env.j2`), the worker in the five lists, the Dockerfile, the workspace, the compose service `analysis`, the CI matrix, `tests/analysis/test_worker.py` (six cases with a stub module). CI runs on the branch through a draft pull request, never merged by hand.
+- F4 done on 2026-09-14: the key `analysis:run` (area exports and analysis, the analyst and admin sets, the frontend catalogue, the permissions doc), `shared/shared/analysis/parameters.py` (`SubjectSelection`, `Window`, `CommonParameters`), `project_modules(settings, project_settings)`, `schemas/analysis.py`, `routers/analyses.py` (the catalogue, the estimate, the list, create with subject resolution from ids, a group or a type inside the caller's scope, the queue cap, read, keep by name, cancel, rerun, delete, geometries as GeoJSON, export as JSON, GeoJSON or CSV of a table), `analysis_modules` on the project list, `tests/api/test_analyses.py` (three tests over a stub module: the life of a run, subjects and bounds, roles, scope and flags). The plan's code fences lost their language tag because ruff lints fenced Python in Markdown.
 
 ## 20. Decision gate before future analytics
 

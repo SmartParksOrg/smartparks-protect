@@ -22,3 +22,14 @@ def enabled_modules(settings: Settings) -> list[str]:
     disables every analysis), in the catalogue's order, unknown keys ignored."""
     wanted = {k.strip() for k in settings.analysis_modules.split(",") if k.strip()}
     return [key for key in MODULES if key in wanted]
+
+
+def project_modules(settings: Settings, project_settings: dict[str, object] | None) -> list[str]:
+    """The deployment's modules narrowed by the project's own list (`settings.analysis_modules`
+    on the project row); absent means every enabled module."""
+    enabled = enabled_modules(settings)
+    chosen = (project_settings or {}).get("analysis_modules")
+    if not isinstance(chosen, list):
+        return enabled
+    wanted = {str(k) for k in chosen}
+    return [key for key in enabled if key in wanted]
