@@ -469,3 +469,13 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
     },
   };
 }
+
+/** Whether a URL names subjects or areas: a deep link that should open the dialog. */
+export function hasFormInput(state: FormState): boolean {
+  return (
+    state.entities.length > 0 ||
+    state.group !== null ||
+    state.type !== null ||
+    state.grazing.areas.length > 0
+  );
+}

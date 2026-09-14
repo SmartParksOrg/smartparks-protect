@@ -57,11 +57,16 @@ export function MovementForm({
   state,
   onChange,
   onRun,
+  editing = null,
 }: {
   projectId: string;
   state: FormState;
   onChange: (patch: Partial<FormState>) => void;
-  onRun: (run: AnalysisRun) => void;
+  /** The new run, and whether it replaces the run being edited. */
+  onRun: (run: AnalysisRun, replaced: boolean) => void;
+  /** Set when an existing run is being changed: its name and sharing carry over on
+   * "Run and replace". */
+  editing?: { name: string | null; shared: boolean } | null;
 }) {
   const { t } = useTranslation();
   const { can } = usePermissions(projectId);
@@ -108,15 +113,23 @@ export function MovementForm({
     staleTime: 60_000,
   });
   const run = useMutationToast({
-    mutationFn: () =>
-      api.post<AnalysisRun>(`/api/v1/projects/${projectId}/analyses`, {
-        body: { module: "movement", parameters },
-      }),
+    mutationFn: async (replace: boolean) => {
+      const created = await api.post<AnalysisRun>(
+        `/api/v1/projects/${projectId}/analyses`,
+        { body: { module: "movement", parameters } },
+      );
+      if (replace && editing && (editing.name || editing.shared))
+        return api.patch<AnalysisRun>(
+          `/api/v1/projects/${projectId}/analyses/${created.id}`,
+          { body: { name: editing.name, shared: editing.shared } },
+        );
+      return created;
+    },
     invalidate: [
       queryKeys.analyses(projectId, { module: "movement", recent: true }),
     ],
     success: t("Analysis queued"),
-    onSuccess: (r) => onRun(r),
+    onSuccess: (r, replace) => onRun(r, replace),
   });
   const addAll = (ids: string[]) =>
     onChange({
@@ -249,16 +262,39 @@ export function MovementForm({
             </SelectContent>
           </Select>
         </div>
-        {mayRun && (
+        {mayRun && !editing && (
           <Button
             type="button"
             size="sm"
             className="h-8"
             disabled={!parameters || run.isPending || (e ? !e.ok : false)}
-            onClick={() => run.mutate()}
+            onClick={() => run.mutate(false)}
           >
             <Play className="size-4" /> {t("Run")}
           </Button>
+        )}
+        {mayRun && editing && (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8"
+              disabled={!parameters || run.isPending || (e ? !e.ok : false)}
+              onClick={() => run.mutate(false)}
+            >
+              {t("Run as new")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8"
+              disabled={!parameters || run.isPending || (e ? !e.ok : false)}
+              onClick={() => run.mutate(true)}
+            >
+              <Play className="size-4" /> {t("Run and replace")}
+            </Button>
+          </>
         )}
       </div>
       <button

@@ -2,20 +2,24 @@
 
 The Movement page under Analyze answers, for one to twenty-five collared animals over a period of at most a year: how far and how fast they moved, when they rested, how much ground they used and where they kept returning. It is the first analysis module (decisions D196 to D203, `docs/ANALYTICS_PHASE1_PLAN.md`); it reads the project's positions and writes only its own result tables, and a project or a server can switch it off without touching anything else.
 
-## The question form
+## The page
+
+The page lists the module's analyses: every run a person may see, newest first, with its status, subjects, period, who ran it, when it expires and whether it is saved and shared. "New analysis" opens a dialog with the form; Run queues the analysis and returns to the list, where the new run shows its progress. A run that finishes while the list is open says so with a way to open it. Opening a run shows its result under "All analyses", with a folded "Settings of this run" block listing everything it was asked.
+
+"Edit and run again" on an opened run brings the same dialog back with that run's settings filled in. "Run as new" keeps the old run and adds a new one; "Run and replace" gives the new run the old one's name and sharing and removes the old one, for a saved analysis that should follow new data.
+
+## The form
 
 - **Subjects**: entities picked by name, a group with its subgroups, or every entity of a type; at most 25 per run. Devices are not subjects: a collar's fixes belong to the animals it tracked, by the assignment history.
 - **Period**: the last 7, 30 or 90 days, the last year, or a custom range; at most 366 days.
 - **Compare with**: nothing, or the period of the same length right before.
 - **Method**, folded with its defaults on one line: the gap threshold (4 hours; a longer silence between two fixes is a gap, not movement), the maximum plausible speed (15 m/s; a fix that would need more is left out and counted), the grid cell (100 m; residence time, hotspots and the cluster distance), and the home range methods: MCP 95 %, KDE 50 % and 95 % (bandwidth automatic or in metres), clusters.
 
-The line under the form estimates the run: how many animals, days and fixes it will read, and what to change when a bound is crossed. The form lives in the URL, so a link reproduces it; "Analyse movement" on an entity page opens it with that animal and the last 30 days filled in.
+The line under the form estimates the run: how many animals, days and fixes it will read, and what to change when a bound is crossed. "Analyse movement" on an entity page opens the dialog with that animal and the last 30 days filled in.
 
 ## The run
 
-Run queues an analysis from what the form says; the analysis worker computes it, one run at a time per server, with its own statement and wall-clock timeouts. The run appears in the runs table with its status and, when it completes, the page shows the result; a failure shows its reason. Opening a run from the table, or "Change settings…" on the run, loads its settings into the form, so adjusting them and pressing Run is how a person iterates: every Run is a new run, and the form is the only place settings are set. A folded "Settings of this run" block under the status lists everything a run was asked.
-
-A run is unsaved until it is given a name with "Save…"; an unsaved run expires a few days after it finished (`ANALYSIS_RETENTION_DAYS`, 7 by default) and a saved one never. A run is visible to the person who ran it only, until they switch "Shared with the project" on; project admins see every run of the project and may rename, share or delete it. The runs table lists saved and unsaved runs alike, with who ran them, when they expire and whether they are shared. Anyone with `project:read` sees the runs they may see, inside their scope; `analysis:run` (Analysts and Admins) starts, saves, shares, cancels and deletes their own runs.
+The analysis worker computes a run, one at a time per server, with its own statement and wall-clock timeouts. A run is unsaved until it is given a name with "Save…"; an unsaved run expires a few days after it finished (`ANALYSIS_RETENTION_DAYS`, 7 by default) and a saved one never. A run is visible to the person who ran it only, until they switch "Shared with the project" on; project admins see every run of the project and may rename, share or delete it. Anyone with `project:read` sees the runs they may see, inside their scope; `analysis:run` (Analysts and Admins) starts, saves, shares, cancels and deletes their own runs.
 
 ## What the result holds
 

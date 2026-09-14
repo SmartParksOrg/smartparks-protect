@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -24,10 +25,14 @@ import { formatAgo, formatTime } from "@/lib/format";
 import { isActive } from "@/lib/analyses";
 import { useAuthStore } from "@/stores/auth";
 
+/** The status each run was last seen with, per page, so a run that finishes while the list
+ * is open gets one notice; a module-level map, not a ref, so the effect stays pure. */
+const lastSeen = new Map<string, string>();
+
 /** The runs of one module a person may see (their own and the shared ones), newest first,
  * polled while any is active: saved and unsaved alike, with the status, the subjects, the
- * period, who ran it and whether it is saved and shared. A click opens the run and loads
- * its settings into the form. */
+ * period, who ran it and whether it is saved and shared. A click opens the run; a run that
+ * finishes while the list is open says so with a way to open it. */
 export function RunList({
   projectId,
   module,
@@ -61,7 +66,24 @@ export function RunList({
     success: t("Run deleted"),
     onSuccess: () => setRemoving(null),
   });
-  const items = runs.data?.items ?? [];
+  const items = useMemo(() => runs.data?.items ?? [], [runs.data]);
+  useEffect(() => {
+    for (const run of items) {
+      const before = lastSeen.get(run.id);
+      lastSeen.set(run.id, run.status);
+      if (before && isActive(before) && !isActive(run.status)) {
+        const label = run.name ?? t("The unnamed run");
+        if (run.status === "completed")
+          toast.success(t("{{run}} is ready", { run: label }), {
+            action: { label: t("Open"), onClick: () => onSelect(run) },
+          });
+        else if (run.status === "failed")
+          toast.error(t("{{run}} failed", { run: label }), {
+            action: { label: t("Open"), onClick: () => onSelect(run) },
+          });
+      }
+    }
+  }, [items, onSelect, t]);
   if (runs.isPending)
     return (
       <p className="text-xs text-muted-foreground">{t("Loading runs…")}</p>

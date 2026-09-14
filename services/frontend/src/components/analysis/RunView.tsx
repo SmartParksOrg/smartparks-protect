@@ -63,7 +63,7 @@ export function RunView({
     ) => React.ReactNode;
     after?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
   };
-  /** Load the run's settings into the page's form: the way to run it again with changes. */
+  /** Open the run's settings in the dialog, to change them and run again. */
   onEdit?: (run: AnalysisRun) => void;
 }) {
   const { t } = useTranslation();
@@ -151,7 +151,7 @@ export function RunView({
           )}
           {mayRun && onEdit && !isActive(r.status) && (
             <Button variant="outline" size="sm" onClick={() => onEdit(r)}>
-              {t("Change settings…")}
+              {t("Edit and run again")}
             </Button>
           )}
           {mayRun && r.status === "completed" && naming === null && (

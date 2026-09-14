@@ -1,54 +1,67 @@
 import { useTranslation } from "react-i18next";
-import { SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
+import { api } from "@/api/client";
 import type { AnalysisRun } from "@/api/types";
-import { MovementForm } from "@/components/analysis/MovementForm";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/api/queryKeys";
 import { ResultMap } from "@/components/analysis/ResultMap";
+import { RunDialog } from "@/components/analysis/RunDialog";
 import { RunList } from "@/components/analysis/RunList";
 import { RunView } from "@/components/analysis/RunView";
 import { SubjectCards } from "@/components/analysis/SubjectCards";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { useIsPhone } from "@/hooks/useMediaQuery";
+import { usePermissions } from "@/hooks/useProjects";
 import {
   type FormState,
-  formStateOfRun,
+  hasFormInput,
   readFormState,
   writeFormState,
 } from "@/lib/analyses";
 
-/** Movement and space use (docs/ANALYTICS_PHASE1_PLAN.md, section 8): the question form at
- * the top, the runs of the module, and the selected run's result with its cards, map,
- * charts and table. The form lives in the URL, so a link reproduces it; on a phone it folds
- * into a sheet. */
+/** Movement and space use (docs/ANALYTICS_PHASE1_PLAN.md, section 8): the runs of the
+ * module as a table, "New analysis" opening the dialog with the form, and an opened run with
+ * its cards, map, charts and table; "Edit and run again" opens the same dialog with the run's
+ * settings. */
 export function MovementPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
-  const phone = useIsPhone();
-  const [formOpen, setFormOpen] = useState(false);
+  const { can } = usePermissions(projectId);
+  const client = useQueryClient();
   const state = readFormState(params);
-  const update = (patch: Partial<FormState>) =>
-    setParams(writeFormState({ ...state, ...patch }), { replace: true });
-  // opening a run loads its settings into the form; Run then makes a new run from the form
-  const select = (run: AnalysisRun) =>
-    update({ ...formStateOfRun(run, state), run: run.id });
-  const started = (run: AnalysisRun) => {
-    setFormOpen(false);
-    update({ run: run.id });
-  };
+  // a deep link ("Analyse …" on an entity, a group or a zone) opens the dialog filled in
+  const [dialog, setDialog] = useState<{
+    open: boolean;
+    editing: AnalysisRun | null;
+    initial: FormState;
+  }>(() => ({ open: hasFormInput(state), editing: null, initial: state }));
+  const show = (run: string | null) =>
+    setParams(
+      writeFormState({ ...readFormState(new URLSearchParams()), run }),
+      {
+        replace: true,
+      },
+    );
   const labels = MOVEMENT_LABELS(t);
-  const form = (
-    <MovementForm
-      projectId={projectId}
-      state={state}
-      onChange={update}
-      onRun={started}
-    />
-  );
+  const created = (_run: AnalysisRun, replaced: AnalysisRun | null) => {
+    setDialog((d) => ({ ...d, open: false, editing: null }));
+    if (replaced)
+      void api
+        .delete(`/api/v1/projects/${projectId}/analyses/${replaced.id}`)
+        .then(() =>
+          client.invalidateQueries({
+            queryKey: queryKeys.analyses(projectId, {
+              module: "movement",
+              recent: true,
+            }),
+          }),
+        );
+    show(null);
+  };
   return (
     <>
       <PageHeader
@@ -57,85 +70,82 @@ export function MovementPage() {
           "Distance, speed, space use and home range of tracked animals",
         )}
         actions={
-          phone ? (
+          can("analysis:run") ? (
             <Button
               type="button"
               size="sm"
-              variant="outline"
-              onClick={() => setFormOpen(true)}
+              onClick={() =>
+                setDialog({
+                  open: true,
+                  editing: null,
+                  initial: readFormState(new URLSearchParams()),
+                })
+              }
             >
-              <SlidersHorizontal className="size-4" /> {t("Set up a run")}
+              <Plus className="size-4" /> {t("New analysis")}
             </Button>
           ) : undefined
         }
       />
       <Page>
-        {phone ? (
-          <Sheet open={formOpen} onOpenChange={setFormOpen}>
-            <SheetContent
-              side="bottom"
-              className="max-h-[85vh] overflow-y-auto"
+        {state.run ? (
+          <div className="space-y-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="-ml-2"
+              onClick={() => show(null)}
             >
-              <SheetTitle>{t("Set up a run")}</SheetTitle>
-              <div className="pt-3">{form}</div>
-            </SheetContent>
-          </Sheet>
-        ) : (
-          <div className="rounded-md border bg-card p-3">{form}</div>
-        )}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <h2 className="text-sm font-medium">{t("Runs")}</h2>
-            <RunList
+              <ArrowLeft className="size-4" /> {t("All analyses")}
+            </Button>
+            <RunView
               projectId={projectId}
-              module="movement"
-              selected={state.run}
-              onSelect={select}
+              runId={state.run}
+              labels={labels}
+              onEdit={(r) =>
+                setDialog({ open: true, editing: r, initial: state })
+              }
+              render={{
+                summary: (document, _run, colors) => (
+                  <SubjectCards
+                    document={document}
+                    labels={labels}
+                    metrics={CARD_METRICS}
+                    colors={colors}
+                  />
+                ),
+                map: (document, run, colors) => (
+                  <ResultMap
+                    projectId={projectId}
+                    runId={run.id}
+                    document={document}
+                    labels={labels}
+                    colors={colors}
+                  />
+                ),
+                after: () => <Limitations />,
+              }}
             />
           </div>
-          <div className="min-w-0">
-            {state.run ? (
-              <RunView
-                projectId={projectId}
-                runId={state.run}
-                labels={labels}
-                onEdit={(r) => {
-                  select(r);
-                  if (phone) setFormOpen(true);
-                  else
-                    document
-                      .querySelector("main")
-                      ?.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                render={{
-                  summary: (document, _run, colors) => (
-                    <SubjectCards
-                      document={document}
-                      labels={labels}
-                      metrics={CARD_METRICS}
-                      colors={colors}
-                    />
-                  ),
-                  map: (document, run, colors) => (
-                    <ResultMap
-                      projectId={projectId}
-                      runId={run.id}
-                      document={document}
-                      labels={labels}
-                      colors={colors}
-                    />
-                  ),
-                  after: () => <Limitations />,
-                }}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("Pick a run, or set one up and run it.")}
-              </p>
-            )}
-          </div>
-        </div>
+        ) : (
+          <RunList
+            projectId={projectId}
+            module="movement"
+            selected={null}
+            onSelect={(run) => show(run.id)}
+          />
+        )}
       </Page>
+      <RunDialog
+        projectId={projectId}
+        module="movement"
+        open={dialog.open}
+        onOpenChange={(open) => setDialog((d) => ({ ...d, open }))}
+        initial={dialog.initial}
+        editing={dialog.editing}
+        onCreated={created}
+      />
     </>
   );
 }

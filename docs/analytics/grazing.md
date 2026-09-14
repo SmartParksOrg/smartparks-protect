@@ -4,7 +4,9 @@ The Grazing page under Analyze answers, for a herd of tracked grazing animals an
 
 Time in an area is a proxy for potential grazing pressure. It is not measured feeding, and the tables say "use", never "grazing".
 
-## The question form
+## The page and the form
+
+The page works as the [Movement](movement.md) page: a list of the analyses, "New analysis" opening the dialog with the form, an opened run with "Edit and run again", "Run as new" or "Run and replace". The form asks:
 
 - **Herd**: entities picked by name, a group with its subgroups ("Analyse grazing" on the Groups page and on the entities list's group filter opens the form with the group), or every entity of a type; at most 100 animals.
 - **Areas**: 1 to 50 of the project's zones and geofences (polygons; a circle is a polygon already). No new feature type: a management unit is a zone the person picks. When a project marks its units with `attributes.management.unit = true`, "All management units" picks them at once; the run stores the chosen ids either way. "Grazing in this area" on a zone's panel on the live map and on the Features page opens the form with that area chosen.
@@ -13,7 +15,7 @@ Time in an area is a proxy for potential grazing pressure. It is not measured fe
 - **Weighting**: each animal counts one (the default), an attribute of the entity (`livestock_unit`, for example), or metabolic (body mass to the 0.75, normalised to the herd mean). Animals without a value count one and are named in a warning; every weighted header names the unit.
 - **Method**, folded: the gap threshold (4 hours), the absence that starts a new visit (6 hours), the grid cell (100 m), the animal-hours at or below which a day is a rest day (0), the maximum plausible speed (5 m/s for livestock).
 
-The estimate line names what the run cannot use before Run is pressed: an area under one hectare, an invalid polygon, a feature that is not a zone or a geofence.
+The estimate line under the form names what the run cannot use before Run is pressed: an area under one hectare, an invalid polygon, a feature that is not a zone or a geofence.
 
 ## What the result holds
 
