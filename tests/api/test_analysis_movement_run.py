@@ -137,8 +137,8 @@ async def test_a_movement_run_over_fixes(client, db):
     assert len(by_kind["hotspot"]) == 1
     assert hotspot.area_m2 == pytest.approx(100 * 100, rel=0.02)
     assert hotspot.level == pytest.approx(0.5, abs=0.05)
-    # the MCP of a straight line has no area; the KDE has, the 50 percent one inside the 95
-    assert by_kind["mcp"][0].area_m2 < 1
+    # the MCP of a straight line is a line: no area stored, zero hectares in the summary
+    assert (by_kind["mcp"][0].area_m2 or 0) < 1
     kde = {row.level: row.area_m2 for row in by_kind["kde"]}
     assert set(kde) == {0.5, 0.95} and 0 < kde[0.5] < kde[0.95]
     assert summary["kde95_ha"] == pytest.approx(kde[0.95] / 10_000, rel=0.01)
