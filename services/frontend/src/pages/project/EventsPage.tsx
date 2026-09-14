@@ -49,7 +49,15 @@ export function AlertActions({ scope, alert, onDone }: { scope: Scope; alert: Al
   );
 }
 
-/** Detail of one event: context, alert with actions, deliveries of the automations. */
+/** The event's context without the machinery (the deduplication fingerprint), or null when
+ * nothing is left: what a rule or a decoder saw, folded away as technical details. */
+function technicalContext(context: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  const entries = Object.entries(context ?? {}).filter(([k]) => k !== "dedup");
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
+
+/** Detail of one event: alert with actions, deliveries of the automations, the technical
+ * details folded away. */
 export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; eventId: string | null; onClose: () => void }) {
   const { t } = useTranslation();
   const detail = useQuery({ queryKey: queryKeys.event(scope, eventId ?? ""), queryFn: () => api.get<EventDetail>(`${scopeBase(scope)}/events/${eventId}`), enabled: Boolean(eventId) });
@@ -85,7 +93,12 @@ export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; e
                 <ul className="space-y-1">{d.deliveries.map((x) => <li key={x.id} className="flex flex-wrap items-center gap-2"><StatusBadge value={x.status} /><span>{x.action_type}</span><span className="text-xs text-muted-foreground">{x.attempts} {t("attempt")}{x.attempts === 1 ? "" : "s"}{x.delivered_at ? `, delivered ${formatTime(x.delivered_at)}` : ""}</span>{x.error_message && <span className="text-xs text-destructive">{x.error_message}</span>}</li>)}</ul>
               )}
             </div>
-            <div><div className="mb-1 font-medium">{t("Context")}</div><JsonView value={d.event.context} /></div>
+            {technicalContext(d.event.context) && (
+              <details className="rounded-md border px-3 py-2">
+                <summary className="cursor-pointer text-muted-foreground">{t("Technical details")}</summary>
+                <div className="mt-2"><JsonView value={technicalContext(d.event.context)} /></div>
+              </details>
+            )}
           </div>
         )}
       </DialogContent>
