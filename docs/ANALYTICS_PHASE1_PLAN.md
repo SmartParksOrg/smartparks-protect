@@ -1,8 +1,8 @@
 # Analytics phase 1 plan: movement ecology and grazing
 
-Status: reviewed and approved by Tim on 2026-09-14 on the branch `feature/analytics-movement-grazing`, with one change to the proposal: analyses run in a worker of their own from the start (decision A below). Implementation follows the roadmap on this branch. Nothing here is merged into `main`.
+Status: implemented and merged into `main` on 2026-09-14 after Tim's review on the dev server. The plan of record is phase 22 of `PROJECT_PLAN.md` (decisions D196 to D203, ADR 0031); this document stays as the design reference for the two modules (sections 5 to 17), and its "Progress on the branch" section is the build record.
 
-Where this document lives. The repository keeps plans as phases inside `PROJECT_PLAN.md` and its conventions ask for no redundant Markdown files (`CONVENTIONS.md`, rule 8). This file is the review artefact for the analytics branch, kept apart on purpose so that `main` stays untouched while the plan is discussed. When the plan is approved, its decisions move into `PROJECT_PLAN.md` as the rewritten phase 22 (the placeholder "Analysis as modules" already reserved for this work), the architectural choice becomes ADR 0031, and the user-facing parts become `docs/analytics/movement.md` and `docs/analytics/grazing.md` in the MkDocs nav. This file is then removed or shortened to a pointer. Until then it is not in the MkDocs nav and the docs build ignores it.
+Where this document lives. The repository keeps plans as phases inside `PROJECT_PLAN.md`; the phase 22 section carries the goal, the decisions, what was built and the exit criteria, and points here for the design: the architecture, the data model, the two methods, the API, the bounds and the tests. The decision gate of section 20 is the next step after the two modules have run with a real project.
 
 ## 1. Executive summary
 

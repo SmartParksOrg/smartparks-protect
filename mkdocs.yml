@@ -101,6 +101,7 @@ nav:
       - Dashboards: analytics/dashboards.md
       - Movement: analytics/movement.md
       - Grazing: analytics/grazing.md
+      - Analysis design (phase 1): ANALYTICS_PHASE1_PLAN.md
   - Rules:
       - rules/index.md
       - Automations and notifications: rules/automations.md
