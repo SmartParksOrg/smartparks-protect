@@ -152,7 +152,11 @@ import {
 import { imprecise } from "@/lib/accuracy";
 import { circleRing } from "@/lib/geodesy";
 import { isAllProjects } from "@/lib/scope";
-import { usePermissions, useProjects } from "@/hooks/useProjects";
+import {
+  useAnalysisModules,
+  usePermissions,
+  useProjects,
+} from "@/hooks/useProjects";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useAuthStore } from "@/stores/auth";
 import { useProjectStore } from "@/stores/project";
@@ -745,6 +749,7 @@ export function MapPage() {
 
   // drawing and measuring (decisions D139 and D141): a tool is transient, not in the URL
   const { can } = usePermissions(projectId);
+  const analysisModules = useAnalysisModules(projectId);
   const canEdit = can("features:write");
   const [tool, setTool] = useState<"draw" | "measure" | null>(null);
   const [drawKind, setDrawKind] = useState<DrawKind>("polygon");
@@ -1982,6 +1987,13 @@ export function MapPage() {
               feature={selectedFeature}
               projectId={projectId}
               canWriteRules={canEdit}
+              grazingHref={
+                analysisModules.includes("grazing") &&
+                can("analysis:run") &&
+                ["zone", "geofence"].includes(selectedFeature.feature_type)
+                  ? `/projects/${projectId}/analyze/grazing?area=${selectedFeature.id}`
+                  : null
+              }
               wasHidden={revealNote === `feature:${selectedFeature.id}`}
               onClose={() => selectFeature(null)}
             />

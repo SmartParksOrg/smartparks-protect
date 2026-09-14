@@ -100,6 +100,7 @@ nav:
       - Data curation: analytics/curation.md
       - Dashboards: analytics/dashboards.md
       - Movement: analytics/movement.md
+      - Grazing: analytics/grazing.md
   - Rules:
       - rules/index.md
       - Automations and notifications: rules/automations.md

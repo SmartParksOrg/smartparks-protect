@@ -16,12 +16,15 @@ export function FeaturePanel({
   feature,
   projectId,
   canWriteRules,
+  grazingHref = null,
   wasHidden,
   onClose,
 }: {
   feature: Feature;
   projectId: string;
   canWriteRules: boolean;
+  /** The grazing page with this area chosen, when the module is on and the person may run. */
+  grazingHref?: string | null;
   wasHidden: boolean;
   onClose: () => void;
 }) {
@@ -63,14 +66,23 @@ export function FeaturePanel({
       }
       onClose={onClose}
       footer={
-        template && canWriteRules ? (
-          <Button asChild size="sm" className="h-8">
-            <Link
-              to={`/projects/${projectId}/rules?new=${template}&feature=${feature.id}`}
-            >
-              {t("Create rule")}
-            </Link>
-          </Button>
+        (template && canWriteRules) || grazingHref ? (
+          <span className="flex flex-wrap gap-2">
+            {template && canWriteRules && (
+              <Button asChild size="sm" className="h-8">
+                <Link
+                  to={`/projects/${projectId}/rules?new=${template}&feature=${feature.id}`}
+                >
+                  {t("Create rule")}
+                </Link>
+              </Button>
+            )}
+            {grazingHref && (
+              <Button asChild size="sm" variant="outline" className="h-8">
+                <Link to={grazingHref}>{t("Grazing in this area")}</Link>
+              </Button>
+            )}
+          </span>
         ) : undefined
       }
     >

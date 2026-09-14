@@ -2,10 +2,10 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Wheat } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { z } from "zod";
 
 import { api } from "@/api/client";
@@ -28,6 +28,7 @@ import {
 } from "@/components/map/draw";
 import { useMap } from "@/components/map/useMap";
 import { Button } from "@/components/ui/button";
+import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import {
   Dialog,
   DialogContent,
@@ -113,6 +114,7 @@ function DrawMap({
 export function FeaturesPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
+  const { can } = usePermissions(projectId);
   const features = useQuery({
     queryKey: queryKeys.features(projectId),
     queryFn: () =>
@@ -148,6 +150,8 @@ export function FeaturesPage() {
     success: t("Feature deleted"),
     onSuccess: () => setRemoving(null),
   });
+  const analysisModules = useAnalysisModules(projectId);
+  const grazingOn = analysisModules.includes("grazing") && can("analysis:run");
   const columns: ColumnDef<Feature, unknown>[] = [
     { header: t("Name"), accessorKey: "name" },
     { header: t("Type"), accessorKey: "feature_type" },
@@ -156,14 +160,32 @@ export function FeaturesPage() {
       id: "actions",
       header: "",
       cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("Delete feature")}
-          onClick={() => setRemoving(row.original)}
-        >
-          <Trash2 className="size-4" />
-        </Button>
+        <span className="flex items-center justify-end gap-1">
+          {grazingOn &&
+            ["zone", "geofence"].includes(row.original.feature_type) && (
+              <Button
+                asChild
+                variant="ghost"
+                size="icon"
+                aria-label={t("Grazing in this area")}
+                title={t("Grazing in this area")}
+              >
+                <Link
+                  to={`/projects/${projectId}/analyze/grazing?area=${row.original.id}`}
+                >
+                  <Wheat className="size-4" />
+                </Link>
+              </Button>
+            )}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t("Delete feature")}
+            onClick={() => setRemoving(row.original)}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </span>
       ),
     },
   ];

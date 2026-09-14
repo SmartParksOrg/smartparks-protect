@@ -170,13 +170,18 @@ export function ResultMap({
     if (map && bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 14 });
   };
   const kindLabel: Record<string, string> = {
+    area: t("Areas by pressure"),
     mcp: t("MCP 95%"),
     kde: t("KDE 50% and 95%"),
     hotspot: t("Hotspots"),
     cluster: t("Clusters"),
   };
   const area =
-    typeof picked?.area_m2 === "number" ? picked.area_m2 / 10_000 : null;
+    typeof picked?.hectares === "number"
+      ? picked.hectares
+      : typeof picked?.area_m2 === "number"
+        ? picked.area_m2 / 10_000
+        : null;
   const share =
     typeof picked?.time_share === "number"
       ? picked.time_share
@@ -245,6 +250,32 @@ export function ResultMap({
                     : t("Fix share")}
                 </dt>
                 <dd>{Math.round(share * 100)}%</dd>
+              </>
+            )}
+            {typeof picked.relative_pressure === "number" && (
+              <>
+                <dt>{t("Relative pressure")}</dt>
+                <dd>
+                  {picked.relative_pressure.toFixed(2)}
+                  {typeof picked.pressure_rank === "number" &&
+                    ` (#${picked.pressure_rank})`}
+                </dd>
+              </>
+            )}
+            {typeof picked.animal_days_per_ha === "number" && (
+              <>
+                <dt>{t("Use")}</dt>
+                <dd>
+                  {t("{{value}} animal-days per ha", {
+                    value: picked.animal_days_per_ha.toFixed(3),
+                  })}
+                </dd>
+              </>
+            )}
+            {typeof picked.rest_days === "number" && (
+              <>
+                <dt>{t("Rest days")}</dt>
+                <dd>{picked.rest_days}</dd>
               </>
             )}
             {typeof picked.visits === "number" && (

@@ -6,3 +6,4 @@ Both are bounded by design (architecture 13.10): no request can return more than
 - [Data curation](curation.md): reversible, audited corrections on canonical records, bulk jobs, the effective value and export views.
 - [Dashboards](dashboards.md): saved views and live tiles on a shared grid per project.
 - [Movement](movement.md): distance, speed, rest, day and night, residence time, home range and clusters of tracked animals, computed by the analysis worker from the positions and kept as runs.
+- [Grazing](grazing.md): how a herd uses the management areas over time, in animal-days per hectare with rest days, visits, hotspots and the relative pressure per area, compared between periods, seasons and herds.

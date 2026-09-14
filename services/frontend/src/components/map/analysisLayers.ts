@@ -14,18 +14,46 @@ import { SOURCES } from "@/components/map/layers";
  * the polygon's properties.
  */
 export const ANALYSIS_SOURCE = "analysis";
-export const ANALYSIS_KINDS = ["mcp", "kde", "hotspot", "cluster"] as const;
+export const ANALYSIS_KINDS = [
+  "area",
+  "mcp",
+  "kde",
+  "hotspot",
+  "cluster",
+] as const;
 export type AnalysisKind = (typeof ANALYSIS_KINDS)[number];
 
 const FILL_OPACITY: Record<string, number> = {
+  area: 0.35,
   mcp: 0.08,
   kde: 0.22,
   hotspot: 0.45,
   cluster: 0.18,
 };
 
+/** A five-step ramp in the brand palette for an area's relative grazing pressure: 1.0 is
+ * the herd's average over the chosen areas. Null (no use anywhere) is the lightest step. */
+export const PRESSURE_RAMP = [
+  "#E7EDE8",
+  "#B9CCBF",
+  "#8FAF98",
+  "#52735E",
+  "#B86B5C",
+] as const;
+
+export function pressureColor(level: number | null | undefined): string {
+  if (level === null || level === undefined || !Number.isFinite(level))
+    return PRESSURE_RAMP[0];
+  if (level < 0.25) return PRESSURE_RAMP[0];
+  if (level < 0.75) return PRESSURE_RAMP[1];
+  if (level < 1.25) return PRESSURE_RAMP[2];
+  if (level < 2) return PRESSURE_RAMP[3];
+  return PRESSURE_RAMP[4];
+}
+
 /** The features with their colour and opacity set, ordered so the largest draw first: the
- * 95 percent isopleth under the 50, the hull under everything of its subject. */
+ * areas under everything, the 95 percent isopleth under the 50, the hull under the rest of
+ * its subject. An area is coloured by its pressure, everything else by its subject. */
 export function decorateAnalysisFeatures(
   features: GeoJSON.Feature[],
   colorOf: (subjectId: string | null) => string,
@@ -33,6 +61,7 @@ export function decorateAnalysisFeatures(
   const rank = (f: GeoJSON.Feature): number => {
     const kind = String(f.properties?.kind ?? "");
     const level = Number(f.properties?.level ?? 0);
+    if (kind === "area") return -1;
     if (kind === "mcp") return 0;
     if (kind === "kde") return level >= 0.9 ? 1 : 2;
     if (kind === "cluster") return 3;
@@ -43,11 +72,12 @@ export function decorateAnalysisFeatures(
     .map((f) => {
       const kind = String(f.properties?.kind ?? "");
       const subject = (f.properties?.subject_id as string | null) ?? null;
+      const level = f.properties?.level as number | null | undefined;
       return {
         ...f,
         properties: {
           ...f.properties,
-          color: colorOf(subject),
+          color: kind === "area" ? pressureColor(level) : colorOf(subject),
           opacity: FILL_OPACITY[kind] ?? 0.2,
         },
       };

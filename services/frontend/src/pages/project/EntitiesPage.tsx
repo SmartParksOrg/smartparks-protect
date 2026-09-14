@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Link2, Plus, MapPin } from "lucide-react";
+import { Link2, MapPin, Plus, Wheat } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router";
 
@@ -28,7 +28,7 @@ import { GroupSelect } from "@/components/entities/GroupSelect";
 import { MoveToGroupDialog } from "@/components/entities/MoveToGroupDialog";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
-import { usePermissions } from "@/hooks/useProjects";
+import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import { useNow } from "@/hooks/useNow";
 import { usePages } from "@/hooks/usePages";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
@@ -38,6 +38,7 @@ export function EntitiesPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const { can } = usePermissions(projectId);
+  const analysisModules = useAnalysisModules(projectId);
   const navigate = useNavigate();
   const [editing, setEditing] = useState<Entity | null>(null);
   const [open, setOpen] = useState(false);
@@ -239,6 +240,16 @@ export function EntitiesPage() {
               onChange={setGroup}
               className="h-9 w-44"
             />
+            {group &&
+              group !== UNGROUPED &&
+              analysisModules.includes("grazing") &&
+              can("analysis:run") && (
+                <Button asChild variant="outline">
+                  <Link to={`/projects/${projectId}/analyze/grazing?group=${group}`}>
+                    <Wheat className="size-4" /> {t("Analyse grazing")}
+                  </Link>
+                </Button>
+              )}
             {can("entities:write") && (
               <Button
                 onClick={() => {

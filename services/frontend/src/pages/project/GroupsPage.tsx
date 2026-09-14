@@ -1,6 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FolderOpen, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  FolderOpen,
+  GripVertical,
+  Pencil,
+  Plus,
+  Trash2,
+  Wheat,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router";
@@ -20,6 +27,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
+import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import {
   Dialog,
   DialogContent,
@@ -256,6 +264,9 @@ const DRAG_TYPE = "application/x-entity-ids";
 export function GroupsPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
+  const { can } = usePermissions(projectId);
+  const analysisModules = useAnalysisModules(projectId);
+  const grazingOn = analysisModules.includes("grazing") && can("analysis:run");
   const groups = useGroups(projectId);
   const types = useQuery({
     queryKey: queryKeys.entityTypes,
@@ -458,6 +469,22 @@ export function GroupsPage() {
                   depth + 1,
                   group.id,
                   <>
+                    {grazingOn && (
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        aria-label={t("Analyse grazing")}
+                        title={t("Analyse grazing")}
+                      >
+                        <Link
+                          to={`/projects/${projectId}/analyze/grazing?group=${group.id}`}
+                        >
+                          <Wheat className="size-3.5" />
+                        </Link>
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"

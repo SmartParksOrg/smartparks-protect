@@ -4,7 +4,9 @@ import {
   comparisonOf,
   documentOf,
   fixesPreset,
+  grazingParameters,
   groupWithSubgroups,
+  isManagementUnit,
   isActive,
   movementParameters,
   readFormState,
@@ -136,5 +138,45 @@ describe("analysis form state", () => {
       from: "2026-08-31T00:00:00Z",
       to: "2026-09-30T00:00:00Z",
     });
+  });
+  it("keeps the grazing choices in the URL and builds the module's parameters", () => {
+    const state = readFormState(
+      new URLSearchParams(
+        "entity=a&area=z1&area=z2&weighting=attribute&weight_key=lsu&compare=herd&herd_b=g2&absence=12",
+      ),
+    );
+    expect(state.grazing).toEqual({
+      areas: ["z1", "z2"],
+      weighting: "attribute",
+      weight_key: "lsu",
+      herd_b: "g2",
+      seasons: false,
+      absence: 12,
+      rest: 0,
+    });
+    expect(writeFormState(state).toString()).toBe(
+      "entity=a&compare=herd&area=z1&area=z2&weighting=attribute&weight_key=lsu&herd_b=g2&absence=12",
+    );
+    const now = new Date("2026-09-14T10:17:42Z");
+    expect(grazingParameters(state, ["b", "c"], now)).toMatchObject({
+      entity_ids: ["a"],
+      feature_ids: ["z1", "z2"],
+      weighting: "attribute",
+      weight_key: "lsu",
+      herd_b_entity_ids: ["b", "c"],
+      min_absence_hours: 12,
+      rest_threshold_hours: 0,
+      max_speed_mps: 15,
+    });
+    expect(
+      grazingParameters(readFormState(new URLSearchParams("entity=a")), [], now),
+    ).toBeNull();
+  });
+  it("recognises the management unit convention", () => {
+    const feature = (attributes: unknown) =>
+      ({ attributes }) as unknown as Parameters<typeof isManagementUnit>[0];
+    expect(isManagementUnit(feature({ management: { unit: true } }))).toBe(true);
+    expect(isManagementUnit(feature({ management: { unit: "yes" } }))).toBe(false);
+    expect(isManagementUnit(feature({}))).toBe(false);
   });
 });

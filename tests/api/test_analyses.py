@@ -135,7 +135,7 @@ async def test_catalogue_estimate_and_the_life_of_a_run(client, db, stub):
     base = f"/api/v1/projects/{project.id}/analyses"
 
     catalogue = (await client.get("/api/v1/analysis-modules", headers=h)).json()
-    assert [m["key"] for m in catalogue] == ["movement"]
+    assert [m["key"] for m in catalogue] == ["movement", "grazing"]
     assert catalogue[0]["limits"]["subjects"] == 25 and catalogue[0]["limits"]["days"] == 366
 
     estimate = await client.get(
@@ -251,7 +251,7 @@ async def test_subjects_from_a_group_and_a_type_and_the_bounds(client, db, stub)
     )
     assert backwards.status_code == 422
     assert (
-        await client.post(base, json={"module": "grazing", "parameters": _params(loose)}, headers=h)
+        await client.post(base, json={"module": "habitat", "parameters": _params(loose)}, headers=h)
     ).status_code == 404
 
     # the queue cap: two more queued runs reach it
@@ -339,7 +339,9 @@ async def test_roles_scope_and_flags(client, db, stub, monkeypatch):
     # and the deployment's setting turns the module off everywhere
     await client.patch(f"/api/v1/projects/{project.id}", json={"settings": {}}, headers=h)
     monkeypatch.setattr(get_settings(), "analysis_modules", "grazing")
-    assert (await client.get("/api/v1/analysis-modules", headers=h)).json() == []
+    assert [m["key"] for m in (await client.get("/api/v1/analysis-modules", headers=h)).json()] == [
+        "grazing"
+    ]
     assert (
         await client.post(base, json={"module": "movement", "parameters": _params(ids)}, headers=h)
     ).status_code == 404

@@ -1,4 +1,4 @@
-import type { AnalysisRun, EntityGroup } from "@/api/types";
+import type { AnalysisRun, EntityGroup, Feature } from "@/api/types";
 import { trackColor } from "@/components/map/layers";
 import type { ExportPreset } from "@/lib/exports";
 
@@ -30,6 +30,9 @@ export interface ResultChartSeries {
   subject?: string;
   period?: string;
   name?: string;
+  /** Grazing: the area the series belongs to, and the herd when two are compared. */
+  area?: string;
+  herd?: string;
   data: [number | string, number | null][];
 }
 export interface ResultChart {
@@ -86,6 +89,31 @@ export const DEFAULT_METHOD: MethodOptions = {
   kde_bandwidth: null,
 };
 
+/** The grazing page's own choices (plan, section 9.4): the areas, the weighting, the second
+ * herd, and the visit and rest options. */
+export interface GrazingOptions {
+  areas: string[];
+  weighting: "equal" | "attribute" | "metabolic";
+  weight_key: string | null;
+  /** The group of the second herd; its members become `herd_b_entity_ids`. */
+  herd_b: string | null;
+  seasons: boolean;
+  /** Hours away from an area before a new visit. */
+  absence: number;
+  /** Animal-hours at or below which a day counts as rest. */
+  rest: number;
+}
+
+export const DEFAULT_GRAZING: GrazingOptions = {
+  areas: [],
+  weighting: "equal",
+  weight_key: null,
+  herd_b: null,
+  seasons: false,
+  absence: 6,
+  rest: 0,
+};
+
 /** The subjects and the period as the pages keep them in the URL. */
 export interface FormState {
   entities: string[];
@@ -97,6 +125,7 @@ export interface FormState {
   compare: string | null;
   run: string | null;
   method: MethodOptions;
+  grazing: GrazingOptions;
 }
 
 export const DEFAULT_RANGE = "30d";
@@ -131,6 +160,19 @@ export function readFormState(params: URLSearchParams): FormState {
         ? numberOr(params.get("kde"), 0) || null
         : null,
     },
+    grazing: {
+      areas: params.getAll("area"),
+      weighting: (["equal", "attribute", "metabolic"] as const).includes(
+        params.get("weighting") as "equal",
+      )
+        ? (params.get("weighting") as GrazingOptions["weighting"])
+        : "equal",
+      weight_key: params.get("weight_key"),
+      herd_b: params.get("herd_b"),
+      seasons: params.get("seasons") === "1",
+      absence: numberOr(params.get("absence"), DEFAULT_GRAZING.absence),
+      rest: params.get("rest") === null ? 0 : numberOr(params.get("rest"), 0),
+    },
   };
 }
 
@@ -153,8 +195,46 @@ export function writeFormState(state: FormState): URLSearchParams {
   if (m.methods.join(",") !== ALL_METHODS.join(","))
     params.set("methods", m.methods.join(","));
   if (m.kde_bandwidth) params.set("kde", String(m.kde_bandwidth));
+  const g = state.grazing;
+  for (const id of g.areas) params.append("area", id);
+  if (g.weighting !== "equal") params.set("weighting", g.weighting);
+  if (g.weight_key) params.set("weight_key", g.weight_key);
+  if (g.herd_b) params.set("herd_b", g.herd_b);
+  if (g.seasons) params.set("seasons", "1");
+  if (g.absence !== DEFAULT_GRAZING.absence)
+    params.set("absence", String(g.absence));
+  if (g.rest) params.set("rest", String(g.rest));
   if (state.run) params.set("run", state.run);
   return params;
+}
+
+/** The parameters the grazing module takes; null until subjects and areas are chosen. The
+ * second herd's members come from the caller, who knows the entities of the group. */
+export function grazingParameters(
+  state: FormState,
+  herdB: string[],
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  const window = windowOf(state, now);
+  if (!window || state.entities.length === 0 || state.grazing.areas.length === 0)
+    return null;
+  const comparison = comparisonOf(state, window);
+  const g = state.grazing;
+  return {
+    entity_ids: state.entities,
+    ...window,
+    ...(comparison ? { comparison } : {}),
+    feature_ids: g.areas,
+    weighting: g.weighting,
+    ...(g.weighting !== "equal" && g.weight_key ? { weight_key: g.weight_key } : {}),
+    seasons: g.seasons,
+    ...(herdB.length ? { herd_b_entity_ids: herdB } : {}),
+    gap_hours: state.method.gap,
+    min_absence_hours: g.absence,
+    cell_m: state.method.cell,
+    rest_threshold_hours: g.rest,
+    max_speed_mps: state.method.speed_max,
+  };
 }
 
 /** The parameters the movement module takes, from the form; null while the form is not
@@ -271,4 +351,16 @@ export function fixesPreset(document: ResultDocument): ExportPreset {
     from: main?.time_from,
     to: main?.time_to,
   };
+}
+
+/** Whether a feature is marked as a management unit by the optional convention
+ * (`attributes.management.unit`), so "All management units" can pick them at once. */
+export function isManagementUnit(feature: Feature): boolean {
+  const management = (feature.attributes as Record<string, unknown> | null)
+    ?.management;
+  return (
+    typeof management === "object" &&
+    management !== null &&
+    (management as { unit?: unknown }).unit === true
+  );
 }

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PRESSURE_RAMP,
   boundsOfFeatures,
   decorateAnalysisFeatures,
+  pressureColor,
 } from "./analysisLayers";
 
 const feature = (
@@ -79,5 +81,23 @@ describe("analysis layers", () => {
       [12.5, -19],
     ]);
     expect(boundsOfFeatures([])).toBeNull();
+  });
+  it("colours an area by its relative pressure and draws it under the rest", () => {
+    const square = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+    ];
+    const decorated = decorateAnalysisFeatures(
+      [feature("hotspot", 0.3, "a", square), feature("area", 2.4, "", square)],
+      () => "#111111",
+    );
+    expect(decorated[0].properties?.kind).toBe("area");
+    expect(decorated[0].properties?.color).toBe(PRESSURE_RAMP[4]);
+    expect(pressureColor(null)).toBe(PRESSURE_RAMP[0]);
+    expect(pressureColor(1)).toBe(PRESSURE_RAMP[2]);
+    expect(pressureColor(0.5)).toBe(PRESSURE_RAMP[1]);
   });
 });
