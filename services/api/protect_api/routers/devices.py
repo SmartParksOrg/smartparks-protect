@@ -46,6 +46,7 @@ from protect_api.visibility import group_and_subgroups, visibility_for
 from shared.config import get_settings
 from shared.connectivity.registry import ADAPTERS
 from shared.connectivity.satellite import SatelliteSession
+from shared.curation.apply import recompute_current_state
 from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
@@ -516,6 +517,16 @@ async def update_device(
     if body.device_type_id is not None:
         await get_or_404(session, DeviceType, body.device_type_id, "Device type")
     changed = apply_patch(device, body)
+    if changed.keys() & {"location_source", "location_fallback_hours"}:
+        # the setting decides which positions become current (decision D164): rebuild the
+        # state now, and the state of the entity the device tracks today
+        tracked = await session.scalar(
+            select(DeviceEntityAssignment.entity_id).where(
+                DeviceEntityAssignment.device_id == device.id,
+                DeviceEntityAssignment.validity.op("@>")(utc_now()),
+            )
+        )
+        await recompute_current_state(session, device.id, {tracked} if tracked else set())
     await flush_or_409(session, "Device")
     await record_audit(
         session,

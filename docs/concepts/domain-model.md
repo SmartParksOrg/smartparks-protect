@@ -65,5 +65,5 @@ its accuracy (ADR 0024). Every map, chart, list, rule and export shows the devic
 unless a person asks for the network's locations, and the current position of an entity or a
 device follows its location source setting: the device's fixes, the network's locations, or
 the device with the network standing in after a period without a fix. Network locations draw
-on the live map's Coverage tab as circles of their radius.
+on the live map's Coverage tab as circles of their radius. A change of the setting rebuilds the current position at once from the positions held, so it does not wait for the next position to arrive.
 

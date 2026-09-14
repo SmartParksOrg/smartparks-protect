@@ -219,9 +219,7 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
             headers=h,
         )
     ).status_code == 200
-    assert (
-        await client.post(f"/api/v1/devices/{device['id']}/reattribute", json={}, headers=h)
-    ).status_code == 200
+    # the setting change alone rebuilds the state: nothing new needs to arrive
     props = await current_feature()
     assert props["position_kind"] == "network" and props["accuracy_m"] == 5000.0
     assert datetime.fromisoformat(props["position_time"]) == datetime.fromisoformat(

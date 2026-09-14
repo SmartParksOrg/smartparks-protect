@@ -132,17 +132,22 @@ export function EntityPage() {
     refetchInterval: 60_000,
   });
   const around = useAt();
+  // the network's locations count here when the entity's location source lets them stand in
+  // (decision D164), so the small map and the recent positions show what the live map shows
+  const sources =
+    entity.data && entity.data.location_source !== "device" ? "all" : undefined;
   const positions = useQuery({
     queryKey: queryKeys.positions(projectId, {
       entityId,
       recent: true,
       at: around.at,
+      sources,
     }),
     queryFn: () =>
       api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, {
         query: around.at
-          ? { entity_id: entityId, limit: 50, from: around.from, to: around.to }
-          : { entity_id: entityId, limit: 10, from: since30d },
+          ? { entity_id: entityId, limit: 50, from: around.from, to: around.to, sources }
+          : { entity_id: entityId, limit: 10, from: since30d, sources },
       }),
   });
   const traffic = useQuery({

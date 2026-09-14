@@ -30,7 +30,13 @@ export const SOURCES = {
 /** Source ids a base map style brings along; ours must never collide with them, or an ensure
  * function skips its own source and the next `setData` hits a raster source (the blank page
  * of 2026-09-11: MapTiler's hybrid style has a raster source named `satellite`). */
-export const BASEMAP_SOURCE_IDS = ["satellite", "maptiler_planet", "openmaptiles", "terrain", "hillshade"];
+export const BASEMAP_SOURCE_IDS = [
+  "satellite",
+  "maptiler_planet",
+  "openmaptiles",
+  "terrain",
+  "hillshade",
+];
 
 /** Glyphs the OpenFreeMap styles serve; the MapLibre default (Open Sans) is not among them. */
 const FONT = ["Noto Sans Regular"];
@@ -225,7 +231,16 @@ export async function setEntities(
     });
   }
   source.setData({ type: "FeatureCollection", features: withMarkers });
-  setAccuracyCircles(map, SOURCES.entity_accuracy, features);
+  // the disc for the selected entity only (Tim, 2026-09-13): a map full of discs reads as noise
+  setAccuracyCircles(
+    map,
+    SOURCES.entity_accuracy,
+    features.filter(
+      (f) =>
+        (f.properties as { entity_id?: string } | null)?.entity_id ===
+        selectedId,
+    ),
+  );
 }
 
 export function deviceStateFor(
@@ -378,23 +393,37 @@ export async function setDevices(
     });
   }
   source.setData({ type: "FeatureCollection", features: withMarkers });
-  setAccuracyCircles(map, SOURCES.device_accuracy, features);
+  setAccuracyCircles(
+    map,
+    SOURCES.device_accuracy,
+    features.filter(
+      (f) =>
+        (f.properties as { device_id?: string } | null)?.device_id ===
+        selectedId,
+    ),
+  );
 }
 
-/** The accuracy circle (decision D193): around a position whose accuracy is known and above
- * the warning threshold, a translucent disc of that radius in the brand green under the
- * markers, so an imprecise location (a network estimate, a fix taken under a poor sky) never
- * looks as sharp as a good one. One source per marker layer, filled with the same features. */
+/** The accuracy circle (decision D193): around the selected position, when its accuracy is
+ * known and above the warning threshold, a translucent disc of that radius in the brand green
+ * under the markers, so an imprecise location (a network estimate, a fix taken under a poor
+ * sky) never looks as sharp as a good one. One source per marker layer, holding the disc of
+ * the selected object only. */
 export function ensureAccuracyLayers(map: MapLibreMap, sourceId: string): void {
   if (map.getSource(sourceId)) return;
-  map.addSource(sourceId, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-  const before = map.getLayer("entity-clusters") ? "entity-clusters" : undefined;
+  map.addSource(sourceId, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  const before = map.getLayer("entity-clusters")
+    ? "entity-clusters"
+    : undefined;
   map.addLayer(
     {
       id: `${sourceId}-fill`,
       type: "fill",
       source: sourceId,
-      paint: { "fill-color": "#90AE9B", "fill-opacity": 0.2 },
+      paint: { "fill-color": "#52735E", "fill-opacity": 0.14 },
     },
     before,
   );
@@ -403,20 +432,34 @@ export function ensureAccuracyLayers(map: MapLibreMap, sourceId: string): void {
       id: `${sourceId}-line`,
       type: "line",
       source: sourceId,
-      paint: { "line-color": "#52735E", "line-width": 1, "line-opacity": 0.7, "line-dasharray": [2, 2] },
+      paint: {
+        "line-color": "#52735E",
+        "line-width": 2,
+        "line-opacity": 0.9,
+        "line-dasharray": [3, 2],
+      },
     },
     before,
   );
 }
 
-export function setAccuracyCircles(map: MapLibreMap, sourceId: string, features: GeoJSON.Feature[]): void {
+export function setAccuracyCircles(
+  map: MapLibreMap,
+  sourceId: string,
+  features: GeoJSON.Feature[],
+): void {
   const source = map.getSource(sourceId) as GeoJSONSource | undefined;
   if (!source) return;
-  source.setData({ type: "FeatureCollection", features: accuracyCircles(features) });
+  source.setData({
+    type: "FeatureCollection",
+    features: accuracyCircles(features),
+  });
 }
 
 /** The discs for the features that deserve one; exported for its test. */
-export function accuracyCircles(features: GeoJSON.Feature[]): GeoJSON.Feature[] {
+export function accuracyCircles(
+  features: GeoJSON.Feature[],
+): GeoJSON.Feature[] {
   const out: GeoJSON.Feature[] = [];
   for (const feature of features) {
     const props = feature.properties as { accuracy_m?: number | null } | null;
@@ -1022,7 +1065,8 @@ export function setNetworkLocations(
   map: MapLibreMap,
   features: GeoJSON.Feature[],
 ): void {
-  const source = map.getSource(SOURCES.network_locations) as GeoJSONSource | undefined;
+  const source = map.getSource(SOURCES.network_locations) as
+    GeoJSONSource | undefined;
   source?.setData({ type: "FeatureCollection", features });
 }
 
