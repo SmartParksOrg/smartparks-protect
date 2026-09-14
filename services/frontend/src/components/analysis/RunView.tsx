@@ -31,7 +31,7 @@ import {
   fixesPreset,
   isActive,
   type ResultDocument,
-  subjectColor,
+  subjectPalette,
 } from "@/lib/analyses";
 
 /** One run on an analysis page: its status, the actions (save, share, export, cancel,
@@ -51,8 +51,16 @@ export function RunView({
   /** The page's own blocks: a summary in place of the flat list, a map beside it, and
    * anything after the tables (the method's limitations, say). */
   render?: {
-    summary?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
-    map?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
+    summary?: (
+      document: ResultDocument,
+      run: AnalysisRun,
+      colors: Record<string, string>,
+    ) => React.ReactNode;
+    map?: (
+      document: ResultDocument,
+      run: AnalysisRun,
+      colors: Record<string, string>,
+    ) => React.ReactNode;
     after?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
   };
   /** Load the run's settings into the page's form: the way to run it again with changes. */
@@ -108,6 +116,7 @@ export function RunView({
     onSuccess: () => setDeleting(false),
   });
   const document = documentOf(run.data);
+  const colors = document ? subjectPalette(document) : {};
   // the subjects' names label their series and rows
   const labels: Record<string, string> = {
     ...given,
@@ -275,7 +284,7 @@ export function RunView({
         <>
           <WarningsCallout document={document} />
           {render?.summary ? (
-            render.summary(document, r)
+            render.summary(document, r, colors)
           ) : (
             <Card>
               <CardHeader>
@@ -301,7 +310,7 @@ export function RunView({
               </CardContent>
             </Card>
           )}
-          {render?.map?.(document, r)}
+          {render?.map?.(document, r, colors)}
           <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             {document.charts.map((chart) => (
               <Card key={chart.key}>
@@ -313,7 +322,7 @@ export function RunView({
                     chart={chart}
                     labels={labels}
                     colorOf={(s) =>
-                      s.subject ? subjectColor(s.subject) : null
+                      s.subject ? (colors[s.subject] ?? null) : null
                     }
                   />
                 </CardContent>

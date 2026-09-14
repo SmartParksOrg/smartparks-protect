@@ -1,5 +1,5 @@
 import type { AnalysisRun, EntityGroup, Feature } from "@/api/types";
-import { trackColor } from "@/components/map/layers";
+import { PALETTE } from "@/lib/chartStyle";
 import type { ExportPreset } from "@/lib/exports";
 
 /** The analysis pages' shared pieces (docs/ANALYTICS_PHASE1_PLAN.md, sections 8 and 9): the
@@ -263,10 +263,14 @@ export function movementParameters(
   };
 }
 
-/** The colour of a subject everywhere on the page: the map's track colour, so the polygon,
- * the track and the chart line of one animal agree. */
-export function subjectColor(subjectId: string): string {
-  return trackColor(subjectId);
+/** One brand colour per subject of a result, in the document's order, used alike on the
+ * cards, the charts, the polygons and the track, so one animal has one colour everywhere. */
+export function subjectPalette(
+  document: ResultDocument,
+): Record<string, string> {
+  return Object.fromEntries(
+    document.subjects.map((s, i) => [s.id, PALETTE[i % PALETTE.length]]),
+  );
 }
 
 /** The per-subject figures of a period from a movement or grazing summary shaped

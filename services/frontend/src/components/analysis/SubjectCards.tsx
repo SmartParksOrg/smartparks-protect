@@ -1,10 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import {
-  subjectColor,
-  subjectSummary,
-  type ResultDocument,
-} from "@/lib/analyses";
+import { subjectSummary, type ResultDocument } from "@/lib/analyses";
 
 /** One card per subject with the figures that answer the question first (plan, section 8.7):
  * how far, how fast, how much space; the comparison period's figure beside each. */
@@ -12,11 +8,13 @@ export function SubjectCards({
   document,
   metrics,
   labels,
+  colors,
 }: {
   document: ResultDocument;
   /** The metric keys to show, with their unit text. */
   metrics: [string, string][];
   labels: Record<string, string>;
+  colors: Record<string, string>;
 }) {
   const { t } = useTranslation();
   const hasComparison = document.periods.some((p) => p.key === "comparison");
@@ -43,7 +41,7 @@ export function SubjectCards({
             <div className="mb-2 flex items-center gap-2">
               <span
                 className="inline-block size-3 shrink-0 rounded-full"
-                style={{ backgroundColor: subjectColor(subject.id) }}
+                style={{ backgroundColor: colors[subject.id] }}
                 aria-hidden
               />
               <span className="truncate font-medium">{subject.name}</span>

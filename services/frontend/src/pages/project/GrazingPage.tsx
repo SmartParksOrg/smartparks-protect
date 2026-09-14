@@ -112,12 +112,13 @@ export function GrazingPage() {
                   summary: (document) => (
                     <AreaCards document={document} labels={labels} />
                   ),
-                  map: (document, run) => (
+                  map: (document, run, colors) => (
                     <ResultMap
                       projectId={projectId}
                       runId={run.id}
                       document={document}
                       labels={labels}
+                      colors={colors}
                       tracksOn={false}
                     />
                   ),

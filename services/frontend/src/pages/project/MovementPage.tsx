@@ -108,19 +108,21 @@ export function MovementPage() {
                       ?.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 render={{
-                  summary: (document) => (
+                  summary: (document, _run, colors) => (
                     <SubjectCards
                       document={document}
                       labels={labels}
                       metrics={CARD_METRICS}
+                      colors={colors}
                     />
                   ),
-                  map: (document, run) => (
+                  map: (document, run, colors) => (
                     <ResultMap
                       projectId={projectId}
                       runId={run.id}
                       document={document}
                       labels={labels}
+                      colors={colors}
                     />
                   ),
                   after: () => <Limitations />,

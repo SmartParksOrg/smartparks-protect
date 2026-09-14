@@ -57,11 +57,7 @@ import { useMapConfig } from "@/hooks/useMapConfig";
 import { usePreference } from "@/hooks/usePreference";
 import { useTheme } from "@/hooks/useTheme";
 import { boundsOfTracks } from "@/lib/explore";
-import {
-  intensityFeatures,
-  subjectColor,
-  type ResultDocument,
-} from "@/lib/analyses";
+import { intensityFeatures, type ResultDocument } from "@/lib/analyses";
 
 const TRACK_POINTS = 5000;
 const HEAT_RADIUS_M = 60;
@@ -79,12 +75,15 @@ export function ResultMap({
   runId,
   document,
   labels,
+  colors,
   tracksOn = true,
 }: {
   projectId: string;
   runId: string;
   document: ResultDocument;
   labels: Record<string, string>;
+  /** The subjects' colours, shared with the cards and the charts. */
+  colors: Record<string, string>;
   /** Whether the subjects' tracks start shown; a use map reads better without them. */
   tracksOn?: boolean;
 }) {
@@ -157,11 +156,12 @@ export function ResultMap({
                 kind: "entity" as const,
                 geometry: track.geometry as unknown as GeoJSON.Geometry,
                 times: track.times,
+                color: colors[document.subjects[i].id],
               },
             ]
           : [],
       ),
-    [tracks, document.subjects],
+    [tracks, document.subjects, colors],
   );
   // the fixes as points, for the points layer and the heatmap
   const pointFeatures = useMemo<GeoJSON.Feature[]>(
@@ -194,9 +194,9 @@ export function ResultMap({
   const features = useMemo(
     () =>
       decorateAnalysisFeatures(geometries.data?.features ?? [], (id) =>
-        id ? subjectColor(id) : "#52735E",
+        id ? (colors[id] ?? "#52735E") : "#52735E",
       ),
-    [geometries.data],
+    [geometries.data, colors],
   );
 
   useEffect(() => {

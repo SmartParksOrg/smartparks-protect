@@ -623,6 +623,8 @@ export interface TrackLayer {
   kind?: "entity" | "device";
   geometry: GeoJSON.Geometry;
   times: string[];
+  /** A colour of the caller's choosing; the entity's hashed colour otherwise. */
+  color?: string;
 }
 
 /** Every track shown at once, each in its entity's colour. */
@@ -631,7 +633,7 @@ export function setTracks(map: MapLibreMap, tracks: TrackLayer[]): void {
   if (!source) return;
   const features: GeoJSON.Feature[] = [];
   for (const track of tracks) {
-    const color = trackColor(track.entityId);
+    const color = track.color ?? trackColor(track.entityId);
     features.push({
       type: "Feature",
       geometry: track.geometry,

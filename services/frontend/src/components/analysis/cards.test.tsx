@@ -121,6 +121,7 @@ describe("analysis cards", () => {
           ["fixes", ""],
           ["mcp95_ha", "ha"],
         ]}
+        colors={{ a: "#52735E" }}
       />,
     );
     expect(screen.getByText("Aldo")).toBeInTheDocument();
