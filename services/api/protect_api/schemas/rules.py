@@ -105,6 +105,9 @@ class EventRead(ORMModel):
     trace_id: uuid.UUID | None
     alert_id: uuid.UUID | None = None
     alert_status: str | None = None
+    #: The names of the entity and the device the event is about, for the feed and the lists.
+    entity_name: str | None = None
+    device_name: str | None = None
 
 
 class AlertRead(ORMModel):

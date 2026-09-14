@@ -8,7 +8,11 @@ import {
   unreadCount,
 } from "@/lib/feed";
 
-const item = (id: string, created: string, extra: Partial<FeedItem> = {}): FeedItem => ({
+const item = (
+  id: string,
+  created: string,
+  extra: Partial<FeedItem> = {},
+): FeedItem => ({
   id,
   created_at: created,
   time: created,
@@ -33,10 +37,44 @@ describe("feed", () => {
     expect(unreadCount(items, "2026-09-12T09:30:00+00:00")).toBe(2);
     expect(unreadCount(items, "2026-09-12T11:00:00+00:00")).toBe(0);
     expect(isUnread(items[1], "2026-09-12T10:00:00+00:00")).toBe(true);
-    expect(unreadCount(Array.from({ length: 150 }, (_, i) => item(String(i), "2026-09-13T00:00:00+00:00")), "2026-09-12T00:00:00+00:00")).toBe(99);
+    expect(
+      unreadCount(
+        Array.from({ length: 150 }, (_, i) =>
+          item(String(i), "2026-09-13T00:00:00+00:00"),
+        ),
+        "2026-09-12T00:00:00+00:00",
+      ),
+    ).toBe(99);
   });
   it("reads a point position", () => {
-    expect(feedPosition(item("p", "2026-09-12T10:00:00+00:00", { geometry: { type: "Point", coordinates: [31.5, -24.9] } }))).toEqual([31.5, -24.9]);
-    expect(feedPosition(item("q", "2026-09-12T10:00:00+00:00", { geometry: null }))).toBeNull();
+    expect(
+      feedPosition(
+        item("p", "2026-09-12T10:00:00+00:00", {
+          geometry: { type: "Point", coordinates: [31.5, -24.9] },
+        }),
+      ),
+    ).toEqual([31.5, -24.9]);
+    expect(
+      feedPosition(item("q", "2026-09-12T10:00:00+00:00", { geometry: null })),
+    ).toBeNull();
+  });
+  it("names the subject in front of a title that does not name it", () => {
+    expect(
+      titledWithSubject({ title: "Device rebooted", device_name: "SP051890" }),
+    ).toBe("SP051890 · Device rebooted");
+    expect(
+      titledWithSubject({
+        title: "Aldo left the reserve",
+        entity_name: "Aldo",
+        device_name: "SP1",
+      }),
+    ).toBe("Aldo left the reserve");
+    expect(
+      titledWithSubject({
+        title: "No data",
+        entity_name: null,
+        device_name: null,
+      }),
+    ).toBe("No data");
   });
 });

@@ -30,7 +30,7 @@ from protect_api.schemas.rules import (
 from protect_api.visibility import EVERYTHING, Visibility
 from shared.database import get_session
 from shared.enums import AlertStatus
-from shared.models import ActionDelivery, Alert, Event, User
+from shared.models import ActionDelivery, Alert, Device, Entity, Event, User
 from shared.permissions import Permission
 from shared.rules.events import close_alert
 from shared.timeutil import utc_now
@@ -59,6 +59,28 @@ def _icon(event_type: str) -> str:
     if event_type.startswith("GEOFENCE"):
         return ICON_BY_TYPE.get(event_type, "event.geofence")
     return ICON_BY_TYPE.get(event_type, "event.alert")
+
+
+async def with_names(session: AsyncSession, reads: list[EventRead]) -> None:
+    """The names of the entities and devices the events are about (Tim, 2026-09-14: a feed
+    row must say which device or animal it is)."""
+    entity_ids = {r.entity_id for r in reads if r.entity_id}
+    device_ids = {r.device_id for r in reads if r.device_id}
+    entities: dict[uuid.UUID, str] = {}
+    devices: dict[uuid.UUID, str] = {}
+    if entity_ids:
+        rows = (
+            await session.execute(select(Entity.id, Entity.name).where(Entity.id.in_(entity_ids)))
+        ).all()
+        entities = {row.id: row.name for row in rows}
+    if device_ids:
+        rows = (
+            await session.execute(select(Device.id, Device.name).where(Device.id.in_(device_ids)))
+        ).all()
+        devices = {row.id: row.name for row in rows}
+    for r in reads:
+        r.entity_name = entities.get(r.entity_id) if r.entity_id else None
+        r.device_name = devices.get(r.device_id) if r.device_id else None
 
 
 def event_read(event: Event, alert: Alert | None) -> EventRead:
@@ -132,6 +154,7 @@ async def list_events_for(
         await session.execute(statement.order_by(Event.time.desc()).limit(page.limit + 1))
     ).all()
     items = [event_read(event, alert) for event, alert in rows[: page.limit]]
+    await with_names(session, items)
     next_cursor = items[-1].time.isoformat() if len(rows) > page.limit else None
     return PageResponse(items=items, next_cursor=next_cursor)
 
@@ -230,8 +253,10 @@ async def event_detail_for(
         .order_by(ActionDelivery.created_at)
         .limit(200)
     )
+    read = event_read(event, alert)
+    await with_names(session, [read])
     return EventDetail(
-        event=event_read(event, alert),
+        event=read,
         alert=alert_read(alert, event) if alert else None,
         deliveries=[ActionDeliveryRead.model_validate(d) for d in deliveries],
     )

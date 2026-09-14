@@ -7582,6 +7582,10 @@ export interface components {
             alert_id?: string | null;
             /** Alert Status */
             alert_status?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /** Device Name */
+            device_name?: string | null;
         };
         /**
          * ExportDataset

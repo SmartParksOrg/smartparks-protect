@@ -11,6 +11,8 @@ export interface FeedItem {
   severity: string;
   entity_id?: string | null;
   device_id?: string | null;
+  entity_name?: string | null;
+  device_name?: string | null;
   alert_id?: string | null;
   alert_status?: string | null;
   geometry?: { type?: string; coordinates?: unknown } | null;
@@ -46,4 +48,16 @@ export function feedPosition(item: FeedItem): [number, number] | null {
   if (!g || g.type !== "Point" || !Array.isArray(g.coordinates)) return null;
   const [lon, lat] = g.coordinates as number[];
   return typeof lon === "number" && typeof lat === "number" ? [lon, lat] : null;
+}
+
+/** The title with the subject named in front when the title does not name it (Tim,
+ * 2026-09-14): "SP051890 · Device rebooted", "Aldo · left the reserve". */
+export function titledWithSubject(item: {
+  title: string;
+  entity_name?: string | null;
+  device_name?: string | null;
+}): string {
+  const subject = item.entity_name ?? item.device_name;
+  if (!subject || item.title.includes(subject)) return item.title;
+  return `${subject} · ${item.title}`;
 }

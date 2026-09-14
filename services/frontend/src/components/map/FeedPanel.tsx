@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { type FeedItem, isUnread } from "@/lib/feed";
+import { type FeedItem, isUnread, titledWithSubject } from "@/lib/feed";
 import { formatAgo, formatTime } from "@/lib/format";
 import { eventIcon } from "@/lib/rules";
 
@@ -76,7 +76,8 @@ export function FeedPanel({
         )}
         {items.map((item) => {
           const unread = isUnread(item, seenUpTo);
-          const entity = entityName(item.entity_id);
+          const entity = item.entity_name ?? entityName(item.entity_id);
+          const subject = entity ?? item.device_name ?? null;
           return (
             <li
               key={item.id}
@@ -95,34 +96,41 @@ export function FeedPanel({
                   <span
                     className={`block truncate ${unread ? "font-semibold" : ""}`}
                   >
-                    {item.title}
+                    {titledWithSubject(item)}
                   </span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    <StatusBadge value={item.severity} className="text-[10px]" />
+                    <StatusBadge
+                      value={item.severity}
+                      className="text-[10px]"
+                    />
                     {item.alert_status && (
                       <StatusBadge
                         value={item.alert_status}
                         className="text-[10px]"
                       />
                     )}
-                    {entity && <span className="truncate">{entity}</span>}
-                    <span title={formatTime(item.time)}>{formatAgo(item.time)}</span>
+                    {subject && <span className="truncate">{subject}</span>}
+                    <span title={formatTime(item.time)}>
+                      {formatAgo(item.time)}
+                    </span>
                   </span>
                 </span>
-                {canWriteAlerts && item.alert_id && item.alert_status === "open" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 shrink-0 px-2 text-xs"
-                    disabled={acknowledge.isPending}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      acknowledge.mutate(item);
-                    }}
-                  >
-                    {t("Acknowledge")}
-                  </Button>
-                )}
+                {canWriteAlerts &&
+                  item.alert_id &&
+                  item.alert_status === "open" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 shrink-0 px-2 text-xs"
+                      disabled={acknowledge.isPending}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        acknowledge.mutate(item);
+                      }}
+                    >
+                      {t("Acknowledge")}
+                    </Button>
+                  )}
               </button>
             </li>
           );

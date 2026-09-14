@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+
+import { titledWithSubject } from "@/lib/feed";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { RefreshCw } from "lucide-react";
@@ -58,7 +60,7 @@ export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; e
     <Dialog open={eventId !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">{d && <Icon iconKey={eventIcon(d.event.event_type)} className="size-5 text-primary" />}{d?.event.title ?? "Event"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">{d && <Icon iconKey={eventIcon(d.event.event_type)} className="size-5 text-primary" />}{d ? titledWithSubject(d.event) : "Event"}</DialogTitle>
           <DialogDescription>{d ? `${d.event.event_type} at ${formatTime(d.event.time)}` : "Loading…"}</DialogDescription>
         </DialogHeader>
         {detail.error && <Callout kind="error">{detail.error.message}</Callout>}
@@ -67,8 +69,8 @@ export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; e
             <div className="grid grid-cols-2 gap-2">
               <div><span className="text-muted-foreground">{t("Severity")}</span><div><StatusBadge value={d.event.severity} /></div></div>
               <div><span className="text-muted-foreground">{t("Created")}</span><div>{formatTime(d.event.created_at)}</div></div>
-              {d.event.entity_id && projectPath && <div><span className="text-muted-foreground">{t("Entity")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/map?entity=${d.event.entity_id}`}>{t("show on map")}</Link></div></div>}
-              {d.event.device_id && projectPath && <div><span className="text-muted-foreground">{t("Device")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/devices/${d.event.device_id}`}>{t("open device")}</Link></div></div>}
+              {d.event.entity_id && projectPath && <div><span className="text-muted-foreground">{t("Entity")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/entities/${d.event.entity_id}`}>{d.event.entity_name ?? t("open entity")}</Link> · <Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/map?entity=${d.event.entity_id}`}>{t("show on map")}</Link></div></div>}
+              {d.event.device_id && projectPath && <div><span className="text-muted-foreground">{t("Device")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/devices/${d.event.device_id}`}>{d.event.device_name ?? t("open device")}</Link></div></div>}
               {d.event.trace_id && projectPath && <div><span className="text-muted-foreground">{t("Trace")}</span><div><Link className="underline" to={`/projects/${projectFor(scope, d.event.project_id)}/network/traces?trace=${d.event.trace_id}`}>{t("view processing trace")}</Link></div></div>}
               {d.event.description && <div className="col-span-2"><span className="text-muted-foreground">{t("Description")}</span><div>{d.event.description}</div></div>}
             </div>
@@ -115,7 +117,7 @@ export function EventsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   const columns: ColumnDef<EventItem, unknown>[] = [
     ...(allProjects ? [{ id: "project", header: t("Project"), accessorFn: (e: EventItem) => projectName(e.project_id) } as ColumnDef<EventItem, unknown>] : []),
     { header: t("Time"), accessorKey: "time", cell: ({ getValue }) => <span className="whitespace-nowrap">{formatTime(getValue<string>())}</span> },
-    { header: t("Event"), accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{row.original.title}</span> },
+    { header: t("Event"), accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{titledWithSubject(row.original)}</span> },
     { header: t("Type"), accessorKey: "event_type", cell: ({ getValue }) => <code className="text-xs">{getValue<string>()}</code> },
     { header: t("Severity"), accessorKey: "severity", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
     { header: t("Alert"), accessorKey: "alert_status", cell: ({ getValue }) => <StatusBadge value={getValue<string | null>()} /> },

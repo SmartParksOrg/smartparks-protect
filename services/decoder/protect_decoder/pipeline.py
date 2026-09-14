@@ -680,7 +680,8 @@ async def _write_events(
             device_id=device.id,
             event_type=record.event_type,
             severity=record.severity,
-            title=record.title,
+            # the device's own events name it, so a notification says which collar
+            title=record.title if device.name in record.title else f"{device.name}: {record.title}",
             description=record.description,
             geom=(
                 from_shape(Point(record.longitude, record.latitude), srid=4326)
