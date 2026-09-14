@@ -84,6 +84,27 @@ async def list_modules(_: User = Depends(current_active_user)) -> list[Any]:
     ]
 
 
+async def _ensure_visible(
+    session: AsyncSession, context: ProjectContext, entity_ids: list[uuid.UUID]
+) -> None:
+    """Every id names an entity of the project inside the caller's scope, or 422."""
+    found = set(
+        await session.scalars(
+            select(Entity.id).where(
+                Entity.project_id == context.project.id, Entity.id.in_(entity_ids)
+            )
+        )
+    )
+    missing = [str(i) for i in entity_ids if i not in found]
+    if missing:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unknown entity {missing[0]}")
+    outside = [i for i in entity_ids if not context.visibility.entity_visible(i)]
+    if outside:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "An entity is outside what you may see"
+        )
+
+
 async def _resolve_subjects(
     session: AsyncSession, context: ProjectContext, params: CommonParameters, limit: int
 ) -> list[uuid.UUID]:
@@ -91,23 +112,7 @@ async def _resolve_subjects(
     (an id outside the scope is refused), or a group with its subgroups, or a type."""
     project_id = context.project.id
     if params.entity_ids:
-        found = set(
-            await session.scalars(
-                select(Entity.id).where(
-                    Entity.project_id == project_id, Entity.id.in_(params.entity_ids)
-                )
-            )
-        )
-        missing = [str(i) for i in params.entity_ids if i not in found]
-        if missing:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unknown entity {missing[0]}"
-            )
-        outside = [i for i in params.entity_ids if not context.visibility.entity_visible(i)]
-        if outside:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, "An entity is outside what you may see"
-            )
+        await _ensure_visible(session, context, params.entity_ids)
         ids = list(dict.fromkeys(params.entity_ids))
     elif params.group_id is not None:
         statement = select(Entity.id).where(
@@ -181,7 +186,19 @@ async def _estimate(
     subjects = await _resolve_subjects(session, context, params, limits["subjects"])
     fixes = await _count_fixes(session, subjects, params)
     days = (params.time_to - params.time_from).total_seconds() / 86_400
+    # a second herd (grazing) is narrowed the same way as the subjects
+    herd_b: list[uuid.UUID] = list(getattr(params, "herd_b_entity_ids", None) or [])
+    if herd_b:
+        await _ensure_visible(session, context, herd_b)
+        if len(herd_b) > limits["subjects"]:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"{len(herd_b)} entities in the second herd; at most {limits['subjects']}.",
+            )
     reasons: list[str] = []
+    check = getattr(module, "check", None)
+    if check is not None:
+        reasons.extend(await check(session, context.project.id, params))
     if fixes > limits["fixes"]:
         reasons.append(
             f"{fixes} fixes; at most {limits['fixes']} in one run. Choose fewer subjects or a "
