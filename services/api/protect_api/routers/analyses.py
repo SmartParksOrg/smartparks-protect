@@ -37,7 +37,6 @@ from shared.analysis.limits import (
     MAX_DAYS,
     MAX_QUEUED_PER_PROJECT,
     MAX_SUBJECTS_MOVEMENT,
-    RESULT_RETENTION_DAYS,
 )
 from shared.analysis.parameters import CommonParameters
 from shared.bus import RedisStreamsBus, Topic
@@ -237,11 +236,33 @@ async def estimate(
 
 
 def _visible_run(run: AnalysisRun, context: ProjectContext) -> bool:
-    """A run is for the reader when every subject is inside the reader's scope."""
+    """A run is for the reader when it is theirs or shared, and every subject is inside the
+    reader's scope."""
+    if not run.shared and run.created_by_user_id != context.user.id:
+        return False
     if not context.visibility.limited:
         return True
     ids = run.parameters.get("entity_ids") or []
     return all(context.visibility.entity_visible(uuid.UUID(str(i))) for i in ids)
+
+
+async def _with_names(session: AsyncSession, reads: list[AnalysisRunRead]) -> None:
+    """The name of the person who ran each, for the runs table."""
+    ids = {r.created_by_user_id for r in reads if r.created_by_user_id}
+    if not ids:
+        return
+    rows = (
+        await session.execute(select(User.id, User.full_name, User.email).where(User.id.in_(ids)))
+    ).all()
+    names = {row.id: row.full_name or row.email for row in rows}
+    for r in reads:
+        r.created_by_name = names.get(r.created_by_user_id) if r.created_by_user_id else None
+
+
+async def _read(session: AsyncSession, run: AnalysisRun) -> AnalysisRunRead:
+    read = AnalysisRunRead.model_validate(run)
+    await _with_names(session, [read])
+    return read
 
 
 @router.get("/projects/{project_id}/analyses", response_model=PageResponse[AnalysisRunRead])
@@ -253,7 +274,10 @@ async def list_runs(
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[AnalysisRunRead]:
     """The project's runs, newest first; the result document is left out here."""
-    statement = select(AnalysisRun).where(AnalysisRun.project_id == context.project.id)
+    statement = select(AnalysisRun).where(
+        AnalysisRun.project_id == context.project.id,
+        AnalysisRun.shared.is_(True) | (AnalysisRun.created_by_user_id == context.user.id),
+    )
     if module:
         statement = statement.where(AnalysisRun.module == module)
     if run_status:
@@ -266,6 +290,7 @@ async def list_runs(
         read = AnalysisRunRead.model_validate(run)
         read.result = None
         items.append(read)
+    await _with_names(session, items)
     return PageResponse(items=items, next_cursor=next_cursor)
 
 
@@ -347,8 +372,8 @@ async def get_run(
     run_id: uuid.UUID,
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
-) -> AnalysisRun:
-    return await _run_for(session, context, run_id)
+) -> AnalysisRunRead:
+    return await _read(session, await _run_for(session, context, run_id))
 
 
 @router.patch("/projects/{project_id}/analyses/{run_id}", response_model=AnalysisRunRead)
@@ -357,15 +382,22 @@ async def update_run(
     body: AnalysisRunUpdate,
     context: ProjectContext = Depends(require_permission(Permission.ANALYSIS_RUN)),
     session: AsyncSession = Depends(get_session),
-) -> AnalysisRun:
-    """Keep the run under a name (it stops expiring), or drop the name (it expires again)."""
+) -> AnalysisRunRead:
+    """Save the run under a name (it stops expiring), drop the name (it expires again), or
+    share it with the project's members; a field left out stays as it is."""
     run = await _run_for(session, context, run_id)
     _may_change(run, context)
-    run.name = body.name
-    if body.name:
-        run.expires_at = None
-    elif run.finished_at is not None:
-        run.expires_at = run.finished_at + timedelta(days=RESULT_RETENTION_DAYS)
+    changed = body.model_dump(exclude_unset=True)
+    if "name" in changed:
+        run.name = body.name
+        if body.name:
+            run.expires_at = None
+        elif run.finished_at is not None:
+            run.expires_at = run.finished_at + timedelta(
+                days=get_settings().analysis_retention_days
+            )
+    if body.shared is not None:
+        run.shared = body.shared
     await record_audit(
         session,
         user=context.user,
@@ -373,10 +405,10 @@ async def update_run(
         object_type="analysis_run",
         object_id=str(run.id),
         project_id=context.project.id,
-        details={"name": body.name},
+        details=changed,
     )
     await session.commit()
-    return run
+    return await _read(session, run)
 
 
 @router.post("/projects/{project_id}/analyses/{run_id}/cancel", response_model=AnalysisRunRead)
@@ -398,44 +430,6 @@ async def cancel_run(
         raise HTTPException(status.HTTP_409_CONFLICT, f"The run is {run.status}")
     await session.commit()
     return run
-
-
-@router.post(
-    "/projects/{project_id}/analyses/{run_id}/rerun",
-    response_model=AnalysisRunRead,
-    status_code=status.HTTP_201_CREATED,
-)
-async def rerun(
-    run_id: uuid.UUID,
-    context: ProjectContext = Depends(require_permission(Permission.ANALYSIS_RUN)),
-    session: AsyncSession = Depends(get_session),
-    bus: RedisStreamsBus = Depends(get_bus),
-) -> AnalysisRun:
-    """A new run with the same parameters, linked to this one."""
-    source = await _run_for(session, context, run_id)
-    module = _module(source.module, context)
-    fresh = AnalysisRun(
-        project_id=context.project.id,
-        module=source.module,
-        parameters=source.parameters,
-        method_version=module.version,
-        created_by_user_id=context.user.id,
-        source_run_id=source.id,
-    )
-    session.add(fresh)
-    await session.flush()
-    await record_audit(
-        session,
-        user=context.user,
-        action="analysis.created",
-        object_type="analysis_run",
-        object_id=str(fresh.id),
-        project_id=context.project.id,
-        details={"module": source.module, "source_run_id": str(source.id)},
-    )
-    await session.commit()
-    await bus.publish(Topic.ANALYSIS_REQUESTED, {"run_id": str(fresh.id)})
-    return fresh
 
 
 @router.delete("/projects/{project_id}/analyses/{run_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -2548,7 +2548,8 @@ export interface paths {
         head?: never;
         /**
          * Update Run
-         * @description Keep the run under a name (it stops expiring), or drop the name (it expires again).
+         * @description Save the run under a name (it stops expiring), drop the name (it expires again), or
+         *     share it with the project's members; a field left out stays as it is.
          */
         patch: operations["update_run_api_v1_projects__project_id__analyses__run_id__patch"];
         trace?: never;
@@ -2567,26 +2568,6 @@ export interface paths {
          * @description A queued run is cancelled at once; a running one stops at its next step.
          */
         post: operations["cancel_run_api_v1_projects__project_id__analyses__run_id__cancel_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{project_id}/analyses/{run_id}/rerun": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Rerun
-         * @description A new run with the same parameters, linked to this one.
-         */
-        post: operations["rerun_api_v1_projects__project_id__analyses__run_id__rerun_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4992,6 +4973,13 @@ export interface components {
             error_message: string | null;
             /** Created By User Id */
             created_by_user_id: string | null;
+            /** Created By Name */
+            created_by_name?: string | null;
+            /**
+             * Shared
+             * @default false
+             */
+            shared: boolean;
             /**
              * Created At
              * Format: date-time
@@ -5006,10 +4994,16 @@ export interface components {
             /** Source Run Id */
             source_run_id: string | null;
         };
-        /** AnalysisRunUpdate */
+        /**
+         * AnalysisRunUpdate
+         * @description What a person may change on a run: its name (a name saves it, null lets it expire
+         *     again) and whether the project's members see it; a field left out stays as it is.
+         */
         AnalysisRunUpdate: {
             /** Name */
             name?: string | null;
+            /** Shared */
+            shared?: boolean | null;
         };
         /**
          * AnalysisStatus
@@ -17201,38 +17195,6 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AnalysisRunRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    rerun_api_v1_projects__project_id__analyses__run_id__rerun_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                run_id: string;
-                project_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
                 headers: {
                     [name: string]: unknown;
                 };

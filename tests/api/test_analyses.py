@@ -186,8 +186,29 @@ async def test_catalogue_estimate_and_the_life_of_a_run(client, db, stub):
 
     kept = await client.patch(f"{base}/{run['id']}", json={"name": "Wolves, week one"}, headers=h)
     assert kept.status_code == 200 and kept.json()["expires_at"] is None
-    again = await client.post(f"{base}/{run['id']}/rerun", headers=h)
-    assert again.status_code == 201 and again.json()["source_run_id"] == run["id"]
+    assert kept.json()["created_by_name"] == admin.user.email and kept.json()["shared"] is False
+
+    # a run is the runner's own until shared with the project
+    other = await project_actor(client, db, project, Role.ANALYST)
+    assert (await client.get(f"{base}/{run['id']}", headers=other.headers)).status_code == 404
+    assert run["id"] not in {
+        r["id"] for r in (await client.get(base, headers=other.headers)).json()["items"]
+    }
+    shared = await client.patch(f"{base}/{run['id']}", json={"shared": True}, headers=h)
+    assert shared.status_code == 200 and shared.json()["shared"] is True
+    assert shared.json()["name"] == "Wolves, week one"  # a field left out stays
+    seen = await client.get(f"{base}/{run['id']}", headers=other.headers)
+    assert seen.status_code == 200 and seen.json()["created_by_name"] == admin.user.email
+    # the other member may not rename or delete it
+    assert (
+        await client.patch(f"{base}/{run['id']}", json={"name": "Mine"}, headers=other.headers)
+    ).status_code == 403
+
+    # a queued run can be cancelled and deleted
+    again = await client.post(
+        base, json={"module": "movement", "parameters": _params(ids)}, headers=h
+    )
+    assert again.status_code == 201
     cancelled = await client.post(f"{base}/{again.json()['id']}/cancel", headers=h)
     assert cancelled.status_code == 200 and cancelled.json()["status"] == "cancelled"
     assert (await client.delete(f"{base}/{again.json()['id']}", headers=h)).status_code == 204

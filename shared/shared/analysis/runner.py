@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.analysis import MODULES, enabled_modules
 from shared.analysis.base import AnalysisCancelled, AnalysisTooLarge, RunContext, RunResult
-from shared.analysis.limits import MAX_GEOMETRIES, MAX_RESULT_BYTES, RESULT_RETENTION_DAYS
+from shared.analysis.limits import MAX_GEOMETRIES, MAX_RESULT_BYTES
 from shared.config import get_settings
 from shared.database import get_session_factory
 from shared.enums import AnalysisStatus
@@ -161,7 +161,7 @@ async def _finish(
     run.finished_at = finished
     run.progress = 100 if status == AnalysisStatus.COMPLETED else run.progress
     if run.name is None:
-        run.expires_at = finished + timedelta(days=RESULT_RETENTION_DAYS)
+        run.expires_at = finished + timedelta(days=get_settings().analysis_retention_days)
     await session.commit()
 
 

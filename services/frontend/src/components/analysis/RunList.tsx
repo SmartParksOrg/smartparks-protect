@@ -1,17 +1,33 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { AnalysisRun, Page as PageType } from "@/api/types";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
-import { formatAgo } from "@/lib/format";
+import { usePermissions } from "@/hooks/useProjects";
+import { formatAgo, formatTime } from "@/lib/format";
 import { isActive } from "@/lib/analyses";
+import { useAuthStore } from "@/stores/auth";
 
-/** The recent runs of one module in the project as a row of chips above the result, newest
- * first, polled while any is active; a click opens the run on the page. */
+/** The runs of one module a person may see (their own and the shared ones), newest first,
+ * polled while any is active: saved and unsaved alike, with the status, the subjects, the
+ * period, who ran it and whether it is saved and shared. A click opens the run and loads
+ * its settings into the form. */
 export function RunList({
   projectId,
   module,
@@ -21,18 +37,29 @@ export function RunList({
   projectId: string;
   module: string;
   selected: string | null;
-  onSelect: (id: string) => void;
+  onSelect: (run: AnalysisRun) => void;
 }) {
   const { t } = useTranslation();
   const now = useNow();
+  const me = useAuthStore((s) => s.user);
+  const { can } = usePermissions(projectId);
+  const [removing, setRemoving] = useState<AnalysisRun | null>(null);
+  const key = queryKeys.analyses(projectId, { module, recent: true });
   const runs = useQuery({
-    queryKey: queryKeys.analyses(projectId, { module, recent: true }),
+    queryKey: key,
     queryFn: () =>
       api.get<PageType<AnalysisRun>>(`/api/v1/projects/${projectId}/analyses`, {
-        query: { module, limit: 20 },
+        query: { module, limit: 50 },
       }),
     refetchInterval: (query) =>
       query.state.data?.items.some((r) => isActive(r.status)) ? 3000 : false,
+  });
+  const remove = useMutationToast({
+    mutationFn: (run: AnalysisRun) =>
+      api.delete(`/api/v1/projects/${projectId}/analyses/${run.id}`),
+    invalidate: [key],
+    success: t("Run deleted"),
+    onSuccess: () => setRemoving(null),
   });
   const items = runs.data?.items ?? [];
   if (runs.isPending)
@@ -45,42 +72,124 @@ export function RunList({
         {t("No runs yet. Choose subjects and a period, then run.")}
       </p>
     );
+  const mayDelete = (run: AnalysisRun) =>
+    can("project:write") ||
+    (can("analysis:run") && run.created_by_user_id === me?.id);
+  const period = (run: AnalysisRun) => {
+    const p = run.parameters as { time_from?: string; time_to?: string };
+    return p.time_from && p.time_to
+      ? `${formatTime(p.time_from).slice(0, 12)} – ${formatTime(p.time_to).slice(0, 12)}`
+      : "";
+  };
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {items.map((run) => (
-        <Button
-          key={run.id}
-          variant={run.id === selected ? "secondary" : "outline"}
-          size="sm"
-          className="h-8 max-w-full gap-2 overflow-hidden"
-          aria-pressed={run.id === selected}
-          onClick={() => onSelect(run.id)}
-        >
-          <span className="min-w-0 truncate">
-            {run.name ??
-              t("{{count}} subjects", {
-                count:
-                  (run.parameters as { entity_ids?: string[] }).entity_ids
-                    ?.length ?? 0,
-              })}
-          </span>
-          <Badge
-            variant={
-              run.status === "completed"
-                ? "default"
-                : run.status === "failed"
-                  ? "destructive"
-                  : "secondary"
-            }
-            className="shrink-0"
-          >
-            {run.status}
-          </Badge>
-          <span className="shrink-0 text-xs text-muted-foreground">
-            {formatAgo(run.created_at, now)}
-          </span>
-        </Button>
-      ))}
+    <div className="overflow-x-auto rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("Run")}</TableHead>
+            <TableHead>{t("Status")}</TableHead>
+            <TableHead className="hidden sm:table-cell">
+              {t("Subjects")}
+            </TableHead>
+            <TableHead className="hidden md:table-cell">
+              {t("Period")}
+            </TableHead>
+            <TableHead className="hidden md:table-cell">{t("By")}</TableHead>
+            <TableHead>{t("Started")}</TableHead>
+            <TableHead className="hidden sm:table-cell">{t("Saved")}</TableHead>
+            <TableHead className="hidden sm:table-cell">
+              {t("Shared")}
+            </TableHead>
+            <TableHead className="w-10" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((run) => (
+            <TableRow
+              key={run.id}
+              className={`cursor-pointer ${run.id === selected ? "bg-muted" : ""}`}
+              aria-selected={run.id === selected}
+              onClick={() => onSelect(run)}
+            >
+              <TableCell className="max-w-64 truncate font-medium">
+                {run.name ?? (
+                  <span className="font-normal text-muted-foreground">
+                    {t("Unnamed")}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={
+                    run.status === "completed"
+                      ? "default"
+                      : run.status === "failed"
+                        ? "destructive"
+                        : "secondary"
+                  }
+                >
+                  {run.status}
+                </Badge>
+              </TableCell>
+              <TableCell className="hidden sm:table-cell">
+                {(run.parameters as { entity_ids?: string[] }).entity_ids
+                  ?.length ?? 0}
+              </TableCell>
+              <TableCell className="hidden whitespace-nowrap text-muted-foreground md:table-cell">
+                {period(run)}
+              </TableCell>
+              <TableCell className="hidden max-w-40 truncate text-muted-foreground md:table-cell">
+                {run.created_by_user_id === me?.id
+                  ? t("you")
+                  : (run.created_by_name ?? "")}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">
+                {formatAgo(run.created_at, now)}
+              </TableCell>
+              <TableCell className="hidden sm:table-cell">
+                {run.name
+                  ? t("yes")
+                  : run.expires_at
+                    ? t("expires {{when}}", {
+                        when: formatAgo(run.expires_at, now),
+                      })
+                    : t("no")}
+              </TableCell>
+              <TableCell className="hidden sm:table-cell">
+                {run.shared ? t("yes") : t("no")}
+              </TableCell>
+              <TableCell className="p-1 text-right">
+                {mayDelete(run) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    aria-label={t("Delete run")}
+                    title={t("Delete run")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRemoving(run);
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(open) => !open && setRemoving(null)}
+        title={t("Delete run")}
+        description={t(
+          "The run and its results go. The analysis can be run again from the same choices.",
+        )}
+        confirmLabel={t("Delete")}
+        onConfirm={() => removing && remove.mutate(removing)}
+        pending={remove.isPending}
+      />
     </div>
   );
 }

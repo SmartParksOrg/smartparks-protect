@@ -20,9 +20,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
-import { formatTime } from "@/lib/format";
+import { useAuthStore } from "@/stores/auth";
+import { formatAgo, formatTime } from "@/lib/format";
 import { usePermissions } from "@/hooks/useProjects";
 import {
   documentOf,
@@ -32,8 +34,8 @@ import {
   subjectColor,
 } from "@/lib/analyses";
 
-/** One run on an analysis page: its status, the actions (keep, export, run again, cancel,
- * delete), and the result blocks the document holds. The module's page adds its own summary
+/** One run on an analysis page: its status, the actions (save, share, export, cancel,
+ * delete), its settings, and the result blocks the document holds. The module's page adds its own summary
  * and map through `render` and the labels of its metrics through `labels`; this view knows
  * nothing of the method. */
 export function RunView({
@@ -41,8 +43,6 @@ export function RunView({
   runId,
   labels: given,
   render,
-  onRerun,
-  onAdjust,
 }: {
   projectId: string;
   runId: string;
@@ -54,13 +54,11 @@ export function RunView({
     map?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
     after?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
   };
-  onRerun?: (run: AnalysisRun) => void;
-  /** Load the run's settings into the page's form, to change them and run again. */
-  onAdjust?: (run: AnalysisRun) => void;
 }) {
   const { t } = useTranslation();
   const now = useNow();
   const { can } = usePermissions(projectId);
+  const me = useAuthStore((s) => s.user);
   const base = `/api/v1/projects/${projectId}/analyses/${runId}`;
   const run = useQuery({
     queryKey: queryKeys.analysis(projectId, runId),
@@ -84,20 +82,21 @@ export function RunView({
     invalidate,
     success: (r) =>
       r.name
-        ? t("Kept as {{name}}", { name: r.name })
+        ? t("Saved as {{name}}", { name: r.name })
         : t("The run expires again"),
     onSuccess: () => setNaming(null),
+  });
+  const share = useMutationToast({
+    mutationFn: (shared: boolean) =>
+      api.patch<AnalysisRun>(base, { body: { shared } }),
+    invalidate,
+    success: (r) =>
+      r.shared ? t("Shared with the project") : t("Only you see it now"),
   });
   const cancel = useMutationToast({
     mutationFn: () => api.post<AnalysisRun>(`${base}/cancel`),
     invalidate,
     success: t("Cancelled"),
-  });
-  const rerun = useMutationToast({
-    mutationFn: () => api.post<AnalysisRun>(`${base}/rerun`),
-    invalidate,
-    success: t("Run again"),
-    onSuccess: (r) => onRerun?.(r),
   });
   const remove = useMutationToast({
     mutationFn: () => api.delete(base),
@@ -138,28 +137,13 @@ export function RunView({
               {t("Cancel")}
             </Button>
           )}
-          {mayRun && !isActive(r.status) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => rerun.mutate()}
-              disabled={rerun.isPending}
-            >
-              {t("Run again")}
-            </Button>
-          )}
-          {mayRun && onAdjust && (
-            <Button variant="outline" size="sm" onClick={() => onAdjust(r)}>
-              {t("Adjust and run again")}
-            </Button>
-          )}
           {mayRun && r.status === "completed" && naming === null && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => setNaming(r.name ?? "")}
             >
-              {r.name ? t("Rename") : t("Keep")}
+              {r.name ? t("Rename") : t("Save…")}
             </Button>
           )}
           {document && (
@@ -236,7 +220,7 @@ export function RunView({
           <Input
             value={naming}
             onChange={(e) => setNaming(e.target.value)}
-            placeholder={t("A name keeps the run")}
+            placeholder={t("A name saves the run")}
             className="w-64"
             aria-label={t("Name")}
           />
@@ -253,11 +237,31 @@ export function RunView({
           </Button>
         </form>
       )}
-      {r.name && naming === null && (
-        <p className="text-sm text-muted-foreground">
-          {t("Kept as {{name}}; it does not expire.", { name: r.name })}
-        </p>
-      )}
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+        {r.name && naming === null && (
+          <span>
+            {t("Saved as {{name}}; it does not expire.", { name: r.name })}
+          </span>
+        )}
+        {!r.name && r.expires_at && (
+          <span>
+            {t("Not saved: it expires {{when}}.", {
+              when: formatAgo(r.expires_at, now),
+            })}
+          </span>
+        )}
+        {(r.created_by_user_id === me?.id || can("project:write")) && (
+          <label className="flex items-center gap-2">
+            <Switch
+              checked={r.shared}
+              onCheckedChange={(v) => share.mutate(v)}
+              disabled={share.isPending}
+              aria-label={t("Shared with the project")}
+            />
+            {t("Shared with the project")}
+          </label>
+        )}
+      </p>
       <RunSettings run={r} document={document} />
       {document && (
         <>

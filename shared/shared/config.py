@@ -154,6 +154,9 @@ class Settings(BaseSettings):
     analysis_concurrency: int = Field(
         default=1, ge=1, description="Runs in progress at once in the analysis worker"
     )
+    analysis_retention_days: int = Field(
+        default=7, ge=1, description="Days an unsaved run is kept after it finished"
+    )
     analysis_timeout_seconds: int = Field(
         default=900, ge=60, description="Wall clock a run may take before it is failed"
     )

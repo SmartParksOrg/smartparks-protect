@@ -53,6 +53,12 @@ class AnalysisRun(UuidPrimaryKeyMixin, Base):
     module: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="queued")
     name: Mapped[str | None] = mapped_column(String(200), comment="Set when the run is kept")
+    shared: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+        comment="Visible to the project's members, not only to the person who ran it",
+    )
     parameters: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, comment="The module's parameters as validated, subjects resolved"
     )

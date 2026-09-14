@@ -13,7 +13,9 @@ The line under the form estimates the run: how many animals, days and fixes it w
 
 ## The run
 
-Run queues an analysis; the analysis worker computes it, one run at a time per server, with its own statement and wall-clock timeouts. The run appears in the Runs row with its progress; a folded "Settings of this run" block under it lists everything it was asked, and "Adjust and run again" loads those settings into the form; the page shows the result when it completes, or the reason it failed and a Run again button. Results are kept for 30 days unless the run is given a name with Keep. Anyone with `project:read` sees results inside their scope; `analysis:run` (Analysts and Admins) starts, cancels and deletes runs.
+Run queues an analysis from what the form says; the analysis worker computes it, one run at a time per server, with its own statement and wall-clock timeouts. The run appears in the runs table with its status and, when it completes, the page shows the result; a failure shows its reason. Opening a run from the table loads its settings into the form, so adjusting them and pressing Run is how a person iterates: every Run is a new run, and the form is the only place settings are set. A folded "Settings of this run" block under the status lists everything a run was asked.
+
+A run is unsaved until it is given a name with "Save…"; an unsaved run expires a few days after it finished (`ANALYSIS_RETENTION_DAYS`, 7 by default) and a saved one never. A run is visible to the person who ran it only, until they switch "Shared with the project" on; project admins see and may delete every run they can open. The runs table lists saved and unsaved runs alike, with who ran them, when they expire and whether they are shared. Anyone with `project:read` sees the runs they may see, inside their scope; `analysis:run` (Analysts and Admins) starts, saves, shares, cancels and deletes their own runs.
 
 ## What the result holds
 
@@ -46,7 +48,7 @@ All arithmetic is on the sphere with the haversine; positions are WGS 84 and a p
 
 ## Exports and API
 
-Export gives the summary table as CSV, the polygons as GeoJSON (with subject, kind, level, area and period as attributes, for QGIS), and the whole document as JSON; "The fixes behind it" opens the export dialog with the positions of the subjects over the period, as GeoJSON by default. The API is `GET /analysis-modules`, `GET /projects/{id}/analyses/estimate`, `GET|POST /projects/{id}/analyses`, and on a run `GET`, `PATCH` (name), `POST .../cancel`, `POST .../rerun`, `DELETE`, `GET .../geometries` (GeoJSON, `kind` and `subject_id` filters) and `GET .../export?what=document|geometries|summary&format=json|geojson|csv`.
+Export gives the summary table as CSV, the polygons as GeoJSON (with subject, kind, level, area and period as attributes, for QGIS), and the whole document as JSON; "The fixes behind it" opens the export dialog with the positions of the subjects over the period, as GeoJSON by default. The API is `GET /analysis-modules`, `GET /projects/{id}/analyses/estimate`, `GET|POST /projects/{id}/analyses`, and on a run `GET`, `PATCH` (`name`, `shared`), `POST .../cancel`, `DELETE`, `GET .../geometries` (GeoJSON, `kind` and `subject_id` filters) and `GET .../export?what=document|geometries|summary&format=json|geojson|csv`.
 
 ## Switching it on and off
 

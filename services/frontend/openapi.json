@@ -11278,7 +11278,7 @@
      "analyses"
     ],
     "summary": "Update Run",
-    "description": "Keep the run under a name (it stops expiring), or drop the name (it expires again).",
+    "description": "Save the run under a name (it stops expiring), drop the name (it expires again), or\nshare it with the project's members; a field left out stays as it is.",
     "operationId": "update_run_api_v1_projects__project_id__analyses__run_id__patch",
     "security": [
      {
@@ -11427,65 +11427,6 @@
     ],
     "responses": {
      "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/AnalysisRunRead"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/v1/projects/{project_id}/analyses/{run_id}/rerun": {
-   "post": {
-    "tags": [
-     "analyses"
-    ],
-    "summary": "Rerun",
-    "description": "A new run with the same parameters, linked to this one.",
-    "operationId": "rerun_api_v1_projects__project_id__analyses__run_id__rerun_post",
-    "security": [
-     {
-      "OAuth2PasswordBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "run_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "string",
-       "format": "uuid",
-       "title": "Run Id"
-      }
-     },
-     {
-      "name": "project_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "string",
-       "format": "uuid",
-       "title": "Project Id"
-      }
-     }
-    ],
-    "responses": {
-     "201": {
       "description": "Successful Response",
       "content": {
        "application/json": {
@@ -21208,6 +21149,22 @@
       ],
       "title": "Created By User Id"
      },
+     "created_by_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By Name"
+     },
+     "shared": {
+      "type": "boolean",
+      "title": "Shared",
+      "default": false
+     },
      "created_at": {
       "type": "string",
       "format": "date-time",
@@ -21301,10 +21258,22 @@
        }
       ],
       "title": "Name"
+     },
+     "shared": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Shared"
      }
     },
     "type": "object",
-    "title": "AnalysisRunUpdate"
+    "title": "AnalysisRunUpdate",
+    "description": "What a person may change on a run: its name (a name saves it, null lets it expire\nagain) and whether the project's members see it; a field left out stays as it is."
    },
    "AnalysisStatus": {
     "type": "string",

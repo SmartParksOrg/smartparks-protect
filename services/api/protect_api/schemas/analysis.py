@@ -24,8 +24,11 @@ class AnalysisRunCreate(BaseModel):
 
 
 class AnalysisRunUpdate(BaseModel):
-    #: A name keeps the run; null lets it expire again.
+    """What a person may change on a run: its name (a name saves it, null lets it expire
+    again) and whether the project's members see it; a field left out stays as it is."""
+
     name: str | None = Field(default=None, max_length=200)
+    shared: bool | None = None
 
 
 class AnalysisRunRead(ORMModel):
@@ -45,6 +48,9 @@ class AnalysisRunRead(ORMModel):
     error_code: str | None
     error_message: str | None
     created_by_user_id: uuid.UUID | None
+    #: The name of the person who ran it, for the runs table.
+    created_by_name: str | None = None
+    shared: bool = False
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None

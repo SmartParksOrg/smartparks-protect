@@ -34,10 +34,12 @@ export function GrazingPage() {
   const state = readFormState(params);
   const update = (patch: Partial<FormState>) =>
     setParams(writeFormState({ ...state, ...patch }), { replace: true });
-  const select = (run: string | null) => update({ run });
+  // opening a run loads its settings into the form; Run then makes a new run from the form
+  const select = (run: AnalysisRun) =>
+    update({ ...formStateOfRun(run, state), run: run.id });
   const started = (run: AnalysisRun) => {
     setFormOpen(false);
-    select(run.id);
+    update({ run: run.id });
   };
   const labels = GRAZING_LABELS(t);
   const form = (
@@ -98,11 +100,6 @@ export function GrazingPage() {
                 projectId={projectId}
                 runId={state.run}
                 labels={labels}
-                onRerun={(r) => select(r.id)}
-                onAdjust={(r) => {
-                  update(formStateOfRun(r, state));
-                  if (phone) setFormOpen(true);
-                }}
                 render={{
                   summary: (document) => (
                     <AreaCards document={document} labels={labels} />
