@@ -71,6 +71,15 @@ export const queryKeys = {
   dataSourceStatus: (id: string) => ["data-sources", id, "status"] as const,
   identities: (dataSourceId: string) =>
     ["data-sources", dataSourceId, "identities"] as const,
+  analysisModules: ["analysis-modules"] as const,
+  analyses: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "analyses", params] as const,
+  analysis: (projectId: string, runId: string) =>
+    ["projects", projectId, "analyses", runId] as const,
+  analysisGeometries: (projectId: string, runId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "analyses", runId, "geometries", params] as const,
+  analysisEstimate: (projectId: string, params: Record<string, unknown>) =>
+    ["projects", projectId, "analyses", "estimate", params] as const,
   users: ["admin", "users"] as const,
   user: (userId: string) => ["admin", "users", userId] as const,
   serverInvitations: ["admin", "invitations"] as const,

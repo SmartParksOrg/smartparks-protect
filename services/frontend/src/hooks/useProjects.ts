@@ -40,6 +40,13 @@ export function usePermissions(projectId: string | undefined) {
   return { can, all, keys, scopeLimited: Boolean(project?.scope_limited) };
 }
 
+/** The analysis modules the project offers (docs/ANALYTICS_PHASE1_PLAN.md, section 16): the
+ * deployment's list narrowed by the project's; empty hides the analysis pages and items. */
+export function useAnalysisModules(projectId: string | undefined): string[] {
+  const { project } = useProject(projectId);
+  return project?.analysis_modules ?? [];
+}
+
 /** Members and settings: the gate of the project admin pages. */
 export const canAdmin = (role: string | null) =>
   role === "project-admin" || role === "server-admin";

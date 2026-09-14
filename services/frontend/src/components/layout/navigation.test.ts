@@ -12,3 +12,15 @@ describe("navigation sections", () => {
     expect(sections.some((s) => "technical" in s)).toBe(false);
   });
 });
+
+describe("analysis items", () => {
+  it("carry the module that must be offered and no permission (plan, section 16)", () => {
+    const analyze = sectionsFor(false).find((s) => s.label === "Analyze");
+    const movement = analyze?.items.find((i) => i.to === "analyze/movement");
+    const grazing = analyze?.items.find((i) => i.to === "analyze/grazing");
+    expect(movement?.module).toBe("movement");
+    expect(grazing?.module).toBe("grazing");
+    expect(movement?.permission).toBeUndefined();
+    expect(sectionsFor(true).find((s) => s.label === "Analyze")?.items.some((i) => i.module)).toBeFalsy();
+  });
+});

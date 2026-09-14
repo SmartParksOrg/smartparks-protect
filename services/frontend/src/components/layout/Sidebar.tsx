@@ -9,7 +9,7 @@ import {
   type NavItem,
 } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
-import { usePermissions } from "@/hooks/useProjects";
+import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import { isAllProjects } from "@/lib/scope";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
@@ -78,6 +78,7 @@ export function Sidebar({
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const { can } = usePermissions(projectId);
+  const modules = useAnalysisModules(projectId);
 
   return (
     <div className="flex h-full flex-col">
@@ -119,7 +120,9 @@ export function Sidebar({
           sectionsFor(isAllProjects(projectId)).map((section) => {
             if (section.permission && !can(section.permission)) return null;
             const items = section.items.filter(
-              (item) => !item.permission || can(item.permission),
+              (item) =>
+                (!item.permission || can(item.permission)) &&
+                (!item.module || modules.includes(item.module)),
             );
             if (items.length === 0) return null;
             return (

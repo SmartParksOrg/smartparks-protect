@@ -25,7 +25,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { usePermissions } from "@/hooks/useProjects";
+import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import { useAuthStore } from "@/stores/auth";
 import { isAllProjects } from "@/lib/scope";
 import { recordsHref } from "@/lib/records";
@@ -122,6 +122,7 @@ export function CommandPalette() {
   const lastProject = useProjectStore((s) => s.lastProjectId);
   const projectId = routeProject ?? lastProject ?? undefined;
   const { can } = usePermissions(projectId);
+  const modules = useAnalysisModules(projectId);
   const user = useAuthStore((s) => s.user);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -170,7 +171,11 @@ export function CommandPalette() {
     if (projectId)
       for (const section of sectionsFor(isAllProjects(projectId)))
         for (const item of section.items)
-          if (item.to && (!item.permission || can(item.permission)))
+          if (
+            item.to &&
+            (!item.permission || can(item.permission)) &&
+            (!item.module || modules.includes(item.module))
+          )
             out.push({
               label: item.label,
               to: item.to.startsWith("/")
@@ -188,7 +193,7 @@ export function CommandPalette() {
               icon: item.icon,
             });
     return term ? out.filter((p) => p.label.toLowerCase().includes(term)) : [];
-  }, [debounced, projectId, can, user, t]);
+  }, [debounced, projectId, can, modules, user, t]);
 
   const go = (item: Recent) => {
     remember(item);

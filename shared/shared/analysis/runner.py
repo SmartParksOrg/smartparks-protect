@@ -84,10 +84,10 @@ async def run_analysis(session: AsyncSession, run: AnalysisRun) -> None:
         await _store(session, run, result)
         await _finish(session, run, AnalysisStatus.COMPLETED)
     except AnalysisCancelled as stopped:
-        await session.rollback()
+        await _reset(session, run)
         await _finish(session, run, AnalysisStatus.CANCELLED, "CANCELLED", str(stopped))
     except TimeoutError:
-        await session.rollback()
+        await _reset(session, run)
         await _finish(
             session,
             run,
@@ -96,12 +96,19 @@ async def run_analysis(session: AsyncSession, run: AnalysisRun) -> None:
             f"the run exceeded {settings.analysis_timeout_seconds} seconds",
         )
     except AnalysisTooLarge as error:
-        await session.rollback()
+        await _reset(session, run)
         await _finish(session, run, AnalysisStatus.FAILED, "INPUT_TOO_LARGE", str(error))
     except Exception as error:
-        await session.rollback()
+        await _reset(session, run)
         await _finish(session, run, AnalysisStatus.FAILED, "ANALYSIS_FAILED", str(error))
         log.exception("analysis failed", run_id=str(run_id), module=key, error=str(error))
+
+
+async def _reset(session: AsyncSession, run: AnalysisRun) -> None:
+    """After a failure: undo what the module wrote and reload the row, which the rollback
+    expired (an expired attribute cannot be loaded lazily on an async session)."""
+    await session.rollback()
+    await session.refresh(run)
 
 
 async def _store(session: AsyncSession, run: AnalysisRun, result: RunResult) -> None:

@@ -14,6 +14,7 @@ import {
   DatabaseBackup,
   FileClock,
   FolderTree,
+  Footprints,
   GitBranch,
   Layers,
   LayoutDashboard,
@@ -32,6 +33,7 @@ import {
   TriangleAlert,
   Users,
   Waypoints,
+  Wheat,
   Workflow,
 } from "lucide-react";
 
@@ -43,6 +45,8 @@ export interface NavItem {
   phase?: number;
   /** The permission key that shows the item (decision D188). */
   permission?: PermissionKey;
+  /** An analysis module the project must offer for the item to show (plan, section 16). */
+  module?: string;
   serverAdminOnly?: boolean;
   /** Works in the all-projects scope (decision D116); the rest is per project. */
   allScope?: boolean;
@@ -84,6 +88,18 @@ export const projectSections: NavSection[] = [
       { label: "Exports", icon: FileClock, to: "analyze/exports" },
       { label: "Dashboards", icon: LayoutDashboard, to: "analyze/dashboards" },
       { label: "Curation", icon: PenLine, to: "analyze/curation" },
+      {
+        label: "Movement",
+        icon: Footprints,
+        to: "analyze/movement",
+        module: "movement",
+      },
+      {
+        label: "Grazing",
+        icon: Wheat,
+        to: "analyze/grazing",
+        module: "grazing",
+      },
     ],
   },
   {
@@ -133,7 +149,12 @@ export const projectSections: NavSection[] = [
   {
     label: "Project admin",
     items: [
-      { label: "Members", icon: Users, to: "admin/members", permission: "members:write" },
+      {
+        label: "Members",
+        icon: Users,
+        to: "admin/members",
+        permission: "members:write",
+      },
       {
         label: "Features",
         icon: Layers,

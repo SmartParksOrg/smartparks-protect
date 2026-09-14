@@ -3,7 +3,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 
 import { AppLayout } from "@/components/layout/AppLayout";
-import { RequireAuth, RequireProjectPermission, RequireServerAdmin } from "@/components/layout/RequireAuth";
+import { RequireAuth, RequireAnalysisModule, RequireProjectPermission, RequireServerAdmin } from "@/components/layout/RequireAuth";
 import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/auth/PasswordPages";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
@@ -21,6 +21,8 @@ const TracesPage = lazy(() => import("@/pages/project/TracesPage").then((m) => (
 const ExplorerPage = lazy(() => import("@/pages/project/ExplorerPage").then((m) => ({ default: m.ExplorerPage })));
 const ExportsPage = lazy(() => import("@/pages/project/ExportsPage").then((m) => ({ default: m.ExportsPage })));
 const CurationPage = lazy(() => import("@/pages/project/CurationPage").then((m) => ({ default: m.CurationPage })));
+const MovementPage = lazy(() => import("@/pages/project/MovementPage").then((m) => ({ default: m.MovementPage })));
+const GrazingPage = lazy(() => import("@/pages/project/GrazingPage").then((m) => ({ default: m.GrazingPage })));
 const DashboardsPage = lazy(() => import("@/pages/project/DashboardsPage").then((m) => ({ default: m.DashboardsPage })));
 const AiPolicyPage = lazy(() => import("@/pages/admin/AiPolicyPage").then((m) => ({ default: m.AiPolicyPage })));
 const MembersPage = lazy(() => import("@/pages/project/MembersPage").then((m) => ({ default: m.MembersPage })));
@@ -90,6 +92,12 @@ export default function App() {
               <Route path="analyze/exports" element={<ExportsPage />} />
               <Route path="analyze/curation" element={<CurationPage />} />
               <Route path="analyze/dashboards" element={<DashboardsPage />} />
+              <Route element={<RequireAnalysisModule module="movement" />}>
+                <Route path="analyze/movement" element={<MovementPage />} />
+              </Route>
+              <Route element={<RequireAnalysisModule module="grazing" />}>
+                <Route path="analyze/grazing" element={<GrazingPage />} />
+              </Route>
               <Route path="network/traffic" element={<TrafficPage />} />
               <Route path="network/gateways" element={<GatewaysPage />} />
               <Route path="integrate/integrations" element={<IntegrationsPage />} />

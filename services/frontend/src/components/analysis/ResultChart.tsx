@@ -1,0 +1,147 @@
+import { useTranslation } from "react-i18next";
+import { BarChart, LineChart } from "echarts/charts";
+import {
+  GridComponent,
+  LegendComponent,
+  PolarComponent,
+  TooltipComponent,
+} from "echarts/components";
+import * as echarts from "echarts/core";
+import { CanvasRenderer } from "echarts/renderers";
+import { useEffect, useRef } from "react";
+
+import { useTheme } from "@/hooks/useTheme";
+import type { ResultChart as ResultChartData } from "@/lib/analyses";
+import { PALETTE, chartTheme } from "@/lib/chartStyle";
+
+echarts.use([
+  LineChart,
+  BarChart,
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+  PolarComponent,
+  CanvasRenderer,
+]);
+
+/** A chart of a result document: a line or bar over time, a stacked bar, or a rose of
+ * directions; the data comes from the document, the look from the brand palette. */
+export function ResultChart({
+  chart,
+  labels,
+  className,
+}: {
+  chart: ResultChartData;
+  labels?: Record<string, string>;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const { resolved } = useTheme();
+  const dark = resolved === "dark";
+  const container = useRef<HTMLDivElement | null>(null);
+  const instance = useRef<echarts.ECharts | null>(null);
+  useEffect(() => {
+    if (!container.current) return;
+    const chartInstance = echarts.init(container.current, undefined, {
+      renderer: "canvas",
+    });
+    instance.current = chartInstance;
+    const observer = new ResizeObserver(() => chartInstance.resize());
+    observer.observe(container.current);
+    return () => {
+      observer.disconnect();
+      chartInstance.dispose();
+      instance.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    const th = chartTheme(dark);
+    const names = chart.series.map(
+      (s, i) =>
+        s.name ??
+        [
+          labels?.[s.subject ?? ""] ?? s.subject,
+          s.period === "comparison" ? t("before") : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") ??
+        `${i}`,
+    );
+    const rose = chart.kind === "rose";
+    const option: echarts.EChartsCoreOption = {
+      animation: false,
+      color: PALETTE,
+      tooltip: {
+        trigger: rose ? "item" : "axis",
+        backgroundColor: th.tooltipBg,
+        textStyle: { color: th.tooltipText, fontSize: 11 },
+      },
+      legend:
+        chart.series.length > 1
+          ? { bottom: 0, textStyle: { color: th.text, fontSize: 11 } }
+          : undefined,
+      grid: rose
+        ? undefined
+        : {
+            left: 44,
+            right: 12,
+            top: 12,
+            bottom: chart.series.length > 1 ? 36 : 24,
+          },
+      ...(rose
+        ? {
+            polar: {},
+            angleAxis: {
+              type: "category",
+              data: chart.series[0]?.data.map((d) => String(d[0])) ?? [],
+              axisLabel: { color: th.text, fontSize: 10 },
+            },
+            radiusAxis: {
+              axisLabel: { show: false },
+              splitLine: { lineStyle: { color: th.grid } },
+            },
+          }
+        : {
+            xAxis: {
+              type:
+                typeof chart.series[0]?.data[0]?.[0] === "number"
+                  ? "time"
+                  : "category",
+              axisLabel: { color: th.text, fontSize: 10, hideOverlap: true },
+              axisLine: { lineStyle: { color: th.grid } },
+              splitLine: { show: false },
+            },
+            yAxis: {
+              type: "value",
+              name: chart.unit ?? undefined,
+              nameTextStyle: { color: th.text, fontSize: 10 },
+              axisLabel: { color: th.text, fontSize: 10 },
+              splitLine: { lineStyle: { color: th.grid } },
+            },
+          }),
+      series: chart.series.map((s, i) => ({
+        name: names[i],
+        type: chart.kind === "line" ? "line" : "bar",
+        coordinateSystem: rose ? "polar" : "cartesian2d",
+        stack: chart.kind === "stacked" ? "all" : undefined,
+        data: rose ? s.data.map((d) => d[1]) : s.data,
+        showSymbol: false,
+        connectNulls: true,
+        lineStyle: { width: 1.5 },
+        areaStyle:
+          chart.kind === "line" && chart.series.length === 1
+            ? { opacity: 0.1 }
+            : undefined,
+      })),
+    };
+    instance.current?.setOption(option, true);
+  }, [chart, labels, dark, t]);
+  return (
+    <div
+      ref={container}
+      className={className ?? "h-56 w-full"}
+      role="img"
+      aria-label={labels?.[chart.key] ?? chart.key}
+    />
+  );
+}

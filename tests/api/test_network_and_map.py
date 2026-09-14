@@ -194,6 +194,7 @@ async def test_traffic_traces_and_health(client, db, bus):
         "rules",
         "automation",
         "integration",
+        "analysis",
     }
     assert any(s["id"] == source["id"] and s["events_last_hour"] == 2 for s in body["data_sources"])
     # the health dot's summary (decision D181) is for every signed-in account and reads the

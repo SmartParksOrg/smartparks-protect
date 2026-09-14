@@ -2,7 +2,11 @@ import { useTranslation } from "react-i18next";
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router";
 
-import { usePermissions, useProjects } from "@/hooks/useProjects";
+import {
+  useAnalysisModules,
+  usePermissions,
+  useProjects,
+} from "@/hooks/useProjects";
 import type { PermissionKey } from "@/lib/permissions";
 import { useAuthStore } from "@/stores/auth";
 
@@ -45,11 +49,28 @@ export function RequireServerAdmin() {
 
 /** A project page behind a permission key (decision D188): a member without it lands on the
  * project's map instead of a page whose every request would be refused. */
-export function RequireProjectPermission({ permission }: { permission: PermissionKey }) {
+export function RequireProjectPermission({
+  permission,
+}: {
+  permission: PermissionKey;
+}) {
   const { projectId } = useParams();
   const { can } = usePermissions(projectId);
   const { isPending } = useProjects();
   if (isPending) return null;
-  if (!can(permission)) return <Navigate to={`/projects/${projectId}/map`} replace />;
+  if (!can(permission))
+    return <Navigate to={`/projects/${projectId}/map`} replace />;
+  return <Outlet />;
+}
+
+/** A page of an analysis module the project does not offer redirects to the map, so a switched
+ * off module leaves no trace in the interface (docs/ANALYTICS_PHASE1_PLAN.md, section 16). */
+export function RequireAnalysisModule({ module }: { module: string }) {
+  const { projectId } = useParams();
+  const modules = useAnalysisModules(projectId);
+  const { isPending } = useProjects();
+  if (isPending) return null;
+  if (!modules.includes(module))
+    return <Navigate to={`/projects/${projectId}/map`} replace />;
   return <Outlet />;
 }

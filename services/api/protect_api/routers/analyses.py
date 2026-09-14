@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
+from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.crud import geom_to_geojson, get_or_404
 from protect_api.deps import ProjectContext, require_permission
@@ -73,7 +74,7 @@ def _limits(key: str) -> dict[str, int]:
 
 
 @router.get("/analysis-modules", response_model=list[AnalysisModuleRead])
-async def list_modules(_: User = Depends(require_permission(Permission.PROJECT_READ))) -> list[Any]:
+async def list_modules(_: User = Depends(current_active_user)) -> list[Any]:
     """The modules this deployment offers (the project's own list applies on the project)."""
     return [
         AnalysisModuleRead(key=m.key, label=m.label, version=m.version, limits=_limits(m.key))
