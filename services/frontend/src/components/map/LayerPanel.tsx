@@ -670,7 +670,8 @@ export function LayerPanel({
           onValueChange={(v) => setGrouping(v as Grouping)}
         >
           <SelectTrigger
-            className="h-8 w-auto shrink-0 gap-1 px-2 text-xs"
+            size="sm"
+            className="w-auto shrink-0 gap-1 px-2 text-xs"
             aria-label={t("Arrange the rows")}
           >
             <SelectValue />
