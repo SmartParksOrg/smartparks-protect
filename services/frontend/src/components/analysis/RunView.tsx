@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
+import { formatTime } from "@/lib/format";
 import { usePermissions } from "@/hooks/useProjects";
 import {
   documentOf,
@@ -41,6 +42,7 @@ export function RunView({
   labels: given,
   render,
   onRerun,
+  onAdjust,
 }: {
   projectId: string;
   runId: string;
@@ -53,6 +55,8 @@ export function RunView({
     after?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
   };
   onRerun?: (run: AnalysisRun) => void;
+  /** Load the run's settings into the page's form, to change them and run again. */
+  onAdjust?: (run: AnalysisRun) => void;
 }) {
   const { t } = useTranslation();
   const now = useNow();
@@ -142,6 +146,11 @@ export function RunView({
               disabled={rerun.isPending}
             >
               {t("Run again")}
+            </Button>
+          )}
+          {mayRun && onAdjust && (
+            <Button variant="outline" size="sm" onClick={() => onAdjust(r)}>
+              {t("Adjust and run again")}
             </Button>
           )}
           {mayRun && r.status === "completed" && naming === null && (
@@ -249,6 +258,7 @@ export function RunView({
           {t("Kept as {{name}}; it does not expire.", { name: r.name })}
         </p>
       )}
+      <RunSettings run={r} document={document} />
       {document && (
         <>
           <WarningsCallout document={document} />
@@ -329,5 +339,83 @@ export function RunView({
         pending={remove.isPending}
       />
     </div>
+  );
+}
+
+/** What the run was asked: its subjects, period, comparison and every option, from the
+ * stored parameters, so a result is never read without its settings. */
+function RunSettings({
+  run,
+  document,
+}: {
+  run: AnalysisRun;
+  document: ResultDocument | null;
+}) {
+  const { t } = useTranslation();
+  const p = run.parameters as Record<string, unknown>;
+  const names = new Map<string, string>();
+  for (const s of document?.subjects ?? []) names.set(s.id, s.name);
+  const areas =
+    (document?.summary.areas as { id: string; name: string }[] | undefined) ??
+    [];
+  for (const a of areas) names.set(a.id, a.name);
+  const fmt = (iso: unknown) =>
+    typeof iso === "string" ? formatTime(iso) : "";
+  const listOf = (key: string) =>
+    Array.isArray(p[key])
+      ? (p[key] as unknown[])
+          .map((id) => names.get(String(id)) ?? String(id))
+          .join(", ")
+      : null;
+  const rows: [string, string][] = [];
+  const subjects = listOf("entity_ids");
+  if (subjects) rows.push([t("Subjects"), subjects]);
+  const herdB = listOf("herd_b_entity_ids");
+  if (herdB) rows.push([t("Second herd"), herdB]);
+  const chosen = listOf("feature_ids");
+  if (chosen) rows.push([t("Areas"), chosen]);
+  rows.push([t("Period"), `${fmt(p.time_from)} – ${fmt(p.time_to)}`]);
+  const comparison = p.comparison as
+    { time_from?: string; time_to?: string } | undefined;
+  if (comparison)
+    rows.push([
+      t("Compared with"),
+      `${fmt(comparison.time_from)} – ${fmt(comparison.time_to)}`,
+    ]);
+  if (p.seasons === true) rows.push([t("Seasons"), t("rows per season")]);
+  const options: [string, string][] = [
+    ["gap_hours", t("Gap threshold (hours)")],
+    ["max_speed_mps", t("Maximum plausible speed (m/s)")],
+    ["cell_m", t("Grid cell (m)")],
+    ["revisit_hours", t("Revisit after (hours)")],
+    ["methods", t("Home range methods")],
+    ["kde_bandwidth_m", t("KDE bandwidth (m)")],
+    ["weighting", t("Weighting")],
+    ["weight_key", t("Attribute key")],
+    ["min_absence_hours", t("New visit after (hours away)")],
+    ["rest_threshold_hours", t("Rest day at or below (animal-hours)")],
+  ];
+  for (const [key, label] of options) {
+    const v = p[key];
+    if (v === undefined || v === null) continue;
+    rows.push([
+      label,
+      Array.isArray(v) ? v.map(String).join(", ").toUpperCase() : String(v),
+    ]);
+  }
+  return (
+    <details className="rounded-md border px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {t("Settings of this run")}
+      </summary>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-muted-foreground">{k}</dt>
+            <dd className="min-w-0 break-words">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }

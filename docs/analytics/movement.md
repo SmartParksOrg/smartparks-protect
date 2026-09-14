@@ -13,12 +13,12 @@ The line under the form estimates the run: how many animals, days and fixes it w
 
 ## The run
 
-Run queues an analysis; the analysis worker computes it, one run at a time per server, with its own statement and wall-clock timeouts. The run appears in the Runs list with its progress; the page shows the result when it completes, or the reason it failed and a Run again button. Results are kept for 30 days unless the run is given a name with Keep. Anyone with `project:read` sees results inside their scope; `analysis:run` (Analysts and Admins) starts, cancels and deletes runs.
+Run queues an analysis; the analysis worker computes it, one run at a time per server, with its own statement and wall-clock timeouts. The run appears in the Runs row with its progress; a folded "Settings of this run" block under it lists everything it was asked, and "Adjust and run again" loads those settings into the form; the page shows the result when it completes, or the reason it failed and a Run again button. Results are kept for 30 days unless the run is given a name with Keep. Anyone with `project:read` sees results inside their scope; `analysis:run` (Analysts and Admins) starts, cancels and deletes runs.
 
 ## What the result holds
 
 - **Cards** per subject: distance, daily distance, median speed, stationary share, MCP and KDE 95 % areas, the number of fixes, and the comparison period's figure beside each.
-- **Map**: the subjects' tracks over the main period and, toggled by chips, the MCP hull, the KDE isopleths, the hotspot cells and the cluster hulls, each in the subject's colour; a click on a polygon names it with its area and its share of time or fixes.
+- **Map**: the subjects' tracks over the main period (with the fixes as points and a heatmap as further chips) and, toggled by chips, the MCP hull, the KDE isopleths, the hotspot cells and the cluster hulls, each in the subject's colour; a click on a polygon names it with its area and its share of time or fixes.
 - **Charts**: daily distance, the speed histogram (fixed bins from under 0.01 to over 10 m/s, so every animal shares one axis), activity by hour of the day, the rose of turning angles, the net squared displacement, and distance by day, twilight and night.
 - **Table**: every figure per subject and period, with a mean and standard deviation row for groups; secondary columns hidden on a phone.
 - **Warnings** above the results say what the fixes allow: missing fixes against the sampling interval, gaps, irregular sampling, impossible speeds left out, duplicates collapsed, poor GNSS quality, a collar change inside the period, too few fixes for a home range.

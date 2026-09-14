@@ -4,6 +4,7 @@ import {
   comparisonOf,
   documentOf,
   fixesPreset,
+  formStateOfRun,
   grazingParameters,
   groupWithSubgroups,
   intensityFeatures,
@@ -240,5 +241,45 @@ describe("analysis form state", () => {
         typeof intensityFeatures
       >[0]),
     ).toEqual([]);
+  });
+  it("fills the form from a run's parameters", () => {
+    const base = readFormState(new URLSearchParams());
+    const run = {
+      parameters: {
+        entity_ids: ["a", "b"],
+        time_from: "2026-08-15T00:00:00Z",
+        time_to: "2026-09-14T00:00:00Z",
+        comparison: {
+          time_from: "2026-07-16T00:00:00Z",
+          time_to: "2026-08-15T00:00:00Z",
+        },
+        gap_hours: 6,
+        cell_m: 105,
+        methods: ["mcp"],
+        feature_ids: ["z1"],
+        weighting: "attribute",
+        weight_key: "lsu",
+        min_absence_hours: 12,
+      },
+    } as unknown as Parameters<typeof formStateOfRun>[0];
+    const state = formStateOfRun(run, base);
+    expect(state).toMatchObject({
+      entities: ["a", "b"],
+      range: "custom",
+      from: "2026-08-15T00:00:00Z",
+      to: "2026-09-14T00:00:00Z",
+      compare: "previous",
+      method: { gap: 6, cell: 105, methods: ["mcp"], speed_max: 15 },
+      grazing: {
+        areas: ["z1"],
+        weighting: "attribute",
+        weight_key: "lsu",
+        absence: 12,
+      },
+    });
+    expect(windowOf(state)).toEqual({
+      time_from: "2026-08-15T00:00:00.000Z",
+      time_to: "2026-09-14T00:00:00.000Z",
+    });
   });
 });

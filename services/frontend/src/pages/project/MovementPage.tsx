@@ -13,7 +13,12 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIsPhone } from "@/hooks/useMediaQuery";
-import { type FormState, readFormState, writeFormState } from "@/lib/analyses";
+import {
+  type FormState,
+  formStateOfRun,
+  readFormState,
+  writeFormState,
+} from "@/lib/analyses";
 
 /** Movement and space use (docs/ANALYTICS_PHASE1_PLAN.md, section 8): the question form at
  * the top, the runs of the module, and the selected run's result with its cards, map,
@@ -93,6 +98,10 @@ export function MovementPage() {
                 runId={state.run}
                 labels={labels}
                 onRerun={(r) => select(r.id)}
+                onAdjust={(r) => {
+                  update(formStateOfRun(r, state));
+                  if (phone) setFormOpen(true);
+                }}
                 render={{
                   summary: (document) => (
                     <SubjectCards

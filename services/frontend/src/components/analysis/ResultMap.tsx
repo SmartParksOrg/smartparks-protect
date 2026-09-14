@@ -25,9 +25,13 @@ import {
   basemapStyle,
   loadBasemap,
 } from "@/components/map/basemap";
+import { DEFAULT_HEAT } from "@/components/map/heat";
 import {
   ensureEntityLayers,
+  ensureHeatLayer,
   ensureTrackLayers,
+  setHeatPaint,
+  setHeatPoints,
   setTracks,
   type TrackLayer,
 } from "@/components/map/layers";
@@ -79,7 +83,9 @@ export function ResultMap({
   const main = document.periods.find((p) => p.key === "main");
   const available = ANALYSIS_KINDS.filter((k) => document.geometries[k]);
   const [hidden, setHidden] = useState<string[]>(() => {
-    const off: string[] = tracksOn ? [] : ["tracks"];
+    const off: string[] = tracksOn
+      ? ["points", "heatmap"]
+      : ["tracks", "points", "heatmap"];
     // the hotspot outlines repeat what the intensity cells show; start folded away
     if (document.summary.intensity) off.push("hotspot");
     return off;
@@ -91,6 +97,8 @@ export function ResultMap({
     ...(intensity.length ? ["intensity"] : []),
     ...available,
     "tracks",
+    "points",
+    "heatmap",
   ];
 
   const tracks = useQueries({
@@ -131,6 +139,24 @@ export function ResultMap({
       ),
     [tracks, document.subjects],
   );
+  // the fixes as points, for the points layer and the heatmap
+  const pointFeatures = useMemo<GeoJSON.Feature[]>(
+    () =>
+      trackLayers.flatMap((track) => {
+        const coords =
+          track.geometry.type === "LineString"
+            ? track.geometry.coordinates
+            : track.geometry.type === "MultiPoint"
+              ? track.geometry.coordinates
+              : [];
+        return coords.map((c) => ({
+          type: "Feature" as const,
+          geometry: { type: "Point" as const, coordinates: c },
+          properties: { entity_id: track.entityId },
+        }));
+      }),
+    [trackLayers],
+  );
   const geometries = useQuery({
     queryKey: queryKeys.analysisGeometries(projectId, runId, { limit: 2000 }),
     queryFn: () =>
@@ -162,10 +188,21 @@ export function ResultMap({
       map.setLayoutProperty("track-points", "visibility", "none");
     ensureAnalysisLayers(map);
     ensureIntensityLayers(map);
+    ensureHeatLayer(map);
+    const paintHeat = () =>
+      setHeatPaint(
+        map,
+        DEFAULT_HEAT.radius_m,
+        map.getCenter().lat,
+        DEFAULT_HEAT.sensitivity,
+      );
+    paintHeat();
+    map.on("moveend", paintHeat);
     const unbind = bindAnalysisClicks(map, setPicked);
     return () => {
       observer.disconnect();
       unbind();
+      map.off("moveend", paintHeat);
     };
   }, [mapRef, ready]);
 
@@ -176,6 +213,7 @@ export function ResultMap({
     setTracks(map, trackLayers);
     setAnalysisFeatures(map, features);
     setIntensityFeatures(map, intensity);
+    setHeatPoints(map, pointFeatures);
     if (fitted.current || (available.length > 0 && features.length === 0))
       return;
     // the polygons say where the result is; a track may hold a far outlier
@@ -184,7 +222,15 @@ export function ResultMap({
       fitted.current = true;
       map.fitBounds(bounds, { padding: 40, maxZoom: 14, duration: 0 });
     }
-  }, [mapRef, ready, trackLayers, features, intensity, available.length]);
+  }, [
+    mapRef,
+    ready,
+    trackLayers,
+    pointFeatures,
+    features,
+    intensity,
+    available.length,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -192,6 +238,18 @@ export function ResultMap({
     setAnalysisKinds(map, shown);
     setIntensityVisible(map, !hidden.includes("intensity"));
     setTracksVisible(map, !hidden.includes("tracks"));
+    if (map.getLayer("track-points"))
+      map.setLayoutProperty(
+        "track-points",
+        "visibility",
+        hidden.includes("points") ? "none" : "visible",
+      );
+    if (map.getLayer("heat"))
+      map.setLayoutProperty(
+        "heat",
+        "visibility",
+        hidden.includes("heatmap") ? "none" : "visible",
+      );
     // the list is derived from the document and the hidden set
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapRef, ready, shown.join(","), hidden.join(",")]);
@@ -204,6 +262,8 @@ export function ResultMap({
   const kindLabel: Record<string, string> = {
     intensity: t("Use intensity"),
     tracks: t("Tracks"),
+    points: t("Fixes"),
+    heatmap: t("Heatmap"),
     area: t("Areas by pressure"),
     mcp: t("MCP 95%"),
     kde: t("KDE 50% and 95%"),

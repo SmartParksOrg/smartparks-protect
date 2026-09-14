@@ -425,7 +425,7 @@ export function GrazingForm({
             value={state.grazing.absence}
             min={1}
             max={168}
-            step={1}
+            step={0.5}
             onChange={(v) => grazing({ absence: v })}
           />
           <NumberField
@@ -433,7 +433,7 @@ export function GrazingForm({
             value={state.method.cell}
             min={10}
             max={5000}
-            step={10}
+            step={1}
             onChange={(v) => onChange({ method: { ...state.method, cell: v } })}
           />
           <NumberField

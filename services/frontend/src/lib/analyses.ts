@@ -419,3 +419,49 @@ export function intensityFeatures(document: ResultDocument): GeoJSON.Feature[] {
     };
   });
 }
+
+/** The form filled from a run's stored parameters, so a person adjusts and runs again. The
+ * period becomes a custom range with the run's dates; a comparison window is "the period
+ * before" (what the form can express); a second herd is not recoverable as a group and is
+ * left out. */
+export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
+  const p = run.parameters as Record<string, unknown>;
+  const list = (key: string): string[] =>
+    Array.isArray(p[key]) ? (p[key] as unknown[]).map(String) : [];
+  const num = (key: string, fallback: number): number =>
+    typeof p[key] === "number" ? (p[key] as number) : fallback;
+  const seasons = p.seasons === true;
+  return {
+    ...base,
+    entities: list("entity_ids"),
+    group: null,
+    type: null,
+    range: "custom",
+    from: typeof p.time_from === "string" ? p.time_from : null,
+    to: typeof p.time_to === "string" ? p.time_to : null,
+    compare: seasons ? "seasons" : p.comparison ? "previous" : null,
+    method: {
+      gap: num("gap_hours", DEFAULT_METHOD.gap),
+      speed_max: num("max_speed_mps", DEFAULT_METHOD.speed_max),
+      cell: num("cell_m", DEFAULT_METHOD.cell),
+      methods: Array.isArray(p.methods)
+        ? list("methods").filter((m) => ALL_METHODS.includes(m))
+        : ALL_METHODS,
+      kde_bandwidth:
+        typeof p.kde_bandwidth_m === "number" ? p.kde_bandwidth_m : null,
+    },
+    grazing: {
+      areas: list("feature_ids"),
+      weighting: (["equal", "attribute", "metabolic"] as const).includes(
+        p.weighting as "equal",
+      )
+        ? (p.weighting as GrazingOptions["weighting"])
+        : "equal",
+      weight_key: typeof p.weight_key === "string" ? p.weight_key : null,
+      herd_b: null,
+      seasons,
+      absence: num("min_absence_hours", DEFAULT_GRAZING.absence),
+      rest: num("rest_threshold_hours", 0),
+    },
+  };
+}
