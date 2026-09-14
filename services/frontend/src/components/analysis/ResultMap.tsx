@@ -1,7 +1,17 @@
 import { useTranslation } from "react-i18next";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Maximize2 } from "lucide-react";
+import {
+  Compass,
+  Layers,
+  Maximize,
+  Maximize2,
+  Minimize,
+  Minus,
+  Mountain,
+  Plus,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -21,10 +31,18 @@ import {
   setTracksVisible,
 } from "@/components/map/analysisLayers";
 import {
+  type BasemapKey,
   basemapsFor,
   basemapStyle,
   loadBasemap,
+  saveBasemap,
 } from "@/components/map/basemap";
+import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
+import {
+  TERRAIN_PITCH,
+  setTerrain,
+  terrainTileJson,
+} from "@/components/map/terrain";
 import {
   ensureEntityLayers,
   ensureHeatLayer,
@@ -35,8 +53,8 @@ import {
   type TrackLayer,
 } from "@/components/map/layers";
 import { useMap } from "@/components/map/useMap";
-import { Button } from "@/components/ui/button";
 import { useMapConfig } from "@/hooks/useMapConfig";
+import { usePreference } from "@/hooks/usePreference";
 import { useTheme } from "@/hooks/useTheme";
 import { boundsOfTracks } from "@/lib/explore";
 import {
@@ -74,10 +92,15 @@ export function ResultMap({
   const { maptilerKey } = useMapConfig();
   const basemaps = useMemo(() => basemapsFor(maptilerKey), [maptilerKey]);
   const container = useRef<HTMLDivElement | null>(null);
+  const frame = useRef<HTMLDivElement | null>(null);
   const { resolved } = useTheme();
-  const { mapRef, ready } = useMap(
+  // the same base map, terrain and full screen controls as the live map, in its strips
+  const [basemap, setBasemap] = useState<BasemapKey>(loadBasemap);
+  const [terrainOn, setTerrainOn] = usePreference<boolean>("terrain", false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const { mapRef, ready, stripHost, zoomHost } = useMap(
     container,
-    basemapStyle(loadBasemap(), basemaps, resolved === "dark"),
+    basemapStyle(basemap, basemaps, resolved === "dark"),
     [31.5, -24.9],
     6,
   );
@@ -204,6 +227,32 @@ export function ResultMap({
     };
   }, [mapRef, ready]);
 
+  // terrain on top of any base map; a style change drops it, so it is applied again on ready
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setTerrain(
+      map,
+      terrainOn && maptilerKey ? terrainTileJson(maptilerKey) : null,
+    );
+  }, [mapRef, ready, terrainOn, maptilerKey]);
+
+  // full screen through the browser's API on the map's frame; the map follows the size
+  useEffect(() => {
+    const onChange = () => {
+      setFullscreen(globalThis.document.fullscreenElement === frame.current);
+      setTimeout(() => mapRef.current?.resize(), 50);
+    };
+    globalThis.document.addEventListener("fullscreenchange", onChange);
+    return () =>
+      globalThis.document.removeEventListener("fullscreenchange", onChange);
+  }, [mapRef]);
+  const toggleFullscreen = () => {
+    if (globalThis.document.fullscreenElement)
+      void globalThis.document.exitFullscreen();
+    else void frame.current?.requestFullscreen?.();
+  };
+
   const fitted = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
@@ -257,6 +306,75 @@ export function ResultMap({
     const bounds = boundsOfFeatures(features) ?? boundsOfTracks(trackLayers);
     if (map && bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 14 });
   };
+  const toolItems: StripItem[] = [
+    {
+      kind: "menu",
+      key: "basemap",
+      icon: Layers,
+      label: t("Base map"),
+      value: basemap,
+      options: Object.entries(basemaps).map(([value, b]) => ({
+        value,
+        label: b.label,
+      })),
+      onChange: (v) => {
+        setBasemap(v as BasemapKey);
+        saveBasemap(v as BasemapKey);
+      },
+    },
+    ...(maptilerKey
+      ? [
+          {
+            key: "terrain",
+            icon: Mountain,
+            label: terrainOn ? t("Flat map") : t("3D terrain"),
+            active: terrainOn,
+            onClick: () => {
+              const next = !terrainOn;
+              setTerrainOn(next);
+              mapRef.current?.easeTo({
+                pitch: next ? TERRAIN_PITCH : 0,
+                duration: 600,
+              });
+            },
+          } satisfies StripItem,
+        ]
+      : []),
+    {
+      key: "fullscreen",
+      icon: fullscreen ? Minimize : Maximize,
+      label: fullscreen ? t("Leave full screen") : t("Full screen"),
+      active: fullscreen,
+      onClick: toggleFullscreen,
+    },
+  ];
+  const zoomItems: StripItem[] = [
+    {
+      key: "zoom-in",
+      icon: Plus,
+      label: t("Zoom in"),
+      onClick: () => mapRef.current?.zoomIn(),
+    },
+    {
+      key: "zoom-out",
+      icon: Minus,
+      label: t("Zoom out"),
+      onClick: () => mapRef.current?.zoomOut(),
+    },
+    {
+      key: "north",
+      icon: Compass,
+      label: t("Reset north"),
+      onClick: () => mapRef.current?.easeTo({ bearing: 0, pitch: 0 }),
+    },
+    {
+      key: "fit",
+      icon: Maximize2,
+      label: t("Fit the result"),
+      disabled: trackLayers.length === 0 && features.length === 0,
+      onClick: fit,
+    },
+  ];
   const kindLabel: Record<string, string> = {
     intensity: t("Use intensity"),
     tracks: t("Tracks"),
@@ -281,9 +399,18 @@ export function ResultMap({
         ? picked.fix_share
         : null;
   return (
-    <div className="relative h-80 overflow-hidden rounded-md border lg:h-[26rem]">
+    <div
+      ref={frame}
+      className={`relative overflow-hidden rounded-md border bg-card ${fullscreen ? "" : "h-80 lg:h-[26rem]"}`}
+    >
       <div ref={container} className="absolute! inset-0 z-0" />
-      <div className="pointer-events-none absolute top-2 right-2 left-2 z-10 flex flex-wrap items-center gap-1.5">
+      {stripHost && createPortal(<ControlStrip items={toolItems} />, stripHost)}
+      {zoomHost &&
+        createPortal(
+          <ControlStrip items={zoomItems} label={t("Zoom and position")} />,
+          zoomHost,
+        )}
+      <div className="pointer-events-none absolute top-2 right-14 left-2 z-10 flex flex-wrap items-center gap-1.5">
         {toggles.map((kind) => (
           <button
             key={kind}
@@ -303,16 +430,6 @@ export function ResultMap({
             {kindLabel[kind] ?? kind}
           </button>
         ))}
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="pointer-events-auto ml-auto h-7 bg-card"
-          onClick={fit}
-          disabled={trackLayers.length === 0 && features.length === 0}
-        >
-          <Maximize2 className="size-4" /> {t("Fit")}
-        </Button>
       </div>
       {intensity.length > 0 && !hidden.includes("intensity") && (
         <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
