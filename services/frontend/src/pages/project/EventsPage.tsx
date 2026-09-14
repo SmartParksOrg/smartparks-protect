@@ -74,10 +74,10 @@ export function EventDetailDialog({ scope, eventId, onClose }: { scope: Scope; e
         {d && (
           <div className="space-y-4 text-sm">
             {d.event.explanation && (
-              <div className="rounded-md border bg-muted/30 p-3">
-                <div className="mb-1 font-medium">{t("What this means")}</div>
-                <p className="text-muted-foreground">{d.event.explanation}</p>
-              </div>
+              <details className="rounded-md border px-3 py-2">
+                <summary className="cursor-pointer font-medium">{t("What this means")}</summary>
+                <p className="mt-2 text-muted-foreground">{d.event.explanation}</p>
+              </details>
             )}
             <div className="grid grid-cols-2 gap-2">
               <div><span className="text-muted-foreground">{t("Severity")}</span><div><StatusBadge value={d.event.severity} /></div></div>
