@@ -22,23 +22,34 @@ import { Input } from "@/components/ui/input";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { usePermissions } from "@/hooks/useProjects";
-import { documentOf, isActive } from "@/lib/analyses";
+import {
+  documentOf,
+  isActive,
+  type ResultDocument,
+  subjectColor,
+} from "@/lib/analyses";
 
 /** One run on an analysis page: its status, the actions (keep, export, run again, cancel,
- * delete), and the result blocks the document holds. The module's page adds its own map and
- * the labels of its metrics through `labels`; this view knows nothing of the method. */
+ * delete), and the result blocks the document holds. The module's page adds its own summary
+ * and map through `render` and the labels of its metrics through `labels`; this view knows
+ * nothing of the method. */
 export function RunView({
   projectId,
   runId,
-  labels,
-  map,
+  labels: given,
+  render,
   onRerun,
 }: {
   projectId: string;
   runId: string;
   labels: Record<string, string>;
-  /** The page's map block, drawn beside the summary when the run has a result. */
-  map?: React.ReactNode;
+  /** The page's own blocks: a summary in place of the flat list, a map beside it, and
+   * anything after the tables (the method's limitations, say). */
+  render?: {
+    summary?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
+    map?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
+    after?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
+  };
   onRerun?: (run: AnalysisRun) => void;
 }) {
   const { t } = useTranslation();
@@ -88,6 +99,13 @@ export function RunView({
     onSuccess: () => setDeleting(false),
   });
   const document = documentOf(run.data);
+  // the subjects' names label their series and rows
+  const labels: Record<string, string> = {
+    ...given,
+    ...Object.fromEntries(
+      (document?.subjects ?? []).map((s) => [s.id, s.name]),
+    ),
+  };
   if (run.isPending)
     return <p className="text-sm text-muted-foreground">{t("Loading…")}</p>;
   if (run.isError || !run.data)
@@ -226,7 +244,9 @@ export function RunView({
       {document && (
         <>
           <WarningsCallout document={document} />
-          <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+          {render?.summary ? (
+            render.summary(document, r)
+          ) : (
             <Card>
               <CardHeader>
                 <CardTitle>{t("Summary")}</CardTitle>
@@ -250,18 +270,24 @@ export function RunView({
                 </dl>
               </CardContent>
             </Card>
-            {map}
+          )}
+          {render?.map?.(document, r)}
+          <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+            {document.charts.map((chart) => (
+              <Card key={chart.key}>
+                <CardHeader>
+                  <CardTitle>{labels[chart.key] ?? chart.key}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResultChart
+                    chart={chart}
+                    labels={labels}
+                    colorOf={(s) => (s.subject ? subjectColor(s.subject) : null)}
+                  />
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          {document.charts.map((chart) => (
-            <Card key={chart.key}>
-              <CardHeader>
-                <CardTitle>{labels[chart.key] ?? chart.key}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResultChart chart={chart} labels={labels} />
-              </CardContent>
-            </Card>
-          ))}
           {document.tables.map((table) => (
             <div key={table.key} className="space-y-2">
               <h2 className="text-base font-medium">
@@ -270,6 +296,7 @@ export function RunView({
               <ResultTable table={table} labels={labels} />
             </div>
           ))}
+          {render?.after?.(document, r)}
         </>
       )}
       <ConfirmDialog

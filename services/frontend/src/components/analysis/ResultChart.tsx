@@ -11,7 +11,10 @@ import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useRef } from "react";
 
 import { useTheme } from "@/hooks/useTheme";
-import type { ResultChart as ResultChartData } from "@/lib/analyses";
+import type {
+  ResultChart as ResultChartData,
+  ResultChartSeries,
+} from "@/lib/analyses";
 import { PALETTE, chartTheme } from "@/lib/chartStyle";
 
 echarts.use([
@@ -29,10 +32,13 @@ echarts.use([
 export function ResultChart({
   chart,
   labels,
+  colorOf,
   className,
 }: {
   chart: ResultChartData;
   labels?: Record<string, string>;
+  /** The colour of a series, or null for the palette's; a subject keeps its map colour. */
+  colorOf?: (series: ResultChartSeries) => string | null;
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -68,9 +74,12 @@ export function ResultChart({
         `${i}`,
     );
     const rose = chart.kind === "rose";
+    const colors = chart.series.map(
+      (s, i) => colorOf?.(s) ?? PALETTE[i % PALETTE.length],
+    );
     const option: echarts.EChartsCoreOption = {
       animation: false,
-      color: PALETTE,
+      color: colors,
       tooltip: {
         trigger: rose ? "item" : "axis",
         backgroundColor: th.tooltipBg,
@@ -127,7 +136,12 @@ export function ResultChart({
         data: rose ? s.data.map((d) => d[1]) : s.data,
         showSymbol: false,
         connectNulls: true,
-        lineStyle: { width: 1.5 },
+        lineStyle: {
+          width: 1.5,
+          type: s.period === "comparison" ? "dashed" : "solid",
+        },
+        itemStyle:
+          s.period === "comparison" ? { opacity: 0.55 } : undefined,
         areaStyle:
           chart.kind === "line" && chart.series.length === 1
             ? { opacity: 0.1 }
@@ -135,7 +149,7 @@ export function ResultChart({
       })),
     };
     instance.current?.setOption(option, true);
-  }, [chart, labels, dark, t]);
+  }, [chart, labels, colorOf, dark, t]);
   return (
     <div
       ref={container}

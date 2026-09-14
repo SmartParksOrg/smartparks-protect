@@ -119,7 +119,8 @@ async def test_a_movement_run_over_fixes(client, db):
     assert document["subjects"][0]["name"] == "Rhino 14"
     assert document["subjects"][0]["type"] == "Animal"
     assert {c["key"] for c in document["charts"]} >= {"daily_distance", "turning", "nsd"}
-    assert [w["code"] for w in document["warnings"] if w["level"] == "warning"] == ["gaps"]
+    # half the day has no fixes at all, which is missing data, not a gap between fixes
+    assert [w["code"] for w in document["warnings"] if w["level"] == "warning"] == ["missing_fixes"]
 
     stored = (
         await db.execute(
