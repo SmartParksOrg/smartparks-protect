@@ -19,12 +19,29 @@ const movement: ResultDocument = {
   module: "movement",
   subjects: [{ id: "a", name: "Aldo", type: "Elephant" }],
   periods: [
-    { key: "main", time_from: "2026-08-15T00:00:00Z", time_to: "2026-09-14T00:00:00Z" },
-    { key: "comparison", time_from: "2026-07-16T00:00:00Z", time_to: "2026-08-15T00:00:00Z" },
+    {
+      key: "main",
+      time_from: "2026-08-15T00:00:00Z",
+      time_to: "2026-09-14T00:00:00Z",
+    },
+    {
+      key: "comparison",
+      time_from: "2026-07-16T00:00:00Z",
+      time_to: "2026-08-15T00:00:00Z",
+    },
   ],
   summary: {
-    main: { a: { distance_km: 123.456, stationary_share: 0.42, fixes: 720, mcp95_ha: null } },
-    comparison: { a: { distance_km: 99, stationary_share: 0.5, fixes: 700, mcp95_ha: 12 } },
+    main: {
+      a: {
+        distance_km: 123.456,
+        stationary_share: 0.42,
+        fixes: 720,
+        mcp95_ha: null,
+      },
+    },
+    comparison: {
+      a: { distance_km: 99, stationary_share: 0.5, fixes: 700, mcp95_ha: 12 },
+    },
   },
   charts: [],
 };
@@ -33,9 +50,21 @@ const grazing: ResultDocument = {
   ...base,
   module: "grazing",
   subjects: [{ id: "a", name: "Aldo" }],
-  periods: [{ key: "main", time_from: "2026-09-11T00:00:00Z", time_to: "2026-09-14T00:00:00Z" }],
+  periods: [
+    {
+      key: "main",
+      time_from: "2026-09-11T00:00:00Z",
+      time_to: "2026-09-14T00:00:00Z",
+    },
+  ],
   summary: {
-    herd: { main: { tracked_animal_hours: 71.5, share_inside: 0.8, share_outside: 0.2 } },
+    herd: {
+      main: {
+        tracked_animal_hours: 71.5,
+        share_inside: 0.8,
+        share_outside: 0.2,
+      },
+    },
     weighting: { kind: "attribute", key: "lsu", unit: "lsu units" },
     areas: [
       { id: "z1", name: "Camp 1", kind: "zone", hectares: 10.04 },
@@ -80,7 +109,12 @@ describe("analysis cards", () => {
     render(
       <SubjectCards
         document={movement}
-        labels={{ distance_km: "Distance (km)", stationary_share: "Stationary", fixes: "Fixes", mcp95_ha: "MCP" }}
+        labels={{
+          distance_km: "Distance (km)",
+          stationary_share: "Stationary",
+          fixes: "Fixes",
+          mcp95_ha: "MCP",
+        }}
         metrics={[
           ["distance_km", "km"],
           ["stationary_share", "%"],
@@ -110,7 +144,9 @@ describe("analysis cards", () => {
         }}
       />,
     );
-    expect(screen.getByText(/72 animal-hours; 80% of that time inside/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/72 animal-hours; 80% of that time inside/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Weighted in lsu units/)).toBeInTheDocument();
     expect(screen.getByText("Camp 1")).toBeInTheDocument();
     expect(screen.getByText("2.00 (#1)")).toBeInTheDocument();
@@ -118,11 +154,15 @@ describe("analysis cards", () => {
     expect(screen.getByText("Not used.")).toBeInTheDocument();
   });
   it("draws a cell per day with the rest days empty", () => {
-    const { container } = render(<RestStrip document={grazing} restThreshold={0} />);
+    const { container } = render(
+      <RestStrip document={grazing} restThreshold={0} />,
+    );
     expect(screen.getByText("Use and rest by day")).toBeInTheDocument();
     const cells = container.querySelectorAll("tbody td span");
     expect(cells).toHaveLength(3);
     expect((cells[1] as HTMLElement).style.backgroundColor).toBe("transparent");
-    expect((cells[0] as HTMLElement).style.backgroundColor).not.toBe("transparent");
+    expect((cells[0] as HTMLElement).style.backgroundColor).not.toBe(
+      "transparent",
+    );
   });
 });
