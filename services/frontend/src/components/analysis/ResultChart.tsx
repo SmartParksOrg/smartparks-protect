@@ -62,17 +62,23 @@ export function ResultChart({
   }, []);
   useEffect(() => {
     const th = chartTheme(dark);
-    const names = chart.series.map(
-      (s, i) =>
-        s.name ??
-        [
-          labels?.[s.subject ?? ""] ?? s.subject,
-          s.period === "comparison" ? t("before") : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") ??
-        `${i}`,
+    const shorten = (name: string) =>
+      name.length > 28 ? `${name.slice(0, 27)}…` : name;
+    const names = chart.series.map((s, i) =>
+      shorten(
+        s.name
+          ? (labels?.[s.name] ?? s.name)
+          : ([
+              labels?.[s.subject ?? ""] ?? s.subject,
+              s.period === "comparison" ? t("before") : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") ?? `${i}`),
+      ),
     );
+    // the legend sits above the plot, so long names never cover the axis
+    const legendRows =
+      chart.series.length > 1 ? Math.ceil(names.join("  ").length / 70) : 0;
     const rose = chart.kind === "rose";
     const colors = chart.series.map(
       (s, i) => colorOf?.(s) ?? PALETTE[i % PALETTE.length],
@@ -87,19 +93,19 @@ export function ResultChart({
       },
       legend:
         chart.series.length > 1
-          ? { bottom: 0, textStyle: { color: th.text, fontSize: 11 } }
+          ? { top: 0, left: 44, textStyle: { color: th.text, fontSize: 11 } }
           : undefined,
       grid: rose
         ? undefined
         : {
             left: 44,
             right: 12,
-            top: 12,
-            bottom: chart.series.length > 1 ? 36 : 24,
+            top: 24 + legendRows * 18,
+            bottom: 24,
           },
       ...(rose
         ? {
-            polar: {},
+            polar: { center: ["50%", "55%"] },
             angleAxis: {
               type: "category",
               data: chart.series[0]?.data.map((d) => String(d[0])) ?? [],
@@ -140,8 +146,7 @@ export function ResultChart({
           width: 1.5,
           type: s.period === "comparison" ? "dashed" : "solid",
         },
-        itemStyle:
-          s.period === "comparison" ? { opacity: 0.55 } : undefined,
+        itemStyle: s.period === "comparison" ? { opacity: 0.55 } : undefined,
         areaStyle:
           chart.kind === "line" && chart.series.length === 1
             ? { opacity: 0.1 }

@@ -19,6 +19,9 @@ export function ResultTable({
       accessorKey: c,
       cell: ({ getValue }) => {
         const v = getValue<unknown>();
+        // a period or a herd key reads by its label
+        if ((c === "period" || c === "herd") && typeof v === "string")
+          return labels?.[v] ?? v;
         return typeof v === "number"
           ? Number.isInteger(v)
             ? v

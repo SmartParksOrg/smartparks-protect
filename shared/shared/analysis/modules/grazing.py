@@ -280,7 +280,7 @@ def area_use(
     ranked = sorted(figures.items(), key=lambda kv: kv[1]["animal_days_per_ha"], reverse=True)
     for rank, (_area_id, f) in enumerate(ranked, start=1):
         f["relative_pressure"] = round(f["animal_days_per_ha"] / mean, 3) if mean > 0 else None
-        f["pressure_rank"] = rank
+        f["pressure_rank"] = rank if mean > 0 else None
     herd = {
         "tracked_animal_hours": round(tracked_h, 2),
         "weighted_animal_hours": round(weighted_tracked_h, 2),
@@ -486,7 +486,7 @@ class GrazingModule:
                             Warning(
                                 code="no_fixes",
                                 subject_id=row.id,
-                                text=f"{row.name} has no fixes in the {period.key} period.",
+                                text=f"No fixes in the {period.key} period.",
                             )
                         )
                         continue

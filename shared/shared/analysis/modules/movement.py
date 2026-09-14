@@ -108,7 +108,7 @@ class SubjectMetrics:
 
     summary: dict[str, float | None]
     daily_km: list[list[float]]  # [ms at local midnight, km]
-    speed_hist: list[list[Any]]  # [bin start in m/s, fixes]
+    speed_hist: list[list[Any]]  # [bin start in m/s as a label, fixes]
     hour_km: list[list[Any]]  # [hour of the day, km]
     turning_hist: list[list[Any]]  # [bin centre in degrees, steps]
     nsd: list[list[float]]  # [ms, km²]
@@ -211,7 +211,7 @@ def analyse_trajectory(
         summary["p95_speed_mps"] = round(float(np.percentile(speeds, 95)), 4)
         top = max(float(np.percentile(speeds, 99)), 0.01)
         hist, edges = np.histogram(np.clip(speeds, 0, top), bins=SPEED_BINS, range=(0, top))
-        speed_hist = [[round(float(edges[i]), 3), int(hist[i])] for i in range(SPEED_BINS)]
+        speed_hist = [[f"{float(edges[i]):.2f}", int(hist[i])] for i in range(SPEED_BINS)]
         figures["speed_bin_mps"] = top / SPEED_BINS
     else:
         speed_hist = []

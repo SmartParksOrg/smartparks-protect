@@ -185,7 +185,7 @@ export const MOVEMENT_LABELS = (
 ): Record<string, string> => ({
   subject: t("Subject"),
   period: t("Period"),
-  main: t("Period"),
+  main: t("This period"),
   comparison: t("Before"),
   mean: t("Mean"),
   sd: t("Standard deviation"),

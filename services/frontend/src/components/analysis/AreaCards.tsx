@@ -22,7 +22,8 @@ export function AreaCards({
 }) {
   const { t } = useTranslation();
   const areas = (document.summary.areas as AreaInfo[] | undefined) ?? [];
-  const herd = (document.summary.herd as Record<string, Record<string, number>>)?.main;
+  const herd = (document.summary.herd as Record<string, Record<string, number>>)
+    ?.main;
   const weighting = document.summary.weighting as { unit?: string } | undefined;
   const hasComparison = document.periods.some((p) => p.key === "comparison");
   const num = (v: number | null | undefined, digits = 2): string =>
@@ -82,20 +83,28 @@ export function AreaCards({
                   </dt>
                   <dd className="text-right tabular-nums">
                     {num(pressure)}
-                    {main.pressure_rank !== null &&
+                    {pressure !== null &&
+                      main.pressure_rank !== null &&
                       main.pressure_rank !== undefined &&
                       ` (#${main.pressure_rank})`}
                   </dd>
-                  <dt className="text-muted-foreground">{labels.animals_used}</dt>
-                  <dd className="text-right tabular-nums">{num(main.animals_used, 0)}</dd>
+                  <dt className="text-muted-foreground">
+                    {labels.animals_used}
+                  </dt>
+                  <dd className="text-right tabular-nums">
+                    {num(main.animals_used, 0)}
+                  </dd>
                   <dt className="text-muted-foreground">{labels.use_days}</dt>
                   <dd className="text-right tabular-nums">
-                    {num(main.use_days, 0)} / {num(main.rest_days, 0)} {t("rest")}
+                    {num(main.use_days, 0)} / {num(main.rest_days, 0)}{" "}
+                    {t("rest")}
                   </dd>
                   <dt className="text-muted-foreground">
                     {labels.longest_rest_days}
                   </dt>
-                  <dd className="text-right tabular-nums">{num(main.longest_rest_days, 0)}</dd>
+                  <dd className="text-right tabular-nums">
+                    {num(main.longest_rest_days, 0)}
+                  </dd>
                   <dt className="text-muted-foreground">
                     {labels.hours_since_last_use}
                   </dt>
@@ -104,7 +113,9 @@ export function AreaCards({
                   </dd>
                 </dl>
               ) : (
-                <p className="text-sm text-muted-foreground">{t("Not used.")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("Not used.")}
+                </p>
               )}
             </div>
           );

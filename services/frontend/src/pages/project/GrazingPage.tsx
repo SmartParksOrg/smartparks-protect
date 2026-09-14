@@ -175,7 +175,7 @@ export const GRAZING_LABELS = (
   herd: t("Herd"),
   animal: t("Animal"),
   metric: t("Figure"),
-  main: t("Period"),
+  main: t("This period"),
   comparison: t("Before"),
   change_percent: t("Change (%)"),
   area_a: t("Area"),
