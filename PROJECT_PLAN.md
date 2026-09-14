@@ -1951,6 +1951,7 @@ Listed by the phase where they are first needed.
 ### 2026-09-14, the layers panel's tab row (Claude and Tim)
 
 - Tim: the Map layers card shows a vertical and a horizontal scrollbar around the tabs on a desktop. Measured: the tab list's content was 378 by 37 px in a 326 by 36 px box, so a browser that draws scrollbars drew two. Fixed: the tab list scrolls only on a phone (its scrollbar hidden) and is `overflow-visible` from tablet width, where the five tabs shrink to fit with smaller padding and text.
+- Committed as 97b8533, CI green, deployed; no scrolling element left in the panel on a 1440 px desktop.
 
 ### 2026-09-14, the battery trend from the panel (Claude and Tim)
 
