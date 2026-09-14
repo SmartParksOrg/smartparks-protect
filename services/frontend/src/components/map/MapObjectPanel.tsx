@@ -110,7 +110,9 @@ export function MapPanel({
       ) : (
         <>
           {note && (
-            <div className="mt-2 text-xs text-muted-foreground">{note}</div>
+            <div className="mt-2 hidden text-xs text-muted-foreground sm:block">
+              {note}
+            </div>
           )}
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
             {children}
@@ -171,6 +173,23 @@ export function AccuracyWarning({ accuracyM }: { accuracyM: number }) {
         )}
       </span>
     </div>
+  );
+}
+
+/** The accuracy as an amber badge; the full sentence sits in its title (decision D193). */
+export function AccuracyBadge({ accuracyM }: { accuracyM: number }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-brand-sand/20 px-2 py-0.5 text-xs text-brand-sand"
+      title={t(
+        "Imprecise: the location is only known to about {{value}} m. The circle on the map shows the uncertainty.",
+        { value: Math.round(accuracyM) },
+      )}
+    >
+      <AlertTriangle className="size-3" />
+      {t("±{{value}} m", { value: Math.round(accuracyM) })}
+    </span>
   );
 }
 
@@ -255,6 +274,9 @@ function HealthRows({
   onOpenState?: () => void;
 }) {
   const { t } = useTranslation();
+  // on a phone the rows stay short (Tim, 2026-09-14): the accuracy as a badge with its
+  // sentence behind a tap, and "estimate" for the position's kind
+  const phone = useIsPhone();
   return (
     <>
       <PanelRow label={t("Last seen")} title={formatTime(lastSeenAt)}>
@@ -278,17 +300,25 @@ function HealthRows({
         {positionTime && positionKind === "network" && (
           <span className="text-muted-foreground">
             {" "}
-            · {t("network estimate")}
+            · {phone ? t("estimate") : t("network estimate")}
           </span>
         )}
-        {positionTime && accuracy != null && (
-          <span className="text-muted-foreground">
+        {positionTime &&
+          accuracy != null &&
+          !(phone && imprecise(accuracy)) && (
+            <span className="text-muted-foreground">
+              {" "}
+              · {t("±{{value}} m", { value: Math.round(accuracy) })}
+            </span>
+          )}
+        {positionTime && phone && imprecise(accuracy) && (
+          <>
             {" "}
-            · {t("±{{value}} m", { value: Math.round(accuracy) })}
-          </span>
+            <AccuracyBadge accuracyM={accuracy as number} />
+          </>
         )}
       </PanelRow>
-      {positionTime && imprecise(accuracy) && (
+      {positionTime && !phone && imprecise(accuracy) && (
         <AccuracyWarning accuracyM={accuracy as number} />
       )}
       {batteryVoltage != null && (

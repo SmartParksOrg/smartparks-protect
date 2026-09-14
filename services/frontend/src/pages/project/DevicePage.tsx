@@ -77,20 +77,25 @@ export function DevicePage() {
       }),
   });
   const around = useAt();
+  // the network's locations count here when the device's location source lets them stand in
+  const sources =
+    device.data && device.data.location_source !== "device" ? "all" : undefined;
   const positions = useQuery({
     queryKey: queryKeys.positions(projectId ?? "", {
       deviceId,
       recent: true,
       at: around.at,
+      sources,
     }),
     queryFn: () =>
       api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, {
         query: around.at
-          ? { device_id: deviceId, limit: 50, from: around.from, to: around.to }
+          ? { device_id: deviceId, limit: 50, from: around.from, to: around.to, sources }
           : {
               device_id: deviceId,
               limit: 10,
               from: new Date(Date.now() - 30 * 86400_000).toISOString(),
+              sources,
             },
       }),
     enabled: Boolean(projectId),

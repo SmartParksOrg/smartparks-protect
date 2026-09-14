@@ -2,7 +2,6 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 
 import { api } from "@/api/client";
-import { Callout } from "@/components/common/Callout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,7 +19,8 @@ type Source = "device" | "network" | "device_else_network";
 /** Which positions decide the current position of an entity or a device (decision D164): the
  * device's own fixes, the network's locations, or the device with the network standing in
  * after a period without a fix. Device only by default; a network location never reaches the
- * main map unless a person chose it here. */
+ * main map unless a person chose it here. One short line of explanation, so the card fits a
+ * phone (Tim, 2026-09-14). */
 export function LocationSourceCard({
   path,
   value,
@@ -59,12 +59,7 @@ export function LocationSourceCard({
       <CardHeader>
         <CardTitle>{t("Location source")}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <p className="text-muted-foreground">
-          {t(
-            "Which positions decide where this is shown: the device's own fixes, or a location the network provides (an Iridium estimate, a LoRaWAN geolocation), which is coarse.",
-          )}
-        </p>
+      <CardContent className="space-y-2 text-sm">
         <div className="flex flex-wrap items-center gap-2">
           <Select
             value={source}
@@ -72,7 +67,7 @@ export function LocationSourceCard({
             disabled={!canEdit}
           >
             <SelectTrigger
-              className="h-9 w-64"
+              className="h-9 w-full sm:w-64"
               aria-label={t("Location source")}
             >
               <SelectValue />
@@ -113,13 +108,13 @@ export function LocationSourceCard({
             </Button>
           )}
         </div>
-        {source !== "device" && (
-          <Callout kind="info">
-            {t(
-              "A network location is drawn with its radius and named as an estimate in the panels, the tracks and the exports.",
-            )}
-          </Callout>
-        )}
+        <p className="text-xs text-muted-foreground">
+          {source === "device"
+            ? t("The device's own fixes decide where this is shown.")
+            : t(
+                "The network's coarse estimate may stand in; it is drawn with its radius and named as an estimate.",
+              )}
+        </p>
       </CardContent>
     </Card>
   );

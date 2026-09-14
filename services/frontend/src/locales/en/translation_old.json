@@ -23,6 +23,7 @@
   "6 hours": "6 hours",
   "7 days": "7 days",
   "A large selection: the rows keep loading, and an export gives them as one file.": "A large selection: the rows keep loading, and an export gives them as one file.",
+  "A network location is drawn with its radius and named as an estimate in the panels, the tracks and the exports.": "A network location is drawn with its radius and named as an estimate in the panels, the tracks and the exports.",
   "Adds every entity of the group": "Adds every entity of the group",
   "admin": "admin",
   "After approval you return to": "After approval you return to",
@@ -161,6 +162,7 @@
   "viewer": "viewer",
   "When": "When",
   "Which gateways hear this project's devices, and how well every device is covered. Network health is not device health: a device can be healthy but poorly connected.": "Which gateways hear this project's devices, and how well every device is covered. Network health is not device health: a device can be healthy but poorly connected.",
+  "Which positions decide where this is shown: the device's own fixes, or a location the network provides (an Iridium estimate, a LoRaWAN geolocation), which is coarse.": "Which positions decide where this is shown: the device's own fixes, or a location the network provides (an Iridium estimate, a LoRaWAN geolocation), which is coarse.",
   "Who can open this project and with which role": "Who can open this project and with which role",
   "Workers without a heartbeat for 15 minutes:": "Workers without a heartbeat for 15 minutes:",
   "Would": "Would"
