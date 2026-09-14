@@ -178,7 +178,9 @@ async def clusters_sql(
                 labelled AS (
                     SELECT g, t,
                            ST_ClusterDBSCAN(
-                               g, eps := CAST(:eps AS float8), minpoints := CAST(:min_points AS integer)
+                               g,
+                               eps := CAST(:eps AS float8),
+                               minpoints := CAST(:min_points AS integer)
                            ) OVER () AS cid
                     FROM fixes
                 )
