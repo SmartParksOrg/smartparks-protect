@@ -1952,6 +1952,7 @@ Listed by the phase where they are first needed.
 
 - Tim: the entity and device pages of SP040078 look wrong on a phone because of the text around the position. Found: the Location source card carried a paragraph, a callout and a 256 px select (336 px tall on a phone), and the small map said "No position yet" because the pages read positions with the default `sources=device` while the animal and the collar stand on the network's estimate. Fixed: the card is the select (full width on a phone), the "after n hours" line and one short sentence that follows the choice; the pages pass `sources=all` when the object's location source is not `device`, so the small map and the recent positions show the estimate the live map shows.
 - Tim: the unfolded entity and device panels of SP040078 also carry too much text on a phone. Fixed in `HealthRows`: on a phone the position row says "estimate" and shows the accuracy as the amber badge (`AccuracyBadge`, the sentence in its title), the warning sentence stays on wider screens only, and the "hidden in the layers panel" note is hidden on a phone.
+- Committed as 9dad5d4, CI green, deployed.
 
 ### 2026-09-13, the layers panel's arrangements (Claude and Tim)
 
