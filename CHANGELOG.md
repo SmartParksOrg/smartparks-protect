@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- The battery trend from the live map: the battery value in an entity or device panel (folded or unfolded) unfolds a small line of the collar's battery voltage over the last day, week or month inside the panel, with its low, high and current values, read from the analytics series on demand.
 - The layers panel arranges its entities four ways (decision D195): by the project's groups as before, ungrouped, per entity type, or per type and sub-type, so "Wildlife > Wolf" or "Vehicles" is one row whose checkbox switches every animal or vehicle below it and whose "only" leaves only those on; the choice is kept per account.
 - The accuracy circle (decision D193): the selected entity or device whose position accuracy is known and above 50 m gets a translucent disc of that radius under its marker on the live map, and the entity, device and fix panels show "±n m" with a warning line; the current states keep the accuracy of the position shown and the map features carry it.
 - `MAIL_DELIVER_TO_ALL` lets a non-production server mail every recipient, for a development server that stands in for production; an invitation that was not mailed answers with the reason and the registration link, and the members and users pages show both instead of "mail is not configured".
@@ -51,6 +52,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- A map panel whose rows overflowed its height painted a white block over the map below itself in Chromium (a scrolling box with a background inside the page's fixed-height panel column); the panel is a shell now and an inner transparent box scrolls.
 - Changing an entity's or a device's location source (or fallback hours) rebuilds its current position at once; before, the new setting waited for the next position, which never came for a collar that repeats the same network estimate.
 - A rebuild of the current position from the rows (after an assignment's reattribution or a curation) took the newest position whatever its kind and set no kind, fix time or accuracy, so a collar assigned to an animal could show a network estimate as its position with the location source still "device"; the rebuild follows the decoder's rule now (the newest device fix, the estimate only when the setting lets it stand in) and carries the kind, the fix time and the accuracy.
 - KPN's network geolocation reached the platform embedded in every uplink of a device that has it on (`DevLAT`, `DevLON`, `DevLocTime`, `DevLocRadius` on the `DevEUI_uplink`, recorded live from SP040078 on 2026-09-13), not as the separate `DevEUI_location` report the adapter read; the adapter now reads the fields from both, one network position per solved location.

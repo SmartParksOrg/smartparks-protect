@@ -20,6 +20,7 @@ import type {
 } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
 import { useIsPhone } from "@/hooks/useMediaQuery";
+import { BatteryTrend, BatteryValue } from "@/components/map/BatteryTrend";
 import { imprecise } from "@/lib/accuracy";
 import { formatAgo, formatTime } from "@/lib/format";
 import { projectFor } from "@/lib/scope";
@@ -63,65 +64,69 @@ export function MapPanel({
   const foldable = phone && summary != null;
   const folded = foldable && unfoldedFor !== title;
   return (
-    <aside className="max-h-[45vh] shrink-0 overflow-y-auto rounded-lg border bg-card p-3 shadow-lg sm:p-4">
-      <div className="flex items-start gap-2">
-        {picture}
-        <div className="min-w-0 flex-1">
-          {titleTo ? (
-            <Link
-              className="block truncate font-semibold underline-offset-2 hover:underline"
-              to={titleTo}
+    // the panel is a shell and an inner box scrolls: a scrolling box with a background in the
+    // page's fixed-height column paints its colour far below itself in Chromium
+    <aside className="flex max-h-[45vh] shrink-0 flex-col rounded-lg border bg-card shadow-lg">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+        <div className="flex items-start gap-2">
+          {picture}
+          <div className="min-w-0 flex-1">
+            {titleTo ? (
+              <Link
+                className="block truncate font-semibold underline-offset-2 hover:underline"
+                to={titleTo}
+              >
+                {title}
+              </Link>
+            ) : (
+              <div className="truncate font-semibold">{title}</div>
+            )}
+            {subtitle && (
+              <div className="text-xs text-muted-foreground">{subtitle}</div>
+            )}
+          </div>
+          {foldable && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={folded ? t("Show more") : t("Show less")}
+              aria-expanded={!folded}
+              onClick={() => setUnfoldedFor(folded ? title : null)}
             >
-              {title}
-            </Link>
-          ) : (
-            <div className="truncate font-semibold">{title}</div>
+              {folded ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronUp className="size-4" />
+              )}
+            </Button>
           )}
-          {subtitle && (
-            <div className="text-xs text-muted-foreground">{subtitle}</div>
-          )}
-        </div>
-        {foldable && (
           <Button
             variant="ghost"
             size="icon"
-            aria-label={folded ? t("Show more") : t("Show less")}
-            aria-expanded={!folded}
-            onClick={() => setUnfoldedFor(folded ? title : null)}
+            aria-label={t("Close")}
+            onClick={onClose}
           >
-            {folded ? (
-              <ChevronDown className="size-4" />
-            ) : (
-              <ChevronUp className="size-4" />
-            )}
+            <X className="size-4" />
           </Button>
+        </div>
+        {folded ? (
+          <div className="mt-2 text-sm">{summary}</div>
+        ) : (
+          <>
+            {note && (
+              <div className="mt-2 hidden text-xs text-muted-foreground sm:block">
+                {note}
+              </div>
+            )}
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+              {children}
+            </dl>
+          </>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("Close")}
-          onClick={onClose}
-        >
-          <X className="size-4" />
-        </Button>
+        {footer && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">{footer}</div>
+        )}
       </div>
-      {folded ? (
-        <div className="mt-2 text-sm">{summary}</div>
-      ) : (
-        <>
-          {note && (
-            <div className="mt-2 hidden text-xs text-muted-foreground sm:block">
-              {note}
-            </div>
-          )}
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            {children}
-          </dl>
-        </>
-      )}
-      {footer && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">{footer}</div>
-      )}
     </aside>
   );
 }
@@ -201,6 +206,8 @@ export function PanelSummary({
   positionKind,
   accuracy,
   batteryVoltage,
+  batteryProject,
+  batteryDevice,
   healthLevel,
   now,
 }: {
@@ -209,10 +216,15 @@ export function PanelSummary({
   positionKind?: string | null;
   accuracy?: number | null;
   batteryVoltage: number | null | undefined;
+  /** Where the battery trend reads from: the project and the device (Tim, 2026-09-14). */
+  batteryProject?: string;
+  batteryDevice?: string | null;
   healthLevel: string | null | undefined;
   now: number;
 }) {
   const { t } = useTranslation();
+  // the battery trend unfolds inside the panel (Tim, 2026-09-14), folded again per object
+  const [trendOpen, setTrendOpen] = useState(false);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <span title={formatTime(lastSeenAt)}>
@@ -239,9 +251,26 @@ export function PanelSummary({
       )}
       {batteryVoltage != null && (
         <span className={batteryClass(healthLevel)}>
-          {batteryVoltage.toFixed(2)} V
+          {batteryProject ? (
+            <BatteryValue
+              deviceId={batteryDevice}
+              voltage={batteryVoltage}
+              open={trendOpen}
+              onToggle={() => setTrendOpen((o) => !o)}
+            />
+          ) : (
+            `${batteryVoltage.toFixed(2)} V`
+          )}
         </span>
       )}
+      {batteryVoltage != null &&
+        trendOpen &&
+        batteryProject &&
+        batteryDevice && (
+          <div className="basis-full rounded-md border bg-muted/30 p-2">
+            <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} />
+          </div>
+        )}
     </div>
   );
 }
@@ -253,6 +282,8 @@ function HealthRows({
   positionKind,
   accuracy,
   batteryVoltage,
+  batteryProject,
+  batteryDevice,
   healthLevel,
   lastStatusAt,
   now,
@@ -265,6 +296,9 @@ function HealthRows({
   /** Accuracy in metres of the position shown; above the threshold the row warns (D193). */
   accuracy?: number | null;
   batteryVoltage: number | null | undefined;
+  /** Where the battery trend reads from: the project and the device (Tim, 2026-09-14). */
+  batteryProject?: string;
+  batteryDevice?: string | null;
   healthLevel: string | null | undefined;
   lastStatusAt: string | null | undefined;
   now: number;
@@ -274,6 +308,8 @@ function HealthRows({
   onOpenState?: () => void;
 }) {
   const { t } = useTranslation();
+  // the battery trend unfolds inside the panel (Tim, 2026-09-14), folded again per object
+  const [trendOpen, setTrendOpen] = useState(false);
   // on a phone the rows stay short (Tim, 2026-09-14): the accuracy as a badge with its
   // sentence behind a tap, and "estimate" for the position's kind
   const phone = useIsPhone();
@@ -317,15 +353,32 @@ function HealthRows({
             <AccuracyBadge accuracyM={accuracy as number} />
           </>
         )}
+        {positionTime && !phone && imprecise(accuracy) && (
+          <AccuracyWarning accuracyM={accuracy as number} />
+        )}
       </PanelRow>
-      {positionTime && !phone && imprecise(accuracy) && (
-        <AccuracyWarning accuracyM={accuracy as number} />
-      )}
       {batteryVoltage != null && (
         <PanelRow label={t("Battery")} className={batteryClass(healthLevel)}>
-          {batteryVoltage.toFixed(2)} V
+          {batteryProject ? (
+            <BatteryValue
+              deviceId={batteryDevice}
+              voltage={batteryVoltage}
+              open={trendOpen}
+              onToggle={() => setTrendOpen((o) => !o)}
+            />
+          ) : (
+            `${batteryVoltage.toFixed(2)} V`
+          )}
         </PanelRow>
       )}
+      {batteryVoltage != null &&
+        trendOpen &&
+        batteryProject &&
+        batteryDevice && (
+          <div className="col-span-2 rounded-md border bg-muted/30 p-2">
+            <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} />
+          </div>
+        )}
       {lastStatusAt && (
         <PanelRow label={t("Last status")} title={formatTime(lastStatusAt)}>
           {onOpenState ? (
@@ -509,6 +562,8 @@ export function EntityPanel({
           positionKind={props.position_kind}
           accuracy={props.accuracy_m}
           batteryVoltage={props.battery_voltage}
+          batteryProject={projectFor(projectId, props.project_id)}
+          batteryDevice={props.device_id}
           healthLevel={props.health_level}
           now={now}
         />
@@ -536,6 +591,8 @@ export function EntityPanel({
         onOpenPosition={onOpenPosition}
         onOpenState={onOpenState}
         batteryVoltage={props.battery_voltage}
+        batteryProject={projectFor(projectId, props.project_id)}
+        batteryDevice={props.device_id}
         healthLevel={props.health_level}
         lastStatusAt={props.last_status_at}
         now={now}
@@ -660,6 +717,8 @@ export function DevicePanel({
           positionKind={props.position_kind}
           accuracy={props.accuracy_m}
           batteryVoltage={props.battery_voltage}
+          batteryProject={projectFor(projectId, props.project_id)}
+          batteryDevice={props.device_id}
           healthLevel={props.health_level}
           now={now}
         />
@@ -687,6 +746,8 @@ export function DevicePanel({
         onOpenPosition={onOpenPosition}
         onOpenState={onOpenState}
         batteryVoltage={props.battery_voltage}
+        batteryProject={projectFor(projectId, props.project_id)}
+        batteryDevice={props.device_id}
         healthLevel={props.health_level}
         lastStatusAt={props.last_status_at}
         now={now}
