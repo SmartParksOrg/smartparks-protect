@@ -19,7 +19,7 @@ Run queues an analysis; the analysis worker computes it, one run at a time per s
 
 - **Cards** per subject: distance, daily distance, median speed, stationary share, MCP and KDE 95 % areas, the number of fixes, and the comparison period's figure beside each.
 - **Map**: the subjects' tracks over the main period and, toggled by chips, the MCP hull, the KDE isopleths, the hotspot cells and the cluster hulls, each in the subject's colour; a click on a polygon names it with its area and its share of time or fixes.
-- **Charts**: daily distance, the speed histogram, activity by hour of the day, the rose of turning angles, the net squared displacement, and distance by day, twilight and night.
+- **Charts**: daily distance, the speed histogram (fixed bins from under 0.01 to over 10 m/s, so every animal shares one axis), activity by hour of the day, the rose of turning angles, the net squared displacement, and distance by day, twilight and night.
 - **Table**: every figure per subject and period, with a mean and standard deviation row for groups; secondary columns hidden on a phone.
 - **Warnings** above the results say what the fixes allow: missing fixes against the sampling interval, gaps, irregular sampling, impossible speeds left out, duplicates collapsed, poor GNSS quality, a collar change inside the period, too few fixes for a home range.
 

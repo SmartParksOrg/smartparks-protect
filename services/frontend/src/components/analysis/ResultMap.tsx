@@ -134,6 +134,9 @@ export function ResultMap({
     observer.observe(element);
     ensureEntityLayers(map);
     ensureTrackLayers(map);
+    // the line says where the animal went; the live map's point markers would hide the polygons
+    if (map.getLayer("track-points"))
+      map.setLayoutProperty("track-points", "visibility", "none");
     ensureAnalysisLayers(map);
     const unbind = bindAnalysisClicks(map, setPicked);
     return () => {

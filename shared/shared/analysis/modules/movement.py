@@ -59,7 +59,20 @@ FEW_FIXES = 30
 NSD_POINTS = 500
 CLUSTER_MIN_POINTS = 5
 MAX_CLUSTERS_PER_SUBJECT = 50
-SPEED_BINS = 20
+SPEED_EDGES = [0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, np.inf]
+SPEED_LABELS = [
+    "<0.01",
+    "0.01",
+    "0.02",
+    "0.05",
+    "0.1",
+    "0.2",
+    "0.5",
+    "1",
+    "2",
+    "5",
+    ">10",
+]
 TURNING_BINS = 16
 
 #: The summary's metric keys in the order the table shows them (plan, section 8.3).
@@ -209,10 +222,9 @@ def analyse_trajectory(
         summary["mean_speed_mps"] = round(float(speeds.mean()), 4)
         summary["median_speed_mps"] = round(float(np.median(speeds)), 4)
         summary["p95_speed_mps"] = round(float(np.percentile(speeds, 95)), 4)
-        top = max(float(np.percentile(speeds, 99)), 0.01)
-        hist, edges = np.histogram(np.clip(speeds, 0, top), bins=SPEED_BINS, range=(0, top))
-        speed_hist = [[f"{float(edges[i]):.2f}", int(hist[i])] for i in range(SPEED_BINS)]
-        figures["speed_bin_mps"] = top / SPEED_BINS
+        # fixed, roughly logarithmic bins, so every subject shares one axis whatever its pace
+        hist, _ = np.histogram(speeds, bins=SPEED_EDGES)
+        speed_hist = [[SPEED_LABELS[i], int(hist[i])] for i in range(len(SPEED_LABELS))]
     else:
         speed_hist = []
 
