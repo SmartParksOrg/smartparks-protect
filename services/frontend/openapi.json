@@ -10956,49 +10956,27 @@
     "summary": "List Modules",
     "description": "The modules this deployment offers (the project's own list applies on the project).",
     "operationId": "list_modules_api_v1_analysis_modules_get",
-    "security": [
-     {
-      "OAuth2PasswordBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "project_id",
-      "in": "query",
-      "required": true,
-      "schema": {
-       "type": "string",
-       "format": "uuid",
-       "title": "Project Id"
-      }
-     }
-    ],
     "responses": {
      "200": {
       "description": "Successful Response",
       "content": {
        "application/json": {
         "schema": {
-         "type": "array",
          "items": {
           "$ref": "#/components/schemas/AnalysisModuleRead"
          },
+         "type": "array",
          "title": "Response List Modules Api V1 Analysis Modules Get"
         }
        }
       }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
      }
-    }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
    }
   },
   "/api/v1/projects/{project_id}/analyses/estimate": {

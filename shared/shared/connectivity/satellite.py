@@ -12,11 +12,11 @@ canonical position: it is provenance, kept on the source event and shown as a ci
 
 from __future__ import annotations
 
-import math
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any
 
+from shared.geodesy import haversine_m
 from shared.timeutil import require_aware
 
 # Iridium SBD mobile-originated session status (DirectIP), by code and by Cloudloop's names.
@@ -56,7 +56,6 @@ STATUS_TEXT: dict[str, str] = {
 DELIVERED_STATUSES = frozenset({"ok", "mt_too_large", "location_unacceptable"})
 # The estimate is only worth showing when the network did not disown it.
 ESTIMATE_STATUSES = frozenset({"ok", "mt_too_large"})
-EARTH_RADIUS_M = 6_371_008.8
 
 
 def status_from_code(code: Any) -> str:
@@ -147,11 +146,8 @@ def _float(value: Any) -> float | None:
 
 
 def distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Great-circle distance in metres (haversine)."""
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dp, dl = p2 - p1, math.radians(lon2 - lon1)
-    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return 2 * EARTH_RADIUS_M * math.asin(math.sqrt(a))
+    """Great-circle distance in metres (haversine), the shared one."""
+    return haversine_m(lat1, lon1, lat2, lon2)
 
 
 # A fix this many CEP radii from the estimate is worth a note: the CEP holds half of the

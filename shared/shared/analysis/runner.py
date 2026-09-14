@@ -16,7 +16,7 @@ from sqlalchemy import delete, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.analysis import MODULES, enabled_modules
-from shared.analysis.base import AnalysisCancelled, RunContext, RunResult
+from shared.analysis.base import AnalysisCancelled, AnalysisTooLarge, RunContext, RunResult
 from shared.analysis.limits import MAX_GEOMETRIES, MAX_RESULT_BYTES, RESULT_RETENTION_DAYS
 from shared.config import get_settings
 from shared.database import get_session_factory
@@ -27,10 +27,6 @@ from shared.timeutil import utc_now
 
 log = get_logger("analysis.runner")
 CLEANUP_BATCH = 100
-
-
-class AnalysisTooLarge(Exception):
-    """The module read or produced more than the run may hold."""
 
 
 async def _write(run_id: uuid.UUID, **values: object) -> None:

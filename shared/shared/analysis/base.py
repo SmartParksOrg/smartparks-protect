@@ -128,3 +128,7 @@ class AnalysisModule(Protocol):
 
 class AnalysisCancelled(Exception):
     """Raised inside a run when the person cancelled it; the runner marks the row cancelled."""
+
+
+class AnalysisTooLarge(Exception):
+    """The module read or produced more than the run may hold; the runner stores it."""

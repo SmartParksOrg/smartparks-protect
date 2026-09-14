@@ -25,6 +25,7 @@ from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform
 
+from shared.geodesy import metres_between
 from shared.rules.schema import (
     AllOf,
     AnyOf,
@@ -72,9 +73,6 @@ class Sample:
     age_seconds: float = 0.0
 
 
-EARTH_RADIUS_M = 6_371_008.8
-
-
 @dataclass(slots=True)
 class EntityPoint:
     """Another entity's latest position, for the proximity condition."""
@@ -83,16 +81,6 @@ class EntityPoint:
     name: str
     point: tuple[float, float]
     time: datetime
-
-
-def metres_between(a: tuple[float, float], b: tuple[float, float]) -> float:
-    """Great-circle distance in metres between two (lon, lat) points (haversine)."""
-    lon1, lat1, lon2, lat2 = (math.radians(v) for v in (a[0], a[1], b[0], b[1]))
-    h = (
-        math.sin((lat2 - lat1) / 2) ** 2
-        + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
-    )
-    return 2 * EARTH_RADIUS_M * math.asin(math.sqrt(h))
 
 
 def metres_to_geometry(point: tuple[float, float], geometry: BaseGeometry) -> float:
