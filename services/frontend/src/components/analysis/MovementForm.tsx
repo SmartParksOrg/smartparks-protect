@@ -82,7 +82,13 @@ export function MovementForm({
       }),
   });
   const items = entities.data?.items ?? [];
-  useResolveSubjects(state, entities.data?.items, groups.data, MAX_SUBJECTS, onChange);
+  useResolveSubjects(
+    state,
+    entities.data?.items,
+    groups.data,
+    MAX_SUBJECTS,
+    onChange,
+  );
   const usedTypes = new Set(items.map((e) => e.entity_type_id));
   const typeOptions = (types.data?.items ?? []).filter((x) =>
     usedTypes.has(x.id),
@@ -278,7 +284,9 @@ export function MovementForm({
                 methods:
                   state.method.methods.length === 0
                     ? t("no home range")
-                    : state.method.methods.map((m) => m.toUpperCase()).join(", "),
+                    : state.method.methods
+                        .map((m) => m.toUpperCase())
+                        .join(", "),
               },
             )}
           </span>

@@ -1,6 +1,10 @@
 import { useTranslation } from "react-i18next";
 
-import { subjectColor, subjectSummary, type ResultDocument } from "@/lib/analyses";
+import {
+  subjectColor,
+  subjectSummary,
+  type ResultDocument,
+} from "@/lib/analyses";
 
 /** One card per subject with the figures that answer the question first (plan, section 8.7):
  * how far, how fast, how much space; the comparison period's figure beside each. */
@@ -20,7 +24,11 @@ export function SubjectCards({
     if (v === null || v === undefined) return "–";
     if (unit === "%") return `${Math.round(v * 100)}%`;
     const text =
-      Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2);
+      Math.abs(v) >= 100
+        ? v.toFixed(0)
+        : Math.abs(v) >= 10
+          ? v.toFixed(1)
+          : v.toFixed(2);
     return unit ? `${text} ${unit}` : text;
   };
   return (

@@ -21,7 +21,10 @@ export function RestStrip({
   );
   if (series.length === 0) return null;
   const days = series[0].data.map((d) => Number(d[0]));
-  const fmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+  const fmt = new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+  });
   return (
     <div className="space-y-2 overflow-x-auto">
       <h2 className="text-base font-medium">{t("Use and rest by day")}</h2>
@@ -34,11 +37,11 @@ export function RestStrip({
             {days.map((ms, i) => (
               <th
                 key={ms}
-                className="w-3 p-0 text-left font-normal text-muted-foreground"
+                className="relative h-5 w-3 p-0 text-left font-normal text-muted-foreground"
                 title={fmt.format(new Date(ms))}
               >
                 {i % 7 === 0 ? (
-                  <span className="block w-0 -rotate-90 whitespace-nowrap">
+                  <span className="absolute top-0 left-0 whitespace-nowrap text-[10px]">
                     {fmt.format(new Date(ms))}
                   </span>
                 ) : null}
@@ -63,7 +66,11 @@ export function RestStrip({
                         style={{
                           backgroundColor: rest
                             ? "transparent"
-                            : pressureColor(max > 0 ? (hours / max) * 2 : 0),
+                            : pressureColor(
+                                max > 0
+                                  ? Math.min(1.99, (hours / max) * 1.99)
+                                  : 0,
+                              ),
                           outline: rest ? "1px solid var(--border)" : undefined,
                           outlineOffset: "-1px",
                         }}
@@ -77,7 +84,9 @@ export function RestStrip({
         </tbody>
       </table>
       <p className="text-xs text-muted-foreground">
-        {t("An empty cell is a rest day; the darker the cell, the more animal-hours against the area's busiest day.")}
+        {t(
+          "An empty cell is a rest day; the darker the cell, the more animal-hours against the area's busiest day.",
+        )}
       </p>
     </div>
   );

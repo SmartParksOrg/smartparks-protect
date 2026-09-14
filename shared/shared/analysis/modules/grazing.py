@@ -343,6 +343,7 @@ def _overlaps_sql() -> str:
         FROM features a JOIN features b ON a.id < b.id
         WHERE a.id = ANY(CAST(:ids AS uuid[])) AND b.id = ANY(CAST(:ids AS uuid[]))
           AND ST_Intersects(a.geom, b.geom)
+          AND ST_Area(ST_Intersection(a.geom, b.geom)::geography) > 0
     """
 
 
@@ -627,7 +628,7 @@ class GrazingModule:
         if comparison_rows:
             tables.append(
                 Table(
-                    key="comparison",
+                    key="changes",
                     columns=["area", "metric", "main", "comparison", "change_percent"],
                     rows=comparison_rows,
                 )

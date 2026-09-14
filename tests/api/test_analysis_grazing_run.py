@@ -109,6 +109,8 @@ async def test_a_grazing_run_over_zones(client, db):
     areas = next(t for t in document["tables"] if t["key"] == "areas")
     assert areas["columns"][:3] == ["area", "period", "hectares"]
     assert [r[:2] for r in areas["rows"]] == [["Camp 1", "main"], ["Camp 2", "main"]]
+    # the camps share no ground: no overlap table
+    assert "overlaps" not in {t["key"] for t in document["tables"]}
     animals = next(t for t in document["tables"] if t["key"] == "animals")
     assert animals["rows"][0][:2] == ["Rhino 14", "Camp 1"]
     timeline = next(c for c in document["charts"] if c["key"] == "timeline")

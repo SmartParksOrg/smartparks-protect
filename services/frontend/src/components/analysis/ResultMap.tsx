@@ -148,13 +148,15 @@ export function ResultMap({
     if (!map || !ready) return;
     setTracks(map, trackLayers);
     setAnalysisFeatures(map, features);
-    if (fitted.current) return;
-    const bounds = boundsOfTracks(trackLayers) ?? boundsOfFeatures(features);
+    if (fitted.current || (available.length > 0 && features.length === 0))
+      return;
+    // the polygons say where the result is; a track may hold a far outlier
+    const bounds = boundsOfFeatures(features) ?? boundsOfTracks(trackLayers);
     if (bounds) {
       fitted.current = true;
       map.fitBounds(bounds, { padding: 40, maxZoom: 14, duration: 0 });
     }
-  }, [mapRef, ready, trackLayers, features]);
+  }, [mapRef, ready, trackLayers, features, available.length]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -166,7 +168,7 @@ export function ResultMap({
 
   const fit = () => {
     const map = mapRef.current;
-    const bounds = boundsOfTracks(trackLayers) ?? boundsOfFeatures(features);
+    const bounds = boundsOfFeatures(features) ?? boundsOfTracks(trackLayers);
     if (map && bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 14 });
   };
   const kindLabel: Record<string, string> = {

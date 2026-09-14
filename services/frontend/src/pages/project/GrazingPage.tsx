@@ -66,7 +66,10 @@ export function GrazingPage() {
       <Page>
         {phone ? (
           <Sheet open={formOpen} onOpenChange={setFormOpen}>
-            <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+            <SheetContent
+              side="bottom"
+              className="max-h-[85vh] overflow-y-auto"
+            >
               <SheetTitle>{t("Set up a run")}</SheetTitle>
               <div className="pt-3">{form}</div>
             </SheetContent>
@@ -75,7 +78,7 @@ export function GrazingPage() {
           <div className="rounded-md border bg-card p-3">{form}</div>
         )}
         <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <h2 className="text-sm font-medium">{t("Runs")}</h2>
             <RunList
               projectId={projectId}
@@ -154,7 +157,9 @@ function Limitations() {
           )}
         </li>
         <li>
-          {t("Overlapping areas double-count by design; the overlap is listed.")}
+          {t(
+            "Overlapping areas double-count by design; the overlap is listed.",
+          )}
         </li>
         <li>
           {t(
@@ -205,6 +210,7 @@ export const GRAZING_LABELS = (
   areas: t("Areas"),
   animals: t("Animals"),
   overlaps: t("Overlaps"),
+  changes: t("Change against the period before"),
   timeline: t("Daily animal-hours"),
   pressure: t("Use per hectare"),
   summary: t("Summary"),

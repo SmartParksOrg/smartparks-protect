@@ -51,7 +51,7 @@ export function RunList({
         <li key={run.id}>
           <Button
             variant="ghost"
-            className={`h-auto w-full justify-between gap-2 rounded-none px-3 py-2 text-left ${run.id === selected ? "bg-muted" : ""}`}
+            className={`h-auto w-full justify-between gap-2 overflow-hidden rounded-none px-3 py-2 text-left ${run.id === selected ? "bg-muted" : ""}`}
             onClick={() => onSelect(run.id)}
           >
             <span className="min-w-0 flex-1 truncate">

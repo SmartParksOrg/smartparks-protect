@@ -290,7 +290,9 @@ export function RunView({
                   <ResultChart
                     chart={chart}
                     labels={labels}
-                    colorOf={(s) => (s.subject ? subjectColor(s.subject) : null)}
+                    colorOf={(s) =>
+                      s.subject ? subjectColor(s.subject) : null
+                    }
                   />
                 </CardContent>
               </Card>

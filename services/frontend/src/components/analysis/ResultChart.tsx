@@ -76,9 +76,8 @@ export function ResultChart({
               .join(" · ") ?? `${i}`),
       ),
     );
-    // the legend sits above the plot, so long names never cover the axis
-    const legendRows =
-      chart.series.length > 1 ? Math.ceil(names.join("  ").length / 70) : 0;
+    // one legend row above the plot that scrolls when the names do not fit
+    const legend = chart.series.length > 1;
     const rose = chart.kind === "rose";
     const colors = chart.series.map(
       (s, i) => colorOf?.(s) ?? PALETTE[i % PALETTE.length],
@@ -91,21 +90,22 @@ export function ResultChart({
         backgroundColor: th.tooltipBg,
         textStyle: { color: th.tooltipText, fontSize: 11 },
       },
-      legend:
-        chart.series.length > 1
-          ? { top: 0, left: 44, textStyle: { color: th.text, fontSize: 11 } }
-          : undefined,
-      grid: rose
-        ? undefined
-        : {
+      legend: legend
+        ? {
+            type: "scroll",
+            top: 0,
             left: 44,
             right: 12,
-            top: 24 + legendRows * 18,
-            bottom: 24,
-          },
+            textStyle: { color: th.text, fontSize: 11 },
+            pageTextStyle: { color: th.text },
+          }
+        : undefined,
+      grid: rose
+        ? undefined
+        : { left: 44, right: 12, top: legend ? 44 : 24, bottom: 24 },
       ...(rose
         ? {
-            polar: { center: ["50%", "55%"] },
+            polar: { center: ["50%", legend ? "58%" : "52%"], radius: "60%" },
             angleAxis: {
               type: "category",
               data: chart.series[0]?.data.map((d) => String(d[0])) ?? [],
@@ -122,7 +122,16 @@ export function ResultChart({
                 typeof chart.series[0]?.data[0]?.[0] === "number"
                   ? "time"
                   : "category",
-              axisLabel: { color: th.text, fontSize: 10, hideOverlap: true },
+              axisLabel: {
+                color: th.text,
+                fontSize: 10,
+                hideOverlap: true,
+                // a few long category names (areas) all show, shortened
+                ...(typeof chart.series[0]?.data[0]?.[0] === "string" &&
+                (chart.series[0]?.data.length ?? 0) <= 8
+                  ? { interval: 0, width: 90, overflow: "truncate" as const }
+                  : {}),
+              },
               axisLine: { lineStyle: { color: th.grid } },
               splitLine: { show: false },
             },

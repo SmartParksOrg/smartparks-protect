@@ -94,9 +94,17 @@ export function GrazingForm({
       }),
   });
   const items = entities.data?.items ?? [];
-  useResolveSubjects(state, entities.data?.items, groups.data, MAX_ANIMALS, onChange);
+  useResolveSubjects(
+    state,
+    entities.data?.items,
+    groups.data,
+    MAX_ANIMALS,
+    onChange,
+  );
   const usedTypes = new Set(items.map((e) => e.entity_type_id));
-  const typeOptions = (types.data?.items ?? []).filter((x) => usedTypes.has(x.id));
+  const typeOptions = (types.data?.items ?? []).filter((x) =>
+    usedTypes.has(x.id),
+  );
   const areas = (features.data?.items ?? []).filter((f) =>
     AREA_TYPES.has(f.feature_type),
   );
@@ -238,14 +246,20 @@ export function GrazingForm({
         {areas.length === 0 && features.data && (
           <span className="text-xs text-muted-foreground">
             {t("No zones yet.")}{" "}
-            <Link className="underline" to={`/projects/${projectId}/admin/features`}>
+            <Link
+              className="underline"
+              to={`/projects/${projectId}/admin/features`}
+            >
               {t("Draw one on the map")}
             </Link>
           </span>
         )}
         <div className="space-y-1">
           <Label className="text-xs">{t("Period")}</Label>
-          <Select value={state.range} onValueChange={(v) => onChange({ range: v })}>
+          <Select
+            value={state.range}
+            onValueChange={(v) => onChange({ range: v })}
+          >
             <SelectTrigger className="h-8 w-40" aria-label={t("Period")}>
               <SelectValue />
             </SelectTrigger>
@@ -304,7 +318,9 @@ export function GrazingForm({
         {state.compare === "herd" && (
           <Select
             value={state.grazing.herd_b ?? "none"}
-            onValueChange={(id) => grazing({ herd_b: id === "none" ? null : id })}
+            onValueChange={(id) =>
+              grazing({ herd_b: id === "none" ? null : id })
+            }
           >
             <SelectTrigger className="h-8 w-40" aria-label={t("Second herd")}>
               <SelectValue placeholder={t("Second herd")} />
@@ -333,7 +349,9 @@ export function GrazingForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="equal">{t("Each animal counts one")}</SelectItem>
+              <SelectItem value="equal">
+                {t("Each animal counts one")}
+              </SelectItem>
               <SelectItem value="attribute">{t("By an attribute")}</SelectItem>
               <SelectItem value="metabolic">
                 {t("Metabolic (mass to the 0.75)")}
@@ -451,7 +469,11 @@ export function GrazingForm({
             onClick={() =>
               onChange({
                 method: { ...DEFAULT_METHOD, speed_max: 5 },
-                grazing: { ...state.grazing, absence: DEFAULT_GRAZING.absence, rest: 0 },
+                grazing: {
+                  ...state.grazing,
+                  absence: DEFAULT_GRAZING.absence,
+                  rest: 0,
+                },
               })
             }
           >

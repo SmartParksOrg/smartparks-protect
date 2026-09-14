@@ -13,11 +13,7 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIsPhone } from "@/hooks/useMediaQuery";
-import {
-  type FormState,
-  readFormState,
-  writeFormState,
-} from "@/lib/analyses";
+import { type FormState, readFormState, writeFormState } from "@/lib/analyses";
 
 /** Movement and space use (docs/ANALYTICS_PHASE1_PLAN.md, section 8): the question form at
  * the top, the runs of the module, and the selected run's result with its cards, map,
@@ -69,7 +65,10 @@ export function MovementPage() {
       <Page>
         {phone ? (
           <Sheet open={formOpen} onOpenChange={setFormOpen}>
-            <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+            <SheetContent
+              side="bottom"
+              className="max-h-[85vh] overflow-y-auto"
+            >
               <SheetTitle>{t("Set up a run")}</SheetTitle>
               <div className="pt-3">{form}</div>
             </SheetContent>
@@ -78,7 +77,7 @@ export function MovementPage() {
           <div className="rounded-md border bg-card p-3">{form}</div>
         )}
         <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <h2 className="text-sm font-medium">{t("Runs")}</h2>
             <RunList
               projectId={projectId}
@@ -158,9 +157,7 @@ function Limitations() {
             "The KDE is an estimate of space use that depends on the bandwidth and the grid; its isopleths are unions of cells, not smooth contours.",
           )}
         </li>
-        <li>
-          {t("The MCP includes ground never visited between far fixes.")}
-        </li>
+        <li>{t("The MCP includes ground never visited between far fixes.")}</li>
         <li>
           {t(
             "Residence time on a regular grid depends on the cell size and is biased by irregular sampling.",

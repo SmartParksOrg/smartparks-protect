@@ -21,7 +21,7 @@ The estimate line names what the run cannot use before Run is pressed: an area u
 - **Map**: the herd's tracks and the areas coloured by relative pressure on a five-step ramp (1.0 is the herd's average over the chosen areas), the hotspot cells inside each area; a click on an area names it with its hectares, use, pressure, rank and rest days.
 - **Charts**: the daily animal-hours per area over the period, and use per hectare per area (with the comparison period or the second herd beside it).
 - **Use and rest by day**: one row per area, one cell per day, empty on a rest day, darker with more animal-hours against the area's busiest day.
-- **Tables**: the areas (one row per area and period, per season when asked, per herd when two), the animals (hours, visits, mean visit, first and last use, days used per area), the comparison (main against the period before with the change in percent) and the overlaps.
+- **Tables**: the areas (one row per area and period, per season when asked, per herd when two), the animals (hours, visits, mean visit, first and last use, days used per area), the changes (this period against the period before with the change in percent) and the overlaps (areas that share ground, not a boundary).
 - **Warnings**: missing fixes, gaps, irregular sampling, impossible speeds, duplicates, poor GNSS quality, collar changes, animals without a weighting value, animals without fixes, overlapping areas.
 
 ## The method

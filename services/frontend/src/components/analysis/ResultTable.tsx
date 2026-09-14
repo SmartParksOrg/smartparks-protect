@@ -20,7 +20,10 @@ export function ResultTable({
       cell: ({ getValue }) => {
         const v = getValue<unknown>();
         // a period or a herd key reads by its label
-        if ((c === "period" || c === "herd") && typeof v === "string")
+        if (
+          (c === "period" || c === "herd" || c === "metric") &&
+          typeof v === "string"
+        )
           return labels?.[v] ?? v;
         return typeof v === "number"
           ? Number.isInteger(v)
