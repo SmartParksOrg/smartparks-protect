@@ -9,6 +9,7 @@ from shared.models.access import (
     ProjectRole,
     User,
 )
+from shared.models.analysis import AnalysisGeometry, AnalysisRun
 from shared.models.analytics import ExportJob, SavedView
 from shared.models.backup import BackupRun
 from shared.models.base import Base
@@ -61,6 +62,8 @@ __all__ = [
     "HYPERTABLES",
     "ActionDelivery",
     "Alert",
+    "AnalysisGeometry",
+    "AnalysisRun",
     "ApplicationError",
     "AuditLog",
     "Automation",

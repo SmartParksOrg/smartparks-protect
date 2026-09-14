@@ -151,6 +151,11 @@ class Settings(BaseSettings):
         "kept invalid until curated (decision D119)",
     )
 
+    analysis_modules: str = Field(
+        default="movement,grazing",
+        description="The analysis modules this deployment offers, a comma list; empty turns the "
+        "analysis area off (docs/ANALYTICS_PHASE1_PLAN.md, section 16)",
+    )
     rate_limit_enabled: bool = Field(
         default=True,
         description="Application-level throttling of login, token, webhook and AI action calls",

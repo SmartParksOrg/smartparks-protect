@@ -263,6 +263,23 @@ class ExportStatus(StrEnum):
     EXPIRED = "expired"  # the file was removed after its retention (architecture 14)
 
 
+class AnalysisStatus(StrEnum):
+    """The life of an analysis run (docs/ANALYTICS_PHASE1_PLAN.md, section 7)."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class AnalysisModuleKey(StrEnum):
+    """The analysis modules of phase 1."""
+
+    MOVEMENT = "movement"
+    GRAZING = "grazing"
+
+
 class NotificationChannel(StrEnum):
     EMAIL = "email"
     TELEGRAM = "telegram"

@@ -1,0 +1,14 @@
+"""The bounds of a run (plan, section 14). The ones an operator may tune mirror a setting;
+the rest are constants a module reads."""
+
+MAX_SUBJECTS_MOVEMENT = 25
+MAX_ANIMALS_GRAZING = 100
+MAX_AREAS_GRAZING = 50
+MAX_DAYS = 366
+MAX_FIXES_PER_SUBJECT = 200_000
+KDE_MAX_CELLS = 250
+MAX_GEOMETRIES = 5_000
+MAX_RESULT_BYTES = 4 * 1024 * 1024
+MAX_QUEUED_PER_PROJECT = 5
+KEPT_RUNS_PER_PROJECT = 200
+RESULT_RETENTION_DAYS = 30

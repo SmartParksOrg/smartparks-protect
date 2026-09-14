@@ -810,6 +810,11 @@ Each task: objective, existing files, proposed files, backend, frontend, databas
 - Dependencies: everything above.
 - Priority: 1 before the merge. Complexity: M.
 
+## Progress on the branch
+
+- F1 done on 2026-09-14: `shared/shared/analysis/` (`__init__.py` registry and `enabled_modules`, `base.py` contract, `limits.py`, `environment.py` provider boundary), `Settings.analysis_modules`, `tests/shared/test_analysis_boundary.py` (no core module imports the package, the setting gates the catalogue, no provider in phase 1). mypy strict clean.
+- F2 done on 2026-09-14: `AnalysisStatus` and `AnalysisModuleKey` enums, `shared/shared/models/analysis.py` (`AnalysisRun`, `AnalysisGeometry`), migration `0029_analysis_runs.py`, `tests/api/test_analysis_models.py` (round trip, the area from PostGIS, cascade). The migration runs up and down in CI's test session.
+
 ## 20. Decision gate before future analytics
 
 After movement and grazing are merged and have run on the dev server and with the first real project for at least one month, a review answers, with evidence:
