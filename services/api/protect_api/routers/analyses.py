@@ -236,9 +236,13 @@ async def estimate(
 
 
 def _visible_run(run: AnalysisRun, context: ProjectContext) -> bool:
-    """A run is for the reader when it is theirs or shared, and every subject is inside the
-    reader's scope."""
-    if not run.shared and run.created_by_user_id != context.user.id:
+    """A run is for the reader when it is theirs, shared, or the reader administers the
+    project, and every subject is inside the reader's scope."""
+    if (
+        not run.shared
+        and run.created_by_user_id != context.user.id
+        and Permission.PROJECT_WRITE not in context.permissions
+    ):
         return False
     if not context.visibility.limited:
         return True
@@ -274,10 +278,11 @@ async def list_runs(
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[AnalysisRunRead]:
     """The project's runs, newest first; the result document is left out here."""
-    statement = select(AnalysisRun).where(
-        AnalysisRun.project_id == context.project.id,
-        AnalysisRun.shared.is_(True) | (AnalysisRun.created_by_user_id == context.user.id),
-    )
+    statement = select(AnalysisRun).where(AnalysisRun.project_id == context.project.id)
+    if Permission.PROJECT_WRITE not in context.permissions:
+        statement = statement.where(
+            AnalysisRun.shared.is_(True) | (AnalysisRun.created_by_user_id == context.user.id)
+        )
     if module:
         statement = statement.where(AnalysisRun.module == module)
     if run_status:
