@@ -10,8 +10,8 @@ import { useNow } from "@/hooks/useNow";
 import { formatAgo } from "@/lib/format";
 import { isActive } from "@/lib/analyses";
 
-/** The recent runs of one module in the project, newest first, polled while any is active;
- * a click opens the run on the page. */
+/** The recent runs of one module in the project as a row of chips above the result, newest
+ * first, polled while any is active; a click opens the run on the page. */
 export function RunList({
   projectId,
   module,
@@ -46,40 +46,41 @@ export function RunList({
       </p>
     );
   return (
-    <ul className="divide-y rounded-md border">
+    <div className="flex flex-wrap items-center gap-2">
       {items.map((run) => (
-        <li key={run.id}>
-          <Button
-            variant="ghost"
-            className={`h-auto w-full justify-between gap-2 overflow-hidden rounded-none px-3 py-2 text-left ${run.id === selected ? "bg-muted" : ""}`}
-            onClick={() => onSelect(run.id)}
+        <Button
+          key={run.id}
+          variant={run.id === selected ? "secondary" : "outline"}
+          size="sm"
+          className="h-8 max-w-full gap-2 overflow-hidden"
+          aria-pressed={run.id === selected}
+          onClick={() => onSelect(run.id)}
+        >
+          <span className="min-w-0 truncate">
+            {run.name ??
+              t("{{count}} subjects", {
+                count:
+                  (run.parameters as { entity_ids?: string[] }).entity_ids
+                    ?.length ?? 0,
+              })}
+          </span>
+          <Badge
+            variant={
+              run.status === "completed"
+                ? "default"
+                : run.status === "failed"
+                  ? "destructive"
+                  : "secondary"
+            }
+            className="shrink-0"
           >
-            <span className="min-w-0 flex-1 truncate">
-              {run.name ??
-                t("{{count}} subjects", {
-                  count:
-                    (run.parameters as { entity_ids?: string[] }).entity_ids
-                      ?.length ?? 0,
-                })}
-            </span>
-            <Badge
-              variant={
-                run.status === "completed"
-                  ? "default"
-                  : run.status === "failed"
-                    ? "destructive"
-                    : "secondary"
-              }
-              className="shrink-0"
-            >
-              {run.status}
-            </Badge>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {formatAgo(run.created_at, now)}
-            </span>
-          </Button>
-        </li>
+            {run.status}
+          </Badge>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {formatAgo(run.created_at, now)}
+          </span>
+        </Button>
       ))}
-    </ul>
+    </div>
   );
 }

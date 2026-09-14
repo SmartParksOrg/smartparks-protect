@@ -76,8 +76,8 @@ export function MovementPage() {
         ) : (
           <div className="rounded-md border bg-card p-3">{form}</div>
         )}
-        <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <div className="min-w-0 space-y-2">
+        <div className="space-y-4">
+          <div className="space-y-2">
             <h2 className="text-sm font-medium">{t("Runs")}</h2>
             <RunList
               projectId={projectId}
