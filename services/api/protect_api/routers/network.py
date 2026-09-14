@@ -45,13 +45,14 @@ from shared.timeutil import require_aware, utc_now
 router = APIRouter(tags=["network"])
 
 MAX_ROWS = 500
-WORKERS = ("ingest", "decoder", "export", "rules", "automation", "integration")
+WORKERS = ("ingest", "decoder", "export", "rules", "automation", "integration", "analysis")
 GROUPS = {
     "decoder": Topic.SOURCE_EVENT_RECEIVED,
     "export": Topic.EXPORT_REQUESTED,
     "rules": Topic.POSITION_CREATED,
     "automation": Topic.EVENT_CREATED,
     "integration": Topic.POSITION_CREATED,
+    "analysis": Topic.ANALYSIS_REQUESTED,
 }
 
 

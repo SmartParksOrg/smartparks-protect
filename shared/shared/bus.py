@@ -49,6 +49,7 @@ class Topic:
     INTEGRATION_BACKFILL_REQUESTED = "integration.backfill_requested"
     LOG_FILE_UPLOADED = "log_file.uploaded"
     CURATION_JOB_REQUESTED = "curation.job_requested"
+    ANALYSIS_REQUESTED = "analysis.requested"
     CURATION_APPLIED = "curation.applied"
     IDENTITY_REPROCESS_REQUESTED = "identity.reprocess_requested"
 

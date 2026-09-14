@@ -5,6 +5,7 @@ requires-python = "==3.12.*"
 [manifest]
 members = [
     "smartparks-protect",
+    "smartparks-protect-analysis",
     "smartparks-protect-api",
     "smartparks-protect-automation",
     "smartparks-protect-decoder",
@@ -1711,6 +1712,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "smartparks-protect-analysis" },
     { name = "smartparks-protect-api" },
     { name = "smartparks-protect-automation" },
     { name = "smartparks-protect-decoder" },
@@ -1737,6 +1739,7 @@ dev = [
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "ruff", specifier = "==0.16.5" },
+    { name = "smartparks-protect-analysis", editable = "services/analysis" },
     { name = "smartparks-protect-api", editable = "services/api" },
     { name = "smartparks-protect-automation", editable = "services/automation" },
     { name = "smartparks-protect-decoder", editable = "services/decoder" },
@@ -1752,6 +1755,17 @@ docs = [
     { name = "mkdocs", specifier = "<2" },
     { name = "mkdocs-material", specifier = "==9.7.7" },
 ]
+
+[[package]]
+name = "smartparks-protect-analysis"
+version = "0.0.0"
+source = { editable = "services/analysis" }
+dependencies = [
+    { name = "smartparks-protect-shared" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "smartparks-protect-shared", editable = "shared" }]
 
 [[package]]
 name = "smartparks-protect-api"

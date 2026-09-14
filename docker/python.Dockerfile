@@ -22,6 +22,7 @@ COPY services/rules/pyproject.toml services/rules/pyproject.toml
 COPY services/automation/pyproject.toml services/automation/pyproject.toml
 COPY services/integration/pyproject.toml services/integration/pyproject.toml
 COPY services/mcp/pyproject.toml services/mcp/pyproject.toml
+COPY services/analysis/pyproject.toml services/analysis/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-workspace --all-packages
 
@@ -34,6 +35,7 @@ COPY services/rules services/rules
 COPY services/automation services/automation
 COPY services/integration services/integration
 COPY services/mcp services/mcp
+COPY services/analysis services/analysis
 # VERSION exists from the first release on; the glob keeps the build working without it.
 COPY VERSIO[N] ./
 RUN --mount=type=cache,target=/root/.cache/uv \

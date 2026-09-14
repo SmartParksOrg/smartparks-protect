@@ -151,6 +151,18 @@ class Settings(BaseSettings):
         "kept invalid until curated (decision D119)",
     )
 
+    analysis_concurrency: int = Field(
+        default=1, ge=1, description="Runs in progress at once in the analysis worker"
+    )
+    analysis_timeout_seconds: int = Field(
+        default=900, ge=60, description="Wall clock a run may take before it is failed"
+    )
+    analysis_statement_timeout_seconds: int = Field(
+        default=300, ge=10, description="PostgreSQL statement timeout inside a run"
+    )
+    analysis_max_fixes: int = Field(
+        default=500_000, ge=1_000, description="Fixes one run may read across its subjects"
+    )
     analysis_modules: str = Field(
         default="movement,grazing",
         description="The analysis modules this deployment offers, a comma list; empty turns the "

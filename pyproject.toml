@@ -18,6 +18,7 @@ smartparks-protect-api = { workspace = true }
 smartparks-protect-ingest = { workspace = true }
 smartparks-protect-decoder = { workspace = true }
 smartparks-protect-export = { workspace = true }
+smartparks-protect-analysis = { workspace = true }
 smartparks-protect-rules = { workspace = true }
 smartparks-protect-automation = { workspace = true }
 smartparks-protect-integration = { workspace = true }
@@ -30,6 +31,7 @@ dev = [
     "smartparks-protect-ingest",
     "smartparks-protect-decoder",
     "smartparks-protect-export",
+    "smartparks-protect-analysis",
     "smartparks-protect-rules",
     "smartparks-protect-automation",
     "smartparks-protect-integration",
@@ -50,7 +52,7 @@ docs = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "services/integration", "services/mcp", "tests"]
+src = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "services/integration", "services/mcp", "services/analysis", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF", "ANN"]
@@ -69,8 +71,8 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "f
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "services/integration", "services/mcp"]
-packages = ["shared", "protect_api", "protect_ingest", "protect_decoder", "protect_export", "protect_rules", "protect_automation", "protect_integration", "protect_mcp"]
+mypy_path = ["shared", "services/api", "services/ingest", "services/decoder", "services/export", "services/rules", "services/automation", "services/integration", "services/mcp", "services/analysis"]
+packages = ["shared", "protect_api", "protect_ingest", "protect_decoder", "protect_export", "protect_rules", "protect_automation", "protect_integration", "protect_mcp", "protect_analysis"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]

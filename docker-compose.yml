@@ -160,6 +160,11 @@ services:
       MAIL_FROM: ${MAIL_FROM:-}
       DEV_NOTIFY_EMAILS: ${DEV_NOTIFY_EMAILS:-}
       MAIL_DELIVER_TO_ALL: ${MAIL_DELIVER_TO_ALL:-false}
+      ANALYSIS_MODULES: ${ANALYSIS_MODULES:-movement,grazing}
+      ANALYSIS_CONCURRENCY: ${ANALYSIS_CONCURRENCY:-1}
+      ANALYSIS_TIMEOUT_SECONDS: ${ANALYSIS_TIMEOUT_SECONDS:-900}
+      ANALYSIS_STATEMENT_TIMEOUT_SECONDS: ${ANALYSIS_STATEMENT_TIMEOUT_SECONDS:-300}
+      ANALYSIS_MAX_FIXES: ${ANALYSIS_MAX_FIXES:-500000}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       RULES_RELOAD_SECONDS: ${RULES_RELOAD_SECONDS:-10}
       SYSTEM_CHECK_INTERVAL_SECONDS: ${SYSTEM_CHECK_INTERVAL_SECONDS:-300}
@@ -242,6 +247,20 @@ services:
         condition: service_healthy
     environment: *python-env
 
+
+  analysis:
+    container_name: protect-analysis
+    build: *python-build
+    restart: unless-stopped
+    command: ["/app/.venv/bin/python", "-m", "protect_analysis.main"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment: *python-env
   rules:
     container_name: protect-rules
     build: *python-build

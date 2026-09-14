@@ -21,7 +21,7 @@ from shared.timeutil import utc_now
 
 log = get_logger("rules.system")
 
-WORKERS = ("ingest", "decoder", "export", "rules", "automation", "integration")
+WORKERS = ("ingest", "decoder", "export", "rules", "automation", "integration", "analysis")
 TOPICS = (
     Topic.SOURCE_EVENT_RECEIVED,
     Topic.POSITION_CREATED,
@@ -29,6 +29,7 @@ TOPICS = (
     Topic.DEVICE_STATE_CHANGED,
     Topic.EVENT_CREATED,
     Topic.EXPORT_REQUESTED,
+    Topic.ANALYSIS_REQUESTED,
 )
 CONSUMERS = {
     Topic.SOURCE_EVENT_RECEIVED: ("decoder",),
@@ -36,6 +37,7 @@ CONSUMERS = {
     Topic.MEASUREMENT_CREATED: ("rules", "integration"),
     Topic.EVENT_CREATED: ("automation", "integration"),
     Topic.EXPORT_REQUESTED: ("export",),
+    Topic.ANALYSIS_REQUESTED: ("analysis",),
 }
 LAG_THRESHOLD = 1_000
 DEAD_LETTER_THRESHOLD = 1

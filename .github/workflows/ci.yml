@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [shared, api, decoder, export, rules, automation, integration, mcp]
+        package: [shared, api, decoder, export, rules, automation, integration, mcp, analysis]
     services:
       postgres:
         image: timescale/timescaledb-ha:pg17.10-ts2.29.2
