@@ -14,6 +14,15 @@ import { SOURCES } from "@/components/map/layers";
  * the polygon's properties.
  */
 export const ANALYSIS_SOURCE = "analysis";
+export const INTENSITY_SOURCE = "analysis-intensity";
+/** Light to dark, by the share of the busiest cell: the sequential ramp of a use map. */
+export const INTENSITY_RAMP = [
+  "#EEF3EF",
+  "#C9DBCF",
+  "#9DBFA8",
+  "#6E9C7E",
+  "#3E6B4E",
+] as const;
 export const ANALYSIS_KINDS = [
   "area",
   "mcp",
@@ -189,7 +198,8 @@ export function boundsOfFeatures(
     for (const c of coordinates) visit(c);
   };
   for (const f of features) {
-    if (f.geometry && "coordinates" in f.geometry) visit(f.geometry.coordinates);
+    if (f.geometry && "coordinates" in f.geometry)
+      visit(f.geometry.coordinates);
   }
   return Number.isFinite(west)
     ? [
@@ -201,3 +211,66 @@ export function boundsOfFeatures(
 
 /** Keep the source ids apart: the analysis source is not one of the live map's. */
 export const _sourcesOfTheLiveMap = SOURCES;
+
+/** The use intensity cells (grazing) under the analysis polygons: a choropleth of hours per
+ * cell, the darker the more. */
+export function ensureIntensityLayers(map: MapLibreMap): void {
+  if (map.getSource(INTENSITY_SOURCE)) return;
+  map.addSource(INTENSITY_SOURCE, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  const before = map.getLayer("analysis-fill")
+    ? "analysis-fill"
+    : map.getLayer("track-line")
+      ? "track-line"
+      : undefined;
+  map.addLayer(
+    {
+      id: "intensity-fill",
+      type: "fill",
+      source: INTENSITY_SOURCE,
+      paint: {
+        "fill-color": [
+          "step",
+          ["get", "share"],
+          INTENSITY_RAMP[0],
+          0.05,
+          INTENSITY_RAMP[1],
+          0.2,
+          INTENSITY_RAMP[2],
+          0.4,
+          INTENSITY_RAMP[3],
+          0.7,
+          INTENSITY_RAMP[4],
+        ],
+        "fill-opacity": 0.8,
+      },
+    },
+    before,
+  );
+}
+
+export function setIntensityFeatures(
+  map: MapLibreMap,
+  features: GeoJSON.Feature[],
+): void {
+  const source = map.getSource(INTENSITY_SOURCE) as GeoJSONSource | undefined;
+  source?.setData({ type: "FeatureCollection", features });
+}
+
+export function setIntensityVisible(map: MapLibreMap, visible: boolean): void {
+  if (map.getLayer("intensity-fill"))
+    map.setLayoutProperty(
+      "intensity-fill",
+      "visibility",
+      visible ? "visible" : "none",
+    );
+}
+
+export function setTracksVisible(map: MapLibreMap, visible: boolean): void {
+  for (const id of ["track-line", "track-line-device"]) {
+    if (map.getLayer(id))
+      map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+  }
+}

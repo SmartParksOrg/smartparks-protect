@@ -539,11 +539,11 @@ class GrazingModule:
                     if label == period.key:
                         main_use[f"{period.key}:{herd_key}"] = use
                         if period.key == "main" and herd_key == "A":
-                            geometries.extend(
-                                _spatial(
-                                    animals, areas, use, grid, params.time_from, params.time_to
-                                )
+                            spatial, intensity = _spatial(
+                                animals, areas, use, grid, params.time_from, params.time_to
                             )
+                            geometries.extend(spatial)
+                            summary["intensity"] = intensity
                         if herd_key == "A":
                             summary["herd"][period.key] = use.herd
                             summary[period.key] = {str(a): f for a, f in use.areas.items()}
@@ -711,13 +711,24 @@ def _spatial(
     grid: LocalGrid,
     time_from: datetime,
     time_to: datetime,
-) -> list[Geometry]:
-    """The hotspot cells inside each area (the busiest holding half of the area's time, at
-    most 60) and the areas themselves with their pressure, for the main period; the hotspot
-    counts are written into the use figures."""
+) -> tuple[list[Geometry], dict[str, Any]]:
+    """The use intensity inside each area (every residence cell with its animal-hours, as a
+    compact grid the page draws), the hotspot cells (the busiest holding half of the area's
+    time, at most 60) and the areas themselves with their pressure, for the main period; the
+    hotspot counts are written into the use figures."""
     out: list[Geometry] = []
+    intensity: dict[str, Any] = {
+        "origin_lat": grid.origin_lat,
+        "origin_lon": grid.origin_lon,
+        "cell_m": grid.cell_m,
+        "m_per_deg_lon": round(grid.m_per_deg_lon, 3),
+        "areas": {},
+    }
     for area in areas:
         cells = _area_cells(animals, area, grid, time_from, time_to)
+        intensity["areas"][str(area.id)] = [
+            [key[0], key[1], round(cell.seconds / 3600, 2)] for key, cell in cells.items()
+        ]
         total = sum(c.seconds for c in cells.values()) or 1.0
         busiest = hotspots(cells, 0.5)[:MAX_HOTSPOTS_PER_AREA]
         use.areas[area.id]["hotspot_count"] = len(busiest)
@@ -756,7 +767,7 @@ def _spatial(
                 },
             )
         )
-    return out
+    return out, intensity
 
 
 def _area_cells(

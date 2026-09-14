@@ -18,7 +18,7 @@ The estimate line names what the run cannot use before Run is pressed: an area u
 ## What the result holds
 
 - **Cards** per area: use in animal-days per hectare, the relative pressure with its rank, the animals that used it, use and rest days, the longest rest, the hours since the last use; the comparison period's use beside it; the herd's tracked animal-hours and the share inside and outside the areas above the cards.
-- **Map**: the herd's tracks and the areas coloured by relative pressure on a five-step ramp (1.0 is the herd's average over the chosen areas), the hotspot cells inside each area; a click on an area names it with its hectares, use, pressure, rank and rest days.
+- **Map**: the use intensity inside the areas as a choropleth of animal-hours per grid cell (the convention of grazing distribution maps: time per cell over the paddock, light to dark), the areas coloured by relative pressure on a five-step ramp (1.0 is the herd's average over the chosen areas), the hotspot outlines and the herd's tracks as toggles that start off; a click on an area names it with its hectares, use, pressure, rank and rest days.
 - **Charts**: the daily animal-hours per area over the period, and use per hectare per area (with the comparison period or the second herd beside it).
 - **Use and rest by day**: one row per area, one cell per day, empty on a rest day, darker with more animal-hours against the area's busiest day.
 - **Tables**: the areas (one row per area and period, per season when asked, per herd when two), the animals (hours, visits, mean visit, first and last use, days used per area), the changes (this period against the period before with the change in percent) and the overlaps (areas that share ground, not a boundary).

@@ -106,6 +106,10 @@ async def test_a_grazing_run_over_zones(client, db):
     assert document["summary"]["herd"]["main"]["share_inside"] == 1
     assert document["summary"]["weighting"]["unit"] == "animals"
     assert [a["name"] for a in document["summary"]["areas"]] == ["Camp 1", "Camp 2"]
+    intensity = document["summary"]["intensity"]
+    assert intensity["cell_m"] == 100 and set(intensity["areas"]) == {camp, far}
+    assert len(intensity["areas"][camp]) == 1 and intensity["areas"][far] == []
+    assert intensity["areas"][camp][0][2] == pytest.approx(11.83, rel=0.02)
     areas = next(t for t in document["tables"] if t["key"] == "areas")
     assert areas["columns"][:3] == ["area", "period", "hectares"]
     assert [r[:2] for r in areas["rows"]] == [["Camp 1", "main"], ["Camp 2", "main"]]

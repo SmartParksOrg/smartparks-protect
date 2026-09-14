@@ -6,8 +6,9 @@ import {
   fixesPreset,
   grazingParameters,
   groupWithSubgroups,
-  isManagementUnit,
+  intensityFeatures,
   isActive,
+  isManagementUnit,
   movementParameters,
   readFormState,
   subjectSummary,
@@ -86,7 +87,9 @@ describe("analysis form state", () => {
     ).toBeNull();
     const parameters = movementParameters(
       readFormState(
-        new URLSearchParams("entity=a&entity=b&range=7d&compare=previous&cell=50"),
+        new URLSearchParams(
+          "entity=a&entity=b&range=7d&compare=previous&cell=50",
+        ),
       ),
       now,
     );
@@ -120,15 +123,30 @@ describe("analysis form state", () => {
       { id: "c", parent_id: "b" },
       { id: "d", parent_id: null },
     ] as Parameters<typeof groupWithSubgroups>[0];
-    expect([...groupWithSubgroups(groups, "a")].sort()).toEqual(["a", "b", "c"]);
+    expect([...groupWithSubgroups(groups, "a")].sort()).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
     expect([...groupWithSubgroups(groups, "d")]).toEqual(["d"]);
   });
   it("presets the fixes export to the subjects over the main period", () => {
     const document = {
-      subjects: [{ id: "a", name: "A" }, { id: "b", name: "B" }],
+      subjects: [
+        { id: "a", name: "A" },
+        { id: "b", name: "B" },
+      ],
       periods: [
-        { key: "comparison", time_from: "2026-08-01T00:00:00Z", time_to: "2026-08-31T00:00:00Z" },
-        { key: "main", time_from: "2026-08-31T00:00:00Z", time_to: "2026-09-30T00:00:00Z" },
+        {
+          key: "comparison",
+          time_from: "2026-08-01T00:00:00Z",
+          time_to: "2026-08-31T00:00:00Z",
+        },
+        {
+          key: "main",
+          time_from: "2026-08-31T00:00:00Z",
+          time_to: "2026-09-30T00:00:00Z",
+        },
       ],
     } as unknown as Parameters<typeof fixesPreset>[0];
     expect(fixesPreset(document)).toEqual({
@@ -169,14 +187,58 @@ describe("analysis form state", () => {
       max_speed_mps: 15,
     });
     expect(
-      grazingParameters(readFormState(new URLSearchParams("entity=a")), [], now),
+      grazingParameters(
+        readFormState(new URLSearchParams("entity=a")),
+        [],
+        now,
+      ),
     ).toBeNull();
   });
   it("recognises the management unit convention", () => {
     const feature = (attributes: unknown) =>
       ({ attributes }) as unknown as Parameters<typeof isManagementUnit>[0];
-    expect(isManagementUnit(feature({ management: { unit: true } }))).toBe(true);
-    expect(isManagementUnit(feature({ management: { unit: "yes" } }))).toBe(false);
+    expect(isManagementUnit(feature({ management: { unit: true } }))).toBe(
+      true,
+    );
+    expect(isManagementUnit(feature({ management: { unit: "yes" } }))).toBe(
+      false,
+    );
     expect(isManagementUnit(feature({}))).toBe(false);
+  });
+  it("draws the intensity grid as squares with a share of the busiest cell", () => {
+    const document = {
+      summary: {
+        intensity: {
+          origin_lat: -19,
+          origin_lon: 23.5,
+          cell_m: 100,
+          m_per_deg_lon: 105_000,
+          areas: {
+            z1: [
+              [0, 0, 4],
+              [1, 0, 2],
+            ],
+            z2: [],
+          },
+        },
+      },
+    } as unknown as Parameters<typeof intensityFeatures>[0];
+    const features = intensityFeatures(document);
+    expect(features).toHaveLength(2);
+    expect(features[0].properties).toMatchObject({
+      kind: "intensity",
+      area_id: "z1",
+      hours: 4,
+      share: 1,
+    });
+    expect(features[1].properties?.share).toBe(0.5);
+    const ring = (features[1].geometry as GeoJSON.Polygon).coordinates[0];
+    expect(ring[0][0]).toBeCloseTo(23.5 + 100 / 105_000, 8);
+    expect(ring[2][1]).toBeCloseTo(-19 + 100 / 111_320, 8);
+    expect(
+      intensityFeatures({ summary: {} } as unknown as Parameters<
+        typeof intensityFeatures
+      >[0]),
+    ).toEqual([]);
   });
 });

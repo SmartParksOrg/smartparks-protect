@@ -153,9 +153,7 @@ export function readFormState(params: URLSearchParams): FormState {
       methods:
         methods === null
           ? ALL_METHODS
-          : methods
-              .split(",")
-              .filter((m) => ALL_METHODS.includes(m)),
+          : methods.split(",").filter((m) => ALL_METHODS.includes(m)),
       kde_bandwidth: params.get("kde")
         ? numberOr(params.get("kde"), 0) || null
         : null,
@@ -216,7 +214,11 @@ export function grazingParameters(
   now: Date = new Date(),
 ): Record<string, unknown> | null {
   const window = windowOf(state, now);
-  if (!window || state.entities.length === 0 || state.grazing.areas.length === 0)
+  if (
+    !window ||
+    state.entities.length === 0 ||
+    state.grazing.areas.length === 0
+  )
     return null;
   const comparison = comparisonOf(state, window);
   const g = state.grazing;
@@ -226,7 +228,9 @@ export function grazingParameters(
     ...(comparison ? { comparison } : {}),
     feature_ids: g.areas,
     weighting: g.weighting,
-    ...(g.weighting !== "equal" && g.weight_key ? { weight_key: g.weight_key } : {}),
+    ...(g.weighting !== "equal" && g.weight_key
+      ? { weight_key: g.weight_key }
+      : {}),
     seasons: g.seasons,
     ...(herdB.length ? { herd_b_entity_ids: herdB } : {}),
     gap_hours: state.method.gap,
@@ -363,4 +367,55 @@ export function isManagementUnit(feature: Feature): boolean {
     management !== null &&
     (management as { unit?: unknown }).unit === true
   );
+}
+
+/** The grazing use intensity as the document carries it: a local metric grid and, per area,
+ * its cells with their animal-hours. */
+export interface IntensityGrid {
+  origin_lat: number;
+  origin_lon: number;
+  cell_m: number;
+  m_per_deg_lon: number;
+  areas: Record<string, [number, number, number][]>;
+}
+
+const M_PER_DEG_LAT = 111_320;
+
+/** The intensity cells as square features with their hours and their share of the busiest
+ * cell, for a choropleth of use inside the areas (the convention of grazing distribution
+ * maps: time per cell over the paddock). */
+export function intensityFeatures(document: ResultDocument): GeoJSON.Feature[] {
+  const grid = document.summary.intensity as IntensityGrid | undefined;
+  if (!grid || !grid.areas) return [];
+  const cells = Object.entries(grid.areas).flatMap(([area, list]) =>
+    list.map(([ix, iy, hours]) => ({ area, ix, iy, hours })),
+  );
+  const max = Math.max(0, ...cells.map((c) => c.hours));
+  const dx = grid.cell_m / grid.m_per_deg_lon;
+  const dy = grid.cell_m / M_PER_DEG_LAT;
+  return cells.map((c) => {
+    const x0 = grid.origin_lon + c.ix * dx;
+    const y0 = grid.origin_lat + c.iy * dy;
+    return {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [x0, y0],
+            [x0 + dx, y0],
+            [x0 + dx, y0 + dy],
+            [x0, y0 + dy],
+            [x0, y0],
+          ],
+        ],
+      },
+      properties: {
+        kind: "intensity",
+        area_id: c.area,
+        hours: c.hours,
+        share: max > 0 ? c.hours / max : 0,
+      },
+    };
+  });
 }

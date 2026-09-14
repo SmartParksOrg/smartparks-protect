@@ -8,12 +8,17 @@ import { queryKeys } from "@/api/queryKeys";
 import type { Track } from "@/api/types";
 import {
   ANALYSIS_KINDS,
+  INTENSITY_RAMP,
   bindAnalysisClicks,
   boundsOfFeatures,
   decorateAnalysisFeatures,
   ensureAnalysisLayers,
+  ensureIntensityLayers,
   setAnalysisFeatures,
   setAnalysisKinds,
+  setIntensityFeatures,
+  setIntensityVisible,
+  setTracksVisible,
 } from "@/components/map/analysisLayers";
 import {
   basemapsFor,
@@ -31,7 +36,11 @@ import { Button } from "@/components/ui/button";
 import { useMapConfig } from "@/hooks/useMapConfig";
 import { useTheme } from "@/hooks/useTheme";
 import { boundsOfTracks } from "@/lib/explore";
-import { subjectColor, type ResultDocument } from "@/lib/analyses";
+import {
+  intensityFeatures,
+  subjectColor,
+  type ResultDocument,
+} from "@/lib/analyses";
 
 const TRACK_POINTS = 5000;
 const trackData = (results: { data?: Track }[]): (Track | undefined)[] =>
@@ -47,11 +56,14 @@ export function ResultMap({
   runId,
   document,
   labels,
+  tracksOn = true,
 }: {
   projectId: string;
   runId: string;
   document: ResultDocument;
   labels: Record<string, string>;
+  /** Whether the subjects' tracks start shown; a use map reads better without them. */
+  tracksOn?: boolean;
 }) {
   const { t } = useTranslation();
   const { maptilerKey } = useMapConfig();
@@ -66,9 +78,20 @@ export function ResultMap({
   );
   const main = document.periods.find((p) => p.key === "main");
   const available = ANALYSIS_KINDS.filter((k) => document.geometries[k]);
-  const [hidden, setHidden] = useState<string[]>([]);
+  const [hidden, setHidden] = useState<string[]>(() => {
+    const off: string[] = tracksOn ? [] : ["tracks"];
+    // the hotspot outlines repeat what the intensity cells show; start folded away
+    if (document.summary.intensity) off.push("hotspot");
+    return off;
+  });
   const [picked, setPicked] = useState<Record<string, unknown> | null>(null);
   const shown = available.filter((k) => !hidden.includes(k));
+  const intensity = useMemo(() => intensityFeatures(document), [document]);
+  const toggles: string[] = [
+    ...(intensity.length ? ["intensity"] : []),
+    ...available,
+    "tracks",
+  ];
 
   const tracks = useQueries({
     queries: document.subjects.map((subject) => ({
@@ -138,6 +161,7 @@ export function ResultMap({
     if (map.getLayer("track-points"))
       map.setLayoutProperty("track-points", "visibility", "none");
     ensureAnalysisLayers(map);
+    ensureIntensityLayers(map);
     const unbind = bindAnalysisClicks(map, setPicked);
     return () => {
       observer.disconnect();
@@ -151,6 +175,7 @@ export function ResultMap({
     if (!map || !ready) return;
     setTracks(map, trackLayers);
     setAnalysisFeatures(map, features);
+    setIntensityFeatures(map, intensity);
     if (fitted.current || (available.length > 0 && features.length === 0))
       return;
     // the polygons say where the result is; a track may hold a far outlier
@@ -159,15 +184,17 @@ export function ResultMap({
       fitted.current = true;
       map.fitBounds(bounds, { padding: 40, maxZoom: 14, duration: 0 });
     }
-  }, [mapRef, ready, trackLayers, features, available.length]);
+  }, [mapRef, ready, trackLayers, features, intensity, available.length]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     setAnalysisKinds(map, shown);
+    setIntensityVisible(map, !hidden.includes("intensity"));
+    setTracksVisible(map, !hidden.includes("tracks"));
     // the list is derived from the document and the hidden set
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapRef, ready, shown.join(",")]);
+  }, [mapRef, ready, shown.join(","), hidden.join(",")]);
 
   const fit = () => {
     const map = mapRef.current;
@@ -175,6 +202,8 @@ export function ResultMap({
     if (map && bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 14 });
   };
   const kindLabel: Record<string, string> = {
+    intensity: t("Use intensity"),
+    tracks: t("Tracks"),
     area: t("Areas by pressure"),
     mcp: t("MCP 95%"),
     kde: t("KDE 50% and 95%"),
@@ -197,16 +226,16 @@ export function ResultMap({
     <div className="relative h-80 overflow-hidden rounded-md border lg:h-[26rem]">
       <div ref={container} className="absolute! inset-0 z-0" />
       <div className="pointer-events-none absolute top-2 right-2 left-2 z-10 flex flex-wrap items-center gap-1.5">
-        {available.map((kind) => (
+        {toggles.map((kind) => (
           <button
             key={kind}
             type="button"
             className={`pointer-events-auto rounded-full border px-2 py-0.5 text-xs shadow ${
-              shown.includes(kind)
+              !hidden.includes(kind)
                 ? "bg-card text-foreground"
                 : "bg-card/70 text-muted-foreground line-through"
             }`}
-            aria-pressed={shown.includes(kind)}
+            aria-pressed={!hidden.includes(kind)}
             onClick={() =>
               setHidden((h) =>
                 h.includes(kind) ? h.filter((k) => k !== kind) : [...h, kind],
@@ -227,6 +256,19 @@ export function ResultMap({
           <Maximize2 className="size-4" /> {t("Fit")}
         </Button>
       </div>
+      {intensity.length > 0 && !hidden.includes("intensity") && (
+        <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
+          <span>{t("less use")}</span>
+          {INTENSITY_RAMP.map((c) => (
+            <span
+              key={c}
+              className="inline-block size-3"
+              style={{ backgroundColor: c }}
+            />
+          ))}
+          <span>{t("more")}</span>
+        </div>
+      )}
       {picked && (
         <div className="absolute bottom-2 left-2 z-10 max-w-[80%] rounded-md border bg-card/95 px-3 py-2 text-xs shadow">
           <div className="flex items-start justify-between gap-3">

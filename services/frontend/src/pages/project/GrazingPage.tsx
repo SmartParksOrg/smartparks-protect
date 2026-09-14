@@ -104,6 +104,7 @@ export function GrazingPage() {
                       runId={run.id}
                       document={document}
                       labels={labels}
+                      tracksOn={false}
                     />
                   ),
                   after: (document, run) => (
