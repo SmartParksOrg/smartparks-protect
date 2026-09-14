@@ -299,7 +299,6 @@ export function ensureDeviceLayers(map: MapLibreMap): void {
         "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 50, 24],
         "circle-stroke-width": 3,
         "circle-stroke-color": "#52735E",
-        "circle-translate": [10, 10],
       },
     },
     "entity-clusters",
@@ -314,7 +313,6 @@ export function ensureDeviceLayers(map: MapLibreMap): void {
         "text-field": ["get", "point_count_abbreviated"],
         "text-size": 11,
         "text-font": FONT,
-        "text-offset": [0.9, 0.9],
         "text-allow-overlap": true,
       },
       paint: { "text-color": "#2F4A3A" },
@@ -330,13 +328,13 @@ export function ensureDeviceLayers(map: MapLibreMap): void {
       layout: {
         "icon-image": ["get", "marker"],
         "icon-size": 0.75,
-        // beside its animal (decision D112), not under it
-        "icon-offset": [16, 16],
+        // on its position like an entity (Tim, 2026-09-15); the entity layers sit above the
+        // device layers, so an animal and its collar at one place show the animal
         "icon-allow-overlap": true,
         "text-field": ["get", "name"],
         "text-size": 10,
         "text-font": FONT,
-        "text-offset": [1.2, 2.4],
+        "text-offset": [0, 1.4],
         "text-anchor": "top",
         "text-optional": true,
       },
@@ -1163,4 +1161,23 @@ export function setHeatPaint(
     radiusExpression(radiusMetres, latitude),
   );
   map.setPaintProperty("heat", "heatmap-intensity", intensityFor(sensitivity));
+}
+
+/** The marker layers of the entities and the devices, in the order they must stack. */
+const MARKER_LAYERS = [
+  "device-clusters",
+  "device-cluster-count",
+  "device-markers",
+  "entity-clusters",
+  "entity-cluster-count",
+  "entity-markers",
+] as const;
+
+/** Bring the markers to the top after other layers were added (Tim, 2026-09-15): tracks,
+ * heat, features, coverage, events and analysis polygons never cover an entity or a device,
+ * so the markers stay clickable; the entities end above the devices. */
+export function raiseMarkers(map: MapLibreMap): void {
+  for (const id of MARKER_LAYERS) {
+    if (map.getLayer(id)) map.moveLayer(id);
+  }
 }

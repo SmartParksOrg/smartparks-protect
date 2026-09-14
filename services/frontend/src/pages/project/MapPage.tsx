@@ -56,19 +56,19 @@ import {
   bindGatewayClicks,
   bindTrackPointClicks,
   type DeviceFeatureProperties,
-  type EntityFeatureProperties,
+  ensureCoverageLayers,
   ensureDeviceLayers,
   ensureEntityLayers,
   ensureEventLayers,
   ensureFeatureLayers,
-  ensureCoverageLayers,
-  ensureNetworkLocationLayers,
   ensureGatewayLayers,
   ensureHeatLayer,
+  ensureNetworkLocationLayers,
   ensureTrackLayers,
+  type EntityFeatureProperties,
   type EventFeatureProperties,
+  raiseMarkers,
   setCoverage,
-  setNetworkLocations,
   setDevices,
   setEntities,
   setEvents,
@@ -76,6 +76,7 @@ import {
   setGateways,
   setHeatPaint,
   setHeatPoints,
+  setNetworkLocations,
   setSelectedTrackPoint,
   setTracks,
   SOURCES,
@@ -376,7 +377,15 @@ export function MapPage() {
     const newest = newestCreatedAt(feedItems) ?? new Date().toISOString();
     if (seenUpTo === null || (feedOpen && newest > seenUpTo))
       setFeedSeen({ ...feedSeen, [projectId]: newest });
-  }, [feed.data, feedItems, feedOpen, feedSeen, seenUpTo, projectId, setFeedSeen]);
+  }, [
+    feed.data,
+    feedItems,
+    feedOpen,
+    feedSeen,
+    seenUpTo,
+    projectId,
+    setFeedSeen,
+  ]);
   // the Tracks card shows while tracks are on unless folded from the strip
   const [tracksCardHidden, setTracksCardHidden] = useState(false);
   // heatmaps (decision D138): switched on per entity and device like the tracks (`?heat=` and
@@ -714,7 +723,14 @@ export function MapPage() {
   // On a phone the panels share one short column (Tim, 2026-09-13): a selection closes the
   // layers panel and the feed, and opening either of them clears the selection, so whatever
   // was asked for last has the room. Desktop keeps them side by side.
-  const selectionKey = ["entity", "device", "gateway", "state", "point", "feature"]
+  const selectionKey = [
+    "entity",
+    "device",
+    "gateway",
+    "state",
+    "point",
+    "feature",
+  ]
     .map((k) => params.get(k) ?? "")
     .join("|");
   const panelsBefore = useRef({ selectionKey, panelOpen, feedOpen });
@@ -724,7 +740,8 @@ export function MapPage() {
     if (!phone) return;
     const selected = selectionKey.replace(/\|/g, "") !== "";
     const newSelection = selected && selectionKey !== before.selectionKey;
-    const newPanel = (panelOpen && !before.panelOpen) || (feedOpen && !before.feedOpen);
+    const newPanel =
+      (panelOpen && !before.panelOpen) || (feedOpen && !before.feedOpen);
     if (newSelection && (panelOpen || feedOpen)) {
       setParams(
         (p) => {
@@ -881,7 +898,10 @@ export function MapPage() {
       void client.invalidateQueries({ queryKey: ["events", projectId] });
     }
     // a new alert announces itself while the map is open (decision D180)
-    if (message.topic === "alert.created" && typeof message.event_id === "string") {
+    if (
+      message.topic === "alert.created" &&
+      typeof message.event_id === "string"
+    ) {
       const eventId = message.event_id;
       toast.warning(String(message.title ?? t("Alert")), {
         description: String(message.severity ?? ""),
@@ -913,6 +933,7 @@ export function MapPage() {
     ensureHeatLayer(map);
     ensureTrackLayers(map);
     ensureEventLayers(map);
+    raiseMarkers(map);
   }, [mapRef, ready]);
 
   // terrain on top of any base map; a style change drops it, so it is applied again on ready
@@ -1053,7 +1074,11 @@ export function MapPage() {
     if (locate === "denied") {
       locateSession.current?.stop();
       locateSession.current = null;
-      toast.error(t("Your position is not available; check the browser's location permission"));
+      toast.error(
+        t(
+          "Your position is not available; check the browser's location permission",
+        ),
+      );
     }
   }, [locate, t]);
   useEffect(
@@ -1220,9 +1245,12 @@ export function MapPage() {
     // device with an imprecise position fits its accuracy disc (the selection effect below)
     if (gatewayParam || featureParamValue) return;
     const selectedAccuracy = selectedId
-      ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)?.properties.accuracy_m
+      ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)
+          ?.properties.accuracy_m
       : selectedDeviceId
-        ? deviceFeatures?.find((f) => f.properties.device_id === selectedDeviceId)?.properties.accuracy_m
+        ? deviceFeatures?.find(
+            (f) => f.properties.device_id === selectedDeviceId,
+          )?.properties.accuracy_m
         : null;
     if (imprecise(selectedAccuracy)) return;
     const bounds = boundsOf([
@@ -1434,9 +1462,12 @@ export function MapPage() {
     // an imprecise position (decision D193) is shown with its whole accuracy disc in view, on
     // every screen; a precise one is panned from under the panel on a phone only
     const accuracy = selectedId
-      ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)?.properties.accuracy_m
+      ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)
+          ?.properties.accuracy_m
       : selectedDeviceId
-        ? deviceFeatures?.find((f) => f.properties.device_id === selectedDeviceId)?.properties.accuracy_m
+        ? deviceFeatures?.find(
+            (f) => f.properties.device_id === selectedDeviceId,
+          )?.properties.accuracy_m
         : null;
     if (!phone && !imprecise(accuracy)) return;
     pannedFor.current = key;
@@ -1451,7 +1482,12 @@ export function MapPage() {
           [lon + dLon, lat + dLat],
         ],
         {
-          padding: { top: 60, left: 40, right: 40, bottom: phone ? Math.round(height * 0.45) : 60 },
+          padding: {
+            top: 60,
+            left: 40,
+            right: 40,
+            bottom: phone ? Math.round(height * 0.45) : 60,
+          },
           maxZoom: 17,
           duration: 400,
         },
@@ -1578,8 +1614,8 @@ export function MapPage() {
   };
   const entityNameOf = (id: string | null | undefined): string | null =>
     id
-      ? ((currentFeatures?.find((f) => f.properties.entity_id === id)?.properties
-          .name as string | undefined) ?? null)
+      ? ((currentFeatures?.find((f) => f.properties.entity_id === id)
+          ?.properties.name as string | undefined) ?? null)
       : null;
   const selectFeedItem = (item: FeedItem) => {
     const position = feedPosition(item);
@@ -1623,9 +1659,12 @@ export function MapPage() {
           : locate === "waiting"
             ? t("Waiting for a position")
             : locate === "tracking"
-              ? t("Following stopped by a pan; press again to stop showing the position")
+              ? t(
+                  "Following stopped by a pan; press again to stop showing the position",
+                )
               : t("Stop following my position"),
-      active: locate === "waiting" || locate === "following" || locate === "tracking",
+      active:
+        locate === "waiting" || locate === "following" || locate === "tracking",
       onClick: toggleLocate,
     },
   ];
@@ -1635,17 +1674,22 @@ export function MapPage() {
       <div ref={container} className="absolute! inset-0 z-0" />
       {/* the layers and feed buttons and the events count in the top left (decisions D137, D174, D177); the entity and device count went on 2026-09-12 at Tim's word, the layers panel carries the numbers */}
       <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-5rem)] items-start gap-2 [&>*]:pointer-events-auto">
-        <ControlStrip items={[layersItem, feedItem]} label={t("Layers and feed")} />
+        <ControlStrip
+          items={[layersItem, feedItem]}
+          label={t("Layers and feed")}
+        />
         <div className="flex flex-wrap gap-2 [&>*]:pointer-events-auto">
-        {events.data && events.data.features.length > 0 && (
-          <Badge
-            variant="secondary"
-            className="pointer-events-auto cursor-pointer bg-card"
-            onClick={() => void navigate(`/projects/${projectId}/rules/events`)}
-          >
-            {events.data.features.length} {t("events, 24 h")}
-          </Badge>
-        )}
+          {events.data && events.data.features.length > 0 && (
+            <Badge
+              variant="secondary"
+              className="pointer-events-auto cursor-pointer bg-card"
+              onClick={() =>
+                void navigate(`/projects/${projectId}/rules/events`)
+              }
+            >
+              {events.data.features.length} {t("events, 24 h")}
+            </Badge>
+          )}
         </div>
       </div>
       {/* the control strips, rendered into the map's own top right and bottom right stacks */}
@@ -1858,8 +1902,7 @@ export function MapPage() {
             }
             position={
               (selectedEntityFeature?.geometry?.coordinates as
-                | [number, number]
-                | undefined) ?? null
+                [number, number] | undefined) ?? null
             }
             tracked={trackedIds.includes(selected.entity_id)}
             trackLengthLabel={trackLengthLabel}
@@ -1895,13 +1938,10 @@ export function MapPage() {
                 "device",
               )
             }
-            onOpenState={() =>
-              selectState(selectedDevice.properties.device_id)
-            }
+            onOpenState={() => selectState(selectedDevice.properties.device_id)}
             position={
               (selectedDevice.geometry?.coordinates as
-                | [number, number]
-                | undefined) ?? null
+                [number, number] | undefined) ?? null
             }
             tracked={trackedDeviceIds.includes(
               selectedDevice.properties.device_id,

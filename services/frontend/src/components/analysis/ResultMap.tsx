@@ -47,6 +47,7 @@ import {
   ensureEntityLayers,
   ensureHeatLayer,
   ensureTrackLayers,
+  raiseMarkers,
   setHeatPaint,
   setHeatPoints,
   setTracks,
@@ -213,6 +214,7 @@ export function ResultMap({
     ensureAnalysisLayers(map);
     ensureIntensityLayers(map);
     ensureHeatLayer(map);
+    raiseMarkers(map);
     // a result holds a period of fixes in a small area: a tight radius and the lowest
     // sensitivity keep the heatmap graded instead of one saturated blob
     const paintHeat = () =>
