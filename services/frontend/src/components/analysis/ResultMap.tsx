@@ -25,7 +25,6 @@ import {
   basemapStyle,
   loadBasemap,
 } from "@/components/map/basemap";
-import { DEFAULT_HEAT } from "@/components/map/heat";
 import {
   ensureEntityLayers,
   ensureHeatLayer,
@@ -47,6 +46,8 @@ import {
 } from "@/lib/analyses";
 
 const TRACK_POINTS = 5000;
+const HEAT_RADIUS_M = 25;
+const HEAT_SENSITIVITY = 1;
 const trackData = (results: { data?: Track }[]): (Track | undefined)[] =>
   results.map((r) => r.data);
 
@@ -189,13 +190,10 @@ export function ResultMap({
     ensureAnalysisLayers(map);
     ensureIntensityLayers(map);
     ensureHeatLayer(map);
+    // a result holds a period of fixes in a small area: a tight radius and the lowest
+    // sensitivity keep the heatmap graded instead of one saturated blob
     const paintHeat = () =>
-      setHeatPaint(
-        map,
-        DEFAULT_HEAT.radius_m,
-        map.getCenter().lat,
-        DEFAULT_HEAT.sensitivity,
-      );
+      setHeatPaint(map, HEAT_RADIUS_M, map.getCenter().lat, HEAT_SENSITIVITY);
     paintHeat();
     map.on("moveend", paintHeat);
     const unbind = bindAnalysisClicks(map, setPicked);
