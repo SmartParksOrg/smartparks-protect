@@ -61,11 +61,8 @@ async def run_analysis(session: AsyncSession, run: AnalysisRun) -> None:
     run.started_at = utc_now()
     await session.commit()
     # the module's statements end with the run's own timeout, not the API's
-    await session.execute(
-        text(
-            f"SET LOCAL statement_timeout = {int(settings.analysis_statement_timeout_seconds) * 1000}"
-        )
-    )
+    timeout_ms = int(settings.analysis_statement_timeout_seconds) * 1000
+    await session.execute(text(f"SET LOCAL statement_timeout = {timeout_ms}"))
 
     async def progress(percent: int, step: str) -> None:
         await _write(run_id, progress=max(0, min(100, percent)))
