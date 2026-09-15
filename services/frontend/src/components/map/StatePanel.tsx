@@ -43,6 +43,7 @@ function StatusRow({
   onToggle,
   projectId,
   deviceId,
+  until,
 }: {
   label: string;
   text: string;
@@ -53,6 +54,7 @@ function StatusRow({
   onToggle: () => void;
   projectId: string;
   deviceId: string;
+  until?: string | null;
 }) {
   const { t } = useTranslation();
   const value = <span className={mono ? "font-mono text-xs" : undefined}>{text}</span>;
@@ -75,7 +77,7 @@ function StatusRow({
       </PanelRow>
       {spec && open && (
         <div className="col-span-2 rounded-md border bg-muted/30 p-2">
-          <MetricTrend projectId={projectId} deviceId={deviceId} spec={spec} />
+          <MetricTrend projectId={projectId} deviceId={deviceId} spec={spec} until={until} />
         </div>
       )}
     </>
@@ -158,6 +160,7 @@ export function StatePanel({
           onToggle={() => toggle(f.key)}
           projectId={projectId}
           deviceId={deviceId}
+          until={s?.health.last_seen_at ?? s?.time}
         />
       ))}
       {rest.map(([key, value]) => (
@@ -171,6 +174,7 @@ export function StatePanel({
           onToggle={() => toggle(key)}
           projectId={projectId}
           deviceId={deviceId}
+          until={s?.health.last_seen_at ?? s?.time}
         />
       ))}
       {s && s.health.fields.length === 0 && rest.length === 0 && (

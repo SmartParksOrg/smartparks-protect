@@ -57,6 +57,7 @@ export function HealthCard({
               open={openKey === f.key}
               onToggle={() => setOpenKey((k) => (k === f.key ? null : f.key))}
               trends={trends}
+              until={health.last_seen_at}
             />
           ))}
         </dl>
@@ -72,12 +73,14 @@ function FieldRow({
   open,
   onToggle,
   trends,
+  until,
 }: {
   field: HealthValue;
   spec: TrendSpec | null;
   open: boolean;
   onToggle: () => void;
   trends: { projectId: string; deviceId: string } | null;
+  until?: string | null;
 }) {
   const { t } = useTranslation();
   return (
@@ -100,7 +103,7 @@ function FieldRow({
       </dd>
       {spec && trends && open && (
         <dd className="col-span-2 rounded-md border bg-muted/30 p-2">
-          <MetricTrend projectId={trends.projectId} deviceId={trends.deviceId} spec={spec} />
+          <MetricTrend projectId={trends.projectId} deviceId={trends.deviceId} spec={spec} until={until} />
         </dd>
       )}
     </>

@@ -284,7 +284,7 @@ export function PanelSummary({
         batteryProject &&
         batteryDevice && (
           <div className="basis-full rounded-md border bg-muted/30 p-2">
-            <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} />
+            <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
           </div>
         )}
       {hasMovement && (
@@ -300,7 +300,7 @@ export function PanelSummary({
       )}
       {hasMovement && movementOpen && batteryProject && batteryDevice && (
         <div className="basis-full rounded-md border bg-muted/30 p-2">
-          <MovementTrend projectId={batteryProject} deviceId={batteryDevice} />
+          <MovementTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
         </div>
       )}
     </div>
@@ -424,7 +424,7 @@ function HealthRows({
         batteryProject &&
         batteryDevice && (
           <div className="col-span-2 rounded-md border bg-muted/30 p-2">
-            <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} />
+            <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
           </div>
         )}
       {hasMovement && (
@@ -444,7 +444,7 @@ function HealthRows({
       )}
       {hasMovement && movementOpen && batteryProject && batteryDevice && (
         <div className="col-span-2 rounded-md border bg-muted/30 p-2">
-          <MovementTrend projectId={batteryProject} deviceId={batteryDevice} />
+          <MovementTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
         </div>
       )}
       {uptime != null && (
@@ -469,7 +469,7 @@ function HealthRows({
       )}
       {uptime != null && uptimeOpen && batteryProject && batteryDevice && (
         <div className="col-span-2 rounded-md border bg-muted/30 p-2">
-          <UptimeTrend projectId={batteryProject} deviceId={batteryDevice} />
+          <UptimeTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
         </div>
       )}
       {lastStatusAt && (

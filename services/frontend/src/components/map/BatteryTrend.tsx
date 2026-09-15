@@ -10,11 +10,12 @@ import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useRef, useState } from "react";
 
+import { useNow } from "@/hooks/useNow";
 import { useTheme } from "@/hooks/useTheme";
 import { chartTheme } from "@/lib/chartStyle";
 import { formatInZone } from "@/lib/analytics";
 import { browserTimezone, type RangePreset, rangeFor } from "@/lib/analytics";
-import { formatAgo, formatDuration } from "@/lib/format";
+import { formatAgo, formatDuration, formatTime } from "@/lib/format";
 import { stillHours } from "@/lib/movement";
 import { decimalsFor, niceStep, type TrendSpec } from "@/lib/trend";
 
@@ -64,15 +65,18 @@ export function BatteryValue({
 export function BatteryTrend({
   projectId,
   deviceId,
+  until,
 }: {
   projectId: string;
   deviceId: string;
+  until?: string | null;
 }) {
   const { t } = useTranslation();
   return (
     <MetricTrend
       projectId={projectId}
       deviceId={deviceId}
+      until={until}
       spec={{
         metric: "battery_voltage",
         label: t("Battery"),
@@ -130,15 +134,18 @@ export function MovementValue({
 export function MovementTrend({
   projectId,
   deviceId,
+  until,
 }: {
   projectId: string;
   deviceId: string;
+  until?: string | null;
 }) {
   const { t } = useTranslation();
   return (
     <MetricTrend
       projectId={projectId}
       deviceId={deviceId}
+      until={until}
       spec={{
         metric: "activity",
         label: t("Movement"),
@@ -197,15 +204,18 @@ export function UptimeValue({
 export function UptimeTrend({
   projectId,
   deviceId,
+  until,
 }: {
   projectId: string;
   deviceId: string;
+  until?: string | null;
 }) {
   const { t } = useTranslation();
   return (
     <MetricTrend
       projectId={projectId}
       deviceId={deviceId}
+      until={until}
       spec={{
         metric: "uptime",
         label: t("Uptime"),
@@ -227,14 +237,20 @@ export function MetricTrend({
   projectId,
   deviceId,
   spec,
+  until,
 }: {
   projectId: string;
   deviceId: string;
   spec: TrendSpec;
+  /** The device's last record: the period ends there rather than now, so a collar silent for
+   * a year still shows its last week (Tim, 2026-09-15, decision D207). */
+  until?: string | null;
 }) {
   const { t } = useTranslation();
   const [range, setRange] = useState<RangePreset>("7d");
-  const window = rangeFor(range);
+  const now = useNow();
+  const anchor = trendAnchor(until, now);
+  const window = rangeFor(range, anchor);
   const timezone = browserTimezone();
   const series = useQuery({
     queryKey: queryKeys.analyticsSeries(projectId, {
@@ -277,7 +293,14 @@ export function MetricTrend({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{spec.label}</span>
+        <span className="text-sm font-medium">
+          {spec.label}
+          {anchor.getTime() < now - 86_400_000 && (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              {t("up to {{date}}", { date: formatTime(anchor.toISOString()) })}
+            </span>
+          )}
+        </span>
         <span className="flex gap-1" role="group" aria-label={t("Period")}>
           {RANGES.map((r) => (
             <button
@@ -328,6 +351,12 @@ export function MetricTrend({
       )}
     </div>
   );
+}
+
+/** Where a trend's period ends: a minute past the device's last record, capped at now. */
+function trendAnchor(until: string | null | undefined, now: number): Date {
+  const parsed = until ? Date.parse(until) : Number.NaN;
+  return new Date(Number.isFinite(parsed) ? Math.min(parsed + 60_000, now) : now);
 }
 
 /** A small line of one series (decision-free: brand green, no legend, no zoom, two y labels,
