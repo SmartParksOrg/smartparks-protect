@@ -130,12 +130,3 @@
     }
   }
 }
-
-/* The analysis print view (decision D208): A4 with a modest margin; the page itself hides
-   what does not belong on paper with `print:hidden`. */
-@media print {
-  @page {
-    size: A4;
-    margin: 12mm;
-  }
-}

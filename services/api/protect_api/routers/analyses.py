@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,13 +40,15 @@ from shared.analysis.limits import (
     MAX_SUBJECTS_MOVEMENT,
 )
 from shared.analysis.parameters import CommonParameters
+from shared.analysis.report import publish_report, queue_report, remove_report
 from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
 from shared.curation.effective import device_fix, effective_time, visible
 from shared.database import get_session
-from shared.enums import AnalysisStatus
+from shared.enums import AnalysisStatus, ReportStatus
 from shared.models import AnalysisGeometry, AnalysisRun, Entity, EntityType, Position, User
 from shared.permissions import Permission
+from shared.storage import stream_object
 from shared.timeutil import utc_now
 
 router = APIRouter(tags=["analyses"])
@@ -454,6 +457,7 @@ async def delete_run(
         project_id=context.project.id,
         details={"module": run.module},
     )
+    await remove_report(run)
     await session.delete(run)
     await session.commit()
 
@@ -534,6 +538,54 @@ async def export_run(
         out.getvalue().encode(),
         media_type="text/csv; charset=utf-8",
         headers=_attachment(f"{name}-{what}.csv"),
+    )
+
+
+@router.post("/projects/{project_id}/analyses/{run_id}/report", response_model=AnalysisRunRead)
+async def make_report(
+    run_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.EXPORTS_CREATE)),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> AnalysisRunRead:
+    """Ask for the run's PDF report (decision D211): the export service renders it and keeps it
+    with the run; the run read says when it is ready. 409 while one is being made."""
+    run = await _run_for(session, context, run_id)
+    if run.result is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The run has no result yet")
+    if run.report_status in (ReportStatus.QUEUED, ReportStatus.RUNNING):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The report is being made")
+    queue_report(run)
+    await record_audit(
+        session,
+        user=context.user,
+        action="analysis.report_requested",
+        object_type="analysis_run",
+        object_id=str(run.id),
+        project_id=context.project.id,
+        details={"module": run.module},
+    )
+    await session.commit()
+    await publish_report(bus, run)
+    return await _read(session, run)
+
+
+@router.get("/projects/{project_id}/analyses/{run_id}/report")
+async def download_report(
+    run_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """The run's PDF report, once it is ready (decision D211)."""
+    run = await _run_for(session, context, run_id)
+    if run.report_status != ReportStatus.READY or not run.report_key:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "The run has no report yet")
+    stamp = (run.report_at or datetime.now(UTC)).strftime("%Y%m%d")
+    stem = (run.name or f"{run.module}-{str(run.id)[:8]}").replace("/", "-")
+    return StreamingResponse(
+        stream_object(get_settings().minio_bucket_exports, run.report_key),
+        media_type="application/pdf",
+        headers=_attachment(f"{stem}-{stamp}.pdf"),
     )
 
 

@@ -14,8 +14,7 @@ import type { ResultDocument } from "@/lib/analyses";
 type Translate = (k: string) => string;
 
 /** How a module's results read: the human names of its keys and the blocks of its own (a
- * summary in place of the flat list, a map beside it, what comes after the tables). The
- * analysis page and the print view share one presentation, so the paper shows the screen. */
+ * summary in place of the flat list, a map beside it, what comes after the tables). */
 export interface Presentation {
   labels: Record<string, string>;
   render: {
@@ -33,11 +32,6 @@ export interface Presentation {
   };
 }
 
-export interface PresentationOptions {
-  /** For the print view: the map keeps its drawing for the printer and hides its controls. */
-  printable?: boolean;
-}
-
 /** The figures on a movement subject's card, with their unit. */
 export const MOVEMENT_CARD_METRICS: [string, string][] = [
   ["distance_km", "km"],
@@ -52,7 +46,6 @@ export const MOVEMENT_CARD_METRICS: [string, string][] = [
 export function movementPresentation(
   t: Translate,
   projectId: string,
-  options: PresentationOptions = {},
 ): Presentation {
   const labels = movementLabels(t);
   return {
@@ -73,7 +66,6 @@ export function movementPresentation(
           document={document}
           labels={labels}
           colors={colors}
-          printable={options.printable}
         />
       ),
       after: () => <MovementLimitations />,
@@ -84,7 +76,6 @@ export function movementPresentation(
 export function grazingPresentation(
   t: Translate,
   projectId: string,
-  options: PresentationOptions = {},
 ): Presentation {
   const labels = grazingLabels(t);
   return {
@@ -99,7 +90,6 @@ export function grazingPresentation(
           labels={labels}
           colors={colors}
           tracksOn={false}
-          printable={options.printable}
         />
       ),
       after: (document, run) => (
@@ -116,18 +106,6 @@ export function grazingPresentation(
       ),
     },
   };
-}
-
-/** The presentation of a module by its key; the print view takes the key from the route. */
-export function presentationFor(
-  module: string,
-  t: Translate,
-  projectId: string,
-  options: PresentationOptions = {},
-): Presentation {
-  return module === "grazing"
-    ? grazingPresentation(t, projectId, options)
-    : movementPresentation(t, projectId, options);
 }
 
 /** The human names of the movement result's keys. */

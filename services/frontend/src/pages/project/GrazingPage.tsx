@@ -108,7 +108,6 @@ export function GrazingPage() {
                 setDialog({ open: true, editing: r, initial: state })
               }
               render={presentation.render}
-              printTo={`/projects/${projectId}/analyze/grazing/print/${state.run}`}
             />
           </div>
         ) : (

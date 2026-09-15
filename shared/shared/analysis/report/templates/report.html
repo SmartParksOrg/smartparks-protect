@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ title }}</title>
+  </head>
+  <body>
+    <div class="running-title">{{ project_name }} · {{ title }}</div>
+    <div class="running-footer">Smart Parks Protect {{ version }} · made {{ generated_at }}</div>
+
+    <header class="title">
+      <div>
+        <p class="kicker">{{ module_label }} analysis</p>
+        <h1>{{ title }}</h1>
+        <p class="lead">{{ project_name }}{% if period %} · {{ period }}{% endif %}</p>
+      </div>
+      {% if logo %}<img class="logo" src="{{ logo }}" alt="Smart Parks" />{% endif %}
+    </header>
+
+    <section class="meta">
+      <table class="plain">
+        <tr>
+          <th>Subjects</th>
+          <td>
+            {% for s in subjects %}<span class="dot" style="background: {{ s.color }}"></span>{{ s.name }}{% if s.type %} <span class="muted">{{ s.type }}</span>{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
+          </td>
+        </tr>
+        <tr><th>Run</th><td>{{ created_at }}{% if created_by %} by {{ created_by }}{% endif %}{% if computed_at %}, computed {{ computed_at }}{% endif %}</td></tr>
+        <tr><th>Method</th><td>{{ method_version }}</td></tr>
+        <tr><th>Times</th><td>{{ timezone }}</td></tr>
+      </table>
+    </section>
+
+    <section class="settings">
+      <h2>Settings</h2>
+      <table class="plain two">
+        {% for label, value in settings %}<tr><th>{{ label }}</th><td>{{ value }}</td></tr>{% endfor %}
+      </table>
+    </section>
+
+    {% if warnings %}
+    <section class="warnings">
+      <h2>Read with care</h2>
+      <ul>
+        {% for w in warnings %}<li class="{{ w.level }}">{{ w.text }}</li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    <section class="figures">
+      <h2>Key figures</h2>
+      {% if figures.herd %}
+      <p class="muted">
+        The herd was tracked for {{ '%.0f' % figures.herd.get('animal_hours', 0) }} animal-hours;
+        {{ '%.0f' % (100 * figures.herd.get('inside_share', 0)) }}% of that time inside the chosen areas.
+      </p>
+      {% endif %}
+      <table class="data">
+        <thead>
+          <tr><th>{{ figures.first }}</th>{% for c in figures.columns %}<th class="num">{{ c }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+          {% for row in figures.rows %}
+          <tr>
+            <td><strong>{{ row.name }}</strong>{% if row.note %} <span class="muted">{{ row.note }}</span>{% endif %}</td>
+            {% for cell in row.cells %}<td class="num">{{ cell }}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if figures.note %}<p class="muted small">{{ figures.note }}</p>{% endif %}
+    </section>
+
+    {% if map %}
+    <section class="map">
+      <h2>Map</h2>
+      <img src="{{ map.png }}" alt="Map of the result" />
+      {% if map.note %}<p class="muted small">{{ map.note }}</p>{% endif %}
+    </section>
+    {% endif %}
+
+    {% if charts %}
+    <section class="charts">
+      <h2>Charts</h2>
+      <div class="grid">
+        {% for chart in charts %}
+        <figure>
+          <figcaption>{{ chart.title }}</figcaption>
+          <img src="{{ chart.svg }}" alt="{{ chart.title }}" />
+        </figure>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% for table in tables %}
+    <section class="table">
+      <h2>{{ table.title }}</h2>
+      <table class="data{% if table.wide %} wide{% endif %}">
+        <thead><tr>{% for c in table.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in table.rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endfor %}
+
+    <section class="limitations">
+      <h2>What these figures can and cannot say</h2>
+      <ul>{% for line in limitations %}<li>{{ line }}</li>{% endfor %}</ul>
+    </section>
+  </body>
+</html>

@@ -90,6 +90,15 @@ class AnalysisRun(UuidPrimaryKeyMixin, Base):
         Uuid, ForeignKey("analysis_runs.id", ondelete="SET NULL"), comment="Re-run from"
     )
     trace_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # the PDF report (decision D211): made by the export service, kept with the run
+    report_status: Mapped[str | None] = mapped_column(
+        String(16), comment="queued, running, ready or failed; null when no report was asked for"
+    )
+    report_key: Mapped[str | None] = mapped_column(
+        String(512), comment="The PDF in the exports bucket"
+    )
+    report_error: Mapped[str | None] = mapped_column(Text)
+    report_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AnalysisGeometry(Base):

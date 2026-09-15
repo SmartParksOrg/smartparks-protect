@@ -56,6 +56,11 @@ class AnalysisRunRead(ORMModel):
     finished_at: datetime | None
     expires_at: datetime | None
     source_run_id: uuid.UUID | None
+    #: The PDF report (decision D211): null until one is asked for, then queued, running,
+    #: ready (downloadable) or failed with the error.
+    report_status: str | None = None
+    report_error: str | None = None
+    report_at: datetime | None = None
 
 
 class AnalysisEstimate(BaseModel):

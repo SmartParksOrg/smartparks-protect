@@ -33,10 +33,6 @@ export function useMap(
   style: string,
   center: [number, number],
   zoom: number,
-  options: {
-    /** Keep the drawn frame, so the canvas prints and can be read back (the print view). */
-    preserveDrawingBuffer?: boolean;
-  } = {},
 ) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -50,9 +46,6 @@ export function useMap(
       style,
       center,
       zoom,
-      canvasContextAttributes: {
-        preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
-      },
       attributionControl: { compact: true },
       transformRequest: ((url: string) => {
         if (url.startsWith(window.location.origin) || url.startsWith("/")) {

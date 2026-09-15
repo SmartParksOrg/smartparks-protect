@@ -144,6 +144,15 @@ class LogFileStatus(StrEnum):
     FAILED = "failed"
 
 
+class ReportStatus(StrEnum):
+    """Where the PDF report of an analysis run stands (decision D211)."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    READY = "ready"
+    FAILED = "failed"
+
+
 class AttributionJobStatus(StrEnum):
     """Status of an attribution job (decision D206)."""
 

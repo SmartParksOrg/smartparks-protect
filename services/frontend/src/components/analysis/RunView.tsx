@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
+import { FileText, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import { api, downloadFile } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Callout } from "@/components/common/Callout";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAuthStore } from "@/stores/auth";
@@ -36,6 +38,9 @@ import {
   subjectPalette,
 } from "@/lib/analyses";
 
+const reportActive = (run: AnalysisRun): boolean =>
+  run.report_status === "queued" || run.report_status === "running";
+
 /** One run on an analysis page: its status, the actions (save, share, export, cancel,
  * delete), its settings, and the result blocks the document holds. The module's page adds its own summary
  * and map through `render` and the labels of its metrics through `labels`; this view knows
@@ -46,7 +51,6 @@ export function RunView({
   labels: given,
   render,
   onEdit,
-  printTo,
 }: {
   projectId: string;
   runId: string;
@@ -68,12 +72,9 @@ export function RunView({
   };
   /** Open the run's settings in the dialog, to change them and run again. */
   onEdit?: (run: AnalysisRun) => void;
-  /** The print view of the run (decision D208), offered under Export as "Save as PDF". */
-  printTo?: string;
 }) {
   const { t } = useTranslation();
   const now = useNow();
-  const navigate = useNavigate();
   const { can } = usePermissions(projectId);
   const me = useAuthStore((s) => s.user);
   const base = `/api/v1/projects/${projectId}/analyses/${runId}`;
@@ -81,7 +82,10 @@ export function RunView({
     queryKey: queryKeys.analysis(projectId, runId),
     queryFn: () => api.get<AnalysisRun>(base),
     refetchInterval: (query) =>
-      query.state.data && isActive(query.state.data.status) ? 3000 : false,
+      query.state.data &&
+      (isActive(query.state.data.status) || reportActive(query.state.data))
+        ? 3000
+        : false,
   });
   const invalidate = [
     queryKeys.analysis(projectId, runId),
@@ -120,6 +124,12 @@ export function RunView({
     invalidate,
     success: t("Run deleted"),
     onSuccess: () => setDeleting(false),
+  });
+  // the PDF report is made by the export worker and kept with the run (decision D211)
+  const makeReport = useMutationToast({
+    mutationFn: () => api.post<AnalysisRun>(`${base}/report`),
+    invalidate,
+    success: t("The PDF report is being made; Download PDF appears here when it is ready"),
   });
   const document = documentOf(run.data);
   const colors = document ? subjectPalette(document) : {};
@@ -192,9 +202,16 @@ export function RunView({
                     })}
                   </DropdownMenuItem>
                 ))}
-                {printTo && (
-                  <DropdownMenuItem onClick={() => navigate(printTo)}>
-                    {t("Save as PDF (print view)…")}
+                {can("exports:create") && (
+                  <DropdownMenuItem
+                    disabled={reportActive(r) || makeReport.isPending}
+                    onClick={() => makeReport.mutate()}
+                  >
+                    {reportActive(r)
+                      ? t("PDF report being made…")
+                      : r.report_status === "ready"
+                        ? t("Make the PDF report again")
+                        : t("Make PDF report")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
@@ -225,6 +242,20 @@ export function RunView({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          {r.report_status === "ready" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                void downloadFile(
+                  `${base}/report`,
+                  `${r.name ?? r.module}.pdf`,
+                ).catch((e: Error) => toast.error(e.message))
+              }
+            >
+              <FileText className="size-4" /> {t("Download PDF")}
+            </Button>
+          )}
           {mayRun && (
             <Button
               variant="ghost"
@@ -237,6 +268,17 @@ export function RunView({
           )}
         </div>
       </div>
+      {reportActive(r) && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          {t("The PDF report is being made: the charts, the map and the tables on A4. It takes a few seconds to a minute.")}
+        </p>
+      )}
+      {r.report_status === "failed" && (
+        <Callout kind="error">
+          {t("The PDF report failed: {{message}}", { message: r.report_error ?? "" })}
+        </Callout>
+      )}
       {naming !== null && (
         <form
           className="flex flex-wrap items-center gap-2"

@@ -168,16 +168,23 @@ async def _finish(
 async def expire_analyses(session: AsyncSession) -> int:
     """Delete runs past their expiry (their geometries go by cascade); returns how many."""
     now = utc_now()
-    ids = list(
-        await session.scalars(
-            select(AnalysisRun.id)
+    rows = (
+        await session.execute(
+            select(AnalysisRun.id, AnalysisRun.report_key)
             .where(AnalysisRun.expires_at.is_not(None), AnalysisRun.expires_at < now)
             .order_by(AnalysisRun.expires_at)
             .limit(CLEANUP_BATCH)
         )
-    )
-    if not ids:
+    ).all()
+    if not rows:
         return 0
+    ids = [row.id for row in rows]
     await session.execute(delete(AnalysisRun).where(AnalysisRun.id.in_(ids)))
     await session.commit()
+    # the PDF reports go with their runs (decision D211); a missing object is no error
+    from shared.storage import remove_object
+
+    for row in rows:
+        if row.report_key:
+            await remove_object(get_settings().minio_bucket_exports, row.report_key)
     return len(ids)

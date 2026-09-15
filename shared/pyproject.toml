@@ -30,6 +30,8 @@ dependencies = [
     "opentelemetry-instrumentation-redis==0.65b0",
     "chirpstack-api==4.19.0",
     "pillow==12.3.0",
+    "weasyprint==70.0",
+    "matplotlib==3.11.2",
 ]
 
 [build-system]

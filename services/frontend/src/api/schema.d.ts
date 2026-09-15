@@ -2637,6 +2637,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/analyses/{run_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Report
+         * @description The run's PDF report, once it is ready (decision D211).
+         */
+        get: operations["download_report_api_v1_projects__project_id__analyses__run_id__report_get"];
+        put?: never;
+        /**
+         * Make Report
+         * @description Ask for the run's PDF report (decision D211): the export service renders it and keeps it
+         *     with the run; the run read says when it is ready. 409 while one is being made.
+         */
+        post: operations["make_report_api_v1_projects__project_id__analyses__run_id__report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/rules/templates": {
         parameters: {
             query?: never;
@@ -5015,6 +5040,12 @@ export interface components {
             expires_at: string | null;
             /** Source Run Id */
             source_run_id: string | null;
+            /** Report Status */
+            report_status?: string | null;
+            /** Report Error */
+            report_error?: string | null;
+            /** Report At */
+            report_at?: string | null;
         };
         /**
          * AnalysisRunUpdate
@@ -17414,6 +17445,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_report_api_v1_projects__project_id__analyses__run_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_report_api_v1_projects__project_id__analyses__run_id__report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisRunRead"];
                 };
             };
             /** @description Validation Error */

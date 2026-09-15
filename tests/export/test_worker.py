@@ -47,6 +47,7 @@ async def test_worker_runs_a_queued_job(db, monkeypatch):
         Topic.EXPORT_REQUESTED,
         Topic.CURATION_JOB_REQUESTED,
         Topic.ATTRIBUTION_REQUESTED,
+        Topic.ANALYSIS_REPORT_REQUESTED,
     ]
     handler = worker._subscriptions[0][1]
     await handler(

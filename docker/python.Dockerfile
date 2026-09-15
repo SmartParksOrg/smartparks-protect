@@ -12,6 +12,13 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
+# WeasyPrint (the PDF reports of analysis runs, decision D211) draws text through Pango and
+# HarfBuzz and needs a font on the system; nothing else in the image wants system packages.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml uv.lock ./
 COPY shared/pyproject.toml shared/pyproject.toml
 COPY services/api/pyproject.toml services/api/pyproject.toml

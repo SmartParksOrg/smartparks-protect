@@ -107,7 +107,6 @@ export function MovementPage() {
                 setDialog({ open: true, editing: r, initial: state })
               }
               render={presentation.render}
-              printTo={`/projects/${projectId}/analyze/movement/print/${state.run}`}
             />
           </div>
         ) : (
