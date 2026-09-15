@@ -132,9 +132,9 @@ def extent_for(
 
 async def fetch_base_map(
     extent: Extent, width_px: int, height_px: int, key: str, referer: str
-) -> bytes | None:
-    """MapTiler's static map at the extent's centre and zoom; None when the call fails (the
-    drawing then goes on a plain background)."""
+) -> tuple[bytes | None, str]:
+    """MapTiler's static map at the extent's centre and zoom, and the reason when there is
+    none (the drawing then goes on a plain background and the report says why)."""
     cx, cy = (extent.xmin + extent.xmax) / 2, (extent.ymin + extent.ymax) / 2
     lon, lat = inverse_mercator(cx, cy)
     url = STATIC_URL.format(lon=lon, lat=lat, zoom=extent.zoom, w=width_px, h=height_px)
@@ -147,13 +147,25 @@ async def fetch_base_map(
             )
     except httpx.HTTPError as exc:
         log.warning("base map not fetched", error=str(exc))
-        return None
+        return None, "the map service did not answer"
+    if response.status_code == 403:
+        # MapTiler says why in a header ("Access to rendered maps not allowed": the key's
+        # allowed services exclude the Static Maps API, which the key's settings can allow)
+        why = response.headers.get("statustext", "").removeprefix("403 ").strip()
+        log.warning("base map refused", status=response.status_code, reason=why)
+        return None, (
+            f"the map service refused this server's key ({why}); allow the Static Maps API "
+            "for the key at MapTiler"
+            if why
+            else "the map service refused this server's key; allow the Static Maps API for the "
+            "key at MapTiler"
+        )
     if response.status_code != 200 or not response.headers.get("content-type", "").startswith(
         "image/"
     ):
         log.warning("base map refused", status=response.status_code)
-        return None
-    return response.content
+        return None, f"the map service answered {response.status_code}"
+    return response.content, ""
 
 
 def _scale_bar_length(width_m: float, cos_lat: float) -> tuple[float, str]:
@@ -312,16 +324,11 @@ async def map_picture(
     extent = extent_for(points_of(tracks, shapes), width_px, height_px)
     if extent is None:
         return None
-    base = (
+    base, reason = (
         await fetch_base_map(extent, width_px, height_px, maptiler_key, referer)
         if maptiler_key
-        else None
+        else (None, "this server has no map key")
     )
     png = draw_map(extent, base, tracks, shapes, width_px=width_px, height_px=height_px)
-    note = (
-        ""
-        if base is not None
-        else "The base map is not drawn: this server has no map key, or the map service did "
-        "not answer."
-    )
+    note = "" if base is not None else f"The base map is not drawn: {reason}."
     return MapPicture(png=png, with_base_map=base is not None, note=note)
