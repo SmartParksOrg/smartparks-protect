@@ -157,6 +157,11 @@ class Settings(BaseSettings):
     analysis_retention_days: int = Field(
         default=7, ge=1, description="Days an unsaved run is kept after it finished"
     )
+    report_tiles: bool = Field(
+        default=True,
+        description="Whether a PDF report fetches OpenStreetMap's tiles for its map (decision "
+        "D211); off for a server without outside access, the map is then a plain drawing",
+    )
     analysis_timeout_seconds: int = Field(
         default=900, ge=60, description="Wall clock a run may take before it is failed"
     )

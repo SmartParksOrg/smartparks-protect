@@ -11,7 +11,12 @@ from geoalchemy2.shape import to_shape
 from shapely.geometry import mapping
 from sqlalchemy import select
 
-from shared.analysis.report.mapimage import MapPicture, map_picture, shapes_from_geometries
+from shared.analysis.report.mapimage import (
+    MapPicture,
+    fetch_osm_tiles,
+    map_picture,
+    shapes_from_geometries,
+)
 from shared.analysis.report.render import ReportInput, render_pdf, subject_colors
 from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
@@ -85,6 +90,7 @@ async def build_input(session: Any, run: AnalysisRun) -> ReportInput:
         shapes,
         maptiler_key=settings.maptiler_key,
         referer=settings.public_url,
+        tile_source=fetch_osm_tiles if settings.report_tiles else None,
     )
     provenance = document.get("provenance") or {}
     computed = provenance.get("computed_at")

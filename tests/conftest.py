@@ -13,6 +13,7 @@ from pathlib import Path
 
 DEFAULTS = {
     "ENVIRONMENT": "test",
+    "REPORT_TILES": "false",  # a test never fetches map tiles
     "DATABASE_URL": "postgresql+asyncpg://protect:protect-dev-password@localhost:5432/smartparks_protect",
     "REDIS_URL": "redis://:protect-dev-redis@localhost:6379/0",
     "MINIO_ENDPOINT": "localhost:9000",

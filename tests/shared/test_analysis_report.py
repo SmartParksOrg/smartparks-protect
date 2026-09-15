@@ -12,6 +12,8 @@ from shapely.geometry import Polygon, mapping
 
 from shared.analysis.report.charts import chart_svg, series_name
 from shared.analysis.report.mapimage import (
+    MAX_TILES,
+    OSM_ATTRIBUTION,
     TrackLine,
     draw_map,
     extent_for,
@@ -20,6 +22,8 @@ from shared.analysis.report.mapimage import (
     metres_per_pixel,
     pressure_color,
     shapes_from_geometries,
+    stitch_tiles,
+    tile_grid,
 )
 from shared.analysis.report.render import (
     ReportInput,
@@ -244,6 +248,46 @@ def test_the_extent_fits_the_points_and_the_zoom_matches_the_pixels():
     assert pressure_color(None) == "#E7EDE8" and pressure_color(2.5) == "#B86B5C"
 
 
+async def _no_tiles(_extent, _width):
+    return None, "no tiles in tests"
+
+
+def _png(color: tuple[int, int, int]) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (256, 256), color).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_the_tile_grid_covers_the_extent_within_the_tile_budget():
+    extent = extent_for([(31.5, -24.9), (31.52, -24.88)], 1000, 620)
+    assert extent is not None
+    grid = tile_grid(extent, 1000)
+    assert 0 < grid.count <= MAX_TILES
+    xmin, xmax, ymin, ymax = grid.bounds
+    assert (
+        xmin <= extent.xmin and xmax >= extent.xmax and ymin <= extent.ymin and ymax >= extent.ymax
+    )
+    # a tile's pixels are at least as fine as the picture's, unless the budget coarsens them
+    size_px = (xmax - xmin) / ((grid.x1 - grid.x0 + 1) * 256)
+    assert size_px <= extent.width_m / 1000 * 2
+    # a whole country: the budget wins and the zoom drops
+    wide = extent_for([(16.0, -29.0), (33.0, -22.0)], 1000, 620)
+    assert wide is not None and tile_grid(wide, 1000).count <= MAX_TILES
+
+
+def test_tiles_stitch_into_one_picture_with_the_credit():
+    extent = extent_for([(31.5, -24.9), (31.52, -24.88)], 1000, 620)
+    assert extent is not None
+    grid = tile_grid(extent, 1000)
+    tiles = {(grid.x0, grid.y0): _png((200, 10, 10)), (grid.x1, grid.y1): b"not a png"}
+    base = stitch_tiles(grid, tiles)
+    assert base.attribution == OSM_ATTRIBUTION and base.bounds == grid.bounds
+    assert base.image.size == ((grid.x1 - grid.x0 + 1) * 256, (grid.y1 - grid.y0 + 1) * 256)
+    assert base.image.getpixel((1, 1)) == (200, 10, 10)
+    png = draw_map(extent, base, [], [], width_px=400, height_px=300)
+    assert Image.open(io.BytesIO(png)).size == (800, 600)
+
+
 @pytest.mark.asyncio
 async def test_the_map_draws_without_a_base_map_and_says_so():
     ring = Polygon([(31.5, -24.9), (31.52, -24.9), (31.52, -24.88), (31.5, -24.88)])
@@ -273,8 +317,11 @@ async def test_the_map_draws_without_a_base_map_and_says_so():
             lon=[31.5, 31.51, 31.52], lat=[-24.9, -24.89, -24.88], color="#52735E", label="Rhino 14"
         )
     ]
-    picture = await map_picture(tracks, shapes, maptiler_key=None, referer="http://localhost:3000")
-    assert picture is not None and not picture.with_base_map and "no map key" in picture.note
+    picture = await map_picture(
+        tracks, shapes, maptiler_key=None, referer="http://localhost:3000", tile_source=_no_tiles
+    )
+    assert picture is not None and not picture.with_base_map
+    assert picture.note == "The base map is not drawn: no tiles in tests."
     image = Image.open(io.BytesIO(picture.png))
     assert image.width == 2000 and image.height == 1240
     extent = extent_for([(31.5, -24.9), (31.52, -24.88)], 1000, 620)
@@ -287,7 +334,9 @@ async def test_the_map_draws_without_a_base_map_and_says_so():
 async def test_a_document_renders_to_a_pdf_of_several_pages():
     document = _document()
     tracks = [TrackLine(lon=[31.5, 31.51], lat=[-24.9, -24.89], color="#52735E", label="Rhino 14")]
-    picture = await map_picture(tracks, [], maptiler_key=None, referer="http://localhost:3000")
+    picture = await map_picture(
+        tracks, [], maptiler_key=None, referer="http://localhost:3000", tile_source=_no_tiles
+    )
     inp = _input(document, map=picture)
     html = render_html(inp)
     assert "May 2025" in html and "Demo park" in html and "Rhino 15" in html

@@ -147,6 +147,7 @@ services:
       # the live map's imagery and the PDF reports' base map (decisions D141, D211); every
       # service reads it, the export worker for the reports
       MAPTILER_KEY: ${MAPTILER_KEY:-}
+      REPORT_TILES: ${REPORT_TILES:-true}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-json}
       BUS_MAXLEN: ${BUS_MAXLEN:-100000}

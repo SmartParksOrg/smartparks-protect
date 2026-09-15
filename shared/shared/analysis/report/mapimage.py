@@ -1,11 +1,18 @@
-"""The map of a report: the tracks and the result polygons drawn in Web Mercator over a
-MapTiler static image when the server has a key, over a plain background otherwise, with a
-scale bar, a north arrow and the attribution the base map requires."""
+"""The map of a report: the result polygons (and tracks, when asked) drawn in Web Mercator over
+a base map, with a scale bar, a north arrow and the attribution the base map requires.
+
+The base map is MapTiler's static image when the server has a key that allows static maps,
+else the standard OpenStreetMap raster tiles stitched together (a dozen or so small images,
+fetched a few at a time with a proper user agent, the way the tile usage policy asks), else a
+plain ground; the report says which when it is not the first.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import io
 import math
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -21,20 +28,34 @@ from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
 from shared.logger import get_logger
+from shared.version import __version__
 
 log = get_logger("analysis.report.map")
 
 EARTH_RADIUS = 6_378_137.0
-TILE = 512  # MapTiler's tiles are 512 px
+WORLD = 2 * math.pi * EARTH_RADIUS
+TILE = 512  # MapTiler's static map reckons in 512 px tiles
+OSM_TILE = 256
 STATIC_URL = (
     "https://api.maptiler.com/maps/streets-v2/static/{lon:.6f},{lat:.6f},{zoom:.2f}/{w}x{h}@2x.png"
 )
+OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+USER_AGENT = (
+    f"SmartParksProtect/{__version__} (+https://github.com/SmartParksOrg/smartparks-protect)"
+)
 MAX_ZOOM = 17.0
 MIN_ZOOM = 2.0
-ATTRIBUTION = "© MapTiler © OpenStreetMap contributors"
+OSM_MAX_ZOOM = 18
+#: At most this many tiles per map: a report's picture, not a bulk download.
+MAX_TILES = 40
+TILE_CONCURRENCY = 4
+MAPTILER_ATTRIBUTION = "© MapTiler © OpenStreetMap contributors"
+OSM_ATTRIBUTION = "© OpenStreetMap contributors"
 BACKGROUND = "#F1F4F2"
 PRESSURE_RAMP = ["#E7EDE8", "#B9CCBF", "#8FAF98", "#52735E", "#B86B5C"]
 FILL_ALPHA = {"area": 0.45, "mcp": 0.12, "kde": 0.2, "cluster": 0.25, "hotspot": 0.35}
+
+Bounds = tuple[float, float, float, float]  # xmin, xmax, ymin, ymax in Mercator metres
 
 
 @dataclass
@@ -55,7 +76,7 @@ class Shape:
 
 @dataclass
 class Extent:
-    """Mercator metres of the image's edges and the zoom it was fetched at."""
+    """Mercator metres of the image's edges and the zoom it was reckoned at."""
 
     xmin: float
     xmax: float
@@ -68,6 +89,44 @@ class Extent:
     def width_m(self) -> float:
         return self.xmax - self.xmin
 
+    @property
+    def bounds(self) -> Bounds:
+        return (self.xmin, self.xmax, self.ymin, self.ymax)
+
+
+@dataclass
+class BaseImage:
+    """A base map to draw over: the picture, the Mercator metres of its edges, its credit."""
+
+    image: Image.Image
+    bounds: Bounds
+    attribution: str
+
+
+@dataclass
+class TileGrid:
+    """The OpenStreetMap tiles that cover an extent at one zoom."""
+
+    zoom: int
+    x0: int
+    x1: int
+    y0: int
+    y1: int
+
+    @property
+    def count(self) -> int:
+        return (self.x1 - self.x0 + 1) * (self.y1 - self.y0 + 1)
+
+    @property
+    def bounds(self) -> Bounds:
+        size = WORLD / 2**self.zoom
+        return (
+            self.x0 * size - WORLD / 2,
+            (self.x1 + 1) * size - WORLD / 2,
+            WORLD / 2 - (self.y1 + 1) * size,
+            WORLD / 2 - self.y0 * size,
+        )
+
 
 @dataclass
 class MapPicture:
@@ -75,6 +134,9 @@ class MapPicture:
     with_base_map: bool
     note: str = ""
     legend: list[tuple[str, str]] = field(default_factory=list)
+
+
+TileSource = Callable[[Extent, int], Awaitable[tuple["BaseImage | None", str]]]
 
 
 def mercator(lon: float, lat: float) -> tuple[float, float]:
@@ -91,7 +153,7 @@ def inverse_mercator(x: float, y: float) -> tuple[float, float]:
 
 
 def metres_per_pixel(zoom: float) -> float:
-    return 2 * math.pi * EARTH_RADIUS / (TILE * 2**zoom)
+    return WORLD / (TILE * 2**zoom)
 
 
 def pressure_color(level: float | None) -> str:
@@ -120,8 +182,8 @@ def extent_for(
     span_x = max(max(xs) - min(xs), 300.0) * (1 + 2 * padding)
     span_y = max(max(ys) - min(ys), 300.0) * (1 + 2 * padding)
     zoom = min(
-        math.log2(2 * math.pi * EARTH_RADIUS * width_px / (TILE * span_x)),
-        math.log2(2 * math.pi * EARTH_RADIUS * height_px / (TILE * span_y)),
+        math.log2(WORLD * width_px / (TILE * span_x)),
+        math.log2(WORLD * height_px / (TILE * span_y)),
     )
     zoom = math.floor(max(MIN_ZOOM, min(MAX_ZOOM, zoom)) * 100) / 100
     mpp = metres_per_pixel(zoom)
@@ -132,9 +194,8 @@ def extent_for(
 
 async def fetch_base_map(
     extent: Extent, width_px: int, height_px: int, key: str, referer: str
-) -> tuple[bytes | None, str]:
-    """MapTiler's static map at the extent's centre and zoom, and the reason when there is
-    none (the drawing then goes on a plain background and the report says why)."""
+) -> tuple[BaseImage | None, str]:
+    """MapTiler's static map at the extent's centre and zoom, or the reason there is none."""
     cx, cy = (extent.xmin + extent.xmax) / 2, (extent.ymin + extent.ymax) / 2
     lon, lat = inverse_mercator(cx, cy)
     url = STATIC_URL.format(lon=lon, lat=lat, zoom=extent.zoom, w=width_px, h=height_px)
@@ -143,29 +204,98 @@ async def fetch_base_map(
             response = await client.get(
                 url,
                 params={"key": key, "attribution": "false"},
-                headers={"Referer": referer.rstrip("/") + "/"},
+                headers={"Referer": referer.rstrip("/") + "/", "User-Agent": USER_AGENT},
             )
     except httpx.HTTPError as exc:
-        log.warning("base map not fetched", error=str(exc))
-        return None, "the map service did not answer"
+        log.warning("MapTiler static map not fetched", error=str(exc))
+        return None, "MapTiler did not answer"
     if response.status_code == 403:
         # MapTiler says why in a header ("Access to rendered maps not allowed": the key's
         # allowed services exclude the Static Maps API, which the key's settings can allow)
         why = response.headers.get("statustext", "").removeprefix("403 ").strip()
-        log.warning("base map refused", status=response.status_code, reason=why)
+        log.warning("MapTiler static map refused", status=response.status_code, reason=why)
         return None, (
-            f"the map service refused this server's key ({why}); allow the Static Maps API "
-            "for the key at MapTiler"
+            f"MapTiler refused this server's key ({why}); allow the Static Maps API for the key"
             if why
-            else "the map service refused this server's key; allow the Static Maps API for the "
-            "key at MapTiler"
+            else "MapTiler refused this server's key; allow the Static Maps API for the key"
         )
     if response.status_code != 200 or not response.headers.get("content-type", "").startswith(
         "image/"
     ):
-        log.warning("base map refused", status=response.status_code)
-        return None, f"the map service answered {response.status_code}"
-    return response.content, ""
+        log.warning("MapTiler static map refused", status=response.status_code)
+        return None, f"MapTiler answered {response.status_code}"
+    image = Image.open(io.BytesIO(response.content)).convert("RGB")
+    return BaseImage(image, extent.bounds, MAPTILER_ATTRIBUTION), ""
+
+
+def tile_grid(extent: Extent, width_px: int) -> TileGrid:
+    """The OpenStreetMap tiles covering the extent at the zoom whose pixels are at least as
+    fine as the picture's, coarsened until at most `MAX_TILES` tiles are needed."""
+    wanted = extent.width_m / width_px
+    zoom = min(OSM_MAX_ZOOM, max(0, math.ceil(math.log2(WORLD / (OSM_TILE * wanted)))))
+    while True:
+        size = WORLD / 2**zoom
+        x0 = math.floor((extent.xmin + WORLD / 2) / size)
+        x1 = math.floor((extent.xmax + WORLD / 2) / size)
+        y0 = math.floor((WORLD / 2 - extent.ymax) / size)
+        y1 = math.floor((WORLD / 2 - extent.ymin) / size)
+        limit = 2**zoom - 1
+        grid = TileGrid(zoom, max(0, x0), min(limit, x1), max(0, y0), min(limit, y1))
+        if grid.count <= MAX_TILES or zoom == 0:
+            return grid
+        zoom -= 1
+
+
+def stitch_tiles(grid: TileGrid, tiles: dict[tuple[int, int], bytes]) -> BaseImage:
+    """One picture from the tiles of a grid; a tile that did not arrive stays the ground colour."""
+    columns, rows = grid.x1 - grid.x0 + 1, grid.y1 - grid.y0 + 1
+    canvas = Image.new("RGB", (columns * OSM_TILE, rows * OSM_TILE), BACKGROUND)
+    for (x, y), data in tiles.items():
+        try:
+            tile = Image.open(io.BytesIO(data)).convert("RGB")
+        except OSError:
+            continue
+        canvas.paste(tile, ((x - grid.x0) * OSM_TILE, (y - grid.y0) * OSM_TILE))
+    return BaseImage(canvas, grid.bounds, OSM_ATTRIBUTION)
+
+
+async def fetch_osm_tiles(extent: Extent, width_px: int) -> tuple[BaseImage | None, str]:
+    """The standard OpenStreetMap tiles under the extent, a few at a time with a proper user
+    agent, or the reason there is none."""
+    grid = tile_grid(extent, width_px)
+    semaphore = asyncio.Semaphore(TILE_CONCURRENCY)
+    tiles: dict[tuple[int, int], bytes] = {}
+    failures: list[str] = []
+
+    async def one(client: httpx.AsyncClient, x: int, y: int) -> None:
+        async with semaphore:
+            try:
+                response = await client.get(OSM_TILE_URL.format(z=grid.zoom, x=x, y=y))
+            except httpx.HTTPError as exc:
+                failures.append(str(exc))
+                return
+            if response.status_code == 200:
+                tiles[(x, y)] = response.content
+            else:
+                failures.append(str(response.status_code))
+
+    try:
+        async with httpx.AsyncClient(timeout=20, headers={"User-Agent": USER_AGENT}) as client:
+            await asyncio.gather(
+                *(
+                    one(client, x, y)
+                    for x in range(grid.x0, grid.x1 + 1)
+                    for y in range(grid.y0, grid.y1 + 1)
+                )
+            )
+    except httpx.HTTPError as exc:
+        failures.append(str(exc))
+    if not tiles:
+        log.warning("OpenStreetMap tiles not fetched", zoom=grid.zoom, error=failures[:1])
+        return None, "OpenStreetMap's tiles did not arrive"
+    if failures:
+        log.info("OpenStreetMap tiles partly missing", missing=len(failures), of=grid.count)
+    return stitch_tiles(grid, tiles), ""
 
 
 def _scale_bar_length(width_m: float, cos_lat: float) -> tuple[float, str]:
@@ -182,7 +312,7 @@ def _scale_bar_length(width_m: float, cos_lat: float) -> tuple[float, str]:
 
 def draw_map(
     extent: Extent,
-    base_png: bytes | None,
+    base: BaseImage | None,
     tracks: list[TrackLine],
     shapes: list[Shape],
     *,
@@ -197,14 +327,10 @@ def draw_map(
     ax.set_xlim(extent.xmin, extent.xmax)
     ax.set_ylim(extent.ymin, extent.ymax)
     ax.set_aspect("equal")
-    if base_png is not None:
-        image = Image.open(io.BytesIO(base_png)).convert("RGB")
+    if base is not None:
+        # the base image's own edges; the axes clip it to the extent
         ax.imshow(
-            image,
-            extent=(extent.xmin, extent.xmax, extent.ymin, extent.ymax),
-            aspect="equal",
-            zorder=0,
-            interpolation="bilinear",
+            base.image, extent=base.bounds, aspect="equal", zorder=0, interpolation="bilinear"
         )
     else:
         ax.set_facecolor(BACKGROUND)
@@ -218,7 +344,7 @@ def draw_map(
         xs, ys = zip(*xy, strict=True)
         ax.plot(xs, ys, color=track.color, linewidth=0.9, alpha=0.9, zorder=5)
         ax.plot(xs[-1], ys[-1], marker="o", markersize=3, color=track.color, zorder=6)
-    _decorate(ax, extent, base_png is not None)
+    _decorate(ax, extent, base.attribution if base else None)
     buffer = io.BytesIO()
     fig.savefig(buffer, format="png", dpi=200, facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -238,7 +364,10 @@ def _draw_shape(ax: Any, item: Shape) -> None:
         ax.plot(xs, ys, color=item.color, linewidth=0.8, zorder=3)
 
 
-def _decorate(ax: Any, extent: Extent, with_base: bool) -> None:
+LABEL_BOX = {"boxstyle": "round,pad=0.15", "facecolor": "white", "alpha": 0.7, "linewidth": 0}
+
+
+def _decorate(ax: Any, extent: Extent, attribution: str | None) -> None:
     cos_lat = max(0.2, math.cos(math.radians(extent.centre_lat)))
     metres, label = _scale_bar_length(extent.width_m, cos_lat)
     bar = metres / cos_lat
@@ -254,6 +383,7 @@ def _decorate(ax: Any, extent: Extent, with_base: bool) -> None:
         fontsize=6,
         color="#1F2A24",
         zorder=10,
+        bbox=LABEL_BOX,
     )
     nx = extent.xmax - extent.width_m * 0.05
     ny = extent.ymax - (extent.ymax - extent.ymin) * 0.16
@@ -268,12 +398,13 @@ def _decorate(ax: Any, extent: Extent, with_base: bool) -> None:
     ax.text(
         extent.xmax - extent.width_m * 0.01,
         extent.ymin + (extent.ymax - extent.ymin) * 0.012,
-        ATTRIBUTION if with_base else "Drawn without a base map",
+        attribution or "Drawn without a base map",
         ha="right",
         va="bottom",
         fontsize=5,
         color="#4B5651",
         zorder=10,
+        bbox=LABEL_BOX,
     )
 
 
@@ -319,16 +450,24 @@ async def map_picture(
     referer: str,
     width_px: int = 1000,
     height_px: int = 620,
+    tile_source: TileSource | None = fetch_osm_tiles,
 ) -> MapPicture | None:
-    """The whole picture, or None when there is nothing to draw."""
+    """The whole picture, or None when there is nothing to draw. MapTiler when the key allows
+    it, OpenStreetMap's tiles otherwise (`tile_source`, None to skip them), a plain ground last;
+    the note says why when the base map is missing."""
     extent = extent_for(points_of(tracks, shapes), width_px, height_px)
     if extent is None:
         return None
-    base, reason = (
-        await fetch_base_map(extent, width_px, height_px, maptiler_key, referer)
-        if maptiler_key
-        else (None, "this server has no map key")
-    )
+    base: BaseImage | None = None
+    reasons: list[str] = []
+    if maptiler_key:
+        base, reason = await fetch_base_map(extent, width_px, height_px, maptiler_key, referer)
+        if base is None:
+            reasons.append(reason)
+    if base is None and tile_source is not None:
+        base, reason = await tile_source(extent, width_px)
+        if base is None:
+            reasons.append(reason)
     png = draw_map(extent, base, tracks, shapes, width_px=width_px, height_px=height_px)
-    note = "" if base is not None else f"The base map is not drawn: {reason}."
+    note = "" if base is not None else "The base map is not drawn: " + "; ".join(reasons) + "."
     return MapPicture(png=png, with_base_map=base is not None, note=note)
