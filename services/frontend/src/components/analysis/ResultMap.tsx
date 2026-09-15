@@ -77,7 +77,6 @@ export function ResultMap({
   document,
   labels,
   colors,
-  tracksOn = true,
 }: {
   projectId: string;
   runId: string;
@@ -85,8 +84,6 @@ export function ResultMap({
   labels: Record<string, string>;
   /** The subjects' colours, shared with the cards and the charts. */
   colors: Record<string, string>;
-  /** Whether the subjects' tracks start shown; a use map reads better without them. */
-  tracksOn?: boolean;
 }) {
   const { t } = useTranslation();
   const { maptilerKey } = useMapConfig();
@@ -106,10 +103,10 @@ export function ResultMap({
   );
   const main = document.periods.find((p) => p.key === "main");
   const available = ANALYSIS_KINDS.filter((k) => document.geometries[k]);
+  // the result's polygons are the picture; the tracks, fixes and heatmap start hidden and
+  // the chips switch them on (Tim, 2026-09-15)
   const [hidden, setHidden] = useState<string[]>(() => {
-    const off: string[] = tracksOn
-      ? ["points", "heatmap"]
-      : ["tracks", "points", "heatmap"];
+    const off: string[] = ["tracks", "points", "heatmap"];
     // the hotspot outlines repeat what the intensity cells show; start folded away
     if (document.summary.intensity) off.push("hotspot");
     return off;

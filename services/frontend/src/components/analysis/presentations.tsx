@@ -89,7 +89,6 @@ export function grazingPresentation(
           document={document}
           labels={labels}
           colors={colors}
-          tracksOn={false}
         />
       ),
       after: (document, run) => (

@@ -11,14 +11,7 @@ from geoalchemy2.shape import to_shape
 from shapely.geometry import mapping
 from sqlalchemy import select
 
-from shared.analysis.base import AnalysisTooLarge
-from shared.analysis.primitives.trajectory import load_trajectory
-from shared.analysis.report.mapimage import (
-    MapPicture,
-    TrackLine,
-    map_picture,
-    shapes_from_geometries,
-)
+from shared.analysis.report.mapimage import MapPicture, map_picture, shapes_from_geometries
 from shared.analysis.report.render import ReportInput, render_pdf, subject_colors
 from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
@@ -33,8 +26,6 @@ from shared.version import __version__
 log = get_logger("analysis.report")
 
 REPORT_PREFIX = "analysis-reports"
-#: A track is drawn with at most this many points; the map is a picture, not the data.
-TRACK_POINTS = 2000
 
 
 def report_key(run_id: uuid.UUID) -> str:
@@ -62,41 +53,6 @@ async def remove_report(run: AnalysisRun) -> None:
         await remove_object(get_settings().minio_bucket_exports, run.report_key)
 
 
-async def _tracks(
-    session: Any, document: dict[str, Any], colors: dict[str, str], max_fixes: int
-) -> list[TrackLine]:
-    main = next((p for p in document.get("periods", []) if p.get("key") == "main"), None)
-    if main is None:
-        return []
-    from datetime import datetime
-
-    time_from = datetime.fromisoformat(main["time_from"])
-    time_to = datetime.fromisoformat(main["time_to"])
-    tracks: list[TrackLine] = []
-    for subject in document.get("subjects", []):
-        entity_id = uuid.UUID(str(subject["id"]))
-        try:
-            trajectory = await load_trajectory(
-                session, entity_id, time_from, time_to, max_fixes=max_fixes
-            )
-        except AnalysisTooLarge:
-            log.info("report track skipped, too many fixes", entity_id=str(entity_id))
-            continue
-        n = len(trajectory.times)
-        if n == 0:
-            continue
-        step = max(1, n // TRACK_POINTS)
-        tracks.append(
-            TrackLine(
-                lon=[float(v) for v in trajectory.lon[::step]],
-                lat=[float(v) for v in trajectory.lat[::step]],
-                color=colors.get(str(subject["id"]), "#52735E"),
-                label=str(subject["name"]),
-            )
-        )
-    return tracks
-
-
 async def _geometries(session: Any, run_id: uuid.UUID) -> list[dict[str, Any]]:
     rows = await session.scalars(
         select(AnalysisGeometry)
@@ -122,10 +78,10 @@ async def build_input(session: Any, run: AnalysisRun) -> ReportInput:
     project = await session.get(Project, run.project_id)
     creator = await session.get(User, run.created_by_user_id) if run.created_by_user_id else None
     colors = subject_colors(document)
+    # the polygons are the picture; the tracks stay off the paper (Tim, 2026-09-15)
     shapes = shapes_from_geometries(await _geometries(session, run.id), colors)
-    tracks = await _tracks(session, document, colors, settings.analysis_max_fixes)
     picture: MapPicture | None = await map_picture(
-        tracks,
+        [],
         shapes,
         maptiler_key=settings.maptiler_key,
         referer=settings.public_url,
