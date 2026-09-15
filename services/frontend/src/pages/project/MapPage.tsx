@@ -6,6 +6,7 @@ import {
   Flame,
   Layers,
   ListTree,
+  Crosshair,
   LocateFixed,
   Minus,
   Mountain,
@@ -99,6 +100,7 @@ import {
 } from "@/components/map/layerChoices";
 import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
 import { FeedPanel } from "@/components/map/FeedPanel";
+import { createSettler, isNewer } from "@/components/map/live";
 import { type LocateStatus, startLocate } from "@/components/map/locate";
 import {
   type DrawKind,
@@ -272,6 +274,12 @@ export function MapPage() {
     6,
   );
   const client = useQueryClient();
+  // following (Tim, 2026-09-15): while an entity or a device is selected the map keeps it in
+  // view as new positions arrive; a drag by hand pauses that for this selection, the Follow
+  // button resumes it, and another selection starts following again
+  const [followPausedFor, setFollowPausedFor] = useState<string | null>(null);
+  // a burst of positions (a raw log decoded now) refreshes the tracks and heatmaps once
+  const settle = useMemo(() => createSettler(5_000), []);
   const navigate = useNavigate();
   const selectedEvent = params.get("event");
   const setLast = useProjectStore((s) => s.setLastProjectId);
@@ -806,62 +814,87 @@ export function MapPage() {
     },
   });
 
-  // live updates: patch the cached current state and refetch tracks
+  const followKey = selectedId
+    ? `entity:${selectedId}`
+    : selectedDeviceId
+      ? `device:${selectedDeviceId}`
+      : null;
+  const following = followKey !== null && followPausedFor !== followKey;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !followKey) return;
+    const onDrag = () => setFollowPausedFor(followKey);
+    map.on("dragstart", onDrag);
+    return () => {
+      map.off("dragstart", onDrag);
+    };
+  }, [mapRef, ready, followKey]);
+
+  // live updates: patch the cached current state, follow the selection, refresh the tracks
+  // and the heatmaps
   useProjectStream(projectId, (message) => {
     if (message.topic === "position.created") {
-      client.setQueryData<CurrentState>(
-        queryKeys.currentState(projectId),
-        (old) => {
-          if (!old) return old;
-          const entityId = message.entity_id as string | null;
-          if (!entityId) return old;
-          const time = message.time as string;
-          const features = (old.features as unknown as CurrentFeature[]).map(
-            (f) =>
-              f.properties.entity_id === entityId
-                ? {
-                    ...f,
-                    geometry: {
-                      type: "Point" as const,
-                      coordinates: [
-                        message.longitude as number,
-                        message.latitude as number,
-                      ],
-                    },
-                    properties: {
-                      ...f.properties,
-                      last_seen_at: time,
-                      position_time: time,
-                      device_id: message.device_id as string | null,
-                    },
-                  }
-                : f,
-          );
-          return {
-            ...old,
-            features: features as unknown as CurrentState["features"],
-          };
-        },
-      );
+      const time = message.time as string;
+      const entityId = message.entity_id as string | null;
       const deviceId = message.device_id as string | null;
-      if (deviceId)
+      const coordinates: [number, number] = [
+        message.longitude as number,
+        message.latitude as number,
+      ];
+      // a position older than the one shown (a raw log decoded now) moves nothing
+      const shownEntity = entityId
+        ? (
+            client.getQueryData<CurrentState>(queryKeys.currentState(projectId))
+              ?.features as unknown as CurrentFeature[] | undefined
+          )?.find((f) => f.properties.entity_id === entityId)
+        : undefined;
+      const shownDevice = deviceId
+        ? (
+            client.getQueryData<CurrentState>(queryKeys.mapDevices(projectId))
+              ?.features as unknown as DeviceFeature[] | undefined
+          )?.find((f) => f.properties.device_id === deviceId)
+        : undefined;
+      const entityFresh =
+        Boolean(entityId) && isNewer(shownEntity?.properties.position_time, time);
+      const deviceFresh =
+        Boolean(deviceId) && isNewer(shownDevice?.properties.position_time, time);
+      if (entityFresh)
+        client.setQueryData<CurrentState>(
+          queryKeys.currentState(projectId),
+          (old) => {
+            if (!old) return old;
+            const features = (old.features as unknown as CurrentFeature[]).map(
+              (f) =>
+                f.properties.entity_id === entityId
+                  ? {
+                      ...f,
+                      geometry: { type: "Point" as const, coordinates },
+                      properties: {
+                        ...f.properties,
+                        last_seen_at: time,
+                        position_time: time,
+                        device_id: deviceId,
+                      },
+                    }
+                  : f,
+            );
+            return {
+              ...old,
+              features: features as unknown as CurrentState["features"],
+            };
+          },
+        );
+      if (deviceFresh)
         client.setQueryData<CurrentState>(
           queryKeys.mapDevices(projectId),
           (old) => {
             if (!old) return old;
-            const time = message.time as string;
             const features = (old.features as unknown as DeviceFeature[]).map(
               (f) =>
                 f.properties.device_id === deviceId
                   ? {
                       ...f,
-                      geometry: {
-                        type: "Point" as const,
-                        coordinates: [
-                          message.longitude as number,
-                          message.latitude as number,
-                        ],
-                      },
+                      geometry: { type: "Point" as const, coordinates },
                       properties: {
                         ...f.properties,
                         last_seen_at: time,
@@ -876,13 +909,30 @@ export function MapPage() {
             };
           },
         );
+      // the selected object stays in view while it moves
       if (
-        (typeof message.entity_id === "string" &&
-          trackedIds.includes(message.entity_id)) ||
+        following &&
+        ((selectedId && entityId === selectedId && entityFresh) ||
+          (selectedDeviceId && deviceId === selectedDeviceId && deviceFresh))
+      )
+        mapRef.current?.easeTo({ center: coordinates, duration: 800 });
+      if (
+        (entityId && trackedIds.includes(entityId)) ||
         (deviceId && trackedDeviceIds.includes(deviceId))
       )
-        void client.invalidateQueries({
-          queryKey: ["projects", projectId, "track"],
+        settle("track", () => {
+          void client.invalidateQueries({
+            queryKey: ["projects", projectId, "track"],
+          });
+        });
+      if (
+        (entityId && heatIds.includes(entityId)) ||
+        (deviceId && heatDeviceIds.includes(deviceId))
+      )
+        settle("heat", () => {
+          void client.invalidateQueries({
+            queryKey: ["projects", projectId, "map", "heat"],
+          });
         });
     }
     if (
@@ -1600,6 +1650,19 @@ export function MapPage() {
             active: !heatCardHidden,
             badge: heatIds.length + heatDeviceIds.length,
             onClick: () => setHeatCardHidden((h) => !h),
+          } satisfies StripItem,
+        ]
+      : []),
+    ...(followKey
+      ? [
+          {
+            key: "follow",
+            icon: Crosshair,
+            label: following
+              ? t("Following the selection; a drag pauses it")
+              : t("Follow the selection as positions arrive"),
+            active: following,
+            onClick: () => setFollowPausedFor(following ? followKey : null),
           } satisfies StripItem,
         ]
       : []),
