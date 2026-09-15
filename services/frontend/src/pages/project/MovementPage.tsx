@@ -7,11 +7,10 @@ import { api } from "@/api/client";
 import type { AnalysisRun } from "@/api/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/api/queryKeys";
-import { ResultMap } from "@/components/analysis/ResultMap";
 import { RunDialog } from "@/components/analysis/RunDialog";
 import { RunList } from "@/components/analysis/RunList";
 import { RunView } from "@/components/analysis/RunView";
-import { SubjectCards } from "@/components/analysis/SubjectCards";
+import { movementPresentation } from "@/components/analysis/presentations";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/useProjects";
@@ -46,7 +45,8 @@ export function MovementPage() {
         replace: true,
       },
     );
-  const labels = MOVEMENT_LABELS(t);
+  const presentation = movementPresentation(t, projectId);
+  const labels = presentation.labels;
   const created = (_run: AnalysisRun, replaced: AnalysisRun | null) => {
     setDialog((d) => ({ ...d, open: false, editing: null }));
     if (replaced)
@@ -106,26 +106,8 @@ export function MovementPage() {
               onEdit={(r) =>
                 setDialog({ open: true, editing: r, initial: state })
               }
-              render={{
-                summary: (document, _run, colors) => (
-                  <SubjectCards
-                    document={document}
-                    labels={labels}
-                    metrics={CARD_METRICS}
-                    colors={colors}
-                  />
-                ),
-                map: (document, run, colors) => (
-                  <ResultMap
-                    projectId={projectId}
-                    runId={run.id}
-                    document={document}
-                    labels={labels}
-                    colors={colors}
-                  />
-                ),
-                after: () => <Limitations />,
-              }}
+              render={presentation.render}
+              printTo={`/projects/${projectId}/analyze/movement/print/${state.run}`}
             />
           </div>
         ) : (
@@ -149,97 +131,3 @@ export function MovementPage() {
     </>
   );
 }
-
-/** The figures on a subject's card, with their unit. */
-const CARD_METRICS: [string, string][] = [
-  ["distance_km", "km"],
-  ["daily_distance_km", "km/day"],
-  ["median_speed_mps", "m/s"],
-  ["stationary_share", "%"],
-  ["mcp95_ha", "ha"],
-  ["kde95_ha", "ha"],
-  ["fixes", ""],
-];
-
-/** What the method cannot say (plan, section 8.10), folded under the results. */
-function Limitations() {
-  const { t } = useTranslation();
-  return (
-    <details className="rounded-md border px-3 py-2 text-sm">
-      <summary className="cursor-pointer font-medium">
-        {t("What these figures can and cannot say")}
-      </summary>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-        <li>
-          {t(
-            "Distance from fixes underestimates the path between them; a coarser sampling means a shorter apparent distance. The sampling interval stands next to the distance for that reason.",
-          )}
-        </li>
-        <li>
-          {t("Speed is the mean over a step, not an instantaneous speed.")}
-        </li>
-        <li>
-          {t(
-            "The KDE is an estimate of space use that depends on the bandwidth and the grid; its isopleths are unions of cells, not smooth contours.",
-          )}
-        </li>
-        <li>{t("The MCP includes ground never visited between far fixes.")}</li>
-        <li>
-          {t(
-            "Residence time on a regular grid depends on the cell size and is biased by irregular sampling.",
-          )}
-        </li>
-        <li>
-          {t(
-            "Day and night follow the sun's elevation, not the animal's own rhythm or the cloud cover.",
-          )}
-        </li>
-        <li>
-          {t("The results describe the collared animals, not the population.")}
-        </li>
-      </ul>
-    </details>
-  );
-}
-
-/** The human names of the movement result's keys. */
-export const MOVEMENT_LABELS = (
-  t: (k: string) => string,
-): Record<string, string> => ({
-  subject: t("Subject"),
-  period: t("Period"),
-  main: t("This period"),
-  comparison: t("Before"),
-  mean: t("Mean"),
-  sd: t("Standard deviation"),
-  fixes: t("Fixes"),
-  days_with_data: t("Days with data"),
-  median_interval_min: t("Sampling interval (min)"),
-  distance_km: t("Distance (km)"),
-  daily_distance_km: t("Daily distance (km)"),
-  displacement_km: t("Displacement (km)"),
-  max_displacement_km: t("Farthest from the start (km)"),
-  mean_speed_mps: t("Mean speed (m/s)"),
-  median_speed_mps: t("Median speed (m/s)"),
-  p95_speed_mps: t("95th percentile speed (m/s)"),
-  stationary_share: t("Stationary share"),
-  moving_share: t("Moving share"),
-  stationary_periods: t("Stationary periods"),
-  day_distance_km: t("Distance by day (km)"),
-  night_distance_km: t("Distance by night (km)"),
-  mcp95_ha: t("MCP 95% (ha)"),
-  kde50_ha: t("KDE 50% (ha)"),
-  kde95_ha: t("KDE 95% (ha)"),
-  kde_bandwidth_m: t("KDE bandwidth (m)"),
-  hotspot_count: t("Hotspots"),
-  cluster_count: t("Clusters"),
-  missing_share: t("Missing fixes share"),
-  excluded_fixes: t("Excluded fixes"),
-  daily_distance: t("Daily distance"),
-  speed_histogram: t("Speed"),
-  hour_profile: t("Activity by hour"),
-  turning: t("Turning angles"),
-  nsd: t("Net squared displacement"),
-  day_night: t("Day and night"),
-  summary: t("Summary"),
-});

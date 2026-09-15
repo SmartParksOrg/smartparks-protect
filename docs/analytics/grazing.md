@@ -45,7 +45,7 @@ The estimate line under the form names what the run cannot use before Run is pre
 
 ## Reports and exports
 
-A saved run with a name, shared with the project, is the report of phase 1; the tables export as CSV, the polygons as GeoJSON and the whole document as JSON, and "The fixes behind it" opens the export dialog with the herd's positions over the period. A monthly utilisation report as a fixed document is noted for later; the result already holds every number and the provenance it needs.
+A saved run with a name, shared with the project, is the report of phase 1; the tables export as CSV, the polygons as GeoJSON and the whole document as JSON, "Save as PDF (print view)" opens the run as a clean sheet the browser's print dialog saves as a PDF, and "The fixes behind it" opens the export dialog with the herd's positions over the period. A monthly utilisation report as a fixed document is noted for later; the result already holds every number and the provenance it needs.
 
 ## Levels not built
 

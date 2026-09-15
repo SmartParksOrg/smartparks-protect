@@ -52,7 +52,7 @@ All arithmetic is on the sphere with the haversine; positions are WGS 84 and a p
 
 ## Exports and API
 
-Export gives the summary table as CSV, the polygons as GeoJSON (with subject, kind, level, area and period as attributes, for QGIS), and the whole document as JSON; "The fixes behind it" opens the export dialog with the positions of the subjects over the period, as GeoJSON by default. The API is `GET /analysis-modules`, `GET /projects/{id}/analyses/estimate`, `GET|POST /projects/{id}/analyses`, and on a run `GET`, `PATCH` (`name`, `shared`), `POST .../cancel`, `DELETE`, `GET .../geometries` (GeoJSON, `kind` and `subject_id` filters) and `GET .../export?what=document|geometries|summary&format=json|geojson|csv`.
+Export gives the summary table as CSV, the polygons as GeoJSON (with subject, kind, level, area and period as attributes, for QGIS), the whole document as JSON, and "Save as PDF (print view)": the run as a clean sheet with the project, the settings, the cards, the map, the charts and the tables on a light background, which the browser's print dialog saves as a PDF; "The fixes behind it" opens the export dialog with the positions of the subjects over the period, as GeoJSON by default. The API is `GET /analysis-modules`, `GET /projects/{id}/analyses/estimate`, `GET|POST /projects/{id}/analyses`, and on a run `GET`, `PATCH` (`name`, `shared`), `POST .../cancel`, `DELETE`, `GET .../geometries` (GeoJSON, `kind` and `subject_id` filters) and `GET .../export?what=document|geometries|summary&format=json|geojson|csv`.
 
 ## Switching it on and off
 

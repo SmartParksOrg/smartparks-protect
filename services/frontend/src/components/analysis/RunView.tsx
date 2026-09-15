@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 
 import { api, downloadFile } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -45,6 +46,7 @@ export function RunView({
   labels: given,
   render,
   onEdit,
+  printTo,
 }: {
   projectId: string;
   runId: string;
@@ -66,9 +68,12 @@ export function RunView({
   };
   /** Open the run's settings in the dialog, to change them and run again. */
   onEdit?: (run: AnalysisRun) => void;
+  /** The print view of the run (decision D208), offered under Export as "Save as PDF". */
+  printTo?: string;
 }) {
   const { t } = useTranslation();
   const now = useNow();
+  const navigate = useNavigate();
   const { can } = usePermissions(projectId);
   const me = useAuthStore((s) => s.user);
   const base = `/api/v1/projects/${projectId}/analyses/${runId}`;
@@ -187,6 +192,11 @@ export function RunView({
                     })}
                   </DropdownMenuItem>
                 ))}
+                {printTo && (
+                  <DropdownMenuItem onClick={() => navigate(printTo)}>
+                    {t("Save as PDF (print view)…")}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() =>
                     void downloadFile(`${base}/export`, "geometries.geojson", {
@@ -366,7 +376,7 @@ export function RunView({
 
 /** What the run was asked: its subjects, period, comparison and every option, from the
  * stored parameters, so a result is never read without its settings. */
-function RunSettings({
+export function RunSettings({
   run,
   document,
 }: {

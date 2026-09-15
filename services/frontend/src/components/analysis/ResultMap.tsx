@@ -78,6 +78,7 @@ export function ResultMap({
   labels,
   colors,
   tracksOn = true,
+  printable = false,
 }: {
   projectId: string;
   runId: string;
@@ -87,6 +88,9 @@ export function ResultMap({
   colors: Record<string, string>;
   /** Whether the subjects' tracks start shown; a use map reads better without them. */
   tracksOn?: boolean;
+  /** For the print view (decision D208): the drawing is kept for the printer, the controls
+   * stay off the paper and the frame has one height. */
+  printable?: boolean;
 }) {
   const { t } = useTranslation();
   const { maptilerKey } = useMapConfig();
@@ -103,6 +107,7 @@ export function ResultMap({
     basemapStyle(basemap, basemaps, resolved === "dark"),
     [31.5, -24.9],
     6,
+    { preserveDrawingBuffer: printable },
   );
   const main = document.periods.find((p) => p.key === "main");
   const available = ANALYSIS_KINDS.filter((k) => document.geometries[k]);
@@ -403,11 +408,12 @@ export function ResultMap({
   return (
     <div
       ref={frame}
-      className={`relative overflow-hidden rounded-md border bg-card ${fullscreen ? "" : "h-80 lg:h-[26rem]"}`}
+      className={`relative overflow-hidden rounded-md border bg-card ${fullscreen ? "" : printable ? "h-[26rem] break-inside-avoid" : "h-80 lg:h-[26rem]"}`}
     >
       <div ref={container} className="absolute! inset-0 z-0" />
-      {stripHost && createPortal(<ControlStrip items={toolItems} />, stripHost)}
+      {stripHost && !printable && createPortal(<ControlStrip items={toolItems} />, stripHost)}
       {zoomHost &&
+        !printable &&
         createPortal(
           <ControlStrip items={zoomItems} label={t("Zoom and position")} />,
           zoomHost,

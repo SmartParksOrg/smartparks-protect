@@ -46,6 +46,7 @@ import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
+import { lastPositionsWindow } from "@/lib/positionsWindow";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
@@ -84,12 +85,16 @@ export function DevicePage() {
   // the network's locations count here when the device's location source lets them stand in
   const sources =
     device.data && device.data.location_source !== "device" ? "all" : undefined;
+  // the 30 days up to the device's last record rather than up to now (Tim, 2026-09-15), so a
+  // collar silent for a year still shows its last month here; the health card keeps the age
+  const recentWindow = lastPositionsWindow(device.data?.last_seen_at);
   const positions = useQuery({
     queryKey: queryKeys.positions(projectId ?? "", {
       deviceId,
       recent: true,
       at: around.at,
       sources,
+      to: recentWindow.to,
     }),
     queryFn: () =>
       api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, {
@@ -98,11 +103,12 @@ export function DevicePage() {
           : {
               device_id: deviceId,
               limit: 10,
-              from: new Date(Date.now() - 30 * 86400_000).toISOString(),
+              from: recentWindow.from,
+              to: recentWindow.to,
               sources,
             },
       }),
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && !device.isPending,
   });
   const span = useQuery({
     queryKey: queryKeys.deviceSpan(deviceId),
@@ -454,7 +460,7 @@ export function DevicePage() {
                   }
                 />
               )}
-              <HealthCard health={d.health} />
+              <HealthCard health={d.health} projectId={deviceProjectId} deviceId={d.id} />
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2">
                   <CardTitle>{t("Project assignments")}</CardTitle>
@@ -671,11 +677,18 @@ export function DevicePage() {
                         </button>
                       </div>
                     )}
+                    {!around.at && (
+                      <div className="mb-2 text-xs text-muted-foreground">
+                        {t("The 30 days up to {{date}}, the newest first.", {
+                          date: formatTime(recentWindow.to),
+                        })}
+                      </div>
+                    )}
                     {positions.data?.length === 0 && (
                       <div className="text-sm text-muted-foreground">
                         {around.at
                           ? t("No positions within 12 hours of that time.")
-                          : t("No positions in the last 30 days.")}
+                          : t("No positions in those 30 days.")}
                       </div>
                     )}
                     <ul className="divide-y text-sm">

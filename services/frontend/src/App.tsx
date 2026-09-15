@@ -23,6 +23,7 @@ const ExportsPage = lazy(() => import("@/pages/project/ExportsPage").then((m) =>
 const CurationPage = lazy(() => import("@/pages/project/CurationPage").then((m) => ({ default: m.CurationPage })));
 const MovementPage = lazy(() => import("@/pages/project/MovementPage").then((m) => ({ default: m.MovementPage })));
 const GrazingPage = lazy(() => import("@/pages/project/GrazingPage").then((m) => ({ default: m.GrazingPage })));
+const AnalysisPrintPage = lazy(() => import("@/pages/project/AnalysisPrintPage").then((m) => ({ default: m.AnalysisPrintPage })));
 const DashboardsPage = lazy(() => import("@/pages/project/DashboardsPage").then((m) => ({ default: m.DashboardsPage })));
 const AiPolicyPage = lazy(() => import("@/pages/admin/AiPolicyPage").then((m) => ({ default: m.AiPolicyPage })));
 const MembersPage = lazy(() => import("@/pages/project/MembersPage").then((m) => ({ default: m.MembersPage })));
@@ -71,6 +72,8 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route element={<RequireAuth />}>
           <Route path="/oauth/consent" element={<ConsentPage />} />
+          {/* the print view of an analysis sits outside the layout, so only the sheet prints */}
+          <Route path="/projects/:projectId/analyze/:module/print/:runId" element={<AnalysisPrintPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Navigate to="/projects" replace />} />
             <Route path="/projects" element={<ProjectsPage />} />

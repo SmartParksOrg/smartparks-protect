@@ -16,6 +16,7 @@ import { formatInZone } from "@/lib/analytics";
 import { browserTimezone, type RangePreset, rangeFor } from "@/lib/analytics";
 import { formatAgo, formatDuration } from "@/lib/format";
 import { stillHours } from "@/lib/movement";
+import { decimalsFor, niceStep, type TrendSpec } from "@/lib/trend";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
@@ -57,21 +58,6 @@ export function BatteryValue({
       {label}
     </button>
   );
-}
-
-/** What one trend shows: the metric, its words and how its axis is stepped. */
-interface TrendSpec {
-  metric: string;
-  label: string;
-  unit: string;
-  decimals: number;
-  /** The axis step, so the labels never crowd. */
-  step: number;
-  /** A floor for the axis (zero for movement: a flat line at zero means still). */
-  floor?: number;
-  /** A factor on the stored value before it is shown (seconds to days for the uptime). */
-  scale?: number;
-  ariaLabel: string;
 }
 
 /** The battery trend: mounted while unfolded, so the series is read on demand. */
@@ -234,8 +220,10 @@ export function UptimeTrend({
   );
 }
 
-/** One metric of a device over the last day, week or month from the analytics series. */
-function MetricTrend({
+/** One metric of a device over the last day, week or month from the analytics series: the
+ * battery, movement and uptime trends above, and any numeric metric of the registry from the
+ * status panels (Tim, 2026-09-15, `trendSpecFor`). */
+export function MetricTrend({
   projectId,
   deviceId,
   spec,
@@ -279,7 +267,13 @@ function MetricTrend({
   const values = points
     .map((p) => p.value)
     .filter((v): v is number => v != null);
-  const show = (v: number) => `${v.toFixed(spec.decimals)} ${spec.unit}`;
+  const decimals =
+    spec.decimals ??
+    decimalsFor(
+      spec.step ??
+        niceStep(Math.min(...values, Infinity), Math.max(...values, -Infinity)),
+    );
+  const show = (v: number) => `${v.toFixed(decimals)} ${spec.unit}`;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -372,8 +366,11 @@ function Sparkline({
     const values = points
       .map((p) => p[1])
       .filter((v): v is number => v != null);
-    // the axis in the spec's steps around the data, so the labels never crowd
-    const step = spec.step;
+    // the axis in the spec's steps around the data, so the labels never crowd; a spec
+    // without a step takes a round one from the data
+    const step =
+      spec.step ?? niceStep(Math.min(...values), Math.max(...values));
+    const decimals = spec.decimals ?? decimalsFor(step);
     const low =
       spec.floor !== undefined
         ? spec.floor
@@ -393,7 +390,7 @@ function Sparkline({
           formatter: (params: unknown) => {
             const p = (params as { value: [number, number | null] }[])[0];
             if (!p) return "";
-            return `${formatInZone(new Date(p.value[0]).toISOString(), timezone)}<br/>${p.value[1] == null ? "" : p.value[1].toFixed(spec.decimals)} ${spec.unit}`;
+            return `${formatInZone(new Date(p.value[0]).toISOString(), timezone)}<br/>${p.value[1] == null ? "" : p.value[1].toFixed(decimals)} ${spec.unit}`;
           },
         },
         xAxis: {
@@ -416,7 +413,7 @@ function Sparkline({
           axisLabel: {
             color: th.text,
             fontSize: 10,
-            formatter: (v: number) => v.toFixed(spec.decimals),
+            formatter: (v: number) => v.toFixed(decimals),
           },
           splitLine: { lineStyle: { color: th.grid } },
         },

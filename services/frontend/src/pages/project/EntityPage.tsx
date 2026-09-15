@@ -47,6 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
+import { lastPositionsWindow } from "@/lib/positionsWindow";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
@@ -71,9 +72,6 @@ export function EntityPage() {
   const [editing, setEditing] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [changing, setChanging] = useState<EntityAssignment | null>(null);
-  const [since30d] = useState(() =>
-    new Date(Date.now() - 30 * 86400_000).toISOString(),
-  );
   const [since7d] = useState(() =>
     new Date(Date.now() - 7 * 86400_000).toISOString(),
   );
@@ -139,19 +137,32 @@ export function EntityPage() {
   // (decision D164), so the small map and the recent positions show what the live map shows
   const sources =
     entity.data && entity.data.location_source !== "device" ? "all" : undefined;
+  // the 30 days up to the entity's last known position rather than up to now (Tim,
+  // 2026-09-15), so an animal whose collar fell silent still shows its last month here
+  const recentWindow = lastPositionsWindow(
+    live?.position_time ?? live?.last_seen_at,
+  );
   const positions = useQuery({
     queryKey: queryKeys.positions(projectId, {
       entityId,
       recent: true,
       at: around.at,
       sources,
+      to: recentWindow.to,
     }),
     queryFn: () =>
       api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, {
         query: around.at
           ? { entity_id: entityId, limit: 50, from: around.from, to: around.to, sources }
-          : { entity_id: entityId, limit: 10, from: since30d, sources },
+          : {
+              entity_id: entityId,
+              limit: 10,
+              from: recentWindow.from,
+              to: recentWindow.to,
+              sources,
+            },
       }),
+    enabled: !state.isPending,
   });
   const traffic = useQuery({
     queryKey: queryKeys.traffic(projectId, {
@@ -481,7 +492,13 @@ export function EntityPage() {
                 invalidate={[queryKeys.entity(projectId, e.id)]}
                 canEdit={admin}
               />
-              {current && <HealthCard health={device.data?.health} />}
+              {current && (
+                <HealthCard
+                  health={device.data?.health}
+                  projectId={projectId}
+                  deviceId={current.device_id}
+                />
+              )}
               {/* the picture and the map side by side, the same frame (decision D194) */}
               <PictureCard
                 path={`/api/v1/projects/${projectId}/entities/${e.id}/picture`}
@@ -653,11 +670,18 @@ export function EntityPage() {
                       </button>
                     </div>
                   )}
+                  {!around.at && (
+                    <div className="mb-2 text-xs text-muted-foreground">
+                      {t("The 30 days up to {{date}}, the newest first.", {
+                        date: formatTime(recentWindow.to),
+                      })}
+                    </div>
+                  )}
                   {positions.data?.length === 0 && (
                     <div className="text-sm text-muted-foreground">
                       {around.at
                         ? t("No positions within 12 hours of that time.")
-                        : t("No positions in the last 30 days.")}
+                        : t("No positions in those 30 days.")}
                     </div>
                   )}
                   <ul className="divide-y text-sm">

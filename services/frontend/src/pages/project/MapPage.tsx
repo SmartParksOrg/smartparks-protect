@@ -1253,6 +1253,23 @@ export function MapPage() {
           )?.properties.accuracy_m
         : null;
     if (imprecise(selectedAccuracy)) return;
+    // a "show on map" link centres on its object (Tim, 2026-09-15); a plain project visit
+    // fits everything
+    const selectedPoint = selectedId
+      ? currentFeatures?.find((f) => f.properties.entity_id === selectedId)
+          ?.geometry
+      : selectedDeviceId
+        ? deviceFeatures?.find(
+            (f) => f.properties.device_id === selectedDeviceId,
+          )?.geometry
+        : null;
+    if (selectedPoint?.type === "Point") {
+      map.jumpTo({
+        center: selectedPoint.coordinates as [number, number],
+        zoom: Math.max(map.getZoom(), 14),
+      });
+      return;
+    }
     const bounds = boundsOf([
       ...(currentFeatures ?? []),
       ...(deviceFeatures ?? []),
