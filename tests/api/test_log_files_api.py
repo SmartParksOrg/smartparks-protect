@@ -92,7 +92,12 @@ async def test_upload_list_download_and_redecode(client, db, bus):
         )
     ).all()
     assert [(e.processing_status, e.error_code) for e in frames] == [("processed", None)]
-    assert (got["frames_total"], got["records_found"], got["records_new"]) == (1, 3, 3)
+    assert (got["frames_total"], got["frames_done"], got["records_found"], got["records_new"]) == (
+        1,
+        1,
+        3,
+        3,
+    )
     assert got["trace_id"] and got["period_start"] < got["period_end"]
     listing = (await client.get(f"/api/v1/devices/{device['id']}/log-files", headers=h)).json()
     assert [f["id"] for f in listing] == [row["id"]]

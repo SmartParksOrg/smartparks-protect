@@ -360,7 +360,7 @@ export function DevicePage() {
           value={tab}
           onValueChange={(v) => setTab(v as (typeof TABS)[number])}
         >
-          <TabsList className="max-w-full justify-start overflow-x-auto">
+          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none] sm:overflow-visible">
             <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
             <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>
@@ -616,11 +616,11 @@ export function DevicePage() {
                 deviceId={d.id}
                 deviceName={d.name}
                 driverKey={type?.driver_key}
-                canWrite={can("devices:write")}
+                canWrite={can("devices:control")}
               />
               <LogFilesCard
                 deviceId={d.id}
-                canWrite={can("devices:write")}
+                canWrite={can("devices:control")}
               />
               {projectId && (
                 <Card className="lg:col-span-2">

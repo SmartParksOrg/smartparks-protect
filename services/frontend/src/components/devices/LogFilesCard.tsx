@@ -17,9 +17,26 @@ import { formatAgo, formatTime } from "@/lib/format";
 
 const CHANNEL_LABEL: Record<string, string> = { log_file: "uploaded file", webble: "browser sync" };
 
+/** How far the decoder is with a file: the frames done of the frames in the file, as a bar
+ * with the percentage; the row is refetched every few seconds while it is processing. */
+function Progress({ f }: { f: DeviceLogFile }) {
+  const { t } = useTranslation();
+  if (f.frames_total === 0) return <span className="text-muted-foreground">{t("reading the file")}</span>;
+  const percent = Math.min(100, Math.floor((f.frames_done / f.frames_total) * 100));
+  return (
+    <div className="max-w-xs space-y-1">
+      <div className="text-muted-foreground">{t("{{done}} of {{total}} frames decoded, {{percent}}%", { done: f.frames_done, total: f.frames_total, percent })}</div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+        <div className="h-full bg-primary transition-[width] duration-500" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function Counts({ f }: { f: DeviceLogFile }) {
   const { t } = useTranslation();
   if (f.status === "queued") return <span className="text-muted-foreground">{t("waiting for the decoder")}</span>;
+  if (f.status === "processing") return <Progress f={f} />;
   return (
     <span className="text-muted-foreground">
       {t("{{frames}} frames, {{fresh}} new, {{known}} known through another path", { frames: f.frames_total, fresh: f.records_new, known: f.records_duplicate })}{f.frames_failed > 0 ? t(", {{count}} malformed", { count: f.frames_failed }) : ""}

@@ -72,7 +72,18 @@ class DeviceLogFile(UuidPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="queued")
     error_code: Mapped[str | None] = mapped_column(String(64))
     error_message: Mapped[str | None] = mapped_column(Text)
-    frames_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    frames_total: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        comment="Frames in the file (or stored frames on a re-decode), known from the split",
+    )
+    frames_done: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        comment="Frames decoded so far; moves with every batch, equals frames_total when complete",
+    )
     frames_failed: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("0"), comment="Malformed frames"
     )

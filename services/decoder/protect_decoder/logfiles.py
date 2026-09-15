@@ -4,9 +4,10 @@ One `log_file.uploaded` message per file. The worker reads the file from the log
 splits it into frames, stores every frame as a source event on the channel's built-in data
 source (with the device known up front) and decodes it through the normal pipeline, in
 batches of one transaction each so a large flash dump shows progress and survives a restart.
-The row keeps the counts: frames, malformed frames, records found, new and known through
-another path, the log period and the firmware version seen. A re-decode reprocesses the frames
-that exist instead of storing them again.
+The row keeps the counts: frames in the file (`frames_total`, known from the split), frames
+done so far (`frames_done`, written after every batch, the progress the card shows), malformed
+frames, records found, new and known through another path, the log period and the firmware
+version seen. A re-decode reprocesses the frames that exist instead of storing them again.
 
 The file has its own trace (root `log_file`); every frame has the compact trace the ingest
 starts, as any other delivery.
@@ -113,7 +114,7 @@ class Counters:
             self.decoder = outcome.decoder_version
 
     def apply(self, row: DeviceLogFile) -> None:
-        row.frames_total = self.frames
+        row.frames_done = self.frames
         row.frames_failed = self.failed
         row.records_found = self.found
         row.records_new = self.new
@@ -165,6 +166,7 @@ async def process_log_file(
         await tracer.start()
         row.trace_id = tracer.trace_id
         row.status = LogFileStatus.PROCESSING
+        row.frames_done = 0
         row.error_code = None
         row.error_message = None
         await session.commit()
@@ -262,13 +264,16 @@ async def _process_new(
         counters.failed += len(parsed.errors)
         counters.frames += len(parsed.errors)
         row.frames_total = parsed.lines
+        counters.apply(row)
         await session.commit()
         frames = parsed.frames
-        # Frames already stored by an interrupted run are recognised by their line number.
+        # Frames already stored by an interrupted run are recognised by their line number and
+        # count as done, so the progress reaches the end.
         done = {
             int(e.provider_metadata.get("line", -1)) for e in await _existing_frames(session, row)
         }
         frames = [f for f in frames if f.line not in done]
+        counters.frames += len(done)
 
     for start in range(0, len(frames), batch_size):
         batch = frames[start : start + batch_size]
@@ -308,6 +313,7 @@ async def _reprocess(
         assert row is not None
         events = await _existing_frames(session, row)
         keys = [(e.id, e.ingested_at) for e in events]
+        row.frames_total = len(keys)
         tracer = await Tracer.resume(session, trace_id)
         async with tracer.step("logfiles", "frames reprocessed") as step:
             step.metadata.update(frames=len(keys))

@@ -6709,6 +6709,8 @@ export interface components {
             error_message: string | null;
             /** Frames Total */
             frames_total: number;
+            /** Frames Done */
+            frames_done: number;
             /** Frames Failed */
             frames_failed: number;
             /** Records Found */

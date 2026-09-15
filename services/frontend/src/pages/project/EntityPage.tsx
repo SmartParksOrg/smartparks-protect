@@ -322,7 +322,7 @@ export function EntityPage() {
           value={tab}
           onValueChange={(v) => setTab(v as (typeof TABS)[number])}
         >
-          <TabsList className="max-w-full justify-start overflow-x-auto">
+          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none] sm:overflow-visible">
             <TabsTrigger value="overview">{t("Overview")}</TabsTrigger>
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
             <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>

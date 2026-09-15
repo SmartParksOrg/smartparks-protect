@@ -32,6 +32,7 @@ The row shows:
 | Field | Meaning |
 | --- | --- |
 | status | `queued`, `processing`, `complete`, `failed` |
+| progress | while processing, the frames decoded of the frames in the file, as a bar with the percentage; the card refreshes every few seconds |
 | frames | lines that held a frame, and how many were malformed |
 | records found, new, known | canonical records decoded; new rows created; rows that existed already through another path (linked as repeat deliveries) |
 | period | earliest and latest canonical device time in the file |

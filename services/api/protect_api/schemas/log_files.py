@@ -25,6 +25,7 @@ class DeviceLogFileRead(ORMModel):
     error_code: str | None
     error_message: str | None
     frames_total: int
+    frames_done: int
     frames_failed: int
     records_found: int
     records_new: int

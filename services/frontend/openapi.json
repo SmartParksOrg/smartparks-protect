@@ -25877,6 +25877,10 @@
       "type": "integer",
       "title": "Frames Total"
      },
+     "frames_done": {
+      "type": "integer",
+      "title": "Frames Done"
+     },
      "frames_failed": {
       "type": "integer",
       "title": "Frames Failed"
@@ -25996,6 +26000,7 @@
      "error_code",
      "error_message",
      "frames_total",
+     "frames_done",
      "frames_failed",
      "records_found",
      "records_new",

@@ -89,7 +89,7 @@ async def test_one_record_over_three_paths_is_one_position_with_three_deliveries
         db, bus, world, [bytes.fromhex("1d" + FLASH)], AcquisitionChannel.LOG_FILE, "raw_logs.txt"
     )
     assert upload.status == LogFileStatus.COMPLETE, upload.error_message
-    assert (upload.frames_total, upload.frames_failed) == (1, 0)
+    assert (upload.frames_total, upload.frames_done, upload.frames_failed) == (1, 1, 0)
     assert (upload.records_found, upload.records_new, upload.records_duplicate) == (3, 2, 1)
     assert upload.period_start == datetime.fromtimestamp(0x6568633C, tz=UTC)
     assert upload.period_end == datetime.fromtimestamp(0x656864BA, tz=UTC)
@@ -158,6 +158,7 @@ async def test_one_record_over_three_paths_is_one_position_with_three_deliveries
     upload = await db.get(DeviceLogFile, upload_id)
     assert upload.status == LogFileStatus.COMPLETE
     assert (upload.records_found, upload.records_new, upload.records_duplicate) == (3, 0, 3)
+    assert upload.frames_total == upload.frames_done == 1
     assert (
         await db.scalar(
             select(Position).where(Position.device_id == device_id, Position.time == FIX_TIME)
@@ -181,7 +182,7 @@ async def test_malformed_frames_are_counted_and_an_empty_file_fails(db, bus, wor
     await process_log_file(bus, row.id)
     await db.refresh(row)
     assert row.status == LogFileStatus.COMPLETE
-    assert row.frames_total == 3 and row.frames_failed == 2
+    assert row.frames_total == 3 and row.frames_done == 3 and row.frames_failed == 2
     assert row.records_new > 0 and row.firmware_version == "4.4"
 
     empty = await store_log_file(

@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- A log file being decoded shows how far it is: the Log files card on the device page draws a bar with the percentage and "n of m frames decoded" while the status is processing, refreshed every few seconds; the row keeps `frames_done` next to `frames_total`, written after every batch by the decoder (migration 0033).
 - Every event explains itself: the event dialog opens with "What this means" in plain words for each event type the system raises (device errors with each flag spelled out, `ublox_fix`, `lr_join` and the rest; reboots with their reason; no data, battery low, collar not moving, geofences, proximity, speed, the system alerts), from one table in `shared/domain/explanations.py` that the API adds to every event as `explanation`.
 - Events name their subject: the event read carries the entity's and the device's names (`entity_name`, `device_name`); the feed on the live map shows the entity, or the device when no animal is tracked, under the title, and the event dialog's links read the names and open the entity, its place on the map and the device; the event's context is folded away as technical details, without the deduplication fingerprint.
 - Uptime as days and a reboot warning (decision D205): metrics stored in seconds (the uptime) read as durations everywhere they were bare seconds, the records, the record dialog and the Explore chart; the live map's entity and device panels get an Uptime row with the same fold-out trend as the battery and the movement, in days; a status message whose uptime is lower than the one before it is a reboot: the decoder writes a `device_reset` event (warning, with the reset reason the status carries), keeps `last_reset_at` on the device's current state, and the uptime health line and the panel row say "rebooted 2 h ago (watchdog)" and warn for a day. The OpenCollar driver reads the uptime byte as hours on firmware before 4.0.1 and as days since, from the firmware version inside the status message, and a counter wrapping at 255 is not taken for a reboot.
@@ -60,6 +61,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- The Log files and Bluetooth cards on the device page showed their buttons behind `devices:write` while the upload, the browser sync and "decode again" ask the API for `devices:control`, so an Operator saw no "Upload raw log" although the upload would have been accepted; the cards follow the API's key now.
+- The tab row of the entity and device pages (Overview, Data, Connectivity, Network) showed scroll indicators on a desktop with room to spare: the row scrolled in both directions since its tabs hang one pixel below the list, so a browser that draws scrollbars drew them. The row scrolls only on a phone now, with the indicator hidden, as the layers panel's tab row does. Found by Tim on 2026-09-15.
 - The layers panel's tab row showed scrollbars on a desktop: the five tabs overran the panel's width by 52 px and its height by 1 px; they fit now. The arrangement select in the same toolbar is as tall as the search field.
 - A map panel whose rows overflowed its height painted a white block over the map below itself in Chromium (a scrolling box with a background inside the page's fixed-height panel column); the panel is a shell now and an inner transparent box scrolls.
 - Changing an entity's or a device's location source (or fallback hours) rebuilds its current position at once; before, the new setting waited for the next position, which never came for a collar that repeats the same network estimate.
@@ -81,6 +84,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Migrations
 
+- 0033 (log file progress): adds `device_log_files.frames_done` and sets it to `frames_total` for complete files; the downgrade drops it.
 - 0032 (last reset): adds `device_current_state.last_reset_at`; the downgrade drops it.
 - 0031 (last movement): adds `device_current_state.last_movement_at`; the downgrade drops it. Existing devices get it with their next status message.
 - 0030 (analysis runs shared): adds `analysis_runs.shared` (false by default); the downgrade drops it.
