@@ -71,6 +71,7 @@ async def test_bulk_assign_from_first_data_with_entities_and_skips(client, db):
     assert result.status_code == 201, result.text
     body = result.json()
     assert body["assigned"] == 2 and body["entities"] == 2
+    assert "attribution_jobs" in body  # one job per device with records (decision D206)
     assert [s["device_id"] for s in body["skipped"]] == [third]
     assert body["skipped"][0]["reason"].startswith("assigned to ")
 

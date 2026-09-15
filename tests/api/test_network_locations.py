@@ -209,6 +209,10 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
 
     rebuilt = await client.post(f"/api/v1/devices/{device['id']}/reattribute", json={}, headers=h)
     assert rebuilt.status_code == 200, rebuilt.text
+    # the rewrite is a job the export worker runs (decision D206); run it here
+    from shared.domain.attribution import run_attribution_job
+
+    await run_attribution_job({"job_id": rebuilt.json()["attribution_job"]["id"]})
     props = await current_feature()
     assert props["position_kind"] == "device"
     assert datetime.fromisoformat(props["position_time"]) == datetime.fromisoformat(fix_time)

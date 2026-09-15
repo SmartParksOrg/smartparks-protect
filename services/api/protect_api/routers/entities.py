@@ -1,13 +1,16 @@
 """Entities, features and device-to-entity assignments inside a project."""
 
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from protect_api.attribution import hold_while_attributing, job_read, queue_job
 from protect_api.audit import record_audit
+from protect_api.bus import get_bus
 from protect_api.crud import (
     apply_patch,
     flush_or_409,
@@ -41,9 +44,11 @@ from protect_api.schemas.domain import (
     FeatureUpdate,
 )
 from protect_api.visibility import group_and_subgroups
+from shared.bus import RedisStreamsBus
 from shared.curation.apply import recompute_current_state
 from shared.database import get_session
-from shared.domain.assignments import reattribute, resolve_attribution
+from shared.domain.assignments import resolve_attribution
+from shared.domain.attribution import QueueResult, publish_job
 from shared.models import (
     Device,
     DeviceEntityAssignment,
@@ -496,6 +501,7 @@ async def create_entity_assignment(
     body: EntityAssignmentCreate,
     context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> EntityAssignmentRead:
     """Assign a device to an entity of this project from `valid_from`: an existing entity, or
     a new one from `new_entity` (decision D170; the caller then needs `entities:write` too). The
@@ -511,6 +517,7 @@ async def create_entity_assignment(
     else:
         entity = await _project_entity(session, context, body.entity_id)  # type: ignore[arg-type]
     await get_or_404(session, Device, body.device_id, "Device")
+    await hold_while_attributing(session, body.device_id)
     attribution = await resolve_attribution(session, body.device_id, body.valid_from)
     if attribution.project_id != context.project.id:
         raise HTTPException(
@@ -529,9 +536,15 @@ async def create_entity_assignment(
     )
     session.add(assignment)
     await flush_or_409(session, "Entity assignment")
-    # Records already decoded inside the range get the entity now (decision D103).
-    reattributed = await reattribute(
-        session, body.device_id, body.valid_from, body.valid_to or utc_now()
+    # Records already decoded inside the range get the entity through a job (D103, D206).
+    queued = await queue_job(
+        session,
+        device_id=body.device_id,
+        start=body.valid_from,
+        end=body.valid_to or utc_now(),
+        reason="entity_assignment.created",
+        user=context.user,
+        project_id=context.project.id,
     )
     await record_audit(
         session,
@@ -544,11 +557,15 @@ async def create_entity_assignment(
             "device_id": str(body.device_id),
             "entity_id": str(entity.id),
             "valid_from": body.valid_from.isoformat(),
-            "reattributed": reattributed,
+            "attribution_job_id": str(queued.job.id) if queued.job else None,
         },
     )
     await session.commit()
-    return assignment_read(assignment, entity_name=entity.name)
+    if queued.created and queued.job is not None:
+        await publish_job(bus, queued.job)
+    read = assignment_read(assignment, entity_name=entity.name)
+    read.attribution_job = job_read(queued.job)
+    return read
 
 
 @router.post(
@@ -559,12 +576,14 @@ async def extend_entity_assignment_start(
     body: AssignmentStart,
     context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> EntityAssignmentExtended:
     """Move the start of an entity assignment back and attribute the records in between
     (decision D103). The device must belong to this project at the new start: extend the
     project assignment first."""
     assignment = await get_or_404(session, DeviceEntityAssignment, assignment_id, "Assignment")
     await _project_entity(session, context, assignment.entity_id)
+    await hold_while_attributing(session, assignment.device_id)
     old_from, valid_to = range_bounds(assignment.validity)
     if body.valid_from >= old_from:
         raise HTTPException(
@@ -579,7 +598,15 @@ async def extend_entity_assignment_start(
         )
     assignment.validity = Range(body.valid_from, valid_to, bounds="[)")
     await flush_or_409(session, "Entity assignment")
-    counts = await reattribute(session, assignment.device_id, body.valid_from, old_from)
+    queued = await queue_job(
+        session,
+        device_id=assignment.device_id,
+        start=body.valid_from,
+        end=old_from,
+        reason="entity_assignment.start_moved",
+        user=context.user,
+        project_id=context.project.id,
+    )
     await record_audit(
         session,
         user=context.user,
@@ -590,12 +617,15 @@ async def extend_entity_assignment_start(
         details={
             "from": old_from.isoformat(),
             "to": body.valid_from.isoformat(),
-            "reattributed": counts,
+            "attribution_job_id": str(queued.job.id) if queued.job else None,
         },
     )
     await session.commit()
-    read = assignment_read(assignment)
-    return EntityAssignmentExtended(**read.model_dump(), reattributed=counts)
+    if queued.created and queued.job is not None:
+        await publish_job(bus, queued.job)
+    data = assignment_read(assignment).model_dump()
+    data["attribution_job"] = job_read(queued.job)
+    return EntityAssignmentExtended(**data)
 
 
 @router.patch("/entity-assignments/{assignment_id}", response_model=EntityAssignmentRead)
@@ -604,12 +634,14 @@ async def change_entity_assignment(
     body: AssignmentChange | AssignmentEnd,
     context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> EntityAssignmentRead:
     """Change when a device tracked this entity: end it (`valid_to`), move its start, or move
     both. The device must belong to the project at the new start; records between the old
     and the new bounds are attributed again, so history follows the change."""
     assignment = await get_or_404(session, DeviceEntityAssignment, assignment_id, "Assignment")
     await _project_entity(session, context, assignment.entity_id)
+    await hold_while_attributing(session, assignment.device_id)
     old_from, old_to = range_bounds(assignment.validity)
     change = (
         body if isinstance(body, AssignmentChange) else AssignmentChange(valid_to=body.valid_to)
@@ -636,16 +668,26 @@ async def change_entity_assignment(
     if change.reason is not None:
         assignment.reason = change.reason
     await flush_or_409(session, "Entity assignment")
-    # Records between the old and the new bounds change hands; recompute that span only.
+    # Records between the old and the new bounds change hands: one job over the span from the
+    # earliest to the latest bound that moved (D206; a start and an end moved together take the
+    # assignment in between along, which the rewrite leaves as it is).
     now = utc_now()
-    starts = [old_from, new_from]
-    ends = [old_to or now, new_to or now]
-    counts = {"positions": 0, "measurements": 0}
+    spans: list[tuple[datetime, datetime]] = []
     if new_from != old_from:
-        counts = await reattribute(session, assignment.device_id, min(starts), max(starts))
+        spans.append((min(old_from, new_from), max(old_from, new_from)))
     if (old_to or now) != (new_to or now):
-        more = await reattribute(session, assignment.device_id, min(ends), max(ends))
-        counts = {k: counts[k] + more[k] for k in counts}
+        spans.append((min(old_to or now, new_to or now), max(old_to or now, new_to or now)))
+    queued = QueueResult(None, created=False)
+    if spans:
+        queued = await queue_job(
+            session,
+            device_id=assignment.device_id,
+            start=min(s[0] for s in spans),
+            end=max(s[1] for s in spans),
+            reason="entity_assignment.changed",
+            user=context.user,
+            project_id=context.project.id,
+        )
     await record_audit(
         session,
         user=context.user,
@@ -656,8 +698,12 @@ async def change_entity_assignment(
         details={
             "from": [old_from.isoformat(), new_from.isoformat()],
             "to": [old_to.isoformat() if old_to else None, new_to.isoformat() if new_to else None],
-            "reattributed": counts,
+            "attribution_job_id": str(queued.job.id) if queued.job else None,
         },
     )
     await session.commit()
-    return assignment_read(assignment)
+    if queued.created and queued.job is not None:
+        await publish_job(bus, queued.job)
+    read = assignment_read(assignment)
+    read.attribution_job = job_read(queued.job)
+    return read

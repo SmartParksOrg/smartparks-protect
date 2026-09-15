@@ -4047,6 +4047,59 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/attribution-jobs": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Attribution Jobs",
+    "description": "The device's newest attribution jobs, newest first (decision D206): after an assignment\nchange the records already inside the range get their project and entity in the\nbackground, and the pages poll this to draw how far it is.",
+    "operationId": "attribution_jobs_api_v1_devices__device_id__attribution_jobs_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/AttributionJobRead"
+         },
+         "title": "Response Attribution Jobs Api V1 Devices  Device Id  Attribution Jobs Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/reattribute": {
    "post": {
     "tags": [
@@ -21592,6 +21645,154 @@
     ],
     "title": "AttentionSummary"
    },
+   "AttributionJobRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason",
+      "description": "The audit action that queued it"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "queued, running, complete or failed"
+     },
+     "time_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time From"
+     },
+     "time_to": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time To"
+     },
+     "records_total": {
+      "type": "integer",
+      "title": "Records Total",
+      "description": "Positions and measurements in the window"
+     },
+     "records_done": {
+      "type": "integer",
+      "title": "Records Done",
+      "description": "Records rewritten so far"
+     },
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Counts",
+      "description": "Rows rewritten per table"
+     },
+     "error_code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Code"
+     },
+     "error_message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error Message"
+     },
+     "trace_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trace Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "device_id",
+     "project_id",
+     "reason",
+     "status",
+     "time_from",
+     "time_to",
+     "records_total",
+     "records_done",
+     "counts",
+     "error_code",
+     "error_message",
+     "trace_id",
+     "created_at",
+     "started_at",
+     "finished_at"
+    ],
+    "title": "AttributionJobRead",
+    "description": "The rewrite of a device's records after an assignment change (decision D206): queued by\nthe change, run by the export service in windows, the records done so far on the row."
+   },
    "AuditRead": {
     "properties": {
      "id": {
@@ -22578,8 +22779,11 @@
       "type": "integer",
       "title": "Entities"
      },
-     "reattributed": {
-      "$ref": "#/components/schemas/RecordCounts"
+     "attribution_jobs": {
+      "type": "integer",
+      "title": "Attribution Jobs",
+      "description": "Jobs queued to give the records already inside the new assignments the project, one per device with records (decision D206)",
+      "default": 0
      },
      "skipped": {
       "items": {
@@ -22593,7 +22797,6 @@
     "required": [
      "assigned",
      "entities",
-     "reattributed",
      "skipped"
     ],
     "title": "BulkAssignResult"
@@ -26994,6 +27197,17 @@
       "format": "date-time",
       "title": "Created At"
      },
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none"
+     },
      "entity_id": {
       "type": "string",
       "format": "uuid",
@@ -27022,13 +27236,6 @@
       ],
       "title": "Entity Name",
       "description": "Filled by the device read (decision D106)"
-     },
-     "reattributed": {
-      "additionalProperties": {
-       "type": "integer"
-      },
-      "type": "object",
-      "title": "Reattributed"
      }
     },
     "type": "object",
@@ -27039,10 +27246,10 @@
      "valid_to",
      "reason",
      "created_at",
-     "entity_id",
-     "reattributed"
+     "entity_id"
     ],
-    "title": "EntityAssignmentExtended"
+    "title": "EntityAssignmentExtended",
+    "description": "The assignment with the job attributing the records in between (decision D206)."
    },
    "EntityAssignmentRead": {
     "properties": {
@@ -27088,6 +27295,17 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none"
      },
      "entity_id": {
       "type": "string",
@@ -34171,6 +34389,17 @@
       "format": "date-time",
       "title": "Created At"
      },
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none"
+     },
      "project_id": {
       "type": "string",
       "format": "uuid",
@@ -34187,13 +34416,6 @@
       ],
       "title": "Project Name",
       "description": "Filled by the device read, so the page names the project"
-     },
-     "reattributed": {
-      "additionalProperties": {
-       "type": "integer"
-      },
-      "type": "object",
-      "title": "Reattributed"
      }
     },
     "type": "object",
@@ -34204,10 +34426,10 @@
      "valid_to",
      "reason",
      "created_at",
-     "project_id",
-     "reattributed"
+     "project_id"
     ],
-    "title": "ProjectAssignmentExtended"
+    "title": "ProjectAssignmentExtended",
+    "description": "The assignment with the job attributing the records in between (decision D206)."
    },
    "ProjectAssignmentRead": {
     "properties": {
@@ -34253,6 +34475,17 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none"
      },
      "project_id": {
       "type": "string",
@@ -35005,19 +35238,23 @@
       "format": "date-time",
       "title": "Valid To"
      },
-     "reattributed": {
-      "additionalProperties": {
-       "type": "integer"
-      },
-      "type": "object",
-      "title": "Reattributed"
+     "attribution_job": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AttributionJobRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The job rewriting the window (decision D206); null when it holds no record"
      }
     },
     "type": "object",
     "required": [
      "valid_from",
      "valid_to",
-     "reattributed"
+     "attribution_job"
     ],
     "title": "ReattributeResult"
    },

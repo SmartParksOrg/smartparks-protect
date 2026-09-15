@@ -46,7 +46,7 @@ export function BulkAssignDialog({ devices, onClose, onDone }: { devices: Device
         <DialogHeader><DialogTitle>{t("Assign {{count}} devices to a project", { count: devices.length })}</DialogTitle></DialogHeader>
         {result ? (
           <div className="space-y-2 text-sm">
-            <Callout kind="info">{t("{{assigned}} devices assigned and {{entities}} entities created; {{positions}} positions and {{measurements}} measurements from before now carry the project.", { assigned: result.assigned, entities: result.entities, positions: result.reattributed.positions, measurements: result.reattributed.measurements })}</Callout>
+            <Callout kind="info">{t("{{assigned}} devices assigned and {{entities}} entities created; the records from before now are being given the project in the background for {{jobs}} of them.", { assigned: result.assigned, entities: result.entities, jobs: result.attribution_jobs })}</Callout>
             {result.skipped.length > 0 && <ul className="list-disc space-y-1 pl-5 text-xs">{result.skipped.map((s) => <li key={s.device_id}>{s.name ?? s.device_id}: {s.reason}</li>)}</ul>}
           </div>
         ) : (

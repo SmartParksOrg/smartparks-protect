@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
+  EntityAssignment,
   Device,
   DeviceDataSpan,
   DeviceDetail,
@@ -118,7 +119,7 @@ function AssignDeviceForm({
     )?.valid_from ?? null;
   const assign = useMutationToast({
     mutationFn: () =>
-      api.post(`/api/v1/projects/${projectId}/entity-assignments`, {
+      api.post<EntityAssignment>(`/api/v1/projects/${projectId}/entity-assignments`, {
         body: {
           device_id: deviceId,
           entity_id: entityId,
@@ -129,10 +130,15 @@ function AssignDeviceForm({
       queryKeys.entityAssignments(projectId),
       queryKeys.device(deviceId),
       queryKeys.deviceSpan(deviceId),
+      queryKeys.attributionJobs(deviceId),
       queryKeys.devices({ projectId, unassigned: true }),
       queryKeys.currentState(projectId),
     ],
-    success: t("Device assigned to {{name}}", { name: entityName }),
+    // the records already inside the range follow through a job the page shows (decision D206)
+    success: (a) =>
+      a.attribution_job
+        ? t("Device assigned to {{name}}; {{count}} earlier records are being given the entity in the background", { name: entityName, count: a.attribution_job.records_total })
+        : t("Device assigned to {{name}}", { name: entityName }),
     onSuccess: onDone,
   });
   return (

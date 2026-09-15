@@ -14,8 +14,10 @@ from sqlalchemy import exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from protect_api.attribution import hold_while_attributing, job_read, queue_job
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
+from protect_api.bus import get_bus
 from protect_api.crud import apply_patch, flush_or_409, get_or_404, range_bounds
 from protect_api.deps import accessible_project_ids, require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
@@ -24,6 +26,7 @@ from protect_api.routers.entities import assignment_read
 from protect_api.schemas.domain import (
     AssignmentEnd,
     AssignmentStart,
+    AttributionJobRead,
     DeviceCreate,
     DeviceDataSpan,
     DeviceRead,
@@ -43,6 +46,7 @@ from protect_api.schemas.domain import (
 )
 from protect_api.serial import fill_serial_from_identity
 from protect_api.visibility import group_and_subgroups, visibility_for
+from shared.bus import RedisStreamsBus
 from shared.config import get_settings
 from shared.connectivity.registry import ADAPTERS
 from shared.connectivity.satellite import SatelliteSession
@@ -50,11 +54,13 @@ from shared.curation.apply import recompute_current_state
 from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
-from shared.domain.assignments import reattribute, resolve_attribution
+from shared.domain.assignments import resolve_attribution
+from shared.domain.attribution import active_job, publish_job, recent_jobs
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
 from shared.enums import AcquisitionChannel, DeviceStatus, Role
 from shared.models import (
+    AttributionJob,
     ConnectivityState,
     DataSource,
     Device,
@@ -570,7 +576,11 @@ class BulkAssignSkipped(BaseModel):
 class BulkAssignResult(BaseModel):
     assigned: int
     entities: int
-    reattributed: RecordCounts
+    attribution_jobs: int = Field(
+        default=0,
+        description="Jobs queued to give the records already inside the new assignments the "
+        "project, one per device with records (decision D206)",
+    )
     skipped: list[BulkAssignSkipped]
 
 
@@ -603,6 +613,7 @@ async def bulk_assign(
     body: BulkAssign,
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> BulkAssignResult:
     """Devices in no project, onboarded in bulk, join a project in one go (decision D122): each
     gets an assignment from its first data unless a start is given, optionally an entity of one
@@ -656,7 +667,7 @@ async def bulk_assign(
     }
     now = utc_now()
     assigned = entities = 0
-    reattributed = {"positions": 0, "measurements": 0}
+    jobs: list[AttributionJob] = []
     skipped: list[BulkAssignSkipped] = []
     for device_id in dict.fromkeys(body.device_ids):  # in the caller's order, once each
         device = devices.get(device_id)
@@ -681,6 +692,15 @@ async def bulk_assign(
                 else f"assigned to {where} since {range_bounds(overlapping.validity)[0]:%Y-%m-%d}"
             )
             skipped.append(BulkAssignSkipped(device_id=device.id, name=device.name, reason=reason))
+            continue
+        if await active_job(session, device.id) is not None:
+            skipped.append(
+                BulkAssignSkipped(
+                    device_id=device.id,
+                    name=device.name,
+                    reason="its records are being attributed, try again later",
+                )
+            )
             continue
         session.add(
             DeviceProjectAssignment(
@@ -714,10 +734,19 @@ async def bulk_assign(
             entities += 1
             details["entity_id"] = str(entity.id)
         await flush_or_409(session, "Bulk assignment")
-        counts = await reattribute(session, device.id, start, now)
-        for key in reattributed:
-            reattributed[key] += int(counts.get(key, 0))
-        details["reattributed"] = counts
+        queued = await queue_job(
+            session,
+            device_id=device.id,
+            start=start,
+            end=now,
+            reason="project_assignment.created",
+            user=user,
+            project_id=project.id,
+        )
+        if queued.created:
+            jobs.append(queued.job)  # type: ignore[arg-type]
+        if queued.job is not None:
+            details["attribution_job_id"] = str(queued.job.id)
         await record_audit(
             session,
             user=user,
@@ -729,11 +758,10 @@ async def bulk_assign(
         )
         assigned += 1
     await session.commit()
+    for job in jobs:
+        await publish_job(bus, job)
     return BulkAssignResult(
-        assigned=assigned,
-        entities=entities,
-        reattributed=RecordCounts(**reattributed),
-        skipped=skipped,
+        assigned=assigned, entities=entities, attribution_jobs=len(jobs), skipped=skipped
     )
 
 
@@ -747,12 +775,14 @@ async def assign_to_project(
     body: ProjectAssignmentCreate,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> ProjectAssignmentRead:
     """Server admins, or admins of the target project. Overlaps are rejected: use the handover
     endpoint to move a device that is assigned elsewhere."""
     await _require_project_admin(session, user, body.project_id)
     device = await get_or_404(session, Device, device_id, "Device")
     await get_or_404(session, Project, body.project_id, "Project")
+    await hold_while_attributing(session, device.id)
     if body.valid_to is not None and body.valid_to <= body.valid_from:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "valid_to must be after valid_from"
@@ -767,8 +797,16 @@ async def assign_to_project(
     session.add(assignment)
     await flush_or_409(session, "Project assignment")
     # Records already decoded inside the range (a raw log, data before onboarding) get the
-    # project now (decision D103); nothing is fabricated for the future.
-    counts = await reattribute(session, device.id, body.valid_from, body.valid_to or utc_now())
+    # project through a job (decisions D103, D206); nothing is fabricated for the future.
+    queued = await queue_job(
+        session,
+        device_id=device.id,
+        start=body.valid_from,
+        end=body.valid_to or utc_now(),
+        reason="project_assignment.created",
+        user=user,
+        project_id=body.project_id,
+    )
     await record_audit(
         session,
         user=user,
@@ -779,11 +817,15 @@ async def assign_to_project(
         details={
             "device_id": str(device.id),
             "valid_from": body.valid_from.isoformat(),
-            "reattributed": counts,
+            "attribution_job_id": str(queued.job.id) if queued.job else None,
         },
     )
     await session.commit()
-    return project_assignment_read(assignment)
+    if queued.created and queued.job is not None:
+        await publish_job(bus, queued.job)
+    read = project_assignment_read(assignment)
+    read.attribution_job = job_read(queued.job)
+    return read
 
 
 async def _record_counts(
@@ -884,18 +926,33 @@ async def device_data_span(
     )
 
 
+@router.get("/{device_id}/attribution-jobs", response_model=list[AttributionJobRead])
+async def attribution_jobs(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[AttributionJob]:
+    """The device's newest attribution jobs, newest first (decision D206): after an assignment
+    change the records already inside the range get their project and entity in the
+    background, and the pages poll this to draw how far it is."""
+    device = await _visible_device(session, user, device_id)
+    return await recent_jobs(session, device.id)
+
+
 @router.post("/{device_id}/reattribute", response_model=ReattributeResult)
 async def reattribute_device(
     device_id: uuid.UUID,
     body: ReattributeRequest,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> ReattributeResult:
     """Recompute the project and entity of the device's records over a window from its
     assignments as they stand (decision D103): the repair for records that were decoded before
     an assignment existed and so carry none, found on the dev server on 2026-09-09. Project
     admins of the device's current project, or a server admin."""
     device = await get_or_404(session, Device, device_id, "Device")
+    await hold_while_attributing(session, device.id)
     attribution = await resolve_attribution(session, device.id, utc_now())
     if not user.is_superuser:
         if attribution.project_id is None:
@@ -910,7 +967,15 @@ async def reattribute_device(
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "valid_to must be after valid_from"
         )
-    counts = await reattribute(session, device.id, start, end)
+    queued = await queue_job(
+        session,
+        device_id=device.id,
+        start=start,
+        end=end,
+        reason="device.reattributed",
+        user=user,
+        project_id=attribution.project_id,
+    )
     await record_audit(
         session,
         user=user,
@@ -918,10 +983,16 @@ async def reattribute_device(
         object_type="device",
         object_id=str(device.id),
         project_id=attribution.project_id,
-        details={"from": start.isoformat(), "to": end.isoformat(), "reattributed": counts},
+        details={
+            "from": start.isoformat(),
+            "to": end.isoformat(),
+            "attribution_job_id": str(queued.job.id) if queued.job else None,
+        },
     )
     await session.commit()
-    return ReattributeResult(valid_from=start, valid_to=end, reattributed=counts)
+    if queued.created and queued.job is not None:
+        await publish_job(bus, queued.job)
+    return ReattributeResult(valid_from=start, valid_to=end, attribution_job=job_read(queued.job))
 
 
 @router.post(
@@ -934,6 +1005,7 @@ async def extend_project_assignment_start(
     body: AssignmentStart,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> ProjectAssignmentExtended:
     """Move the start of a project assignment back and attribute the records in between
     (decision D103): the repair for data that arrived before the device was assigned."""
@@ -941,6 +1013,7 @@ async def extend_project_assignment_start(
     if assignment.device_id != device_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
     await _require_project_admin(session, user, assignment.project_id)
+    await hold_while_attributing(session, device_id)
     old_from, valid_to = range_bounds(assignment.validity)
     if body.valid_from >= old_from:
         raise HTTPException(
@@ -948,7 +1021,15 @@ async def extend_project_assignment_start(
         )
     assignment.validity = Range(body.valid_from, valid_to, bounds="[)")
     await flush_or_409(session, "Project assignment")
-    counts = await reattribute(session, device_id, body.valid_from, old_from)
+    queued = await queue_job(
+        session,
+        device_id=device_id,
+        start=body.valid_from,
+        end=old_from,
+        reason="project_assignment.start_moved",
+        user=user,
+        project_id=assignment.project_id,
+    )
     await record_audit(
         session,
         user=user,
@@ -959,12 +1040,15 @@ async def extend_project_assignment_start(
         details={
             "from": old_from.isoformat(),
             "to": body.valid_from.isoformat(),
-            "reattributed": counts,
+            "attribution_job_id": str(queued.job.id) if queued.job else None,
         },
     )
     await session.commit()
-    read = project_assignment_read(assignment)
-    return ProjectAssignmentExtended(**read.model_dump(), reattributed=counts)
+    if queued.created and queued.job is not None:
+        await publish_job(bus, queued.job)
+    data = project_assignment_read(assignment).model_dump()
+    data["attribution_job"] = job_read(queued.job)
+    return ProjectAssignmentExtended(**data)
 
 
 @router.patch(
@@ -981,6 +1065,7 @@ async def end_project_assignment(
     if assignment.device_id != device_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
     await _require_project_admin(session, user, assignment.project_id)
+    await hold_while_attributing(session, device_id)
     valid_from, _ = range_bounds(assignment.validity)
     if body.valid_to <= valid_from:
         raise HTTPException(
@@ -1011,12 +1096,14 @@ async def handover(
     body: HandoverRequest,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> ProjectAssignmentRead:
     """Move the device to another project from `effective_at`: the current project assignment and
     entity assignment close at that moment, a new project assignment opens. History is untouched.
     Allowed for server admins and for admins of both the current and the target project."""
     device = await get_or_404(session, Device, device_id, "Device")
     await get_or_404(session, Project, body.project_id, "Project")
+    await hold_while_attributing(session, device.id)
     current = await session.scalar(
         select(DeviceProjectAssignment).where(
             DeviceProjectAssignment.device_id == device.id,
@@ -1058,8 +1145,16 @@ async def handover(
     )
     session.add(new)
     await flush_or_409(session, "Handover")
-    # Records already decoded after the handover moment move with the device (D103).
-    counts = await reattribute(session, device.id, body.effective_at, utc_now())
+    # Records already decoded after the handover moment move with the device (D103, D206).
+    queued = await queue_job(
+        session,
+        device_id=device.id,
+        start=body.effective_at,
+        end=utc_now(),
+        reason="device.handover",
+        user=user,
+        project_id=body.project_id,
+    )
     await record_audit(
         session,
         user=user,
@@ -1072,11 +1167,15 @@ async def handover(
             "to_project_id": str(body.project_id),
             "effective_at": body.effective_at.isoformat(),
             "entity_assignment_closed": str(entity_assignment.id) if entity_assignment else None,
-            "reattributed": counts,
+            "attribution_job_id": str(queued.job.id) if queued.job else None,
         },
     )
     await session.commit()
-    return project_assignment_read(new)
+    if queued.created and queued.job is not None:
+        await publish_job(bus, queued.job)
+    read = project_assignment_read(new)
+    read.attribution_job = job_read(queued.job)
+    return read
 
 
 # External identities

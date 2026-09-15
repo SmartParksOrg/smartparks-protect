@@ -1,5 +1,6 @@
 """Assignment dates from the data and the attribution repair (decision D103): records that
-arrived before a device was assigned become visible when the assignment start moves back."""
+arrived before a device was assigned become visible when the assignment start moves back. The
+rewrite runs as an attribution job (decision D206), run here as the export worker would."""
 
 import uuid
 
@@ -21,6 +22,22 @@ async def bus():
     bus = RedisStreamsBus()
     yield bus
     await bus.close()
+
+
+async def _finish_jobs(client, device_id: str, headers) -> list[dict]:
+    """Run the device's queued attribution jobs as the export worker would (it is not running
+    in tests) and return the jobs, newest first."""
+    from shared.domain.attribution import run_attribution_job
+
+    jobs = (
+        await client.get(f"/api/v1/devices/{device_id}/attribution-jobs", headers=headers)
+    ).json()
+    for job in jobs:
+        if job["status"] == "queued":
+            await run_attribution_job({"job_id": job["id"]})
+    return (
+        await client.get(f"/api/v1/devices/{device_id}/attribution-jobs", headers=headers)
+    ).json()
 
 
 async def _device_with_early_records(client, db, bus):
@@ -115,7 +132,45 @@ async def test_records_before_the_assignment_are_repaired_by_moving_the_start(cl
     )
     assert extended.status_code == 200, extended.text
     assert extended.json()["valid_from"].startswith("2026-05-03")
-    assert extended.json()["reattributed"] == {"positions": 3, "measurements": 3}
+    job = extended.json()["attribution_job"]
+    assert job["status"] == "queued" and job["records_total"] == 6
+    assert job["reason"] == "project_assignment.start_moved"
+    # the records are the project's once the export worker has run the job (decision D206); a
+    # change while it is still queued folds into it with a wider window...
+    again = await client.post(
+        f"/api/v1/devices/{device['id']}/project-assignments/{assigned.json()['id']}/extend-start",
+        json={"valid_from": "2026-05-01T00:00:00+00:00"},
+        headers=h,
+    )
+    assert again.status_code == 200, again.text
+    folded = again.json()["attribution_job"]
+    assert folded["id"] == job["id"] and folded["time_from"].startswith("2026-05-01")
+    assert folded["records_total"] == 6
+    # ...and a change while it runs waits
+    from sqlalchemy import update
+
+    from shared.models import AttributionJob
+
+    job_id = uuid.UUID(job["id"])
+    await db.execute(
+        update(AttributionJob).where(AttributionJob.id == job_id).values(status="running")
+    )
+    await db.commit()
+    busy = await client.post(
+        f"/api/v1/devices/{device['id']}/project-assignments/{assigned.json()['id']}/extend-start",
+        json={"valid_from": "2026-04-01T00:00:00+00:00"},
+        headers=h,
+    )
+    assert busy.status_code == 409, busy.text
+    await db.execute(
+        update(AttributionJob).where(AttributionJob.id == job_id).values(status="queued")
+    )
+    await db.commit()
+    jobs = await _finish_jobs(client, device["id"], h)
+    assert jobs[0]["id"] == job["id"] and jobs[0]["status"] == "complete"
+    assert jobs[0]["records_done"] == 6 and jobs[0]["records_total"] == 6
+    assert jobs[0]["counts"] == {"positions": 3, "measurements": 3}
+    assert jobs[0]["trace_id"] and jobs[0]["finished_at"]
     listed = (
         await client.get(f"/api/v1/projects/{project.id}/positions", params=window, headers=h)
     ).json()
@@ -163,6 +218,8 @@ async def test_records_before_the_assignment_are_repaired_by_moving_the_start(cl
     )
     assert entity_assignment.status_code == 201, entity_assignment.text
     # creating the assignment attributes the record already inside its range (May 5)
+    assert entity_assignment.json()["attribution_job"]["records_total"] == 2
+    await _finish_jobs(client, device["id"], h)
     listed = (
         await client.get(f"/api/v1/projects/{project.id}/positions", params=window, headers=h)
     ).json()
@@ -184,7 +241,12 @@ async def test_records_before_the_assignment_are_repaired_by_moving_the_start(cl
         headers=h,
     )
     assert extended.status_code == 200, extended.text
-    assert extended.json()["reattributed"] == {"positions": 2, "measurements": 2}
+    assert extended.json()["attribution_job"]["records_total"] == 4
+    jobs = await _finish_jobs(client, device["id"], h)
+    assert jobs[0]["status"] == "complete" and jobs[0]["counts"] == {
+        "positions": 2,
+        "measurements": 2,
+    }
     listed = (
         await client.get(f"/api/v1/projects/{project.id}/positions", params=window, headers=h)
     ).json()
@@ -264,8 +326,10 @@ async def test_records_inside_an_assignment_without_an_entity_are_repaired(clien
     repaired = await client.post(f"/api/v1/devices/{device['id']}/reattribute", json={}, headers=h)
     assert repaired.status_code == 200, repaired.text
     body = repaired.json()
-    assert body["reattributed"]["positions"] == 3 and body["reattributed"]["measurements"] == 3
+    assert body["attribution_job"]["records_total"] == 6
     assert body["valid_from"].startswith("2026-05-03T10:00:00")
+    jobs = await _finish_jobs(client, device["id"], h)
+    assert jobs[0]["counts"] == {"positions": 3, "measurements": 3}
     db.expire_all()
     left = (
         await db.scalars(

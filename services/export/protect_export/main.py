@@ -1,5 +1,6 @@
 """Export service: consumes `export.requested`, runs the job, stores the result in MinIO. It is
-also the batch worker for curation jobs (`curation.job_requested`, architecture 28.5)."""
+also the batch worker for curation jobs (`curation.job_requested`, architecture 28.5) and for
+attribution jobs (`attribution.requested`, decision D206)."""
 
 import asyncio
 import uuid
@@ -7,6 +8,7 @@ import uuid
 from shared.bus import Message, Topic
 from shared.curation.jobs import run_job
 from shared.database import session_scope
+from shared.domain.attribution import run_attribution_job
 from shared.exports.cleanup import expire_exports
 from shared.exports.runner import run_export
 from shared.logger import get_logger
@@ -33,6 +35,9 @@ def build_worker() -> Worker:
     async def on_curation(message: Message) -> None:
         await run_job(worker.bus, message.payload)
 
+    async def on_attribution(message: Message) -> None:
+        await run_attribution_job(message.payload)
+
     async def cleanup_loop() -> None:
         """Every hour: remove the files of exports past their retention (architecture 14)."""
         while not worker.bus._stop.is_set():
@@ -47,6 +52,7 @@ def build_worker() -> Worker:
 
     worker.subscribe(Topic.EXPORT_REQUESTED, handle)
     worker.subscribe(Topic.CURATION_JOB_REQUESTED, on_curation)
+    worker.subscribe(Topic.ATTRIBUTION_REQUESTED, on_attribution)
     worker.background(cleanup_loop)
     return worker
 

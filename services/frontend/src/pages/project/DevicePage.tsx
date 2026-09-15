@@ -13,7 +13,9 @@ import type {
   Page as PageType,
   Position,
   TrafficRow,
-} from "@/api/types";
+  EntityAssignmentExtended,
+  ProjectAssignmentExtended,
+  ReattributeResult,} from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -40,8 +42,10 @@ import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AssignEntityDialog } from "@/components/devices/AssignEntityDialog";
+import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
+import { useAttributionJob } from "@/hooks/useAttributionJob";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
@@ -124,38 +128,53 @@ export function DevicePage() {
   const repairInvalidate = [
     queryKeys.device(deviceId),
     queryKeys.deviceSpan(deviceId),
+    queryKeys.attributionJobs(deviceId),
     queryKeys.positions(projectId ?? "", { deviceId, recent: true }),
   ];
+  // the records in between get their project or entity through a job (decision D206)
   const extendProject = useMutationToast({
     mutationFn: (s: DeviceDataSpan) =>
-      api.post(
+      api.post<ProjectAssignmentExtended>(
         `/api/v1/devices/${deviceId}/project-assignments/${s.earliest_project_assignment_id}/extend-start`,
         { body: { valid_from: s.first_data_at } },
       ),
     invalidate: repairInvalidate,
-    success: t(
-      "Assignment extended; the earlier records now belong to the project",
-    ),
+    success: (r) =>
+      r.attribution_job
+        ? t(
+            "Assignment extended; {{count}} earlier records are being given the project in the background",
+            { count: r.attribution_job.records_total },
+          )
+        : t("Assignment extended"),
   });
   const extendEntity = useMutationToast({
     mutationFn: (s: DeviceDataSpan) =>
-      api.post(
+      api.post<EntityAssignmentExtended>(
         `/api/v1/projects/${projectId}/entity-assignments/${s.earliest_entity_assignment_id}/extend-start`,
         { body: { valid_from: s.first_data_at } },
       ),
     invalidate: repairInvalidate,
-    success: t(
-      "Assignment extended; the earlier records now belong to the entity",
-    ),
+    success: (r) =>
+      r.attribution_job
+        ? t(
+            "Assignment extended; {{count}} earlier records are being given the entity in the background",
+            { count: r.attribution_job.records_total },
+          )
+        : t("Assignment extended"),
   });
   const recompute = useMutationToast({
     mutationFn: () =>
-      api.post<{ reattributed: { positions: number; measurements: number } }>(
-        `/api/v1/devices/${deviceId}/reattribute`,
-        { body: {} },
-      ),
+      api.post<ReattributeResult>(`/api/v1/devices/${deviceId}/reattribute`, {
+        body: {},
+      }),
     invalidate: [...repairInvalidate, ["projects", projectId ?? "", "records"]],
-    success: t("Attribution recomputed over the device's assignments"),
+    success: (r) =>
+      r.attribution_job
+        ? t(
+            "Recomputing the attribution of {{count}} records in the background",
+            { count: r.attribution_job.records_total },
+          )
+        : t("Nothing to recompute: the device has no records in that window"),
   });
   const d = device.data;
   const type = types.data?.items.find((t) => t.id === d?.device_type_id);
@@ -179,6 +198,17 @@ export function DevicePage() {
   // the device's project today: the route's, or on the admin route the current assignment's
   const deviceProjectId =
     projectId ?? d?.project_assignments.find((a) => !a.valid_to)?.project_id ?? null;
+  const attribution = useAttributionJob(deviceId, [
+    ...repairInvalidate,
+    ...(deviceProjectId
+      ? [
+          queryKeys.currentState(deviceProjectId),
+          queryKeys.entityAssignments(deviceProjectId),
+        ]
+      : []),
+  ]);
+  // while the records are being rewritten, the assignments hold still (decision D206)
+  const attributing = attribution.active !== null;
   // in a project, the project's own permission; without one, a server admin picks the project in the dialog (D192)
   const mayAssign = deviceProjectId ? can("devices:write") : Boolean(user?.is_superuser);
   // the project an entity assignment belongs to: the project assignment covering its start
@@ -280,6 +310,7 @@ export function DevicePage() {
         }
       />
       <Page>
+        <AttributionProgress active={attribution.active} failed={attribution.failed} />
         {sp &&
           (sp.clock_ahead?.positions ?? 0) +
             (sp.clock_ahead?.measurements ?? 0) >
@@ -318,7 +349,7 @@ export function DevicePage() {
                 size="sm"
                 variant="outline"
                 className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
-                disabled={extendProject.isPending}
+                disabled={extendProject.isPending || attributing}
                 onClick={() => extendProject.mutate(sp)}
               >
                 {t("Extend the assignment back to {{date}}", {
@@ -346,7 +377,7 @@ export function DevicePage() {
                   size="sm"
                   variant="outline"
                   className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
-                  disabled={extendEntity.isPending}
+                  disabled={extendEntity.isPending || attributing}
                   onClick={() => extendEntity.mutate(sp)}
                 >
                   {t("Extend the entity assignment back to {{date}}", {
@@ -428,7 +459,7 @@ export function DevicePage() {
                 <CardHeader className="flex flex-row items-center justify-between gap-2">
                   <CardTitle>{t("Project assignments")}</CardTitle>
                   {!deviceProjectId && user?.is_superuser && (
-                    <Button size="sm" variant="outline" onClick={() => setAssigning("project")}>
+                    <Button size="sm" variant="outline" disabled={attributing} onClick={() => setAssigning("project")}>
                       {t("Assign to project")}
                     </Button>
                   )}
@@ -465,13 +496,13 @@ export function DevicePage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={release.isPending}
+                        disabled={release.isPending || attributing}
                         onClick={() => release.mutate(currentEntityAssignment.id)}
                       >
                         {t("Release")}
                       </Button>
                     ) : (
-                      <Button size="sm" onClick={() => setAssigning("entity")}>
+                      <Button size="sm" disabled={attributing} onClick={() => setAssigning("entity")}>
                         {t("Assign to entity")}
                       </Button>
                     ))}
@@ -593,7 +624,7 @@ export function DevicePage() {
                       "Give every record its project and entity again from the assignments as they stand, for records decoded before an assignment existed",
                     )}
                     onClick={() => recompute.mutate()}
-                    disabled={recompute.isPending}
+                    disabled={recompute.isPending || attributing}
                   >
                     <RefreshCw className="size-4" />{" "}
                     {t("Recompute attribution")}

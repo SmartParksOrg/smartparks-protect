@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type { DeviceLogFile } from "@/api/types";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { TraceDialog } from "@/components/devices/ProvenancePanel";
+import { ProgressBar } from "@/components/common/ProgressBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,9 +27,7 @@ function Progress({ f }: { f: DeviceLogFile }) {
   return (
     <div className="max-w-xs space-y-1">
       <div className="text-muted-foreground">{t("{{done}} of {{total}} frames decoded, {{percent}}%", { done: f.frames_done, total: f.frames_total, percent })}</div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
-        <div className="h-full bg-primary transition-[width] duration-500" style={{ width: `${percent}%` }} />
-      </div>
+      <ProgressBar percent={percent} />
     </div>
   );
 }

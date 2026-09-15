@@ -47,14 +47,15 @@ async def resolve_attribution(
     return Attribution(project_id=project_id, entity_id=entity_id)
 
 
-async def reattribute(
+async def rewrite_attribution(
     session: AsyncSession, device_id: uuid.UUID, start: datetime, end: datetime
-) -> dict[str, int]:
+) -> tuple[dict[str, int], set[uuid.UUID | None]]:
     """Rewrite the project and entity of the device's records whose effective time lies in
     `[start, end)` from the assignments as they stand now (decision D103): after an assignment
     start moved back, records that had no project or the wrong one get the right attribution.
-    Records in a gap get none. Returns the rows touched per table. The current state of the
-    device and the entities involved is recomputed afterwards."""
+    Records in a gap get none. Returns the rows touched per table and the entities involved
+    (None stands for the gaps), for the current-state recompute the caller runs; the
+    attribution job (decision D206) runs this per window and recomputes once at the end."""
     from sqlalchemy import and_, text, update
 
     from shared.curation.effective import effective_time
@@ -63,7 +64,7 @@ async def reattribute(
     require_aware(start)
     require_aware(end)
     if end <= start:
-        return {"positions": 0, "measurements": 0}
+        return {"positions": 0, "measurements": 0}, {None}
     # Records older than the compression horizon live in compressed chunks; the update must
     # be allowed to decompress them.
     await session.execute(
@@ -114,7 +115,17 @@ async def reattribute(
                     .values(entity_id=entity_assignment.entity_id),
                     execution_options={"synchronize_session": False},
                 )
+    return counts, entity_ids
+
+
+async def reattribute(
+    session: AsyncSession, device_id: uuid.UUID, start: datetime, end: datetime
+) -> dict[str, int]:
+    """`rewrite_attribution` and the current-state recompute in one call, for a window small
+    enough for one transaction: the curation overlay's time change of a record. Assignment
+    changes queue an attribution job instead (`shared/domain/attribution.py`)."""
     from shared.curation.apply import recompute_current_state
 
+    counts, entity_ids = await rewrite_attribution(session, device_id, start, end)
     await recompute_current_state(session, device_id, entity_ids)
     return counts

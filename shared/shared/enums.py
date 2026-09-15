@@ -144,6 +144,15 @@ class LogFileStatus(StrEnum):
     FAILED = "failed"
 
 
+class AttributionJobStatus(StrEnum):
+    """Status of an attribution job (decision D206)."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+
 class AcquisitionChannel(StrEnum):
     """Route from the device to the upstream system (architecture 25.1)."""
 

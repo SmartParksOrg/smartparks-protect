@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- Attribution in the background with progress (decision D206, ADR 0032): an assignment change (a start extended back to the first data, a device assigned to a project or an entity, a handover, a changed assignment, "Recompute attribution", the bulk assignment) writes the assignment and returns at once; the records already inside the range get their project and entity through a job the export service runs in pieces of thirty days, and the device and entity pages show a callout with the records done, the percentage and a bar until it is complete, then a toast. On the development server a collar with 195,756 records held the request for 38 and 60 s, close to the proxy's limit, with only a greyed button to show for it. While a device's job runs, its other assignment changes are refused (409) and their buttons disabled; a change made while the job is still queued folds into it (the assign dialog's project and entity steps need one job). `GET /devices/{id}/attribution-jobs` lists a device's newest jobs; the assignment endpoints answer the job as `attribution_job` in place of the counts of rewritten rows; the bulk assignment answers `attribution_jobs`, the number of devices with records.
 - A log file being decoded shows how far it is: the Log files card on the device page draws a bar with the percentage and "n of m frames decoded" while the status is processing, refreshed every few seconds; the row keeps `frames_done` next to `frames_total`, written after every batch by the decoder (migration 0033).
 - Every event explains itself: the event dialog opens with "What this means" in plain words for each event type the system raises (device errors with each flag spelled out, `ublox_fix`, `lr_join` and the rest; reboots with their reason; no data, battery low, collar not moving, geofences, proximity, speed, the system alerts), from one table in `shared/domain/explanations.py` that the API adds to every event as `explanation`.
 - Events name their subject: the event read carries the entity's and the device's names (`entity_name`, `device_name`); the feed on the live map shows the entity, or the device when no animal is tracked, under the title, and the event dialog's links read the names and open the entity, its place on the map and the device; the event's context is folded away as technical details, without the deduplication fingerprint.
@@ -84,6 +85,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Migrations
 
+- 0034 (attribution jobs): adds `attribution_jobs`; the downgrade drops it.
 - 0033 (log file progress): adds `device_log_files.frames_done` and sets it to `frames_total` for complete files; the downgrade drops it.
 - 0032 (last reset): adds `device_current_state.last_reset_at`; the downgrade drops it.
 - 0031 (last movement): adds `device_current_state.last_movement_at`; the downgrade drops it. Existing devices get it with their next status message.

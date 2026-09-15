@@ -17,13 +17,14 @@ import type {
   Page as PageType,
   Position,
   TrafficRow,
-} from "@/api/types";
+  EntityAssignmentExtended,} from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { TrafficTable } from "@/components/network/TrafficTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { HealthCard } from "@/components/devices/HealthCard";
+import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { ChangeAssignmentDialog } from "@/components/entities/ChangeAssignmentDialog";
 import { EntityDialog } from "@/components/entities/EntityDialog";
@@ -45,6 +46,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAttributionJob } from "@/hooks/useAttributionJob";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
@@ -181,7 +183,7 @@ export function EntityPage() {
   });
   const extend = useMutationToast({
     mutationFn: (s: DeviceDataSpan) =>
-      api.post(
+      api.post<EntityAssignmentExtended>(
         `/api/v1/projects/${projectId}/entity-assignments/${current?.id}/extend-start`,
         { body: { valid_from: s.first_data_at } },
       ),
@@ -193,13 +195,29 @@ export function EntityPage() {
         ? [
             queryKeys.deviceSpan(current.device_id),
             queryKeys.device(current.device_id),
+            queryKeys.attributionJobs(current.device_id),
           ]
         : []),
     ],
-    success: t(
-      "Assignment extended; the earlier records now belong to this entity",
-    ),
+    success: (r) =>
+      r.attribution_job
+        ? t(
+            "Assignment extended; {{count}} earlier records are being given this entity in the background",
+            { count: r.attribution_job.records_total },
+          )
+        : t("Assignment extended"),
   });
+  // the records get the entity through a job the page follows (decision D206)
+  const attribution = useAttributionJob(current?.device_id, [
+    queryKeys.entityAssignments(projectId),
+    queryKeys.currentState(projectId),
+    queryKeys.entity(projectId, entityId),
+    queryKeys.positions(projectId, { entityId, recent: true }),
+    ...(current
+      ? [queryKeys.device(current.device_id), queryKeys.deviceSpan(current.device_id)]
+      : []),
+  ]);
+  const attributing = attribution.active !== null;
   const sp = span.data;
   const beforeEntity =
     sp && current && sp.earliest_entity_assignment_id === current.id
@@ -286,6 +304,7 @@ export function EntityPage() {
         }
       />
       <Page>
+        <AttributionProgress active={attribution.active} failed={attribution.failed} />
         {current && sp && beforeEntity > 0 && (
           <Callout kind="info">
             {t(
@@ -301,7 +320,7 @@ export function EntityPage() {
                 size="sm"
                 variant="outline"
                 className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
-                disabled={extend.isPending}
+                disabled={extend.isPending || attributing}
                 onClick={() => extend.mutate(sp)}
               >
                 {t("Extend the assignment back to {{date}}", {
@@ -396,7 +415,7 @@ export function EntityPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("Device")}</CardTitle>
                   {admin && !current && (
-                    <Button size="sm" onClick={() => setAssigning(true)}>
+                    <Button size="sm" disabled={attributing} onClick={() => setAssigning(true)}>
                       <Plus className="size-4" /> {t("Assign device")}
                     </Button>
                   )}
@@ -434,6 +453,7 @@ export function EntityPage() {
                           variant="outline"
                           size="sm"
                           className="ml-auto"
+                          disabled={attributing}
                           onClick={() => setChanging(current)}
                         >
                           {t("Change…")}
@@ -443,7 +463,7 @@ export function EntityPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={release.isPending}
+                          disabled={release.isPending || attributing}
                           onClick={() => release.mutate(current.id)}
                         >
                           {t("Release device")}

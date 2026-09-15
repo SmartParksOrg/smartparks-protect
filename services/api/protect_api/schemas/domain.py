@@ -289,6 +289,28 @@ class DeviceRead(ORMModel):
     )
 
 
+class AttributionJobRead(ORMModel):
+    """The rewrite of a device's records after an assignment change (decision D206): queued by
+    the change, run by the export service in windows, the records done so far on the row."""
+
+    id: uuid.UUID
+    device_id: uuid.UUID
+    project_id: uuid.UUID | None
+    reason: str = Field(description="The audit action that queued it")
+    status: str = Field(description="queued, running, complete or failed")
+    time_from: datetime
+    time_to: datetime
+    records_total: int = Field(description="Positions and measurements in the window")
+    records_done: int = Field(description="Records rewritten so far")
+    counts: dict[str, int] = Field(description="Rows rewritten per table")
+    error_code: str | None
+    error_message: str | None
+    trace_id: uuid.UUID | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
 class AssignmentRead(ORMModel):
     id: uuid.UUID
     device_id: uuid.UUID
@@ -296,6 +318,12 @@ class AssignmentRead(ORMModel):
     valid_to: datetime | None
     reason: str | None
     created_at: datetime
+    attribution_job: AttributionJobRead | None = Field(
+        default=None,
+        description="Set by the endpoints that change an assignment: the job giving the records "
+        "already inside the range their project and entity (decision D206); null when there "
+        "were none",
+    )
 
 
 class ProjectAssignmentRead(AssignmentRead):
@@ -383,7 +411,7 @@ class AssignmentStart(BaseModel):
 
 
 class ProjectAssignmentExtended(ProjectAssignmentRead):
-    reattributed: dict[str, int]
+    """The assignment with the job attributing the records in between (decision D206)."""
 
 
 class ReattributeRequest(BaseModel):
@@ -403,11 +431,13 @@ class ReattributeRequest(BaseModel):
 class ReattributeResult(BaseModel):
     valid_from: datetime
     valid_to: datetime
-    reattributed: dict[str, int]
+    attribution_job: AttributionJobRead | None = Field(
+        description="The job rewriting the window (decision D206); null when it holds no record"
+    )
 
 
 class EntityAssignmentExtended(EntityAssignmentRead):
-    reattributed: dict[str, int]
+    """The assignment with the job attributing the records in between (decision D206)."""
 
 
 class RecordCounts(BaseModel):

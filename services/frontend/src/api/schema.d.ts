@@ -848,6 +848,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/attribution-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attribution Jobs
+         * @description The device's newest attribution jobs, newest first (decision D206): after an assignment
+         *     change the records already inside the range get their project and entity in the
+         *     background, and the pages poll this to draw how far it is.
+         */
+        get: operations["attribution_jobs_api_v1_devices__device_id__attribution_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/reattribute": {
         parameters: {
             query?: never;
@@ -5152,6 +5174,77 @@ export interface components {
              */
             queued_source_events: number;
         };
+        /**
+         * AttributionJobRead
+         * @description The rewrite of a device's records after an assignment change (decision D206): queued by
+         *     the change, run by the export service in windows, the records done so far on the row.
+         */
+        AttributionJobRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Project Id */
+            project_id: string | null;
+            /**
+             * Reason
+             * @description The audit action that queued it
+             */
+            reason: string;
+            /**
+             * Status
+             * @description queued, running, complete or failed
+             */
+            status: string;
+            /**
+             * Time From
+             * Format: date-time
+             */
+            time_from: string;
+            /**
+             * Time To
+             * Format: date-time
+             */
+            time_to: string;
+            /**
+             * Records Total
+             * @description Positions and measurements in the window
+             */
+            records_total: number;
+            /**
+             * Records Done
+             * @description Records rewritten so far
+             */
+            records_done: number;
+            /**
+             * Counts
+             * @description Rows rewritten per table
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Trace Id */
+            trace_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+        };
         /** AuditRead */
         AuditRead: {
             /** Id */
@@ -5509,7 +5602,12 @@ export interface components {
             assigned: number;
             /** Entities */
             entities: number;
-            reattributed: components["schemas"]["RecordCounts"];
+            /**
+             * Attribution Jobs
+             * @description Jobs queued to give the records already inside the new assignments the project, one per device with records (decision D206)
+             * @default 0
+             */
+            attribution_jobs: number;
             /** Skipped */
             skipped: components["schemas"]["BulkAssignSkipped"][];
         };
@@ -7098,7 +7196,10 @@ export interface components {
             /** @description Create this entity and assign the device to it */
             new_entity?: components["schemas"]["EntityCreate"] | null;
         };
-        /** EntityAssignmentExtended */
+        /**
+         * EntityAssignmentExtended
+         * @description The assignment with the job attributing the records in between (decision D206).
+         */
         EntityAssignmentExtended: {
             /**
              * Id
@@ -7124,6 +7225,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** @description Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none */
+            attribution_job?: components["schemas"]["AttributionJobRead"] | null;
             /**
              * Entity Id
              * Format: uuid
@@ -7139,10 +7242,6 @@ export interface components {
              * @description Filled by the device read (decision D106)
              */
             entity_name?: string | null;
-            /** Reattributed */
-            reattributed: {
-                [key: string]: number;
-            };
         };
         /** EntityAssignmentRead */
         EntityAssignmentRead: {
@@ -7170,6 +7269,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** @description Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none */
+            attribution_job?: components["schemas"]["AttributionJobRead"] | null;
             /**
              * Entity Id
              * Format: uuid
@@ -9548,7 +9649,10 @@ export interface components {
              */
             project_id: string;
         };
-        /** ProjectAssignmentExtended */
+        /**
+         * ProjectAssignmentExtended
+         * @description The assignment with the job attributing the records in between (decision D206).
+         */
         ProjectAssignmentExtended: {
             /**
              * Id
@@ -9574,6 +9678,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** @description Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none */
+            attribution_job?: components["schemas"]["AttributionJobRead"] | null;
             /**
              * Project Id
              * Format: uuid
@@ -9584,10 +9690,6 @@ export interface components {
              * @description Filled by the device read, so the page names the project
              */
             project_name?: string | null;
-            /** Reattributed */
-            reattributed: {
-                [key: string]: number;
-            };
         };
         /** ProjectAssignmentRead */
         ProjectAssignmentRead: {
@@ -9615,6 +9717,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** @description Set by the endpoints that change an assignment: the job giving the records already inside the range their project and entity (decision D206); null when there were none */
+            attribution_job?: components["schemas"]["AttributionJobRead"] | null;
             /**
              * Project Id
              * Format: uuid
@@ -9884,10 +9988,8 @@ export interface components {
              * Format: date-time
              */
             valid_to: string;
-            /** Reattributed */
-            reattributed: {
-                [key: string]: number;
-            };
+            /** @description The job rewriting the window (decision D206); null when it holds no record */
+            attribution_job: components["schemas"]["AttributionJobRead"] | null;
         };
         /** ReceptionRead */
         ReceptionRead: {
@@ -13566,6 +13668,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceDataSpan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attribution_jobs_api_v1_devices__device_id__attribution_jobs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttributionJobRead"][];
                 };
             };
             /** @description Validation Error */

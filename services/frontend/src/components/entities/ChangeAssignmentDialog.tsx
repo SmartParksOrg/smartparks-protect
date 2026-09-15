@@ -82,9 +82,13 @@ export function ChangeAssignmentDialog({
       queryKeys.currentState(projectId),
       queryKeys.device(assignment.device_id),
       queryKeys.deviceSpan(assignment.device_id),
+      queryKeys.attributionJobs(assignment.device_id),
       queryKeys.devices({ projectId, unassigned: true }),
     ],
-    success: t("Assignment changed; the records in between follow"),
+    success: (a) =>
+      a.attribution_job
+        ? t("Assignment changed; {{count}} records in between are being attributed in the background", { count: a.attribution_job.records_total })
+        : t("Assignment changed"),
     onSuccess: () => onOpenChange(false),
   });
   return (

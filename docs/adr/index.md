@@ -37,3 +37,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0029 One top bar on every screen, and a night mode that reaches the map](0029-one-top-bar-and-night-mode.md)
 - [0030 Roles as named permission sets, custom roles per project, and a member's scope enforced on every read](0030-roles-and-member-scope.md)
 - [0031 Analysis as an isolated, optional subsystem](0031-analysis-as-an-isolated-optional-subsystem.md)
+- [0032 Attribution repair as a background job with progress](0032-attribution-as-a-background-job.md)

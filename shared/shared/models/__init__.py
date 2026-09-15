@@ -11,6 +11,7 @@ from shared.models.access import (
 )
 from shared.models.analysis import AnalysisGeometry, AnalysisRun
 from shared.models.analytics import ExportJob, SavedView
+from shared.models.attribution import AttributionJob
 from shared.models.backup import BackupRun
 from shared.models.base import Base
 from shared.models.control import Command, CommandExecution
@@ -65,6 +66,7 @@ __all__ = [
     "AnalysisGeometry",
     "AnalysisRun",
     "ApplicationError",
+    "AttributionJob",
     "AuditLog",
     "Automation",
     "BackupRun",

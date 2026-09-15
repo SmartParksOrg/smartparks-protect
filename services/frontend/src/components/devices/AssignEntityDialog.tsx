@@ -98,8 +98,14 @@ function AssignEntityForm({ projectId: fixedProjectId, device, entity: entitySte
         },
       });
     },
-    invalidate: [queryKeys.device(device.id), queryKeys.deviceSpan(device.id), queryKeys.devices({}), queryKeys.entities(projectId), queryKeys.entityAssignments(projectId), queryKeys.currentState(projectId), queryKeys.devices({ projectId, unassigned: true })],
-    success: (a: EntityAssignment | null) => (a ? t("{{device}} now tracks {{entity}}", { device: device.name, entity: a.entity_name ?? name }) : t("{{device}} is in {{project}} now", { device: device.name, project: project?.name ?? "" })),
+    invalidate: [queryKeys.device(device.id), queryKeys.deviceSpan(device.id), queryKeys.attributionJobs(device.id), queryKeys.devices({}), queryKeys.entities(projectId), queryKeys.entityAssignments(projectId), queryKeys.currentState(projectId), queryKeys.devices({ projectId, unassigned: true })],
+    // the records already inside the range follow through a job the page shows (decision D206)
+    success: (a: EntityAssignment | null) =>
+      a
+        ? a.attribution_job
+          ? t("{{device}} now tracks {{entity}}; {{count}} earlier records are being given the entity in the background", { device: device.name, entity: a.entity_name ?? name, count: a.attribution_job.records_total })
+          : t("{{device}} now tracks {{entity}}", { device: device.name, entity: a.entity_name ?? name })
+        : t("{{device}} is in {{project}} now", { device: device.name, project: project?.name ?? "" }),
     onSuccess: onDone,
   });
   const projectStep = needProject && (
