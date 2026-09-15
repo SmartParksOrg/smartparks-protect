@@ -105,7 +105,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Upgrade notes
 
-- The Python image installs Pango, HarfBuzz and the DejaVu fonts for the PDF reports (decision D211); `docker compose build` fetches them, nothing to configure. The map in a report uses `MAPTILER_KEY` when set, with the server's `PUBLIC_URL` as the referrer; without a key the report draws the map on a plain ground.
+- The Python image installs Pango, HarfBuzz and the DejaVu fonts for the PDF reports (decision D211); `docker compose build` fetches them, nothing to configure. The map in a report uses `MAPTILER_KEY` when set, with the server's `PUBLIC_URL` as the referrer; without a key the report draws the map on a plain ground. `MAPTILER_KEY` moved from the API service to the shared environment in `docker-compose.yml`, so the export worker sees it too.
 - A new service `analysis` in `docker-compose.yml` (the same image, `python -m protect_analysis.main`); `ANALYSIS_MODULES`, `ANALYSIS_CONCURRENCY`, `ANALYSIS_TIMEOUT_SECONDS`, `ANALYSIS_STATEMENT_TIMEOUT_SECONDS`, `ANALYSIS_RETENTION_DAYS` and `ANALYSIS_MAX_FIXES` in `.env` (the defaults apply when absent). The Ansible playbook writes the first three. Without the service, runs stay queued and "waiting for the worker" shows; the rest of Protect is unaffected.
 - The MinIO server and client images come from `quay.io/minio/...` now: MinIO's repositories disappeared from Docker Hub on 2026-09-11 (a pull answers "access denied", the repository page 404). The tags and digests are the same; a server pulls each image once more from Quay on its next update.
 

@@ -144,6 +144,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       CREDENTIALS_KEY: ${CREDENTIALS_KEY}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      # the live map's imagery and the PDF reports' base map (decisions D141, D211); every
+      # service reads it, the export worker for the reports
+      MAPTILER_KEY: ${MAPTILER_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-json}
       BUS_MAXLEN: ${BUS_MAXLEN:-100000}
@@ -196,7 +199,6 @@ services:
       JWT_LIFETIME_SECONDS: ${JWT_LIFETIME_SECONDS:-3600}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       INVITATION_LIFETIME_HOURS: ${INVITATION_LIFETIME_HOURS:-168}
-      MAPTILER_KEY: ${MAPTILER_KEY:-}
       STATEMENT_TIMEOUT_SECONDS: ${API_STATEMENT_TIMEOUT_SECONDS:-120}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
