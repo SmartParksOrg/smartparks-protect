@@ -6,7 +6,6 @@ import {
   Flame,
   Layers,
   ListTree,
-  Crosshair,
   LocateFixed,
   Minus,
   Mountain,
@@ -1653,19 +1652,6 @@ export function MapPage() {
           } satisfies StripItem,
         ]
       : []),
-    ...(followKey
-      ? [
-          {
-            key: "follow",
-            icon: Crosshair,
-            label: following
-              ? t("Following the selection; a drag pauses it")
-              : t("Follow the selection as positions arrive"),
-            active: following,
-            onClick: () => setFollowPausedFor(following ? followKey : null),
-          } satisfies StripItem,
-        ]
-      : []),
   ];
   const shownLayers = shownLayerCount(layers, {
     entities: visibleFeatures?.length ?? 0,
@@ -1989,6 +1975,10 @@ export function MapPage() {
             track={selectedTrack}
             heat={heatIds.includes(selected.entity_id)}
             onToggleHeat={() => toggleHeat(selected.entity_id)}
+            following={following}
+            onToggleFollow={() =>
+              setFollowPausedFor(following ? followKey : null)
+            }
             onToggleTrack={() =>
               setTracked(
                 trackedIds.includes(selected.entity_id)
@@ -2031,6 +2021,10 @@ export function MapPage() {
             heat={heatDeviceIds.includes(selectedDevice.properties.device_id)}
             onToggleHeat={() =>
               toggleDeviceHeat(selectedDevice.properties.device_id)
+            }
+            following={following}
+            onToggleFollow={() =>
+              setFollowPausedFor(following ? followKey : null)
             }
             onToggleTrack={() =>
               setTrackedDevices(

@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  Crosshair,
   Flame,
   Route,
   X,
@@ -560,6 +561,35 @@ export function HeatButton({
   );
 }
 
+/** Whether the map follows the object as new positions arrive (decision D210, Tim,
+ * 2026-09-15): on while selected, off after a drag by hand, on again with this button. */
+export function FollowButton({
+  on,
+  onToggle,
+}: {
+  on: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Button
+      variant={on ? "default" : "outline"}
+      size="icon"
+      className="size-8"
+      aria-pressed={on}
+      aria-label={on ? t("Stop following") : t("Follow as positions arrive")}
+      title={
+        on
+          ? t("Following: the map moves with every new position; a drag stops it")
+          : t("Follow: the map moves with every new position")
+      }
+      onClick={onToggle}
+    >
+      <Crosshair className="size-4" />
+    </Button>
+  );
+}
+
 /** Copies "latitude, longitude" of a position to the clipboard (Tim, 2026-09-13). */
 export function CopyPositionButton({
   position,
@@ -604,6 +634,8 @@ export function EntityPanel({
   onToggleTrack,
   heat,
   onToggleHeat,
+  following,
+  onToggleFollow,
 }: {
   props: EntityFeatureProperties;
   projectId: string;
@@ -619,6 +651,9 @@ export function EntityPanel({
   onToggleTrack: () => void;
   heat: boolean;
   onToggleHeat: () => void;
+  /** The map follows the object as positions arrive (decision D210). */
+  following: boolean;
+  onToggleFollow: () => void;
   onOpenPosition?: () => void;
   onOpenState?: () => void;
   /** The newest position, for the copy button. */
@@ -674,6 +709,7 @@ export function EntityPanel({
             onToggle={onToggleTrack}
           />
           <HeatButton on={heat} onToggle={onToggleHeat} />
+          <FollowButton on={following} onToggle={onToggleFollow} />
           {position && <CopyPositionButton position={position} />}
         </>
       }
@@ -757,6 +793,8 @@ export function DevicePanel({
   onToggleTrack,
   heat,
   onToggleHeat,
+  following,
+  onToggleFollow,
 }: {
   props: DeviceFeatureProperties;
   projectId: string;
@@ -771,6 +809,9 @@ export function DevicePanel({
   onToggleTrack: () => void;
   heat: boolean;
   onToggleHeat: () => void;
+  /** The map follows the object as positions arrive (decision D210). */
+  following: boolean;
+  onToggleFollow: () => void;
   onOpenPosition?: () => void;
   onOpenState?: () => void;
   /** The newest position, for the copy button. */
@@ -835,6 +876,7 @@ export function DevicePanel({
             onToggle={onToggleTrack}
           />
           <HeatButton on={heat} onToggle={onToggleHeat} />
+          <FollowButton on={following} onToggle={onToggleFollow} />
           {position && <CopyPositionButton position={position} />}
         </>
       }
