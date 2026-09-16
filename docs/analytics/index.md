@@ -7,3 +7,4 @@ Both are bounded by design (architecture 13.10): no request can return more than
 - [Dashboards](dashboards.md): saved views and live tiles on a shared grid per project.
 - [Movement](movement.md): distance, speed, rest, day and night, residence time, home range and clusters of tracked animals, computed by the analysis worker from the positions and kept as runs.
 - [Grazing](grazing.md): how a herd uses the management areas over time, in animal-days per hectare with rest days, visits, hotspots and the relative pressure per area, compared between periods, seasons and herds.
+- [Device performance](device-performance.md): how the devices perform, as a fleet and one by one: battery and reboots, reporting against the settings, GNSS fixes, and the LoRaWAN and Iridium networks per data source, each indicator with a level and a fleet rank.

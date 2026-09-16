@@ -177,14 +177,24 @@ No new table: the run row and the geometries table hold everything (D202).
 
 ## 12. Tasks
 
-- [ ] **P1 device subjects in the framework**: `SubjectSelection` device fields, `Subject.kind` and `tracked`, `subject_kind` on modules, the API's resolution by ids, type and "all" with the scope, `load_trajectory` by device; tests.
-- [ ] **P2 primitives**: `intervals.py`, `network.py`, `health.py`, `levels.py` with the defaults table; unit tests on synthetic series.
-- [ ] **P3 the module**: `modules/device_performance.py` with the four areas, the fleet summary, the tables, the charts, the geometries and the warnings; `MAX_DEVICES_PERFORMANCE`; the estimate; the module test.
-- [ ] **P4 the pages**: `DevicePerformancePage.tsx`, `DevicePerformanceForm.tsx` with the device picker and the type shortcut, the presentation with the fleet table and the per-device sections, the map's fix classes and gateway points in `analysisLayers.ts`; "Analyse performance" on the device page and the devices list.
-- [ ] **P5 the report**: labels, key figures as the fleet table with level dots, the per-device sections; a rendered fixture test.
-- [ ] **P6 docs**: `docs/analytics/device-performance.md` (what each indicator means, its default threshold, its limits), the analytics index, `DEVELOPERS.md`, the changelog, ADR 0034 (device subjects and the indicator levels).
+- [x] **P1 device subjects in the framework**: `SubjectSelection` device fields, `Subject.kind` and `tracked`, `subject_kind` on modules, the API's resolution by ids, type and "all" with the scope, `load_trajectory` by device; tests.
+- [x] **P2 primitives**: `intervals.py`, `network.py`, `health.py`, `levels.py` with the defaults table; unit tests on synthetic series.
+- [x] **P3 the module**: `modules/device_performance.py` with the four areas, the fleet summary, the tables, the charts, the geometries and the warnings; `MAX_DEVICES_PERFORMANCE`; the estimate; the module test.
+- [x] **P4 the pages**: `DevicePerformancePage.tsx`, `DevicePerformanceForm.tsx` with the device picker and the type shortcut, the presentation with the fleet table and the per-device sections, the map's fix classes and gateway points in `analysisLayers.ts`; "Analyse performance" on the device page and the devices list.
+- [x] **P5 the report**: labels, key figures as the fleet table with level dots, the per-device sections; a rendered fixture test.
+- [x] **P6 docs**: `docs/analytics/device-performance.md` (what each indicator means, its default threshold, its limits), the analytics index, `DEVELOPERS.md`, the changelog, ADR 0034 (device subjects and the indicator levels).
 - [ ] **P7 dev server**: a fleet run over the FreeNature and Smart Parks collars and a deep dive of SP050969 read by Tim; the benchmark section over 100 devices; the budgets of the analytics plan held during a run.
 - [ ] **P8 release** as v2.8.0 after the exit criteria.
+
+### Built on 2026-09-16, and where it differs from the sections above
+
+- The device's settings come from four layers, later ones winning: the driver's catalogue defaults, the type's `default_settings`, the device's `attributes.settings`, and the settings frames the device sent (the `port_3_tlv` states decoded by the catalogue's ids and types). A device whose settings frames were never received falls back to the type's defaults, and the document says the interval it assumed.
+- The clock indicator of section 4.2 became "records held invalid": every record the pipeline or a curation holds invalid in the period, the clock-ahead rule D119 among them, with its share; the decoder does not keep the reason apart.
+- The fleet table's network columns take the worst data source of the device (the highest lost share, the lowest RSSI); the network table has one row per device and source.
+- The frame counter comes from `provider_metadata.f_cnt` of the uplink source events, the joins from source events of type `join`; a source that delivers neither shows no figure.
+- The trajectory loader takes `by_device=True` rather than a `device_id` argument; the `Trajectory.entity_id` field then holds the device's id (the subject's id either way).
+- The limit constant is `MAX_DEVICES` (100) and the rows one device may hold per read `MAX_ROWS_PER_DEVICE` (500,000); the estimate counts the device's fixes, the run refuses beyond the bound.
+- The interface folds the charts into the device sections and lets the presentation replace the run view's chart grid and table list (`render.charts`, `render.tables`), so a run over a hundred devices does not draw a hundred series in one chart.
 
 ## 13. Exit criteria
 

@@ -101,6 +101,7 @@ nav:
       - Dashboards: analytics/dashboards.md
       - Movement: analytics/movement.md
       - Grazing: analytics/grazing.md
+      - Device performance: analytics/device-performance.md
       - Analysis design (phase 1): ANALYTICS_PHASE1_PLAN.md
       - Analysis design (device performance): ANALYTICS_DEVICE_PERFORMANCE_PLAN.md
   - Rules:
@@ -161,3 +162,4 @@ nav:
       - adr/0031-analysis-as-an-isolated-optional-subsystem.md
       - adr/0032-attribution-as-a-background-job.md
       - adr/0033-pdf-reports-made-on-the-server.md
+      - adr/0034-devices-as-analysis-subjects-with-levels.md
