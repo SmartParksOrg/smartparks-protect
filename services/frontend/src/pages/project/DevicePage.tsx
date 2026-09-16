@@ -1,6 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Footprints, MapPin, RefreshCw, Table2 } from "lucide-react";
+import {
+  ExternalLink,
+  Footprints,
+  Gauge,
+  MapPin,
+  RefreshCw,
+  Table2,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -15,7 +22,8 @@ import type {
   TrafficRow,
   EntityAssignmentExtended,
   ProjectAssignmentExtended,
-  ReattributeResult,} from "@/api/types";
+  ReattributeResult,
+} from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -51,7 +59,7 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { useAt } from "@/hooks/useAt";
 import { useTab } from "@/hooks/useTab";
-import { usePermissions } from "@/hooks/useProjects";
+import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
 import { useAuthStore } from "@/stores/auth";
@@ -63,6 +71,7 @@ export function DevicePage() {
   const { projectId, deviceId = "" } = useParams();
   const user = useAuthStore((s) => s.user);
   const { can } = usePermissions(projectId);
+  const modules = useAnalysisModules(projectId);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
     null,
   );
@@ -99,7 +108,13 @@ export function DevicePage() {
     queryFn: () =>
       api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, {
         query: around.at
-          ? { device_id: deviceId, limit: 50, from: around.from, to: around.to, sources }
+          ? {
+              device_id: deviceId,
+              limit: 50,
+              from: around.from,
+              to: around.to,
+              sources,
+            }
           : {
               device_id: deviceId,
               limit: 10,
@@ -200,10 +215,13 @@ export function DevicePage() {
   );
   const currentEntityId =
     d?.entity_assignments.find((a) => !a.valid_to)?.entity_id ?? null;
-  const currentEntityAssignment = d?.entity_assignments.find((a) => !a.valid_to) ?? null;
+  const currentEntityAssignment =
+    d?.entity_assignments.find((a) => !a.valid_to) ?? null;
   // the device's project today: the route's, or on the admin route the current assignment's
   const deviceProjectId =
-    projectId ?? d?.project_assignments.find((a) => !a.valid_to)?.project_id ?? null;
+    projectId ??
+    d?.project_assignments.find((a) => !a.valid_to)?.project_id ??
+    null;
   const attribution = useAttributionJob(deviceId, [
     ...repairInvalidate,
     ...(deviceProjectId
@@ -216,7 +234,9 @@ export function DevicePage() {
   // while the records are being rewritten, the assignments hold still (decision D206)
   const attributing = attribution.active !== null;
   // in a project, the project's own permission; without one, a server admin picks the project in the dialog (D192)
-  const mayAssign = deviceProjectId ? can("devices:write") : Boolean(user?.is_superuser);
+  const mayAssign = deviceProjectId
+    ? can("devices:write")
+    : Boolean(user?.is_superuser);
   // the project an entity assignment belongs to: the project assignment covering its start
   const projectOfAssignment = (validFrom: string): string | null =>
     d?.project_assignments.find(
@@ -224,19 +244,28 @@ export function DevicePage() {
         new Date(p.valid_from) <= new Date(validFrom) &&
         (!p.valid_to || new Date(p.valid_to) > new Date(validFrom)),
     )?.project_id ?? deviceProjectId;
-  const entityLink = (a: { entity_id: string; valid_from: string }): string | null => {
+  const entityLink = (a: {
+    entity_id: string;
+    valid_from: string;
+  }): string | null => {
     const p = projectOfAssignment(a.valid_from);
     return p ? `/projects/${p}/entities/${a.entity_id}` : null;
   };
-  const currentEntityLink = currentEntityAssignment ? entityLink(currentEntityAssignment) : null;
+  const currentEntityLink = currentEntityAssignment
+    ? entityLink(currentEntityAssignment)
+    : null;
   const currentEntityName = currentEntityAssignment
-    ? (currentEntityAssignment.entity_name ?? currentEntityAssignment.entity_id.slice(0, 8))
+    ? (currentEntityAssignment.entity_name ??
+      currentEntityAssignment.entity_id.slice(0, 8))
     : null;
   const release = useMutationToast({
     mutationFn: (assignmentId: string) =>
-      api.patch(`/api/v1/projects/${deviceProjectId}/entity-assignments/${assignmentId}`, {
-        body: { valid_to: new Date().toISOString() },
-      }),
+      api.patch(
+        `/api/v1/projects/${deviceProjectId}/entity-assignments/${assignmentId}`,
+        {
+          body: { valid_to: new Date().toISOString() },
+        },
+      ),
     invalidate: [
       queryKeys.device(deviceId),
       ...(deviceProjectId
@@ -289,8 +318,12 @@ export function DevicePage() {
             ))}
             {currentEntityLink && (
               <Button asChild variant="outline" size="sm">
-                <Link to={currentEntityLink} title={t("Open the entity this device tracks")}>
-                  <Footprints className="size-4" /> {t("Tracks {{name}}", { name: currentEntityName })}
+                <Link
+                  to={currentEntityLink}
+                  title={t("Open the entity this device tracks")}
+                >
+                  <Footprints className="size-4" />{" "}
+                  {t("Tracks {{name}}", { name: currentEntityName })}
                 </Link>
               </Button>
             )}
@@ -307,6 +340,17 @@ export function DevicePage() {
                 </Link>
               </Button>
             )}
+            {deviceProjectId &&
+              modules.includes("device_performance") &&
+              can("analysis:run") && (
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    to={`/projects/${deviceProjectId}/analyze/device-performance?device=${d.id}`}
+                  >
+                    <Gauge className="size-4" /> {t("Analyse performance")}
+                  </Link>
+                </Button>
+              )}
             {user?.is_superuser && (
               <Button asChild variant="outline" size="sm">
                 <Link to={`/admin/devices?device=${d.id}`}>{t("Manage")}</Link>
@@ -316,7 +360,10 @@ export function DevicePage() {
         }
       />
       <Page>
-        <AttributionProgress active={attribution.active} failed={attribution.failed} />
+        <AttributionProgress
+          active={attribution.active}
+          failed={attribution.failed}
+        />
         {sp &&
           (sp.clock_ahead?.positions ?? 0) +
             (sp.clock_ahead?.measurements ?? 0) >
@@ -416,8 +463,12 @@ export function DevicePage() {
                     <dt className="text-muted-foreground">{t("Project")}</dt>
                     <dd>
                       {deviceProjectId ? (
-                        <Link className="underline" to={`/projects/${deviceProjectId}/devices/${d.id}`}>
-                          {d.project_assignments.find((a) => !a.valid_to)?.project_name ?? t("a project")}
+                        <Link
+                          className="underline"
+                          to={`/projects/${deviceProjectId}/devices/${d.id}`}
+                        >
+                          {d.project_assignments.find((a) => !a.valid_to)
+                            ?.project_name ?? t("a project")}
                         </Link>
                       ) : (
                         t("none")
@@ -426,7 +477,9 @@ export function DevicePage() {
                     <dt className="text-muted-foreground">{t("Tracks")}</dt>
                     <dd>
                       {currentEntityLink ? (
-                        <Link className="underline" to={currentEntityLink}>{currentEntityName}</Link>
+                        <Link className="underline" to={currentEntityLink}>
+                          {currentEntityName}
+                        </Link>
                       ) : (
                         t("nothing")
                       )}
@@ -460,12 +513,21 @@ export function DevicePage() {
                   }
                 />
               )}
-              <HealthCard health={d.health} projectId={deviceProjectId} deviceId={d.id} />
+              <HealthCard
+                health={d.health}
+                projectId={deviceProjectId}
+                deviceId={d.id}
+              />
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2">
                   <CardTitle>{t("Project assignments")}</CardTitle>
                   {!deviceProjectId && user?.is_superuser && (
-                    <Button size="sm" variant="outline" disabled={attributing} onClick={() => setAssigning("project")}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={attributing}
+                      onClick={() => setAssigning("project")}
+                    >
                       {t("Assign to project")}
                     </Button>
                   )}
@@ -503,12 +565,18 @@ export function DevicePage() {
                         size="sm"
                         variant="outline"
                         disabled={release.isPending || attributing}
-                        onClick={() => release.mutate(currentEntityAssignment.id)}
+                        onClick={() =>
+                          release.mutate(currentEntityAssignment.id)
+                        }
                       >
                         {t("Release")}
                       </Button>
                     ) : (
-                      <Button size="sm" disabled={attributing} onClick={() => setAssigning("entity")}>
+                      <Button
+                        size="sm"
+                        disabled={attributing}
+                        onClick={() => setAssigning("entity")}
+                      >
                         {t("Assign to entity")}
                       </Button>
                     ))}
@@ -518,7 +586,9 @@ export function DevicePage() {
                     <div className="text-muted-foreground">
                       {deviceProjectId
                         ? t("Not assigned to an entity.")
-                        : t("Not assigned to an entity; Assign to entity asks for the project first.")}
+                        : t(
+                            "Not assigned to an entity; Assign to entity asks for the project first.",
+                          )}
                     </div>
                   )}
                   {d.entity_assignments.map((a) => (
@@ -655,10 +725,7 @@ export function DevicePage() {
                 driverKey={type?.driver_key}
                 canWrite={can("devices:control")}
               />
-              <LogFilesCard
-                deviceId={d.id}
-                canWrite={can("devices:control")}
-              />
+              <LogFilesCard deviceId={d.id} canWrite={can("devices:control")} />
               {projectId && (
                 <Card className="lg:col-span-2">
                   <CardHeader>
@@ -724,23 +791,22 @@ export function DevicePage() {
                             }
                           />
                           <span className="ml-auto flex gap-3">
-                            {projectId &&
-                              can("devices:write") && (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="h-auto p-0"
-                                  onClick={() =>
-                                    setCurating({
-                                      target_type: "position",
-                                      target_id: p.id,
-                                      target_time: p.original_time,
-                                    })
-                                  }
-                                >
-                                  {t("curate")}
-                                </Button>
-                              )}
+                            {projectId && can("devices:write") && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto p-0"
+                                onClick={() =>
+                                  setCurating({
+                                    target_type: "position",
+                                    target_id: p.id,
+                                    target_time: p.original_time,
+                                  })
+                                }
+                              >
+                                {t("curate")}
+                              </Button>
+                            )}
                             <Button
                               variant="link"
                               size="sm"

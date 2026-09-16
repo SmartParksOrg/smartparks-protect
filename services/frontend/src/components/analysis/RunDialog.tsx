@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 
 import type { AnalysisRun } from "@/api/types";
+import { DevicePerformanceForm } from "@/components/analysis/DevicePerformanceForm";
 import { GrazingForm } from "@/components/analysis/GrazingForm";
 import { MovementForm } from "@/components/analysis/MovementForm";
 import {
@@ -26,7 +27,7 @@ export function RunDialog({
   onCreated,
 }: {
   projectId: string;
-  module: "movement" | "grazing";
+  module: "movement" | "grazing" | "device_performance";
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The form's first state: defaults, a deep link's choices, or an existing run's. */
@@ -44,14 +45,20 @@ export function RunDialog({
               ? t("Change and run again")
               : module === "movement"
                 ? t("New movement analysis")
-                : t("New grazing analysis")}
+                : module === "grazing"
+                  ? t("New grazing analysis")
+                  : t("New device performance analysis")}
           </DialogTitle>
           <DialogDescription>
             {editing
               ? t(
                   "The settings of the run as it was made; change what you want, then run it as a new run or in place of this one.",
                 )
-              : t("Choose the subjects, the period and the method, then run.")}
+              : module === "device_performance"
+                ? t("Choose the devices and the period, then run.")
+                : t(
+                    "Choose the subjects, the period and the method, then run.",
+                  )}
           </DialogDescription>
         </DialogHeader>
         {open && (
@@ -78,7 +85,7 @@ function RunDialogBody({
   onCreated,
 }: {
   projectId: string;
-  module: "movement" | "grazing";
+  module: "movement" | "grazing" | "device_performance";
   initial: FormState;
   editing: AnalysisRun | null;
   onCreated: (run: AnalysisRun, replaced: AnalysisRun | null) => void;
@@ -94,9 +101,7 @@ function RunDialogBody({
     onRun: (run: AnalysisRun, replaced: boolean) =>
       onCreated(run, replaced ? editing : null),
   };
-  return module === "movement" ? (
-    <MovementForm {...props} />
-  ) : (
-    <GrazingForm {...props} />
-  );
+  if (module === "movement") return <MovementForm {...props} />;
+  if (module === "grazing") return <GrazingForm {...props} />;
+  return <DevicePerformanceForm {...props} />;
 }

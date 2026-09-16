@@ -637,6 +637,8 @@ export interface TrackLayer {
   times: string[];
   /** A colour of the caller's choosing; the entity's hashed colour otherwise. */
   color?: string;
+  /** The accuracy of each vertex in metres, when the caller wants the fixes coloured by it. */
+  accuracies?: (number | null)[];
 }
 
 /** Every track shown at once, each in its entity's colour. */

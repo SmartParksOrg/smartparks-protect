@@ -3,58 +3,223 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 
 import { AppLayout } from "@/components/layout/AppLayout";
-import { RequireAuth, RequireAnalysisModule, RequireProjectPermission, RequireServerAdmin } from "@/components/layout/RequireAuth";
-import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/auth/PasswordPages";
+import {
+  RequireAuth,
+  RequireAnalysisModule,
+  RequireProjectPermission,
+  RequireServerAdmin,
+} from "@/components/layout/RequireAuth";
+import {
+  ForgotPasswordPage,
+  ResetPasswordPage,
+} from "@/pages/auth/PasswordPages";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 
-const MapPage = lazy(() => import("@/pages/project/MapPage").then((m) => ({ default: m.MapPage })));
-const EntitiesPage = lazy(() => import("@/pages/project/EntitiesPage").then((m) => ({ default: m.EntitiesPage })));
-const GroupsPage = lazy(() => import("@/pages/project/GroupsPage").then((m) => ({ default: m.GroupsPage })));
-const EntityPage = lazy(() => import("@/pages/project/EntityPage").then((m) => ({ default: m.EntityPage })));
-const DevicesPage = lazy(() => import("@/pages/project/DevicesPage").then((m) => ({ default: m.DevicesPage })));
-const DevicePage = lazy(() => import("@/pages/project/DevicePage").then((m) => ({ default: m.DevicePage })));
-const TrafficPage = lazy(() => import("@/pages/project/TrafficPage").then((m) => ({ default: m.TrafficPage })));
-const TracesPage = lazy(() => import("@/pages/project/TracesPage").then((m) => ({ default: m.TracesPage })));
-const ExplorerPage = lazy(() => import("@/pages/project/ExplorerPage").then((m) => ({ default: m.ExplorerPage })));
-const ExportsPage = lazy(() => import("@/pages/project/ExportsPage").then((m) => ({ default: m.ExportsPage })));
-const CurationPage = lazy(() => import("@/pages/project/CurationPage").then((m) => ({ default: m.CurationPage })));
-const MovementPage = lazy(() => import("@/pages/project/MovementPage").then((m) => ({ default: m.MovementPage })));
-const GrazingPage = lazy(() => import("@/pages/project/GrazingPage").then((m) => ({ default: m.GrazingPage })));
-const DashboardsPage = lazy(() => import("@/pages/project/DashboardsPage").then((m) => ({ default: m.DashboardsPage })));
-const AiPolicyPage = lazy(() => import("@/pages/admin/AiPolicyPage").then((m) => ({ default: m.AiPolicyPage })));
-const MembersPage = lazy(() => import("@/pages/project/MembersPage").then((m) => ({ default: m.MembersPage })));
-const FeaturesPage = lazy(() => import("@/pages/project/FeaturesPage").then((m) => ({ default: m.FeaturesPage })));
-const ProjectSettingsPage = lazy(() => import("@/pages/project/ProjectSettingsPage").then((m) => ({ default: m.ProjectSettingsPage })));
-const AttentionPage = lazy(() => import("@/pages/admin/AttentionPage").then((m) => ({ default: m.AttentionPage })));
-const BackupsPage = lazy(() => import("@/pages/admin/BackupsPage").then((m) => ({ default: m.BackupsPage })));
-const HealthPage = lazy(() => import("@/pages/admin/HealthPage").then((m) => ({ default: m.HealthPage })));
-const AdminProjectsPage = lazy(() => import("@/pages/admin/AdminProjectsPage").then((m) => ({ default: m.AdminProjectsPage })));
-const UsersPage = lazy(() => import("@/pages/admin/UsersPage").then((m) => ({ default: m.UsersPage })));
-const UserPage = lazy(() => import("@/pages/admin/UserPage").then((m) => ({ default: m.UserPage })));
-const AdminDevicesPage = lazy(() => import("@/pages/admin/AdminDevicesPage").then((m) => ({ default: m.AdminDevicesPage })));
-const DataSourcesPage = lazy(() => import("@/pages/admin/DataSourcesPage").then((m) => ({ default: m.DataSourcesPage })));
-const AdminTrafficPage = lazy(() => import("@/pages/admin/AdminTrafficPage").then((m) => ({ default: m.AdminTrafficPage })));
-const DataSourceTrafficPage = lazy(() => import("@/pages/admin/DataSourceTrafficPage").then((m) => ({ default: m.DataSourceTrafficPage })));
-const DeviceTypesPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.DeviceTypesPage })));
-const EntityTypesPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.EntityTypesPage })));
-const MetricsPage = lazy(() => import("@/pages/admin/CatalogPages").then((m) => ({ default: m.MetricsPage })));
-const AuditPage = lazy(() => import("@/pages/admin/AuditPage").then((m) => ({ default: m.AuditPage })));
-const RulesPage = lazy(() => import("@/pages/project/RulesPage").then((m) => ({ default: m.RulesPage })));
-const EventsPage = lazy(() => import("@/pages/project/EventsPage").then((m) => ({ default: m.EventsPage })));
-const AlertsPage = lazy(() => import("@/pages/project/AlertsPage").then((m) => ({ default: m.AlertsPage })));
-const AutomationsPage = lazy(() => import("@/pages/project/AutomationsPage").then((m) => ({ default: m.AutomationsPage })));
-const NotificationsPage = lazy(() => import("@/pages/project/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
-const CommandsPage = lazy(() => import("@/pages/project/CommandsPage").then((m) => ({ default: m.CommandsPage })));
-const IntegrationsPage = lazy(() => import("@/pages/project/IntegrationsPage").then((m) => ({ default: m.IntegrationsPage })));
-const GatewaysPage = lazy(() => import("@/pages/project/GatewaysPage").then((m) => ({ default: m.GatewaysPage })));
-const ConnectionsPage = lazy(() => import("@/pages/account/ConnectionsPage").then((m) => ({ default: m.ConnectionsPage })));
-const ConsentPage = lazy(() => import("@/pages/auth/ConsentPage").then((m) => ({ default: m.ConsentPage })));
-const AdminAlertsPage = lazy(() => import("@/pages/project/AlertsPage").then((m) => ({ default: m.AdminAlertsPage })));
-const AdminAutomationsPage = lazy(() => import("@/pages/project/AutomationsPage").then((m) => ({ default: m.AdminAutomationsPage })));
-const AdminNotificationsPage = lazy(() => import("@/pages/project/NotificationsPage").then((m) => ({ default: m.AdminNotificationsPage })));
+const MapPage = lazy(() =>
+  import("@/pages/project/MapPage").then((m) => ({ default: m.MapPage })),
+);
+const EntitiesPage = lazy(() =>
+  import("@/pages/project/EntitiesPage").then((m) => ({
+    default: m.EntitiesPage,
+  })),
+);
+const GroupsPage = lazy(() =>
+  import("@/pages/project/GroupsPage").then((m) => ({ default: m.GroupsPage })),
+);
+const EntityPage = lazy(() =>
+  import("@/pages/project/EntityPage").then((m) => ({ default: m.EntityPage })),
+);
+const DevicesPage = lazy(() =>
+  import("@/pages/project/DevicesPage").then((m) => ({
+    default: m.DevicesPage,
+  })),
+);
+const DevicePage = lazy(() =>
+  import("@/pages/project/DevicePage").then((m) => ({ default: m.DevicePage })),
+);
+const TrafficPage = lazy(() =>
+  import("@/pages/project/TrafficPage").then((m) => ({
+    default: m.TrafficPage,
+  })),
+);
+const TracesPage = lazy(() =>
+  import("@/pages/project/TracesPage").then((m) => ({ default: m.TracesPage })),
+);
+const ExplorerPage = lazy(() =>
+  import("@/pages/project/ExplorerPage").then((m) => ({
+    default: m.ExplorerPage,
+  })),
+);
+const ExportsPage = lazy(() =>
+  import("@/pages/project/ExportsPage").then((m) => ({
+    default: m.ExportsPage,
+  })),
+);
+const CurationPage = lazy(() =>
+  import("@/pages/project/CurationPage").then((m) => ({
+    default: m.CurationPage,
+  })),
+);
+const MovementPage = lazy(() =>
+  import("@/pages/project/MovementPage").then((m) => ({
+    default: m.MovementPage,
+  })),
+);
+const GrazingPage = lazy(() =>
+  import("@/pages/project/GrazingPage").then((m) => ({
+    default: m.GrazingPage,
+  })),
+);
+const DevicePerformancePage = lazy(() =>
+  import("@/pages/project/DevicePerformancePage").then((m) => ({
+    default: m.DevicePerformancePage,
+  })),
+);
+const DashboardsPage = lazy(() =>
+  import("@/pages/project/DashboardsPage").then((m) => ({
+    default: m.DashboardsPage,
+  })),
+);
+const AiPolicyPage = lazy(() =>
+  import("@/pages/admin/AiPolicyPage").then((m) => ({
+    default: m.AiPolicyPage,
+  })),
+);
+const MembersPage = lazy(() =>
+  import("@/pages/project/MembersPage").then((m) => ({
+    default: m.MembersPage,
+  })),
+);
+const FeaturesPage = lazy(() =>
+  import("@/pages/project/FeaturesPage").then((m) => ({
+    default: m.FeaturesPage,
+  })),
+);
+const ProjectSettingsPage = lazy(() =>
+  import("@/pages/project/ProjectSettingsPage").then((m) => ({
+    default: m.ProjectSettingsPage,
+  })),
+);
+const AttentionPage = lazy(() =>
+  import("@/pages/admin/AttentionPage").then((m) => ({
+    default: m.AttentionPage,
+  })),
+);
+const BackupsPage = lazy(() =>
+  import("@/pages/admin/BackupsPage").then((m) => ({ default: m.BackupsPage })),
+);
+const HealthPage = lazy(() =>
+  import("@/pages/admin/HealthPage").then((m) => ({ default: m.HealthPage })),
+);
+const AdminProjectsPage = lazy(() =>
+  import("@/pages/admin/AdminProjectsPage").then((m) => ({
+    default: m.AdminProjectsPage,
+  })),
+);
+const UsersPage = lazy(() =>
+  import("@/pages/admin/UsersPage").then((m) => ({ default: m.UsersPage })),
+);
+const UserPage = lazy(() =>
+  import("@/pages/admin/UserPage").then((m) => ({ default: m.UserPage })),
+);
+const AdminDevicesPage = lazy(() =>
+  import("@/pages/admin/AdminDevicesPage").then((m) => ({
+    default: m.AdminDevicesPage,
+  })),
+);
+const DataSourcesPage = lazy(() =>
+  import("@/pages/admin/DataSourcesPage").then((m) => ({
+    default: m.DataSourcesPage,
+  })),
+);
+const AdminTrafficPage = lazy(() =>
+  import("@/pages/admin/AdminTrafficPage").then((m) => ({
+    default: m.AdminTrafficPage,
+  })),
+);
+const DataSourceTrafficPage = lazy(() =>
+  import("@/pages/admin/DataSourceTrafficPage").then((m) => ({
+    default: m.DataSourceTrafficPage,
+  })),
+);
+const DeviceTypesPage = lazy(() =>
+  import("@/pages/admin/CatalogPages").then((m) => ({
+    default: m.DeviceTypesPage,
+  })),
+);
+const EntityTypesPage = lazy(() =>
+  import("@/pages/admin/CatalogPages").then((m) => ({
+    default: m.EntityTypesPage,
+  })),
+);
+const MetricsPage = lazy(() =>
+  import("@/pages/admin/CatalogPages").then((m) => ({
+    default: m.MetricsPage,
+  })),
+);
+const AuditPage = lazy(() =>
+  import("@/pages/admin/AuditPage").then((m) => ({ default: m.AuditPage })),
+);
+const RulesPage = lazy(() =>
+  import("@/pages/project/RulesPage").then((m) => ({ default: m.RulesPage })),
+);
+const EventsPage = lazy(() =>
+  import("@/pages/project/EventsPage").then((m) => ({ default: m.EventsPage })),
+);
+const AlertsPage = lazy(() =>
+  import("@/pages/project/AlertsPage").then((m) => ({ default: m.AlertsPage })),
+);
+const AutomationsPage = lazy(() =>
+  import("@/pages/project/AutomationsPage").then((m) => ({
+    default: m.AutomationsPage,
+  })),
+);
+const NotificationsPage = lazy(() =>
+  import("@/pages/project/NotificationsPage").then((m) => ({
+    default: m.NotificationsPage,
+  })),
+);
+const CommandsPage = lazy(() =>
+  import("@/pages/project/CommandsPage").then((m) => ({
+    default: m.CommandsPage,
+  })),
+);
+const IntegrationsPage = lazy(() =>
+  import("@/pages/project/IntegrationsPage").then((m) => ({
+    default: m.IntegrationsPage,
+  })),
+);
+const GatewaysPage = lazy(() =>
+  import("@/pages/project/GatewaysPage").then((m) => ({
+    default: m.GatewaysPage,
+  })),
+);
+const ConnectionsPage = lazy(() =>
+  import("@/pages/account/ConnectionsPage").then((m) => ({
+    default: m.ConnectionsPage,
+  })),
+);
+const ConsentPage = lazy(() =>
+  import("@/pages/auth/ConsentPage").then((m) => ({ default: m.ConsentPage })),
+);
+const AdminAlertsPage = lazy(() =>
+  import("@/pages/project/AlertsPage").then((m) => ({
+    default: m.AdminAlertsPage,
+  })),
+);
+const AdminAutomationsPage = lazy(() =>
+  import("@/pages/project/AutomationsPage").then((m) => ({
+    default: m.AdminAutomationsPage,
+  })),
+);
+const AdminNotificationsPage = lazy(() =>
+  import("@/pages/project/NotificationsPage").then((m) => ({
+    default: m.AdminNotificationsPage,
+  })),
+);
 
 function Loading() {
   const { t } = useTranslation();
@@ -87,7 +252,10 @@ export default function App() {
               <Route path="rules/events" element={<EventsPage />} />
               <Route path="rules/automations" element={<AutomationsPage />} />
               <Route path="control/commands" element={<CommandsPage />} />
-              <Route path="admin/notifications" element={<NotificationsPage />} />
+              <Route
+                path="admin/notifications"
+                element={<NotificationsPage />}
+              />
               <Route path="analyze/explorer" element={<ExplorerPage />} />
               <Route path="analyze/exports" element={<ExportsPage />} />
               <Route path="analyze/curation" element={<CurationPage />} />
@@ -98,21 +266,51 @@ export default function App() {
               <Route element={<RequireAnalysisModule module="grazing" />}>
                 <Route path="analyze/grazing" element={<GrazingPage />} />
               </Route>
+              <Route
+                element={<RequireAnalysisModule module="device_performance" />}
+              >
+                <Route
+                  path="analyze/device-performance"
+                  element={<DevicePerformancePage />}
+                />
+              </Route>
               <Route path="network/traffic" element={<TrafficPage />} />
               <Route path="network/gateways" element={<GatewaysPage />} />
-              <Route path="integrate/integrations" element={<IntegrationsPage />} />
+              <Route
+                path="integrate/integrations"
+                element={<IntegrationsPage />}
+              />
               <Route path="network/traces" element={<TracesPage />} />
-              <Route element={<RequireProjectPermission permission="members:write" />}>
+              <Route
+                element={
+                  <RequireProjectPermission permission="members:write" />
+                }
+              >
                 <Route path="admin/members" element={<MembersPage />} />
               </Route>
-              <Route element={<RequireProjectPermission permission="features:write" />}>
+              <Route
+                element={
+                  <RequireProjectPermission permission="features:write" />
+                }
+              >
                 <Route path="admin/features" element={<FeaturesPage />} />
               </Route>
-              <Route element={<RequireProjectPermission permission="entities:write" />}>
+              <Route
+                element={
+                  <RequireProjectPermission permission="entities:write" />
+                }
+              >
                 <Route path="admin/groups" element={<GroupsPage />} />
               </Route>
-              <Route element={<RequireProjectPermission permission="project:write" />}>
-                <Route path="admin/settings" element={<ProjectSettingsPage />} />
+              <Route
+                element={
+                  <RequireProjectPermission permission="project:write" />
+                }
+              >
+                <Route
+                  path="admin/settings"
+                  element={<ProjectSettingsPage />}
+                />
               </Route>
             </Route>
             <Route path="/admin" element={<RequireServerAdmin />}>
@@ -123,14 +321,20 @@ export default function App() {
               <Route path="backups" element={<BackupsPage />} />
               <Route path="alerts" element={<AdminAlertsPage />} />
               <Route path="automations" element={<AdminAutomationsPage />} />
-              <Route path="notifications" element={<AdminNotificationsPage />} />
+              <Route
+                path="notifications"
+                element={<AdminNotificationsPage />}
+              />
               <Route path="projects" element={<AdminProjectsPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="users/:userId" element={<UserPage />} />
               <Route path="devices" element={<AdminDevicesPage />} />
               <Route path="devices/:deviceId" element={<DevicePage />} />
               <Route path="data-sources" element={<DataSourcesPage />} />
-              <Route path="data-sources/:sourceId/traffic" element={<DataSourceTrafficPage />} />
+              <Route
+                path="data-sources/:sourceId/traffic"
+                element={<DataSourceTrafficPage />}
+              />
               <Route path="device-types" element={<DeviceTypesPage />} />
               <Route path="entity-types" element={<EntityTypesPage />} />
               <Route path="metrics" element={<MetricsPage />} />

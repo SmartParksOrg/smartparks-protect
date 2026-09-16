@@ -80,3 +80,47 @@ export function GrazingLimitations() {
     </details>
   );
 }
+
+/** What the device performance figures cannot say (plan, section 10). */
+export function DevicePerformanceLimitations() {
+  const { t } = useTranslation();
+  return (
+    <details className="rounded-md border px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {t("What these figures can and cannot say")}
+      </summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+        <li>
+          {t(
+            "A missed report is inferred from the device's settings and its messages; a device whose interval changed in the period, or whose settings Protect never read, shows a share to weigh, with the interval it assumed beside it.",
+          )}
+        </li>
+        <li>
+          {t(
+            "Lost uplinks come from the frame counter; a data source that does not deliver it shows no figure, not zero.",
+          )}
+        </li>
+        <li>
+          {t(
+            "The battery slope is a straight line through the daily medians; a battery's curve is not straight, so the days to critical are an indication, not a forecast.",
+          )}
+        </li>
+        <li>
+          {t(
+            "Signal figures are the best gateway's per uplink; a moving device changes gateways, so they describe the network as the device met it.",
+          )}
+        </li>
+        <li>
+          {t(
+            "Levels come from the driver's thresholds and named defaults; they are not a verdict on the device, and a rank says only where a device stands among the chosen ones.",
+          )}
+        </li>
+        <li>
+          {t(
+            "Fix success counts the attempts the device reported; a device that never reports a failed attempt shows every attempt as a fix.",
+          )}
+        </li>
+      </ul>
+    </details>
+  );
+}

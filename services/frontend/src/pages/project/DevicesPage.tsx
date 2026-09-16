@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { MapPin } from "lucide-react";
+import { Gauge, MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
@@ -13,7 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useProjects } from "@/hooks/useProjects";
+import {
+  useAnalysisModules,
+  usePermissions,
+  useProjects,
+} from "@/hooks/useProjects";
 import { isAllProjects, projectFor } from "@/lib/scope";
 import { queryKeys } from "@/api/queryKeys";
 import type { Device, DeviceType, Page as PageType } from "@/api/types";
@@ -44,6 +48,13 @@ export function DevicesPage() {
   const [assigning, setAssigning] = useState<Device[]>([]);
   const allProjects = isAllProjects(projectId);
   const projectList = useProjects();
+  const { can } = usePermissions(allProjects ? undefined : projectId);
+  const modules = useAnalysisModules(allProjects ? undefined : projectId);
+  // in a project, a selection leads to the device performance analysis (decision D219)
+  const analysable =
+    !allProjects &&
+    modules.includes("device_performance") &&
+    can("analysis:run");
   const projectName = (id: string | null | undefined) =>
     projectList.data?.items.find((p) => p.id === id)?.name ?? "";
   const devicePages = usePages<Device>({
@@ -225,17 +236,32 @@ export function DevicesPage() {
         }
       />
       <Page>
-        {allProjects && selected.size > 0 && (
+        {(allProjects || analysable) && selected.size > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
             <span>{t("{{count}} selected", { count: selected.size })}</span>
-            <Button
-              size="sm"
-              onClick={() =>
-                setAssigning(devices.items.filter((d) => selected.has(d.id)))
-              }
-            >
-              {t("Assign to project")}
-            </Button>
+            {allProjects ? (
+              <Button
+                size="sm"
+                onClick={() =>
+                  setAssigning(devices.items.filter((d) => selected.has(d.id)))
+                }
+              >
+                {t("Assign to project")}
+              </Button>
+            ) : (
+              <Button asChild size="sm">
+                <Link
+                  to={`/projects/${projectId}/analyze/device-performance?${[
+                    ...selected,
+                  ]
+                    .slice(0, 100)
+                    .map((id) => `device=${id}`)
+                    .join("&")}`}
+                >
+                  <Gauge className="size-4" /> {t("Analyse performance")}
+                </Link>
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -251,7 +277,7 @@ export function DevicesPage() {
           searchable
           columnFilters={allProjects}
           selection={
-            allProjects
+            allProjects || analysable
               ? { selected, onChange: setSelected, rowId: (d) => d.id }
               : undefined
           }

@@ -38162,6 +38162,21 @@
       "type": "array",
       "title": "Times"
      },
+     "accuracies": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Accuracies",
+      "default": []
+     },
      "first_position_id": {
       "anyOf": [
        {

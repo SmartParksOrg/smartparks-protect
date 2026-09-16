@@ -69,6 +69,14 @@ export function RunView({
       colors: Record<string, string>,
     ) => React.ReactNode;
     after?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
+    /** The charts and the tables laid out by the module itself, in place of the grid and
+     * the list below. */
+    charts?: (
+      document: ResultDocument,
+      run: AnalysisRun,
+      colors: Record<string, string>,
+    ) => React.ReactNode;
+    tables?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
   };
   /** Open the run's settings in the dialog, to change them and run again. */
   onEdit?: (run: AnalysisRun) => void;
@@ -129,7 +137,9 @@ export function RunView({
   const makeReport = useMutationToast({
     mutationFn: () => api.post<AnalysisRun>(`${base}/report`),
     invalidate,
-    success: t("The PDF report is being made; Download PDF appears here when it is ready"),
+    success: t(
+      "The PDF report is being made; Download PDF appears here when it is ready",
+    ),
   });
   const document = documentOf(run.data);
   const colors = document ? subjectPalette(document) : {};
@@ -271,12 +281,16 @@ export function RunView({
       {reportActive(r) && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          {t("The PDF report is being made: the charts, the map and the tables on A4. It takes a few seconds to a minute.")}
+          {t(
+            "The PDF report is being made: the charts, the map and the tables on A4. It takes a few seconds to a minute.",
+          )}
         </p>
       )}
       {r.report_status === "failed" && (
         <Callout kind="error">
-          {t("The PDF report failed: {{message}}", { message: r.report_error ?? "" })}
+          {t("The PDF report failed: {{message}}", {
+            message: r.report_error ?? "",
+          })}
         </Callout>
       )}
       {naming !== null && (
@@ -364,32 +378,38 @@ export function RunView({
             </Card>
           )}
           {render?.map?.(document, r, colors)}
-          <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-            {document.charts.map((chart) => (
-              <Card key={chart.key}>
-                <CardHeader>
-                  <CardTitle>{labels[chart.key] ?? chart.key}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResultChart
-                    chart={chart}
-                    labels={labels}
-                    colorOf={(s) =>
-                      s.subject ? (colors[s.subject] ?? null) : null
-                    }
-                  />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          {document.tables.map((table) => (
-            <div key={table.key} className="space-y-2">
-              <h2 className="text-base font-medium">
-                {labels[table.key] ?? table.key}
-              </h2>
-              <ResultTable table={table} labels={labels} />
+          {render?.charts ? (
+            render.charts(document, r, colors)
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+              {document.charts.map((chart) => (
+                <Card key={chart.key}>
+                  <CardHeader>
+                    <CardTitle>{labels[chart.key] ?? chart.key}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResultChart
+                      chart={chart}
+                      labels={labels}
+                      colorOf={(s) =>
+                        s.subject ? (colors[s.subject] ?? null) : null
+                      }
+                    />
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          ))}
+          )}
+          {render?.tables
+            ? render.tables(document, r)
+            : document.tables.map((table) => (
+                <div key={table.key} className="space-y-2">
+                  <h2 className="text-base font-medium">
+                    {labels[table.key] ?? table.key}
+                  </h2>
+                  <ResultTable table={table} labels={labels} />
+                </div>
+              ))}
           {render?.after?.(document, r)}
         </>
       )}
@@ -442,7 +462,7 @@ export function RunSettings({
           .join(", ")
       : null;
   const rows: [string, string][] = [];
-  const subjects = listOf("entity_ids");
+  const subjects = listOf("entity_ids") ?? listOf("device_ids");
   if (subjects) rows.push([t("Subjects"), subjects]);
   const herdB = listOf("herd_b_entity_ids");
   if (herdB) rows.push([t("Second herd"), herdB]);

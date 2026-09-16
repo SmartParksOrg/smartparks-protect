@@ -9,6 +9,10 @@ export interface ResultSubject {
   id: string;
   name: string;
   type?: string | null;
+  /** Entities unless the module is about devices (decision D214). */
+  kind?: "entity" | "device";
+  /** A device subject: the entity it tracked in the period, when it tracked one. */
+  tracked?: string | null;
 }
 export interface ResultPeriod {
   key: "main" | "comparison";
@@ -119,6 +123,10 @@ export interface FormState {
   entities: string[];
   group: string | null;
   type: string | null;
+  /** Device performance (decision D214): devices by id, every device of a type, or all. */
+  devices: string[];
+  deviceType: string | null;
+  allDevices: boolean;
   range: string;
   from: string | null;
   to: string | null;
@@ -141,6 +149,9 @@ export function readFormState(params: URLSearchParams): FormState {
     entities: params.getAll("entity"),
     group: params.get("group"),
     type: params.get("type"),
+    devices: params.getAll("device"),
+    deviceType: params.get("device_type"),
+    allDevices: params.get("all_devices") === "1",
     range: params.get("range") ?? DEFAULT_RANGE,
     from: params.get("from"),
     to: params.get("to"),
@@ -179,6 +190,9 @@ export function writeFormState(state: FormState): URLSearchParams {
   for (const id of state.entities) params.append("entity", id);
   if (state.group) params.set("group", state.group);
   if (state.type) params.set("type", state.type);
+  for (const id of state.devices) params.append("device", id);
+  if (state.deviceType) params.set("device_type", state.deviceType);
+  if (state.allDevices) params.set("all_devices", "1");
   if (state.range !== DEFAULT_RANGE) params.set("range", state.range);
   if (state.range === "custom") {
     if (state.from) params.set("from", state.from);
@@ -261,6 +275,46 @@ export function movementParameters(
     methods: m.methods,
     ...(m.kde_bandwidth ? { kde_bandwidth_m: m.kde_bandwidth } : {}),
   };
+}
+
+/** The parameters the device performance module takes (decision D214): devices by id, by
+ * type or every device, the period, the comparison and the impossible speed; null while no
+ * subject is chosen or a custom range lacks a date. */
+export function devicePerformanceParameters(
+  state: FormState,
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  const window = windowOf(state, now);
+  if (!window) return null;
+  const selection = state.devices.length
+    ? { device_ids: state.devices }
+    : state.deviceType
+      ? { device_type_id: state.deviceType }
+      : state.allDevices
+        ? { all_devices: true }
+        : null;
+  if (!selection) return null;
+  const comparison = comparisonOf(state, window);
+  return {
+    ...selection,
+    ...window,
+    ...(comparison ? { comparison } : {}),
+    max_speed_mps: state.method.speed_max,
+  };
+}
+
+/** The level of one indicator of one device in a result, when the summary carries levels. */
+export function levelOf(
+  document: ResultDocument,
+  subjectId: string,
+  key: string,
+): "ok" | "warn" | "critical" | null {
+  const levels = document.summary.levels as
+    Record<string, Record<string, string>> | undefined;
+  const level = levels?.[subjectId]?.[key];
+  return level === "ok" || level === "warn" || level === "critical"
+    ? level
+    : null;
 }
 
 /** One brand colour per subject of a result, in the document's order, used alike on the
@@ -352,10 +406,13 @@ export function groupWithSubgroups(
  * period, as GeoJSON for QGIS, R or Python (plan, section 8.9). */
 export function fixesPreset(document: ResultDocument): ExportPreset {
   const main = document.periods.find((p) => p.key === "main");
+  const devices = document.subjects.some((s) => s.kind === "device");
   return {
     dataset: "positions",
     format: "geojson",
-    entityIds: document.subjects.map((s) => s.id),
+    ...(devices
+      ? { deviceIds: document.subjects.map((s) => s.id) }
+      : { entityIds: document.subjects.map((s) => s.id) }),
     from: main?.time_from,
     to: main?.time_to,
   };
@@ -440,6 +497,9 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
     entities: list("entity_ids"),
     group: null,
     type: null,
+    devices: list("device_ids"),
+    deviceType: null,
+    allDevices: false,
     range: "custom",
     from: typeof p.time_from === "string" ? p.time_from : null,
     to: typeof p.time_to === "string" ? p.time_to : null,
@@ -476,6 +536,9 @@ export function hasFormInput(state: FormState): boolean {
     state.entities.length > 0 ||
     state.group !== null ||
     state.type !== null ||
+    state.devices.length > 0 ||
+    state.deviceType !== null ||
+    state.allDevices ||
     state.grazing.areas.length > 0
   );
 }

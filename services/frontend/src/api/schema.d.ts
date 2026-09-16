@@ -10999,6 +10999,11 @@ export interface components {
             };
             /** Times */
             times: string[];
+            /**
+             * Accuracies
+             * @default []
+             */
+            accuracies: (number | null)[];
             /** First Position Id */
             first_position_id: number | null;
             /** Last Position Id */

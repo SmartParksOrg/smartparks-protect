@@ -92,6 +92,9 @@ class TrackResponse(BaseModel):
     step: int
     geometry: dict[str, Any]
     times: list[datetime]
+    #: The accuracy of each vertex in metres, null when the fix carries none (the device
+    #: performance map colours the fixes by it, decision D220).
+    accuracies: list[float | None] = []
     first_position_id: int | None
     last_position_id: int | None
 
@@ -555,6 +558,7 @@ async def track(
             effective_time(Position).label("time"),
             func.ST_X(effective_geom()).label("lon"),
             func.ST_Y(effective_geom()).label("lat"),
+            Position.accuracy_m.label("accuracy_m"),
             func.row_number().over(order_by=effective_time(Position)).label("rn"),
         )
         .where(*conditions)
@@ -562,12 +566,18 @@ async def track(
     )
     rows = (
         await session.execute(
-            select(numbered.c.id, numbered.c.time, numbered.c.lon, numbered.c.lat)
+            select(
+                numbered.c.id,
+                numbered.c.time,
+                numbered.c.lon,
+                numbered.c.lat,
+                numbered.c.accuracy_m,
+            )
             .where(((numbered.c.rn - 1) % step == 0) | (numbered.c.rn == total))
             .order_by(numbered.c.time)
         )
     ).all()
-    coordinates = [[lon, lat] for _, _, lon, lat in rows]
+    coordinates = [[lon, lat] for _, _, lon, lat, _ in rows]
     geometry: dict[str, Any] = (
         {"type": "LineString", "coordinates": coordinates}
         if len(coordinates) >= 2
@@ -583,6 +593,7 @@ async def track(
         step=step,
         geometry=geometry,
         times=[r[1] for r in rows],
+        accuracies=[float(r[4]) if r[4] is not None else None for r in rows],
         first_position_id=rows[0][0] if rows else None,
         last_position_id=rows[-1][0] if rows else None,
     )

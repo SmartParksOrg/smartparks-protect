@@ -29,6 +29,8 @@ export const ANALYSIS_KINDS = [
   "kde",
   "hotspot",
   "cluster",
+  "coverage",
+  "gateway",
 ] as const;
 export type AnalysisKind = (typeof ANALYSIS_KINDS)[number];
 
@@ -38,7 +40,25 @@ const FILL_OPACITY: Record<string, number> = {
   kde: 0.22,
   hotspot: 0.45,
   cluster: 0.18,
+  coverage: 0.1,
 };
+
+/** The colour of a fix by its accuracy: under 10 m, under 30 m, under 100 m, worse, unknown
+ * (the device performance map, decision D220). */
+export const ACCURACY_CLASSES: [number, string][] = [
+  [10, "#3E6B4E"],
+  [30, "#9DBFA8"],
+  [100, "#D9A441"],
+  [Infinity, "#B86B5C"],
+];
+export const ACCURACY_UNKNOWN = "#9CA3AF";
+
+export function accuracyColor(accuracy: number | null | undefined): string {
+  if (accuracy === null || accuracy === undefined) return ACCURACY_UNKNOWN;
+  for (const [bound, color] of ACCURACY_CLASSES)
+    if (accuracy < bound) return color;
+  return ACCURACY_UNKNOWN;
+}
 
 /** A five-step ramp in the brand palette for an area's relative grazing pressure: 1.0 is
  * the herd's average over the chosen areas. Null (no use anywhere) is the lightest step. */
@@ -71,6 +91,7 @@ export function decorateAnalysisFeatures(
     const kind = String(f.properties?.kind ?? "");
     const level = Number(f.properties?.level ?? 0);
     if (kind === "area") return -1;
+    if (kind === "coverage") return -0.5;
     if (kind === "mcp") return 0;
     if (kind === "kde") return level >= 0.9 ? 1 : 2;
     if (kind === "cluster") return 3;
@@ -130,6 +151,60 @@ export function ensureAnalysisLayers(map: MapLibreMap): void {
     },
     before,
   );
+  // the gateways heard (device performance): a point sized by its share of the uplinks
+  map.addLayer({
+    id: "analysis-points",
+    type: "circle",
+    source: ANALYSIS_SOURCE,
+    filter: ["==", ["geometry-type"], "Point"],
+    paint: {
+      "circle-radius": ["+", 5, ["*", 12, ["coalesce", ["get", "level"], 0]]],
+      "circle-color": ["coalesce", ["get", "color"], "#52735E"],
+      "circle-opacity": 0.85,
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 1.5,
+    },
+  });
+}
+
+/** The fixes of a device coloured by their accuracy class (device performance). */
+export const FIXES_SOURCE = "analysis-fixes";
+
+export function ensureFixLayer(map: MapLibreMap): void {
+  if (map.getSource(FIXES_SOURCE)) return;
+  map.addSource(FIXES_SOURCE, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  map.addLayer({
+    id: "analysis-fixes",
+    type: "circle",
+    source: FIXES_SOURCE,
+    paint: {
+      "circle-radius": 3.5,
+      "circle-color": ["coalesce", ["get", "color"], ACCURACY_UNKNOWN],
+      "circle-opacity": 0.9,
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 0.5,
+    },
+  });
+}
+
+export function setFixFeatures(
+  map: MapLibreMap,
+  features: GeoJSON.Feature[],
+): void {
+  const source = map.getSource(FIXES_SOURCE) as GeoJSONSource | undefined;
+  source?.setData({ type: "FeatureCollection", features });
+}
+
+export function setFixesVisible(map: MapLibreMap, visible: boolean): void {
+  if (map.getLayer("analysis-fixes"))
+    map.setLayoutProperty(
+      "analysis-fixes",
+      "visibility",
+      visible ? "visible" : "none",
+    );
 }
 
 export function setAnalysisFeatures(
@@ -150,6 +225,12 @@ export function setAnalysisKinds(map: MapLibreMap, kinds: string[]): void {
   for (const id of ["analysis-fill", "analysis-line"]) {
     if (map.getLayer(id)) map.setFilter(id, filter);
   }
+  if (map.getLayer("analysis-points"))
+    map.setFilter("analysis-points", [
+      "all",
+      ["==", ["geometry-type"], "Point"],
+      filter,
+    ]);
 }
 
 /** A click on a polygon reports its properties; returns the unbind. */
@@ -167,13 +248,17 @@ export function bindAnalysisClicks(
   const leave = () => {
     map.getCanvas().style.cursor = "";
   };
-  map.on("click", "analysis-fill", onClick);
-  map.on("mouseenter", "analysis-fill", enter);
-  map.on("mouseleave", "analysis-fill", leave);
+  for (const id of ["analysis-fill", "analysis-points"]) {
+    map.on("click", id, onClick);
+    map.on("mouseenter", id, enter);
+    map.on("mouseleave", id, leave);
+  }
   return () => {
-    map.off("click", "analysis-fill", onClick);
-    map.off("mouseenter", "analysis-fill", enter);
-    map.off("mouseleave", "analysis-fill", leave);
+    for (const id of ["analysis-fill", "analysis-points"]) {
+      map.off("click", id, onClick);
+      map.off("mouseenter", id, enter);
+      map.off("mouseleave", id, leave);
+    }
   };
 }
 

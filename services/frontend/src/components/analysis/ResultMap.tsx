@@ -17,15 +17,20 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { Track } from "@/api/types";
 import {
+  ACCURACY_CLASSES,
   ANALYSIS_KINDS,
   INTENSITY_RAMP,
+  accuracyColor,
   bindAnalysisClicks,
   boundsOfFeatures,
   decorateAnalysisFeatures,
   ensureAnalysisLayers,
+  ensureFixLayer,
   ensureIntensityLayers,
   setAnalysisFeatures,
   setAnalysisKinds,
+  setFixFeatures,
+  setFixesVisible,
   setIntensityFeatures,
   setIntensityVisible,
   setTracksVisible,
@@ -102,6 +107,8 @@ export function ResultMap({
     6,
   );
   const main = document.periods.find((p) => p.key === "main");
+  // device subjects (decision D214) read their own tracks and colour the fixes by accuracy
+  const byDevice = document.subjects.some((s) => s.kind === "device");
   const available = ANALYSIS_KINDS.filter((k) => document.geometries[k]);
   // the result's polygons are the picture; the tracks, fixes and heatmap start hidden and
   // the chips switch them on (Tim, 2026-09-15)
@@ -125,7 +132,7 @@ export function ResultMap({
   const tracks = useQueries({
     queries: document.subjects.map((subject) => ({
       queryKey: queryKeys.track(projectId, {
-        entity_id: subject.id,
+        ...(byDevice ? { device_id: subject.id } : { entity_id: subject.id }),
         from: main?.time_from,
         to: main?.time_to,
         max_points: TRACK_POINTS,
@@ -133,7 +140,9 @@ export function ResultMap({
       queryFn: () =>
         api.get<Track>(`/api/v1/projects/${projectId}/tracks`, {
           query: {
-            entity_id: subject.id,
+            ...(byDevice
+              ? { device_id: subject.id }
+              : { entity_id: subject.id }),
             from: main?.time_from,
             to: main?.time_to,
             max_points: TRACK_POINTS,
@@ -151,15 +160,16 @@ export function ResultMap({
           ? [
               {
                 entityId: document.subjects[i].id,
-                kind: "entity" as const,
+                kind: byDevice ? ("device" as const) : ("entity" as const),
                 geometry: track.geometry as unknown as GeoJSON.Geometry,
                 times: track.times,
                 color: colors[document.subjects[i].id],
+                accuracies: track.accuracies,
               },
             ]
           : [],
       ),
-    [tracks, document.subjects, colors],
+    [tracks, document.subjects, colors, byDevice],
   );
   // the fixes as points, for the points layer and the heatmap
   const pointFeatures = useMemo<GeoJSON.Feature[]>(
@@ -171,10 +181,13 @@ export function ResultMap({
             : track.geometry.type === "MultiPoint"
               ? track.geometry.coordinates
               : [];
-        return coords.map((c) => ({
+        return coords.map((c, i) => ({
           type: "Feature" as const,
           geometry: { type: "Point" as const, coordinates: c },
-          properties: { entity_id: track.entityId },
+          properties: {
+            entity_id: track.entityId,
+            color: accuracyColor(track.accuracies?.[i]),
+          },
         }));
       }),
     [trackLayers],
@@ -210,6 +223,7 @@ export function ResultMap({
       map.setLayoutProperty("track-points", "visibility", "none");
     ensureAnalysisLayers(map);
     ensureIntensityLayers(map);
+    ensureFixLayer(map);
     ensureHeatLayer(map);
     raiseMarkers(map);
     // a result holds a period of fixes in a small area: a tight radius and the lowest
@@ -260,6 +274,7 @@ export function ResultMap({
     setAnalysisFeatures(map, features);
     setIntensityFeatures(map, intensity);
     setHeatPoints(map, pointFeatures);
+    setFixFeatures(map, byDevice ? pointFeatures : []);
     if (fitted.current || (available.length > 0 && features.length === 0))
       return;
     // the polygons say where the result is; a track may hold a far outlier
@@ -276,6 +291,7 @@ export function ResultMap({
     features,
     intensity,
     available.length,
+    byDevice,
   ]);
 
   useEffect(() => {
@@ -284,12 +300,14 @@ export function ResultMap({
     setAnalysisKinds(map, shown);
     setIntensityVisible(map, !hidden.includes("intensity"));
     setTracksVisible(map, !hidden.includes("tracks"));
+    // a device's fixes draw in their accuracy colours instead of the track points
     if (map.getLayer("track-points"))
       map.setLayoutProperty(
         "track-points",
         "visibility",
-        hidden.includes("points") ? "none" : "visible",
+        hidden.includes("points") || byDevice ? "none" : "visible",
       );
+    setFixesVisible(map, byDevice && !hidden.includes("points"));
     if (map.getLayer("heat"))
       map.setLayoutProperty(
         "heat",
@@ -298,7 +316,7 @@ export function ResultMap({
       );
     // the list is derived from the document and the hidden set
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapRef, ready, shown.join(","), hidden.join(",")]);
+  }, [mapRef, ready, shown.join(","), hidden.join(","), byDevice]);
 
   const fit = () => {
     const map = mapRef.current;
@@ -384,7 +402,13 @@ export function ResultMap({
     kde: t("KDE 50% and 95%"),
     hotspot: t("Hotspots"),
     cluster: t("Clusters"),
+    coverage: t("Coverage of the fixes"),
+    gateway: t("Gateways heard"),
   };
+  const uplinkShare =
+    typeof picked?.share === "number" && typeof picked?.uplinks === "number"
+      ? { share: picked.share, uplinks: picked.uplinks }
+      : null;
   const area =
     typeof picked?.hectares === "number"
       ? picked.hectares
@@ -430,6 +454,21 @@ export function ResultMap({
           </button>
         ))}
       </div>
+      {byDevice && !hidden.includes("points") && (
+        <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
+          {ACCURACY_CLASSES.map(([bound, color], i) => (
+            <span key={color} className="inline-flex items-center gap-0.5">
+              <span
+                className="inline-block size-2.5 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              {Number.isFinite(bound)
+                ? t("<{{m}} m", { m: bound })
+                : t(">{{m}} m", { m: ACCURACY_CLASSES[i - 1][0] })}
+            </span>
+          ))}
+        </div>
+      )}
       {intensity.length > 0 && !hidden.includes("intensity") && (
         <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
           <span>{t("less use")}</span>
@@ -471,6 +510,20 @@ export function ResultMap({
                     : t("Fix share")}
                 </dt>
                 <dd>{Math.round(share * 100)}%</dd>
+              </>
+            )}
+            {uplinkShare && (
+              <>
+                <dt>{t("Uplinks heard")}</dt>
+                <dd>
+                  {uplinkShare.uplinks} ({Math.round(uplinkShare.share * 100)}%)
+                </dd>
+              </>
+            )}
+            {typeof picked.fixes === "number" && (
+              <>
+                <dt>{t("Fixes")}</dt>
+                <dd>{picked.fixes}</dd>
               </>
             )}
             {typeof picked.relative_pressure === "number" && (
