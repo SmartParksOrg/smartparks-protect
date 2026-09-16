@@ -154,78 +154,74 @@ export function DeviceSettingsTab({
           <div className="border-b bg-muted/40 px-3 py-1.5 text-sm font-medium">
             {group}
           </div>
-          <table className="w-full text-sm">
-            <tbody>
-              {rows
-                .filter((r) => (r.group ?? "Other") === group)
-                .map((row) => {
-                  const known = row.value !== null && row.value !== undefined;
-                  return (
-                    <tr
-                      key={row.key}
-                      className={`border-t ${known ? "" : "text-muted-foreground"}`}
-                    >
-                      <td className="px-3 py-1.5 align-top">
-                        <div className="font-mono text-xs">{row.key}</div>
-                        {row.description && (
-                          <div className="max-w-xl text-xs text-muted-foreground">
-                            {row.description}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 align-top tabular-nums whitespace-nowrap">
-                        {known ? (
-                          <span
-                            className={row.status === "sent" ? "italic" : ""}
-                          >
-                            {showValue(row, row.value)}
-                          </span>
-                        ) : (
-                          <span className="text-xs">{t("unknown")}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 align-top text-xs text-muted-foreground">
-                        {known ? (
-                          <>
-                            {t(
-                              SOURCE_LABELS[row.source ?? ""] ??
-                                row.source ??
-                                "",
-                            )}
-                            {row.status === "sent" &&
-                              ` · ${t("not yet confirmed")}`}
-                            {row.observed_at &&
-                              ` · ${formatAgo(row.observed_at)}`}
-                          </>
-                        ) : (
-                          <>
-                            {t("default {{value}}", {
-                              value: showValue(row, row.default) || "–",
-                            })}
-                            {row.since_firmware &&
-                              ` · ${t("since firmware {{v}}", { v: row.since_firmware })}`}
-                          </>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-right align-top whitespace-nowrap">
-                        {(canControl || canRecord) && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditing(row)}
-                            aria-label={t("Change {{setting}}", {
-                              setting: row.key,
-                            })}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
+          <div className="text-sm">
+            {rows
+              .filter((r) => (r.group ?? "Other") === group)
+              .map((row) => {
+                const known = row.value !== null && row.value !== undefined;
+                return (
+                  <div
+                    key={row.key}
+                    className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-t px-3 py-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.6fr)_auto] sm:items-start ${known ? "" : "text-muted-foreground"}`}
+                  >
+                    <div className="min-w-0 sm:col-start-1 sm:row-start-1">
+                      <div className="font-mono text-xs break-all">
+                        {row.key}
+                      </div>
+                      {row.description && (
+                        <div className="text-xs text-muted-foreground">
+                          {row.description}
+                        </div>
+                      )}
+                    </div>
+                    <div className="col-start-2 row-start-1 sm:col-start-4">
+                      {(canControl || canRecord) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditing(row)}
+                          aria-label={t("Change {{setting}}", {
+                            setting: row.key,
+                          })}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="col-span-2 tabular-nums sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:pt-1">
+                      {known ? (
+                        <span className={row.status === "sent" ? "italic" : ""}>
+                          {showValue(row, row.value)}
+                        </span>
+                      ) : (
+                        <span className="text-xs">{t("unknown")}</span>
+                      )}
+                    </div>
+                    <div className="col-span-2 text-xs text-muted-foreground sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:pt-1">
+                      {known ? (
+                        <>
+                          {t(
+                            SOURCE_LABELS[row.source ?? ""] ?? row.source ?? "",
+                          )}
+                          {row.status === "sent" &&
+                            ` · ${t("not yet confirmed")}`}
+                          {row.observed_at &&
+                            ` · ${formatAgo(row.observed_at)}`}
+                        </>
+                      ) : (
+                        <>
+                          {t("default {{value}}", {
+                            value: showValue(row, row.default) || "–",
+                          })}
+                          {row.since_firmware &&
+                            ` · ${t("since firmware {{v}}", { v: row.since_firmware })}`}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       ))}
       <SettingDialog
