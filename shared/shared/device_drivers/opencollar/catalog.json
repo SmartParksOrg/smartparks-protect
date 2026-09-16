@@ -100,9 +100,8 @@
    "min": 1606314575,
    "max": 4294967295,
    "group": "Device",
-   "unit": "s",
-   "since_firmware": "4.4.2",
-   "description": "It is the device clock, which is derived from the last u-blox fix time (the wiki example shows store timestamps 7 to 9 s after fix_timestamp), from init_time (setting 0x07, default 1606314575) plus uptime before any fix,…"
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 8,
@@ -293,7 +292,7 @@
    "min": 1,
    "max": 600,
    "group": "GNSS",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "hot_fix_timeout 0x17 and cold_fix_timeout 0x16 are u16 seconds."
   },
@@ -306,7 +305,7 @@
    "min": 1,
    "max": 600,
    "group": "GNSS",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "hot_fix_timeout 0x17 and cold_fix_timeout 0x16 are u16 seconds."
   },
@@ -319,7 +318,7 @@
    "min": 100,
    "max": 10000,
    "group": "Bluetooth",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2"
   },
   {
@@ -331,7 +330,7 @@
    "min": 0,
    "max": 86400,
    "group": "Wi-Fi",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Interval settings wifi_scan_interval (0x19) and wifi_scan_aggregated_interval (0x1A)."
   },
@@ -344,7 +343,7 @@
    "min": 0,
    "max": 86400,
    "group": "Wi-Fi",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Interval settings wifi_scan_interval (0x19) and wifi_scan_aggregated_interval (0x1A)."
   },
@@ -357,7 +356,7 @@
    "min": 50,
    "max": 10000,
    "group": "Bluetooth",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Interval ble_scan_interval (0x1C), duration ble_scan_duration (0x1B, ms)."
   },
@@ -370,7 +369,7 @@
    "min": 0,
    "max": 86400,
    "group": "Bluetooth",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Interval ble_scan_interval (0x1C), duration ble_scan_duration (0x1B, ms)."
   },
@@ -383,7 +382,7 @@
    "min": 0,
    "max": 86400,
    "group": "Bluetooth",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Interval ble_scan_aggregated_interval (0x1D);"
   },
@@ -494,9 +493,8 @@
    "min": 0,
    "max": 86400,
    "group": "u-blox GNSS",
-   "unit": "s",
-   "since_firmware": "4.4.2",
-   "description": "ublox_send_interval 0x02 (interval 1), ublox_send_interval_2 0x26 (interval 2), ublox_multiple_intervals 0x29, ublox_interval1_start 0x27 and ublox_interval2_start 0x52 (UTC hours) define a two period daily schedule."
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 39,
@@ -507,9 +505,8 @@
    "min": 0,
    "max": 23,
    "group": "u-blox GNSS",
-   "unit": "s",
-   "since_firmware": "6.8.1",
-   "description": "ublox_send_interval 0x02 (interval 1), ublox_send_interval_2 0x26 (interval 2), ublox_multiple_intervals 0x29, ublox_interval1_start 0x27 and ublox_interval2_start 0x52 (UTC hours) define a two period daily schedule."
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 40,
@@ -520,7 +517,7 @@
    "min": 0,
    "max": 30,
    "group": "u-blox GNSS",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2"
   },
   {
@@ -533,8 +530,7 @@
    "max": true,
    "group": "u-blox GNSS",
    "unit": null,
-   "since_firmware": "4.4.2",
-   "description": "ublox_send_interval 0x02 (interval 1), ublox_send_interval_2 0x26 (interval 2), ublox_multiple_intervals 0x29, ublox_interval1_start 0x27 and ublox_interval2_start 0x52 (UTC hours) define a two period daily schedule."
+   "since_firmware": "4.4.2"
   },
   {
    "id": 42,
@@ -606,7 +602,7 @@
    "min": 0,
    "max": 86400,
    "group": "GNSS",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2"
   },
   {
@@ -618,7 +614,7 @@
    "min": 0,
    "max": 255,
    "group": "GNSS",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2"
   },
   {
@@ -630,7 +626,7 @@
    "min": 0,
    "max": 86400,
    "group": "LoRa GNSS and LoRaWAN",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Queued by cmd_send_lr_message (0xC4, up to 46 bytes of text) and retried per lr_messaging_retry_interval (0x31) and lr_messaging_retry_count (0x32)."
   },
@@ -668,7 +664,7 @@
    "min": 0,
    "max": 86400,
    "group": "Other",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Interval memfault_send_interval (0x34, default 0)."
   },
@@ -681,7 +677,7 @@
    "min": 600,
    "max": 86400,
    "group": "Other",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Device joins on boot and after rejoin_interval (0x35, default 3600 s)."
   },
@@ -694,7 +690,7 @@
    "min": 0,
    "max": 2678400,
    "group": "Other",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2"
   },
   {
@@ -780,7 +776,7 @@
    "min": 0,
    "max": 604800,
    "group": "Fence",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "fence_enabled (0x3F), fence_interval (0x40, seconds), fence_sampling_length (0x41, s), fence_mv_scaling_factor (0x42)."
   },
@@ -819,7 +815,7 @@
    "min": 0,
    "max": 604800,
    "group": "Flash log",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "4.4.2",
    "description": "Periodic every flash_status_interval (0x43, default 0 = off since 6.12.0), or on cmd_get_flash_status (0xB3)."
   },
@@ -905,7 +901,7 @@
    "min": 1,
    "max": 10000,
    "group": "Command queue",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "5.0.1"
   },
   {
@@ -917,7 +913,7 @@
    "min": 1,
    "max": 10000,
    "group": "Command queue",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "5.0.1"
   },
   {
@@ -929,7 +925,7 @@
    "min": 1,
    "max": 10000,
    "group": "Command queue",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "5.0.1"
   },
   {
@@ -954,7 +950,7 @@
    "min": 1,
    "max": 10000,
    "group": "Command queue",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "5.0.1",
    "description": "reporting interval cmdq_reporting_interval (0x4E)."
   },
@@ -992,9 +988,8 @@
    "min": 0,
    "max": 23,
    "group": "u-blox GNSS",
-   "unit": "s",
-   "since_firmware": "6.8.1",
-   "description": "ublox_send_interval 0x02 (interval 1), ublox_send_interval_2 0x26 (interval 2), ublox_multiple_intervals 0x29, ublox_interval1_start 0x27 and ublox_interval2_start 0x52 (UTC hours) define a two period daily schedule."
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 87,
@@ -1054,7 +1049,7 @@
    "min": 0,
    "max": 86400,
    "group": "VHF beacon",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.8.1"
   },
   {
@@ -1066,7 +1061,7 @@
    "min": 0,
    "max": 86400,
    "group": "VHF beacon",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.8.1"
   },
   {
@@ -1078,7 +1073,7 @@
    "min": 0,
    "max": 23,
    "group": "VHF beacon",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.8.1"
   },
   {
@@ -1090,7 +1085,7 @@
    "min": 0,
    "max": 23,
    "group": "VHF beacon",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.8.1"
   },
   {
@@ -1198,7 +1193,7 @@
    "min": 0,
    "max": 255,
    "group": "GNSS",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.8.1"
   },
   {
@@ -1224,8 +1219,7 @@
    "max": true,
    "group": "Accelerometer",
    "unit": null,
-   "since_firmware": "6.14.1",
-   "description": "The LIS2DW12 FIFO capture added in 6.14.0 (accel_movement_data_fifo_enabled 0x73, accel_odr_hz 0x74, accel_g_scale 0x75) is not emitted as a LoRaWAN message in the public source;"
+   "since_firmware": "6.14.1"
   },
   {
    "id": 116,
@@ -1237,8 +1231,7 @@
    "max": 1600,
    "group": "Accelerometer",
    "unit": null,
-   "since_firmware": "6.14.1",
-   "description": "The LIS2DW12 FIFO capture added in 6.14.0 (accel_movement_data_fifo_enabled 0x73, accel_odr_hz 0x74, accel_g_scale 0x75) is not emitted as a LoRaWAN message in the public source;"
+   "since_firmware": "6.14.1"
   },
   {
    "id": 117,
@@ -1250,8 +1243,7 @@
    "max": 16,
    "group": "Accelerometer",
    "unit": null,
-   "since_firmware": "6.14.1",
-   "description": "The LIS2DW12 FIFO capture added in 6.14.0 (accel_movement_data_fifo_enabled 0x73, accel_odr_hz 0x74, accel_g_scale 0x75) is not emitted as a LoRaWAN message in the public source;"
+   "since_firmware": "6.14.1"
   },
   {
    "id": 118,
@@ -1262,7 +1254,7 @@
    "min": 0,
    "max": 86400,
    "group": "Satellite",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.14.1"
   },
   {
@@ -1274,7 +1266,7 @@
    "min": 0,
    "max": 23,
    "group": "Satellite",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.14.1"
   },
   {
@@ -1298,7 +1290,7 @@
    "min": 0,
    "max": 23,
    "group": "Satellite",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.14.1"
   },
   {
@@ -1346,7 +1338,7 @@
    "min": 0,
    "max": 4320,
    "group": "u-blox GNSS",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.15.0"
   },
   {
@@ -1394,7 +1386,7 @@
    "min": 0,
    "max": 86400,
    "group": "External switch",
-   "unit": "s",
+   "unit": null,
    "since_firmware": "6.15.0",
    "description": "Port 20, periodic status every external_switch_detection_reporting_interval (0x81): 99 05 [state u8] [count u32 LE]."
   },
