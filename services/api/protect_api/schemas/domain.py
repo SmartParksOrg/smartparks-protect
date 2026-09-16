@@ -481,6 +481,41 @@ class DeviceDataSpan(BaseModel):
     )
 
 
+class LearnedInterval(BaseModel):
+    seconds: float
+    regular_share: float
+    intervals: int
+    confident: bool
+
+
+class DeviceReporting(BaseModel):
+    """What the device is expected to report and how often (decisions D225 to D227): the
+    declared interval with its source, the interval learned from the last 30 days of fixes,
+    the expectation the analyses use, and a person's override when one is set."""
+
+    expected_fix_s: float | None
+    expected_source: str
+    declared_fix_s: float | None
+    declared_source: str | None
+    learned: LearnedInterval | None
+    learned_from_fixes: int
+    learned_days: int
+    disagrees: bool
+    override: dict[str, Any] | None
+    expected_status_s: float | None
+    status_source: str | None
+
+
+class DeviceReportingUpdate(BaseModel):
+    expected_fix_interval_s: int | None = Field(
+        default=None,
+        ge=10,
+        le=30 * 86400,
+        description="Seconds between fixes the device is expected to keep; null clears the "
+        "override so the settings and the data decide again",
+    )
+
+
 class HandoverRequest(BaseModel):
     """Move a device to another project from `effective_at` (architecture 28.10)."""
 

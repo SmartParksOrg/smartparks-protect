@@ -7,12 +7,10 @@ thresholds or the catalogue's defaults, and a rank inside the fleet."""
 
 from __future__ import annotations
 
-import json
 import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -52,11 +50,10 @@ from shared.analysis.primitives.health import (
     versions_seen,
 )
 from shared.analysis.primitives.intervals import (
+    Expected,
     IntervalReport,
-    decode_tlv_settings,
-    expected_intervals,
     interval_report,
-    merged_settings,
+    resolve_expected,
 )
 from shared.analysis.primitives.levels import (
     CRITICAL_FLAGS,
@@ -72,6 +69,7 @@ from shared.analysis.primitives.trajectory import Trajectory, exclude_impossible
 from shared.connectivity.satellite import DELIVERED_STATUSES, SatelliteSession
 from shared.curation.effective import effective_number, effective_time, in_window, visible
 from shared.device_drivers.registry import DRIVERS
+from shared.domain.reporting import Declared, declared_intervals
 from shared.enums import AcquisitionChannel
 from shared.models import (
     DataSource,
@@ -151,7 +149,11 @@ HEALTH_COLUMNS = [
 ]
 REPORTING_COLUMNS = [
     "expected_fix_s",
+    "expected_fix_source",
+    "fix_regular_share",
+    "declared_fix_s",
     "expected_status_s",
+    "expected_status_source",
     "fixes",
     "observed_fix_median_s",
     "observed_fix_p90_s",
@@ -216,6 +218,8 @@ class DeviceInfo:
     default_settings: dict[str, Any]
     attributes: dict[str, Any]
     tracked: str | None
+    device: Device
+    device_type: DeviceType
 
 
 @dataclass(slots=True)
@@ -242,21 +246,17 @@ class DeviceFigures:
     geometries: list[Geometry] = field(default_factory=list)
 
 
-def _catalog(driver_key: str) -> list[dict[str, Any]]:
-    """The driver's settings catalogue, when it ships one (OpenCollar's `catalog.json`)."""
-    path = Path(__file__).resolve().parents[2] / "device_drivers" / driver_key / "catalog.json"
-    if not path.exists():
-        return []
-    try:
-        document = json.loads(path.read_text())
-    except ValueError:
-        return []
-    settings = document.get("settings") if isinstance(document, dict) else None
-    return [s for s in settings or [] if isinstance(s, dict)]
-
-
 def _ms(seconds: float) -> float:
     return float(seconds) * 1000
+
+
+def _minutes(seconds: float) -> str:
+    """An interval as words: "5 min", "1.5 h", "2 d"."""
+    if seconds >= 2 * DAY_S:
+        return f"{seconds / DAY_S:.0f} d"
+    if seconds >= 3600:
+        return f"{seconds / 3600:g} h"
+    return f"{seconds / 60:.0f} min"
 
 
 def _level(thresholds: dict[str, Threshold], key: str, value: float | None) -> Level | None:
@@ -271,7 +271,7 @@ async def load_devices(
     first and, when it changed, the last)."""
     rows = (
         await session.execute(
-            select(Device, DeviceType.label, DeviceType.driver_key, DeviceType.default_settings)
+            select(Device, DeviceType)
             .join(DeviceType, DeviceType.id == Device.device_type_id)
             .where(Device.id.in_(device_ids))
             .order_by(Device.name)
@@ -294,7 +294,12 @@ async def load_devices(
         if name not in tracked[device_id]:
             tracked[device_id].append(name)
     out = []
-    for device, type_label, driver_key, defaults in rows:
+    for device, device_type in rows:
+        type_label, driver_key, defaults = (
+            device_type.label,
+            device_type.driver_key,
+            device_type.default_settings,
+        )
         names = tracked.get(device.id, [])
         text = None
         if len(names) == 1:
@@ -310,6 +315,8 @@ async def load_devices(
                 default_settings=dict(defaults or {}),
                 attributes=dict(device.attributes or {}),
                 tracked=text,
+                device=device,
+                device_type=device_type,
             )
         )
     return out
@@ -687,20 +694,31 @@ def health_figures(
 def reporting_figures(
     fix_times: NDArray[np.float64],
     status_times: NDArray[np.float64],
-    settings: dict[str, Any],
+    declared: Declared,
     invalid: int,
     valid: int,
     messages: int,
     thresholds: dict[str, Threshold],
     period: Period,
     out: DeviceFigures,
-) -> None:
+) -> tuple[Expected, Expected]:
     """Section 4.2: expected against observed intervals, missed reports, silences, messages
-    and the records held invalid."""
+    and the records held invalid. The expected intervals come from the declared sources and
+    the data together (decisions D225 to D227): a declared one holds unless the data plainly
+    disagrees, a confident learned one serves when nothing is declared, and the source is
+    named beside the figure."""
     s = out.summary
-    expected = expected_intervals(settings)
-    s["expected_fix_s"] = expected["fix"]
-    s["expected_status_s"] = expected["status"]
+    fix_expected = resolve_expected(declared.fix, fix_times)
+    status_expected = resolve_expected(declared.status, status_times)
+    s["expected_fix_s"] = fix_expected.seconds
+    s["expected_fix_source"] = fix_expected.source
+    s["fix_regular_share"] = (
+        fix_expected.learned.regular_share if fix_expected.learned is not None else None
+    )
+    s["declared_fix_s"] = fix_expected.declared_seconds
+    s["expected_status_s"] = status_expected.seconds
+    s["expected_status_source"] = status_expected.source
+    expected = {"fix": fix_expected.seconds, "status": status_expected.seconds}
     from_s, to_s = period.time_from.timestamp(), period.time_to.timestamp()
     fixes: IntervalReport = interval_report(fix_times, from_s, to_s, expected["fix"])
     statuses: IntervalReport = interval_report(status_times, from_s, to_s, expected["status"])
@@ -728,6 +746,7 @@ def reporting_figures(
         level = _level(thresholds, key, s.get(key))
         if level is not None:
             out.levels[key] = level
+    return fix_expected, status_expected
 
 
 def gnss_figures(
@@ -995,21 +1014,9 @@ async def analyse_device(
                 + ("period." if main else "comparison period."),
             )
         )
-    # the settings: the type's defaults under the device's attributes under the settings frames
-    catalog = _catalog(info.driver_key)
-    from_frames: dict[str, Any] = {}
-    for _, state in states:
-        for key, tlv in state.items():
-            if key.startswith("port_") and key.endswith("_tlv") and isinstance(tlv, dict):
-                from_frames.update(decode_tlv_settings(tlv, catalog))
-    settings = merged_settings(
-        {str(s.get("name")): s.get("default") for s in catalog},
-        info.default_settings,
-        info.attributes.get("settings")
-        if isinstance(info.attributes.get("settings"), dict)
-        else None,
-        from_frames,
-    )
+    # the declared intervals as of the period's end: a person's override, the newest settings
+    # frame, an acknowledged command, the type's defaults (shared/domain/reporting.py)
+    declared = await declared_intervals(session, info.device, info.device_type, period.time_to)
     health_figures(metrics, states, reboots, thresholds, period, bucket_s, out)
     status_times = np.asarray([t for t, state in states if is_status(state)], dtype=np.float64)
     if status_times.size == 0 and "battery_voltage" in metrics:
@@ -1017,16 +1024,39 @@ async def analyse_device(
         # measurements, not the states): the battery readings mark the statuses then
         status_times = metrics["battery_voltage"][0]
         out.summary["statuses"] = int(status_times.size)
-    reporting_figures(
-        track.times, status_times, settings, invalid, valid, messages, thresholds, period, out
+    fix_expected, _ = reporting_figures(
+        track.times, status_times, declared, invalid, valid, messages, thresholds, period, out
     )
-    if out.summary.get("expected_fix_s") is None and len(track):
+    if fix_expected.disagrees and fix_expected.declared_seconds:
+        out.warnings.append(
+            Warning(
+                code="interval_disagrees",
+                subject_id=subject.id,
+                text=(
+                    f"{subject.name}'s settings say a fix every "
+                    f"{_minutes(fix_expected.declared_seconds)} ({fix_expected.declared_source}), "
+                    f"the collar reports every {_minutes(fix_expected.seconds or 0)}: the settings "
+                    "Protect knows are stale; missed fixes are counted against what it does."
+                ),
+            )
+        )
+    elif fix_expected.seconds is None and len(track):
+        seen = fix_expected.learned
+        why = (
+            f"the fixes are too irregular to learn it ({round(seen.regular_share * 100)} percent "
+            f"near {_minutes(seen.seconds)})"
+            if seen is not None
+            else "too few fixes to learn it"
+        )
         out.warnings.append(
             Warning(
                 code="interval_unknown",
                 level="notice",
                 subject_id=subject.id,
-                text=f"{subject.name}'s fix interval is not known; missed fixes cannot be counted.",
+                text=(
+                    f"{subject.name}'s fix interval is not known and {why}; "
+                    "missed fixes cannot be counted."
+                ),
             )
         )
     expected = out.summary.get("expected_fix_s") or out.summary.get("expected_status_s")

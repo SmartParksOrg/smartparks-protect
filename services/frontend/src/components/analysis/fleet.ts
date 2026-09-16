@@ -89,6 +89,9 @@ export const AREA_CARDS: [string, string[]][] = [
     "reporting",
     [
       "expected_fix_s",
+      "expected_fix_source",
+      "fix_regular_share",
+      "declared_fix_s",
       "observed_fix_median_s",
       "missed_fix_share",
       "expected_status_s",

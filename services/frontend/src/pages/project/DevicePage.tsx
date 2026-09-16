@@ -53,6 +53,7 @@ import { AssignEntityDialog } from "@/components/devices/AssignEntityDialog";
 import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
+import { ReportingCard } from "@/components/devices/ReportingCard";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
 import { lastPositionsWindow } from "@/lib/positionsWindow";
 import { useMutationToast } from "@/hooks/useMutationToast";
@@ -527,6 +528,10 @@ export function DevicePage() {
                   }
                 />
               )}
+              <ReportingCard
+                deviceId={d.id}
+                canEdit={Boolean(user?.is_superuser) || can("project:write")}
+              />
               <HealthCard
                 health={d.health}
                 projectId={deviceProjectId}

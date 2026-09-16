@@ -84,6 +84,7 @@
   "Feed, {{count}} unread_other": "Feed, {{count}} unread",
   "Filters": "Filters",
   "Fit": "Fit",
+  "Fix interval set (s)": "Fix interval set (s)",
   "Folders of entities: a herd, a team, a region. Two levels deep.": "Folders of entities: a herd, a team, a region. Two levels deep.",
   "Folders of entities: a region, a herd inside it, a family inside that.": "Folders of entities: a region, a herd inside it, a family inside that.",
   "Follow the selection as positions arrive": "Follow the selection as positions arrive",

@@ -848,6 +848,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/reporting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Reporting
+         * @description The fix interval the device is expected to keep and where that comes from (decisions
+         *     D225 to D227), with the interval its last 30 days of fixes show.
+         */
+        get: operations["device_reporting_api_v1_devices__device_id__reporting_get"];
+        /**
+         * Set Device Reporting
+         * @description A person's word on the expected fix interval (decision D226), kept on the device's
+         *     attributes with who set it and when; null clears it. Project admins of the device's
+         *     current project, or a server admin.
+         */
+        put: operations["set_device_reporting_api_v1_devices__device_id__reporting_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/attribution-jobs": {
         parameters: {
             query?: never;
@@ -6992,6 +7019,45 @@ export interface components {
             data_source_names?: string[];
         };
         /**
+         * DeviceReporting
+         * @description What the device is expected to report and how often (decisions D225 to D227): the
+         *     declared interval with its source, the interval learned from the last 30 days of fixes,
+         *     the expectation the analyses use, and a person's override when one is set.
+         */
+        DeviceReporting: {
+            /** Expected Fix S */
+            expected_fix_s: number | null;
+            /** Expected Source */
+            expected_source: string;
+            /** Declared Fix S */
+            declared_fix_s: number | null;
+            /** Declared Source */
+            declared_source: string | null;
+            learned: components["schemas"]["LearnedInterval"] | null;
+            /** Learned From Fixes */
+            learned_from_fixes: number;
+            /** Learned Days */
+            learned_days: number;
+            /** Disagrees */
+            disagrees: boolean;
+            /** Override */
+            override: {
+                [key: string]: unknown;
+            } | null;
+            /** Expected Status S */
+            expected_status_s: number | null;
+            /** Status Source */
+            status_source: string | null;
+        };
+        /** DeviceReportingUpdate */
+        DeviceReportingUpdate: {
+            /**
+             * Expected Fix Interval S
+             * @description Seconds between fixes the device is expected to keep; null clears the override so the settings and the data decide again
+             */
+            expected_fix_interval_s?: number | null;
+        };
+        /**
          * DeviceStateRead
          * @description A device's last status (Tim, 2026-09-13): the driver's health lines with their levels,
          *     the raw status document, and the source event it came from.
@@ -8920,6 +8986,17 @@ export interface components {
          * @enum {string}
          */
         Layout: "series" | "long" | "wide";
+        /** LearnedInterval */
+        LearnedInterval: {
+            /** Seconds */
+            seconds: number;
+            /** Regular Share */
+            regular_share: number;
+            /** Intervals */
+            intervals: number;
+            /** Confident */
+            confident: boolean;
+        };
         /** LinkIdentity */
         LinkIdentity: {
             /**
@@ -13799,6 +13876,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceDataSpan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_reporting_api_v1_devices__device_id__reporting_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceReporting"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_device_reporting_api_v1_devices__device_id__reporting_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceReportingUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceReporting"];
                 };
             };
             /** @description Validation Error */

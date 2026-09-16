@@ -40,7 +40,8 @@ Every indicator is computed when the device reports the data behind it and left 
 
 | Indicator | Meaning | Default level |
 | --- | --- | --- |
-| Fix interval set, status interval set | The seconds between fixes and statuses the device's settings promise: the type's defaults, the device's attributes, and the settings frames the device sent, in that order of precedence | none |
+| Fix interval expected, status interval expected | The seconds between fixes and statuses the device is expected to keep, with the source named: a person's override on the device page, the newest settings frame the collar sent, an interval command the collar acknowledged, the device type's settings, or the interval learned from the fixes (the dominant interval, silences left out, trusted when at least 60 percent of the intervals sit within 20 percent of it). A declared interval the collar plainly does not keep (more than 30 percent off a confident learned one) is named stale and gives way to the learned one, with a warning (decisions D225 to D227) | none |
+| Regular fixes | The share of intervals within 20 percent of the learned interval; below 60 percent the fixes are too irregular to count missed ones | none |
 | Fix interval seen | The median and the 90th percentile of the interval between consecutive fixes | none |
 | Missed fixes, missed statuses | One minus the messages seen over the messages the interval promised | warn at 10 percent, critical at 30 |
 | Silences | Gaps longer than three expected intervals, the period's edges included, and the longest of them | warn when the longest exceeds a day, critical when it exceeds a week |
@@ -81,6 +82,10 @@ An Iridium source:
 | Redeliveries | The platform's redeliveries stored as duplicates | none |
 
 The fleet table shows the worst source's lost uplinks and RSSI per device; the network table has one row per device and source.
+
+### The expected interval
+
+The device page's Reporting card shows the same expectation the analysis uses: the expected fix interval with its source, the setting Protect knows when it is stale, and what the last 30 days of fixes show with how regular they are. A project admin sets the interval there when the sources are wrong ("Use the learned interval", or a number of minutes), and clears it again; the override is kept on the device with who set it and when, and comes first. `GET` and `PUT /devices/{id}/reporting` are the API.
 
 ## What the result holds
 

@@ -32,6 +32,7 @@ export type ExternalIdentity = Schemas["ExternalIdentityRead"];
 export type Metric = Schemas["MetricRead"];
 export type UnknownIdentity = Schemas["UnknownIdentity"];
 export type DeviceDataSpan = Schemas["DeviceDataSpan"];
+export type DeviceReporting = Schemas["DeviceReporting"];
 export type DeviceHealth = Schemas["DeviceHealth"];
 export type HealthValue = Schemas["HealthValue"];
 export type BulkCreateResult = Schemas["BulkCreateResult"];

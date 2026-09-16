@@ -4047,6 +4047,112 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/reporting": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Reporting",
+    "description": "The fix interval the device is expected to keep and where that comes from (decisions\nD225 to D227), with the interval its last 30 days of fixes show.",
+    "operationId": "device_reporting_api_v1_devices__device_id__reporting_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceReporting"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Set Device Reporting",
+    "description": "A person's word on the expected fix interval (decision D226), kept on the device's\nattributes with who set it and when; null clears it. Project admins of the device's\ncurrent project, or a server admin.",
+    "operationId": "set_device_reporting_api_v1_devices__device_id__reporting_put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeviceReportingUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceReporting"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/attribution-jobs": {
    "get": {
     "tags": [
@@ -26666,6 +26772,139 @@
     ],
     "title": "DeviceRead"
    },
+   "DeviceReporting": {
+    "properties": {
+     "expected_fix_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Fix S"
+     },
+     "expected_source": {
+      "type": "string",
+      "title": "Expected Source"
+     },
+     "declared_fix_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Declared Fix S"
+     },
+     "declared_source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Declared Source"
+     },
+     "learned": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LearnedInterval"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "learned_from_fixes": {
+      "type": "integer",
+      "title": "Learned From Fixes"
+     },
+     "learned_days": {
+      "type": "integer",
+      "title": "Learned Days"
+     },
+     "disagrees": {
+      "type": "boolean",
+      "title": "Disagrees"
+     },
+     "override": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Override"
+     },
+     "expected_status_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Status S"
+     },
+     "status_source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status Source"
+     }
+    },
+    "type": "object",
+    "required": [
+     "expected_fix_s",
+     "expected_source",
+     "declared_fix_s",
+     "declared_source",
+     "learned",
+     "learned_from_fixes",
+     "learned_days",
+     "disagrees",
+     "override",
+     "expected_status_s",
+     "status_source"
+    ],
+    "title": "DeviceReporting",
+    "description": "What the device is expected to report and how often (decisions D225 to D227): the\ndeclared interval with its source, the interval learned from the last 30 days of fixes,\nthe expectation the analyses use, and a person's override when one is set."
+   },
+   "DeviceReportingUpdate": {
+    "properties": {
+     "expected_fix_interval_s": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 2592000.0,
+        "minimum": 10.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Fix Interval S",
+      "description": "Seconds between fixes the device is expected to keep; null clears the override so the settings and the data decide again"
+     }
+    },
+    "type": "object",
+    "title": "DeviceReportingUpdate"
+   },
    "DeviceStateRead": {
     "properties": {
      "device_id": {
@@ -32130,6 +32369,34 @@
      "wide"
     ],
     "title": "Layout"
+   },
+   "LearnedInterval": {
+    "properties": {
+     "seconds": {
+      "type": "number",
+      "title": "Seconds"
+     },
+     "regular_share": {
+      "type": "number",
+      "title": "Regular Share"
+     },
+     "intervals": {
+      "type": "integer",
+      "title": "Intervals"
+     },
+     "confident": {
+      "type": "boolean",
+      "title": "Confident"
+     }
+    },
+    "type": "object",
+    "required": [
+     "seconds",
+     "regular_share",
+     "intervals",
+     "confident"
+    ],
+    "title": "LearnedInterval"
    },
    "LinkIdentity": {
     "properties": {

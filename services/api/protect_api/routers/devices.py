@@ -30,6 +30,8 @@ from protect_api.schemas.domain import (
     DeviceCreate,
     DeviceDataSpan,
     DeviceRead,
+    DeviceReporting,
+    DeviceReportingUpdate,
     DeviceUpdate,
     DeviceWithAssignments,
     ExternalIdentityCreate,
@@ -37,6 +39,7 @@ from protect_api.schemas.domain import (
     HandoverRequest,
     ImportResult,
     ImportRowResult,
+    LearnedInterval,
     ProjectAssignmentCreate,
     ProjectAssignmentExtended,
     ProjectAssignmentRead,
@@ -59,6 +62,7 @@ from shared.domain.attribution import active_job, publish_job, recent_jobs
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
+from shared.domain.reporting import LEARN_DAYS, OVERRIDE_ATTRIBUTE, expected_fix_interval
 from shared.enums import AcquisitionChannel, DeviceStatus, Role
 from shared.models import (
     AttributionJob,
@@ -936,6 +940,89 @@ async def device_data_span(
         clock_ahead_until=ahead_until,
         outliers_waiting=outliers_waiting,
     )
+
+
+@router.get("/{device_id}/reporting", response_model=DeviceReporting)
+async def device_reporting(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceReporting:
+    """The fix interval the device is expected to keep and where that comes from (decisions
+    D225 to D227), with the interval its last 30 days of fixes show."""
+    device = await _visible_device(session, user, device_id)
+    device_type = await session.get(DeviceType, device.device_type_id)
+    expected, declared, fixes = await expected_fix_interval(session, device, device_type, utc_now())
+    learned = expected.learned
+    return DeviceReporting(
+        expected_fix_s=expected.seconds,
+        expected_source=expected.source,
+        declared_fix_s=(
+            expected.declared_seconds
+            if expected.disagrees
+            else (declared.fix[0] if declared.fix else None)
+        ),
+        declared_source=(
+            expected.declared_source
+            if expected.disagrees
+            else (declared.fix[1] if declared.fix else None)
+        ),
+        learned=(
+            LearnedInterval(
+                seconds=learned.seconds,
+                regular_share=learned.regular_share,
+                intervals=learned.intervals,
+                confident=learned.confident,
+            )
+            if learned is not None
+            else None
+        ),
+        learned_from_fixes=fixes,
+        learned_days=LEARN_DAYS,
+        disagrees=expected.disagrees,
+        override=declared.override,
+        expected_status_s=declared.status[0] if declared.status else None,
+        status_source=declared.status[1] if declared.status else None,
+    )
+
+
+@router.put("/{device_id}/reporting", response_model=DeviceReporting)
+async def set_device_reporting(
+    device_id: uuid.UUID,
+    body: DeviceReportingUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceReporting:
+    """A person's word on the expected fix interval (decision D226), kept on the device's
+    attributes with who set it and when; null clears it. Project admins of the device's
+    current project, or a server admin."""
+    device = await get_or_404(session, Device, device_id, "Device")
+    attribution = await resolve_attribution(session, device.id, utc_now())
+    if not user.is_superuser:
+        if attribution.project_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
+        await _require_project_admin(session, user, attribution.project_id)
+    attributes = dict(device.attributes or {})
+    if body.expected_fix_interval_s is None:
+        attributes.pop(OVERRIDE_ATTRIBUTE, None)
+    else:
+        attributes[OVERRIDE_ATTRIBUTE] = {
+            "seconds": body.expected_fix_interval_s,
+            "set_by": str(user.id),
+            "set_at": utc_now().isoformat(),
+        }
+    device.attributes = attributes
+    await record_audit(
+        session,
+        user=user,
+        action="device.reporting_set",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=attribution.project_id,
+        details={"expected_fix_interval_s": body.expected_fix_interval_s},
+    )
+    await session.commit()
+    return await device_reporting(device_id, user, session)
 
 
 @router.get("/{device_id}/attribution-jobs", response_model=list[AttributionJobRead])

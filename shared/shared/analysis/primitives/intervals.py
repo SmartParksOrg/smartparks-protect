@@ -5,9 +5,7 @@ its type's defaults, the settings frames it sent (TLVs the driver's catalogue na
 
 from __future__ import annotations
 
-import struct
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -18,60 +16,21 @@ SILENCE_FACTOR = 3
 #: this many messages exist.
 MIN_FOR_OBSERVED = 5
 
-TLV_FORMATS = {
-    "uint8": "<B",
-    "uint16": "<H",
-    "uint32": "<I",
-    "int8": "<b",
-    "int16": "<h",
-    "int32": "<i",
-}
-
-
-def decode_tlv_settings(tlv: dict[str, str], catalog: list[dict[str, Any]]) -> dict[str, int]:
-    """The named integer settings out of a settings frame the driver stored as
-    `{"0x01": "hex"}`, by the catalogue's id, name and type; unknown or odd items are left out."""
-    by_id = {int(item["id"]): item for item in catalog if "id" in item and "name" in item}
-    out: dict[str, int] = {}
-    for key, value in tlv.items():
-        try:
-            item = by_id[int(str(key), 16)]
-            raw = bytes.fromhex(str(value))
-            fmt = TLV_FORMATS[str(item.get("type", ""))]
-        except (KeyError, ValueError):
-            continue
-        if len(raw) != struct.calcsize(fmt):
-            continue
-        out[str(item["name"])] = int(struct.unpack(fmt, raw)[0])
-    return out
-
-
-def expected_intervals(settings: dict[str, Any]) -> dict[str, float | None]:
-    """The seconds between fixes, statuses and satellite sessions a device's settings promise;
-    None when unknown or switched off (zero). A fix comes from the LoRa GPS interval, else the
-    u-blox send interval."""
-
-    def seconds(*keys: str) -> float | None:
-        for key in keys:
-            value = settings.get(key)
-            if isinstance(value, int | float) and value > 0:
-                return float(value)
-        return None
-
-    return {
-        "fix": seconds("lr_gps_interval", "ublox_send_interval"),
-        "status": seconds("status_send_interval"),
-        "satellite": seconds("satellite_send_interval"),
-    }
-
-
-def merged_settings(*layers: dict[str, Any] | None) -> dict[str, Any]:
-    """Later layers win: the type's defaults, the device's attributes, the settings frames."""
-    out: dict[str, Any] = {}
-    for layer in layers:
-        if isinstance(layer, dict):
-            out.update({k: v for k, v in layer.items() if isinstance(v, int | float)})
-    return out
+from shared.domain.reporting_rules import (  # noqa: E402
+    DISAGREE_SHARE,
+    LEARN_BIN_S,
+    LEARN_MIN_MESSAGES,
+    LEARN_MIN_SHARE,
+    LEARN_TOLERANCE,
+    TLV_FORMATS,
+    Expected,
+    Learned,
+    decode_tlv_settings,
+    expected_intervals,
+    learn_interval,
+    merged_settings,
+    resolve_expected,
+)
 
 
 @dataclass(slots=True)
@@ -138,3 +97,24 @@ def interval_report(
         longest_silence_s=longest,
         longest_silence_end=longest_end,
     )
+
+
+__all__ = [
+    "DISAGREE_SHARE",
+    "LEARN_BIN_S",
+    "LEARN_MIN_MESSAGES",
+    "LEARN_MIN_SHARE",
+    "LEARN_TOLERANCE",
+    "MIN_FOR_OBSERVED",
+    "SILENCE_FACTOR",
+    "TLV_FORMATS",
+    "Expected",
+    "IntervalReport",
+    "Learned",
+    "decode_tlv_settings",
+    "expected_intervals",
+    "interval_report",
+    "learn_interval",
+    "merged_settings",
+    "resolve_expected",
+]

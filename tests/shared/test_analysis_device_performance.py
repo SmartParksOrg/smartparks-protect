@@ -20,7 +20,9 @@ from shared.analysis.primitives.intervals import (
     decode_tlv_settings,
     expected_intervals,
     interval_report,
+    learn_interval,
     merged_settings,
+    resolve_expected,
 )
 from shared.analysis.primitives.levels import (
     DEFAULTS,
@@ -176,3 +178,43 @@ def test_a_fleet_folds_the_same_warning_over_many_devices_into_one_line():
     folded = fold_warnings(many + few)
     assert [w.code for w in folded] == ["interval_unknown", "no_data", "no_data"]
     assert folded[0].subject_id is None and "5 devices" in folded[0].text
+
+
+def test_the_interval_is_learned_from_regular_fixes_and_doubted_from_irregular_ones():
+    # every five minutes, give or take twenty seconds, with a day's silence in the middle
+    rng = np.random.default_rng(1)
+    times = np.cumsum(np.r_[0, 300 + rng.uniform(-20, 20, 200)]) + T0
+    times = np.r_[times, times[-1] + DAY_S + np.cumsum(300 + rng.uniform(-20, 20, 100))]
+    learned = learn_interval(times)
+    assert learned is not None and learned.seconds == 300 and learned.confident
+    assert learned.regular_share > 0.95 and learned.intervals == 299  # the silence is out
+    # a motion-triggered collar: intervals all over the place
+    wild = np.cumsum(np.r_[0, rng.uniform(60, 7200, 200)]) + T0
+    doubtful = learn_interval(wild)
+    assert doubtful is not None and not doubtful.confident
+    assert learn_interval(times[:3]) is None
+
+
+def test_a_declared_interval_holds_unless_the_data_plainly_disagrees():
+    rng = np.random.default_rng(2)
+    every_five = np.cumsum(np.r_[0, 300 + rng.uniform(-15, 15, 300)]) + T0
+    # the setting says an hour, the collar reports every five minutes: stale, the data counts
+    stale = resolve_expected((3600.0, "type_default"), every_five)
+    assert stale.source == "learned" and stale.seconds == 300 and stale.disagrees
+    assert stale.declared_seconds == 3600 and stale.declared_source == "type_default"
+    # the setting says five minutes and the collar keeps it: the setting holds
+    kept = resolve_expected((300.0, "settings_frame"), every_five)
+    assert kept.source == "settings_frame" and kept.seconds == 300 and not kept.disagrees
+    # a setting within tolerance of the data holds too
+    close = resolve_expected((330.0, "command"), every_five)
+    assert close.source == "command"
+    # a person's override holds whatever the data shows
+    word = resolve_expected((3600.0, "override"), every_five)
+    assert word.source == "override" and word.seconds == 3600 and not word.disagrees
+    # nothing declared: the data serves when confident, else unknown with what was seen
+    assert resolve_expected(None, every_five).source == "learned"
+    wild = np.cumsum(np.r_[0, rng.uniform(60, 7200, 200)]) + T0
+    unknown = resolve_expected(None, wild)
+    assert unknown.source == "unknown" and unknown.seconds is None
+    assert unknown.learned is not None and not unknown.learned.confident
+    assert resolve_expected(None, wild[:3]).learned is None

@@ -290,12 +290,17 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
     assert levels[bad["id"]]["error_share"] == "warn"
     assert b["firmware"] == "6.2"
     # reporting: the interval comes from the type's defaults (and the frame for the bad one)
-    assert g["expected_fix_s"] == 3600 and b["expected_fix_s"] == 3600
+    # the type's defaults say an hour; the good collar keeps it, the bad one plainly fixes every
+    # three hours, so its setting is stale and gives way to the data (decisions D225 to D227)
+    assert g["expected_fix_s"] == 3600 and g["expected_fix_source"] == "type_default"
+    assert b["expected_fix_s"] == 3 * 3600 and b["expected_fix_source"] == "learned"
+    # a failed attempt every fifth fix leaves six-hour gaps: three quarters of the intervals
+    # sit on the three-hour schedule, enough to trust it
+    assert b["declared_fix_s"] == 3600 and 0.7 < b["fix_regular_share"] < 0.8
     assert g["missed_fix_share"] == 0 and levels[good["id"]]["missed_fix_share"] == "ok"
-    assert b["missed_fix_share"] == pytest.approx(
-        1 - (DAYS * 8 - DAYS * 8 / 5) / (DAYS * 24), abs=0.01
-    )
-    assert levels[bad["id"]]["missed_fix_share"] == "critical"
+    # against its own schedule the bad collar misses the attempts that failed: one in five
+    assert b["missed_fix_share"] == pytest.approx(0.2, abs=0.01)
+    assert levels[bad["id"]]["missed_fix_share"] == "warn"
     assert g["silences"] == 0
     # gnss
     assert g["fix_success"] == 1.0 and b["fix_success"] == pytest.approx(0.8)
@@ -345,6 +350,10 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
     assert [p["key"] for p in document["periods"]] == ["main", "comparison"]
     codes = {(w["code"], w["subject_id"]) for w in document["warnings"]}
     assert ("no_data", good["id"]) not in codes
+    assert ("interval_disagrees", bad["id"]) in codes and (
+        "interval_disagrees",
+        good["id"],
+    ) not in codes
     assert ("no_comparison_data", good["id"]) in codes  # nothing before the period, a notice
 
     stored = (
@@ -396,3 +405,23 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
     assert (await client.get(f"{base}/{run_id}", headers=scoped)).status_code == 404
     listed = await client.get(base, params={"module": "device_performance"}, headers=scoped)
     assert listed.status_code == 200 and listed.json()["items"] == []
+
+    # the device page's Reporting card reads the same expectation (decision D226)
+    read = await client.get(f"/api/v1/devices/{bad['id']}/reporting", headers=h)
+    assert read.status_code == 200, read.text
+    reporting = read.json()
+    assert reporting["expected_source"] == "learned" and reporting["disagrees"] is True
+    assert reporting["declared_fix_s"] == 3600 and reporting["declared_source"] == "type_default"
+    assert reporting["learned"]["confident"] and reporting["override"] is None
+    # a person's word comes first, and can be taken back
+    put = await client.put(
+        f"/api/v1/devices/{bad['id']}/reporting",
+        json={"expected_fix_interval_s": 7200},
+        headers=h,
+    )
+    assert put.status_code == 200, put.text
+    assert put.json()["expected_source"] == "override" and put.json()["expected_fix_s"] == 7200
+    cleared = await client.put(
+        f"/api/v1/devices/{bad['id']}/reporting", json={"expected_fix_interval_s": None}, headers=h
+    )
+    assert cleared.json()["override"] is None and cleared.json()["expected_source"] == "learned"
