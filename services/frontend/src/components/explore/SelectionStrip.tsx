@@ -11,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { browserTimezone, RANGE_PRESETS, TIMEZONES } from "@/lib/analytics";
+import { RANGE_PRESETS } from "@/lib/analytics";
+import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { inputValue, type RecordsState } from "@/lib/records";
 
 /** The selection strip of the Explore canvas (decision D151): whose records, over which period,
@@ -117,21 +118,12 @@ export function SelectionStrip({
           />
         </>
       )}
-      <Select
+      <TimezoneSelect
+        size="sm"
+        className="max-w-64"
         value={state.timezone}
-        onValueChange={(v) => onChange({ timezone: v })}
-      >
-        <SelectTrigger className="h-8 w-40" aria-label={t("Timezone")}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {[...new Set([browserTimezone(), ...TIMEZONES])].map((z) => (
-            <SelectItem key={z} value={z}>
-              {z}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        onChange={(v) => onChange({ timezone: v })}
+      />
       <label className="flex items-center gap-2 text-sm">
         <Switch
           checked={state.sources === "all"}

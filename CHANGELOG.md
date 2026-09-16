@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- The project timezone is chosen from a searchable list of every zone the browser knows, each with its offset from UTC beside the name and the browser's own zone and the zones other projects use at the top, on the new project dialog and the project settings page (Tim, 2026-09-16: the field was a bare text box). The same picker serves the Data explorer's strip and the export dialog, which offered nine fixed names before. The API refuses a name that is not an IANA zone (422), so a typo or an abbreviation such as "CAT" can no longer be stored to break the first export or analysis. The Data explorer and the export dialog default to the project's timezone instead of the browser's when the address names none.
+
 - The documentation site is published on GitHub Pages at https://smartparksorg.github.io/smartparks-protect/ from every green build of `main` (the `pages` job of the CI workflow, after the strict build and the link check); `site_url` in `mkdocs.yml` makes the canonical links and the search index right. Servers run tags; the site describes `main`, and the changelog maps one to the other.
 
 ### Changed

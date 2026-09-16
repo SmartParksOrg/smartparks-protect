@@ -31,7 +31,10 @@ function validTime(raw: string | null): string | null {
   return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
 
-export function readRecordsState(params: URLSearchParams): RecordsState {
+export function readRecordsState(
+  params: URLSearchParams,
+  defaults: { timezone?: string | null } = {},
+): RecordsState {
   const range = params.get("range") ?? "7d";
   const from = params.get("from");
   const to = params.get("to");
@@ -44,7 +47,7 @@ export function readRecordsState(params: URLSearchParams): RecordsState {
         : ((range in RANGE_PRESETS ? range : "7d") as RangePreset),
     from,
     to,
-    timezone: params.get("tz") ?? browserTimezone(),
+    timezone: params.get("tz") ?? defaults.timezone ?? browserTimezone(),
     at: validTime(params.get("at")),
     ...(params.get("sources") === "all" ? { sources: "all" as const } : {}),
   };

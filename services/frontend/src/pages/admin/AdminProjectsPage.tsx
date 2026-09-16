@@ -17,6 +17,7 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -83,7 +84,7 @@ export function AdminProjectsPage() {
           <form className="space-y-4" onSubmit={form.handleSubmit((v) => create.mutate(v))} noValidate>
             <Field label={t("Name")} htmlFor="p-name" error={form.formState.errors.name?.message}><Input id="p-name" {...form.register("name", { onChange: (e) => { if (!form.formState.dirtyFields.slug) form.setValue("slug", String(e.target.value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")); } })} /></Field>
             <Field label={t("Slug")} htmlFor="p-slug" error={form.formState.errors.slug?.message} hint={t("Short identifier used in URLs and exports")}><Input id="p-slug" {...form.register("slug")} /></Field>
-            <Field label={t("Timezone")} htmlFor="p-tz" error={form.formState.errors.timezone?.message}><Input id="p-tz" {...form.register("timezone")} /></Field>
+            <Field label={t("Timezone")} htmlFor="p-tz" hint={t("The day boundaries of the analyses, the times in reports and exports, and the default of the Data explorer")} error={form.formState.errors.timezone?.message}><TimezoneSelect id="p-tz" value={form.watch("timezone")} onChange={(v) => form.setValue("timezone", v, { shouldDirty: true })} first={[...new Set((projects.data?.items ?? []).map((p) => p.timezone))]} /></Field>
             <Field label={t("Organization")} htmlFor="p-org" hint={t("A grouping for the admin pages, not a permission boundary")}>
               <Select value={form.watch("organization_id")} onValueChange={(v) => form.setValue("organization_id", v)}>
                 <SelectTrigger id="p-org"><SelectValue /></SelectTrigger>

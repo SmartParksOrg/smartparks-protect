@@ -20,6 +20,7 @@ import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,7 +64,7 @@ export function ProjectSettingsPage() {
             <form className="max-w-lg space-y-4" onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
               <Field label={t("Name")} htmlFor="name" error={form.formState.errors.name?.message}><Input id="name" {...form.register("name")} /></Field>
               <Field label={t("Description")} htmlFor="description"><Textarea id="description" rows={3} {...form.register("description")} /></Field>
-              <Field label={t("Timezone")} htmlFor="timezone" hint={t("IANA name, used for display and exports")} error={form.formState.errors.timezone?.message}><Input id="timezone" {...form.register("timezone")} /></Field>
+              <Field label={t("Timezone")} htmlFor="timezone" hint={t("The day boundaries of the analyses, the times in reports and exports, and the default of the Data explorer")} error={form.formState.errors.timezone?.message}><TimezoneSelect id="timezone" value={form.watch("timezone")} onChange={(v) => form.setValue("timezone", v, { shouldDirty: true })} /></Field>
               <div className="flex items-start gap-2"><Switch id="curation-approval" checked={form.watch("curation_requires_approval")} onCheckedChange={(v) => form.setValue("curation_requires_approval", v)} /><label htmlFor="curation-approval" className="text-sm">{t("Corrections need approval")}<span className="block text-xs text-muted-foreground">{t("Data corrections and bulk jobs stay pending until a second person with the approve permission accepts them.")}</span></label></div>
               {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
               <Button type="submit" disabled={save.isPending}>{t("Save")}</Button>

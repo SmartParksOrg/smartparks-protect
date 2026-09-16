@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AfterValidator, BaseModel, EmailStr, Field
 
 from protect_api.schemas.common import ORMModel
 from shared.enums import Role
@@ -29,11 +30,25 @@ class OrganizationRead(ORMModel):
     project_count: int = 0
 
 
+def valid_timezone(value: str | None) -> str | None:
+    """An IANA zone name the server can load (Tim, 2026-09-16): a typo or an abbreviation
+    such as "CAT" used to be stored and to break the first export or analysis."""
+    if value is None:
+        return None
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(
+            f"{value!r} is not a timezone name; use an IANA name such as Africa/Windhoek"
+        ) from exc
+    return value
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     slug: str = Field(pattern="^[a-z0-9][a-z0-9-]{1,98}$")
     description: str | None = None
-    timezone: str = "UTC"
+    timezone: Annotated[str, AfterValidator(valid_timezone)] = "UTC"
     settings: dict[str, Any] = Field(default_factory=dict)
     organization_id: uuid.UUID | None = None
 
@@ -41,7 +56,7 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
-    timezone: str | None = None
+    timezone: Annotated[str | None, AfterValidator(valid_timezone)] = None
     settings: dict[str, Any] | None = None
     archived_at: datetime | None = None
     organization_id: uuid.UUID | None = None

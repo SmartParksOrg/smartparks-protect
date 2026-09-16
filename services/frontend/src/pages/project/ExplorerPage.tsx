@@ -63,7 +63,7 @@ import { useGroups } from "@/hooks/useGroups";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePreference } from "@/hooks/usePreference";
-import { usePermissions } from "@/hooks/useProjects";
+import { usePermissions, useProject } from "@/hooks/useProjects";
 import { useRecords } from "@/hooks/useRecords";
 import {
   BUCKETS,
@@ -110,6 +110,12 @@ export function ExplorerPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const { can } = usePermissions(projectId);
+  // the project's timezone is the default when the URL names none (Tim, 2026-09-16)
+  const { project } = useProject(projectId);
+  const defaults = useMemo(
+    () => ({ timezone: project?.timezone }),
+    [project?.timezone],
+  );
   const user = useAuthStore((s) => s.user);
   const phone = useIsPhone();
   const [params, setParams] = useSearchParams();
@@ -132,11 +138,17 @@ export function ExplorerPage() {
         : params,
     [currentView, params],
   );
-  const state = useMemo(() => readExploreState(effective), [effective]);
+  const state = useMemo(
+    () => readExploreState(effective, defaults),
+    [effective, defaults],
+  );
   const update = useCallback(
     (patch: Partial<ExploreState>, replace = false) =>
       setParams(
-        writeExploreState({ ...readExploreState(effective), ...patch }),
+        writeExploreState({
+          ...readExploreState(effective, defaults),
+          ...patch,
+        }),
         {
           replace,
         },

@@ -42,7 +42,10 @@ export interface ExploreState extends RecordsState {
   aggregates: Aggregate[];
 }
 
-export function readExploreState(params: URLSearchParams): ExploreState {
+export function readExploreState(
+  params: URLSearchParams,
+  defaults: { timezone?: string | null } = {},
+): ExploreState {
   const raw = params.get("mode");
   // the tabs of v2.4.0 (`records`, `analysis`) open as the table and the chart
   const mode: ExploreMode =
@@ -58,7 +61,7 @@ export function readExploreState(params: URLSearchParams): ExploreState {
       (AGGREGATES as readonly string[]).includes(a),
     );
   return {
-    ...readRecordsState(params),
+    ...readRecordsState(params, defaults),
     mode,
     metrics: params.getAll("metric").slice(0, MAX_CHART_METRICS),
     chart: ((CHART_TYPES as readonly string[]).includes(chart)

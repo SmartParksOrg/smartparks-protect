@@ -15,6 +15,8 @@ import type {
 import { MultiSelect } from "@/components/analytics/MultiSelect";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
+import { TimezoneSelect } from "@/components/TimezoneSelect";
+import { useProject } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,7 +44,6 @@ import {
   RANGE_PRESETS,
   type RangePreset,
   rangeFor,
-  TIMEZONES,
 } from "@/lib/analytics";
 import {
   type Dataset,
@@ -118,8 +119,9 @@ function ExportForm({
   const [layout, setLayout] = useState<"long" | "wide">(
     preset?.layout ?? "long",
   );
+  const { project } = useProject(projectId);
   const [timezone, setTimezone] = useState(
-    preset?.timezone ?? browserTimezone(),
+    preset?.timezone ?? project?.timezone ?? browserTimezone(),
   );
   const [includeNames, setIncludeNames] = useState(true);
   const [view, setView] = useState<"effective" | "original">("effective");
@@ -304,18 +306,12 @@ function ExportForm({
           </Select>
         </Field>
         <Field label={t("Timezone")} htmlFor="timezone">
-          <Select value={timezone} onValueChange={setTimezone}>
-            <SelectTrigger id="timezone" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[...new Set([browserTimezone(), ...TIMEZONES])].map((z) => (
-                <SelectItem key={z} value={z}>
-                  {z}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TimezoneSelect
+            id="timezone"
+            value={timezone}
+            onChange={setTimezone}
+            first={project?.timezone ? [project.timezone] : []}
+          />
         </Field>
         {range === "custom" && (
           <>
