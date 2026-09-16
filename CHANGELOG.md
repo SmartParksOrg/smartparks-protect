@@ -4,6 +4,12 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+Nothing yet.
+
+## v2.6.0, 2026-09-16
+
+Phases 22 to 28 in one release, built between 2026-09-09 and 2026-09-16 from the dev server's use: connectivity per device and network locations, the live map's controls and its feed, one top bar and night mode, roles with a member's scope, the analysis framework with the movement, grazing and device performance modules and their PDF reports, attribution as a background job, GNSS outliers flagged at ingest, the expected fix interval and the device settings known per device. Migrations 0024 to 0038; the schema is at revision 0038. Tim read the device performance runs and the PDF on the dev server and closed phase 28; the phase 23 exit criteria are still his to read.
+
 ### Added
 
 - Device settings known per device (decisions D228 to D231, ADR 0035): the device page's Settings tab lists every setting of the type's catalogue, grouped, with the value Protect knows, where it came from (the device's own frame, a Web Bluetooth read, a command Protect sent, a person's entry) and when; unknown ones greyed with their default and the firmware they appeared in. "Request all settings" asks the device to report them, "Set" changes any setting by its catalogue type and range through the command pipeline (the high-impact permission and its confirmation; the value shows as sent until the device confirms it), "Record as known" keeps a value without sending. The OpenCollar catalogue carries groups, units, the firmware each setting appeared in and descriptions from the firmware research. The expected reporting interval reads the known settings first. A device connected over Bluetooth in the browser reads its whole table at once (the frames sync as a log file and become known values marked as read over Bluetooth); over LoRaWAN or satellite the pencil asks for one setting at a time (`REQUEST_SETTING`, a few bytes each way), and a full request warns that it costs the device power and only its first part arrives. API: `GET /devices/{id}/settings`, `PUT /devices/{id}/settings/{key}`; the driver actions `SET_SETTING`, `REQUEST_SETTING` and `REQUEST_SETTINGS`.
@@ -56,6 +62,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- Every text says "device" where it said "collar" (interface strings, action descriptions, the settings catalogue, the README and the MCP server's description): the same hardware rides on animals, vehicles, people and fixed places. OpenCollar stays as a product name.
 - The Layers button of the live map lost its count badge (decision D174 superseded): the number of layers switched on said nothing to a reader.
 
 - The analysis forms (Movement, Grazing, Device performance) take groups as a choice of their own: a multi-select of the project's groups whose members, with the subgroups, join the subjects picked by name; for devices, the devices tracking an entity of the group. The one-at-a-time "Add a group" dropdown is gone; deep links with `?group=` still open the form with the group chosen (Tim, 2026-09-16).

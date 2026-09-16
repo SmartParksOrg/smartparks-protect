@@ -184,7 +184,7 @@ No new table: the run row and the geometries table hold everything (D202).
 - [x] **P5 the report**: labels, key figures as the fleet table with level dots, the per-device sections; a rendered fixture test.
 - [x] **P6 docs**: `docs/analytics/device-performance.md` (what each indicator means, its default threshold, its limits), the analytics index, `DEVELOPERS.md`, the changelog, ADR 0034 (device subjects and the indicator levels).
 - [x] **P7 dev server** (the runs made and read on 2026-09-16; Tim's reading and the exit criteria below are still his): a fleet run over the FreeNature and Smart Parks devices and a deep dive of SP050969 read by Tim; the benchmark section over 100 devices; the budgets of the analytics plan held during a run.
-- [ ] **P8 release** as v2.8.0 after the exit criteria.
+- [x] **P8 release**: v2.6.0 on 2026-09-16, one tag for phases 22 to 28 (Tim's choice), after Tim read the runs and the PDF and closed the phase.
 
 ### Built on 2026-09-16, and where it differs from the sections above
 
@@ -205,6 +205,8 @@ No new table: the run row and the geometries table hold everything (D202).
 - A deep dive of SP050969 over its raw log period shows the battery slope, the reboot, the error flags by kind, the fix success and time to fix, and no network block (the log came by file); the PDF report of it reads on paper.
 - A member scoped to one device sees only that device in the form and in the runs.
 - A run over 100 devices and a month finishes within the worker's budget without touching the live map's or ingest's figures.
+
+Tim read the fleet run and the SP050969 deep dive with its PDF on the dev server and closed the phase on 2026-09-16; the module is released in v2.6.0.
 
 ## 14. Later, not in this phase
 

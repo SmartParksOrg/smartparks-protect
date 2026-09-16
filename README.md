@@ -6,7 +6,7 @@
 
 Self-hosted operational data platform for [Smart Parks](https://www.smartparks.org) deployments. It connects field devices and IoT platforms to one Smart Parks domain and makes that data useful: a live map, analysis and export, a rules engine that turns observations into events and alerts, device control, and durable integrations with systems such as EarthRanger.
 
-**Status: v2.5.0 released on 2026-09-09**, with connectivity and network locations, the live map's controls and its feed, the entity type catalogue and the health dot live on the development server since, ahead of v2.6.0; see `CHANGELOG.md`.
+**Status: v2.6.0 released on 2026-09-16**, with connectivity and network locations, the live map's controls and its feed, one top bar and night mode, roles and a member's scope, the analysis modules (movement, grazing, device performance) with PDF reports, GNSS outliers flagged at ingest, and device settings known per device; see `CHANGELOG.md`.
 
 ## Core concepts
 
