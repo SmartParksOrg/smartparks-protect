@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Pencil, RefreshCw } from "lucide-react";
+import { Bluetooth, Check, Pencil, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "@/api/client";
@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { useWebBle } from "@/hooks/useWebBle";
 import { formatAgo } from "@/lib/format";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -76,6 +77,25 @@ export function DeviceSettingsTab({
   const [filter, setFilter] = useState("");
   const [unknownToo, setUnknownToo] = useState(true);
   const [editing, setEditing] = useState<DeviceSetting | null>(null);
+  // a collar connected in this browser reports its whole table over Bluetooth for free;
+  // over LoRaWAN or satellite a full report costs power and arrives in one part only
+  const ble = useWebBle(deviceId);
+  const readAll = useMutationToast({
+    mutationFn: async () => {
+      const session = ble.session;
+      if (!session)
+        throw new Error(t("The collar is not connected over Bluetooth"));
+      const values = await session.requestSettings();
+      await ble.sync("settings", session);
+      return values.size;
+    },
+    success: (n: number) =>
+      t(
+        "{{count}} settings read over Bluetooth; they are decoded in the background",
+        { count: n },
+      ),
+    invalidate: [queryKeys.deviceSettings(deviceId)],
+  });
   const request = useMutationToast({
     mutationFn: () =>
       api.post<CommandItem>(`/api/v1/devices/${deviceId}/commands`, {
@@ -129,18 +149,42 @@ export function DeviceSettingsTab({
           {s?.device_firmware &&
             ` · ${t("device firmware {{v}}", { v: s.device_firmware })}`}
         </span>
-        {canControl && available.has("REQUEST_SETTINGS") && (
+        {ble.session ? (
           <Button
             size="sm"
             variant="outline"
             className="ml-auto"
-            disabled={request.isPending}
-            onClick={() => request.mutate()}
+            disabled={readAll.isPending}
+            onClick={() => readAll.mutate()}
           >
-            <RefreshCw className="size-4" /> {t("Request all settings")}
+            <Bluetooth className="size-4" />{" "}
+            {t("Read all settings over Bluetooth")}
           </Button>
+        ) : (
+          canControl &&
+          available.has("REQUEST_SETTINGS") && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto"
+              disabled={request.isPending}
+              title={t(
+                "Over LoRaWAN or satellite a full report costs the collar power and only the first part arrives; connect it over Bluetooth on the Data tab to read everything, or ask for one setting at a time with the pencil.",
+              )}
+              onClick={() => request.mutate()}
+            >
+              <RefreshCw className="size-4" /> {t("Request all settings")}
+            </Button>
+          )
         )}
       </div>
+      {!ble.session && (
+        <p className="text-xs text-muted-foreground">
+          {t(
+            "A collar connected over Bluetooth (Data tab) reports its whole table at no cost. Over LoRaWAN or satellite, ask for one setting at a time with the pencil: a full report costs the collar power and only its first part arrives.",
+          )}
+        </p>
+      )}
       {settings.isError && (
         <Callout kind="error">{settings.error.message}</Callout>
       )}
@@ -228,6 +272,7 @@ export function DeviceSettingsTab({
         deviceId={deviceId}
         setting={editing}
         canSend={canControl && available.has("SET_SETTING")}
+        canRequest={canControl && available.has("REQUEST_SETTING")}
         canRecord={canRecord}
         onClose={() => setEditing(null)}
       />
@@ -240,12 +285,14 @@ function SettingDialog({
   deviceId,
   setting,
   canSend,
+  canRequest,
   canRecord,
   onClose,
 }: {
   deviceId: string;
   setting: DeviceSetting | null;
   canSend: boolean;
+  canRequest: boolean;
   canRecord: boolean;
   onClose: () => void;
 }) {
@@ -279,6 +326,19 @@ function SettingDialog({
       queryKeys.deviceSettings(deviceId),
       queryKeys.deviceCommands(deviceId),
     ],
+    onSuccess: onClose,
+  });
+  const ask = useMutationToast({
+    mutationFn: () =>
+      api.post<CommandItem>(`/api/v1/devices/${deviceId}/commands`, {
+        body: {
+          action_key: "REQUEST_SETTING",
+          parameters: { setting: setting?.key },
+          confirmed: true,
+        },
+      }),
+    success: t("Asked; the value shows here when the collar answers"),
+    invalidate: [queryKeys.deviceCommands(deviceId)],
     onSuccess: onClose,
   });
   const record = useMutationToast({
@@ -356,6 +416,18 @@ function SettingDialog({
           <Button variant="outline" onClick={onClose}>
             {t("Cancel")}
           </Button>
+          {canRequest && (
+            <Button
+              variant="outline"
+              disabled={ask.isPending}
+              onClick={() => ask.mutate()}
+              title={t(
+                "A few bytes each way: the way to read one setting over LoRaWAN or satellite",
+              )}
+            >
+              <RefreshCw className="size-4" /> {t("Ask the collar")}
+            </Button>
+          )}
           {canRecord && (
             <Button
               variant="outline"

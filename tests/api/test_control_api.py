@@ -60,6 +60,7 @@ async def test_actions_availability_and_reasons(client, db):
         "REQUEST_STATUS",
         "REQUEST_POSITION",
         "SET_GNSS_INTERVAL",
+        "REQUEST_SETTING",
         "REQUEST_SETTINGS",
         "SET_SETTING",
         "RESET",

@@ -6,13 +6,22 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
+import pytest_asyncio
 
+from shared.bus import RedisStreamsBus
 from shared.domain.device_settings import record_setting
 from shared.models import DeviceSetting
 from tests.api.conftest import actor, create_project
 from tests.conftest import unique_name
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest_asyncio.fixture
+async def bus():
+    bus = RedisStreamsBus()
+    yield bus
+    await bus.close()
 
 
 async def _opencollar_device(client, db):
@@ -144,3 +153,34 @@ async def test_the_catalogue_shows_what_is_known_and_a_person_records_a_value(cl
     reporting = (await client.get(f"/api/v1/devices/{device['id']}/reporting", headers=h)).json()
     assert reporting["declared_fix_s"] == 900 and reporting["declared_source"] == "manual"
     assert reporting["expected_status_s"] == 1800 and reporting["status_source"] == "settings_frame"
+
+
+async def test_a_bluetooth_settings_read_fills_the_known_settings(client, db, bus):
+    """Decision D229: the frames a browser read over Web Bluetooth are synced as a log file of
+    channel webble; the decoder turns the settings frame into known values marked as read over
+    Bluetooth."""
+    from tests.api.test_log_files_api import _decode
+
+    admin, _project, device = await _opencollar_device(client, db)
+    h = admin.headers
+    # port 3, then the TLVs: ublox_send_interval 3600 s, status_send_interval 1800 s, data_log on
+    frame = "03" + "0204100e0000" + "030408070000" + "0b0101"
+    sync = await client.post(
+        f"/api/v1/devices/{device['id']}/log-files/ble-sync",
+        json={"frames": [frame], "label": "settings"},
+        headers=h,
+    )
+    assert sync.status_code == 201, sync.text
+    await _decode(bus, sync.json()["id"])
+    listed = (await client.get(f"/api/v1/devices/{device['id']}/settings", headers=h)).json()
+    by_key = {i["key"]: i for i in listed["items"]}
+    assert listed["known"] == 3
+    assert (
+        by_key["ublox_send_interval"]["value"] == 3600
+        and by_key["ublox_send_interval"]["source"] == "ble"
+    )
+    assert by_key["status_send_interval"]["value"] == 1800 and by_key["data_log"]["value"] is True
+    assert by_key["ublox_send_interval"]["status"] == "observed"
+    # the device page's expectation follows: the collar's own settings say five minutes... an hour
+    reporting = (await client.get(f"/api/v1/devices/{device['id']}/reporting", headers=h)).json()
+    assert reporting["declared_fix_s"] == 3600 and reporting["declared_source"] == "settings_frame"

@@ -58,6 +58,25 @@ def _encode_request_position(_: BaseModel) -> EncodedCommand:
 
 
 CMD_SEND_ALL_SETTINGS = 0xA7
+CMD_SEND_SINGLE_SETTING = 0xA8
+
+
+class SettingNameParameters(BaseModel):
+    """One catalogue setting by name."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    setting: str = Field(min_length=1, max_length=64, description="The setting's catalogue name")
+
+
+def _encode_request_setting(params: BaseModel) -> EncodedCommand:
+    assert isinstance(params, SettingNameParameters)
+    item = _catalog_item(params.setting)
+    return EncodedCommand(
+        payload=command(CMD_SEND_SINGLE_SETTING, bytes([int(item["id"])])),
+        f_port=PORT_COMMANDS,
+        metadata={"requested_setting": params.setting, "setting_id": int(item["id"])},
+    )
 
 
 class SettingParameters(BaseModel):
@@ -177,12 +196,25 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         permission=Permission.DEVICES_CONTROL_HIGH_IMPACT,
         confirmation=ConfirmationPolicy.PRIVILEGED,
     ),
+    "REQUEST_SETTING": ControlAction(
+        key="REQUEST_SETTING",
+        label="Request one setting",
+        description=(
+            "Ask the collar for one setting by name (cmd_send_single_setting): a few bytes each "
+            "way, the right choice over LoRaWAN or satellite."
+        ),
+        parameters=SettingNameParameters,
+        encode=_encode_request_setting,
+        permission=Permission.DEVICES_CONTROL,
+        confirmation=ConfirmationPolicy.NONE,
+    ),
     "REQUEST_SETTINGS": ControlAction(
         key="REQUEST_SETTINGS",
         label="Request all settings",
         description=(
-            "Ask the collar to report every setting (cmd_send_all_settings); the answers fill "
-            "the Settings tab as they arrive."
+            "Ask the collar to report every setting (cmd_send_all_settings). Over Bluetooth the "
+            "whole table arrives; over LoRaWAN or satellite only the first part does and it costs "
+            "the collar power: read all over Bluetooth, or ask for one setting at a time."
         ),
         parameters=NoParameters,
         encode=_encode_request_settings,

@@ -7,7 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from shared.device_drivers.opencollar.control import CONTROL_ACTIONS, SettingParameters
+from shared.device_drivers.opencollar.control import (
+    CONTROL_ACTIONS,
+    SettingNameParameters,
+    SettingParameters,
+)
 from shared.domain.reporting import driver_catalog, driver_catalog_document
 from shared.domain.reporting_rules import (
     decode_setting_value,
@@ -75,5 +79,10 @@ def test_the_driver_sets_any_setting_and_requests_them_all():
         CONTROL_ACTIONS["SET_SETTING"].encode(SettingParameters(setting="no_such", value=1))
     request = CONTROL_ACTIONS["REQUEST_SETTINGS"].encode(SettingParameters.model_construct())
     assert request.f_port == 32 and request.payload.hex() == "a700"
+    one = CONTROL_ACTIONS["REQUEST_SETTING"].encode(
+        SettingNameParameters(setting="ublox_send_interval")
+    )
+    assert one.f_port == 32 and one.payload.hex() == "a80102"
+    assert one.metadata == {"requested_setting": "ublox_send_interval", "setting_id": 2}
     legacy = CONTROL_ACTIONS["SET_GNSS_INTERVAL"]
     assert legacy.encode(legacy.parameters(interval_seconds=3600)).metadata["setting_id"] == 2
