@@ -91,6 +91,19 @@
     <section class="map">
       <h2>Map</h2>
       <img src="{{ map.png }}" alt="Map of the result" />
+      {% if map.legend %}
+      <ul class="legend">
+        {% for item in map.legend %}
+        <li>
+          {% if item.kind == "swatch" %}<span class="dot" style="background: {{ item.color }}"></span>
+          {% elif item.kind == "outline" %}<span class="swatch outline"></span>
+          {% elif item.kind == "marker" %}<span class="marker small"></span><span class="marker"></span>
+          {% elif item.kind == "ramp" %}{% for c in item.colors %}<span class="swatch" style="background: {{ c }}"></span>{% endfor %}
+          {% endif %}{{ item.text }}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
       {% if map.note %}<p class="muted small">{{ map.note }}</p>{% endif %}
     </section>
     {% endif %}

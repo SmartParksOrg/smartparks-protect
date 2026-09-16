@@ -231,3 +231,43 @@ table.plain.card th.card-title {
 section.defaults table.plain td {
   font-size: 8.5pt;
 }
+
+/* the legend under the map */
+section.map ul.legend {
+  list-style: none;
+  margin: 1.5mm 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm 5mm;
+  font-size: 8pt;
+  color: #4b5651;
+}
+section.map ul.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 1mm;
+}
+section.map .swatch {
+  display: inline-block;
+  width: 3.2mm;
+  height: 2.4mm;
+  vertical-align: middle;
+}
+section.map .swatch.outline {
+  border: 0.5pt solid #3e6b4e;
+  background: rgba(62, 107, 78, 0.15);
+}
+section.map .marker {
+  display: inline-block;
+  width: 3mm;
+  height: 3mm;
+  border-radius: 50%;
+  background: #3e6b4e;
+  border: 0.4pt solid #ffffff;
+  vertical-align: middle;
+}
+section.map .marker.small {
+  width: 1.6mm;
+  height: 1.6mm;
+}

@@ -14,6 +14,8 @@ from shared.analysis.report.charts import chart_svg, series_name
 from shared.analysis.report.mapimage import (
     MAX_TILES,
     OSM_ATTRIBUTION,
+    PRESSURE_RAMP,
+    MapPicture,
     TrackLine,
     draw_map,
     extent_for,
@@ -26,6 +28,7 @@ from shared.analysis.report.mapimage import (
     tile_grid,
 )
 from shared.analysis.report.render import (
+    KIND_LEGEND,
     ReportInput,
     device_sections,
     fmt_figure,
@@ -33,6 +36,7 @@ from shared.analysis.report.render import (
     fmt_time,
     key_figures,
     labels_for,
+    map_legend,
     render_document,
     render_html,
     render_pdf,
@@ -518,6 +522,19 @@ def test_the_device_report_leads_with_the_fleet_and_folds_the_charts_per_device(
     assert "Device performance analysis" in html and 'class="dot lvl-critical"' in html
     assert "The thresholds behind the levels" in html and "warn below 3.6 V" in html
     assert "watchdog" in html and ">Fleet<" not in html  # the fleet table is the key figures
+    # the legend under the map: the two devices in their colours, the hulls and the gateways
+    legend = map_legend(document, {str(G): "#52735E", str(H): "#D9825F"})
+    assert [e["kind"] for e in legend] == ["swatch", "swatch", "outline", "marker"]
+    assert legend[0]["text"] == "SP1" and legend[0]["color"] == "#52735E"
+    assert legend[2]["text"].startswith("Coverage of the fixes")
+    movement = map_legend(_document(), {str(A): "#52735E", str(B): "#D9825F"})
+    assert [e["kind"] for e in movement] == ["swatch", "swatch", "outline"]
+    assert movement[2]["text"].startswith("MCP 95%")
+    grazing = map_legend({"subjects": [], "geometries": {"area": 3}}, {})
+    assert grazing == [{"kind": "ramp", "colors": list(PRESSURE_RAMP), "text": KIND_LEGEND["area"]}]
+    picture = MapPicture(png=_png((200, 10, 10)), with_base_map=False)
+    with_map = render_html(_input(document, module="device_performance", map=picture))
+    assert 'class="legend"' in with_map and "Gateways heard" in with_map
     assert render_document(inp).pages
 
 

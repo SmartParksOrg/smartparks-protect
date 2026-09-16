@@ -16,7 +16,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import CSS, HTML
 
 from shared.analysis.report.charts import PALETTE, chart_svg
-from shared.analysis.report.mapimage import MapPicture
+from shared.analysis.report.mapimage import PRESSURE_RAMP, MapPicture
 
 TEMPLATES = Path(__file__).parent / "templates"
 ASSETS = Path(__file__).parent / "assets"
@@ -719,6 +719,54 @@ def table_block(table: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]
     return {"title": title, "columns": columns, "rows": rows, "wide": len(columns) > WIDE_COLUMNS}
 
 
+#: What each kind of shape on the map means, for the legend under the picture.
+KIND_LEGEND: dict[str, str] = {
+    "area": "Areas by relative grazing pressure, from little use to heavy use",
+    "mcp": "MCP 95% home range: the outline around 95% of the fixes, a faint fill",
+    "kde": "KDE isopleths: the 50% core darker inside the 95% range",
+    "hotspot": "Hotspots: the cells that hold most of the time",
+    "cluster": "Clusters of fixes",
+    "coverage": "Coverage of the fixes: the hull around a device's valid fixes, in its colour",
+    "gateway": "Gateways heard: a marker per gateway, larger for a bigger share of the uplinks",
+}
+#: Above this many subjects the legend names the colours in the sections instead.
+LEGEND_MAX_SUBJECTS = 12
+
+
+def map_legend(document: dict[str, Any], colors: dict[str, str]) -> list[dict[str, Any]]:
+    """The legend under the map: the subjects in their colours and one line per kind of shape
+    the run drew (`document["geometries"]` counts them); the pressure ramp for the areas."""
+    entries: list[dict[str, Any]] = []
+    subjects = document.get("subjects", [])
+    kinds = [k for k, n in (document.get("geometries") or {}).items() if n]
+    coloured = {"mcp", "kde", "hotspot", "cluster", "coverage", "gateway"}
+    if any(k in coloured for k in kinds):
+        if len(subjects) <= LEGEND_MAX_SUBJECTS:
+            entries.extend(
+                {"kind": "swatch", "color": colors.get(str(s["id"]), PALETTE[0]), "text": s["name"]}
+                for s in subjects
+            )
+        else:
+            entries.append(
+                {
+                    "kind": "text",
+                    "text": f"One colour per subject ({len(subjects)}); the sections name them.",
+                }
+            )
+    for kind in kinds:
+        if kind not in KIND_LEGEND:
+            continue
+        if kind == "area":
+            entries.append(
+                {"kind": "ramp", "colors": list(PRESSURE_RAMP), "text": KIND_LEGEND[kind]}
+            )
+        elif kind == "gateway":
+            entries.append({"kind": "marker", "text": KIND_LEGEND[kind]})
+        else:
+            entries.append({"kind": "outline", "text": KIND_LEGEND[kind]})
+    return entries
+
+
 def render_html(inp: ReportInput) -> str:
     document = inp.document
     labels = labels_for(inp.module, document)
@@ -779,7 +827,13 @@ def render_html(inp: ReportInput) -> str:
         ],
         figures=key_figures(inp, labels),
         map=(
-            {"png": _data_uri(inp.map.png, "image/png"), "note": inp.map.note} if inp.map else None
+            {
+                "png": _data_uri(inp.map.png, "image/png"),
+                "note": inp.map.note,
+                "legend": map_legend(document, colors),
+            }
+            if inp.map
+            else None
         ),
         charts=charts,
         sections=device_sections(inp, labels, colors) if devices else [],
