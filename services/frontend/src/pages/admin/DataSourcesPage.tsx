@@ -320,23 +320,21 @@ export function DataSourcesPage() {
           isLoading={sources.isPending}
           cardOf={(s) => (
             <div className="space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate font-medium">{s.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {adapterLabel(s.adapter_key)}
-                    {" · "}
-                    {s.enabled ? t("enabled") : t("disabled")}
-                    {" · "}
-                    {(s.project_ids ?? []).length
-                      ? t("{{count}} projects", {
-                          count: (s.project_ids ?? []).length,
-                        })
-                      : t("all projects")}
-                  </div>
-                </div>
-                <Capabilities source={s} />
+              <div className="font-medium">{s.name}</div>
+              <div className="text-xs text-muted-foreground">
+                {adapterLabel(s.adapter_key)}
+                {" · "}
+                {s.enabled ? t("enabled") : t("disabled")}
+                {" · "}
+                {(s.project_ids ?? []).length === 1
+                  ? t("1 project")
+                  : (s.project_ids ?? []).length
+                    ? t("{{count}} projects", {
+                        count: (s.project_ids ?? []).length,
+                      })
+                    : t("all projects")}
               </div>
+              <Capabilities source={s} />
               {actionsFor(s)}
             </div>
           )}

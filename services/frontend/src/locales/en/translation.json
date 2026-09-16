@@ -182,6 +182,7 @@
   "<{{m}} m": "<{{m}} m",
   ">{{m}} m": ">{{m}} m",
   "0 fires as soon as the condition is true": "0 fires as soon as the condition is true",
+  "1 project": "1 project",
   "3D terrain": "3D terrain",
   "95th percentile speed (m/s)": "95th percentile speed (m/s)",
   "A device connected over Bluetooth (Data tab) reports its whole table at no cost. Over LoRaWAN or satellite, ask for one setting at a time with the pencil: a full report costs the device power and only its first part arrives.": "A device connected over Bluetooth (Data tab) reports its whole table at no cost. Over LoRaWAN or satellite, ask for one setting at a time with the pencil: a full report costs the device power and only its first part arrives.",
