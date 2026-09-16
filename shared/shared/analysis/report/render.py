@@ -215,6 +215,26 @@ DEVICE_KEY_FIGURES: list[str] = [
     "rssi_p10_dbm",
     "missed_sessions_share",
 ]
+#: Short heads for the fleet table on paper, where the full labels break letter by letter.
+DEVICE_SHORT_LABELS: dict[str, str] = {
+    "battery_v": "Battery (V)",
+    "battery_slope_mv_day": "Slope (mV/day)",
+    "days_to_critical": "Days left",
+    "temperature_max_c": "Max °C",
+    "reboots": "Reboots",
+    "error_share": "Errors",
+    "missed_fix_share": "Missed fixes",
+    "longest_silence_h": "Silence (h)",
+    "fix_success": "Fix success",
+    "ttf_p90_s": "TTF p90",
+    "accuracy_median_m": "Accuracy (m)",
+    "lost_uplinks_share": "Lost uplinks",
+    "rssi_p10_dbm": "RSSI p10",
+    "missed_sessions_share": "Missed sessions",
+}
+#: Up to this many devices the fleet table on paper stands on its side: a row per indicator.
+FLEET_TRANSPOSE_MAX = 6
+
 #: The indicators of each area's card in a device's section (the frontend's `AREA_CARDS`).
 DEVICE_AREA_CARDS: list[tuple[str, list[str]]] = [
     (
@@ -279,6 +299,8 @@ DEVICE_PERFORMANCE_LIMITATIONS = [
     "the device, and a rank says only where a device stands among the chosen ones.",
     "Fix success counts the attempts the device reported; a device that never reports a failed "
     "attempt shows every attempt as a fix.",
+    "Messages and the network figures count by the time a message reached Protect; a raw log "
+    "uploaded later counts on the day of the upload, and its records on their own days.",
 ]
 LEVEL_ORDER = {"critical": 0, "warn": 1, "ok": 2, None: 3}
 
@@ -503,9 +525,20 @@ def device_order(document: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(document.get("subjects", []), key=key)
 
 
+def _with_before(value: Any, before: dict[str, Any] | None, key: str, has_comparison: bool) -> str:
+    """A figure, with the comparison period's in brackets when the run has one and the figure
+    exists there."""
+    text = fmt_indicator(value, key)
+    if has_comparison and isinstance(before, dict) and before.get(key) is not None:
+        text += f" ({fmt_indicator(before.get(key), key)})"
+    return text
+
+
 def _device_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
     """The fleet table as the key figures: a row per device, worst first, a level dot beside
-    every headline figure, the comparison in brackets."""
+    every headline figure, the comparison in brackets. Up to `FLEET_TRANSPOSE_MAX` devices the
+    table also comes on its side (`transposed`), a row per indicator, which the template
+    prefers: fourteen columns do not fit A4 portrait."""
     document = inp.document
     summary = document.get("summary", {})
     has_comparison = any(p.get("key") == "comparison" for p in document.get("periods", []))
@@ -516,12 +549,13 @@ def _device_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
     for subject in device_order(document):
         sid = str(subject["id"])
         figures = main.get(sid) or {}
-        cells = []
-        for key in DEVICE_KEY_FIGURES:
-            text = fmt_indicator(figures.get(key), key)
-            if has_comparison and isinstance(before.get(sid), dict):
-                text += f" ({fmt_indicator(before[sid].get(key), key)})"
-            cells.append({"text": text, "level": (levels.get(sid) or {}).get(key)})
+        cells = [
+            {
+                "text": _with_before(figures.get(key), before.get(sid), key, has_comparison),
+                "level": (levels.get(sid) or {}).get(key),
+            }
+            for key in DEVICE_KEY_FIGURES
+        ]
         rows.append(
             {
                 "name": subject["name"],
@@ -530,10 +564,21 @@ def _device_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
                 "cells": cells,
             }
         )
+    transposed = None
+    if 0 < len(rows) <= FLEET_TRANSPOSE_MAX:
+        transposed = {
+            "columns": [row["name"] for row in rows],
+            "levels": [row["level"] for row in rows],
+            "rows": [
+                {"label": labels.get(key, key), "cells": [row["cells"][i] for row in rows]}
+                for i, key in enumerate(DEVICE_KEY_FIGURES)
+            ],
+        }
     return {
         "first": "Device",
-        "columns": [labels.get(k, k) for k in DEVICE_KEY_FIGURES],
+        "columns": [DEVICE_SHORT_LABELS.get(k, labels.get(k, k)) for k in DEVICE_KEY_FIGURES],
         "rows": rows,
+        "transposed": transposed,
         "note": ("The figure in brackets is the period before. " if has_comparison else "")
         + "A dot marks the level: green ok, amber warn, red critical.",
         "herd": None,
@@ -559,15 +604,13 @@ def device_sections(
         for area, keys in DEVICE_AREA_CARDS:
             rows = []
             for key in keys:
-                if figures.get(key) is None:
+                value = figures.get(key)
+                if value is None or value == []:
                     continue
-                text = fmt_indicator(figures.get(key), key)
-                if has_comparison and isinstance(before.get(sid), dict):
-                    text += f" ({fmt_indicator(before[sid].get(key), key)})"
                 rows.append(
                     {
                         "label": labels.get(key, key),
-                        "text": text,
+                        "text": _with_before(value, before.get(sid), key, has_comparison),
                         "level": (levels.get(sid) or {}).get(key),
                     }
                 )

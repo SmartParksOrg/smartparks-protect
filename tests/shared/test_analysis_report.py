@@ -495,11 +495,19 @@ def test_the_device_report_leads_with_the_fleet_and_folds_the_charts_per_device(
     assert figures["rows"][0]["cells"][0] == {"text": "3.50", "level": "critical"}
     assert figures["rows"][0]["cells"][8] == {"text": "60%", "level": "warn"}
     assert figures["rows"][0]["cells"][9] == {"text": "2 min", "level": None}
+    # two devices: the table stands on its side, a row per indicator, the devices as columns
+    assert figures["transposed"]["columns"] == ["SP2", "SP1"]
+    assert figures["transposed"]["levels"] == ["critical", "ok"]
+    assert figures["transposed"]["rows"][0]["label"] == "Battery (V)"
+    assert figures["transposed"]["rows"][0]["cells"][1] == {"text": "3.91", "level": "ok"}
+    assert figures["columns"][1] == "Slope (mV/day)"  # the short heads for paper
     assert fmt_indicator(None, "x") == "-" and fmt_indicator(["a", "b"], "sources") == "a, b"
     sections = device_sections(inp, labels, {str(G): "#52735E", str(H): "#D9825F"})
     assert [s["name"] for s in sections] == ["SP2", "SP1"]
     failing = sections[0]
     assert [c["title"] for c in failing["cards"]] == ["Health", "GNSS", "Network"]
+    # a missing comparison figure adds no brackets
+    assert failing["cards"][0]["rows"][0]["text"] == "3.50"
     assert failing["cards"][0]["rows"][0] == {
         "label": "Battery (V)",
         "text": "3.50",

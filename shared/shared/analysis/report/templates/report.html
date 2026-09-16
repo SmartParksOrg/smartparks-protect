@@ -55,7 +55,22 @@
         {{ '%.0f' % (100 * figures.herd.get('inside_share', 0)) }}% of that time inside the chosen areas.
       </p>
       {% endif %}
+      {% if figures.transposed %}
       <table class="data">
+        <thead>
+          <tr><th></th>{% for c in figures.transposed.columns %}<th class="num">{% if figures.transposed.levels[loop.index0] %}<span class="dot lvl-{{ figures.transposed.levels[loop.index0] }}"></span>{% endif %}{{ c }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+          {% for row in figures.transposed.rows %}
+          <tr>
+            <td>{{ row.label }}</td>
+            {% for cell in row.cells %}<td class="num">{% if cell.level %}<span class="dot lvl-{{ cell.level }}"></span>{% endif %}{{ cell.text }}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <table class="data{% if figures.columns|length > 8 %} wide{% endif %}">
         <thead>
           <tr><th>{{ figures.first }}</th>{% for c in figures.columns %}<th class="num">{{ c }}</th>{% endfor %}</tr>
         </thead>
@@ -68,6 +83,7 @@
           {% endfor %}
         </tbody>
       </table>
+      {% endif %}
       {% if figures.note %}<p class="muted small">{{ figures.note }}</p>{% endif %}
     </section>
 

@@ -194,6 +194,7 @@ No new table: the run row and the geometries table hold everything (D202).
 - The frame counter comes from `provider_metadata.f_cnt` of the uplink source events, the joins from source events of type `join`; a source that delivers neither shows no figure.
 - The trajectory loader takes `by_device=True` rather than a `device_id` argument; the `Trajectory.entity_id` field then holds the device's id (the subject's id either way).
 - The limit constant is `MAX_DEVICES` (100) and the rows one device may hold per read `MAX_ROWS_PER_DEVICE` (500,000); the estimate counts the device's fixes, the run refuses beyond the bound.
+- Statuses are counted from the state history and, when it holds none in the period, from the battery readings: the state history is not curated, so SP050969's repaired clock (D212) moved its measurements into 2025 and left its states in 2064. Messages and the network figures count by arrival at Protect (a raw log counts on the day of its upload); the interface and the docs say so.
 - The interface folds the charts into the device sections and lets the presentation replace the run view's chart grid and table list (`render.charts`, `render.tables`), so a run over a hundred devices does not draw a hundred series in one chart.
 
 ## 13. Exit criteria

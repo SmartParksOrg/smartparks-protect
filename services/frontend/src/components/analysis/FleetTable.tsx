@@ -147,6 +147,15 @@ export function DeviceSections({
   const { t } = useTranslation();
   const hasComparison = document.periods.some((p) => p.key === "comparison");
   const single = document.subjects.length === 1;
+  // the subjects' names label their series
+  const named: Record<string, string> = {
+    ...labels,
+    ...Object.fromEntries(document.subjects.map((s) => [s.id, s.name])),
+  };
+  const shown = (value: unknown): boolean =>
+    value !== undefined &&
+    value !== null &&
+    !(Array.isArray(value) && value.length === 0);
   return (
     <div className="space-y-3">
       {orderedSubjects(document).map((subject) => {
@@ -196,34 +205,35 @@ export function DeviceSections({
               {main ? (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {AREA_CARDS.map(([area, keys]) => {
-                    const present = keys.filter(
-                      (k) => main[k] !== undefined && main[k] !== null,
-                    );
+                    const present = keys.filter((k) => shown(main[k]));
                     if (present.length === 0) return null;
                     return (
                       <div key={area} className="rounded-md border p-3">
                         <p className="mb-2 text-sm font-medium">
                           {labels[area] ?? area}
                         </p>
-                        <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-sm">
+                        <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-sm">
                           {present.map((key) => (
                             <div key={key} className="contents">
-                              <dt className="flex items-center gap-1.5 truncate text-muted-foreground">
-                                <LevelDot
-                                  level={levelOf(document, subject.id, key)}
-                                />
-                                {labels[key] ?? key}
+                              <dt className="flex items-start gap-1.5 leading-tight text-muted-foreground">
+                                <span className="mt-1.5 inline-flex shrink-0">
+                                  <LevelDot
+                                    level={levelOf(document, subject.id, key)}
+                                  />
+                                </span>
+                                <span>{labels[key] ?? key}</span>
                               </dt>
-                              <dd className="text-right tabular-nums">
-                                {Array.isArray(main[key])
-                                  ? (main[key] as unknown[])
-                                      .map(String)
-                                      .join(", ")
-                                  : showFigure(main[key], key)}
-                                {before && before[key] !== undefined && (
-                                  <span className="ml-1 text-xs text-muted-foreground">
-                                    ({t("before")}{" "}
-                                    {showFigure(before[key], key)})
+                              <dd className="flex flex-col items-end text-right tabular-nums leading-tight">
+                                <span>
+                                  {Array.isArray(main[key])
+                                    ? (main[key] as unknown[])
+                                        .map(String)
+                                        .join(", ")
+                                    : showFigure(main[key], key)}
+                                </span>
+                                {before && shown(before[key]) && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {t("before")} {showFigure(before[key], key)}
                                   </span>
                                 )}
                               </dd>
@@ -249,7 +259,7 @@ export function DeviceSections({
                       <CardContent>
                         <ResultChart
                           chart={chart}
-                          labels={labels}
+                          labels={named}
                           colorOf={(s) =>
                             s.subject ? (colors[s.subject] ?? null) : null
                           }

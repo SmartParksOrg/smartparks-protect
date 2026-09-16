@@ -120,6 +120,11 @@ export function DevicePerformanceLimitations() {
             "Fix success counts the attempts the device reported; a device that never reports a failed attempt shows every attempt as a fix.",
           )}
         </li>
+        <li>
+          {t(
+            "Messages and the network figures count by the time a message reached Protect; a raw log uploaded later counts on the day of the upload, and its records on their own days.",
+          )}
+        </li>
       </ul>
     </details>
   );

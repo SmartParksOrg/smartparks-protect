@@ -154,8 +154,15 @@ export function RunList({
                 </Badge>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                {(run.parameters as { entity_ids?: string[] }).entity_ids
-                  ?.length ?? 0}
+                {(
+                  (
+                    run.parameters as {
+                      entity_ids?: string[];
+                      device_ids?: string[];
+                    }
+                  ).entity_ids ??
+                  (run.parameters as { device_ids?: string[] }).device_ids
+                )?.length ?? 0}
               </TableCell>
               <TableCell className="hidden whitespace-nowrap text-muted-foreground md:table-cell">
                 {period(run)}

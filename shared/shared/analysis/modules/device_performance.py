@@ -1012,6 +1012,11 @@ async def analyse_device(
     )
     health_figures(metrics, states, reboots, thresholds, period, bucket_s, out)
     status_times = np.asarray([t for t, state in states if is_status(state)], dtype=np.float64)
+    if status_times.size == 0 and "battery_voltage" in metrics:
+        # the state history is not curated (a clock repaired by a time offset moves the
+        # measurements, not the states): the battery readings mark the statuses then
+        status_times = metrics["battery_voltage"][0]
+        out.summary["statuses"] = int(status_times.size)
     reporting_figures(
         track.times, status_times, settings, invalid, valid, messages, thresholds, period, out
     )
@@ -1096,7 +1101,11 @@ def build_document(
             if m is None:
                 continue
             summary[period.key][str(subject.id)] = m.summary
-            warnings.extend(m.warnings)
+            for warning in m.warnings:
+                if not any(
+                    w.code == warning.code and w.subject_id == warning.subject_id for w in warnings
+                ):
+                    warnings.append(warning)
             health_rows.append(
                 [subject.name, period.key] + [m.summary.get(k) for k in HEALTH_COLUMNS]
             )

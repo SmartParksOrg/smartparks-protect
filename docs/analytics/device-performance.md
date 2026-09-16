@@ -94,6 +94,7 @@ The result document carries the summary per period and device, the levels and ra
 - Signal figures are the best gateway's per uplink; a moving device changes gateways, so they describe the network as the device met it.
 - Levels come from the driver's thresholds and named defaults; they are not a verdict on the device, and a rank says only where a device stands among the chosen ones.
 - Fix success counts the attempts the device reported; a device that never reports a failed attempt shows every attempt as a fix.
+- Messages and the network figures count by the time a message reached Protect; a raw log uploaded later counts on the day of the upload, and its records on their own days. The status count falls back to the battery readings when the state history holds no status in the period (a clock repaired by a time offset moves the measurements, not the states).
 
 ## Exports, the report and the API
 
