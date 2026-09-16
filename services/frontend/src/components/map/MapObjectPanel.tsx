@@ -75,7 +75,7 @@ export function MapPanel({
   return (
     // the panel is a shell and an inner box scrolls: a scrolling box with a background in the
     // page's fixed-height column paints its colour far below itself in Chromium
-    <aside className="flex max-h-[45vh] shrink-0 flex-col rounded-lg border bg-card shadow-lg">
+    <aside className="flex max-h-[45vh] shrink-0 flex-col rounded-lg border bg-card shadow-lg sm:max-h-[calc(100vh-9rem)]">
       <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
         <div className="flex items-start gap-2">
           {picture}
@@ -285,7 +285,11 @@ export function PanelSummary({
         batteryProject &&
         batteryDevice && (
           <div className="basis-full rounded-md border bg-muted/30 p-2">
-            <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
+            <BatteryTrend
+              projectId={batteryProject}
+              deviceId={batteryDevice}
+              until={lastSeenAt}
+            />
           </div>
         )}
       {hasMovement && (
@@ -301,7 +305,11 @@ export function PanelSummary({
       )}
       {hasMovement && movementOpen && batteryProject && batteryDevice && (
         <div className="basis-full rounded-md border bg-muted/30 p-2">
-          <MovementTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
+          <MovementTrend
+            projectId={batteryProject}
+            deviceId={batteryDevice}
+            until={lastSeenAt}
+          />
         </div>
       )}
     </div>
@@ -425,7 +433,11 @@ function HealthRows({
         batteryProject &&
         batteryDevice && (
           <div className="col-span-2 rounded-md border bg-muted/30 p-2">
-            <BatteryTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
+            <BatteryTrend
+              projectId={batteryProject}
+              deviceId={batteryDevice}
+              until={lastSeenAt}
+            />
           </div>
         )}
       {hasMovement && (
@@ -445,7 +457,11 @@ function HealthRows({
       )}
       {hasMovement && movementOpen && batteryProject && batteryDevice && (
         <div className="col-span-2 rounded-md border bg-muted/30 p-2">
-          <MovementTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
+          <MovementTrend
+            projectId={batteryProject}
+            deviceId={batteryDevice}
+            until={lastSeenAt}
+          />
         </div>
       )}
       {uptime != null && (
@@ -470,7 +486,11 @@ function HealthRows({
       )}
       {uptime != null && uptimeOpen && batteryProject && batteryDevice && (
         <div className="col-span-2 rounded-md border bg-muted/30 p-2">
-          <UptimeTrend projectId={batteryProject} deviceId={batteryDevice} until={lastSeenAt} />
+          <UptimeTrend
+            projectId={batteryProject}
+            deviceId={batteryDevice}
+            until={lastSeenAt}
+          />
         </div>
       )}
       {lastStatusAt && (
@@ -580,7 +600,9 @@ export function FollowButton({
       aria-label={on ? t("Stop following") : t("Follow as positions arrive")}
       title={
         on
-          ? t("Following: the map moves with every new position; a drag stops it")
+          ? t(
+              "Following: the map moves with every new position; a drag stops it",
+            )
           : t("Follow: the map moves with every new position")
       }
       onClick={onToggle}

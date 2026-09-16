@@ -228,3 +228,45 @@ async def test_bulk_ignore(client, db):
         e["action"] == "attention.identity_ignored" and (e.get("details") or {}).get("bulk")
         for e in audit
     )
+
+
+async def test_bulk_create_assigns_from_the_given_start(client, db):
+    """The assignments start at `valid_from` when given (Tim, 2026-09-16), so the retained
+    events from before the creation get the project once decoded."""
+    from sqlalchemy import func, select
+
+    from shared.models import DeviceProjectAssignment
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    h = admin.headers
+    device_type = (
+        await client.post(
+            "/api/v1/device-types",
+            json={
+                "key": unique_name("gj").replace("-", "_"),
+                "label": "Generic",
+                "driver_key": "generic_json",
+            },
+            headers=h,
+        )
+    ).json()
+    _, identities = await _unknown_identities(client, h, 1)
+    result = await client.post(
+        "/api/v1/attention/identities/bulk-create-devices",
+        json={
+            "identity_ids": [identities[0]["id"]],
+            "device_type_id": device_type["id"],
+            "project_id": project.id.hex,
+            "valid_from": "2025-01-01T00:00:00+00:00",
+        },
+        headers=h,
+    )
+    assert result.status_code == 201, result.text
+    device_id = result.json()["device_ids"][0]
+    start = await db.scalar(
+        select(func.lower(DeviceProjectAssignment.validity)).where(
+            DeviceProjectAssignment.device_id == uuid.UUID(device_id)
+        )
+    )
+    assert start.isoformat() == "2025-01-01T00:00:00+00:00"

@@ -131,12 +131,18 @@ class BulkIdentityIds(BaseModel):
 
 class BulkCreateDevices(BulkIdentityIds):
     """Devices for many unknown identities at once (decision D96): one type, optionally one
-    project (assigned from the identity's first sighting) and one entity type, in which case
-    every device gets an entity of that type with the same name, assigned from the same time.
-    Names come from the platform (`name` in the identity attributes) or the external id."""
+    project (assigned from `valid_from`, else from each identity's first sighting) and one
+    entity type, in which case every device gets an entity of that type with the same name,
+    assigned from the same time. Names come from the platform (`name` in the identity
+    attributes) or the external id."""
 
     device_type_id: uuid.UUID
     project_id: uuid.UUID | None = None
+    valid_from: datetime | None = Field(
+        default=None,
+        description="Start of every assignment; without it each device starts at its identity's "
+        "first sighting (Tim, 2026-09-16: the retained events from before get the project too)",
+    )
     entity_type_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = Field(
         default=None, description="The group the new entities go into (decision D98)"
@@ -497,8 +503,11 @@ async def bulk_create_devices(
 ) -> BulkCreateResult:
     """A shared network application posts every device it holds; this turns a selection of
     its unknown identities into devices in one go. A name already taken gets the external id
-    appended; an entity name already taken in the project leaves that device without one."""
+    appended; an entity name already taken in the project leaves that device without one. The
+    assignments start at `valid_from` when given, else at each identity's first sighting, so
+    the retained events from before the creation get the project when they are decoded."""
     await get_or_404(session, DeviceType, body.device_type_id, "Device type")
+    start = require_aware(body.valid_from) if body.valid_from is not None else None
     if body.project_id is not None:
         await get_or_404(session, Project, body.project_id, "Project")
     if body.entity_type_id is not None:
@@ -554,7 +563,7 @@ async def bulk_create_devices(
         await session.flush()
         identity.device_id = device.id
         await fill_serial_from_identity(session, device, identity)  # D101
-        valid_from = identity.first_seen_at or now
+        valid_from = start or identity.first_seen_at or now
         if body.project_id is not None:
             session.add(
                 DeviceProjectAssignment(

@@ -184,6 +184,8 @@ function CreateDeviceDialog({
   );
   const [typeId, setTypeId] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [start, setStart] = useState<AssignmentStart>("first_seen");
+  const [startDate, setStartDate] = useState("");
   const create = useMutationToast({
     mutationFn: () =>
       api.post(`/api/v1/attention/identities/${identity?.id}/create-device`, {
@@ -191,7 +193,10 @@ function CreateDeviceDialog({
           name,
           device_type_id: typeId,
           project_id: projectId || null,
-          valid_from: identity?.first_seen_at ?? null,
+          valid_from:
+            assignmentStartValue(start, startDate) ??
+            identity?.first_seen_at ??
+            null,
         },
       }),
     invalidate: [
@@ -232,11 +237,7 @@ function CreateDeviceDialog({
               </SelectContent>
             </Select>
           </Field>
-          <Field
-            label={t("Assign to project")}
-            htmlFor="new-device-project"
-            hint={t("From the first time this identity was seen")}
-          >
+          <Field label={t("Assign to project")} htmlFor="new-device-project">
             <Select
               value={projectId || "none"}
               onValueChange={(v) => setProjectId(v === "none" ? "" : v)}
@@ -254,6 +255,16 @@ function CreateDeviceDialog({
               </SelectContent>
             </Select>
           </Field>
+          {projectId && (
+            <AssignmentStartField
+              id="new-device-start"
+              start={start}
+              onStart={setStart}
+              date={startDate}
+              onDate={setStartDate}
+              firstSeen={identity?.first_seen_at ?? null}
+            />
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
@@ -305,6 +316,8 @@ function BulkCreateDialog({
   const [projectId, setProjectId] = useState("");
   const [entityTypeId, setEntityTypeId] = useState("");
   const [groupId, setGroupId] = useState("");
+  const [start, setStart] = useState<AssignmentStart>("first_seen");
+  const [startDate, setStartDate] = useState("");
   const [result, setResult] = useState<BulkCreateResult | null>(null);
   const create = useMutationToast({
     mutationFn: () =>
@@ -315,6 +328,9 @@ function BulkCreateDialog({
             identity_ids: identities.map((i) => i.id),
             device_type_id: typeId,
             project_id: projectId || null,
+            valid_from: projectId
+              ? assignmentStartValue(start, startDate)
+              : null,
             entity_type_id: entityTypeId || null,
             group_id: entityTypeId && groupId ? groupId : null,
           },
@@ -394,11 +410,7 @@ function BulkCreateDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <Field
-              label={t("Assign to project")}
-              htmlFor="bulk-device-project"
-              hint={t("From the first time each identity was seen")}
-            >
+            <Field label={t("Assign to project")} htmlFor="bulk-device-project">
               <Select
                 value={projectId || "none"}
                 onValueChange={(v) => {
@@ -420,6 +432,16 @@ function BulkCreateDialog({
                 </SelectContent>
               </Select>
             </Field>
+            {projectId && (
+              <AssignmentStartField
+                id="bulk-device-start"
+                start={start}
+                onStart={setStart}
+                date={startDate}
+                onDate={setStartDate}
+                firstSeen={earliestFirstSeen(identities)}
+              />
+            )}
             <Field
               label={t("Also create an entity per device")}
               htmlFor="bulk-entity-type"
@@ -1034,4 +1056,88 @@ export function AttentionPage() {
       <TraceDialog traceId={trace} onClose={() => setTrace(null)} />
     </>
   );
+}
+
+type AssignmentStart = "first_seen" | "now" | "date";
+
+/** When the project (and entity) assignments of new devices start (Tim, 2026-09-16): at the
+ * identity's first sighting, so the retained events from before get the project once decoded;
+ * now; or a date of one's own. The other assignment dialogs offer the same choice. */
+function AssignmentStartField({
+  id,
+  start,
+  onStart,
+  date,
+  onDate,
+  firstSeen,
+}: {
+  id: string;
+  start: AssignmentStart;
+  onStart: (v: AssignmentStart) => void;
+  date: string;
+  onDate: (v: string) => void;
+  /** The earliest first sighting among the identities, for the hint. */
+  firstSeen: string | null;
+}) {
+  const { t } = useTranslation();
+  const hint =
+    start === "first_seen"
+      ? firstSeen
+        ? t(
+            "From the first time the identity was seen ({{when}}); retained events from then on get the project once decoded.",
+            { when: formatTime(firstSeen) },
+          )
+        : t("From the first time each identity was seen.")
+      : start === "now"
+        ? t("From this moment; earlier events stay without a project.")
+        : t("From the date given; earlier events stay without a project.");
+  return (
+    <Field label={t("Assignment starts")} htmlFor={id} hint={hint}>
+      <div className="flex flex-wrap gap-2">
+        <Select
+          value={start}
+          onValueChange={(v) => onStart(v as AssignmentStart)}
+        >
+          <SelectTrigger id={id} className="w-56">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="first_seen">
+              {t("At the identity's first sighting")}
+            </SelectItem>
+            <SelectItem value="now">{t("Now")}</SelectItem>
+            <SelectItem value="date">{t("From a date")}</SelectItem>
+          </SelectContent>
+        </Select>
+        {start === "date" && (
+          <Input
+            type="datetime-local"
+            className="w-56"
+            aria-label={t("Assignment start")}
+            value={date}
+            onChange={(e) => onDate(e.target.value)}
+          />
+        )}
+      </div>
+    </Field>
+  );
+}
+
+/** The start as the API takes it: null lets the server use the first sighting. */
+function assignmentStartValue(
+  start: AssignmentStart,
+  date: string,
+): string | null {
+  if (start === "now") return new Date().toISOString();
+  if (start === "date" && date) return new Date(date).toISOString();
+  return null;
+}
+
+/** The earliest first sighting among identities, or null. */
+function earliestFirstSeen(identities: UnknownIdentity[]): string | null {
+  const seen = identities
+    .map((i) => i.first_seen_at)
+    .filter((v): v is string => typeof v === "string")
+    .sort();
+  return seen[0] ?? null;
 }

@@ -356,7 +356,9 @@ export function MetricTrend({
 /** Where a trend's period ends: a minute past the device's last record, capped at now. */
 function trendAnchor(until: string | null | undefined, now: number): Date {
   const parsed = until ? Date.parse(until) : Number.NaN;
-  return new Date(Number.isFinite(parsed) ? Math.min(parsed + 60_000, now) : now);
+  return new Date(
+    Number.isFinite(parsed) ? Math.min(parsed + 60_000, now) : now,
+  );
 }
 
 /** A small line of one series (decision-free: brand green, no legend, no zoom, two y labels,
@@ -404,10 +406,17 @@ function Sparkline({
       spec.floor !== undefined
         ? spec.floor
         : Math.floor((Math.min(...values) - step / 5) / step) * step;
-    const high = Math.max(
+    let high = Math.max(
       low + step,
       Math.ceil((Math.max(...values) + step / 5) / step) * step,
     );
+    // two or three even ticks: the axis grows to a multiple of the interval, so the labels
+    // sit at equal distances instead of a stray one under the top (Tim, 2026-09-16)
+    const steps = Math.max(1, Math.round((high - low) / step));
+    const parts =
+      steps <= 3 ? steps : ([3, 2].find((n) => steps % n === 0) ?? 3);
+    const interval = Math.ceil(steps / parts) * step;
+    high = low + interval * parts;
     instance.setOption(
       {
         animation: false,
@@ -438,7 +447,7 @@ function Sparkline({
           type: "value",
           min: Number(low.toFixed(3)),
           max: Number(high.toFixed(3)),
-          interval: Math.max(step, Math.round((high - low) / 2 / step) * step),
+          interval: Number(interval.toFixed(6)),
           axisLabel: {
             color: th.text,
             fontSize: 10,

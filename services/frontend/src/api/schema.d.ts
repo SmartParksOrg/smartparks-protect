@@ -1698,7 +1698,9 @@ export interface paths {
          * Bulk Create Devices
          * @description A shared network application posts every device it holds; this turns a selection of
          *     its unknown identities into devices in one go. A name already taken gets the external id
-         *     appended; an entity name already taken in the project leaves that device without one.
+         *     appended; an entity name already taken in the project leaves that device without one. The
+         *     assignments start at `valid_from` when given, else at each identity's first sighting, so
+         *     the retained events from before the creation get the project when they are decoded.
          */
         post: operations["bulk_create_devices_api_v1_attention_identities_bulk_create_devices_post"];
         delete?: never;
@@ -5657,9 +5659,10 @@ export interface components {
         /**
          * BulkCreateDevices
          * @description Devices for many unknown identities at once (decision D96): one type, optionally one
-         *     project (assigned from the identity's first sighting) and one entity type, in which case
-         *     every device gets an entity of that type with the same name, assigned from the same time.
-         *     Names come from the platform (`name` in the identity attributes) or the external id.
+         *     project (assigned from `valid_from`, else from each identity's first sighting) and one
+         *     entity type, in which case every device gets an entity of that type with the same name,
+         *     assigned from the same time. Names come from the platform (`name` in the identity
+         *     attributes) or the external id.
          */
         BulkCreateDevices: {
             /** Identity Ids */
@@ -5671,6 +5674,11 @@ export interface components {
             device_type_id: string;
             /** Project Id */
             project_id?: string | null;
+            /**
+             * Valid From
+             * @description Start of every assignment; without it each device starts at its identity's first sighting (Tim, 2026-09-16: the retained events from before get the project too)
+             */
+            valid_from?: string | null;
             /** Entity Type Id */
             entity_type_id?: string | null;
             /**
