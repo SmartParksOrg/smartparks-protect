@@ -4149,6 +4149,10 @@ Firmware / tracker type (high nibble, setting `tracker_type` 0x00, 0 = hardware 
 * `raw_logs_decoder` has its own app version (`version.txt`, v1.43 at commit 9b10e02) bumped by a GitHub workflow on every push; it is unrelated to decoder versions.
 * Decoder changes tied to firmware releases (from CHANGELOG): 4.4.0 flash status and short u-blox message; 6.1.0 CMDQ (13 byte records); 6.2.0 CMDQ `cmdq_success`, `gps resend` port 16; 6.9.0 CMDQ HRV (15 byte records), `cmd_send_timestamp`/port 18; 6.13.0 unsigned `>>> 0` fix and `fix_timestamp` fix, external switch ports 19/20; 7.1.0 RF scan and open sky removed; 7.2.0 (decoder) air quality port 21 and `version` string.
 
+## 7.1 Firmware 8 and the settings structure
+
+Tim (2026-09-16): OpenCollar Edge firmware v8 and later changes the settings structure in an important way. The tables of section 4 and `catalog.json` describe firmware 7.3.0; the catalogue's `since_firmware` per setting and `versions` list are the place a version-dependent catalogue grows from, keyed by the firmware the device reports in its status. The change is to be addressed when the release and the information to understand it are available; Tim guides that work.
+
 ## 8. What could not be found, and whom to ask
 
 1. IRNAS GitBook "OpenCollar" (`https://github.com/IRNAS/gitbook-opencollar`, `https://app.gitbook.com/@irnas/s/opencollar/technology/firmware`) is private (404/401). The firmware README calls it "the main documentation". Ask Smart Parks or IRNAS for read access or an export; it most likely contains the formal message and settings guidelines the wiki paraphrases.
