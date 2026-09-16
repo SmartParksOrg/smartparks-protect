@@ -132,8 +132,8 @@ export interface ChartGroup {
 }
 
 /** Whose line a record draws on (Tim, 2026-09-09: the perspective follows the selection): the
- * entity when that entity was selected, else the device. A selected collar is one line whatever
- * animals it tracked; a selected animal one line whatever collars tracked it. */
+ * entity when that entity was selected, else the device. A selected device is one line whatever
+ * animals it tracked; a selected animal one line whatever devices tracked it. */
 function ownerOf(
   row: RecordRow,
   entities: ReadonlySet<string>,

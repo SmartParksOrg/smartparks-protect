@@ -25,7 +25,7 @@ def test_scatter_and_ordinary_movement_are_never_outliers():
     near = (OKONJIMA[0] + 0.004, OKONJIMA[1])  # about 450 m
     # 450 m in ten seconds is 45 m/s, yet under the jump floor: GPS scatter, not an outlier
     assert outlier_of((*OKONJIMA, T0), (*near, T0 + timedelta(seconds=10))) is None
-    # 578 m in an hour, the collar's usual step
+    # 578 m in an hour, the device's usual step
     assert outlier_of((*OKONJIMA, T0), (*near, T0 + timedelta(hours=1))) is None
     # a vehicle on a highway: 150 km in an hour is under 50 m/s
     highway = (OKONJIMA[0] + 1.35, OKONJIMA[1])

@@ -1283,7 +1283,7 @@ export function MapPage() {
   }, [mapRef, ready, visibleFeatures, selectedId]);
 
   // fit to the project once per visit, to its entities and devices together (phase 19): a park
-  // whose collars have no animal yet, or hardware in the workshop, fits to the devices; without
+  // whose devices have no animal yet, or hardware in the workshop, fits to the devices; without
   // any position the view stays where it was. Waits for both reads so the fit is not to half.
   const fittedProject = useRef<string | null>(null);
   useEffect(() => {

@@ -294,7 +294,7 @@ export function EntitiesPage() {
           }
           isLoading={entities.isPending}
           emptyMessage={t(
-            "No entities yet. Add one with New entity, or onboard collars with their animals from Needs attention.",
+            "No entities yet. Add one with New entity, or onboard devices with their animals from Needs attention.",
           )}
           columnsKey="entities"
           onRowClick={(e) =>

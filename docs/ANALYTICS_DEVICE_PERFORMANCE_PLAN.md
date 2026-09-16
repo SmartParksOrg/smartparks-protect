@@ -8,9 +8,9 @@ This document is the design reference the way `ANALYTICS_PHASE1_PLAN.md` is for 
 
 The analytics plan's gate (section 20 there, decision D203) asks for a month of use of movement and grazing before any further module gets a plan. Device performance is admitted early by the admission rule of the brief (decision D213), with these answers:
 
-- **Used repeatedly.** Every operations round asks the same questions of the fleet: which collars are low, which reboot, which stopped fixing, which network drops uplinks. Today those answers are spread over the device page's Health, Data and Connectivity tabs, Explore and Needs attention, one device at a time.
+- **Used repeatedly.** Every operations round asks the same questions of the fleet: which devices are low, which reboot, which stopped fixing, which network drops uplinks. Today those answers are spread over the device page's Health, Data and Connectivity tabs, Explore and Needs attention, one device at a time.
 - **The data is already in Protect.** Measurements (battery, temperature, uptime, the GNSS figures), events (device errors, resets), the state history (error flags, reset reasons, firmware), receptions (gateways, RSSI, SNR, frame counters), connectivity states, satellite sessions, and source events per channel. Nothing new is collected.
-- **A real decision.** Service or replace a collar, change a setting (a GPS interval, a status interval), move or add a gateway, switch a device to satellite, retire a firmware.
+- **A real decision.** Service or replace a device, change a setting (a GPS interval, a status interval), move or add a gateway, switch a device to satellite, retire a firmware.
 - **Substantially easier than outside tools.** The figures need the driver's knowledge of the device (thresholds, message layouts) and the platform's knowledge of the networks; an export to a spreadsheet loses both.
 - **Maintenance in proportion.** The module reads existing tables through the analysis primitives and adds no schema beyond the framework's, so the boundary of ADR 0031 holds.
 
@@ -35,7 +35,7 @@ The gate's review of the ecological modules stays where it is; this plan does no
 
 ## 3. Subjects: devices
 
-Decision D214. The framework's subjects are entities today (D201). The module needs devices, and a device may track no animal at all (a spare collar in a drawer, a freshly onboarded one). The framework gains a subject kind:
+Decision D214. The framework's subjects are entities today (D201). The module needs devices, and a device may track no animal at all (a spare device in a drawer, a freshly onboarded one). The framework gains a subject kind:
 
 - `SubjectSelection` gets `device_ids` (up to 100), `device_type_id` (every device of that type assigned to the project in the period) and `all_devices` (every device of the project in the period), next to the entity fields; a module declares which kind it takes (`subject_kind = "device"`), and the API resolves a type or "all" to ids before the run is stored, so the run stays reproducible.
 - `Subject` gets `kind` (`entity` or `device`); for a device subject `name` is the device's name, and `tracked` names the entity it tracked during the period (the first and, when it changed, the last).
@@ -55,13 +55,13 @@ Decision D216: a fixed catalogue per area. Every indicator is computed when its 
 | Battery now | The newest battery voltage in the period | `battery_voltage` | The driver's thresholds (warn below 3.6 V, critical below 3.45 V) |
 | Battery slope | Least-squares slope of the daily median voltage, in mV per day, over the period | `battery_voltage` | warn when falling more than 5 mV a day, critical more than 15 |
 | Days to critical | The days until the slope reaches the critical threshold; "not falling" when the slope is flat or rising | derived | warn under 60 days, critical under 14 |
-| Charging | Days on which the charging voltage was above the battery voltage (a solar collar) | `charging_voltage` | none (informative) |
+| Charging | Days on which the charging voltage was above the battery voltage (a solar device) | `charging_voltage` | none (informative) |
 | Temperature | Minimum, median, maximum and the hours above the warn threshold | `device_temperature` | The driver's thresholds (warn above 50 °C, critical above 60) on the maximum |
 | Reboots | Count of `device_reset` events and the reasons (watchdog, software, lockup, pin) | `events` | warn at one a week, critical at one a day |
 | Uptime | The longest uptime seen and the median | `uptime` | none |
 | Errors | Per error flag (`lr_join`, `ublox_fix`, `flash`, ...) the count of status messages with the flag on and the share of statuses | `device_state_history`, `device_error` events | warn when a flag is on in more than 10 percent of the statuses, critical above 50; `flash` and `battery` flags are critical when on at all |
 | Flash used | The newest value and the change over the period | `flash_used_percent` | The driver's thresholds |
-| Movement | Share of statuses with movement (the `activity` metric above the threshold of D204) and the longest still period | `activity` | none (a still collar is a health signal the health card gives already; here it is context) |
+| Movement | Share of statuses with movement (the `activity` metric above the threshold of D204) and the longest still period | `activity` | none (a still device is a health signal the health card gives already; here it is context) |
 | Firmware | The firmware and hardware versions seen in the period and whether they changed | `device_state_history` | none |
 
 ### 4.2 Reporting
@@ -183,7 +183,7 @@ No new table: the run row and the geometries table hold everything (D202).
 - [x] **P4 the pages**: `DevicePerformancePage.tsx`, `DevicePerformanceForm.tsx` with the device picker and the type shortcut, the presentation with the fleet table and the per-device sections, the map's fix classes and gateway points in `analysisLayers.ts`; "Analyse performance" on the device page and the devices list.
 - [x] **P5 the report**: labels, key figures as the fleet table with level dots, the per-device sections; a rendered fixture test.
 - [x] **P6 docs**: `docs/analytics/device-performance.md` (what each indicator means, its default threshold, its limits), the analytics index, `DEVELOPERS.md`, the changelog, ADR 0034 (device subjects and the indicator levels).
-- [x] **P7 dev server** (the runs made and read on 2026-09-16; Tim's reading and the exit criteria below are still his): a fleet run over the FreeNature and Smart Parks collars and a deep dive of SP050969 read by Tim; the benchmark section over 100 devices; the budgets of the analytics plan held during a run.
+- [x] **P7 dev server** (the runs made and read on 2026-09-16; Tim's reading and the exit criteria below are still his): a fleet run over the FreeNature and Smart Parks devices and a deep dive of SP050969 read by Tim; the benchmark section over 100 devices; the budgets of the analytics plan held during a run.
 - [ ] **P8 release** as v2.8.0 after the exit criteria.
 
 ### Built on 2026-09-16, and where it differs from the sections above
@@ -195,13 +195,13 @@ No new table: the run row and the geometries table hold everything (D202).
 - The trajectory loader takes `by_device=True` rather than a `device_id` argument; the `Trajectory.entity_id` field then holds the device's id (the subject's id either way).
 - The limit constant is `MAX_DEVICES` (100) and the rows one device may hold per read `MAX_ROWS_PER_DEVICE` (500,000); the estimate counts the device's fixes, the run refuses beyond the bound.
 - Statuses are counted from the state history and, when it holds none in the period, from the battery readings: the state history is not curated, so SP050969's repaired clock (D212) moved its measurements into 2025 and left its states in 2064. Messages and the network figures count by arrival at Protect (a raw log counts on the day of its upload); the interface and the docs say so.
-- On the dev server (2026-09-16, commit 374ee3b): a fleet run over FreeNature's one collar and a deep dive of SP050969 over 1 June to 14 September 2025 (204,504 input rows in 13 s): battery 3.61 V falling 0.48 mV a day with 336 days to critical, 28,222 fixes of 28,285 attempts, time to fix 7 s median and 18 s at the 90th percentile, accuracy 21 m median, 2,452 statuses with 3 percent missed, the longest silence 52.9 hours (warn), no network figures because the raw log's messages arrived by file; the PDF report of it has seven pages. The benchmark: 100 devices over a month on the local 1/10 fixture, 958,175 input rows, completed in 22.7 s with a 566 kB result and 102 MB peak memory, two collars critical on their battery and twenty warn. A fleet's repeated warnings fold into one line above three devices.
-- The expected interval (D225 to D227, built the same evening): `shared/domain/reporting.py` resolves the declared interval from the sources Protect has, most trustworthy first (a person's override on the device, the newest settings frame, an acknowledged interval command, the type's settings), `shared/domain/reporting_rules.py` learns the dominant interval from the fixes with its regularity, and a declared interval the collar plainly does not keep gives way to the learned one with the `interval_disagrees` warning; the result names the source (`expected_fix_source`) and the regularity (`fix_regular_share`) beside the figure, and the device page's Reporting card shows the same expectation with a way to set it. The interval rules live in the core so the analysis boundary holds.
+- On the dev server (2026-09-16, commit 374ee3b): a fleet run over FreeNature's one device and a deep dive of SP050969 over 1 June to 14 September 2025 (204,504 input rows in 13 s): battery 3.61 V falling 0.48 mV a day with 336 days to critical, 28,222 fixes of 28,285 attempts, time to fix 7 s median and 18 s at the 90th percentile, accuracy 21 m median, 2,452 statuses with 3 percent missed, the longest silence 52.9 hours (warn), no network figures because the raw log's messages arrived by file; the PDF report of it has seven pages. The benchmark: 100 devices over a month on the local 1/10 fixture, 958,175 input rows, completed in 22.7 s with a 566 kB result and 102 MB peak memory, two devices critical on their battery and twenty warn. A fleet's repeated warnings fold into one line above three devices.
+- The expected interval (D225 to D227, built the same evening): `shared/domain/reporting.py` resolves the declared interval from the sources Protect has, most trustworthy first (a person's override on the device, the newest settings frame, an acknowledged interval command, the type's settings), `shared/domain/reporting_rules.py` learns the dominant interval from the fixes with its regularity, and a declared interval the device plainly does not keep gives way to the learned one with the `interval_disagrees` warning; the result names the source (`expected_fix_source`) and the regularity (`fix_regular_share`) beside the figure, and the device page's Reporting card shows the same expectation with a way to set it. The interval rules live in the core so the analysis boundary holds.
 - The interface folds the charts into the device sections and lets the presentation replace the run view's chart grid and table list (`render.charts`, `render.tables`), so a run over a hundred devices does not draw a hundred series in one chart.
 
 ## 13. Exit criteria
 
-- A fleet run over the collars of a project on the dev server puts the collar with the lowest battery, the one that reboots and the one that fixes worst at the top of the fleet table, each with the reason readable in its cells, and Tim agrees with the order.
+- A fleet run over the devices of a project on the dev server puts the device with the lowest battery, the one that reboots and the one that fixes worst at the top of the fleet table, each with the reason readable in its cells, and Tim agrees with the order.
 - A deep dive of SP050969 over its raw log period shows the battery slope, the reboot, the error flags by kind, the fix success and time to fix, and no network block (the log came by file); the PDF report of it reads on paper.
 - A member scoped to one device sees only that device in the form and in the runs.
 - A run over 100 devices and a month finishes within the worker's budget without touching the live map's or ingest's figures.

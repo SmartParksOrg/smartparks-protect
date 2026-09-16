@@ -212,7 +212,7 @@ export const devicePerformanceLabels = (
   declared_fix_s: t("Fix interval set, stale (s)"),
   expected_status_source: t("Status interval from"),
   override: t("set by a person"),
-  settings_frame: t("the collar's settings"),
+  settings_frame: t("the device's settings"),
   command: t("an acknowledged command"),
   type_default: t("the device type"),
   learned: t("learned from the fixes"),

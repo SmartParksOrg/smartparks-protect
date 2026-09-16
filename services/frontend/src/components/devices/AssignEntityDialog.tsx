@@ -53,7 +53,7 @@ function AssignEntityForm({ projectId: fixedProjectId, device, entity: entitySte
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [q, setQ] = useState("");
   const [entityId, setEntityId] = useState("");
-  const [name, setName] = useState(device.name); // the collar's name is the usual entity name; overwrite it if not
+  const [name, setName] = useState(device.name); // the device's name is the usual entity name; overwrite it if not
   const [typeId, setTypeId] = useState("");
   const [groupId, setGroupId] = useState("");
   const [validFrom, setValidFrom] = useState(() => new Date().toISOString());

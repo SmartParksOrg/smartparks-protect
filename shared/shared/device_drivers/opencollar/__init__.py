@@ -278,7 +278,7 @@ def _unix(value: int) -> datetime | None:
     return datetime.fromtimestamp(value, tz=UTC)
 
 
-# The device's health (decision D104): the port 4 status message every collar sends on its
+# The device's health (decision D104): the port 4 status message every device sends on its
 # interval, plus the last fix. Battery thresholds follow the firmware's own low battery
 # behaviour (research 3.4); GNSS accuracy above 30 m is a poor fix.
 OPENCOLLAR_HEALTH: tuple[HealthField, ...] = (

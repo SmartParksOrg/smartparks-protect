@@ -1,5 +1,5 @@
 /** The extent of the positioned features of a project (phase 19): entities and devices
- * together, so a project whose collars have no animal yet still fits to its hardware. Pure, so
+ * together, so a project whose devices have no animal yet still fits to its hardware. Pure, so
  * the map page's fit-on-switch is testable without a map. */
 export type Bounds = [[number, number], [number, number]];
 

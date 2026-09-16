@@ -1,7 +1,7 @@
 export const RECENT_DAYS = 30;
 
 /** The window of the device and entity pages' recent positions (Tim, 2026-09-15): the 30
- * days up to the device's last known record rather than up to now, so a collar silent for a
+ * days up to the device's last known record rather than up to now, so a device silent for a
  * year still shows its last month on its page. The anchor comes from the current state (the
  * device's last seen, the entity's position time), which leaves clock-ahead rows out; it is
  * capped at now, and without one the window ends now. */

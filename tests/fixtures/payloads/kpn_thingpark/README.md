@@ -23,7 +23,7 @@ Shapes follow the ThingPark tunnel interface documentation (`DevEUI_uplink`,
 The invented files stay until every report type has a recorded example.
 - `kpn_live_join_notification.json`: the `DevEUI_notification` report with `Type` join that KPN posted when SP051440 (DevEUI 0016C001F016D281) joined on 2026-09-06 (source event 5121 on the dev server); the adapter maps it to a `join` event.
 - `kpn_live_uplink_port4_geoloc.json`: a live port 4 uplink of SP040078 (DevEUI 0016C001F004B37B),
-  a collar with KPN's network geolocation on, posted on 2026-09-13 (source event 75846 on the
+  a device with KPN's network geolocation on, posted on 2026-09-13 (source event 75846 on the
   dev server). KPN embeds the geolocation in the uplink (`DevLAT`, `DevLON`, `DevAlt`,
   `DevLocTime`, `DevLocRadius`, `DevLocDilution`, `DevUlFCntUpUsed`, `NwGeolocAlgo`,
   `NwGeolocAlgoUsed`) rather than posting a separate `DevEUI_location` report; the same solved

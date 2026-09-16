@@ -1,5 +1,5 @@
 """The device performance module over real rows (docs/ANALYTICS_DEVICE_PERFORMANCE_PLAN.md,
-section 11): a healthy collar and a failing one through the API and the runner; the fleet table
+section 11): a healthy device and a failing one through the API and the runner; the fleet table
 puts the failing one first with its reasons readable, the geometries land, a scoped member sees
 one device, and the subjects resolve by id, by type and as every device."""
 
@@ -38,7 +38,7 @@ HOUR = timedelta(hours=1)
 
 
 async def _second_device(client, h, project, source, device_type_id):
-    """A collar of the same type on the same source, in the project, tracking no animal."""
+    """A device of the same type on the same source, in the project, tracking no animal."""
     device = (
         await client.post(
             "/api/v1/devices",
@@ -99,7 +99,7 @@ async def _uplinks(db, source, device_id, hours: list[int], counters: list[int],
 
 
 async def _records(db, project, entity_id, device_id, source, *, failing: bool):
-    """Thirty days of a collar: hourly statuses with battery and temperature, GNSS attempts
+    """Thirty days of a device: hourly statuses with battery and temperature, GNSS attempts
     and fixes; the failing one fixes every third hour, loses fixes, reboots and reports an
     error flag in a third of its statuses."""
     device = uuid.UUID(device_id)
@@ -290,7 +290,7 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
     assert levels[bad["id"]]["error_share"] == "warn"
     assert b["firmware"] == "6.2"
     # reporting: the interval comes from the type's defaults (and the frame for the bad one)
-    # the type's defaults say an hour; the good collar keeps it, the bad one plainly fixes every
+    # the type's defaults say an hour; the good device keeps it, the bad one plainly fixes every
     # three hours, so its setting is stale and gives way to the data (decisions D225 to D227)
     assert g["expected_fix_s"] == 3600 and g["expected_fix_source"] == "type_default"
     assert b["expected_fix_s"] == 3 * 3600 and b["expected_fix_source"] == "learned"
@@ -298,7 +298,7 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
     # sit on the three-hour schedule, enough to trust it
     assert b["declared_fix_s"] == 3600 and 0.7 < b["fix_regular_share"] < 0.8
     assert g["missed_fix_share"] == 0 and levels[good["id"]]["missed_fix_share"] == "ok"
-    # against its own schedule the bad collar misses the attempts that failed: one in five
+    # against its own schedule the bad device misses the attempts that failed: one in five
     assert b["missed_fix_share"] == pytest.approx(0.2, abs=0.01)
     assert levels[bad["id"]]["missed_fix_share"] == "warn"
     assert g["silences"] == 0

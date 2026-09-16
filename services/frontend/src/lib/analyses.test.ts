@@ -321,10 +321,10 @@ describe("groups on the forms", () => {
 
 describe("the devices a performance form chooses", () => {
   const devices = [
-    { id: "d1", device_type_id: "collar", entity_id: "e1", group_id: "g1" },
-    { id: "d2", device_type_id: "collar", entity_id: "e2", group_id: null },
+    { id: "d1", device_type_id: "device", entity_id: "e1", group_id: "g1" },
+    { id: "d2", device_type_id: "device", entity_id: "e2", group_id: null },
     { id: "d3", device_type_id: "tag", entity_id: "e3", group_id: "g1" },
-    { id: "d4", device_type_id: "collar", entity_id: null, group_id: null },
+    { id: "d4", device_type_id: "device", entity_id: null, group_id: null },
   ];
   const entities = [
     { id: "e1", entity_type_id: "pangolin" },
@@ -371,18 +371,18 @@ describe("the devices a performance form chooses", () => {
       100,
     );
     expect(mixed.ids).toEqual(["d1", "d3"]);
-    const collars = deviceSelection(
-      { ...base, groups: ["g1"], deviceType: "collar" },
+    const narrowed = deviceSelection(
+      { ...base, groups: ["g1"], deviceType: "device" },
       devices,
       entities,
       groups,
       types,
       100,
     );
-    expect(collars.ids).toEqual(["d1"]);
-    expect(collars.excludedByType).toBe(1);
+    expect(narrowed.ids).toEqual(["d1"]);
+    expect(narrowed.excludedByType).toBe(1);
     const none = deviceSelection(
-      { ...base, entities: ["e3"], deviceType: "collar" },
+      { ...base, entities: ["e3"], deviceType: "device" },
       devices,
       entities,
       groups,
@@ -394,7 +394,7 @@ describe("the devices a performance form chooses", () => {
     const now = new Date("2026-09-16T10:00:00Z");
     expect(
       devicePerformanceParameters(
-        { ...base, entities: ["e3"], deviceType: "collar" },
+        { ...base, entities: ["e3"], deviceType: "device" },
         now,
         none,
       ),

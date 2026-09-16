@@ -146,7 +146,7 @@ DEVICE_PERFORMANCE_LABELS: dict[str, str] = {
     "declared_fix_s": "Fix interval set, stale (s)",
     "expected_status_source": "Status interval from",
     "override": "set by a person",
-    "settings_frame": "the collar's settings",
+    "settings_frame": "the device's settings",
     "command": "an acknowledged command",
     "type_default": "the device type",
     "learned": "learned from the fixes",

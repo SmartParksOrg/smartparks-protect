@@ -434,7 +434,7 @@
    "group": "Device",
    "unit": null,
    "since_firmware": "4.4.2",
-   "description": "The name the collar advertises over Bluetooth."
+   "description": "The name the device advertises over Bluetooth."
   },
   {
    "id": 34,

@@ -14,7 +14,7 @@ async def test_devices_filter_by_source_type_entity_and_identity(client, db):
     h = admin.headers
     project = await create_project(db)
     types = []
-    for label in ("Collar", "Tracker"):
+    for label in ("Device", "Tracker"):
         types.append(
             (
                 await client.post(

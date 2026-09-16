@@ -329,7 +329,7 @@ async def recompute_current_state(
             )
         )
         # the newest value per metric, the health card's figures (decision D104): a time
-        # correction that brings a collar's status records back from the future must show them
+        # correction that brings a device's status records back from the future must show them
         if last_measurement is not None:
             device_state.latest_measurements = await _latest_measurements(
                 session, device_id, last_measurement

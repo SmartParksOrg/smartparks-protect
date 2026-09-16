@@ -1,6 +1,6 @@
 # Device performance
 
-The Device performance page under Analyze answers, for one to a hundred devices of a project over a period of at most a year: how healthy each device is, how regularly it reports against its settings, how well its GNSS fixes come, and how the networks that carry it behave. It is the third analysis module (decisions D213 to D220, `docs/ANALYTICS_DEVICE_PERFORMANCE_PLAN.md`), built on the framework of the movement and grazing modules, and the first whose subjects are devices rather than entities: a collar in a drawer or without an animal is analysed like any other.
+The Device performance page under Analyze answers, for one to a hundred devices of a project over a period of at most a year: how healthy each device is, how regularly it reports against its settings, how well its GNSS fixes come, and how the networks that carry it behave. It is the third analysis module (decisions D213 to D220, `docs/ANALYTICS_DEVICE_PERFORMANCE_PLAN.md`), built on the framework of the movement and grazing modules, and the first whose subjects are devices rather than entities: a device in a drawer or without an animal is analysed like any other.
 
 ## The page
 
@@ -10,7 +10,7 @@ The page lists the module's runs the way the movement page does, and a run opens
 
 ## The form
 
-- **Devices**: devices picked by name (the entity each tracks today beside it), the devices tracking chosen entities, the devices tracking an entity of chosen groups (with subgroups) or of chosen entity types (with subtypes: "every collar on a pangolin"), or every device of the project ("Every device"); the sources add up. "Only this device type" narrows a mixed selection to one device type and says how many it left out. At most 100 per run. A device counts when it was assigned to the project at some point in the period; a member with a device scope sees only their devices.
+- **Devices**: devices picked by name (the entity each tracks today beside it), the devices tracking chosen entities, the devices tracking an entity of chosen groups (with subgroups) or of chosen entity types (with subtypes: "every device on a pangolin"), or every device of the project ("Every device"); the sources add up. "Only this device type" narrows a mixed selection to one device type and says how many it left out. At most 100 per run. A device counts when it was assigned to the project at some point in the period; a member with a device scope sees only their devices.
 - **Period**: the last 7, 30 or 90 days, the last year, or a custom range; at most 366 days. The figures are daily up to 120 days and weekly beyond.
 - **Compare with the period before**: the same indicators over the period of the same length right before, shown in brackets.
 
@@ -18,7 +18,7 @@ The line under the form estimates the run: how many devices, days and fixes it w
 
 ## The indicators
 
-Every indicator is computed when the device reports the data behind it and left out when it does not: a device without GNSS shows no GNSS card, a device on LoRaWAN alone no Iridium figures. Each carries a level from the driver's declared thresholds (an OpenCollar collar's battery, temperature, accuracy, time to fix and flash bounds) or, where the driver declares none, from the defaults named below; in a fleet run every device is also ranked per indicator, 1 the worst.
+Every indicator is computed when the device reports the data behind it and left out when it does not: a device without GNSS shows no GNSS card, a device on LoRaWAN alone no Iridium figures. Each carries a level from the driver's declared thresholds (an OpenCollar device's battery, temperature, accuracy, time to fix and flash bounds) or, where the driver declares none, from the defaults named below; in a fleet run every device is also ranked per indicator, 1 the worst.
 
 ### Health
 
@@ -27,7 +27,7 @@ Every indicator is computed when the device reports the data behind it and left 
 | Battery (V) | The newest battery voltage in the period | warn below 3.6 V, critical below 3.45 V |
 | Battery slope (mV/day) | The least-squares slope through the daily medians | warn when falling more than 5 mV a day, critical more than 15 |
 | Days to critical | How long the slope gives until the critical voltage; none when the battery is not falling | warn under 60 days, critical under 14 |
-| Charging days | Days on which the charging voltage rose above the battery voltage (a solar collar) | none |
+| Charging days | Days on which the charging voltage rose above the battery voltage (a solar device) | none |
 | Temperature | The lowest, median and highest device temperature, and the hours above the warn bound | warn at 50 °C, critical at 60 on the highest |
 | Reboots | `device_reset` events in the period, with the reason of each in the reboots table | warn at one a week, critical at one a day |
 | Longest uptime (days) | The longest uptime the device reported | none |
@@ -40,7 +40,7 @@ Every indicator is computed when the device reports the data behind it and left 
 
 | Indicator | Meaning | Default level |
 | --- | --- | --- |
-| Fix interval expected, status interval expected | The seconds between fixes and statuses the device is expected to keep, with the source named: a person's override on the device page, the newest settings frame the collar sent, an interval command the collar acknowledged, the device type's settings, or the interval learned from the fixes (the dominant interval, silences left out, trusted when at least 60 percent of the intervals sit within 20 percent of it). A declared interval the collar plainly does not keep (more than 30 percent off a confident learned one) is named stale and gives way to the learned one, with a warning (decisions D225 to D227) | none |
+| Fix interval expected, status interval expected | The seconds between fixes and statuses the device is expected to keep, with the source named: a person's override on the device page, the newest settings frame the device sent, an interval command the device acknowledged, the device type's settings, or the interval learned from the fixes (the dominant interval, silences left out, trusted when at least 60 percent of the intervals sit within 20 percent of it). A declared interval the device plainly does not keep (more than 30 percent off a confident learned one) is named stale and gives way to the learned one, with a warning (decisions D225 to D227) | none |
 | Regular fixes | The share of intervals within 20 percent of the learned interval; below 60 percent the fixes are too irregular to count missed ones | none |
 | Fix interval seen | The median and the 90th percentile of the interval between consecutive fixes | none |
 | Missed fixes, missed statuses | One minus the messages seen over the messages the interval promised | warn at 10 percent, critical at 30 |

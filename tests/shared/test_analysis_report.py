@@ -378,7 +378,7 @@ G, H = uuid.uuid4(), uuid.uuid4()
 
 
 def _device_document() -> dict:
-    """A device performance result of two collars, one failing (docs/ANALYTICS_DEVICE_PERFORMANCE_PLAN.md)."""
+    """A device performance result of two devices, one failing (docs/ANALYTICS_DEVICE_PERFORMANCE_PLAN.md)."""
     days = [int((DAY0 + timedelta(days=i)).timestamp() * 1000) for i in range(30)]
     return {
         "version": 1,
@@ -388,11 +388,11 @@ def _device_document() -> dict:
             {
                 "id": str(G),
                 "name": "SP1",
-                "type": "Collar",
+                "type": "Device",
                 "kind": "device",
                 "tracked": "Rhino 14",
             },
-            {"id": str(H), "name": "SP2", "type": "Collar", "kind": "device", "tracked": None},
+            {"id": str(H), "name": "SP2", "type": "Device", "kind": "device", "tracked": None},
         ],
         "periods": [
             {
@@ -493,7 +493,7 @@ def test_the_device_report_leads_with_the_fleet_and_folds_the_charts_per_device(
     assert dict(settings_rows(inp, labels))["Devices"] == "SP1, SP2"
     figures = key_figures(inp, labels)
     assert figures["first"] == "Device" and figures["columns"][0] == "Battery (V)"
-    # the failing collar first, with its level dots, the tracked animal as the note
+    # the failing device first, with its level dots, the tracked animal as the note
     assert [row["name"] for row in figures["rows"]] == ["SP2", "SP1"]
     assert figures["rows"][0]["level"] == "critical" and figures["rows"][1]["note"] == "Rhino 14"
     assert figures["rows"][0]["cells"][0] == {"text": "3.50", "level": "critical"}

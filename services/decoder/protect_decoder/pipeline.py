@@ -173,7 +173,7 @@ def _add_network_position(event: SourceEvent, records: DecodedRecords) -> None:
 
 def _note_estimate_disagreement(event: SourceEvent, records: DecodedRecords) -> None:
     """A decoded fix far outside the satellite network's location estimate is worth a note on
-    the trace (decision D158): a GNSS fault, a clock fault or a collar that travelled a long
+    the trace (decision D158): a GNSS fault, a clock fault or a device that travelled a long
     way between the fix and the session."""
     satellite = SatelliteSession.from_dict((event.provider_metadata or {}).get("satellite_session"))
     if satellite is None or not records.positions:

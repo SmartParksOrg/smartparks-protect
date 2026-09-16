@@ -29,7 +29,7 @@ const RANGE_LABELS: Record<string, string> = {
 };
 
 /** The battery value of an entity or device panel as a button that unfolds the recent trend
- * inside the panel (Tim, 2026-09-14): a small line of the collar's battery voltage over the
+ * inside the panel (Tim, 2026-09-14): a small line of the device's battery voltage over the
  * last day, week or month from the analytics series, so a person sees whether it drops
  * without leaving the map or covering it. The movement value below works the same way. */
 export function BatteryValue({
@@ -130,7 +130,7 @@ export function MovementValue({
 }
 
 /** The movement trend: the change of the accelerometer between status messages, flat at
- * zero while the collar lies still. */
+ * zero while the device lies still. */
 export function MovementTrend({
   projectId,
   deviceId,
@@ -242,7 +242,7 @@ export function MetricTrend({
   projectId: string;
   deviceId: string;
   spec: TrendSpec;
-  /** The device's last record: the period ends there rather than now, so a collar silent for
+  /** The device's last record: the period ends there rather than now, so a device silent for
    * a year still shows its last week (Tim, 2026-09-15, decision D207). */
   until?: string | null;
 }) {

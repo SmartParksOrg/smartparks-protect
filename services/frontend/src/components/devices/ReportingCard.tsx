@@ -12,8 +12,8 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 
 const SOURCE_LABELS: Record<string, string> = {
   override: "set by a person",
-  settings_frame: "the collar's own settings",
-  command: "a command the collar acknowledged",
+  settings_frame: "the device's own settings",
+  command: "a command the device acknowledged",
   type_default: "the device type's settings",
   learned: "learned from the fixes",
   unknown: "unknown",
@@ -91,7 +91,7 @@ export function ReportingCard({
                   <dt className="text-muted-foreground">{t("Settings say")}</dt>
                   <dd className="text-amber-700 dark:text-amber-400">
                     {t(
-                      "{{interval}} ({{source}}): stale, the collar does otherwise",
+                      "{{interval}} ({{source}}): stale, the device does otherwise",
                       {
                         interval: intervalWords(r.declared_fix_s),
                         source: t(
@@ -197,7 +197,7 @@ export function ReportingCard({
             )}
             <p className="text-xs text-muted-foreground">
               {t(
-                "Missed fixes in the device performance analysis are counted against this interval; a setting the collar plainly does not keep gives way to what the fixes show.",
+                "Missed fixes in the device performance analysis are counted against this interval; a setting the device plainly does not keep gives way to what the fixes show.",
               )}
             </p>
           </>

@@ -97,7 +97,7 @@ export function DevicePage() {
   const sources =
     device.data && device.data.location_source !== "device" ? "all" : undefined;
   // the 30 days up to the device's last record rather than up to now (Tim, 2026-09-15), so a
-  // collar silent for a year still shows its last month here; the health card keeps the age
+  // device silent for a year still shows its last month here; the health card keeps the age
   const recentWindow = lastPositionsWindow(device.data?.last_seen_at);
   const positions = useQuery({
     queryKey: queryKeys.positions(projectId ?? "", {

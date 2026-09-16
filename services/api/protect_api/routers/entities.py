@@ -238,7 +238,7 @@ async def update_entity(
     changed = apply_patch(entity, body, exclude={"geometry"})
     if changed.keys() & {"location_source", "location_fallback_hours"}:
         # the setting decides which positions become current (decision D164): rebuild the
-        # state now, since a collar repeating its last estimate brings nothing new to apply it
+        # state now, since a device repeating its last estimate brings nothing new to apply it
         tracking = await session.scalar(
             select(DeviceEntityAssignment.device_id).where(
                 DeviceEntityAssignment.entity_id == entity.id,

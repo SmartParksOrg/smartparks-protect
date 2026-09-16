@@ -95,7 +95,7 @@ async def _fixture(client, db):
         await client.post(
             "/api/v1/device-types",
             json={
-                "key": unique_name("collar").replace("-", "_"),
+                "key": unique_name("device").replace("-", "_"),
                 "label": "OpenCollar",
                 "driver_key": "opencollar",
             },

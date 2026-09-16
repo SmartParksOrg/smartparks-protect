@@ -11,36 +11,36 @@ from typing import Any
 #: byte's join error, in words.
 ERROR_FLAGS: dict[str, str] = {
     "lr_module": (
-        "The LoRa radio module (LR11xx) reported an error, so the collar could not use its "
+        "The LoRa radio module (LR11xx) reported an error, so the device could not use its "
         "radio as it should. One occurrence usually clears by itself; a flag that stays on "
         "points at the radio hardware or its firmware."
     ),
     "ble": "The Bluetooth module reported an error. Positions and status are not affected.",
     "ublox": (
-        "The GPS receiver (u-blox) did not answer as expected. The collar keeps sending its "
+        "The GPS receiver (u-blox) did not answer as expected. The device keeps sending its "
         "status, but positions can be missing until the receiver recovers."
     ),
     "accelerometer": (
         "The accelerometer did not answer, so movement cannot be measured until it recovers."
     ),
     "battery": (
-        "The battery is below the firmware's critical level. The collar may reduce its work "
+        "The battery is below the firmware's critical level. The device may reduce its work "
         "or stop sending; plan a battery change or check the charging."
     ),
     "ublox_fix": (
         "The GPS did not get a fix within the time allowed, so that attempt gave no position. "
-        "Common under dense canopy, indoors, or when the collar lies with its antenna down; "
+        "Common under dense canopy, indoors, or when the device lies with its antenna down; "
         "when it persists, the sky view or the antenna is the problem."
     ),
     "flash": (
-        "The flash memory reported an error. Records stored on the collar may be delayed or "
+        "The flash memory reported an error. Records stored on the device may be delayed or "
         "lost until it recovers."
     ),
     "ublox_busy": "The GPS receiver was still busy with the previous attempt.",
     "lr_join": (
-        "The collar could not join the LoRaWAN network: no gateway answered its join request. "
+        "The device could not join the LoRaWAN network: no gateway answered its join request. "
         "It keeps trying and stores its records meanwhile; they arrive once it joins. Check "
-        "the gateways near the collar."
+        "the gateways near the device."
     ),
 }
 
@@ -53,11 +53,11 @@ RESET_REASONS: dict[str, str] = {
 
 EVENTS: dict[str, str] = {
     "device_error": (
-        "The collar's status message carries one or more error flags. Each flag is explained "
+        "The device's status message carries one or more error flags. Each flag is explained "
         "below; a flag that clears on the next status was a passing fault."
     ),
     "device_reset": (
-        "The collar started again: its uptime dropped back to zero. A single restart is "
+        "The device started again: its uptime dropped back to zero. A single restart is "
         "harmless; repeated restarts point at a firmware or a power problem."
     ),
     "switch_activated": "The external switch on the device became active.",
@@ -66,17 +66,17 @@ EVENTS: dict[str, str] = {
         "The fence monitor could not measure the fence voltage. Check the fence connection."
     ),
     "NO_DATA": (
-        "Nothing has been received from this entity for the time the rule sets. The collar may "
+        "Nothing has been received from this entity for the time the rule sets. The device may "
         "be out of network range, out of battery, or stored records are waiting for a "
         "connection; the delivery from the network may also have stopped."
     ),
     "BATTERY_LOW": (
         "The battery voltage fell below the rule's threshold. Plan a battery change or check "
-        "the charging before the collar stops sending."
+        "the charging before the device stops sending."
     ),
     "POSSIBLE_IMMOBILITY": (
-        "The collar's accelerometer has not changed between status messages for the time the "
-        "rule sets. The collar may have dropped off, or the animal is not moving; check the "
+        "The device's accelerometer has not changed between status messages for the time the "
+        "rule sets. The device may have dropped off, or the animal is not moving; check the "
         "last position and the movement line on the entity page."
     ),
     "GEOFENCE_EXIT": "The entity's position left the geofence named in the title.",
@@ -124,5 +124,5 @@ def explain_event(event_type: str, context: dict[str, Any] | None) -> str | None
             words = [RESET_REASONS.get(r.strip()) for r in reason.split(",")]
             known = [w for w in words if w]
             if known:
-                parts.append("The reason the collar gives: " + "; ".join(known) + ".")
+                parts.append("The reason the device gives: " + "; ".join(known) + ".")
     return " ".join(parts)

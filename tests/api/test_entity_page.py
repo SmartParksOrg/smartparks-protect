@@ -225,11 +225,11 @@ async def test_change_assignment_moves_start_and_end(client, db):
     assert moved.json()["valid_from"].startswith("2026-06-02")
     later = await client.patch(
         f"{base}/{created['id']}",
-        json={"valid_from": "2026-06-05T00:00:00+00:00", "reason": "collar swapped"},
+        json={"valid_from": "2026-06-05T00:00:00+00:00", "reason": "device swapped"},
         headers=h,
     )
     assert later.status_code == 200 and later.json()["valid_from"].startswith("2026-06-05")
-    assert later.json()["reason"] == "collar swapped"
+    assert later.json()["reason"] == "device swapped"
     ended = await client.patch(
         f"{base}/{created['id']}", json={"valid_to": "2026-06-20T00:00:00+00:00"}, headers=h
     )

@@ -1,5 +1,5 @@
 """What a device is expected to report and how often (decisions D225 to D227): the settings
-Protect knows (decoded from the collar's own frames by the driver's catalogue, the type's and
+Protect knows (decoded from the device's own frames by the driver's catalogue, the type's and
 the device's declared settings), the interval the data shows, and the resolution of the two
 into one expectation with its source named. Core code: the analysis module and the device
 page's Reporting card both read it, so they say the same thing."""

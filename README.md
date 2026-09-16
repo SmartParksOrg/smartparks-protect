@@ -10,7 +10,7 @@ Self-hosted operational data platform for [Smart Parks](https://www.smartparks.o
 
 ## Core concepts
 
-- **Devices are hardware, entities are what you care about.** An animal, vehicle, gate or weather station is an entity. A collar or sensor is a device. Time-bounded assignments link them, so hardware can be replaced without losing history.
+- **Devices are hardware, entities are what you care about.** An animal, vehicle, gate or weather station is an entity. A tracker or sensor is a device. Time-bounded assignments link them, so hardware can be replaced without losing history.
 - **Connectivity adapters** talk to external platforms (ChirpStack, KPN, LORIOT, Traccar, Cloudloop) and know nothing about devices.
 - **Device drivers** decode device protocols and encode commands (OpenCollar first) and know nothing about networks.
 - **Raw data is kept.** Every inbound message is stored as an immutable source event. Decoded and normalized data (positions, measurements, states, events) link back to it.
@@ -20,7 +20,7 @@ Self-hosted operational data platform for [Smart Parks](https://www.smartparks.o
 - **Rules produce meaning.** Versioned, testable rules create events; automations act on them; alerts are events that need a person.
 - **Control is bidirectional.** Commands go through one capability-driven path whether a person or an automation issues them.
 - **Integrations are first class.** Outbound delivery is durable, retried and inspectable.
-- **Devices on the map beside their entities.** A device layer, off by default, shows collars with or without an animal and a device's own track across the entities it tracked.
+- **Devices on the map beside their entities.** A device layer, off by default, shows devices with or without an entity and a device's own track across the entities it tracked.
 - **All projects at once for server admins.** The live map, the lists and the network pages over every project, read-only, with devices in no project visible until assigned.
 - **Bulk onboarding and assignment.** Unknown identities become devices in one go, and a selection of devices joins a project from its first data, with an entity each if wanted.
 - **ChirpStack onboarding from the tenant.** One tenant API key connects every application of a ChirpStack to the platform's webhook, over native gRPC or grpc-web, application by application and undoable.

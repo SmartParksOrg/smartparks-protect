@@ -494,7 +494,7 @@ async def test_status_message_updates_health_state_and_firmware(db, bus, world):
 async def test_a_record_from_the_future_is_kept_invalid_and_leaves_the_current_state(
     db, bus, world
 ):
-    """Decision D119: a collar whose clock runs years ahead keeps sending; its records are
+    """Decision D119: a device whose clock runs years ahead keeps sending; its records are
     stored, marked invalid, and never become the newest position or the last seen."""
     future = {"time": "2030-09-05T12:59:01+00:00", "lat": 52.04, "lon": 5.77}
     event, outcome = await _ingest_and_process(db, bus, world, future)

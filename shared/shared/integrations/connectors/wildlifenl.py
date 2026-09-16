@@ -287,7 +287,7 @@ class WildlifeNlConnector:
     setup_hint: ClassVar[str] = (
         "Ask the WildlifeNL administrator for an account with the data-system role, log in "
         "once through the API's own page to receive the token, and let a herd manager register "
-        "each collar's identity as a borne sensor deployment on its animal. Species names must "
+        "each device's identity as a borne sensor deployment on its animal. Species names must "
         "exist on the platform or be mapped. Test the connection first."
     )
 

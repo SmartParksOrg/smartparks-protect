@@ -188,7 +188,7 @@ def test_the_interval_is_learned_from_regular_fixes_and_doubted_from_irregular_o
     learned = learn_interval(times)
     assert learned is not None and learned.seconds == 300 and learned.confident
     assert learned.regular_share > 0.95 and learned.intervals == 299  # the silence is out
-    # a motion-triggered collar: intervals all over the place
+    # a motion-triggered device: intervals all over the place
     wild = np.cumsum(np.r_[0, rng.uniform(60, 7200, 200)]) + T0
     doubtful = learn_interval(wild)
     assert doubtful is not None and not doubtful.confident
@@ -198,11 +198,11 @@ def test_the_interval_is_learned_from_regular_fixes_and_doubted_from_irregular_o
 def test_a_declared_interval_holds_unless_the_data_plainly_disagrees():
     rng = np.random.default_rng(2)
     every_five = np.cumsum(np.r_[0, 300 + rng.uniform(-15, 15, 300)]) + T0
-    # the setting says an hour, the collar reports every five minutes: stale, the data counts
+    # the setting says an hour, the device reports every five minutes: stale, the data counts
     stale = resolve_expected((3600.0, "type_default"), every_five)
     assert stale.source == "learned" and stale.seconds == 300 and stale.disagrees
     assert stale.declared_seconds == 3600 and stale.declared_source == "type_default"
-    # the setting says five minutes and the collar keeps it: the setting holds
+    # the setting says five minutes and the device keeps it: the setting holds
     kept = resolve_expected((300.0, "settings_frame"), every_five)
     assert kept.source == "settings_frame" and kept.seconds == 300 and not kept.disagrees
     # a setting within tolerance of the data holds too

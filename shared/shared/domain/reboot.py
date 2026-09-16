@@ -1,4 +1,4 @@
-"""A reboot from the uptime of status messages (Tim, 2026-09-14): a collar reports its uptime
+"""A reboot from the uptime of status messages (Tim, 2026-09-14): a device reports its uptime
 in whole days, so an uptime lower than the one before it means the device started again.
 The decoder writes a `device_reset` event with the reset reason the status carries and keeps
 the time on the device's current state; the health line warns for a day after. Pure."""

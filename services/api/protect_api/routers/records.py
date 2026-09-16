@@ -1,7 +1,7 @@
 """Records (phase 20, decision D142): what an entity or a device produced, one row per device
 timestamp with the position and every measurement and state field of that moment, newest first,
 in pages with a `time,device` cursor and a separate count for the progress bar. The simplest
-question, "give me everything this collar produced between these dates", answered the way the
+question, "give me everything this device produced between these dates", answered the way the
 data arrives. Every request stays bounded (architecture 13.10); the client pages through."""
 
 import base64

@@ -51,15 +51,15 @@ async def test_dev_eui_becomes_the_serial_of_an_opencollar(client, db):
         )
     ).json()
     collar_type = await _type(client, h, "opencollar")
-    collar = await _device(client, h, collar_type)
+    device = await _device(client, h, collar_type)
     dev_eui = uuid.uuid4().hex[:16]
     added = await client.post(
-        f"/api/v1/devices/{collar['id']}/identities",
+        f"/api/v1/devices/{device['id']}/identities",
         json={"data_source_id": source["id"], "external_id": dev_eui},
         headers=h,
     )
     assert added.status_code == 201, added.text
-    read = (await client.get(f"/api/v1/devices/{collar['id']}", headers=h)).json()
+    read = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()
     assert read["serial_number"] == dev_eui.upper()
 
     # a serial entered by hand stays, and a generic device gets none from its identity

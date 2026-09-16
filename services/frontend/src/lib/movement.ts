@@ -1,4 +1,4 @@
-/** Movement from a collar's accelerometer (Tim, 2026-09-14), read the way the backend's
+/** Movement from a device's accelerometer (Tim, 2026-09-14), read the way the backend's
  * health line reads it (shared/domain/movement.py): the change of the acceleration vector
  * between two status messages is the `activity` metric, and the last change above the
  * threshold is the device's `last_movement_at`. Still for 12 hours warns, 24 is critical. */
@@ -18,7 +18,7 @@ export function movementLevel(
   return "ok";
 }
 
-/** Whole hours a collar has been still, or null while it is moving or unknown. */
+/** Whole hours a device has been still, or null while it is moving or unknown. */
 export function stillHours(
   lastMovementAt: string | null | undefined,
   now: number,

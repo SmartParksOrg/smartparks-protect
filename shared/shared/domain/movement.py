@@ -1,6 +1,6 @@
 """Movement from the accelerometer sample every status message carries (Tim, 2026-09-14): a
-collar's `acceleration_x/y/z` is one snapshot of gravity plus motion, so the value says
-little, but the change of the vector between two status messages says whether the collar
+device's `acceleration_x/y/z` is one snapshot of gravity plus motion, so the value says
+little, but the change of the vector between two status messages says whether the device
 moved at all. The decoder stores that change as the `activity` measurement (m/s²), keeps
 the time of the last change above the threshold on the current state, and the health line,
 the panels and the immobility rule read it. Pure: no database access."""
@@ -15,8 +15,8 @@ from typing import Any
 from shared.device_drivers.base import DecodedMeasurement
 
 AXES = ("acceleration_x", "acceleration_y", "acceleration_z")
-#: Below this change of the acceleration vector between two status messages the collar is
-#: taken as still: a worn collar moves by 1.5 to 6 m/s² between hourly messages, a collar
+#: Below this change of the acceleration vector between two status messages the device is
+#: taken as still: a worn device moves by 1.5 to 6 m/s² between hourly messages, a device
 #: lying on the ground by 0.0.
 MOVEMENT_THRESHOLD_MPS2 = 1.0
 #: Hours without movement before the health line warns, and before it is critical.

@@ -512,7 +512,7 @@ class KpnThingParkAdapter:
     }
     setup_hint: ClassVar[str] = (
         "In the KPN ThingPark Device Manager add the webhook URL as a destination of the "
-        "collars' HTTP application server (routing strategy Blast when it has other "
+        "devices' HTTP application server (routing strategy Blast when it has other "
         "destinations), read the AS ID under its uplink/downlink security and store the key "
         "of that security here as as_key. Where the portal offers custom headers, "
         "Authorization: Bearer <webhook token> works as well."

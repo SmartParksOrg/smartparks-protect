@@ -17,7 +17,7 @@ function cellWidth(c: RecordColumn): number {
 }
 
 /** The records table, virtualized (decision D143): only the rows in view render, so a year of
- * a collar scrolls as one list. Wide content scrolls inside the container. */
+ * a device scrolls as one list. Wide content scrolls inside the container. */
 export function VirtualTable({
   rows,
   columns,

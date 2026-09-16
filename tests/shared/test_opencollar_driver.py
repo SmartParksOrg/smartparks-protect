@@ -180,7 +180,7 @@ def test_switch_timestamp_and_command_confirmation():
 
 def test_unknown_and_legacy_ports_are_notes_not_failures():
     """A port the catalogue does not know (research 3.23) keeps the source event and says so
-    on the trace; a KPN collar on firmware 6.x still sends the Modem-E message on port 199."""
+    on the trace; a KPN device on firmware 6.x still sends the Modem-E message on port 199."""
     unknown = driver.decode(event(99, "0102"))
     assert unknown.empty and unknown.notes == ["port 99 is not in the fw7.2.0 catalogue"]
     legacy = driver.decode(event(199, "000a011700038004d904054c00064c00"))
@@ -310,7 +310,7 @@ def test_catalog_lists_the_protocol_tables():
 
 
 def test_live_chirpstack_status_uplink_matches_chirpstacks_decoder():
-    """The first recorded live uplink (collar SP051307 over chirpstack-dev4, 2026-09-05): our
+    """The first recorded live uplink (device SP051307 over chirpstack-dev4, 2026-09-05): our
     driver and ChirpStack's JavaScript decoder read the same frame the same way."""
     import base64
 
@@ -402,7 +402,7 @@ def test_ports_decode_or_note_per_layout():
     assert values["air_q_pm2_5_mass"] == 3.5 and values["air_q_obstructed"] is True
     assert values["air_q_temperature"] == 21.5
 
-    # an RF scan on an old collar: version 1, alert, one band 868.0 to 868.6 MHz, 3 peaks, -95 dBm
+    # an RF scan on an old device: version 1, alert, one band 868.0 to 868.6 MHz, 3 peaks, -95 dBm
     scan = bytes([0xFB, 8, 1, 1]) + struct.pack("<HH", 8680, 8686) + bytes([3, 95])
     legacy = driver.decode(firmware_event(8, scan.hex(), "6.15"))
     assert legacy.decoder_version == "fw6.15.1" and legacy.states[0].record_type == "rf_scan"
@@ -432,7 +432,7 @@ def test_status_feature_bit_two_is_the_rf_scanner_before_seven():
 def test_flash_log_learns_the_firmware_from_its_status_records():
     """A log stream decoded with no known firmware starts on the newest layout; a status record
     inside it names an older firmware, and the records after it use that layout."""
-    status = load()[4]["data_hex"]  # firmware 4.4 on the wiki collar
+    status = load()[4]["data_hex"]  # firmware 4.4 on the wiki device
     import struct
 
     scan = bytes([0xFB, 8, 1, 0]) + struct.pack("<HH", 8680, 8686) + bytes([2, 100])

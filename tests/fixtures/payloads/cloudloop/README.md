@@ -10,7 +10,7 @@ every file here.
   `key`, no `sbd` section for a platform test, and the message is a text (not an OpenCollar
   frame), so the decoder fails it on purpose.
 - `lingo_220757_replayed.json`: the Lingo shape rebuilt on 2026-09-10 around a real 42 byte
-  satellite message of collar 220757 (message record `rLzVjdQqPgkanllXARyonpRyKbJZONAG`, sent
+  satellite message of device 220757 (message record `rLzVjdQqPgkanllXARyonpRyKbJZONAG`, sent
   2026-04-29 16:15:45 UTC, read with `Data/GetMessageRecordsForThing`, whose `snippet` holds
   the first 128 bytes of a message; this one is complete). The identity ids are the account's
   real thing, subscriber and hardware ids; `sbd.momsn`, `cdrReference` and `location` are not

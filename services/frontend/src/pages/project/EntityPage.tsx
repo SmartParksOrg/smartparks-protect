@@ -138,7 +138,7 @@ export function EntityPage() {
   const sources =
     entity.data && entity.data.location_source !== "device" ? "all" : undefined;
   // the 30 days up to the entity's last known position rather than up to now (Tim,
-  // 2026-09-15), so an animal whose collar fell silent still shows its last month here
+  // 2026-09-15), so an animal whose device fell silent still shows its last month here
   const recentWindow = lastPositionsWindow(
     live?.position_time ?? live?.last_seen_at,
   );

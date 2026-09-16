@@ -165,7 +165,7 @@ function detailsText(r: TrafficRow, t: T): string {
       parts.push(t("{{count}} gateways", { count: r.gateway_count }));
   } else if (r.acquisition_channel === "iridium" && r.satellite) {
     // the Iridium session behind the delivery (decision D158): its counter, its outcome, the
-    // network's own idea of where the collar was, and what went missing before it
+    // network's own idea of where the device was, and what went missing before it
     const s = r.satellite;
     if (s.sequence != null)
       parts.push(t("session {{count}}", { count: s.sequence }));

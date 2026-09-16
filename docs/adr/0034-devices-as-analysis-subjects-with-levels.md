@@ -6,7 +6,7 @@ Status: accepted
 
 ## Context
 
-The analysis framework of phase 22 (ADR 0031) takes entities as its subjects: a collar's fixes belong to the animal it tracked, by the assignment history, and the movement and grazing modules ask about animals. The device performance module (phase 28, decisions D213 to D220) asks about the devices themselves: their battery, their reboots, their fixes, the networks that carry them. A device without an animal, a spare in a drawer or one freshly onboarded, must be analysed like any other, and a device that changed animals inside the period is one subject, not two. The module also has to say whether a figure is worrying: a fleet of a hundred collars is read from a table whose first rows need attention, not from a hundred numbers.
+The analysis framework of phase 22 (ADR 0031) takes entities as its subjects: a device's fixes belong to the animal it tracked, by the assignment history, and the movement and grazing modules ask about animals. The device performance module (phase 28, decisions D213 to D220) asks about the devices themselves: their battery, their reboots, their fixes, the networks that carry them. A device without an animal, a spare in a drawer or one freshly onboarded, must be analysed like any other, and a device that changed animals inside the period is one subject, not two. The module also has to say whether a figure is worrying: a fleet of a hundred devices is read from a table whose first rows need attention, not from a hundred numbers.
 
 ## Decision
 
@@ -17,7 +17,7 @@ Every indicator carries a level, ok, warn or critical (D217). The bounds come fr
 ## Alternatives considered
 
 - A device as an entity of a special type: a device is not a thing the project tracks, and the assignment history, the scope and the pages all treat the two apart; pretending otherwise would leak into every reader.
-- Levels by the fleet's distribution alone (a device is worrying when it is worse than most): a fleet of failing collars would show green; the fleet's rank stays as the second dimension.
+- Levels by the fleet's distribution alone (a device is worrying when it is worse than most): a fleet of failing devices would show green; the fleet's rank stays as the second dimension.
 - Per-run indicator switches: they multiply the result shapes the page, the report and the docs must describe; hiding an indicator the device does not report gives the same effect without them.
 
 ## Consequences

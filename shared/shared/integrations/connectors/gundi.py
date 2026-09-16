@@ -10,7 +10,7 @@ carry an offset. Gundi forwards to the EarthRanger site the connection points at
 type slug must exist on that site with a schema whose keys match `event_details`.
 
 Identities (D62): the Smart Parks entity id is the Gundi `source` and the entity name the
-`source_name`, so an EarthRanger track stays continuous when a collar is replaced. The subject
+`source_name`, so an EarthRanger track stays continuous when a device is replaced. The subject
 type comes from the integration's `subject_types` map (entity type key to EarthRanger subject
 type) with `default_subject_type` as fallback. Event types use `smartparks_protect_` as the
 namespace, like AddaxAI Connect uses `addaxai_connect_`.

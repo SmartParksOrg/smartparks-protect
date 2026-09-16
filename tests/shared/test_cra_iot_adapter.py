@@ -35,7 +35,7 @@ def source(config=None, credentials=None) -> DataSourceContext:
         config=config if config is not None else {},
         credentials=credentials
         if credentials is not None
-        else {"username": "collars@smartparks.org", "password": "pw"},
+        else {"username": "devices@smartparks.org", "password": "pw"},
         capabilities=AdapterCapabilities(uplink=True, downlink=True),
     )
 
@@ -142,7 +142,7 @@ async def test_downlink_and_device_listing_through_the_api(monkeypatch):
             items = [
                 {
                     "deviceId": f"70B3D57ED000{i:04X}",
-                    "custDeviceName": f"Collar {i}",
+                    "custDeviceName": f"Device {i}",
                     "status": "active",
                     "enabled": True,
                 }
@@ -172,7 +172,7 @@ async def test_downlink_and_device_listing_through_the_api(monkeypatch):
     assert len(devices) == 150 and devices[0] == {
         "external_id": "70B3D57ED0000000",
         "identity_type": "dev_eui",
-        "name": "Collar 0",
+        "name": "Device 0",
         "attributes": {"status": "active", "enabled": True},
     }
     assert sum(1 for c in calls if c[1] == "sso.cra.cz") == 1  # token cached

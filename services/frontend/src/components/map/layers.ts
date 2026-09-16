@@ -271,14 +271,14 @@ export function deviceStateFor(
   return "normal";
 }
 
-/** The device layer (decision D112): square markers under the entities, so a collar and its
+/** The device layer (decision D112): square markers under the entities, so a device and its
  * animal stay apart. No clustering: the layer is opt-in per device. Add after the entity
  * layers, which it sits beneath. */
 export function ensureDeviceLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.devices)) return;
   ensureAccuracyLayers(map, SOURCES.device_accuracy);
   // clustered like the entities; a device cluster is the inverse of an entity cluster
-  // (white with a green ring) and sits a little down and right of it, so a collar cluster
+  // (white with a green ring) and sits a little down and right of it, so a device cluster
   // and its animals' cluster over the same ground both stay visible
   map.addSource(SOURCES.devices, {
     type: "geojson",
@@ -329,7 +329,7 @@ export function ensureDeviceLayers(map: MapLibreMap): void {
         "icon-image": ["get", "marker"],
         "icon-size": 0.75,
         // on its position like an entity (Tim, 2026-09-15); the entity layers sit above the
-        // device layers, so an animal and its collar at one place show the animal
+        // device layers, so an animal and its device at one place show the animal
         "icon-allow-overlap": true,
         "text-field": ["get", "name"],
         "text-size": 10,
@@ -529,7 +529,7 @@ export function ensureTrackLayers(map: MapLibreMap): void {
     },
     "entity-clusters",
   );
-  // device tracks are dashed (decision D114), so a collar's path and its animal's stay apart
+  // device tracks are dashed (decision D114), so a device's path and its animal's stay apart
   map.addLayer(
     {
       id: "track-line-device",
@@ -973,7 +973,7 @@ const RSSI_COLOR: ExpressionSpecification = [
   "#15803d",
 ];
 
-/** Where collars were heard (decision D107): hexagons with the count and best signal when zoomed
+/** Where devices were heard (decision D107): hexagons with the count and best signal when zoomed
  * out, the heard positions themselves when zoomed in. Under the gateways and entities. */
 export function ensureCoverageLayers(map: MapLibreMap): void {
   if (map.getSource(SOURCES.coverage)) return;

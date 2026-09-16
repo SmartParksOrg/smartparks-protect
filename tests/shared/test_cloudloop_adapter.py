@@ -306,7 +306,7 @@ def test_live_destination_test_document_is_a_lingo_message():
 
 
 def test_real_satellite_message_decodes_as_stored_records():
-    """A complete 42 byte message of collar 220757 through the adapter and the OpenCollar
+    """A complete 42 byte message of device 220757 through the adapter and the OpenCollar
     driver: the flash storage records the satellite buffer carries, each with its own time."""
     message = parse_lingo(fixture("lingo_220757_replayed.json"))
     assert message.satellite_delivered_at == datetime(2026, 4, 29, 16, 15, 45, tzinfo=UTC)

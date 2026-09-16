@@ -162,7 +162,7 @@ async def test_deliver_and_test_against_a_mock_platform(monkeypatch):
             return httpx.Response(
                 200,
                 json={
-                    "email": "collars@smartparks.org",
+                    "email": "devices@smartparks.org",
                     "roles": [{"ID": 2, "name": "data-system"}],
                 },
             )

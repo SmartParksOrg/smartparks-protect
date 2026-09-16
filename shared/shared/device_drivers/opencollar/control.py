@@ -167,7 +167,7 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         key="REQUEST_STATUS",
         label="Request status",
         description=(
-            "Ask the collar for a status message (battery, temperature, errors, versions)."
+            "Ask the device for a status message (battery, temperature, errors, versions)."
         ),
         parameters=NoParameters,
         encode=_encode_request_status,
@@ -178,7 +178,7 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
     "REQUEST_POSITION": ControlAction(
         key="REQUEST_POSITION",
         label="Request position",
-        description="Ask the collar for a GNSS fix now. The fix arrives as a normal position.",
+        description="Ask the device for a GNSS fix now. The fix arrives as a normal position.",
         parameters=NoParameters,
         encode=_encode_request_position,
         permission=Permission.DEVICES_CONTROL,
@@ -189,7 +189,7 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         key="SET_GNSS_INTERVAL",
         label="Set GNSS interval",
         description=(
-            "Change how often the collar sends a u-blox position (setting ublox_send_interval)."
+            "Change how often the device sends a u-blox position (setting ublox_send_interval)."
         ),
         parameters=GnssIntervalParameters,
         encode=_encode_gnss_interval,
@@ -200,7 +200,7 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         key="REQUEST_SETTING",
         label="Request one setting",
         description=(
-            "Ask the collar for one setting by name (cmd_send_single_setting): a few bytes each "
+            "Ask the device for one setting by name (cmd_send_single_setting): a few bytes each "
             "way, the right choice over LoRaWAN or satellite."
         ),
         parameters=SettingNameParameters,
@@ -212,9 +212,9 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         key="REQUEST_SETTINGS",
         label="Request all settings",
         description=(
-            "Ask the collar to report every setting (cmd_send_all_settings). Over Bluetooth the "
+            "Ask the device to report every setting (cmd_send_all_settings). Over Bluetooth the "
             "whole table arrives; over LoRaWAN or satellite only the first part does and it costs "
-            "the collar power: read all over Bluetooth, or ask for one setting at a time."
+            "the device power: read all over Bluetooth, or ask for one setting at a time."
         ),
         parameters=NoParameters,
         encode=_encode_request_settings,
@@ -225,7 +225,7 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         key="SET_SETTING",
         label="Set a setting",
         description=(
-            "Change one setting of the collar by its catalogue name; the value is checked "
+            "Change one setting of the device by its catalogue name; the value is checked "
             "against the setting's type and range before it is sent."
         ),
         parameters=SettingParameters,
@@ -237,7 +237,7 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         key="RESET",
         label="Reset device",
         description=(
-            "Reboot the collar. It rejoins the network and sends a status message afterwards."
+            "Reboot the device. It rejoins the network and sends a status message afterwards."
         ),
         parameters=NoParameters,
         encode=_encode_reset,

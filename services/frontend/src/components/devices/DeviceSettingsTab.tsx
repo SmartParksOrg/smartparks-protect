@@ -29,7 +29,7 @@ import { useWebBle } from "@/hooks/useWebBle";
 import { formatAgo } from "@/lib/format";
 
 const SOURCE_LABELS: Record<string, string> = {
-  frame: "the collar reported it",
+  frame: "the device reported it",
   ble: "read over Bluetooth",
   command: "sent by Protect",
   manual: "entered by a person",
@@ -49,7 +49,7 @@ function showValue(s: DeviceSetting, value: unknown): string {
 /**
  * The Settings tab of a device (decisions D228 to D231): every setting of the type's
  * catalogue, grouped, with the value Protect knows, where it came from and when; unknown
- * ones greyed. "Request all settings" asks the collar to report them, "Set" sends a new
+ * ones greyed. "Request all settings" asks the device to report them, "Set" sends a new
  * value through the command pipeline, "Record" keeps a value a person knows without sending.
  */
 export function DeviceSettingsTab({
@@ -77,14 +77,14 @@ export function DeviceSettingsTab({
   const [filter, setFilter] = useState("");
   const [unknownToo, setUnknownToo] = useState(true);
   const [editing, setEditing] = useState<DeviceSetting | null>(null);
-  // a collar connected in this browser reports its whole table over Bluetooth for free;
+  // a device connected in this browser reports its whole table over Bluetooth for free;
   // over LoRaWAN or satellite a full report costs power and arrives in one part only
   const ble = useWebBle(deviceId);
   const readAll = useMutationToast({
     mutationFn: async () => {
       const session = ble.session;
       if (!session)
-        throw new Error(t("The collar is not connected over Bluetooth"));
+        throw new Error(t("The device is not connected over Bluetooth"));
       const values = await session.requestSettings();
       await ble.sync("settings", session);
       return values.size;
@@ -106,7 +106,7 @@ export function DeviceSettingsTab({
         },
       }),
     success: t(
-      "The collar is asked for its settings; they fill in as they arrive.",
+      "The device is asked for its settings; they fill in as they arrive.",
     ),
     invalidate: [queryKeys.deviceCommands(deviceId)],
   });
@@ -169,7 +169,7 @@ export function DeviceSettingsTab({
               className="ml-auto"
               disabled={request.isPending}
               title={t(
-                "Over LoRaWAN or satellite a full report costs the collar power and only the first part arrives; connect it over Bluetooth on the Data tab to read everything, or ask for one setting at a time with the pencil.",
+                "Over LoRaWAN or satellite a full report costs the device power and only the first part arrives; connect it over Bluetooth on the Data tab to read everything, or ask for one setting at a time with the pencil.",
               )}
               onClick={() => request.mutate()}
             >
@@ -181,7 +181,7 @@ export function DeviceSettingsTab({
       {!ble.session && (
         <p className="text-xs text-muted-foreground">
           {t(
-            "A collar connected over Bluetooth (Data tab) reports its whole table at no cost. Over LoRaWAN or satellite, ask for one setting at a time with the pencil: a full report costs the collar power and only its first part arrives.",
+            "A device connected over Bluetooth (Data tab) reports its whole table at no cost. Over LoRaWAN or satellite, ask for one setting at a time with the pencil: a full report costs the device power and only its first part arrives.",
           )}
         </p>
       )}
@@ -321,7 +321,7 @@ function SettingDialog({
           confirmed: true,
         },
       }),
-    success: t("Sent; the value shows as sent until the collar confirms it"),
+    success: t("Sent; the value shows as sent until the device confirms it"),
     invalidate: [
       queryKeys.deviceSettings(deviceId),
       queryKeys.deviceCommands(deviceId),
@@ -337,7 +337,7 @@ function SettingDialog({
           confirmed: true,
         },
       }),
-    success: t("Asked; the value shows here when the collar answers"),
+    success: t("Asked; the value shows here when the device answers"),
     invalidate: [queryKeys.deviceCommands(deviceId)],
     onSuccess: onClose,
   });
@@ -357,7 +357,7 @@ function SettingDialog({
         <DialogHeader>
           <DialogTitle className="font-mono">{setting?.key}</DialogTitle>
           <DialogDescription>
-            {setting?.description ?? t("A setting of the collar's firmware.")}{" "}
+            {setting?.description ?? t("A setting of the device's firmware.")}{" "}
             {setting &&
               setting.type !== "bool" &&
               setting.min !== null &&
@@ -425,7 +425,7 @@ function SettingDialog({
                 "A few bytes each way: the way to read one setting over LoRaWAN or satellite",
               )}
             >
-              <RefreshCw className="size-4" /> {t("Ask the collar")}
+              <RefreshCw className="size-4" /> {t("Ask the device")}
             </Button>
           )}
           {canRecord && (
@@ -442,7 +442,7 @@ function SettingDialog({
               disabled={!valid || send.isPending}
               onClick={() => send.mutate()}
             >
-              {t("Send to the collar")}
+              {t("Send to the device")}
             </Button>
           )}
         </DialogFooter>

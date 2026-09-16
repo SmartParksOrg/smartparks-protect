@@ -1,9 +1,9 @@
-"""Coverage (decision D107): where the project's collars were heard, and by which gateway.
+"""Coverage (decision D107): where the project's devices were heard, and by which gateway.
 
 Positions joined to the receptions of the same source event: a heard position carries the
 best RSSI of its receptions. Zoomed out the viewport is tiled into hexagons aggregated in the
 database (PostGIS `ST_HexagonGrid`); zoomed in the positions themselves come back, capped.
-It shows only where collars were, never where nobody walked."""
+It shows only where devices were, never where nobody walked."""
 
 import json
 import uuid

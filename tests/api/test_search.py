@@ -56,7 +56,7 @@ async def test_search_respects_what_the_caller_may_see(client, db):
     device = (
         await client.post(
             "/api/v1/devices",
-            json={"device_type_id": device_type["id"], "name": f"Collar {tag}", "status": "active"},
+            json={"device_type_id": device_type["id"], "name": f"Device {tag}", "status": "active"},
             headers=h,
         )
     ).json()
@@ -77,11 +77,11 @@ async def test_search_respects_what_the_caller_may_see(client, db):
     assert found.status_code == 200, found.text
     body = found.json()
     assert {e["name"] for e in body["entities"]} == {f"Rhino {tag} mine", f"Rhino {tag} other"}
-    assert [d["name"] for d in body["devices"]] == [f"Collar {tag}"]
+    assert [d["name"] for d in body["devices"]] == [f"Device {tag}"]
     assert body["devices"][0]["project_id"] == str(mine.id)
     assert [s["name"] for s in body["data_sources"]] == [f"Network {tag}"]
     by_eui = (await client.get("/api/v1/search", params={"q": eui[:10]}, headers=h)).json()
-    assert [d["name"] for d in by_eui["devices"]] == [f"Collar {tag}"]
+    assert [d["name"] for d in by_eui["devices"]] == [f"Device {tag}"]
     assert {
         p["name"]
         for p in (await client.get("/api/v1/search", params={"q": "search"}, headers=h)).json()[
@@ -93,7 +93,7 @@ async def test_search_respects_what_the_caller_may_see(client, db):
     seen = (await client.get("/api/v1/search", params={"q": tag}, headers=member.headers)).json()
     assert [e["name"] for e in seen["entities"]] == [f"Rhino {tag} mine"]
     assert seen["entities"][0]["subtitle"] == mine.name
-    assert [d["name"] for d in seen["devices"]] == [f"Collar {tag}"]
+    assert [d["name"] for d in seen["devices"]] == [f"Device {tag}"]
     assert seen["data_sources"] == []
     assert [
         p["name"]

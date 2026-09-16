@@ -73,7 +73,7 @@ async def test_the_catalogue_shows_what_is_known_and_a_person_records_a_value(cl
         and interval["group"] == "u-blox GNSS"
     )
 
-    # the collar reported a frame (as the decoder records it), a command was sent for another
+    # the device reported a frame (as the decoder records it), a command was sent for another
     await record_setting(
         db,
         device_id,
@@ -181,6 +181,6 @@ async def test_a_bluetooth_settings_read_fills_the_known_settings(client, db, bu
     )
     assert by_key["status_send_interval"]["value"] == 1800 and by_key["data_log"]["value"] is True
     assert by_key["ublox_send_interval"]["status"] == "observed"
-    # the device page's expectation follows: the collar's own settings say five minutes... an hour
+    # the device page's expectation follows: the device's own settings say five minutes... an hour
     reporting = (await client.get(f"/api/v1/devices/{device['id']}/reporting", headers=h)).json()
     assert reporting["declared_fix_s"] == 3600 and reporting["declared_source"] == "settings_frame"

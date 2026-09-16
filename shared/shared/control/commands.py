@@ -387,7 +387,7 @@ async def request_command(
                 session, command, CommandStatus.ENCODED, "control", {"f_port": encoded.f_port}
             )
             if "setting" in encoded.metadata:
-                # the value Protect asked for is known as sent until the collar confirms it
+                # the value Protect asked for is known as sent until the device confirms it
                 from shared.domain.device_settings import record_setting
 
                 await record_setting(
@@ -606,7 +606,7 @@ async def apply_satellite_delivery(
     """An Iridium session that reports an MTMSN above zero carried exactly one queued message
     to the modem (decision D160): the oldest command pending on that route, submitted before
     the session, is transmitted. Rock7 deliveries carry no MTMSN, so nothing moves there; the
-    collar's own answer still confirms through the action's interpreter."""
+    device's own answer still confirms through the action's interpreter."""
     if not mt_sequence or mt_sequence <= 0 or event.data_source_id is None:
         return []
     when = event.satellite_delivered_at or event.network_received_at or event.ingested_at

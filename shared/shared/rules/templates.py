@@ -110,9 +110,9 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         },
     },
     "possible_immobility": {
-        "name": "Collar not moving",
+        "name": "Device not moving",
         "description": (
-            "The accelerometer of the collar has not changed between status messages for "
+            "The accelerometer of the device has not changed between status messages for "
             "twelve hours (at least three messages), while the battery is fine. Checked hourly."
         ),
         "document": {

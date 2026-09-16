@@ -212,7 +212,7 @@ async def expected_fix_interval(
 ) -> tuple[Expected, Declared, int]:
     """The device page's view: the declared intervals, the expectation resolved against the
     `LEARN_DAYS` days up to the device's last valid fix (capped at now, as the device page
-    anchors its positions, decision D207: a collar silent for a year still shows its
+    anchors its positions, decision D207: a device silent for a year still shows its
     schedule), and how many fixes were learned from."""
     newest = await session.scalar(
         select(func.max(effective_time(Position))).where(

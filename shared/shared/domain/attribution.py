@@ -35,7 +35,7 @@ from shared.trace import Tracer
 
 log = get_logger("attribution")
 
-# One transaction rewrites this many days of a device's records; a collar reporting every ten
+# One transaction rewrites this many days of a device's records; a device reporting every ten
 # minutes has about 20,000 rows in it, a few seconds on compressed chunks.
 WINDOW_DAYS = 30
 ACTIVE = (AttributionJobStatus.QUEUED, AttributionJobStatus.RUNNING)

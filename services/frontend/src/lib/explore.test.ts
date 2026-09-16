@@ -151,7 +151,7 @@ describe("explore data", () => {
         entity_name: "Rhino",
       },
     ];
-    // the collar selected: one line named after it, whatever it tracked
+    // the device selected: one line named after it, whatever it tracked
     const byDevice = chartGroups(tracked, ["battery_voltage"], columns);
     expect(
       byDevice[0].series.map((s) => [s.ownerId, s.name, s.data.length]),
@@ -159,7 +159,7 @@ describe("explore data", () => {
       ["a", "dev-a", 2],
       ["b", "dev-b", 1],
     ]);
-    // the animal selected: one line for it across both collars, the unassigned record apart
+    // the animal selected: one line for it across both devices, the unassigned record apart
     const byEntity = chartGroups(tracked, ["battery_voltage"], columns, ["e1"]);
     expect(
       byEntity[0].series.map((s) => [s.ownerId, s.name, s.data.length]),

@@ -1,9 +1,9 @@
 """FerusTracker (decision D89): the platform at ferustracker.nl that receives Smart Parks
-collar data today through a Node-RED flow.
+device data today through a Node-RED flow.
 
 FerusTracker publishes no API documentation; the contract is the flow Tim shared on
 2026-09-04 ("Ferustracker" tab): for every uplink of a known payload type the flow decodes
-the frame with the collar's JavaScript decoder and posts, without authentication, to
+the frame with the device's JavaScript decoder and posts, without authentication, to
 `https://ferustracker.nl/api/smartparks`:
 
     {
@@ -126,7 +126,7 @@ def build_document(integration: IntegrationContext, item: DeliveryItem) -> dict[
     elif item.object_type == "measurement":
         port, fields = measurement_fields(payload_type, item)
     else:
-        raise Skipped("FerusTracker receives collar positions and status only")
+        raise Skipped("FerusTracker receives device positions and status only")
     dev_eui = dev_eui_for(item)
     document: dict[str, Any] = {
         "devEUI": dev_eui,
@@ -147,7 +147,7 @@ class FerusTrackerConnector:
     key: ClassVar[str] = "ferustracker"
     label: ClassVar[str] = "FerusTracker"
     description: ClassVar[str] = (
-        "Collar positions and status as the decoded uplink documents FerusTracker receives "
+        "Device positions and status as the decoded uplink documents FerusTracker receives "
         "from the Node-RED flow today; events are skipped"
     )
     supports: ClassVar[frozenset[str]] = frozenset({"position", "measurement"})
@@ -183,7 +183,7 @@ class FerusTrackerConnector:
     credentials_schema: ClassVar[dict[str, str]] = {}
     setup_hint: ClassVar[str] = (
         "FerusTracker's endpoint takes the documents without authentication, as the Node-RED "
-        "flow sends them; it recognises collars by DevEUI. Give the site name FerusTracker "
+        "flow sends them; it recognises devices by DevEUI. Give the site name FerusTracker "
         "expects and map each device type to the payload type its decoder had in the flow."
     )
 

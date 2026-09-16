@@ -1035,7 +1035,7 @@ async def analyse_device(
                 text=(
                     f"{subject.name}'s settings say a fix every "
                     f"{_minutes(fix_expected.declared_seconds)} ({fix_expected.declared_source}), "
-                    f"the collar reports every {_minutes(fix_expected.seconds or 0)}: the settings "
+                    f"the device reports every {_minutes(fix_expected.seconds or 0)}: the settings "
                     "Protect knows are stale; missed fixes are counted against what it does."
                 ),
             )
@@ -1106,7 +1106,7 @@ FOLDED_TEXTS = {
 
 def fold_warnings(warnings: list[Warning]) -> list[Warning]:
     """A fleet's warnings: the same code over many devices becomes one line with the count,
-    so a hundred collars without a known interval do not print a hundred lines."""
+    so a hundred devices without a known interval do not print a hundred lines."""
     by_code: dict[str, list[Warning]] = defaultdict(list)
     for w in warnings:
         by_code[w.code].append(w)

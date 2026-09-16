@@ -178,7 +178,7 @@ export function WebBleCard({ deviceId, deviceName, driverKey, canWrite }: { devi
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           {!available && <Callout kind="info">{t("Web Bluetooth needs Chrome or Edge over HTTPS (or localhost). Safari and Firefox do not offer it.")}</Callout>}
-          {available && !connection && <p className="text-muted-foreground">{t("Connect the collar next to you to read its status and settings and to retrieve stored logs. Everything read is stored as a delivery on the WebBLE channel; commands are sent from Control with the WebBLE route.")}</p>}
+          {available && !connection && <p className="text-muted-foreground">{t("Connect the device next to you to read its status and settings and to retrieve stored logs. Everything read is stored as a delivery on the WebBLE channel; commands are sent from Control with the WebBLE route.")}</p>}
           {available && !canWrite && <p className="text-xs text-muted-foreground">{t("Connecting needs the device control permission in this project.")}</p>}
           {connection && (
             <>

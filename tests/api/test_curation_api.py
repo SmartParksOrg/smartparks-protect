@@ -512,7 +512,7 @@ async def test_bulk_time_shift_preview_apply_flag_and_revert(client, db):
 async def test_a_time_offset_of_decades_brings_status_records_back_and_rebuilds_the_latest_values(
     client, db
 ):
-    """SP050969's raw log (2026-09-16): the collar's flash clock ran 39 years ahead, so its
+    """SP050969's raw log (2026-09-16): the device's flash clock ran 39 years ahead, so its
     status records were stored invalid in 2064 while the fixes sat in 2025. Two jobs repair
     them: validity, then a time offset of decades; the device's latest values follow."""
     from shared.models import DeviceCurrentState, Measurement
@@ -655,7 +655,7 @@ async def test_outliers_are_found_in_the_past_listed_and_approved(client, db):
             "field": "valid",
             "corrected_value": True,
             "reason_code": "OUTLIER_APPROVED",
-            "comment": "the collar travelled by car",
+            "comment": "the device travelled by car",
         },
         headers=h,
     )

@@ -17,7 +17,7 @@ public client (github.com/PADAS/er-client), fetched 2026-09-04:
   is how a corrected record reaches the site (architecture 28.10).
 
 Identities: as with Gundi, the Smart Parks entity id is the `manufacturer_id`, so a track stays
-continuous when a collar is replaced. Observations cannot be updated; a corrected position is
+continuous when a device is replaced. Observations cannot be updated; a corrected position is
 sent again and the site keeps both. Live verification waits for a site and a token.
 """
 

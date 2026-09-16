@@ -24,7 +24,7 @@ MAX_METRICS = 5
 DEFAULT_WINDOW_HOURS = 24
 
 INSTRUCTIONS = """Smart Parks Protect is the operational data platform of a conservation area:
-entities (animals, vehicles, gates, sensors) carry devices (collars, trackers) that produce
+entities (animals, vehicles, gates, sensors) carry devices (trackers, sensors) that produce
 positions, measurements, states and events. Everything is scoped to a project; call
 list_projects first and pass the project id to the other tools. Ids are UUIDs. Times are ISO
 8601 in UTC. Every result is bounded; narrow the time window or the filters rather than asking

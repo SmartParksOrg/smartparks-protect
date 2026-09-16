@@ -47,7 +47,7 @@ const RANGES: [string, string][] = [
 /**
  * The question form of the device performance page (docs/ANALYTICS_DEVICE_PERFORMANCE_PLAN.md,
  * section 7): which devices, chosen by name, through the entities they track, through entity
- * groups or entity types ("every collar on a pangolin", Tim, 2026-09-16), or every device of
+ * groups or entity types ("every device on a pangolin", Tim, 2026-09-16), or every device of
  * the project; a device type filter narrows a mixed selection to one type. Then the period
  * and the comparison. The estimate under it says how much the run will read; Run queues it.
  */

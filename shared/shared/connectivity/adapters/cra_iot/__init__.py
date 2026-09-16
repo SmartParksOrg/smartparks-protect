@@ -471,7 +471,7 @@ class CraIotAdapter:
     }
     setup_hint: ClassVar[str] = (
         "In the portal create an HTTP endpoint output with this source's webhook URL and an "
-        "`Authorization: Bearer <token>` header, and assign the collars' data flow to it. The "
+        "`Authorization: Bearer <token>` header, and assign the devices' data flow to it. The "
         "DevEUI is the device identity; downlinks and the device sync use the REST API with "
         "the portal account."
     )

@@ -1558,7 +1558,7 @@ async def _import_row(session: AsyncSession, user: User, row: dict[str, str | No
 MAX_CONNECTIVITY_HOURS = 24 * 90
 # A source that carried nothing for this long is silent; a device's cadence is not known here.
 SILENT_AFTER = timedelta(hours=24)
-# Frame counters are read from this many uplinks at most, newest first (a collar sends about a
+# Frame counters are read from this many uplinks at most, newest first (a device sends about a
 # hundred a day at the most).
 MAX_COUNTER_ROWS = 20000
 
