@@ -62,8 +62,8 @@
         <tbody>
           {% for row in figures.rows %}
           <tr>
-            <td><strong>{{ row.name }}</strong>{% if row.note %} <span class="muted">{{ row.note }}</span>{% endif %}</td>
-            {% for cell in row.cells %}<td class="num">{{ cell }}</td>{% endfor %}
+            <td>{% if row.level %}<span class="dot lvl-{{ row.level }}"></span>{% endif %}<strong>{{ row.name }}</strong>{% if row.note %} <span class="muted">{{ row.note }}</span>{% endif %}</td>
+            {% for cell in row.cells %}<td class="num">{% if cell is mapping %}{% if cell.level %}<span class="dot lvl-{{ cell.level }}"></span>{% endif %}{{ cell.text }}{% else %}{{ cell }}{% endif %}</td>{% endfor %}
           </tr>
           {% endfor %}
         </tbody>
@@ -78,6 +78,30 @@
       {% if map.note %}<p class="muted small">{{ map.note }}</p>{% endif %}
     </section>
     {% endif %}
+
+    {% for section in sections %}
+    <section class="device">
+      <h2><span class="dot" style="background: {{ section.color }}"></span>{{ section.name }}{% if section.level %} <span class="dot lvl-{{ section.level }}"></span>{% endif %}{% if section.type %} <span class="muted">{{ section.type }}</span>{% endif %}{% if section.tracked %} <span class="muted">tracked {{ section.tracked }}</span>{% endif %}</h2>
+      <div class="cards">
+        {% for card in section.cards %}
+        <table class="plain card">
+          <tr><th colspan="2" class="card-title">{{ card.title }}</th></tr>
+          {% for row in card.rows %}<tr><th>{% if row.level %}<span class="dot lvl-{{ row.level }}"></span>{% endif %}{{ row.label }}</th><td class="num">{{ row.text }}</td></tr>{% endfor %}
+        </table>
+        {% endfor %}
+      </div>
+      {% if section.charts %}
+      <div class="grid">
+        {% for chart in section.charts %}
+        <figure>
+          <figcaption>{{ chart.title }}</figcaption>
+          <img src="{{ chart.svg }}" alt="{{ chart.title }}" />
+        </figure>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+    {% endfor %}
 
     {% if charts %}
     <section class="charts">
@@ -104,6 +128,16 @@
       </table>
     </section>
     {% endfor %}
+
+    {% if defaults %}
+    <section class="defaults">
+      <h2>The thresholds behind the levels</h2>
+      <p class="muted small">A driver's own thresholds come first; where a driver declares none, these defaults apply.</p>
+      <table class="plain two">
+        {% for label, text in defaults %}<tr><th>{{ label }}</th><td>{{ text }}</td></tr>{% endfor %}
+      </table>
+    </section>
+    {% endif %}
 
     <section class="limitations">
       <h2>What these figures can and cannot say</h2>

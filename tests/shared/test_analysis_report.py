@@ -27,7 +27,9 @@ from shared.analysis.report.mapimage import (
 )
 from shared.analysis.report.render import (
     ReportInput,
+    device_sections,
     fmt_figure,
+    fmt_indicator,
     fmt_time,
     key_figures,
     labels_for,
@@ -366,3 +368,168 @@ async def test_a_document_renders_to_a_pdf_of_several_pages():
     }
     bare = render_pdf(_input(grazing, module="grazing", run_name=None, map=None))
     assert bare.startswith(b"%PDF")
+
+
+G, H = uuid.uuid4(), uuid.uuid4()
+
+
+def _device_document() -> dict:
+    """A device performance result of two collars, one failing (docs/ANALYTICS_DEVICE_PERFORMANCE_PLAN.md)."""
+    days = [int((DAY0 + timedelta(days=i)).timestamp() * 1000) for i in range(30)]
+    return {
+        "version": 1,
+        "module": "device_performance",
+        "method_version": "device_performance/1",
+        "subjects": [
+            {
+                "id": str(G),
+                "name": "SP1",
+                "type": "Collar",
+                "kind": "device",
+                "tracked": "Rhino 14",
+            },
+            {"id": str(H), "name": "SP2", "type": "Collar", "kind": "device", "tracked": None},
+        ],
+        "periods": [
+            {
+                "key": "main",
+                "time_from": "2025-05-01T00:00:00+00:00",
+                "time_to": "2025-05-31T00:00:00+00:00",
+            }
+        ],
+        "summary": {
+            "main": {
+                str(G): {"level": "ok", "battery_v": 3.912, "fix_success": 1.0, "reboots": 0},
+                str(H): {
+                    "level": "critical",
+                    "battery_v": 3.5,
+                    "battery_slope_mv_day": -6.7,
+                    "fix_success": 0.6,
+                    "ttf_p90_s": 150,
+                    "reboots": 1,
+                    "lost_uplinks_share": 0.25,
+                    "sources": ["ChirpStack"],
+                },
+            },
+            "comparison": {},
+            "levels": {
+                str(G): {"battery_v": "ok", "fix_success": "ok"},
+                str(H): {
+                    "battery_v": "critical",
+                    "battery_slope_mv_day": "warn",
+                    "fix_success": "warn",
+                    "lost_uplinks_share": "critical",
+                },
+            },
+            "ranks": {str(H): {"battery_v": 1}, str(G): {"battery_v": 2}},
+            "devices": {},
+            "defaults": {"battery_v": "warn below 3.6 V, critical below 3.45 V"},
+        },
+        "tables": [
+            {
+                "key": "fleet",
+                "columns": ["device", "level", "battery_v"],
+                "rows": [["SP2", "critical", 3.5], ["SP1", "ok", 3.912]],
+            },
+            {
+                "key": "reboots",
+                "columns": ["device", "time", "reason"],
+                "rows": [["SP2", "2025-05-11T00:00:00+00:00", "watchdog"]],
+            },
+            {
+                "key": "errors",
+                "columns": ["device", "flag", "statuses", "share", "level"],
+                "rows": [],
+            },
+        ],
+        "charts": [
+            {
+                "key": "battery",
+                "kind": "line",
+                "unit": "V",
+                "series": [
+                    {"subject": str(G), "period": "main", "data": [[d, 3.9] for d in days]},
+                    {
+                        "subject": str(H),
+                        "period": "main",
+                        "data": [[d, 3.7 - 0.0067 * i] for i, d in enumerate(days)],
+                    },
+                ],
+            },
+            {
+                "key": "time_to_fix",
+                "kind": "bar",
+                "unit": "attempts",
+                "series": [
+                    {"subject": str(H), "period": "main", "data": [["<15 s", 2], ["120 s", 40]]}
+                ],
+            },
+        ],
+        "geometries": {"coverage": 2, "gateway": 1},
+        "warnings": [],
+        "provenance": {"computed_at": "2026-09-16T13:02:00+00:00"},
+    }
+
+
+def test_the_device_report_leads_with_the_fleet_and_folds_the_charts_per_device():
+    document = _device_document()
+    inp = _input(
+        document,
+        module="device_performance",
+        parameters={
+            "device_ids": [str(G), str(H)],
+            "time_from": "2025-05-01T00:00:00+00:00",
+            "time_to": "2025-05-31T00:00:00+00:00",
+            "max_speed_mps": 15,
+        },
+        run_name=None,
+    )
+    labels = labels_for("device_performance", document)
+    assert labels[str(G)] == "SP1" and labels["lost_uplinks_share"] == "Lost uplinks"
+    assert dict(settings_rows(inp, labels))["Devices"] == "SP1, SP2"
+    figures = key_figures(inp, labels)
+    assert figures["first"] == "Device" and figures["columns"][0] == "Battery (V)"
+    # the failing collar first, with its level dots, the tracked animal as the note
+    assert [row["name"] for row in figures["rows"]] == ["SP2", "SP1"]
+    assert figures["rows"][0]["level"] == "critical" and figures["rows"][1]["note"] == "Rhino 14"
+    assert figures["rows"][0]["cells"][0] == {"text": "3.50", "level": "critical"}
+    assert figures["rows"][0]["cells"][8] == {"text": "60%", "level": "warn"}
+    assert figures["rows"][0]["cells"][9] == {"text": "2 min", "level": None}
+    assert fmt_indicator(None, "x") == "-" and fmt_indicator(["a", "b"], "sources") == "a, b"
+    sections = device_sections(inp, labels, {str(G): "#52735E", str(H): "#D9825F"})
+    assert [s["name"] for s in sections] == ["SP2", "SP1"]
+    failing = sections[0]
+    assert [c["title"] for c in failing["cards"]] == ["Health", "GNSS", "Network"]
+    assert failing["cards"][0]["rows"][0] == {
+        "label": "Battery (V)",
+        "text": "3.50",
+        "level": "critical",
+    }
+    assert len(failing["charts"]) == 2 and len(sections[1]["charts"]) == 1  # SP1 has no time to fix
+    html = render_html(inp)
+    assert "Device performance analysis" in html and 'class="dot lvl-critical"' in html
+    assert "The thresholds behind the levels" in html and "warn below 3.6 V" in html
+    assert "watchdog" in html and ">Fleet<" not in html  # the fleet table is the key figures
+    assert render_document(inp).pages
+
+
+def test_a_gateway_point_draws_as_a_marker_sized_by_its_share():
+    square = Polygon([(31.5, -24.9), (31.52, -24.9), (31.52, -24.88), (31.5, -24.88)])
+    shapes = shapes_from_geometries(
+        [
+            {"kind": "coverage", "subject_id": str(G), "label": "SP1", "geojson": mapping(square)},
+            {
+                "kind": "gateway",
+                "subject_id": str(G),
+                "label": "Hill gateway: 60%",
+                "level": 0.6,
+                "geojson": {"type": "Point", "coordinates": [31.51, -24.89]},
+            },
+        ],
+        {str(G): "#52735E"},
+    )
+    assert [s.kind for s in shapes] == ["coverage", "gateway"] and shapes[1].level == 0.6
+    extent = extent_for([(31.5, -24.9), (31.52, -24.88)], 400, 300)
+    assert extent is not None
+    png = draw_map(extent, None, [], shapes, width_px=400, height_px=300)
+    assert Image.open(io.BytesIO(png)).size == (800, 600)

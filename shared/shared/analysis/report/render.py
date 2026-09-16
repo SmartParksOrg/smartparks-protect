@@ -23,7 +23,11 @@ ASSETS = Path(__file__).parent / "assets"
 CHART_WIDTH_IN = 3.4
 CHART_HEIGHT_IN = 2.2
 
-MODULE_LABELS = {"movement": "Movement", "grazing": "Grazing"}
+MODULE_LABELS = {
+    "movement": "Movement",
+    "grazing": "Grazing",
+    "device_performance": "Device performance",
+}
 
 #: The human names of the result keys, the frontend's `presentations.tsx` in English.
 MOVEMENT_LABELS: dict[str, str] = {
@@ -105,6 +109,179 @@ GRAZING_LABELS: dict[str, str] = {
     "pressure": "Use per hectare",
     "summary": "Summary",
 }
+#: The device performance result's keys, the frontend's `devicePerformanceLabels` in English.
+DEVICE_PERFORMANCE_LABELS: dict[str, str] = {
+    "device": "Device",
+    "period": "Period",
+    "main": "This period",
+    "comparison": "Before",
+    "level": "Level",
+    "source": "Data source",
+    "channel": "Channel",
+    "flag": "Error flag",
+    "time": "Time",
+    "reason": "Reason",
+    "share": "Share",
+    "sources": "Data sources",
+    "statuses": "Statuses",
+    "battery_v": "Battery (V)",
+    "battery_min_v": "Lowest battery (V)",
+    "battery_slope_mv_day": "Battery slope (mV/day)",
+    "days_to_critical": "Days to critical",
+    "charging_days": "Charging days",
+    "temperature_min_c": "Lowest temperature (°C)",
+    "temperature_median_c": "Median temperature (°C)",
+    "temperature_max_c": "Highest temperature (°C)",
+    "hot_hours": "Hours above the warn temperature",
+    "reboots": "Reboots",
+    "reboots_per_week": "Reboots per week",
+    "uptime_max_d": "Longest uptime (days)",
+    "error_share": "Statuses with an error",
+    "flash_used_percent": "Flash used (%)",
+    "moving_share": "Statuses with movement",
+    "firmware": "Firmware",
+    "expected_fix_s": "Fix interval set (s)",
+    "expected_status_s": "Status interval set (s)",
+    "fixes": "Fixes",
+    "observed_fix_median_s": "Fix interval seen (s)",
+    "observed_fix_p90_s": "Fix interval, 90th percentile (s)",
+    "missed_fix_share": "Missed fixes",
+    "observed_status_median_s": "Status interval seen (s)",
+    "missed_status_share": "Missed statuses",
+    "silences": "Silences",
+    "longest_silence_h": "Longest silence (h)",
+    "longest_silence_ended": "Longest silence ended",
+    "messages": "Messages",
+    "invalid_records": "Records held invalid",
+    "invalid_share": "Share held invalid",
+    "attempts": "GNSS attempts",
+    "fix_success": "Fix success",
+    "ttf_median_s": "Time to fix (s)",
+    "ttf_p90_s": "Time to fix, 90th percentile (s)",
+    "satellites_median": "Satellites",
+    "few_satellites_share": "Fixes under four satellites",
+    "accuracy_median_m": "Accuracy (m)",
+    "accuracy_p90_m": "Accuracy, 90th percentile (m)",
+    "poor_accuracy_share": "Fixes above the warn accuracy",
+    "pdop_median": "PDOP",
+    "rejected_fixes": "Rejected fixes",
+    "rejected_share": "Rejected fixes share",
+    "fixes_per_day": "Fixes per day",
+    "per_day": "Messages per day",
+    "lost_uplinks_share": "Lost uplinks",
+    "gateways": "Gateways",
+    "best_gateway": "Best gateway",
+    "best_gateway_share": "Best gateway's share",
+    "rssi_median_dbm": "RSSI (dBm)",
+    "rssi_p10_dbm": "RSSI, 10th percentile (dBm)",
+    "snr_median_db": "SNR (dB)",
+    "snr_p10_db": "SNR, 10th percentile (dB)",
+    "joins": "Joins",
+    "joins_per_day": "Joins per day",
+    "sessions": "Satellite sessions",
+    "missed_sessions_share": "Missed sessions",
+    "failed_sessions_share": "Failed sessions",
+    "redeliveries": "Redeliveries",
+    "bytes": "Bytes",
+    "fleet": "Fleet",
+    "health": "Health",
+    "reporting": "Reporting",
+    "gnss": "GNSS",
+    "network": "Network",
+    "errors": "Error flags",
+    "battery": "Battery",
+    "temperature": "Highest temperature per day",
+    "time_to_fix": "Time to fix",
+    "accuracy": "Accuracy of the fixes",
+    "satellites": "Satellites per fix",
+    "uplinks_per_day": "Messages per day",
+    "rssi_per_day": "RSSI per day",
+    "sessions_per_day": "Satellite sessions per day",
+}
+#: The fleet table's headline columns (the module's `FLEET_COLUMNS`), the key figures block.
+DEVICE_KEY_FIGURES: list[str] = [
+    "battery_v",
+    "battery_slope_mv_day",
+    "days_to_critical",
+    "temperature_max_c",
+    "reboots",
+    "error_share",
+    "missed_fix_share",
+    "longest_silence_h",
+    "fix_success",
+    "ttf_p90_s",
+    "accuracy_median_m",
+    "lost_uplinks_share",
+    "rssi_p10_dbm",
+    "missed_sessions_share",
+]
+#: The indicators of each area's card in a device's section (the frontend's `AREA_CARDS`).
+DEVICE_AREA_CARDS: list[tuple[str, list[str]]] = [
+    (
+        "health",
+        [
+            "battery_v",
+            "battery_slope_mv_day",
+            "days_to_critical",
+            "temperature_max_c",
+            "hot_hours",
+            "reboots",
+            "uptime_max_d",
+            "error_share",
+            "flash_used_percent",
+            "moving_share",
+            "firmware",
+        ],
+    ),
+    (
+        "reporting",
+        [
+            "expected_fix_s",
+            "observed_fix_median_s",
+            "missed_fix_share",
+            "expected_status_s",
+            "missed_status_share",
+            "silences",
+            "longest_silence_h",
+            "messages",
+            "invalid_records",
+        ],
+    ),
+    (
+        "gnss",
+        [
+            "attempts",
+            "fixes",
+            "fix_success",
+            "ttf_median_s",
+            "ttf_p90_s",
+            "satellites_median",
+            "few_satellites_share",
+            "accuracy_median_m",
+            "pdop_median",
+            "rejected_share",
+            "fixes_per_day",
+        ],
+    ),
+    ("network", ["lost_uplinks_share", "rssi_p10_dbm", "missed_sessions_share", "sources"]),
+]
+DEVICE_PERFORMANCE_LIMITATIONS = [
+    "A missed report is inferred from the device's settings and its messages; a device whose "
+    "interval changed in the period, or whose settings Protect never read, shows a share to "
+    "weigh, with the interval it assumed beside it.",
+    "Lost uplinks come from the frame counter; a data source that does not deliver it shows no "
+    "figure, not zero.",
+    "The battery slope is a straight line through the daily medians; a battery's curve is not "
+    "straight, so the days to critical are an indication, not a forecast.",
+    "Signal figures are the best gateway's per uplink; a moving device changes gateways, so "
+    "they describe the network as the device met it.",
+    "Levels come from the driver's thresholds and named defaults; they are not a verdict on "
+    "the device, and a rank says only where a device stands among the chosen ones.",
+    "Fix success counts the attempts the device reported; a device that never reports a failed "
+    "attempt shows every attempt as a fix.",
+]
+LEVEL_ORDER = {"critical": 0, "warn": 1, "ok": 2, None: 3}
+
 #: The figures on a movement subject's card, with their unit (the frontend's card metrics).
 MOVEMENT_KEY_FIGURES: list[tuple[str, str]] = [
     ("distance_km", "km"),
@@ -180,7 +357,8 @@ class ReportInput:
 
 
 def labels_for(module: str, document: dict[str, Any]) -> dict[str, str]:
-    labels = dict(GRAZING_LABELS if module == "grazing" else MOVEMENT_LABELS)
+    by_module = {"grazing": GRAZING_LABELS, "device_performance": DEVICE_PERFORMANCE_LABELS}
+    labels = dict(by_module.get(module, MOVEMENT_LABELS))
     for subject in document.get("subjects", []):
         labels[str(subject["id"])] = subject["name"]
     for area in document.get("summary", {}).get("areas") or []:
@@ -259,6 +437,8 @@ def settings_rows(inp: ReportInput, labels: dict[str, str]) -> list[tuple[str, s
 
     if subjects := names("entity_ids"):
         rows.append(("Subjects", subjects))
+    if devices := names("device_ids"):
+        rows.append(("Devices", devices))
     if herd_b := names("herd_b_entity_ids"):
         rows.append(("Second herd", herd_b))
     if areas := names("feature_ids"):
@@ -282,14 +462,159 @@ def settings_rows(inp: ReportInput, labels: dict[str, str]) -> list[tuple[str, s
     return rows
 
 
-def key_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
-    """The cards as one table: a row per subject (movement) or per area (grazing), a column
-    per figure, the comparison in brackets when the run has one."""
+def fmt_indicator(value: Any, key: str) -> str:
+    """A device performance figure as words: shares as percentages, long seconds as minutes,
+    the rest rounded by size; the frontend's `showFigure`."""
+    if value is None:
+        return "-"
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    if not isinstance(value, int | float):
+        return str(value)
+    if key.endswith("_share") or key == "fix_success":
+        return f"{round(value * 100)}%"
+    if key.endswith("_s") and abs(value) >= 120:
+        return f"{round(value / 60)} min"
+    if float(value).is_integer():
+        return str(int(value))
+    if abs(value) >= 100:
+        return f"{value:.0f}"
+    return f"{value:.1f}" if abs(value) >= 10 else f"{value:.2f}"
+
+
+def device_order(document: dict[str, Any]) -> list[dict[str, Any]]:
+    """The device subjects worst first: by headline level, then by the weight of their
+    critical and warn indicators, then by name (the frontend's `orderedSubjects`)."""
+    summary = document.get("summary", {})
+    main = summary.get("main") or {}
+    levels = summary.get("levels") or {}
+
+    def key(subject: dict[str, Any]) -> tuple[int, int, str]:
+        sid = str(subject["id"])
+        headline = (main.get(sid) or {}).get("level")
+        weight = sum(
+            10 if level == "critical" else 1 if level == "warn" else 0
+            for level in (levels.get(sid) or {}).values()
+        )
+        return (LEVEL_ORDER.get(headline, 3), -weight, str(subject.get("name", "")))
+
+    return sorted(document.get("subjects", []), key=key)
+
+
+def _device_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
+    """The fleet table as the key figures: a row per device, worst first, a level dot beside
+    every headline figure, the comparison in brackets."""
     document = inp.document
     summary = document.get("summary", {})
     has_comparison = any(p.get("key") == "comparison" for p in document.get("periods", []))
     main = summary.get("main") or {}
     before = summary.get("comparison") or {}
+    levels = summary.get("levels") or {}
+    rows = []
+    for subject in device_order(document):
+        sid = str(subject["id"])
+        figures = main.get(sid) or {}
+        cells = []
+        for key in DEVICE_KEY_FIGURES:
+            text = fmt_indicator(figures.get(key), key)
+            if has_comparison and isinstance(before.get(sid), dict):
+                text += f" ({fmt_indicator(before[sid].get(key), key)})"
+            cells.append({"text": text, "level": (levels.get(sid) or {}).get(key)})
+        rows.append(
+            {
+                "name": subject["name"],
+                "note": subject.get("tracked") or subject.get("type") or "",
+                "level": figures.get("level"),
+                "cells": cells,
+            }
+        )
+    return {
+        "first": "Device",
+        "columns": [labels.get(k, k) for k in DEVICE_KEY_FIGURES],
+        "rows": rows,
+        "note": ("The figure in brackets is the period before. " if has_comparison else "")
+        + "A dot marks the level: green ok, amber warn, red critical.",
+        "herd": None,
+    }
+
+
+def device_sections(
+    inp: ReportInput, labels: dict[str, str], colors: dict[str, str]
+) -> list[dict[str, Any]]:
+    """One section per device: the four area cards with the figures and their levels, and
+    the device's own charts."""
+    document = inp.document
+    summary = document.get("summary", {})
+    has_comparison = any(p.get("key") == "comparison" for p in document.get("periods", []))
+    main = summary.get("main") or {}
+    before = summary.get("comparison") or {}
+    levels = summary.get("levels") or {}
+    sections = []
+    for subject in device_order(document):
+        sid = str(subject["id"])
+        figures = main.get(sid) or {}
+        cards = []
+        for area, keys in DEVICE_AREA_CARDS:
+            rows = []
+            for key in keys:
+                if figures.get(key) is None:
+                    continue
+                text = fmt_indicator(figures.get(key), key)
+                if has_comparison and isinstance(before.get(sid), dict):
+                    text += f" ({fmt_indicator(before[sid].get(key), key)})"
+                rows.append(
+                    {
+                        "label": labels.get(key, key),
+                        "text": text,
+                        "level": (levels.get(sid) or {}).get(key),
+                    }
+                )
+            if rows:
+                cards.append({"title": labels.get(area, area), "rows": rows})
+        charts = []
+        for chart in document.get("charts", []):
+            series = [s for s in chart.get("series", []) if s.get("subject") == sid]
+            if not series:
+                continue
+            own = {**chart, "series": series}
+            charts.append(
+                {
+                    "title": labels.get(chart["key"], chart["key"]),
+                    "svg": _data_uri(
+                        chart_svg(
+                            own, labels, colors, width_in=CHART_WIDTH_IN, height_in=CHART_HEIGHT_IN
+                        ),
+                        "image/svg+xml",
+                    ),
+                }
+            )
+        sections.append(
+            {
+                "name": subject["name"],
+                "color": colors.get(sid, PALETTE[0]),
+                "type": subject.get("type") or "",
+                "tracked": subject.get("tracked") or "",
+                "level": figures.get("level"),
+                "cards": cards,
+                "charts": charts,
+            }
+        )
+    return sections
+
+
+def key_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
+    """The cards as one table: a row per subject (movement) or per area (grazing), a column
+    per figure, the comparison in brackets when the run has one; for device performance the
+    fleet table with its level dots."""
+    document = inp.document
+    summary = document.get("summary", {})
+    has_comparison = any(p.get("key") == "comparison" for p in document.get("periods", []))
+    main = summary.get("main") or {}
+    before = summary.get("comparison") or {}
+    if inp.module == "device_performance":
+        return _device_figures(inp, labels)
     if inp.module == "grazing":
         metrics = GRAZING_KEY_FIGURES
         rows_source = [
@@ -355,17 +680,30 @@ def render_html(inp: ReportInput) -> str:
     document = inp.document
     labels = labels_for(inp.module, document)
     colors = subject_colors(document)
-    charts = [
-        {
-            "title": labels.get(c["key"], c["key"]),
-            "svg": _data_uri(
-                chart_svg(c, labels, colors, width_in=CHART_WIDTH_IN, height_in=CHART_HEIGHT_IN),
-                "image/svg+xml",
-            ),
-        }
-        for c in document.get("charts", [])
+    devices = inp.module == "device_performance"
+    # the device report folds the charts into the device sections
+    charts = (
+        []
+        if devices
+        else [
+            {
+                "title": labels.get(c["key"], c["key"]),
+                "svg": _data_uri(
+                    chart_svg(
+                        c, labels, colors, width_in=CHART_WIDTH_IN, height_in=CHART_HEIGHT_IN
+                    ),
+                    "image/svg+xml",
+                ),
+            }
+            for c in document.get("charts", [])
+        ]
+    )
+    tables = [
+        table_block(t, labels)
+        for t in document.get("tables", [])
+        if t.get("rows") and not (devices and t.get("key") == "fleet")
     ]
-    tables = [table_block(t, labels) for t in document.get("tables", [])]
+    defaults = document.get("summary", {}).get("defaults") if devices else None
     main = next((p for p in document.get("periods", []) if p.get("key") == "main"), None)
     module_label = MODULE_LABELS.get(inp.module, inp.module.title())
     logo = ASSETS / "logo-landscape.webp"
@@ -401,8 +739,20 @@ def render_html(inp: ReportInput) -> str:
             {"png": _data_uri(inp.map.png, "image/png"), "note": inp.map.note} if inp.map else None
         ),
         charts=charts,
+        sections=device_sections(inp, labels, colors) if devices else [],
+        defaults=(
+            [(labels.get(k, k), text) for k, text in defaults.items()]
+            if isinstance(defaults, dict)
+            else []
+        ),
         tables=tables,
-        limitations=GRAZING_LIMITATIONS if inp.module == "grazing" else MOVEMENT_LIMITATIONS,
+        limitations=(
+            DEVICE_PERFORMANCE_LIMITATIONS
+            if devices
+            else GRAZING_LIMITATIONS
+            if inp.module == "grazing"
+            else MOVEMENT_LIMITATIONS
+        ),
         version=inp.version,
         generated_at=fmt_time(inp.generated_at, inp.timezone),
         timezone=inp.timezone,

@@ -72,6 +72,8 @@ class Shape:
     color: str
     kind: str
     label: str = ""
+    #: A share or an isopleth level; a point (a gateway heard) is sized by it.
+    level: float | None = None
 
 
 @dataclass
@@ -353,6 +355,22 @@ def draw_map(
 
 def _draw_shape(ax: Any, item: Shape) -> None:
     geometry = item.geometry
+    if geometry.geom_type == "Point":
+        # a gateway heard: a marker sized by its share of the uplinks
+        x, y = mercator(geometry.x, geometry.y)
+        size = 4 + 10 * (item.level or 0)
+        ax.plot(
+            x,
+            y,
+            marker="o",
+            markersize=size,
+            color=item.color,
+            markeredgecolor="white",
+            markeredgewidth=0.8,
+            alpha=0.9,
+            zorder=7,
+        )
+        return
     polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
     alpha = FILL_ALPHA.get(item.kind, 0.2)
     for polygon in polygons:
@@ -423,7 +441,16 @@ def shapes_from_geometries(
             color = pressure_color(row.get("level"))
         else:
             color = subject_colors.get(str(row.get("subject_id") or ""), "#B86B5C")
-        shapes.append(Shape(geometry, color, kind, str(row.get("label", ""))))
+        level = row.get("level")
+        shapes.append(
+            Shape(
+                geometry,
+                color,
+                kind,
+                str(row.get("label", "")),
+                float(level) if isinstance(level, int | float) else None,
+            )
+        )
     shapes.sort(key=lambda s: -s.geometry.area)
     return shapes
 

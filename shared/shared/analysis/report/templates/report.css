@@ -193,3 +193,41 @@ section.limitations ul {
   color: #4b5651;
   font-size: 8.5pt;
 }
+
+/* the levels of the device performance indicators (decision D217) */
+.dot.lvl-ok {
+  background: #3e6b4e;
+}
+.dot.lvl-warn {
+  background: #d9a441;
+}
+.dot.lvl-critical {
+  background: #b86b5c;
+}
+section.device {
+  break-before: auto;
+  break-inside: auto;
+}
+section.device h2 {
+  break-after: avoid;
+}
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4mm;
+  margin-bottom: 3mm;
+}
+table.plain.card {
+  width: 84mm;
+  break-inside: avoid;
+  font-size: 8.5pt;
+}
+table.plain.card th.card-title {
+  font-weight: 600;
+  color: #1f2a24;
+  border-bottom: 0.3pt solid #c9dbcf;
+  padding-bottom: 1mm;
+}
+section.defaults table.plain td {
+  font-size: 8.5pt;
+}
