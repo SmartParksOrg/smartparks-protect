@@ -129,10 +129,10 @@ FLEET_COLUMNS = [
     "missed_sessions_share",
 ]
 #: The details table under the map (decision D234): one row per device with the headline
-#: figure of each area, the missed fixes split between the network and the device.
+#: figure of each area, the missed fixes split between the network and the device. The days
+#: to critical cell carries the trend's word when there is no figure, so no trend column.
 DETAILS_COLUMNS = [
     "battery_v",
-    "battery_trend",
     "days_to_critical",
     "expected_fix_s",
     "expected_fix_source",
