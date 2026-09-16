@@ -18220,6 +18220,74 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/gateways/{gateway_id}/location": {
+   "patch": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "Set Gateway Location",
+    "description": "A project admin places a gateway the platform gave no location for (a Gateway Mesh\nrelay, a gateway on a network without a gateway API), or corrects one, so the map can show\nit (decision D239). The gateway must be one the project sees; latitude and longitude\ntogether set it, both empty clear a location set by hand (the platform's next sync may\nfill it again). The all scope, a server admin, reaches every gateway.",
+    "operationId": "set_gateway_location_api_v1_projects__project_id__gateways__gateway_id__location_patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "gateway_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Gateway Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GatewayLocationRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GatewayRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/admin/gateways": {
    "get": {
     "tags": [
@@ -30272,6 +30340,50 @@
      "last_reception_at"
     ],
     "title": "GatewayDeviceStat"
+   },
+   "GatewayLocationRequest": {
+    "properties": {
+     "latitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 90.0,
+        "minimum": -90.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latitude"
+     },
+     "longitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 180.0,
+        "minimum": -180.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Longitude"
+     },
+     "altitude_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Altitude M"
+     }
+    },
+    "type": "object",
+    "title": "GatewayLocationRequest",
+    "description": "A location set by a person for a gateway the platform gave none (decision D239): both\ncoordinates, or both empty to clear a location set by hand."
    },
    "GatewayRead": {
     "properties": {

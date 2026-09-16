@@ -285,3 +285,60 @@ async def test_a_source_assigned_to_the_project_shows_its_gateways_at_once(clien
     # the search sees it too, and the first source's gateways with it
     found = (await client.get("/api/v1/search", params={"q": "Far"}, headers=h)).json()
     assert any("Far gateway" in str(item) for item in found.get("gateways", found.get("items", [])))
+
+
+async def test_a_project_admin_places_a_gateway_the_platform_gave_no_location(client, db, bus):  # noqa: F811
+    """Decision D239: a Gateway Mesh relay or a gateway on a network without a gateway API has
+    no location; a project admin sets one from the gateway's dialog, a viewer cannot, another
+    project's admin does not see the gateway, and both coordinates empty clear it again."""
+    from shared.enums import Role
+    from shared.models import DataSourceProjectScope, Gateway
+    from tests.api.conftest import actor, add_member, create_project
+
+    admin, project, _entity, _source, _device, _ = await _setup(client, db)
+    h = admin.headers
+    other = DataSource(
+        name=unique_name("Mesh network"), adapter_key="http", config={}, capabilities={}
+    )
+    db.add(other)
+    await db.flush()
+    relay = Gateway(
+        data_source_id=other.id,
+        external_id="f1366ff3",
+        attributes={"kind": "relay"},
+        status="online",
+    )
+    db.add(relay)
+    db.add(DataSourceProjectScope(data_source_id=other.id, project_id=project.id))
+    await db.commit()
+    base = f"/api/v1/projects/{project.id}/gateways/{relay.id}/location"
+    placed = await client.patch(
+        base, json={"latitude": -24.81, "longitude": 31.42, "altitude_m": 410}, headers=h
+    )
+    assert placed.status_code == 200, placed.text
+    body = placed.json()
+    assert body["geometry"]["coordinates"] == [31.42, -24.81]
+    assert body["location_source"] == "admin" and body["altitude_m"] == 410
+    # one coordinate alone is refused
+    assert (await client.patch(base, json={"latitude": -24.8}, headers=h)).status_code == 422
+    # a viewer may not, another project's admin does not see it
+    viewer = await actor(client, db)
+    await add_member(db, viewer.user, project, Role.PROJECT_VIEWER)
+    assert (
+        await client.patch(
+            base, json={"latitude": -24.8, "longitude": 31.4}, headers=viewer.headers
+        )
+    ).status_code == 403
+    elsewhere = await create_project(db)
+    stranger = await actor(client, db)
+    await add_member(db, stranger.user, elsewhere, Role.PROJECT_ADMIN)
+    refused = await client.patch(
+        f"/api/v1/projects/{elsewhere.id}/gateways/{relay.id}/location",
+        json={"latitude": -24.8, "longitude": 31.4},
+        headers=stranger.headers,
+    )
+    assert refused.status_code == 404
+    # both empty clears the location set by hand
+    cleared = await client.patch(base, json={}, headers=h)
+    assert cleared.status_code == 200 and cleared.json()["geometry"] is None
+    assert cleared.json()["location_source"] is None

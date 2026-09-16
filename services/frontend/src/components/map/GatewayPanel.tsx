@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { RadioTower } from "lucide-react";
 import { Link } from "react-router";
 
@@ -12,7 +13,9 @@ import {
   toggleOnlyGateway,
 } from "@/components/map/layerChoices";
 import { MapPanel, PanelRow } from "@/components/map/MapObjectPanel";
+import { GatewayLocationDialog } from "@/components/network/GatewayLocationDialog";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
 
 const HOURS = 168;
@@ -46,6 +49,8 @@ export function GatewayPanel({
   onChange: (next: LayerChoices) => void;
 }) {
   const { t } = useTranslation();
+  const { can } = usePermissions(projectId);
+  const [placing, setPlacing] = useState(false);
   const detail = useQuery({
     queryKey: queryKeys.gateway(projectId, gatewayId, HOURS),
     queryFn: () =>
@@ -116,7 +121,7 @@ export function GatewayPanel({
           <PanelRow label={t("Last seen")} title={formatTime(g.last_seen_at)}>
             {formatAgo(g.last_seen_at, now)}
           </PanelRow>
-          {coordinates && (
+          {coordinates ? (
             <PanelRow label={t("Location")}>
               <span className="font-mono text-xs">
                 {coordinates[1].toFixed(5)}, {coordinates[0].toFixed(5)}
@@ -128,6 +133,27 @@ export function GatewayPanel({
                 </span>
               )}
             </PanelRow>
+          ) : (
+            <PanelRow label={t("Location")}>
+              <span className="text-muted-foreground">{t("none known")}</span>
+            </PanelRow>
+          )}
+          {can("project:write") && !allProjects && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-1"
+              onClick={() => setPlacing(true)}
+            >
+              {coordinates ? t("Change location") : t("Set location")}
+            </Button>
+          )}
+          {placing && (
+            <GatewayLocationDialog
+              projectId={projectId}
+              gateway={g}
+              onClose={() => setPlacing(false)}
+            />
           )}
           <PanelRow label={t("Last 7 days")}>
             {t("{{count}} receptions", { count: g.receptions })}

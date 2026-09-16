@@ -4160,6 +4160,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/gateways/{gateway_id}/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Gateway Location
+         * @description A project admin places a gateway the platform gave no location for (a Gateway Mesh
+         *     relay, a gateway on a network without a gateway API), or corrects one, so the map can show
+         *     it (decision D239). The gateway must be one the project sees; latitude and longitude
+         *     together set it, both empty clear a location set by hand (the platform's next sync may
+         *     fill it again). The all scope, a server admin, reaches every gateway.
+         */
+        patch: operations["set_gateway_location_api_v1_projects__project_id__gateways__gateway_id__location_patch"];
+        trace?: never;
+    };
     "/api/v1/admin/gateways": {
         parameters: {
             query?: never;
@@ -8248,6 +8272,19 @@ export interface components {
             mean_snr: number | null;
             /** Last Reception At */
             last_reception_at: string | null;
+        };
+        /**
+         * GatewayLocationRequest
+         * @description A location set by a person for a gateway the platform gave none (decision D239): both
+         *     coordinates, or both empty to clear a location set by hand.
+         */
+        GatewayLocationRequest: {
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Altitude M */
+            altitude_m?: number | null;
         };
         /** GatewayRead */
         GatewayRead: {
@@ -21154,6 +21191,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceConnectivity"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_gateway_location_api_v1_projects__project_id__gateways__gateway_id__location_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gateway_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatewayLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayRead"];
                 };
             };
             /** @description Validation Error */

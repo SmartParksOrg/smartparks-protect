@@ -13,7 +13,9 @@ import { Callout } from "@/components/common/Callout";
 import { JsonView } from "@/components/common/JsonView";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { GatewayLocationDialog } from "@/components/network/GatewayLocationDialog";
 import { Badge } from "@/components/ui/badge";
+import { usePermissions } from "@/hooks/useProjects";
 import { DataTable } from "@/components/data/DataTable";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Button } from "@/components/ui/button";
@@ -101,6 +103,19 @@ export function GatewaysPage() {
       : gateways.data?.filter((g) => g.data_source_id === sourceFilter);
   const silent = shown?.filter((g) => g.receptions === 0).length ?? 0;
   const [selected, setSelected] = useState<Gateway | null>(null);
+  const [placing, setPlacing] = useState<Gateway | null>(null);
+  const { can } = usePermissions(projectId);
+  // where the picking map looks for a gateway without a location: another gateway of the
+  // same source that has one, else nothing
+  const fallbackFor = (g: Gateway): [number, number] | null => {
+    const near = gateways.data?.find(
+      (x) =>
+        x.data_source_id === g.data_source_id && x.geometry && x.id !== g.id,
+    );
+    const c = (near?.geometry as { coordinates?: number[] } | null)
+      ?.coordinates;
+    return c ? [c[0], c[1]] : null;
+  };
   const detail = useQuery({
     queryKey: queryKeys.gateway(projectId, selected?.id ?? "", hours),
     queryFn: () =>
@@ -383,13 +398,29 @@ export function GatewaysPage() {
                   })}
                 </span>
               </div>
-              {coords(selected) && (
+              {coords(selected) ? (
                 <div className="font-mono text-xs">
                   {coords(selected)}
                   {selected.altitude_m != null
                     ? `, ${selected.altitude_m} m`
                     : ""}
                 </div>
+              ) : (
+                <div className="text-xs text-muted-foreground">
+                  {t(
+                    "No location known: the network reported none, so the map cannot place this gateway.",
+                  )}
+                </div>
+              )}
+              {can("project:write") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPlacing(selected)}
+                >
+                  <MapPin className="size-4" />{" "}
+                  {coords(selected) ? t("Change location") : t("Set location")}
+                </Button>
               )}
               {selected.geometry && (
                 <div className="h-48">
@@ -468,6 +499,16 @@ export function GatewaysPage() {
           )}
         </DialogContent>
       </Dialog>
+      <GatewayLocationDialog
+        key={placing?.id ?? "none"}
+        projectId={projectId}
+        gateway={placing}
+        fallback={placing ? fallbackFor(placing) : null}
+        onClose={() => {
+          setPlacing(null);
+          setSelected(null);
+        }}
+      />
     </>
   );
 }

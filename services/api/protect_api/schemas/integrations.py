@@ -170,6 +170,15 @@ class GatewayUpdateRequest(BaseModel):
     description: str | None = None
 
 
+class GatewayLocationRequest(BaseModel):
+    """A location set by a person for a gateway the platform gave none (decision D239): both
+    coordinates, or both empty to clear a location set by hand."""
+
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    altitude_m: float | None = None
+
+
 class GatewaySyncResult(BaseModel):
     synced: int
 

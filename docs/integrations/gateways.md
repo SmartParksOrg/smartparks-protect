@@ -30,7 +30,7 @@ gateway heard one of them (decision D175, ADR 0027); the all-projects scope sees
   the same read immediately for one source. Public networks without a gateway API (KPN,
   Netmore, akenza) only ever show what receptions reveal.
 
-Administrators can override the name and location of a gateway under `PATCH /admin/gateways/{id}`.
+Administrators can override the name and location of a gateway under `PATCH /admin/gateways/{id}`. A project admin places a gateway the network gave no location for (a Gateway Mesh relay, a gateway on a network without a gateway API), or corrects one, from the gateway's dialog on the Gateways page or its panel on the live map (decision D239): type the coordinates, click the small map, or take the browser's position while standing at the gateway; `PATCH /projects/{id}/gateways/{gateway_id}/location`, both coordinates empty clearing a location set by hand. A location set by a person is kept over the platform's.
 
 ## Screens
 

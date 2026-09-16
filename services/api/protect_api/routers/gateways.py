@@ -14,6 +14,7 @@ from shapely.geometry import Point
 from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from protect_api.audit import record_audit
 from protect_api.crud import geom_to_geojson, get_or_404
 from protect_api.deps import (
     ScopeContext,
@@ -26,6 +27,7 @@ from protect_api.schemas.integrations import (
     DeviceConnectivity,
     GatewayDetail,
     GatewayDeviceStat,
+    GatewayLocationRequest,
     GatewayRead,
     GatewayUpdateRequest,
 )
@@ -407,9 +409,63 @@ async def update_gateway(
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, "latitude and longitude go together"
             )
-        gateway.geom = from_shape(Point(patch["longitude"], patch["latitude"]), srid=4326)
-        gateway.location_source = "admin"  # platform updates keep their hands off it now
-        gateway.location_at = utc_now()
+        _set_location(gateway, patch["latitude"], patch["longitude"])
+    await session.commit()
+    source = await session.get(DataSource, gateway.data_source_id)
+    return gateway_read(gateway, source)
+
+
+def _set_location(gateway: Gateway, latitude: float, longitude: float) -> None:
+    """A location set by a person: the platform's updates keep their hands off it now."""
+    gateway.geom = from_shape(Point(longitude, latitude), srid=4326)
+    gateway.location_source = "admin"
+    gateway.location_at = utc_now()
+
+
+@router.patch("/projects/{project_id}/gateways/{gateway_id}/location", response_model=GatewayRead)
+async def set_gateway_location(
+    gateway_id: uuid.UUID,
+    body: GatewayLocationRequest,
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> GatewayRead:
+    """A project admin places a gateway the platform gave no location for (a Gateway Mesh
+    relay, a gateway on a network without a gateway API), or corrects one, so the map can show
+    it (decision D239). The gateway must be one the project sees; latitude and longitude
+    together set it, both empty clear a location set by hand (the platform's next sync may
+    fill it again). The all scope, a server admin, reaches every gateway."""
+    gateway = await get_or_404(session, Gateway, gateway_id, "Gateway")
+    if not context.is_all:
+        since, until = _window(MAX_HOURS)
+        device_ids = await _scope_device_ids(session, context, since, until)
+        visible = await visible_source_ids(session, context.project_id, device_ids)
+        if gateway.data_source_id not in visible:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Gateway not found")
+    if (body.latitude is None) != (body.longitude is None):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "latitude and longitude go together"
+        )
+    if body.latitude is not None and body.longitude is not None:
+        _set_location(gateway, body.latitude, body.longitude)
+        if body.altitude_m is not None:
+            gateway.altitude_m = body.altitude_m
+    elif gateway.location_source == "admin":
+        gateway.geom = None
+        gateway.location_source = None
+        gateway.location_at = None
+    await record_audit(
+        session,
+        user=context.user,
+        action="gateway.location_set",
+        object_type="gateway",
+        object_id=str(gateway.id),
+        project_id=context.project_id,
+        details={
+            "latitude": body.latitude,
+            "longitude": body.longitude,
+            "altitude_m": body.altitude_m,
+        },
+    )
     await session.commit()
     source = await session.get(DataSource, gateway.data_source_id)
     return gateway_read(gateway, source)

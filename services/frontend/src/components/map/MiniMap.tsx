@@ -24,6 +24,8 @@ export function MiniMap({
   point,
   to,
   label,
+  onPick,
+  fallback,
 }: {
   /** Positions newest first: the newest is marked, the rest is the trail. */
   positions?: Position[];
@@ -31,12 +33,22 @@ export function MiniMap({
   point?: [number, number];
   to: string;
   label?: string;
+  /** With it the map takes gestures and a click places the point (decision D239: a gateway
+   * without a location is put on the map by hand); the map is no link then. */
+  onPick?: (lonLat: [number, number]) => void;
+  /** Where to look when there is no point yet and the map is for picking, [lon, lat]. */
+  fallback?: [number, number];
 }) {
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const readyRef = useRef(false);
   const pendingRef = useRef<(() => void) | null>(null);
+  const pickRef = useRef(onPick);
+  useEffect(() => {
+    pickRef.current = onPick;
+  }, [onPick]);
+  const picking = onPick !== undefined;
   const geometry = point
     ? {
         line: [],
@@ -49,7 +61,7 @@ export function MiniMap({
         ],
       }
     : miniMapGeometry(positions);
-  const hasGeometry = geometry !== null;
+  const hasGeometry = geometry !== null || picking;
 
   const { resolved } = useTheme();
   const dark = resolved === "dark";
@@ -58,11 +70,20 @@ export function MiniMap({
     const map = new maplibregl.Map({
       container: container.current,
       style: basemapStyle(loadBasemap(), basemapsFor(null), dark),
-      center: [0, 0],
-      zoom: 1,
-      interactive: false,
+      center: fallback ?? [0, 0],
+      zoom: fallback ? 12 : 1,
+      interactive: picking,
       attributionControl: false,
     });
+    if (picking) {
+      map.getCanvas().style.cursor = "crosshair";
+      map.on("click", (e) =>
+        pickRef.current?.([
+          Number(e.lngLat.lng.toFixed(6)),
+          Number(e.lngLat.lat.toFixed(6)),
+        ]),
+      );
+    }
     map.on("load", () => {
       map.addSource(TRAIL, {
         type: "geojson",
@@ -111,7 +132,7 @@ export function MiniMap({
       mapRef.current = null;
       readyRef.current = false;
     };
-  }, [hasGeometry, dark]);
+  }, [hasGeometry, dark, picking]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const map = mapRef.current;
@@ -141,7 +162,11 @@ export function MiniMap({
         ],
       });
       const [west, south, east, north] = geometry.bounds;
-      if (west === east && south === north)
+      if (picking) {
+        // the person is placing the point: keep their view, unless it is still the world
+        if (map.getZoom() < 3)
+          map.jumpTo({ center: geometry.latest, zoom: 13 });
+      } else if (west === east && south === north)
         map.jumpTo({ center: geometry.latest, zoom: 13 });
       else
         map.fitBounds([west, south, east, north], {
@@ -157,10 +182,20 @@ export function MiniMap({
     };
   }, [geometry?.latest[0], geometry?.latest[1], geometry?.line.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!geometry) {
+  if (!geometry && !picking) {
     return (
       <div className="flex h-full min-h-56 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
         {t("No position yet.")}
+      </div>
+    );
+  }
+  if (picking) {
+    return (
+      <div className="relative block h-full min-h-56 overflow-hidden rounded-xl border shadow-sm">
+        <div ref={container} className="h-full w-full" />
+        <span className="pointer-events-none absolute right-2 top-2 rounded bg-card/90 px-2 py-0.5 text-xs shadow-sm">
+          {label ?? t("Click to place")}
+        </span>
       </div>
     );
   }
