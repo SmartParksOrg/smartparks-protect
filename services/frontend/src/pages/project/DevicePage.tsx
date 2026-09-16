@@ -66,7 +66,7 @@ import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
 import { useAuthStore } from "@/stores/auth";
 
-const TABS = ["overview", "data", "connectivity", "network"] as const;
+const TABS = ["overview", "data", "connectivity", "network", "settings"] as const;
 
 export function DevicePage() {
   const { t } = useTranslation();
