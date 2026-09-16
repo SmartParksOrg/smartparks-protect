@@ -255,6 +255,20 @@ def test_the_interval_is_learned_from_regular_fixes_and_doubted_from_irregular_o
     assert learn_interval(times[:3]) is None
 
 
+def test_the_learned_interval_snaps_to_a_sensible_one():
+    from shared.domain.reporting_rules import snap_interval
+
+    # Tim (2026-09-16): hourly fixes whose timestamps carry the time to fix read 3570 s
+    rng = np.random.default_rng(3)
+    times = np.cumsum(np.r_[0, 3600 + rng.uniform(-60, 0, 100)]) + T0
+    learned = learn_interval(times)
+    assert learned is not None and learned.seconds == 3600 and learned.confident
+    assert snap_interval(3570) == 3600 and snap_interval(290) == 300 and snap_interval(58) == 60
+    assert snap_interval(85000) == 86400  # within five percent of a day
+    # an odd but real setting keeps its minute: 22 minutes is not 20
+    assert snap_interval(1320) == 1320 and snap_interval(1140) == 1200
+
+
 def test_a_declared_interval_holds_unless_the_data_plainly_disagrees():
     rng = np.random.default_rng(2)
     every_five = np.cumsum(np.r_[0, 300 + rng.uniform(-15, 15, 300)]) + T0

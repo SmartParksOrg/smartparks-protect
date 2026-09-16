@@ -143,7 +143,32 @@ def merged_settings(*layers: dict[str, Any] | None) -> dict[str, Any]:
 
 #: Learning an interval from the data (decision D225): the dominant interval between messages,
 #: silences left out, trusted when this share of the intervals sits within the tolerance of it.
-LEARN_BIN_S = 30.0
+LEARN_BIN_S = 60.0
+#: The intervals a person would set (Tim, 2026-09-16): the learned bin snaps to the nearest
+#: of these when it lies within `SNAP_TOLERANCE` of it or within one bin, so a device fixing
+#: every hour reads 3600 s, not 3570 because the fix time carries the time to fix.
+SENSIBLE_INTERVALS_S = (
+    60,
+    120,
+    180,
+    240,
+    300,
+    600,
+    900,
+    1200,
+    1800,
+    2700,
+    3600,
+    5400,
+    7200,
+    10800,
+    14400,
+    21600,
+    28800,
+    43200,
+    86400,
+)
+SNAP_TOLERANCE = 0.05
 LEARN_TOLERANCE = 0.2
 LEARN_MIN_SHARE = 0.6
 LEARN_MIN_MESSAGES = 5
@@ -165,10 +190,20 @@ class Learned:
         return self.regular_share >= LEARN_MIN_SHARE and self.intervals >= LEARN_MIN_MESSAGES - 1
 
 
+def snap_interval(seconds: float) -> float:
+    """The nearest of `SENSIBLE_INTERVALS_S` when it lies within `SNAP_TOLERANCE` or one bin
+    of the value; the value itself otherwise (a device set to 22 minutes keeps 22)."""
+    nearest = min(SENSIBLE_INTERVALS_S, key=lambda s: abs(s - seconds))
+    if abs(nearest - seconds) <= max(SNAP_TOLERANCE * nearest, LEARN_BIN_S):
+        return float(nearest)
+    return seconds
+
+
 def learn_interval(times_s: NDArray[np.float64]) -> Learned | None:
     """The dominant interval between consecutive messages: intervals longer than three times
-    the median are silences and left out, the rest are rounded to half minutes and the most
-    frequent value wins; None below five messages."""
+    the median are silences and left out, the rest are rounded to whole minutes and the most
+    frequent value wins, snapped to the nearest sensible interval (`snap_interval`); None below
+    five messages."""
     if times_s.size < LEARN_MIN_MESSAGES:
         return None
     gaps = np.diff(np.sort(times_s))
@@ -184,6 +219,7 @@ def learn_interval(times_s: NDArray[np.float64]) -> Learned | None:
     dominant = float(values[int(np.argmax(counts))])
     if dominant <= 0:
         dominant = float(np.median(kept))
+    dominant = snap_interval(dominant)
     regular = float(np.mean(np.abs(kept - dominant) <= LEARN_TOLERANCE * dominant))
     return Learned(seconds=dominant, regular_share=round(regular, 3), intervals=int(kept.size))
 

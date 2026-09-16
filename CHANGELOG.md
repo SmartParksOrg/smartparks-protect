@@ -10,6 +10,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- The learned fix interval read 3570 s for devices fixing every hour, since a fix's timestamp carries the time to fix and the intervals were binned by half minutes. The intervals are binned by whole minutes now and the dominant bin snaps to the nearest sensible interval (1, 2, 3, 4, 5, 10, 15, 20, 30, 45 minutes, 1, 1.5, 2, 3, 4, 6, 8, 12 or 24 hours) when within 5 percent of it; an odd setting such as 22 minutes keeps its minute. (Tim, 2026-09-16.)
 - Device performance: fix success counted only the failures for devices on firmware 7, whose short position message reports a failed attempt but nothing for a fix that came, so it read 0 percent for some devices and nothing for most. It now counts the fixes that came (or the successes reported, whichever is more) against the attempts reported as failed.
 
 ## v2.6.0, 2026-09-16

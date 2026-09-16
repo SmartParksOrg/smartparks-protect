@@ -22,6 +22,7 @@ from shared.domain.reporting_rules import (  # noqa: E402
     LEARN_MIN_MESSAGES,
     LEARN_MIN_SHARE,
     LEARN_TOLERANCE,
+    SENSIBLE_INTERVALS_S,
     TLV_FORMATS,
     Expected,
     Learned,
@@ -30,6 +31,7 @@ from shared.domain.reporting_rules import (  # noqa: E402
     learn_interval,
     merged_settings,
     resolve_expected,
+    snap_interval,
 )
 
 
@@ -106,6 +108,7 @@ __all__ = [
     "LEARN_MIN_SHARE",
     "LEARN_TOLERANCE",
     "MIN_FOR_OBSERVED",
+    "SENSIBLE_INTERVALS_S",
     "SILENCE_FACTOR",
     "TLV_FORMATS",
     "Expected",
@@ -117,4 +120,5 @@ __all__ = [
     "learn_interval",
     "merged_settings",
     "resolve_expected",
+    "snap_interval",
 ]
