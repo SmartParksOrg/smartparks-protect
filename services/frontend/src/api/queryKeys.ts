@@ -149,6 +149,7 @@ export const queryKeys = {
     ["projects", projectId, "curation", "summary"] as const,
   corrections: (projectId: string, params: Record<string, unknown>) =>
     ["projects", projectId, "curation", "corrections", params] as const,
+  outliers: (projectId: string) => ["projects", projectId, "curation", "outliers"] as const,
   curationJobs: (projectId: string, params: Record<string, unknown>) =>
     ["projects", projectId, "curation", "jobs", params] as const,
   curationJob: (projectId: string, id: string) =>

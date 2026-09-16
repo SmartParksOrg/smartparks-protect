@@ -3538,6 +3538,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/curation/outliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Outliers
+         * @description The GNSS fixes flagged as outliers (decision D221), newest first, with the device and
+         *     the entity, the jump and the speed; `waiting` false lists the approved ones too.
+         */
+        get: operations["list_outliers_api_v1_projects__project_id__curation_outliers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/curation/history": {
         parameters: {
             query?: never;
@@ -6787,6 +6808,12 @@ export interface components {
             clock_ahead?: components["schemas"]["RecordCounts"];
             /** Clock Ahead Until */
             clock_ahead_until?: string | null;
+            /**
+             * Outliers Waiting
+             * @description GNSS fixes flagged as outliers and not yet approved (decision D221)
+             * @default 0
+             */
+            outliers_waiting: number;
         };
         /** DeviceHealth */
         DeviceHealth: {
@@ -9315,6 +9342,66 @@ export interface components {
             name?: string | null;
             /** Slug */
             slug?: string | null;
+        };
+        /** OutlierList */
+        OutlierList: {
+            /** Items */
+            items: components["schemas"]["OutlierRead"][];
+            /** Total */
+            total: number;
+            /** Waiting */
+            waiting: number;
+        };
+        /**
+         * OutlierRead
+         * @description A GNSS fix the decoder or a bulk job flagged as an outlier (decision D221): where it
+         *     lies, how far and how fast from the fix before it, and whether a person approved it.
+         */
+        OutlierRead: {
+            /**
+             * Target Type
+             * @default position
+             */
+            target_type: string;
+            /** Target Id */
+            target_id: number;
+            /**
+             * Target Time
+             * Format: date-time
+             */
+            target_time: string;
+            /**
+             * Effective Time
+             * Format: date-time
+             */
+            effective_time: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string | null;
+            /** Entity Id */
+            entity_id: string | null;
+            /** Entity Name */
+            entity_name: string | null;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Accuracy M */
+            accuracy_m: number | null;
+            /** Distance M */
+            distance_m: number | null;
+            /** Seconds */
+            seconds: number | null;
+            /** Speed Mps */
+            speed_mps: number | null;
+            /** Previous Time */
+            previous_time: string | null;
+            /** Valid */
+            valid: boolean;
         };
         /** PageResponse[ActionDeliveryRead] */
         PageResponse_ActionDeliveryRead_: {
@@ -19590,6 +19677,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CorrectionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_outliers_api_v1_projects__project_id__curation_outliers_get: {
+        parameters: {
+            query?: {
+                device_id?: string | null;
+                /** @description Only the flagged fixes not yet approved */
+                waiting?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlierList"];
                 };
             };
             /** @description Validation Error */

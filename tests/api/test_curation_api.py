@@ -581,3 +581,85 @@ async def test_a_time_offset_of_decades_brings_status_records_back_and_rebuilds_
     for row in rows:
         await db.refresh(row)
     assert all(r.valid and r.curated_time == T0 + timedelta(hours=i) for i, r in enumerate(rows))
+
+
+async def test_outliers_are_found_in_the_past_listed_and_approved(client, db):
+    """Decisions D221 to D224: a bulk job walks the past with the outlier rule and flags the
+    jump; the list shows it waiting; a set-valid correction approves it back into the data."""
+    from shared.models import Position
+
+    admin, project, entity, source, device, _ = await _setup(client, db)
+    h = admin.headers
+    device_id = uuid.UUID(device["id"])
+    places = [(31.5, -24.9), (31.501, -24.901), (5.77, 52.04), (31.502, -24.902)]
+    rows = []
+    for i, (lon, lat) in enumerate(places):
+        when = T0 + timedelta(hours=i)
+        rows.append(
+            Position(
+                time=when,
+                device_id=device_id,
+                project_id=project.id,
+                entity_id=uuid.UUID(entity["id"]),
+                data_source_id=uuid.UUID(source["id"]),
+                source_event_id=5000 + i,
+                source_event_ingested_at=when,
+                canonical_key=f"{device['id']}|gnss|outlier{i}",
+                geom=WKTElement(f"POINT({lon} {lat})", srid=4326),
+                accuracy_m=19.0,
+            )
+        )
+    db.add_all(rows)
+    await db.commit()
+    base = f"/api/v1/projects/{project.id}/curation"
+    assert (await client.get(f"{base}/outliers", headers=h)).json()["total"] == 0
+
+    created = await client.post(
+        f"{base}/jobs",
+        json={
+            "target_type": "position",
+            "device_ids": [device["id"]],
+            "time_from": T0.isoformat(),
+            "time_to": (T0 + timedelta(days=1)).isoformat(),
+            "transformation": {"kind": "flag_outliers"},
+            "reason_code": "GPS_OUTLIER",
+        },
+        headers=h,
+    )
+    assert created.status_code == 201, created.text
+    job = created.json()
+    assert job["affected_count"] == 1 and job["preview"]["transformation"] == "flag GNSS outliers"
+    assert job["preview"]["samples"][0]["target_id"] == rows[2].id
+    applied = await client.post(f"{base}/jobs/{job['id']}/apply", headers=h)
+    assert applied.status_code == 200, applied.text
+    await apply_job(uuid.UUID(job["id"]), user_id=admin.user.id)
+
+    listed = (await client.get(f"{base}/outliers", headers=h)).json()
+    assert listed["total"] == 1 and listed["waiting"] == 1
+    item = listed["items"][0]
+    assert item["target_id"] == rows[2].id and item["valid"] is False
+    assert item["speed_mps"] > 800 and item["device_name"] == device["name"]
+    assert item["entity_name"] == "Rhino 14" and item["accuracy_m"] == 19.0
+    span = (await client.get(f"/api/v1/devices/{device['id']}/data-span", headers=h)).json()
+    assert span["outliers_waiting"] == 1
+    await db.rollback()
+    kept = await db.get(Position, (rows[3].id, rows[3].time))
+    assert kept is not None and kept.valid is True  # judged against the fix before the jump
+
+    approved = await client.post(
+        f"{base}/corrections",
+        json={
+            "target_type": "position",
+            "target_id": rows[2].id,
+            "target_time": rows[2].time.isoformat(),
+            "field": "valid",
+            "corrected_value": True,
+            "reason_code": "OUTLIER_APPROVED",
+            "comment": "the collar travelled by car",
+        },
+        headers=h,
+    )
+    assert approved.status_code == 201, approved.text
+    assert (await client.get(f"{base}/outliers", headers=h)).json()["waiting"] == 0
+    everything = (await client.get(f"{base}/outliers?waiting=false", headers=h)).json()
+    assert everything["total"] == 1 and everything["items"][0]["valid"] is True

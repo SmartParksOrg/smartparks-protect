@@ -58,6 +58,7 @@ from shared.domain.assignments import resolve_attribution
 from shared.domain.attribution import active_job, publish_job, recent_jobs
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
+from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.enums import AcquisitionChannel, DeviceStatus, Role
 from shared.models import (
     AttributionJob,
@@ -909,6 +910,16 @@ async def device_data_span(
         setattr(ahead, attr, int(count or 0))
         if until is not None and (ahead_until is None or until > ahead_until):
             ahead_until = until
+    outliers_waiting = int(
+        await session.scalar(
+            select(func.count()).where(
+                Position.device_id == device.id,
+                Position.attributes.has_key(OUTLIER_ATTRIBUTE),
+                Position.valid.is_(False),
+            )
+        )
+        or 0
+    )
     return DeviceDataSpan(
         first_record_at=min(firsts, default=None),
         last_record_at=max(lasts, default=None),
@@ -923,6 +934,7 @@ async def device_data_span(
         before_entity=await _record_counts(session, device.id, entity_from),
         clock_ahead=ahead,
         clock_ahead_until=ahead_until,
+        outliers_waiting=outliers_waiting,
     )
 
 

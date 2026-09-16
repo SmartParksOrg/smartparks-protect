@@ -21,6 +21,8 @@ from protect_api.schemas.curation import (
     CurationSummary,
     JobCreate,
     JobRead,
+    OutlierList,
+    OutlierRead,
     RecordHistory,
 )
 from shared.bus import RedisStreamsBus, Topic
@@ -34,15 +36,24 @@ from shared.curation.apply import (
     recompute_current_state,
     revert_correction,
 )
+from shared.curation.effective import effective_geom, effective_time
 from shared.curation.jobs import Transformation, preview, validate_job
 from shared.database import get_session
+from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.enums import (
     CorrectionStatus,
     CurationJobStatus,
     CurationReason,
     CurationTarget,
 )
-from shared.models import CurationJob, DataCorrection, IntegrationDelivery
+from shared.models import (
+    CurationJob,
+    DataCorrection,
+    Device,
+    Entity,
+    IntegrationDelivery,
+    Position,
+)
 from shared.permissions import Permission
 from shared.timeutil import require_aware, utc_now
 from shared.trace import ApplicationError
@@ -168,6 +179,74 @@ async def list_corrections(
     return PageResponse(
         items=[CorrectionRead.model_validate(r) for r in rows], next_cursor=next_cursor
     )
+
+
+@router.get("/outliers", response_model=OutlierList)
+async def list_outliers(
+    device_id: uuid.UUID | None = None,
+    waiting: bool = Query(True, description="Only the flagged fixes not yet approved"),
+    limit: int = Query(200, ge=1, le=1000),
+    context: ProjectContext = Depends(get_project_context),
+    session: AsyncSession = Depends(get_session),
+) -> OutlierList:
+    """The GNSS fixes flagged as outliers (decision D221), newest first, with the device and
+    the entity, the jump and the speed; `waiting` false lists the approved ones too."""
+    flagged = Position.attributes.has_key(OUTLIER_ATTRIBUTE)
+    conditions = [
+        Position.project_id == context.project.id,
+        flagged,
+        context.visibility.rows(Position.entity_id, Position.device_id),
+    ]
+    if device_id is not None:
+        conditions.append(Position.device_id == device_id)
+    if waiting:
+        conditions.append(Position.valid.is_(False))
+    total = int(await session.scalar(select(func.count()).where(*conditions)) or 0)
+    waiting_count = int(
+        await session.scalar(select(func.count()).where(*conditions, Position.valid.is_(False)))
+        or 0
+    )
+    rows = (
+        await session.execute(
+            select(
+                Position,
+                effective_time(Position).label("at"),
+                func.ST_Y(effective_geom()).label("lat"),
+                func.ST_X(effective_geom()).label("lon"),
+                Device.name.label("device_name"),
+                Entity.name.label("entity_name"),
+            )
+            .join(Device, Device.id == Position.device_id)
+            .outerjoin(Entity, Entity.id == Position.entity_id)
+            .where(*conditions)
+            .order_by(effective_time(Position).desc())
+            .limit(limit)
+        )
+    ).all()
+    items = []
+    for position, at, lat, lon, device_name, entity_name in rows:
+        figures = (position.attributes or {}).get(OUTLIER_ATTRIBUTE) or {}
+        previous = figures.get("previous_time")
+        items.append(
+            OutlierRead(
+                target_id=position.id,
+                target_time=position.time,
+                effective_time=at,
+                device_id=position.device_id,
+                device_name=device_name,
+                entity_id=position.entity_id,
+                entity_name=entity_name,
+                latitude=float(lat),
+                longitude=float(lon),
+                accuracy_m=position.accuracy_m,
+                distance_m=figures.get("distance_m"),
+                seconds=figures.get("seconds"),
+                speed_mps=figures.get("speed_mps"),
+                previous_time=datetime.fromisoformat(previous) if previous else None,
+                valid=bool(position.valid),
+            )
+        )
+    return OutlierList(items=items, total=total, waiting=waiting_count)
 
 
 @router.get("/history", response_model=RecordHistory)

@@ -475,6 +475,10 @@ class DeviceDataSpan(BaseModel):
         description="Records whose device time runs ahead of the clock (decision D119)",
     )
     clock_ahead_until: datetime | None = None
+    outliers_waiting: int = Field(
+        default=0,
+        description="GNSS fixes flagged as outliers and not yet approved (decision D221)",
+    )
 
 
 class HandoverRequest(BaseModel):

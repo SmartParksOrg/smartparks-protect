@@ -388,6 +388,20 @@ export function DevicePage() {
               )}
             </Callout>
           )}
+        {sp && (sp.outliers_waiting ?? 0) > 0 && projectId && (
+          <Callout kind="info">
+            {t(
+              "{{count}} fixes were flagged as GNSS outliers and wait for review; they stay off the map until approved.",
+              { count: sp.outliers_waiting },
+            )}{" "}
+            <Link
+              className="underline"
+              to={`/projects/${projectId}/analyze/curation?tab=outliers`}
+            >
+              {t("Review them under Curation")}
+            </Link>
+          </Callout>
+        )}
         {sp && beforeProject > 0 && sp.earliest_project_assignment_id && (
           <Callout kind="warning">
             {t(

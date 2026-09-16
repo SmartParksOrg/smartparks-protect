@@ -17,7 +17,7 @@ from typing import Any
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
@@ -29,7 +29,9 @@ from shared.control.commands import (
     apply_satellite_delivery,
     interpret_device_records,
 )
+from shared.curation.effective import device_fix, effective_geom, effective_time, visible
 from shared.device_drivers.base import (
+    DecodedEvent,
     DecodedMeasurement,
     DecodedPosition,
     DecodedRecords,
@@ -42,6 +44,9 @@ from shared.device_drivers.base import (
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import Attribution, resolve_attribution
 from shared.domain.movement import MOVEMENT_THRESHOLD_MPS2, derive_activity, previous_sample
+from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
+from shared.domain.outliers import EVENT_TYPE as OUTLIER_EVENT_TYPE
+from shared.domain.outliers import outlier_of
 from shared.domain.reboot import detect_reboots, previous_uptime
 from shared.enums import (
     AcquisitionChannel,
@@ -49,6 +54,7 @@ from shared.enums import (
     ErrorCode,
     LocationSource,
     ProcessingStatus,
+    Severity,
     TraceStatus,
     ValueType,
 )
@@ -98,6 +104,37 @@ class Outcome:
     # records whose device time ran ahead of the delivery (decision D119), kept invalid
     clock_ahead: int = 0
     clock_ahead_seconds: float = 0.0
+    # fixes flagged as outliers (decision D221), kept invalid until approved; their times, so
+    # the current state skips them
+    outliers: int = 0
+    outlier_times: set[datetime] = field(default_factory=set)
+
+
+async def _previous_fix(
+    session: AsyncSession, device_id: uuid.UUID, before: datetime
+) -> tuple[float, float, datetime] | None:
+    """The device's last valid own fix before `before`, at its effective time and place (a
+    fix written earlier in this transaction counts, so a log file is judged in order)."""
+    row = (
+        await session.execute(
+            select(
+                func.ST_Y(effective_geom()),
+                func.ST_X(effective_geom()),
+                effective_time(Position).label("at"),
+            )
+            .where(
+                Position.device_id == device_id,
+                effective_time(Position) < before,
+                visible(Position),
+                device_fix(),
+            )
+            .order_by(effective_time(Position).desc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None
+    return float(row[0]), float(row[1]), row[2]
 
 
 def _ahead_of_delivery(event: SourceEvent, record_time: datetime) -> float:
@@ -360,6 +397,12 @@ async def process_source_event(
             await _write_events(session, event, device, records, outcome, attribution_at)
             total = sum(outcome.created.values())
             step.metadata.update(created=total, duplicates=outcome.duplicates)
+            if outcome.outliers:
+                step.metadata["outliers"] = outcome.outliers
+                step.metadata["outlier_note"] = (
+                    f"{outcome.outliers} fixes flagged as outliers (an impossible speed from the "
+                    "last valid fix), kept invalid until approved under Curation"
+                )
             if outcome.clock_ahead:
                 step.metadata["clock_ahead_records"] = outcome.clock_ahead
                 step.metadata["clock_ahead_days"] = round(outcome.clock_ahead_seconds / 86400, 2)
@@ -373,7 +416,7 @@ async def process_source_event(
             if unassigned:
                 step.metadata["unassigned_times"] = [t.isoformat() for t in unassigned]
 
-        await _update_current_state(session, event, device, records, attributions)
+        await _update_current_state(session, event, device, records, attributions, outcome)
         outcome.messages += await interpret_device_records(session, device, driver, event, records)
         satellite = SatelliteSession.from_dict(
             (event.provider_metadata or {}).get("satellite_session")
@@ -474,6 +517,39 @@ async def _write_positions(
         if ahead:
             outcome.clock_ahead += 1
             outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
+        attributes = dict(record.attributes)
+        outlier = None
+        if not ahead and record.record_type != NETWORK_RECORD_TYPE:
+            previous = await _previous_fix(session, device.id, record.time)
+            if previous is not None:
+                settings = get_settings()
+                outlier = outlier_of(
+                    previous,
+                    (record.latitude, record.longitude, record.time),
+                    max_speed_mps=settings.outlier_max_speed_mps,
+                    min_jump_m=settings.outlier_min_jump_m,
+                )
+        if outlier is not None:
+            # flagged and kept invalid until a person approves it (decision D221); the event
+            # lets rules and the lists say so
+            settings = get_settings()
+            attributes[OUTLIER_ATTRIBUTE] = outlier.attribute(
+                max_speed_mps=settings.outlier_max_speed_mps,
+                min_jump_m=settings.outlier_min_jump_m,
+            )
+            outcome.outliers += 1
+            outcome.outlier_times.add(record.time)
+            records.events.append(
+                DecodedEvent(
+                    time=record.time,
+                    event_type=OUTLIER_EVENT_TYPE,
+                    title=outlier.title(),
+                    severity=Severity.INFO,
+                    context={**attributes[OUTLIER_ATTRIBUTE], "record_type": record.record_type},
+                    latitude=record.latitude,
+                    longitude=record.longitude,
+                )
+            )
         position = Position(
             time=record.time,
             device_id=device.id,
@@ -484,20 +560,24 @@ async def _write_positions(
             source_event_ingested_at=event.ingested_at,
             record_type=record.record_type,
             canonical_key=key,
-            valid=not ahead,
+            valid=not ahead and outlier is None,
             geom=from_shape(Point(record.longitude, record.latitude), srid=4326),
             altitude_m=record.altitude_m,
             speed_mps=record.speed_mps,
             heading_deg=record.heading_deg,
             accuracy_m=record.accuracy_m,
             satellites=record.satellites,
-            attributes=record.attributes,
+            attributes=attributes,
             trace_id=event.trace_id,
         )
         session.add(position)
         await session.flush()
         await _link_delivery(session, event, "position", position.id, position.time, first=True)
         outcome.created["positions"] += 1
+        if not position.valid:
+            # an invalid fix (a clock ahead, an outlier) moves no map, fires no rule and
+            # reaches no integration; it waits for a curation
+            continue
         outcome.messages.append(
             (
                 Topic.POSITION_CREATED,
@@ -714,11 +794,16 @@ async def _update_current_state(
     device: Device,
     records: DecodedRecords,
     attributions: dict[datetime, Attribution],
+    outcome: Outcome,
 ) -> None:
     now = utc_now()
     # a record from the future (decision D119) must not become the newest position, state or
     # last seen: it would block every real update until the clock is curated
-    timely_positions = [p for p in records.positions if not _ahead_of_delivery(event, p.time)]
+    timely_positions = [
+        p
+        for p in records.positions
+        if not _ahead_of_delivery(event, p.time) and p.time not in outcome.outlier_times
+    ]
     timely_states = [s for s in records.states if not _ahead_of_delivery(event, s.time)]
     timely_measurements = [m for m in records.measurements if not _ahead_of_delivery(event, m.time)]
     timely_events = [e for e in records.events if not _ahead_of_delivery(event, e.time)]

@@ -597,3 +597,48 @@ async def test_an_uptime_drop_is_a_reboot_event_and_the_last_reset(db, bus, worl
     current = await db.get(DeviceCurrentState, world.device.id)
     await db.refresh(current)
     assert current.last_reset_at == datetime(2026, 5, 4, 9, tzinfo=UTC)
+
+
+async def test_an_impossible_jump_is_flagged_as_an_outlier_and_kept_out(db, bus, world):
+    """Decision D221: a fix an impossible speed away from the last valid fix is stored invalid
+    with its figures, raises an informational event, moves no map and fires no rule; the fix
+    after it is judged against the last valid one, not the outlier."""
+    from shared.models import Event
+
+    first = {"time": "2026-03-10T10:00:00+00:00", "lat": -24.9, "lon": 31.5}
+    _, ok = await _ingest_and_process(db, bus, world, first)
+    assert ok.outliers == 0
+    jump = {"time": "2026-03-10T11:00:00+00:00", "lat": 52.04, "lon": 5.77}
+    event, outcome = await _ingest_and_process(db, bus, world, jump)
+    assert outcome.status == ProcessingStatus.PROCESSED
+    assert outcome.outliers == 1 and outcome.created["positions"] == 1
+    assert outcome.created["events"] == 1
+    topics = [t for t, _ in outcome.messages]
+    assert Topic.POSITION_CREATED not in topics and Topic.EVENT_CREATED in topics
+    await db.rollback()
+    row = (
+        await db.execute(select(Position).where(Position.source_event_id == event.id))
+    ).scalar_one()
+    assert row.valid is False
+    figures = row.attributes["outlier"]
+    assert figures["speed_mps"] > 2000 and figures["distance_m"] > 8_000_000
+    assert figures["previous_time"] == "2026-03-10T10:00:00+00:00"
+    flagged = (
+        (await db.execute(select(Event).where(Event.event_type == "position_outlier")))
+        .scalars()
+        .all()
+    )
+    assert len(flagged) == 1 and flagged[0].device_id == world.device.id
+    assert flagged[0].severity == "info" and "flagged as an outlier" in flagged[0].title
+    state = await db.get(DeviceCurrentState, world.device.id)
+    assert state is not None
+    assert state.latest_position_time == datetime(2026, 3, 10, 10, tzinfo=UTC)
+    # the next fix near the first one is valid: the outlier is not the yardstick
+    back = {"time": "2026-03-10T12:00:00+00:00", "lat": -24.91, "lon": 31.51}
+    event3, outcome3 = await _ingest_and_process(db, bus, world, back)
+    assert outcome3.outliers == 0
+    await db.rollback()
+    row3 = (
+        await db.execute(select(Position).where(Position.source_event_id == event3.id))
+    ).scalar_one()
+    assert row3.valid is True

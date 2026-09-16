@@ -3,12 +3,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Check, Plus, RotateCcw, Undo2 } from "lucide-react";
 import { useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { Correction, CurationJob, Device, Entity, IntegrationDelivery, MetricWithData, Page as PageType } from "@/api/types";
+import type { Correction, CurationJob, Device, Entity, IntegrationDelivery, MetricWithData, Outlier, OutlierList, Page as PageType } from "@/api/types";
 import { MultiSelect } from "@/components/analytics/MultiSelect";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
@@ -33,13 +33,14 @@ import { type CurationTarget, FIELD_LABELS, formatValue, REASON_LABELS } from "@
 import { formatAgo, formatTime } from "@/lib/format";
 import { useAuthStore } from "@/stores/auth";
 
-type Tab = "pending" | "applied" | "jobs" | "reverted" | "impact";
-const TABS: Array<[Tab, string]> = [["pending", "Pending"], ["applied", "Applied"], ["jobs", "Bulk jobs"], ["reverted", "Reverted"], ["impact", "Downstream impact"]];
-const KINDS: Record<string, string> = { time_offset: "shift time", set_valid: "set validity", value_offset: "add to value", value_scale: "scale value" };
+type Tab = "pending" | "applied" | "outliers" | "jobs" | "reverted" | "impact";
+const TABS: Array<[Tab, string]> = [["pending", "Pending"], ["applied", "Applied"], ["outliers", "Outliers"], ["jobs", "Bulk jobs"], ["reverted", "Reverted"], ["impact", "Downstream impact"]];
+const KINDS: Record<string, string> = { time_offset: "shift time", set_valid: "set validity", value_offset: "add to value", value_scale: "scale value", flag_outliers: "flag GNSS outliers" };
 
 function describeTransformation(t: Record<string, unknown>): string {
   if (t.kind === "time_offset") { const s = Number(t.seconds); return `time ${s >= 0 ? "+" : "-"} ${Math.abs(s)} s (${(Math.abs(s) / 3600).toFixed(2)} h)`; }
   if (t.kind === "set_valid") return t.valid ? "mark valid" : "mark invalid";
+  if (t.kind === "flag_outliers") return "flag GNSS outliers";
   if (t.kind === "value_offset") return `value ${Number(t.delta) >= 0 ? "+" : "-"} ${Math.abs(Number(t.delta))}`;
   return `value x ${t.factor}`;
 }
@@ -57,18 +58,25 @@ export function CurationPage() {
   const client = useQueryClient();
   const summary = useCurationSummary(projectId);
   const base = `/api/v1/projects/${projectId}/curation`;
-  const statusFor: Record<Tab, string | undefined> = { pending: "pending", applied: "active", jobs: undefined, reverted: "reverted", impact: undefined };
-  const corrections = useQuery({ queryKey: queryKeys.corrections(projectId, { status: statusFor[tab] }), queryFn: () => api.get<PageType<Correction>>(`${base}/corrections`, { query: { status: statusFor[tab], limit: 200 } }), enabled: tab !== "jobs" && tab !== "impact" });
+  const statusFor: Record<Tab, string | undefined> = { pending: "pending", applied: "active", outliers: undefined, jobs: undefined, reverted: "reverted", impact: undefined };
+  const corrections = useQuery({ queryKey: queryKeys.corrections(projectId, { status: statusFor[tab] }), queryFn: () => api.get<PageType<Correction>>(`${base}/corrections`, { query: { status: statusFor[tab], limit: 200 } }), enabled: tab !== "jobs" && tab !== "impact" && tab !== "outliers" });
+  const outliers = useQuery({ queryKey: queryKeys.outliers(projectId), queryFn: () => api.get<OutlierList>(`${base}/outliers`, { query: { limit: 200 } }), enabled: tab === "outliers" });
   const superseded = useQuery({ queryKey: queryKeys.corrections(projectId, { status: "superseded" }), queryFn: () => api.get<PageType<Correction>>(`${base}/corrections`, { query: { status: "superseded", limit: 200 } }), enabled: tab === "reverted" });
   const jobs = useQuery({ queryKey: queryKeys.curationJobs(projectId, {}), queryFn: () => api.get<PageType<CurationJob>>(`${base}/jobs`, { query: { limit: 100 } }), refetchInterval: (q) => (q.state.data?.items.some((j) => j.status === "applying" || j.status === "reverting") ? 3_000 : false) });
   const stale = useQuery({ queryKey: queryKeys.integrationDeliveries(projectId, { stale: true }), queryFn: () => api.get<PageType<IntegrationDelivery>>(`/api/v1/projects/${projectId}/integrations/deliveries`, { query: { stale: true, limit: 200 } }), enabled: tab === "impact" });
   const [history, setHistory] = useState<CurationTarget | null>(null);
   const [reverting, setReverting] = useState<{ kind: "correction" | "job"; id: string } | null>(null);
   const [revertComment, setRevertComment] = useState("");
-  const [newJob, setNewJob] = useState(false);
+  const [newJob, setNewJob] = useState<false | "any" | "outliers">(false);
   const [job, setJob] = useState<CurationJob | null>(null);
   const invalidateAll = () => { void client.invalidateQueries({ queryKey: ["projects", projectId, "curation"] }); invalidateRecords(client, projectId); };
   const approve = useMutationToast({ mutationFn: (c: Correction) => api.post<Correction>(`${base}/corrections/${c.id}/approve`), success: t("Correction approved and applied"), onSuccess: invalidateAll });
+  // an approved outlier is a set-valid correction: audited, reversible, subject to the project's approval rule
+  const approveOutlier = useMutationToast({
+    mutationFn: (o: Outlier) => api.post<Correction>(`${base}/corrections`, { body: { target_type: "position", target_id: o.target_id, target_time: o.target_time, field: "valid", corrected_value: true, reason_code: "OUTLIER_APPROVED", comment: null } }),
+    success: (c: Correction) => (c.status === "pending" ? t("Proposed; the fix returns once another person approves") : t("The fix is back in the data")),
+    onSuccess: () => { invalidateAll(); void outliers.refetch(); },
+  });
   const revert = useMutationToast({
     mutationFn: (r: { kind: "correction" | "job"; id: string }) => api.post<unknown>(`${base}/${r.kind === "job" ? "jobs" : "corrections"}/${r.id}/revert`, { body: { comment: revertComment || null } }),
     success: t("Reverted"),
@@ -104,11 +112,21 @@ export function CurationPage() {
     { header: t("Delivered"), accessorKey: "delivered_at", cell: ({ getValue }) => formatTime(getValue<string | null>()) },
     { id: "actions", header: "", cell: ({ row }) => admin ? <span className="flex justify-end"><Button size="sm" variant="outline" onClick={() => resend.mutate(row.original)} disabled={resend.isPending}><RotateCcw className="size-4" /> {t("Resend corrected")}</Button></span> : null },
   ];
+  const outlierColumns: ColumnDef<Outlier, unknown>[] = [
+    { header: t("Time"), accessorKey: "effective_time", cell: ({ getValue }) => formatTime(getValue<string>()) },
+    { header: t("Device"), id: "device", cell: ({ row }) => <Link className="underline" to={`/projects/${projectId}/devices/${row.original.device_id}`}>{row.original.device_name ?? row.original.device_id}</Link> },
+    { header: t("Entity"), accessorKey: "entity_name", cell: ({ getValue }) => getValue<string | null>() ?? <span className="text-muted-foreground">{t("none")}</span> },
+    { header: t("Jump"), id: "jump", cell: ({ row }) => <span className="text-xs">{t("{{km}} km in {{hours}} h", { km: ((row.original.distance_m ?? 0) / 1000).toFixed(0), hours: ((row.original.seconds ?? 0) / 3600).toFixed(1) })}</span> },
+    { header: t("Speed"), accessorKey: "speed_mps", cell: ({ getValue }) => `${(getValue<number | null>() ?? 0).toFixed(0)} m/s` },
+    { header: t("Accuracy"), accessorKey: "accuracy_m", cell: ({ getValue }) => getValue<number | null>() == null ? "" : `${getValue<number>()} m` },
+    { header: t("Where"), id: "where", cell: ({ row }) => <a className="text-xs underline" href={`https://www.openstreetmap.org/?mlat=${row.original.latitude}&mlon=${row.original.longitude}#map=8/${row.original.latitude}/${row.original.longitude}`} target="_blank" rel="noreferrer">{row.original.latitude.toFixed(4)}, {row.original.longitude.toFixed(4)}</a> },
+    { id: "actions", header: "", cell: ({ row }) => admin ? <span className="flex justify-end"><Button size="sm" variant="outline" onClick={() => approveOutlier.mutate(row.original)} disabled={approveOutlier.isPending}><Check className="size-4" /> {t("Approve: the fix is real")}</Button></span> : null },
+  ];
   const pendingJobs = (jobs.data?.items ?? []).filter((j) => j.status === "pending");
   const s = summary.data;
   return (
     <>
-      <PageHeader title={t("Curation")} description={t("Controlled, reversible corrections on canonical records; the original values and every decision stay on file")} actions={admin && <Button onClick={() => setNewJob(true)}><Plus className="size-4" /> {t("New bulk job")}</Button>} />
+      <PageHeader title={t("Curation")} description={t("Controlled, reversible corrections on canonical records; the original values and every decision stay on file")} actions={admin && <Button onClick={() => setNewJob("any")}><Plus className="size-4" /> {t("New bulk job")}</Button>} />
       <Page>
         {s && (
           <div className="grid gap-3 sm:grid-cols-4">
@@ -130,6 +148,15 @@ export function CurationPage() {
         {(tab === "applied") && <DataTable columns={correctionColumns} data={corrections.data?.items} isLoading={corrections.isPending} emptyMessage={t("No active corrections.")} footer={corrections.data && `${corrections.data.items.length} corrections, newest first`} />}
         {tab === "reverted" && <DataTable columns={correctionColumns} data={[...(corrections.data?.items ?? []), ...(superseded.data?.items ?? [])].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))} isLoading={corrections.isPending || superseded.isPending} emptyMessage={t("No reverted or superseded corrections.")} />}
         {tab === "jobs" && <DataTable columns={jobColumns} data={jobs.data?.items} isLoading={jobs.isPending} emptyMessage={t("No bulk jobs yet.")} onRowClick={setJob} />}
+        {tab === "outliers" && (
+          <div className="space-y-3">
+            <Callout kind="info">
+              {t("A GNSS fix that would need an impossible speed from the last valid fix (above {{speed}} m/s over more than {{km}} km by default) is flagged when it arrives and kept off the map, the charts and the rules until a person approves it here. Approving is a set-valid correction: audited and reversible.", { speed: 50, km: 1 })}
+              {admin && <> <Button size="sm" variant="outline" className="ml-2" onClick={() => setNewJob("outliers")}>{t("Find outliers in the past")}</Button></>}
+            </Callout>
+            <DataTable columns={outlierColumns} data={outliers.data?.items} isLoading={outliers.isPending} emptyMessage={t("No flagged fix waits for review.")} footer={outliers.data && t("{{count}} waiting", { count: outliers.data.waiting })} />
+          </div>
+        )}
         {tab === "impact" && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">{t("Outbound deliveries whose object was corrected after it reached the target (architecture 28.10). Resend delivers the corrected version as a new delivery; nothing is sent without review. Rule replays requested on bulk jobs are shown in the job's detail.")}</p>
@@ -145,13 +172,13 @@ export function CurationPage() {
           <DialogFooter><Button variant="outline" onClick={() => setReverting(null)}>{t("Cancel")}</Button><Button onClick={() => reverting && revert.mutate(reverting)} disabled={revert.isPending}>{t("Revert")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-      <NewJobDialog projectId={projectId} open={newJob} onOpenChange={setNewJob} onCreated={(j) => { setNewJob(false); void jobs.refetch(); void summary.refetch(); setJob(j); }} reasons={s?.reasons ?? Object.keys(REASON_LABELS)} />
+      <NewJobDialog key={String(newJob)} projectId={projectId} open={newJob !== false} preset={newJob === "outliers" ? "flag_outliers" : null} onOpenChange={(o) => setNewJob(o ? "any" : false)} onCreated={(j) => { setNewJob(false); void jobs.refetch(); void summary.refetch(); void outliers.refetch(); setJob(j); }} reasons={s?.reasons ?? Object.keys(REASON_LABELS)} />
       <JobDialog projectId={projectId} job={job} admin={admin} userId={user?.id ?? null} onClose={() => setJob(null)} onChanged={(j) => { setJob(j); invalidateAll(); }} onRevert={(j) => { setJob(null); setReverting({ kind: "job", id: j.id }); }} />
     </>
   );
 }
 
-function NewJobDialog({ projectId, open, onOpenChange, onCreated, reasons }: { projectId: string; open: boolean; onOpenChange: (o: boolean) => void; onCreated: (job: CurationJob) => void; reasons: string[] }) {
+function NewJobDialog({ projectId, open, onOpenChange, onCreated, reasons, preset = null }: { projectId: string; open: boolean; onOpenChange: (o: boolean) => void; onCreated: (job: CurationJob) => void; reasons: string[]; preset?: "flag_outliers" | null }) {
   const { t } = useTranslation();
   const [targetType, setTargetType] = useState<"position" | "measurement">("position");
   const [deviceIds, setDeviceIds] = useState<string[]>([]);
@@ -159,12 +186,12 @@ function NewJobDialog({ projectId, open, onOpenChange, onCreated, reasons }: { p
   const [metricKeys, setMetricKeys] = useState<string[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [kind, setKind] = useState("time_offset");
+  const [kind, setKind] = useState(preset ?? "time_offset");
   const [hours, setHours] = useState("12");
   const [valid, setValid] = useState(false);
   const [delta, setDelta] = useState("0");
   const [factor, setFactor] = useState("1");
-  const [reason, setReason] = useState("DEVICE_FIRMWARE_BUG");
+  const [reason, setReason] = useState(preset === "flag_outliers" ? "GPS_OUTLIER" : "DEVICE_FIRMWARE_BUG");
   const [comment, setComment] = useState("");
   const [replay, setReplay] = useState(false);
   const devices = useQuery({ queryKey: queryKeys.devices({ project: projectId, curation: true }), queryFn: () => api.get<PageType<Device>>("/api/v1/devices", { query: { project_id: projectId, limit: 500 } }), enabled: open });
@@ -179,7 +206,7 @@ function NewJobDialog({ projectId, open, onOpenChange, onCreated, reasons }: { p
     } }),
     onSuccess: (j) => { toast.success(`Preview ready: ${j.affected_count} records`); onCreated(j); },
   });
-  const kinds = targetType === "measurement" ? Object.keys(KINDS) : ["time_offset", "set_valid"];
+  const kinds = targetType === "measurement" ? Object.keys(KINDS).filter((k) => k !== "flag_outliers") : ["time_offset", "set_valid", "flag_outliers"];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
@@ -202,6 +229,7 @@ function NewJobDialog({ projectId, open, onOpenChange, onCreated, reasons }: { p
             </Select>
           </Field>
           {kind === "time_offset" && <Field label={t("Hours to add (negative subtracts)")} htmlFor="job-hours"><Input id="job-hours" type="number" step="any" value={hours} onChange={(e) => setHours(e.target.value)} /></Field>}
+          {kind === "flag_outliers" && <p className="text-xs text-muted-foreground">{t("Walks the valid fixes of the selection in time order, device by device, and flags every fix that would need an impossible speed from the fix before it (the server's outlier bounds). The preview counts them; applying marks them invalid until approved under Outliers.")}</p>}
           {kind === "set_valid" && <div className="flex items-center gap-2"><Switch id="job-valid" checked={valid} onCheckedChange={setValid} /><label htmlFor="job-valid">{valid ? "Mark valid" : "Mark invalid (hidden from every normal view)"}</label></div>}
           {kind === "value_offset" && <Field label={t("Add to every value")} htmlFor="job-delta"><Input id="job-delta" type="number" step="any" value={delta} onChange={(e) => setDelta(e.target.value)} /></Field>}
           {kind === "value_scale" && <Field label={t("Multiply every value by")} htmlFor="job-factor"><Input id="job-factor" type="number" step="any" value={factor} onChange={(e) => setFactor(e.target.value)} /></Field>}

@@ -144,6 +144,19 @@ class Settings(BaseSettings):
     log_file_batch_size: int = Field(
         default=200, ge=1, description="Frames of a log file decoded per transaction"
     )
+    outlier_max_speed_mps: float = Field(
+        default=50.0,
+        gt=0,
+        description="A GNSS fix that needs more than this speed from the last valid fix, and "
+        "lies farther than OUTLIER_MIN_JUMP_M, is flagged and kept invalid until approved "
+        "(decision D221)",
+    )
+    outlier_min_jump_m: float = Field(
+        default=1000.0,
+        ge=0,
+        description="A fix closer than this to the last valid fix is never an outlier, whatever "
+        "the speed: GPS scatter over a short interval must not trigger",
+    )
     clock_ahead_tolerance_seconds: int = Field(
         default=3600,
         ge=0,

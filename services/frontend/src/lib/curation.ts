@@ -10,6 +10,7 @@ export const REASON_LABELS: Record<string, string> = {
   DEVICE_CLOCK_ERROR: "device clock error",
   TIMEZONE_ERROR: "timezone error",
   GPS_OUTLIER: "GPS outlier",
+  OUTLIER_APPROVED: "outlier approved: the fix is real",
   CALIBRATION_ERROR: "calibration error",
   WRONG_ENTITY_ASSIGNMENT: "wrong entity assignment",
   WRONG_PROJECT_ASSIGNMENT: "wrong project assignment",

@@ -95,7 +95,6 @@ import {
   revealEntity,
   revealFeature,
   revealGateway,
-  shownLayerCount,
 } from "@/components/map/layerChoices";
 import { ControlStrip, type StripItem } from "@/components/map/ControlStrip";
 import { FeedPanel } from "@/components/map/FeedPanel";
@@ -854,9 +853,11 @@ export function MapPage() {
           )?.find((f) => f.properties.device_id === deviceId)
         : undefined;
       const entityFresh =
-        Boolean(entityId) && isNewer(shownEntity?.properties.position_time, time);
+        Boolean(entityId) &&
+        isNewer(shownEntity?.properties.position_time, time);
       const deviceFresh =
-        Boolean(deviceId) && isNewer(shownDevice?.properties.position_time, time);
+        Boolean(deviceId) &&
+        isNewer(shownDevice?.properties.position_time, time);
       if (entityFresh)
         client.setQueryData<CurrentState>(
           queryKeys.currentState(projectId),
@@ -1653,20 +1654,14 @@ export function MapPage() {
         ]
       : []),
   ];
-  const shownLayers = shownLayerCount(layers, {
-    entities: visibleFeatures?.length ?? 0,
-    devices: visibleDevices.length,
-  });
   const layersItem: StripItem = {
     key: "layers",
     icon: ListTree,
     label: t("Layers"),
     active: panelOpen,
     emphasis: true,
-    badge: shownLayers,
     onClick: () => setPanelOpen(!panelOpen),
   };
-  // (the count is the badge; the React compiler refuses an interpolated label from it)
   const feedItem: StripItem = {
     key: "feed",
     icon: Bell,

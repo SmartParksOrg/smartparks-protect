@@ -15781,6 +15781,96 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/curation/outliers": {
+   "get": {
+    "tags": [
+     "curation"
+    ],
+    "summary": "List Outliers",
+    "description": "The GNSS fixes flagged as outliers (decision D221), newest first, with the device and\nthe entity, the jump and the speed; `waiting` false lists the approved ones too.",
+    "operationId": "list_outliers_api_v1_projects__project_id__curation_outliers_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "waiting",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Only the flagged fixes not yet approved",
+       "default": true,
+       "title": "Waiting"
+      },
+      "description": "Only the flagged fixes not yet approved"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 1000,
+       "minimum": 1,
+       "default": 200,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OutlierList"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/curation/history": {
    "get": {
     "tags": [
@@ -26072,6 +26162,12 @@
        }
       ],
       "title": "Clock Ahead Until"
+     },
+     "outliers_waiting": {
+      "type": "integer",
+      "title": "Outliers Waiting",
+      "description": "GNSS fixes flagged as outliers and not yet approved (decision D221)",
+      "default": 0
      }
     },
     "type": "object",
@@ -33187,6 +33283,182 @@
     "type": "object",
     "title": "OrganizationUpdate"
    },
+   "OutlierList": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/OutlierRead"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "waiting": {
+      "type": "integer",
+      "title": "Waiting"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "total",
+     "waiting"
+    ],
+    "title": "OutlierList"
+   },
+   "OutlierRead": {
+    "properties": {
+     "target_type": {
+      "type": "string",
+      "title": "Target Type",
+      "default": "position"
+     },
+     "target_id": {
+      "type": "integer",
+      "title": "Target Id"
+     },
+     "target_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Target Time"
+     },
+     "effective_time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Effective Time"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "latitude": {
+      "type": "number",
+      "title": "Latitude"
+     },
+     "longitude": {
+      "type": "number",
+      "title": "Longitude"
+     },
+     "accuracy_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Accuracy M"
+     },
+     "distance_m": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Distance M"
+     },
+     "seconds": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seconds"
+     },
+     "speed_mps": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Speed Mps"
+     },
+     "previous_time": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Time"
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid"
+     }
+    },
+    "type": "object",
+    "required": [
+     "target_id",
+     "target_time",
+     "effective_time",
+     "device_id",
+     "device_name",
+     "entity_id",
+     "entity_name",
+     "latitude",
+     "longitude",
+     "accuracy_m",
+     "distance_m",
+     "seconds",
+     "speed_mps",
+     "previous_time",
+     "valid"
+    ],
+    "title": "OutlierRead",
+    "description": "A GNSS fix the decoder or a bulk job flagged as an outlier (decision D221): where it\nlies, how far and how fast from the fix before it, and whether a person approved it."
+   },
    "PageResponse_ActionDeliveryRead_": {
     "properties": {
      "items": {
@@ -38547,7 +38819,7 @@
     "properties": {
      "kind": {
       "type": "string",
-      "pattern": "^(time_offset|set_valid|value_offset|value_scale)$",
+      "pattern": "^(time_offset|set_valid|value_offset|value_scale|flag_outliers)$",
       "title": "Kind"
      },
      "seconds": {

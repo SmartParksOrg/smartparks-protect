@@ -54,7 +54,7 @@ class CorrectionRead(ORMModel):
 
 
 class TransformationIn(BaseModel):
-    kind: str = Field(pattern="^(time_offset|set_valid|value_offset|value_scale)$")
+    kind: str = Field(pattern="^(time_offset|set_valid|value_offset|value_scale|flag_outliers)$")
     seconds: int = 0
     valid: bool = False
     delta: float = 0.0
@@ -118,6 +118,35 @@ class CurationSummary(BaseModel):
     reasons: list[str]
     curatable: dict[str, list[str]]
     transformations: list[str]
+
+
+class OutlierRead(BaseModel):
+    """A GNSS fix the decoder or a bulk job flagged as an outlier (decision D221): where it
+    lies, how far and how fast from the fix before it, and whether a person approved it."""
+
+    target_type: str = "position"
+    target_id: int
+    target_time: datetime
+    effective_time: datetime
+    device_id: uuid.UUID
+    device_name: str | None
+    entity_id: uuid.UUID | None
+    entity_name: str | None
+    latitude: float
+    longitude: float
+    accuracy_m: float | None
+    distance_m: float | None
+    seconds: float | None
+    speed_mps: float | None
+    previous_time: datetime | None
+    #: False while it waits (hidden from every view), true once approved.
+    valid: bool
+
+
+class OutlierList(BaseModel):
+    items: list[OutlierRead]
+    total: int
+    waiting: int
 
 
 class RecordHistory(BaseModel):

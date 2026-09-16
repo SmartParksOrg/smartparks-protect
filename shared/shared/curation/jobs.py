@@ -19,6 +19,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
+from shared.config import get_settings
 from shared.curation.apply import (
     apply_correction,
     effective_of,
@@ -26,9 +27,18 @@ from shared.curation.apply import (
     recompute_current_state,
     revert_correction,
 )
-from shared.curation.effective import effective_time, effective_value_num, in_window
+from shared.curation.effective import (
+    device_fix,
+    effective_geom,
+    effective_time,
+    effective_value_num,
+    in_window,
+    visible,
+)
 from shared.database import session_scope
 from shared.domain.assignments import resolve_attribution
+from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
+from shared.domain.outliers import outlier_of
 from shared.enums import (
     CorrectionStatus,
     CurationField,
@@ -65,7 +75,7 @@ class Transformation(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["time_offset", "set_valid", "value_offset", "value_scale"]
+    kind: Literal["time_offset", "set_valid", "value_offset", "value_scale", "flag_outliers"]
     # up to a hundred years either way: a device clock started from a wrong epoch is off by
     # decades (a collar's flash wrote its status records 39 years ahead, 2026-09-16)
     seconds: int = Field(default=0, ge=-100 * 366 * 86400, le=100 * 366 * 86400)
@@ -80,6 +90,7 @@ class Transformation(BaseModel):
             "set_valid": CurationField.VALID,
             "value_offset": CurationField.VALUE,
             "value_scale": CurationField.VALUE,
+            "flag_outliers": CurationField.VALID,
         }[self.kind]
 
     def apply(self, current: Any) -> Any:
@@ -89,6 +100,8 @@ class Transformation(BaseModel):
             ).isoformat()
         if self.kind == "set_valid":
             return self.valid
+        if self.kind == "flag_outliers":
+            return False
         if self.kind == "value_offset":
             return float(current) + self.delta
         return float(current) * self.factor
@@ -99,6 +112,8 @@ class Transformation(BaseModel):
             return f"time {sign} {abs(self.seconds)} s"
         if self.kind == "set_valid":
             return "mark valid" if self.valid else "mark invalid"
+        if self.kind == "flag_outliers":
+            return "flag GNSS outliers"
         if self.kind == "value_offset":
             return f"value {'+' if self.delta >= 0 else '-'} {abs(self.delta)}"
         return f"value x {self.factor}"
@@ -124,6 +139,8 @@ def validate_job(job: CurationJob) -> Transformation:
         raise _error("value transformations apply to measurements")
     if transformation.kind == "time_offset" and transformation.seconds == 0:
         raise _error("a time offset of zero changes nothing")
+    if transformation.kind == "flag_outliers" and job.target_type != CurationTarget.POSITION:
+        raise _error("outliers are found among positions")
     return transformation
 
 
@@ -137,6 +154,10 @@ def conditions(job: CurationJob, transformation: Transformation) -> list[Any]:
         conditions.append(model.device_id.in_([uuid.UUID(d) for d in job.device_ids]))
     if job.entity_ids:
         conditions.append(model.entity_id.in_([uuid.UUID(e) for e in job.entity_ids]))
+    if transformation.kind == "flag_outliers":
+        # only the valid own fixes are judged; the rule walks them in time order per device
+        conditions.append(visible(model))
+        conditions.append(device_fix())
     if job.target_type == CurationTarget.MEASUREMENT:
         if job.metric_keys:
             conditions.append(Measurement.metric_key.in_(list(job.metric_keys)))
@@ -168,7 +189,17 @@ async def preview(session: AsyncSession, job: CurationJob) -> dict[str, Any]:
     transformation = validate_job(job)
     model = model_for(job.target_type)
     statement = selection(job, transformation)
-    count = int(await session.scalar(select(func.count()).select_from(statement.subquery())) or 0)
+    if transformation.kind == "flag_outliers":
+        # the rule decides which rows change: the count is the flagged ones, the samples too
+        flagged = await find_outliers(session, job)
+        statement = select(model).where(
+            model.id.in_([k[0] for k in flagged[:PREVIEW_SAMPLES]] or [-1])
+        )
+        count = len(flagged)
+    else:
+        count = int(
+            await session.scalar(select(func.count()).select_from(statement.subquery())) or 0
+        )
     if count > MAX_JOB_ROWS:
         raise _error(
             f"{count} records exceed the job limit of {MAX_JOB_ROWS}; narrow the selection"
@@ -293,9 +324,69 @@ async def replay_report(session: AsyncSession, job: CurationJob) -> dict[str, An
     return {"from": time_from.isoformat(), "to": time_to.isoformat(), "rules": report}
 
 
-async def _keys(
-    session: AsyncSession, job: CurationJob, transformation: Transformation
+#: The figures behind a flagged fix, by its key, for the job's apply loop.
+OutlierDetails = dict[tuple[int, datetime], dict[str, Any]]
+
+
+async def find_outliers(
+    session: AsyncSession, job: CurationJob, details: OutlierDetails | None = None
 ) -> list[tuple[int, datetime]]:
+    """The fixes of the selection an impossible speed from the fix before them makes outliers
+    (decision D223): the rule of the decoder walked over the past, device by device in time
+    order, against the last fix it accepted. Returns their keys; `details` collects the
+    figures per key when given."""
+    transformation = Transformation.model_validate(job.transformation)
+    model = Position
+    statement = (
+        select(
+            model.id,
+            model.time,
+            model.device_id,
+            effective_time(model).label("at"),
+            func.ST_Y(effective_geom()).label("lat"),
+            func.ST_X(effective_geom()).label("lon"),
+        )
+        .where(*conditions(job, transformation))
+        .order_by(model.device_id, effective_time(model), model.id)
+        .limit(MAX_JOB_ROWS + 1)
+    )
+    rows = (await session.execute(statement)).all()
+    if len(rows) > MAX_JOB_ROWS:
+        raise _error(f"more than {MAX_JOB_ROWS} positions; narrow the selection")
+    settings = get_settings()
+    flagged: list[tuple[int, datetime]] = []
+    last: dict[uuid.UUID, tuple[float, float, datetime]] = {}
+    for row in rows:
+        previous = last.get(row.device_id)
+        current = (float(row.lat), float(row.lon), row.at)
+        if previous is not None:
+            outlier = outlier_of(
+                previous,
+                current,
+                max_speed_mps=settings.outlier_max_speed_mps,
+                min_jump_m=settings.outlier_min_jump_m,
+            )
+            if outlier is not None:
+                key = (int(row.id), row.time)
+                flagged.append(key)
+                if details is not None:
+                    details[key] = outlier.attribute(
+                        max_speed_mps=settings.outlier_max_speed_mps,
+                        min_jump_m=settings.outlier_min_jump_m,
+                    )
+                continue  # the accepted fix stays the yardstick
+        last[row.device_id] = current
+    return flagged
+
+
+async def _keys(
+    session: AsyncSession,
+    job: CurationJob,
+    transformation: Transformation,
+    details: OutlierDetails | None = None,
+) -> list[tuple[int, datetime]]:
+    if transformation.kind == "flag_outliers":
+        return await find_outliers(session, job, details)
     model = model_for(job.target_type)
     statement = (
         select(model.id, model.time)
@@ -318,7 +409,8 @@ async def apply_job(job_id: uuid.UUID, *, user_id: uuid.UUID | None) -> None:
         job.status = CurationJobStatus.APPLYING
         job.error_message = None
         await session.commit()
-        keys = await _keys(session, job, transformation)
+        details: OutlierDetails = {}
+        keys = await _keys(session, job, transformation, details)
         project_id = job.project_id
         target_type = job.target_type
         reason, comment = job.reason_code, job.comment
@@ -350,6 +442,12 @@ async def apply_job(job_id: uuid.UUID, *, user_id: uuid.UUID | None) -> None:
                 if record is None:
                     continue
                 before = effective_of(record, transformation.field)
+                if key in details and isinstance(record, Position):
+                    # the flagged fix keeps its figures, as the decoder writes them
+                    record.attributes = {
+                        **(record.attributes or {}),
+                        OUTLIER_ATTRIBUTE: details[key],
+                    }
                 correction = DataCorrection(
                     project_id=project_id,
                     target_type=target_type,
