@@ -7,6 +7,7 @@ import {
   formStateOfRun,
   grazingParameters,
   groupWithSubgroups,
+  withGroupMembers,
   intensityFeatures,
   isActive,
   isManagementUnit,
@@ -281,5 +282,37 @@ describe("analysis form state", () => {
       time_from: "2026-08-15T00:00:00.000Z",
       time_to: "2026-09-14T00:00:00.000Z",
     });
+  });
+});
+
+describe("groups on the forms", () => {
+  it("joins the members of the chosen groups to the picks, once each, capped", () => {
+    const groups = [
+      { id: "a", parent_id: null },
+      { id: "b", parent_id: "a" },
+      { id: "c", parent_id: null },
+    ] as Parameters<typeof withGroupMembers>[2];
+    const items = [
+      { id: "e1", group_id: "a" },
+      { id: "e2", group_id: "b" },
+      { id: "e3", group_id: "c" },
+      { id: "e4", group_id: null },
+    ];
+    expect(withGroupMembers(["e4", "e2"], items, groups, ["a"], 25)).toEqual([
+      "e4",
+      "e2",
+      "e1",
+    ]);
+    expect(withGroupMembers([], items, groups, ["c"], 25)).toEqual(["e3"]);
+    expect(withGroupMembers([], items, groups, ["a", "c"], 2)).toEqual([
+      "e1",
+      "e2",
+    ]);
+    expect(withGroupMembers(["e4"], items, undefined, [], 25)).toEqual(["e4"]);
+  });
+  it("keeps the groups in the URL and counts them as input", () => {
+    const state = readFormState(new URLSearchParams("group=a&group=b"));
+    expect(state.groups).toEqual(["a", "b"]);
+    expect(writeFormState(state).toString()).toBe("group=a&group=b");
   });
 });

@@ -121,7 +121,9 @@ export const DEFAULT_GRAZING: GrazingOptions = {
 /** The subjects and the period as the pages keep them in the URL. */
 export interface FormState {
   entities: string[];
-  group: string | null;
+  /** Groups whose members (with the subgroups) join the subjects: entities, or the devices
+   * tracking them (Tim, 2026-09-16). */
+  groups: string[];
   type: string | null;
   /** Device performance (decision D214): devices by id, every device of a type, or all. */
   devices: string[];
@@ -147,7 +149,7 @@ export function readFormState(params: URLSearchParams): FormState {
   const methods = params.get("methods");
   return {
     entities: params.getAll("entity"),
-    group: params.get("group"),
+    groups: params.getAll("group"),
     type: params.get("type"),
     devices: params.getAll("device"),
     deviceType: params.get("device_type"),
@@ -188,7 +190,7 @@ export function readFormState(params: URLSearchParams): FormState {
 export function writeFormState(state: FormState): URLSearchParams {
   const params = new URLSearchParams();
   for (const id of state.entities) params.append("entity", id);
-  if (state.group) params.set("group", state.group);
+  for (const id of state.groups) params.append("group", id);
   if (state.type) params.set("type", state.type);
   for (const id of state.devices) params.append("device", id);
   if (state.deviceType) params.set("device_type", state.deviceType);
@@ -383,7 +385,26 @@ export function comparisonOf(
   };
 }
 
-/** The ids of a group and of every group under it, for "add a group" on a form. */
+/** The subjects a form sends: the ones picked by name and the members of the chosen groups
+ * (with their subgroups), in that order, once each, capped at the module's bound. The items
+ * are entities, or devices with the group of the entity each tracks. */
+export function withGroupMembers(
+  picked: string[],
+  items: { id: string; group_id?: string | null }[],
+  groups: EntityGroup[] | undefined,
+  chosen: string[],
+  max: number,
+): string[] {
+  const inside = new Set<string>();
+  for (const id of chosen)
+    for (const g of groupWithSubgroups(groups ?? [], id)) inside.add(g);
+  const members = items
+    .filter((x) => x.group_id && inside.has(x.group_id))
+    .map((x) => x.id);
+  return [...new Set([...picked, ...members])].slice(0, max);
+}
+
+/** The ids of a group and of every group under it, for the groups on a form. */
 export function groupWithSubgroups(
   groups: EntityGroup[],
   groupId: string,
@@ -495,7 +516,7 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
   return {
     ...base,
     entities: list("entity_ids"),
-    group: null,
+    groups: [],
     type: null,
     devices: list("device_ids"),
     deviceType: null,
@@ -534,7 +555,7 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
 export function hasFormInput(state: FormState): boolean {
   return (
     state.entities.length > 0 ||
-    state.group !== null ||
+    state.groups.length > 0 ||
     state.type !== null ||
     state.devices.length > 0 ||
     state.deviceType !== null ||

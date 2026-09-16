@@ -23,9 +23,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useGroups } from "@/hooks/useGroups";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePermissions } from "@/hooks/useProjects";
-import { devicePerformanceParameters, type FormState } from "@/lib/analyses";
+import {
+  devicePerformanceParameters,
+  type FormState,
+  withGroupMembers,
+} from "@/lib/analyses";
 import { inputValue } from "@/lib/records";
 
 const MAX_DEVICES = 100;
@@ -71,12 +76,21 @@ export function DevicePerformanceForm({
         query: { limit: 500 },
       }),
   });
+  const groups = useGroups(projectId);
   const items = devices.data?.items ?? [];
+  // the devices sent: the ones picked by name and those tracking an entity of a chosen group
+  const chosen = withGroupMembers(
+    state.devices,
+    items,
+    groups.data,
+    state.groups,
+    MAX_DEVICES,
+  );
   const usedTypes = new Set(items.map((d) => d.device_type_id));
   const typeOptions = (types.data?.items ?? []).filter((x) =>
     usedTypes.has(x.id),
   );
-  const parameters = devicePerformanceParameters(state);
+  const parameters = devicePerformanceParameters({ ...state, devices: chosen });
   const estimate = useQuery({
     queryKey: queryKeys.analysisEstimate(projectId, parameters ?? {}),
     queryFn: () =>
@@ -122,10 +136,12 @@ export function DevicePerformanceForm({
       deviceType: null,
       allDevices: false,
     });
+  const chooseGroups = (ids: string[]) =>
+    onChange({ groups: ids, deviceType: null, allDevices: false });
   const chooseType = (id: string) =>
-    onChange({ devices: [], deviceType: id, allDevices: false });
+    onChange({ devices: [], groups: [], deviceType: id, allDevices: false });
   const chooseAll = (on: boolean) =>
-    onChange({ devices: [], deviceType: null, allDevices: on });
+    onChange({ devices: [], groups: [], deviceType: null, allDevices: on });
   const e = estimate.data;
   const mayRun = can("analysis:run");
   const typeName = (id: string | null) =>
@@ -154,6 +170,22 @@ export function DevicePerformanceForm({
             maxSelected={MAX_DEVICES}
           />
         </div>
+        {(groups.data?.length ?? 0) > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs">{t("Groups")}</Label>
+            <MultiSelect
+              options={(groups.data ?? []).map((g) => ({
+                value: g.id,
+                label: g.name,
+              }))}
+              value={state.groups}
+              onChange={chooseGroups}
+              placeholder={t("Add groups")}
+              label={t("groups")}
+              className="h-8 w-40"
+            />
+          </div>
+        )}
         {typeOptions.length > 0 && (
           <Select value={state.deviceType ?? "none"} onValueChange={chooseType}>
             <SelectTrigger

@@ -8,7 +8,7 @@ Time in an area is a proxy for potential grazing pressure. It is not measured fe
 
 The page works as the [Movement](movement.md) page: a list of the analyses, "New analysis" opening the dialog with the form, an opened run with "Edit and run again", "Run as new" or "Run and replace". The form asks:
 
-- **Herd**: entities picked by name, a group with its subgroups ("Analyse grazing" on the Groups page and on the entities list's group filter opens the form with the group), or every entity of a type; at most 100 animals.
+- **Herd**: entities picked by name, one or more groups (their members with the subgroups join the picks; "Analyse grazing" on the Groups page and on the entities list's group filter opens the form with the group chosen), or every entity of a type; at most 100 animals.
 - **Areas**: 1 to 50 of the project's zones and geofences (polygons; a circle is a polygon already). No new feature type: a management unit is a zone the person picks. When a project marks its units with `attributes.management.unit = true`, "All management units" picks them at once; the run stores the chosen ids either way. "Grazing in this area" on a zone's panel on the live map and on the Features page opens the form with that area chosen.
 - **Period**: presets or a custom range, at most 366 days.
 - **Compare with**: nothing, the period before, the seasons (meteorological, in the project's time zone, swapped in the southern hemisphere), or another herd (a group).

@@ -32,7 +32,7 @@ import {
   ALL_METHODS,
   DEFAULT_METHOD,
   type FormState,
-  groupWithSubgroups,
+  withGroupMembers,
   type MethodOptions,
   movementParameters,
 } from "@/lib/analyses";
@@ -87,18 +87,20 @@ export function MovementForm({
       }),
   });
   const items = entities.data?.items ?? [];
-  useResolveSubjects(
-    state,
-    entities.data?.items,
+  useResolveSubjects(state, entities.data?.items, MAX_SUBJECTS, onChange);
+  // the subjects sent: the ones picked by name and the members of the chosen groups
+  const subjects = withGroupMembers(
+    state.entities,
+    items,
     groups.data,
+    state.groups,
     MAX_SUBJECTS,
-    onChange,
   );
   const usedTypes = new Set(items.map((e) => e.entity_type_id));
   const typeOptions = (types.data?.items ?? []).filter((x) =>
     usedTypes.has(x.id),
   );
-  const parameters = movementParameters(state);
+  const parameters = movementParameters({ ...state, entities: subjects });
   const estimate = useQuery({
     queryKey: queryKeys.analysisEstimate(projectId, parameters ?? {}),
     queryFn: () =>
@@ -158,31 +160,20 @@ export function MovementForm({
           />
         </div>
         {(groups.data?.length ?? 0) > 0 && (
-          <Select
-            value="none"
-            onValueChange={(id) => {
-              const inside = groupWithSubgroups(groups.data ?? [], id);
-              addAll(
-                items
-                  .filter((x) => x.group_id && inside.has(x.group_id))
-                  .map((x) => x.id),
-              );
-            }}
-          >
-            <SelectTrigger className="h-8 w-36" aria-label={t("Add a group")}>
-              <SelectValue placeholder={t("Add a group")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none" disabled>
-                {t("Add a group")}
-              </SelectItem>
-              {(groups.data ?? []).map((g) => (
-                <SelectItem key={g.id} value={g.id}>
-                  {g.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("Groups")}</Label>
+            <MultiSelect
+              options={(groups.data ?? []).map((g) => ({
+                value: g.id,
+                label: g.name,
+              }))}
+              value={state.groups}
+              onChange={(v) => onChange({ groups: v })}
+              placeholder={t("Add groups")}
+              label={t("groups")}
+              className="h-8 w-40"
+            />
+          </div>
         )}
         {typeOptions.length > 0 && (
           <Select

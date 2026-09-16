@@ -10,7 +10,7 @@ The page lists the module's analyses: every run a person may see, newest first, 
 
 ## The form
 
-- **Subjects**: entities picked by name, a group with its subgroups, or every entity of a type; at most 25 per run. Devices are not subjects: a collar's fixes belong to the animals it tracked, by the assignment history.
+- **Subjects**: entities picked by name, one or more groups (their members with the subgroups join the picks), or every entity of a type; at most 25 per run. Devices are not subjects: a collar's fixes belong to the animals it tracked, by the assignment history.
 - **Period**: the last 7, 30 or 90 days, the last year, or a custom range; at most 366 days.
 - **Compare with**: nothing, or the period of the same length right before.
 - **Method**, folded with its defaults on one line: the gap threshold (4 hours; a longer silence between two fixes is a gap, not movement), the maximum plausible speed (15 m/s; a fix that would need more is left out and counted), the grid cell (100 m; residence time, hotspots and the cluster distance), and the home range methods: MCP 95 %, KDE 50 % and 95 % (bandwidth automatic or in metres), clusters.
