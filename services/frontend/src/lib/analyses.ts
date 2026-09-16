@@ -127,8 +127,11 @@ export interface FormState {
   type: string | null;
   /** Device performance (decision D214): devices by id, every device of a type, or all. */
   devices: string[];
+  /** Device performance: narrows the chosen devices to one device type. */
   deviceType: string | null;
   allDevices: boolean;
+  /** Device performance: the devices tracking an entity of these types (with the subtypes). */
+  entityTypes: string[];
   range: string;
   from: string | null;
   to: string | null;
@@ -154,6 +157,7 @@ export function readFormState(params: URLSearchParams): FormState {
     devices: params.getAll("device"),
     deviceType: params.get("device_type"),
     allDevices: params.get("all_devices") === "1",
+    entityTypes: params.getAll("entity_type"),
     range: params.get("range") ?? DEFAULT_RANGE,
     from: params.get("from"),
     to: params.get("to"),
@@ -195,6 +199,7 @@ export function writeFormState(state: FormState): URLSearchParams {
   for (const id of state.devices) params.append("device", id);
   if (state.deviceType) params.set("device_type", state.deviceType);
   if (state.allDevices) params.set("all_devices", "1");
+  for (const id of state.entityTypes) params.append("entity_type", id);
   if (state.range !== DEFAULT_RANGE) params.set("range", state.range);
   if (state.range === "custom") {
     if (state.from) params.set("from", state.from);
@@ -285,16 +290,34 @@ export function movementParameters(
 export function devicePerformanceParameters(
   state: FormState,
   now: Date = new Date(),
+  resolved?: DeviceSelection,
 ): Record<string, unknown> | null {
   const window = windowOf(state, now);
   if (!window) return null;
-  const selection = state.devices.length
-    ? { device_ids: state.devices }
-    : state.deviceType
-      ? { device_type_id: state.deviceType }
-      : state.allDevices
-        ? { all_devices: true }
-        : null;
+  let selection: Record<string, unknown> | null;
+  if (resolved) {
+    // the form resolved the sources to devices; every device of one type stays the
+    // server's to resolve, so a fleet beyond the bound is not cut here
+    selection = state.allDevices
+      ? state.deviceType
+        ? { device_type_id: state.deviceType }
+        : { all_devices: true }
+      : resolved.hasSources
+        ? resolved.ids.length
+          ? { device_ids: resolved.ids }
+          : null
+        : state.deviceType
+          ? { device_type_id: state.deviceType }
+          : null;
+  } else {
+    selection = state.devices.length
+      ? { device_ids: state.devices }
+      : state.deviceType
+        ? { device_type_id: state.deviceType }
+        : state.allDevices
+          ? { all_devices: true }
+          : null;
+  }
   if (!selection) return null;
   const comparison = comparisonOf(state, window);
   return {
@@ -302,6 +325,77 @@ export function devicePerformanceParameters(
     ...window,
     ...(comparison ? { comparison } : {}),
     max_speed_mps: state.method.speed_max,
+  };
+}
+
+/** The devices a device performance form has chosen, resolved on the client. */
+export interface DeviceSelection {
+  ids: string[];
+  /** Whether any source (devices, entities, groups, entity types) is chosen at all. */
+  hasSources: boolean;
+  /** Devices the sources gave that the device type filter left out. */
+  excludedByType: number;
+}
+
+/** Resolve the form's sources to devices (Tim, 2026-09-16): the devices picked by name, the
+ * devices tracking the chosen entities, the devices tracking an entity of the chosen groups
+ * (with subgroups) or of the chosen entity types (with subtypes), or every device; then the
+ * device type filter narrows them, and the module's bound caps them. */
+export function deviceSelection(
+  state: FormState,
+  devices: {
+    id: string;
+    device_type_id: string;
+    entity_id?: string | null;
+    group_id?: string | null;
+  }[],
+  entities: { id: string; entity_type_id: string }[],
+  groups: EntityGroup[] | undefined,
+  types: { id: string; parent_id?: string | null }[],
+  max: number,
+): DeviceSelection {
+  const hasSources =
+    state.devices.length > 0 ||
+    state.entities.length > 0 ||
+    state.groups.length > 0 ||
+    state.entityTypes.length > 0;
+  let ids: string[];
+  if (state.allDevices) {
+    ids = devices.map((d) => d.id);
+  } else {
+    const wantedTypes = new Set<string>();
+    for (const id of state.entityTypes) {
+      wantedTypes.add(id);
+      for (const sub of types)
+        if (sub.parent_id === id) wantedTypes.add(sub.id);
+    }
+    const typeOf = new Map(entities.map((e) => [e.id, e.entity_type_id]));
+    const wantedEntities = new Set(state.entities);
+    const byEntity = devices
+      .filter(
+        (d) =>
+          d.entity_id &&
+          (wantedEntities.has(d.entity_id) ||
+            wantedTypes.has(typeOf.get(d.entity_id) ?? "")),
+      )
+      .map((d) => d.id);
+    ids = withGroupMembers(
+      [...state.devices, ...byEntity],
+      devices,
+      groups,
+      state.groups,
+      Number.MAX_SAFE_INTEGER,
+    );
+  }
+  const before = ids.length;
+  if (state.deviceType) {
+    const typeById = new Map(devices.map((d) => [d.id, d.device_type_id]));
+    ids = ids.filter((id) => typeById.get(id) === state.deviceType);
+  }
+  return {
+    ids: ids.slice(0, max),
+    hasSources,
+    excludedByType: before - ids.length,
   };
 }
 
@@ -521,6 +615,7 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
     devices: list("device_ids"),
     deviceType: null,
     allDevices: false,
+    entityTypes: [],
     range: "custom",
     from: typeof p.time_from === "string" ? p.time_from : null,
     to: typeof p.time_to === "string" ? p.time_to : null,
@@ -560,6 +655,7 @@ export function hasFormInput(state: FormState): boolean {
     state.devices.length > 0 ||
     state.deviceType !== null ||
     state.allDevices ||
+    state.entityTypes.length > 0 ||
     state.grazing.areas.length > 0
   );
 }

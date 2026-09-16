@@ -9,6 +9,8 @@ import type {
   AnalysisRun,
   Device,
   DeviceType,
+  Entity,
+  EntityType,
   Page as PageType,
 } from "@/api/types";
 import { MultiSelect } from "@/components/analytics/MultiSelect";
@@ -28,9 +30,10 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePermissions } from "@/hooks/useProjects";
 import {
   devicePerformanceParameters,
+  deviceSelection,
   type FormState,
-  withGroupMembers,
 } from "@/lib/analyses";
+import { typePath } from "@/lib/entityTypes";
 import { inputValue } from "@/lib/records";
 
 const MAX_DEVICES = 100;
@@ -43,9 +46,10 @@ const RANGES: [string, string][] = [
 
 /**
  * The question form of the device performance page (docs/ANALYTICS_DEVICE_PERFORMANCE_PLAN.md,
- * section 7): which devices (by name, every device of a type, or every device of the
- * project), which period, compared with the period before or not. The estimate under it says
- * how much the run will read; Run queues the analysis.
+ * section 7): which devices, chosen by name, through the entities they track, through entity
+ * groups or entity types ("every collar on a pangolin", Tim, 2026-09-16), or every device of
+ * the project; a device type filter narrows a mixed selection to one type. Then the period
+ * and the comparison. The estimate under it says how much the run will read; Run queues it.
  */
 export function DevicePerformanceForm({
   projectId,
@@ -69,28 +73,53 @@ export function DevicePerformanceForm({
         query: { project_id: projectId, limit: 500 },
       }),
   });
-  const types = useQuery({
+  const entities = useQuery({
+    queryKey: queryKeys.entities(projectId),
+    queryFn: () =>
+      api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, {
+        query: { limit: 500 },
+      }),
+  });
+  const deviceTypes = useQuery({
     queryKey: queryKeys.deviceTypes,
     queryFn: () =>
       api.get<PageType<DeviceType>>("/api/v1/device-types", {
         query: { limit: 500 },
       }),
   });
+  const entityTypes = useQuery({
+    queryKey: queryKeys.entityTypes,
+    queryFn: () =>
+      api.get<PageType<EntityType>>("/api/v1/entity-types", {
+        query: { limit: 500 },
+      }),
+  });
   const groups = useGroups(projectId);
   const items = devices.data?.items ?? [];
-  // the devices sent: the ones picked by name and those tracking an entity of a chosen group
-  const chosen = withGroupMembers(
-    state.devices,
+  const animals = entities.data?.items ?? [];
+  const allEntityTypes = entityTypes.data?.items ?? [];
+  // the entity types in use in the project, with their parents, so "Wildlife" picks every
+  // subtype under it
+  const usedEntityTypes = new Set(animals.map((e) => e.entity_type_id));
+  for (const row of allEntityTypes)
+    if (usedEntityTypes.has(row.id) && row.parent_id)
+      usedEntityTypes.add(row.parent_id);
+  const entityTypeOptions = allEntityTypes.filter((x) =>
+    usedEntityTypes.has(x.id),
+  );
+  const usedDeviceTypes = new Set(items.map((d) => d.device_type_id));
+  const deviceTypeOptions = (deviceTypes.data?.items ?? []).filter((x) =>
+    usedDeviceTypes.has(x.id),
+  );
+  const selection = deviceSelection(
+    state,
     items,
+    animals,
     groups.data,
-    state.groups,
+    allEntityTypes,
     MAX_DEVICES,
   );
-  const usedTypes = new Set(items.map((d) => d.device_type_id));
-  const typeOptions = (types.data?.items ?? []).filter((x) =>
-    usedTypes.has(x.id),
-  );
-  const parameters = devicePerformanceParameters({ ...state, devices: chosen });
+  const parameters = devicePerformanceParameters(state, new Date(), selection);
   const estimate = useQuery({
     queryKey: queryKeys.analysisEstimate(projectId, parameters ?? {}),
     queryFn: () =>
@@ -129,23 +158,19 @@ export function DevicePerformanceForm({
     success: t("Analysis queued"),
     onSuccess: (r, replace) => onRun(r, replace),
   });
-  // the three ways to choose exclude one another: a choice clears the other two
-  const chooseDevices = (ids: string[]) =>
-    onChange({
-      devices: ids.slice(0, MAX_DEVICES),
-      deviceType: null,
-      allDevices: false,
-    });
-  const chooseGroups = (ids: string[]) =>
-    onChange({ groups: ids, deviceType: null, allDevices: false });
-  const chooseType = (id: string) =>
-    onChange({ devices: [], groups: [], deviceType: id, allDevices: false });
+  // a source chosen switches "every device" off; "every device" clears the sources
+  const source = (patch: Partial<FormState>) =>
+    onChange({ ...patch, allDevices: false });
   const chooseAll = (on: boolean) =>
-    onChange({ devices: [], groups: [], deviceType: null, allDevices: on });
+    onChange({
+      allDevices: on,
+      ...(on ? { devices: [], entities: [], groups: [], entityTypes: [] } : {}),
+    });
   const e = estimate.data;
   const mayRun = can("analysis:run");
-  const typeName = (id: string | null) =>
-    typeOptions.find((x) => x.id === id)?.label ?? "";
+  const nothing = parameters === null;
+  const emptied =
+    !nothing || (selection.hasSources && selection.ids.length === 0);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-2">
@@ -157,17 +182,22 @@ export function DevicePerformanceForm({
               label: x.entity_name ? `${x.name} (${x.entity_name})` : x.name,
             }))}
             value={state.devices}
-            onChange={chooseDevices}
-            placeholder={
-              state.deviceType
-                ? t("Every {{type}}", { type: typeName(state.deviceType) })
-                : state.allDevices
-                  ? t("Every device")
-                  : t("Choose devices")
-            }
+            onChange={(v) => source({ devices: v.slice(0, MAX_DEVICES) })}
+            placeholder={t("Choose devices")}
             label={t("devices")}
-            className="h-8 w-56"
+            className="h-8 w-52"
             maxSelected={MAX_DEVICES}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">{t("Tracking these entities")}</Label>
+          <MultiSelect
+            options={animals.map((x) => ({ value: x.id, label: x.name }))}
+            value={state.entities}
+            onChange={(v) => source({ entities: v })}
+            placeholder={t("Choose entities")}
+            label={t("entities")}
+            className="h-8 w-48"
           />
         </div>
         {(groups.data?.length ?? 0) > 0 && (
@@ -179,32 +209,28 @@ export function DevicePerformanceForm({
                 label: g.name,
               }))}
               value={state.groups}
-              onChange={chooseGroups}
+              onChange={(v) => source({ groups: v })}
               placeholder={t("Add groups")}
               label={t("groups")}
               className="h-8 w-40"
             />
           </div>
         )}
-        {typeOptions.length > 0 && (
-          <Select value={state.deviceType ?? "none"} onValueChange={chooseType}>
-            <SelectTrigger
-              className="h-8 w-40"
-              aria-label={t("Devices of a type")}
-            >
-              <SelectValue placeholder={t("Devices of a type")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none" disabled>
-                {t("Devices of a type")}
-              </SelectItem>
-              {typeOptions.map((x) => (
-                <SelectItem key={x.id} value={x.id}>
-                  {x.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {entityTypeOptions.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs">{t("Entity types")}</Label>
+            <MultiSelect
+              options={entityTypeOptions.map((x) => ({
+                value: x.id,
+                label: typePath(allEntityTypes, x.id),
+              }))}
+              value={state.entityTypes}
+              onChange={(v) => source({ entityTypes: v })}
+              placeholder={t("Add entity types")}
+              label={t("entity types")}
+              className="h-8 w-44"
+            />
+          </div>
         )}
         <label className="flex h-8 items-center gap-2 text-sm">
           <Switch
@@ -214,6 +240,34 @@ export function DevicePerformanceForm({
           />
           {t("Every device")}
         </label>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        {deviceTypeOptions.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs">{t("Only this device type")}</Label>
+            <Select
+              value={state.deviceType ?? "any"}
+              onValueChange={(v) =>
+                onChange({ deviceType: v === "any" ? null : v })
+              }
+            >
+              <SelectTrigger
+                className="h-8 w-44"
+                aria-label={t("Only this device type")}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">{t("Any device type")}</SelectItem>
+                {deviceTypeOptions.map((x) => (
+                  <SelectItem key={x.id} value={x.id}>
+                    {x.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="space-y-1">
           <Label className="text-xs">{t("Period")}</Label>
           <Select
@@ -276,22 +330,35 @@ export function DevicePerformanceForm({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {parameters === null
-            ? t("Choose devices, a device type or every device, and a period.")
-            : e
-              ? e.ok
-                ? t(
-                    "{{subjects}} devices over {{days}} days, {{fixes}} fixes to read.",
-                    {
-                      subjects: e.subjects,
-                      days: Math.round(e.days),
-                      fixes: e.fixes,
-                    },
-                  )
-                : (e.reasons ?? []).join(" ")
-              : estimate.isError
-                ? estimate.error.message
-                : t("Estimating…")}
+          {selection.hasSources &&
+          selection.ids.length === 0 &&
+          !state.allDevices
+            ? t("No device of this type among the chosen ones.")
+            : nothing
+              ? t(
+                  "Choose devices, entities, groups or entity types, or every device, and a period.",
+                )
+              : e
+                ? e.ok
+                  ? t(
+                      "{{subjects}} devices over {{days}} days, {{fixes}} fixes to read.",
+                      {
+                        subjects: e.subjects,
+                        days: Math.round(e.days),
+                        fixes: e.fixes,
+                      },
+                    )
+                  : (e.reasons ?? []).join(" ")
+                : estimate.isError
+                  ? estimate.error.message
+                  : t("Estimating…")}
+          {emptied && selection.excludedByType > 0 && (
+            <span className="ml-1">
+              {t("{{count}} devices of another type are left out.", {
+                count: selection.excludedByType,
+              })}
+            </span>
+          )}
         </p>
         <div className="flex gap-2">
           {editing && (

@@ -10,7 +10,7 @@ The page lists the module's runs the way the movement page does, and a run opens
 
 ## The form
 
-- **Devices**: devices picked by name (the entity each tracks today beside it), one or more groups (the devices tracking an entity of the group or its subgroups join the picks), every device of a type ("Devices of a type"), or every device of the project ("Every device"); at most 100 per run. A device counts when it was assigned to the project at some point in the period; a member with a device scope sees only their devices.
+- **Devices**: devices picked by name (the entity each tracks today beside it), the devices tracking chosen entities, the devices tracking an entity of chosen groups (with subgroups) or of chosen entity types (with subtypes: "every collar on a pangolin"), or every device of the project ("Every device"); the sources add up. "Only this device type" narrows a mixed selection to one device type and says how many it left out. At most 100 per run. A device counts when it was assigned to the project at some point in the period; a member with a device scope sees only their devices.
 - **Period**: the last 7, 30 or 90 days, the last year, or a custom range; at most 366 days. The figures are daily up to 120 days and weekly beyond.
 - **Compare with the period before**: the same indicators over the period of the same length right before, shown in brackets.
 

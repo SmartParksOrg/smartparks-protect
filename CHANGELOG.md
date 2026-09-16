@@ -51,6 +51,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 ### Changed
 
 - The analysis forms (Movement, Grazing, Device performance) take groups as a choice of their own: a multi-select of the project's groups whose members, with the subgroups, join the subjects picked by name; for devices, the devices tracking an entity of the group. The one-at-a-time "Add a group" dropdown is gone; deep links with `?group=` still open the form with the group chosen (Tim, 2026-09-16).
+- Device performance chooses devices through the entities they track: by entity, by entity group or by entity type with its subtypes ("every collar on a pangolin"), beside devices by name and every device; the sources add up, and "Only this device type" narrows a mixed selection to one device type, saying how many it left out (Tim, 2026-09-16).
 
 - The small map and the Recent positions card of the device and entity pages show the 30 days up to the object's last known record instead of the 30 days before now (decision D207), so a collar silent for a year still shows its last month; the card says which 30 days it shows. The anchor comes from the current state, which leaves clock-ahead records out.
 - "Show on map" from any page centres the live map on the device or entity (zoom 14, or the current zoom if closer) instead of fitting the whole project around it.
