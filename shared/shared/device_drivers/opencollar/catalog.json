@@ -1,6 +1,6 @@
 {
  "firmware": "7.3.0",
- "source": "docs/devices/opencollar-protocol-research.md sections 4.2 to 4.4 (settings.json at firmware commit 73fa4de)",
+ "source": "docs/devices/opencollar-protocol-research.md sections 4.2 to 4.4 (settings.json at firmware commit 73fa4de); since_firmware from the ble-settings-app settings files per release (4.4.2 to 7.2.0), groups and units from the names, descriptions from the research document where it says something",
  "settings": [
   {
    "id": 0,
@@ -9,7 +9,11 @@
    "type": "uint8",
    "default": 0,
    "min": 0,
-   "max": 15
+   "max": 15,
+   "group": "Device",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "The firmware type reported in the status message (5 RangerEdge, 10 FenceEdge, 7 scanner, and so on)."
   },
   {
    "id": 1,
@@ -18,7 +22,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Seconds between LoRa GNSS scans (the LR1110 radio); 0 disables them."
   },
   {
    "id": 2,
@@ -27,7 +35,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 172800
+   "max": 172800,
+   "group": "u-blox GNSS",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Seconds between u-blox GNSS positions sent over LoRaWAN; 0 disables periodic positions."
   },
   {
    "id": 3,
@@ -36,7 +48,11 @@
    "type": "uint32",
    "default": 3600,
    "min": 1,
-   "max": 86400
+   "max": 86400,
+   "group": "Status",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Seconds between status messages (battery, temperature, errors, versions)."
   },
   {
    "id": 4,
@@ -45,7 +61,11 @@
    "type": "uint32",
    "default": 86400,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "Satellite",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Seconds between satellite (Iridium) sessions; 0 disables them."
   },
   {
    "id": 5,
@@ -54,7 +74,10 @@
    "type": "int32",
    "default": 156447700,
    "min": -1800000000,
-   "max": 1800000000
+   "max": 1800000000,
+   "group": "GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 6,
@@ -63,7 +86,10 @@
    "type": "int32",
    "default": 465556280,
    "min": -900000000,
-   "max": 900000000
+   "max": 900000000,
+   "group": "GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 7,
@@ -72,7 +98,11 @@
    "type": "uint32",
    "default": 1606314575,
    "min": 1606314575,
-   "max": 4294967295
+   "max": 4294967295,
+   "group": "Device",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "It is the device clock, which is derived from the last u-blox fix time (the wiki example shows store timestamps 7 to 9 s after fix_timestamp), from init_time (setting 0x07, default 1606314575) plus uptime before any fix,…"
   },
   {
    "id": 8,
@@ -81,7 +111,11 @@
    "type": "bool",
    "default": true,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Bluetooth",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "Bluetooth advertising on or off; a change restarts advertising."
   },
   {
    "id": 9,
@@ -90,7 +124,11 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "GNSS",
+   "unit": null,
+   "since_firmware": "5.0.1",
+   "description": "Send the LoRa GNSS satellite data for assisted (cloud) positioning."
   },
   {
    "id": 10,
@@ -99,7 +137,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "GNSS",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Seconds between resends of the last position on port 16; 0 disables them."
   },
   {
    "id": 11,
@@ -108,7 +150,11 @@
    "type": "bool",
    "default": true,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Flash log",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "Store records to the external flash log."
   },
   {
    "id": 12,
@@ -117,7 +163,11 @@
    "type": "uint32",
    "default": 4162715375,
    "min": 0,
-   "max": 4294967295
+   "max": 4294967295,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "Bit mask of the message ports sent over LoRaWAN."
   },
   {
    "id": 13,
@@ -126,7 +176,11 @@
    "type": "uint32",
    "default": 876143,
    "min": 0,
-   "max": 4294967295
+   "max": 4294967295,
+   "group": "Flash log",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "Bit mask of the message ports stored to the flash log."
   },
   {
    "id": 14,
@@ -135,7 +189,11 @@
    "type": "uint8",
    "default": 3,
    "min": 0,
-   "max": 15
+   "max": 15,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "The fixed data rate when the ADR profile is custom."
   },
   {
    "id": 15,
@@ -144,7 +202,11 @@
    "type": "uint8",
    "default": 1,
    "min": 1,
-   "max": 13
+   "max": 13,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "lr_region (0x0F) selects the frequency plan, values 1 to 13."
   },
   {
    "id": 16,
@@ -153,7 +215,11 @@
    "type": "byte_array",
    "default": "8bcd49421167dd03bad3aeea98efe409",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "LoRaWAN keys",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "The LoRaWAN application key (OTAA)."
   },
   {
    "id": 17,
@@ -162,7 +228,11 @@
    "type": "byte_array",
    "default": "0000000000000000",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "Device",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "The LoRaWAN device EUI."
   },
   {
    "id": 18,
@@ -171,7 +241,11 @@
    "type": "byte_array",
    "default": "0000000000000000",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "LoRaWAN keys",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "The LoRaWAN application (join) EUI."
   },
   {
    "id": 19,
@@ -180,7 +254,11 @@
    "type": "uint32",
    "default": 50,
    "min": 1,
-   "max": 1000
+   "max": 1000,
+   "group": "Other",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "horizontal_accuracy 0x13 (m) is the acceptance threshold for a fix;"
   },
   {
    "id": 20,
@@ -189,7 +267,10 @@
    "type": "uint8",
    "default": 200,
    "min": 1,
-   "max": 255
+   "max": 255,
+   "group": "GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 21,
@@ -198,7 +279,10 @@
    "type": "uint8",
    "default": 4,
    "min": 1,
-   "max": 255
+   "max": 255,
+   "group": "GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 22,
@@ -207,7 +291,11 @@
    "type": "uint16",
    "default": 200,
    "min": 1,
-   "max": 600
+   "max": 600,
+   "group": "GNSS",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "hot_fix_timeout 0x17 and cold_fix_timeout 0x16 are u16 seconds."
   },
   {
    "id": 23,
@@ -216,7 +304,11 @@
    "type": "uint16",
    "default": 65,
    "min": 1,
-   "max": 600
+   "max": 600,
+   "group": "GNSS",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "hot_fix_timeout 0x17 and cold_fix_timeout 0x16 are u16 seconds."
   },
   {
    "id": 24,
@@ -225,7 +317,10 @@
    "type": "uint32",
    "default": 500,
    "min": 100,
-   "max": 10000
+   "max": 10000,
+   "group": "Bluetooth",
+   "unit": "s",
+   "since_firmware": "4.4.2"
   },
   {
    "id": 25,
@@ -234,7 +329,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "Wi-Fi",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Interval settings wifi_scan_interval (0x19) and wifi_scan_aggregated_interval (0x1A)."
   },
   {
    "id": 26,
@@ -243,7 +342,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "Wi-Fi",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Interval settings wifi_scan_interval (0x19) and wifi_scan_aggregated_interval (0x1A)."
   },
   {
    "id": 27,
@@ -252,7 +355,11 @@
    "type": "uint32",
    "default": 600,
    "min": 50,
-   "max": 10000
+   "max": 10000,
+   "group": "Bluetooth",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Interval ble_scan_interval (0x1C), duration ble_scan_duration (0x1B, ms)."
   },
   {
    "id": 28,
@@ -261,7 +368,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "Bluetooth",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Interval ble_scan_interval (0x1C), duration ble_scan_duration (0x1B, ms)."
   },
   {
    "id": 29,
@@ -270,7 +381,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "Bluetooth",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Interval ble_scan_aggregated_interval (0x1D);"
   },
   {
    "id": 30,
@@ -279,7 +394,11 @@
    "type": "uint8",
    "default": 1,
    "min": 0,
-   "max": 3
+   "max": 3,
+   "group": "Bluetooth",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "filter ble_scan_filter (0x1E: 0 none, 1 Smart Parks manufacturer id 0x0A61, 2 configured ble_scan_manufacturer_id 0x72, 3 phones)."
   },
   {
    "id": 31,
@@ -288,7 +407,10 @@
    "type": "uint32",
    "default": 600,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "Bluetooth",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 32,
@@ -297,7 +419,10 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 604800
+   "max": 604800,
+   "group": "S-band",
+   "unit": "s",
+   "since_firmware": "5.0.1"
   },
   {
    "id": 33,
@@ -306,7 +431,11 @@
    "type": "string",
    "default": "",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "Device",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "The name the collar advertises over Bluetooth."
   },
   {
    "id": 34,
@@ -315,7 +444,10 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 4294967295
+   "max": 4294967295,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 35,
@@ -324,7 +456,10 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 4294967295
+   "max": 4294967295,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 36,
@@ -333,7 +468,10 @@
    "type": "uint16",
    "default": 0,
    "min": 0,
-   "max": 1000
+   "max": 1000,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 37,
@@ -342,7 +480,10 @@
    "type": "uint8",
    "default": 10,
    "min": 10,
-   "max": 100
+   "max": 100,
+   "group": "GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 38,
@@ -351,7 +492,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "u-blox GNSS",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "ublox_send_interval 0x02 (interval 1), ublox_send_interval_2 0x26 (interval 2), ublox_multiple_intervals 0x29, ublox_interval1_start 0x27 and ublox_interval2_start 0x52 (UTC hours) define a two period daily schedule."
   },
   {
    "id": 39,
@@ -360,7 +505,11 @@
    "type": "uint8",
    "default": 11,
    "min": 0,
-   "max": 23
+   "max": 23,
+   "group": "u-blox GNSS",
+   "unit": "s",
+   "since_firmware": "6.8.1",
+   "description": "ublox_send_interval 0x02 (interval 1), ublox_send_interval_2 0x26 (interval 2), ublox_multiple_intervals 0x29, ublox_interval1_start 0x27 and ublox_interval2_start 0x52 (UTC hours) define a two period daily schedule."
   },
   {
    "id": 40,
@@ -369,7 +518,10 @@
    "type": "uint8",
    "default": 5,
    "min": 0,
-   "max": 30
+   "max": 30,
+   "group": "u-blox GNSS",
+   "unit": "s",
+   "since_firmware": "4.4.2"
   },
   {
    "id": 41,
@@ -378,7 +530,11 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "u-blox GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "ublox_send_interval 0x02 (interval 1), ublox_send_interval_2 0x26 (interval 2), ublox_multiple_intervals 0x29, ublox_interval1_start 0x27 and ublox_interval2_start 0x52 (UTC hours) define a two period daily schedule."
   },
   {
    "id": 42,
@@ -387,7 +543,11 @@
    "type": "byte_array",
    "default": "00000000",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "Device",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "device_pin 0x2A (4 ASCII digits, 0000 = off) locks BLE access;"
   },
   {
    "id": 43,
@@ -396,7 +556,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "u-blox GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 44,
@@ -405,7 +568,10 @@
    "type": "bool",
    "default": true,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Other",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 45,
@@ -414,7 +580,10 @@
    "type": "uint8",
    "default": 6,
    "min": 0,
-   "max": 63
+   "max": 63,
+   "group": "Other",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 46,
@@ -423,7 +592,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Other",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 47,
@@ -432,7 +604,10 @@
    "type": "uint32",
    "default": 60,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "GNSS",
+   "unit": "s",
+   "since_firmware": "4.4.2"
   },
   {
    "id": 48,
@@ -441,7 +616,10 @@
    "type": "uint8",
    "default": 5,
    "min": 0,
-   "max": 255
+   "max": 255,
+   "group": "GNSS",
+   "unit": "s",
+   "since_firmware": "4.4.2"
   },
   {
    "id": 49,
@@ -450,7 +628,11 @@
    "type": "uint32",
    "default": 60,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Queued by cmd_send_lr_message (0xC4, up to 46 bytes of text) and retried per lr_messaging_retry_interval (0x31) and lr_messaging_retry_count (0x32)."
   },
   {
    "id": 50,
@@ -459,7 +641,11 @@
    "type": "uint8",
    "default": 1,
    "min": 1,
-   "max": 5
+   "max": 5,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "Queued by cmd_send_lr_message (0xC4, up to 46 bytes of text) and retried per lr_messaging_retry_interval (0x31) and lr_messaging_retry_count (0x32)."
   },
   {
    "id": 51,
@@ -468,7 +654,10 @@
    "type": "uint8",
    "default": 15,
    "min": 0,
-   "max": 60
+   "max": 60,
+   "group": "u-blox GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 52,
@@ -477,7 +666,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "Other",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Interval memfault_send_interval (0x34, default 0)."
   },
   {
    "id": 53,
@@ -486,7 +679,11 @@
    "type": "uint32",
    "default": 3600,
    "min": 600,
-   "max": 86400
+   "max": 86400,
+   "group": "Other",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Device joins on boot and after rejoin_interval (0x35, default 3600 s)."
   },
   {
    "id": 54,
@@ -495,7 +692,10 @@
    "type": "uint32",
    "default": 86400,
    "min": 0,
-   "max": 2678400
+   "max": 2678400,
+   "group": "Other",
+   "unit": "s",
+   "since_firmware": "4.4.2"
   },
   {
    "id": 55,
@@ -504,7 +704,10 @@
    "type": "uint8",
    "default": 3,
    "min": 1,
-   "max": 3
+   "max": 3,
+   "group": "GNSS",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 56,
@@ -513,7 +716,10 @@
    "type": "uint8",
    "default": 30,
    "min": 5,
-   "max": 255
+   "max": 255,
+   "group": "u-blox GNSS",
+   "unit": null,
+   "since_firmware": null
   },
   {
    "id": 57,
@@ -522,7 +728,11 @@
    "type": "uint32",
    "default": 16522,
    "min": 0,
-   "max": 4294967295
+   "max": 4294967295,
+   "group": "Satellite",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "Bit mask of the message ports queued for the satellite modem."
   },
   {
    "id": 58,
@@ -531,7 +741,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Satellite",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 59,
@@ -540,7 +753,10 @@
    "type": "uint8",
    "default": 10,
    "min": 1,
-   "max": 15
+   "max": 15,
+   "group": "Satellite",
+   "unit": null,
+   "since_firmware": "4.4.2"
   },
   {
    "id": 63,
@@ -549,7 +765,11 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Fence",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "The electric fence monitor on or off; reported as a status feature bit."
   },
   {
    "id": 64,
@@ -558,7 +778,11 @@
    "type": "uint32",
    "default": 60,
    "min": 0,
-   "max": 604800
+   "max": 604800,
+   "group": "Fence",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "fence_enabled (0x3F), fence_interval (0x40, seconds), fence_sampling_length (0x41, s), fence_mv_scaling_factor (0x42)."
   },
   {
    "id": 65,
@@ -567,7 +791,11 @@
    "type": "uint16",
    "default": 10,
    "min": 1,
-   "max": 60
+   "max": 60,
+   "group": "Fence",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "fence_enabled (0x3F), fence_interval (0x40, seconds), fence_sampling_length (0x41, s), fence_mv_scaling_factor (0x42)."
   },
   {
    "id": 66,
@@ -576,7 +804,11 @@
    "type": "uint32",
    "default": 100000,
    "min": 100,
-   "max": 1000000
+   "max": 1000000,
+   "group": "Fence",
+   "unit": null,
+   "since_firmware": "4.4.2",
+   "description": "fence_enabled (0x3F), fence_interval (0x40, seconds), fence_sampling_length (0x41, s), fence_mv_scaling_factor (0x42)."
   },
   {
    "id": 67,
@@ -585,7 +817,11 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 604800
+   "max": 604800,
+   "group": "Flash log",
+   "unit": "s",
+   "since_firmware": "4.4.2",
+   "description": "Periodic every flash_status_interval (0x43, default 0 = off since 6.12.0), or on cmd_get_flash_status (0xB3)."
   },
   {
    "id": 68,
@@ -594,7 +830,10 @@
    "type": "byte_array",
    "default": "ec7f380e7adfb2e5c9bbde5ac21694a8",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 69,
@@ -603,7 +842,10 @@
    "type": "byte_array",
    "default": "db7e2726cff58c133a07b5a1b400e1d0",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 70,
@@ -612,7 +854,10 @@
    "type": "byte_array",
    "default": "260bf6ef",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 71,
@@ -621,7 +866,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Bluetooth",
+   "unit": null,
+   "since_firmware": "5.0.1"
   },
   {
    "id": 72,
@@ -630,7 +878,11 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Wi-Fi",
+   "unit": null,
+   "since_firmware": "5.0.1",
+   "description": "Empty result messages are only sent when wifi_scan_report_zero_connections_found (0x48) is true."
   },
   {
    "id": 73,
@@ -639,7 +891,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Command queue",
+   "unit": null,
+   "since_firmware": "5.0.1"
   },
   {
    "id": 74,
@@ -648,7 +903,10 @@
    "type": "uint32",
    "default": 10000,
    "min": 1,
-   "max": 10000
+   "max": 10000,
+   "group": "Command queue",
+   "unit": "s",
+   "since_firmware": "5.0.1"
   },
   {
    "id": 75,
@@ -657,7 +915,10 @@
    "type": "uint32",
    "default": 300,
    "min": 1,
-   "max": 10000
+   "max": 10000,
+   "group": "Command queue",
+   "unit": "s",
+   "since_firmware": "5.0.1"
   },
   {
    "id": 76,
@@ -666,7 +927,10 @@
    "type": "uint32",
    "default": 1800,
    "min": 1,
-   "max": 10000
+   "max": 10000,
+   "group": "Command queue",
+   "unit": "s",
+   "since_firmware": "5.0.1"
   },
   {
    "id": 77,
@@ -675,7 +939,11 @@
    "type": "byte_array",
    "default": "d81068acdae4",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "Command queue",
+   "unit": null,
+   "since_firmware": "5.0.1",
+   "description": "One record per received BLE advertisement of the configured CMDQ MAC (cmdq_searched_mac_address 0x4D);"
   },
   {
    "id": 78,
@@ -684,7 +952,11 @@
    "type": "uint32",
    "default": 300,
    "min": 1,
-   "max": 10000
+   "max": 10000,
+   "group": "Command queue",
+   "unit": "s",
+   "since_firmware": "5.0.1",
+   "description": "reporting interval cmdq_reporting_interval (0x4E)."
   },
   {
    "id": 79,
@@ -693,7 +965,10 @@
    "type": "uint32",
    "default": 2008450000,
    "min": 1980000000,
-   "max": 2100000000
+   "max": 2100000000,
+   "group": "S-band",
+   "unit": null,
+   "since_firmware": "5.0.1"
   },
   {
    "id": 80,
@@ -702,7 +977,11 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Command queue",
+   "unit": null,
+   "since_firmware": "5.0.1",
+   "description": "Empty report FC 00 when cmdq_report_zero_messages_to_be_sent (0x50) is on."
   },
   {
    "id": 82,
@@ -711,7 +990,11 @@
    "type": "uint8",
    "default": 19,
    "min": 0,
-   "max": 23
+   "max": 23,
+   "group": "u-blox GNSS",
+   "unit": "s",
+   "since_firmware": "6.8.1",
+   "description": "ublox_send_interval 0x02 (interval 1), ublox_send_interval_2 0x26 (interval 2), ublox_multiple_intervals 0x29, ublox_interval1_start 0x27 and ublox_interval2_start 0x52 (UTC hours) define a two period daily schedule."
   },
   {
    "id": 87,
@@ -720,7 +1003,11 @@
    "type": "uint8",
    "default": 3,
    "min": 0,
-   "max": 3
+   "max": 3,
+   "group": "LoRa GNSS and LoRaWAN",
+   "unit": null,
+   "since_firmware": "6.8.1",
+   "description": "ADR profile: 0 network controlled, 1 mobile long range, 2 mobile low power, 3 custom."
   },
   {
    "id": 95,
@@ -729,7 +1016,10 @@
    "type": "uint8",
    "default": 3,
    "min": 0,
-   "max": 255
+   "max": 255,
+   "group": "u-blox GNSS",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 96,
@@ -738,7 +1028,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "External switch",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 97,
@@ -747,7 +1040,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "VHF beacon",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 98,
@@ -756,7 +1052,10 @@
    "type": "uint32",
    "default": 2,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "VHF beacon",
+   "unit": "s",
+   "since_firmware": "6.8.1"
   },
   {
    "id": 99,
@@ -765,7 +1064,10 @@
    "type": "uint32",
    "default": 2,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "VHF beacon",
+   "unit": "s",
+   "since_firmware": "6.8.1"
   },
   {
    "id": 100,
@@ -774,7 +1076,10 @@
    "type": "uint8",
    "default": 7,
    "min": 0,
-   "max": 23
+   "max": 23,
+   "group": "VHF beacon",
+   "unit": "s",
+   "since_firmware": "6.8.1"
   },
   {
    "id": 101,
@@ -783,7 +1088,10 @@
    "type": "uint8",
    "default": 19,
    "min": 0,
-   "max": 23
+   "max": 23,
+   "group": "VHF beacon",
+   "unit": "s",
+   "since_firmware": "6.8.1"
   },
   {
    "id": 102,
@@ -792,7 +1100,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "VHF beacon",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 103,
@@ -801,7 +1112,10 @@
    "type": "uint8",
    "default": 1,
    "min": 1,
-   "max": 255
+   "max": 255,
+   "group": "VHF beacon",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 104,
@@ -810,7 +1124,10 @@
    "type": "uint16",
    "default": 250,
    "min": 1,
-   "max": 10000
+   "max": 10000,
+   "group": "VHF beacon",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 105,
@@ -819,7 +1136,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "VHF beacon",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 106,
@@ -828,7 +1148,10 @@
    "type": "uint32",
    "default": 150000,
    "min": 150000,
-   "max": 300000
+   "max": 300000,
+   "group": "VHF beacon",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 107,
@@ -837,7 +1160,10 @@
    "type": "uint16",
    "default": 18,
    "min": 5,
-   "max": 10000
+   "max": 10000,
+   "group": "VHF beacon",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 108,
@@ -846,7 +1172,10 @@
    "type": "uint8",
    "default": 1,
    "min": 0,
-   "max": 2
+   "max": 2,
+   "group": "S-band",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 109,
@@ -855,7 +1184,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Fence",
+   "unit": null,
+   "since_firmware": "6.8.1"
   },
   {
    "id": 110,
@@ -864,7 +1196,10 @@
    "type": "uint8",
    "default": 0,
    "min": 0,
-   "max": 255
+   "max": 255,
+   "group": "GNSS",
+   "unit": "s",
+   "since_firmware": "6.8.1"
   },
   {
    "id": 114,
@@ -873,7 +1208,11 @@
    "type": "uint16",
    "default": 2657,
    "min": 0,
-   "max": 65535
+   "max": 65535,
+   "group": "Bluetooth",
+   "unit": null,
+   "since_firmware": "6.12.1",
+   "description": "filter ble_scan_filter (0x1E: 0 none, 1 Smart Parks manufacturer id 0x0A61, 2 configured ble_scan_manufacturer_id 0x72, 3 phones)."
   },
   {
    "id": 115,
@@ -882,7 +1221,11 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Accelerometer",
+   "unit": null,
+   "since_firmware": "6.14.1",
+   "description": "The LIS2DW12 FIFO capture added in 6.14.0 (accel_movement_data_fifo_enabled 0x73, accel_odr_hz 0x74, accel_g_scale 0x75) is not emitted as a LoRaWAN message in the public source;"
   },
   {
    "id": 116,
@@ -891,7 +1234,11 @@
    "type": "uint16",
    "default": 12,
    "min": 0,
-   "max": 1600
+   "max": 1600,
+   "group": "Accelerometer",
+   "unit": null,
+   "since_firmware": "6.14.1",
+   "description": "The LIS2DW12 FIFO capture added in 6.14.0 (accel_movement_data_fifo_enabled 0x73, accel_odr_hz 0x74, accel_g_scale 0x75) is not emitted as a LoRaWAN message in the public source;"
   },
   {
    "id": 117,
@@ -900,7 +1247,11 @@
    "type": "uint8",
    "default": 2,
    "min": 2,
-   "max": 16
+   "max": 16,
+   "group": "Accelerometer",
+   "unit": null,
+   "since_firmware": "6.14.1",
+   "description": "The LIS2DW12 FIFO capture added in 6.14.0 (accel_movement_data_fifo_enabled 0x73, accel_odr_hz 0x74, accel_g_scale 0x75) is not emitted as a LoRaWAN message in the public source;"
   },
   {
    "id": 118,
@@ -909,7 +1260,10 @@
    "type": "uint32",
    "default": 86400,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "Satellite",
+   "unit": "s",
+   "since_firmware": "6.14.1"
   },
   {
    "id": 119,
@@ -918,7 +1272,10 @@
    "type": "uint8",
    "default": 19,
    "min": 0,
-   "max": 23
+   "max": 23,
+   "group": "Satellite",
+   "unit": "s",
+   "since_firmware": "6.14.1"
   },
   {
    "id": 120,
@@ -927,7 +1284,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Satellite",
+   "unit": null,
+   "since_firmware": "6.14.1"
   },
   {
    "id": 121,
@@ -936,7 +1296,10 @@
    "type": "uint8",
    "default": 7,
    "min": 0,
-   "max": 23
+   "max": 23,
+   "group": "Satellite",
+   "unit": "s",
+   "since_firmware": "6.14.1"
   },
   {
    "id": 122,
@@ -945,7 +1308,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Indoor and outdoor",
+   "unit": null,
+   "since_firmware": "6.14.1"
   },
   {
    "id": 123,
@@ -954,7 +1320,10 @@
    "type": "uint8",
    "default": 11,
    "min": 0,
-   "max": 100
+   "max": 100,
+   "group": "Indoor and outdoor",
+   "unit": null,
+   "since_firmware": "6.14.1"
   },
   {
    "id": 124,
@@ -963,7 +1332,10 @@
    "type": "byte_array",
    "default": "cbec6b122a13790f201c0000",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "Indoor and outdoor",
+   "unit": null,
+   "since_firmware": "6.14.1"
   },
   {
    "id": 125,
@@ -972,7 +1344,10 @@
    "type": "uint16",
    "default": 0,
    "min": 0,
-   "max": 4320
+   "max": 4320,
+   "group": "u-blox GNSS",
+   "unit": "s",
+   "since_firmware": "6.15.0"
   },
   {
    "id": 126,
@@ -981,7 +1356,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "External switch",
+   "unit": null,
+   "since_firmware": "6.15.0"
   },
   {
    "id": 127,
@@ -990,7 +1368,10 @@
    "type": "uint8",
    "default": 0,
    "min": 0,
-   "max": 1
+   "max": 1,
+   "group": "External switch",
+   "unit": null,
+   "since_firmware": "6.15.0"
   },
   {
    "id": 128,
@@ -999,7 +1380,10 @@
    "type": "uint16",
    "default": 50,
    "min": 0,
-   "max": 2000
+   "max": 2000,
+   "group": "External switch",
+   "unit": null,
+   "since_firmware": "6.15.0"
   },
   {
    "id": 129,
@@ -1008,7 +1392,11 @@
    "type": "uint32",
    "default": 3600,
    "min": 0,
-   "max": 86400
+   "max": 86400,
+   "group": "External switch",
+   "unit": "s",
+   "since_firmware": "6.15.0",
+   "description": "Port 20, periodic status every external_switch_detection_reporting_interval (0x81): 99 05 [state u8] [count u32 LE]."
   },
   {
    "id": 130,
@@ -1017,7 +1405,10 @@
    "type": "bool",
    "default": true,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "External switch",
+   "unit": null,
+   "since_firmware": "6.15.0"
   },
   {
    "id": 131,
@@ -1026,7 +1417,10 @@
    "type": "uint16",
    "default": 250,
    "min": 0,
-   "max": 65000
+   "max": 65000,
+   "group": "External switch",
+   "unit": null,
+   "since_firmware": "6.15.0"
   },
   {
    "id": 132,
@@ -1035,7 +1429,10 @@
    "type": "uint8",
    "default": 1,
    "min": 0,
-   "max": 2
+   "max": 2,
+   "group": "External switch",
+   "unit": null,
+   "since_firmware": "6.15.0"
   },
   {
    "id": 133,
@@ -1044,7 +1441,11 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "External switch",
+   "unit": null,
+   "since_firmware": "6.15.0",
+   "description": "When state is 2 the device is in impulse counter mode (external_switch_counter_enabled 0x85) and the count is impulse_count."
   },
   {
    "id": 134,
@@ -1053,7 +1454,10 @@
    "type": "bool",
    "default": false,
    "min": false,
-   "max": true
+   "max": true,
+   "group": "Air quality",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 135,
@@ -1062,7 +1466,10 @@
    "type": "uint32",
    "default": 300,
    "min": 10,
-   "max": 86400
+   "max": 86400,
+   "group": "Air quality",
+   "unit": "s",
+   "since_firmware": "7.0.0"
   },
   {
    "id": 136,
@@ -1071,7 +1478,10 @@
    "type": "uint32",
    "default": 0,
    "min": 0,
-   "max": 4294967295
+   "max": 4294967295,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 137,
@@ -1080,7 +1490,10 @@
    "type": "uint32",
    "default": 869150000,
    "min": 0,
-   "max": 2100000000
+   "max": 2100000000,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 138,
@@ -1089,7 +1502,10 @@
    "type": "uint32",
    "default": 869150000,
    "min": 0,
-   "max": 2100000000
+   "max": 2100000000,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 139,
@@ -1098,7 +1514,10 @@
    "type": "byte_array",
    "default": "07050101",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "7.0.0"
   },
   {
    "id": 140,
@@ -1107,7 +1526,10 @@
    "type": "byte_array",
    "default": "00000a013c",
    "min": null,
-   "max": null
+   "max": null,
+   "group": "LP0 companion",
+   "unit": null,
+   "since_firmware": "7.0.0"
   }
  ],
  "commands": [
@@ -1529,5 +1951,20 @@
    "type": "uint8",
    "description": "current RockBLOCK retry"
   }
+ ],
+ "versions": [
+  "4.4.2",
+  "5.0.1",
+  "6.8.1",
+  "6.9.0",
+  "6.10.0",
+  "6.11.0",
+  "6.12.1",
+  "6.14.1",
+  "6.15.0",
+  "7.0.0",
+  "7.1.0",
+  "7.2.0",
+  "7.3.0"
  ]
 }

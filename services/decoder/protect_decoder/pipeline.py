@@ -43,6 +43,7 @@ from shared.device_drivers.base import (
 )
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import Attribution, resolve_attribution
+from shared.domain.device_settings import record_settings_frame
 from shared.domain.movement import MOVEMENT_THRESHOLD_MPS2, derive_activity, previous_sample
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.domain.outliers import EVENT_TYPE as OUTLIER_EVENT_TYPE
@@ -108,6 +109,8 @@ class Outcome:
     # the current state skips them
     outliers: int = 0
     outlier_times: set[datetime] = field(default_factory=set)
+    # settings the device reported that changed what Protect knew (decision D229)
+    settings_changed: int = 0
 
 
 async def _previous_fix(
@@ -397,6 +400,8 @@ async def process_source_event(
             await _write_events(session, event, device, records, outcome, attribution_at)
             total = sum(outcome.created.values())
             step.metadata.update(created=total, duplicates=outcome.duplicates)
+            if outcome.settings_changed:
+                step.metadata["settings_changed"] = outcome.settings_changed
             if outcome.outliers:
                 step.metadata["outliers"] = outcome.outliers
                 step.metadata["outlier_note"] = (
@@ -716,6 +721,18 @@ async def _write_states(
         await session.flush()
         await _link_delivery(session, event, "state", row.id, row.time, first=True)
         outcome.created["states"] += 1
+        if "port_3_tlv" in record.state:
+            # the settings the device reported become the values Protect knows (D229)
+            device_type = await session.get(DeviceType, device.device_type_id)
+            outcome.settings_changed += await record_settings_frame(
+                session,
+                device.id,
+                device_type.driver_key if device_type else "",
+                record.state,
+                source="ble" if event.acquisition_channel == AcquisitionChannel.WEBBLE else "frame",
+                observed_at=record.time,
+                source_event_id=event.id,
+            )
         outcome.messages.append(
             (
                 Topic.DEVICE_STATE_CHANGED,

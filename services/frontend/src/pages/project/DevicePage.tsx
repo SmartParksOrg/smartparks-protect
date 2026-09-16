@@ -54,6 +54,7 @@ import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { ReportingCard } from "@/components/devices/ReportingCard";
+import { DeviceSettingsTab } from "@/components/devices/DeviceSettingsTab";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
 import { lastPositionsWindow } from "@/lib/positionsWindow";
 import { useMutationToast } from "@/hooks/useMutationToast";
@@ -464,6 +465,7 @@ export function DevicePage() {
             <TabsTrigger value="data">{t("Data")}</TabsTrigger>
             <TabsTrigger value="connectivity">{t("Connectivity")}</TabsTrigger>
             <TabsTrigger value="network">{t("Network")}</TabsTrigger>
+            <TabsTrigger value="settings">{t("Settings")}</TabsTrigger>
           </TabsList>
           <TabsContent value="overview">
             <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
@@ -629,6 +631,13 @@ export function DevicePage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+          <TabsContent value="settings">
+            <DeviceSettingsTab
+              deviceId={d.id}
+              canControl={can("devices:control")}
+              canRecord={Boolean(user?.is_superuser) || can("project:write")}
+            />
           </TabsContent>
           <TabsContent value="connectivity">
             <ConnectivityCards

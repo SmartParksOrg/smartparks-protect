@@ -57,13 +57,55 @@ def _encode_request_position(_: BaseModel) -> EncodedCommand:
     return EncodedCommand(payload=command(CMD_GET_UBLOX_FIX), f_port=PORT_COMMANDS)
 
 
+CMD_SEND_ALL_SETTINGS = 0xA7
+
+
+class SettingParameters(BaseModel):
+    """One catalogue setting by name and its new value, checked against the type and range."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    setting: str = Field(min_length=1, max_length=64, description="The setting's catalogue name")
+    value: Any = Field(description="The new value: a number, a boolean, a string or hex bytes")
+
+
+def _catalog_item(name: str) -> dict[str, Any]:
+    from shared.domain.reporting import driver_catalog
+
+    for item in driver_catalog("opencollar"):
+        if item.get("name") == name:
+            return item
+    raise ValueError(f"no setting {name!r} in the OpenCollar catalogue")
+
+
+def _encode_setting(params: BaseModel) -> EncodedCommand:
+    assert isinstance(params, SettingParameters)
+    from shared.domain.reporting_rules import encode_setting_value
+
+    item = _catalog_item(params.setting)
+    value = encode_setting_value(item, params.value)
+    return EncodedCommand(
+        payload=setting(int(item["id"]), value),
+        f_port=PORT_SETTINGS,
+        metadata={"setting": params.setting, "setting_id": int(item["id"]), "value": params.value},
+    )
+
+
+def _encode_request_settings(_: BaseModel) -> EncodedCommand:
+    return EncodedCommand(payload=command(CMD_SEND_ALL_SETTINGS), f_port=PORT_COMMANDS)
+
+
 def _encode_gnss_interval(params: BaseModel) -> EncodedCommand:
     assert isinstance(params, GnssIntervalParameters)
     value = struct.pack("<I", params.interval_seconds)
     return EncodedCommand(
         payload=setting(SETTING_UBLOX_SEND_INTERVAL, value),
         f_port=PORT_SETTINGS,
-        metadata={"setting": "ublox_send_interval"},
+        metadata={
+            "setting": "ublox_send_interval",
+            "setting_id": SETTING_UBLOX_SEND_INTERVAL,
+            "value": params.interval_seconds,
+        },
     )
 
 
@@ -132,6 +174,30 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         ),
         parameters=GnssIntervalParameters,
         encode=_encode_gnss_interval,
+        permission=Permission.DEVICES_CONTROL_HIGH_IMPACT,
+        confirmation=ConfirmationPolicy.PRIVILEGED,
+    ),
+    "REQUEST_SETTINGS": ControlAction(
+        key="REQUEST_SETTINGS",
+        label="Request all settings",
+        description=(
+            "Ask the collar to report every setting (cmd_send_all_settings); the answers fill "
+            "the Settings tab as they arrive."
+        ),
+        parameters=NoParameters,
+        encode=_encode_request_settings,
+        permission=Permission.DEVICES_CONTROL,
+        confirmation=ConfirmationPolicy.NONE,
+    ),
+    "SET_SETTING": ControlAction(
+        key="SET_SETTING",
+        label="Set a setting",
+        description=(
+            "Change one setting of the collar by its catalogue name; the value is checked "
+            "against the setting's type and range before it is sent."
+        ),
+        parameters=SettingParameters,
+        encode=_encode_setting,
         permission=Permission.DEVICES_CONTROL_HIGH_IMPACT,
         confirmation=ConfirmationPolicy.PRIVILEGED,
     ),

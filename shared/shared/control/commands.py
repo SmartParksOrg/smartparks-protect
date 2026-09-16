@@ -386,6 +386,23 @@ async def request_command(
             await _record(
                 session, command, CommandStatus.ENCODED, "control", {"f_port": encoded.f_port}
             )
+            if "setting" in encoded.metadata:
+                # the value Protect asked for is known as sent until the collar confirms it
+                from shared.domain.device_settings import record_setting
+
+                await record_setting(
+                    session,
+                    device.id,
+                    str(encoded.metadata["setting"]),
+                    encoded.metadata.get("value"),
+                    source="command",
+                    observed_at=utc_now(),
+                    setting_id=encoded.metadata.get("setting_id"),
+                    raw_hex=encoded.payload[2:].hex(),
+                    status="sent",
+                    command_id=command.id,
+                    set_by_user_id=actor.user_id if hasattr(actor, "user_id") else None,
+                )
 
         async with tracer.step("control", "route selected") as step:
             route, reason = await select_route(

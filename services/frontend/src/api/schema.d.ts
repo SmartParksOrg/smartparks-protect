@@ -848,6 +848,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Settings
+         * @description Every setting of the device type's catalogue with the value Protect knows for this
+         *     device, its source and when (decisions D228 to D231).
+         */
+        get: operations["device_settings_api_v1_devices__device_id__settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/settings/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Device Setting
+         * @description Record a setting's value as known without sending it (decision D229): for what a
+         *     person set by hand or read elsewhere. Project admins of the device's project, or a server
+         *     admin. The value is checked against the catalogue's type and range.
+         */
+        put: operations["set_device_setting_api_v1_devices__device_id__settings__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/reporting": {
         parameters: {
             query?: never;
@@ -7056,6 +7099,81 @@ export interface components {
              * @description Seconds between fixes the device is expected to keep; null clears the override so the settings and the data decide again
              */
             expected_fix_interval_s?: number | null;
+        };
+        /**
+         * DeviceSettingRead
+         * @description One setting of the device type's catalogue with the value Protect knows for the device
+         *     (decisions D228 to D231): the catalogue's facts and, when known, the value, its source
+         *     (frame, ble, command, manual), its status (observed or sent) and when.
+         */
+        DeviceSettingRead: {
+            /** Key */
+            key: string;
+            /** Setting Id */
+            setting_id: number | null;
+            /** Type */
+            type: string;
+            /** Length */
+            length: number | null;
+            /** Default */
+            default?: unknown;
+            /** Min */
+            min?: unknown;
+            /** Max */
+            max?: unknown;
+            /** Unit */
+            unit?: string | null;
+            /** Group */
+            group?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Since Firmware */
+            since_firmware?: string | null;
+            /** Value */
+            value?: unknown;
+            /** Raw Hex */
+            raw_hex?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Observed At */
+            observed_at?: string | null;
+            /** Set By User Id */
+            set_by_user_id?: string | null;
+            /** Command Id */
+            command_id?: string | null;
+        };
+        /**
+         * DeviceSettingWrite
+         * @description A person's word on a setting Protect cannot observe (decision D229): recorded as known,
+         *     not sent to the device.
+         */
+        DeviceSettingWrite: {
+            /**
+             * Value
+             * @description The value as the catalogue's type takes it
+             */
+            value: unknown;
+        };
+        /** DeviceSettingsRead */
+        DeviceSettingsRead: {
+            /** Driver Key */
+            driver_key: string;
+            /**
+             * Firmware
+             * @description The catalogue's firmware version
+             */
+            firmware?: string | null;
+            /**
+             * Device Firmware
+             * @description The firmware the device reported
+             */
+            device_firmware?: string | null;
+            /** Known */
+            known: number;
+            /** Items */
+            items: components["schemas"]["DeviceSettingRead"][];
         };
         /**
          * DeviceStateRead
@@ -13876,6 +13994,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceDataSpan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_settings_api_v1_devices__device_id__settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSettingsRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_device_setting_api_v1_devices__device_id__settings__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceSettingWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSettingRead"];
                 };
             };
             /** @description Validation Error */

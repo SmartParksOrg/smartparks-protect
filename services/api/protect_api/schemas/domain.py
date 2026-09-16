@@ -481,6 +481,48 @@ class DeviceDataSpan(BaseModel):
     )
 
 
+class DeviceSettingRead(BaseModel):
+    """One setting of the device type's catalogue with the value Protect knows for the device
+    (decisions D228 to D231): the catalogue's facts and, when known, the value, its source
+    (frame, ble, command, manual), its status (observed or sent) and when."""
+
+    key: str
+    setting_id: int | None
+    type: str
+    length: int | None
+    default: Any = None
+    min: Any = None
+    max: Any = None
+    unit: str | None = None
+    group: str | None = None
+    description: str | None = None
+    since_firmware: str | None = None
+    value: Any = None
+    raw_hex: str | None = None
+    source: str | None = None
+    status: str | None = None
+    observed_at: datetime | None = None
+    set_by_user_id: uuid.UUID | None = None
+    command_id: uuid.UUID | None = None
+
+
+class DeviceSettingsRead(BaseModel):
+    driver_key: str
+    firmware: str | None = Field(default=None, description="The catalogue's firmware version")
+    device_firmware: str | None = Field(
+        default=None, description="The firmware the device reported"
+    )
+    known: int
+    items: list[DeviceSettingRead]
+
+
+class DeviceSettingWrite(BaseModel):
+    """A person's word on a setting Protect cannot observe (decision D229): recorded as known,
+    not sent to the device."""
+
+    value: Any = Field(description="The value as the catalogue's type takes it")
+
+
 class LearnedInterval(BaseModel):
     seconds: float
     regular_share: float

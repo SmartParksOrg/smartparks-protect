@@ -29,6 +29,7 @@ from shared.models import (
     Command,
     CommandExecution,
     Device,
+    DeviceSetting,
     DeviceStateHistory,
     DeviceType,
     Position,
@@ -43,6 +44,19 @@ ACKNOWLEDGED = (CommandStatus.ACKNOWLEDGED, CommandStatus.CONFIRMED_BY_DEVICE)
 FRAMES_TO_READ = 20
 #: The device page learns from this many days of fixes.
 LEARN_DAYS = 30
+
+
+def driver_catalog_document(driver_key: str) -> dict[str, Any]:
+    """The driver's whole catalogue document (settings, commands, values, firmware), when it
+    ships one; empty otherwise."""
+    path = Path(__file__).resolve().parents[1] / "device_drivers" / driver_key / "catalog.json"
+    if not path.exists():
+        return {}
+    try:
+        document = json.loads(path.read_text())
+    except ValueError:
+        return {}
+    return document if isinstance(document, dict) else {}
 
 
 def driver_catalog(driver_key: str) -> list[dict[str, Any]]:
@@ -126,21 +140,50 @@ async def declared_intervals(
         .order_by(CommandExecution.time.desc())
         .limit(1)
     )
+    # the settings Protect keeps per device (decisions D228 to D231) come before the frames
+    # read here: a person's entry, then what the device said or a WebBLE read, then a command
+    known = await session.scalars(
+        select(DeviceSetting).where(
+            DeviceSetting.device_id == device.id, DeviceSetting.observed_at < until
+        )
+    )
+    by_source: dict[str, dict[str, Any]] = {"manual": {}, "observed": {}, "sent": {}}
+    for row in known:
+        if row.source == "manual":
+            by_source["manual"][row.key] = row.value
+        elif row.status == "sent":
+            by_source["sent"][row.key] = row.value
+        else:
+            by_source["observed"][row.key] = row.value
     override = override_of(device)
     fix: tuple[float, str] | None = None
     if override is not None:
         fix = (float(override["seconds"]), "override")
-    elif expected_intervals(frames)["fix"]:
-        fix = (float(expected_intervals(frames)["fix"] or 0), "settings_frame")
-    elif isinstance(command, int) and command > 0:
-        fix = (float(command), "command")
-    elif expected_intervals(base)["fix"]:
-        fix = (float(expected_intervals(base)["fix"] or 0), "type_default")
+    else:
+        for layer, source in (
+            (by_source["manual"], "manual"),
+            (by_source["observed"], "settings_frame"),
+            (frames, "settings_frame"),
+            (by_source["sent"], "command"),
+        ):
+            if expected_intervals(layer)["fix"]:
+                fix = (float(expected_intervals(layer)["fix"] or 0), source)
+                break
+        if fix is None and isinstance(command, int) and command > 0:
+            fix = (float(command), "command")
+        if fix is None and expected_intervals(base)["fix"]:
+            fix = (float(expected_intervals(base)["fix"] or 0), "type_default")
     status: tuple[float, str] | None = None
-    if expected_intervals(frames)["status"]:
-        status = (float(expected_intervals(frames)["status"] or 0), "settings_frame")
-    elif expected_intervals(base)["status"]:
-        status = (float(expected_intervals(base)["status"] or 0), "type_default")
+    for layer, source in (
+        (by_source["manual"], "manual"),
+        (by_source["observed"], "settings_frame"),
+        (frames, "settings_frame"),
+        (by_source["sent"], "command"),
+        (base, "type_default"),
+    ):
+        if expected_intervals(layer)["status"]:
+            status = (float(expected_intervals(layer)["status"] or 0), source)
+            break
     return Declared(fix=fix, status=status, override=override)
 
 

@@ -4047,6 +4047,123 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/settings": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Settings",
+    "description": "Every setting of the device type's catalogue with the value Protect knows for this\ndevice, its source and when (decisions D228 to D231).",
+    "operationId": "device_settings_api_v1_devices__device_id__settings_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceSettingsRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/settings/{key}": {
+   "put": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Set Device Setting",
+    "description": "Record a setting's value as known without sending it (decision D229): for what a\nperson set by hand or read elsewhere. Project admins of the device's project, or a server\nadmin. The value is checked against the catalogue's type and range.",
+    "operationId": "set_device_setting_api_v1_devices__device_id__settings__key__put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeviceSettingWrite"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceSettingRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/reporting": {
    "get": {
     "tags": [
@@ -26904,6 +27021,238 @@
     },
     "type": "object",
     "title": "DeviceReportingUpdate"
+   },
+   "DeviceSettingRead": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "setting_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Setting Id"
+     },
+     "type": {
+      "type": "string",
+      "title": "Type"
+     },
+     "length": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Length"
+     },
+     "default": {
+      "title": "Default"
+     },
+     "min": {
+      "title": "Min"
+     },
+     "max": {
+      "title": "Max"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "group": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "since_firmware": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Since Firmware"
+     },
+     "value": {
+      "title": "Value"
+     },
+     "raw_hex": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Raw Hex"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "observed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Observed At"
+     },
+     "set_by_user_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Set By User Id"
+     },
+     "command_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Command Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "setting_id",
+     "type",
+     "length"
+    ],
+    "title": "DeviceSettingRead",
+    "description": "One setting of the device type's catalogue with the value Protect knows for the device\n(decisions D228 to D231): the catalogue's facts and, when known, the value, its source\n(frame, ble, command, manual), its status (observed or sent) and when."
+   },
+   "DeviceSettingWrite": {
+    "properties": {
+     "value": {
+      "title": "Value",
+      "description": "The value as the catalogue's type takes it"
+     }
+    },
+    "type": "object",
+    "required": [
+     "value"
+    ],
+    "title": "DeviceSettingWrite",
+    "description": "A person's word on a setting Protect cannot observe (decision D229): recorded as known,\nnot sent to the device."
+   },
+   "DeviceSettingsRead": {
+    "properties": {
+     "driver_key": {
+      "type": "string",
+      "title": "Driver Key"
+     },
+     "firmware": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Firmware",
+      "description": "The catalogue's firmware version"
+     },
+     "device_firmware": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Firmware",
+      "description": "The firmware the device reported"
+     },
+     "known": {
+      "type": "integer",
+      "title": "Known"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/DeviceSettingRead"
+      },
+      "type": "array",
+      "title": "Items"
+     }
+    },
+    "type": "object",
+    "required": [
+     "driver_key",
+     "known",
+     "items"
+    ],
+    "title": "DeviceSettingsRead"
    },
    "DeviceStateRead": {
     "properties": {

@@ -163,3 +163,4 @@ nav:
       - adr/0032-attribution-as-a-background-job.md
       - adr/0033-pdf-reports-made-on-the-server.md
       - adr/0034-devices-as-analysis-subjects-with-levels.md
+      - adr/0035-device-settings-known-per-device.md

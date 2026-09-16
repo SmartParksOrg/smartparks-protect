@@ -45,6 +45,7 @@ from shared.models.log_files import DeviceLogFile
 from shared.models.network import DataSourceCursor, Gateway
 from shared.models.oauth import OAuthAuthorizationCode, OAuthClient, OAuthRefreshToken
 from shared.models.platform import Dashboard, McpPendingAction, ProjectIcon, ServerSetting
+from shared.models.settings import DeviceSetting
 from shared.models.timeseries import (
     HYPERTABLES,
     ConnectivityState,
@@ -85,6 +86,7 @@ __all__ = [
     "DeviceEntityAssignment",
     "DeviceLogFile",
     "DeviceProjectAssignment",
+    "DeviceSetting",
     "DeviceStateHistory",
     "DeviceType",
     "Entity",

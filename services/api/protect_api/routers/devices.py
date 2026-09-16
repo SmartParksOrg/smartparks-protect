@@ -32,6 +32,9 @@ from protect_api.schemas.domain import (
     DeviceRead,
     DeviceReporting,
     DeviceReportingUpdate,
+    DeviceSettingRead,
+    DeviceSettingsRead,
+    DeviceSettingWrite,
     DeviceUpdate,
     DeviceWithAssignments,
     ExternalIdentityCreate,
@@ -59,10 +62,18 @@ from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import resolve_attribution
 from shared.domain.attribution import active_job, publish_job, recent_jobs
+from shared.domain.device_settings import known_settings, record_setting
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
-from shared.domain.reporting import LEARN_DAYS, OVERRIDE_ATTRIBUTE, expected_fix_interval
+from shared.domain.reporting import (
+    LEARN_DAYS,
+    OVERRIDE_ATTRIBUTE,
+    driver_catalog,
+    driver_catalog_document,
+    expected_fix_interval,
+)
+from shared.domain.reporting_rules import decode_setting_value, encode_setting_value
 from shared.enums import AcquisitionChannel, DeviceStatus, Role
 from shared.models import (
     AttributionJob,
@@ -940,6 +951,106 @@ async def device_data_span(
         clock_ahead_until=ahead_until,
         outliers_waiting=outliers_waiting,
     )
+
+
+@router.get("/{device_id}/settings", response_model=DeviceSettingsRead)
+async def device_settings(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceSettingsRead:
+    """Every setting of the device type's catalogue with the value Protect knows for this
+    device, its source and when (decisions D228 to D231)."""
+    device = await _visible_device(session, user, device_id)
+    device_type = await session.get(DeviceType, device.device_type_id)
+    driver_key = device_type.driver_key if device_type else ""
+    catalog = driver_catalog(driver_key)
+    known = await known_settings(session, device.id)
+    items = []
+    for item in catalog:
+        row = known.get(str(item.get("name")))
+        items.append(
+            DeviceSettingRead(
+                key=str(item.get("name")),
+                setting_id=int(item["id"]) if "id" in item else None,
+                type=str(item.get("type", "")),
+                length=item.get("length"),
+                default=item.get("default"),
+                min=item.get("min"),
+                max=item.get("max"),
+                unit=item.get("unit"),
+                group=item.get("group"),
+                description=item.get("description"),
+                since_firmware=item.get("since_firmware"),
+                value=row.value if row else None,
+                raw_hex=row.raw_hex if row else None,
+                source=row.source if row else None,
+                status=row.status if row else None,
+                observed_at=row.observed_at if row else None,
+                set_by_user_id=row.set_by_user_id if row else None,
+                command_id=row.command_id if row else None,
+            )
+        )
+    document = driver_catalog_document(driver_key)
+    return DeviceSettingsRead(
+        driver_key=driver_key,
+        firmware=str(document.get("firmware")) if document.get("firmware") else None,
+        device_firmware=device.firmware_version,
+        known=len([i for i in items if i.value is not None]),
+        items=items,
+    )
+
+
+@router.put("/{device_id}/settings/{key}", response_model=DeviceSettingRead)
+async def set_device_setting(
+    device_id: uuid.UUID,
+    key: str,
+    body: DeviceSettingWrite,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceSettingRead:
+    """Record a setting's value as known without sending it (decision D229): for what a
+    person set by hand or read elsewhere. Project admins of the device's project, or a server
+    admin. The value is checked against the catalogue's type and range."""
+    device = await get_or_404(session, Device, device_id, "Device")
+    attribution = await resolve_attribution(session, device.id, utc_now())
+    if not user.is_superuser:
+        if attribution.project_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
+        await _require_project_admin(session, user, attribution.project_id)
+    device_type = await session.get(DeviceType, device.device_type_id)
+    catalog = driver_catalog(device_type.driver_key if device_type else "")
+    item = next((i for i in catalog if i.get("name") == key), None)
+    if item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No setting {key} in the catalogue")
+    try:
+        raw = encode_setting_value(item, body.value)
+    except ValueError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
+    value = decode_setting_value(item, raw)
+    await record_setting(
+        session,
+        device.id,
+        key,
+        value,
+        source="manual",
+        observed_at=utc_now(),
+        setting_id=int(item["id"]),
+        raw_hex=raw.hex(),
+        set_by_user_id=user.id,
+    )
+    await record_audit(
+        session,
+        user=user,
+        action="device.setting_recorded",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=attribution.project_id,
+        details={"setting": key, "value": value},
+    )
+    await session.commit()
+    read = await device_settings(device_id, user, session)
+    return next(i for i in read.items if i.key == key)
 
 
 @router.get("/{device_id}/reporting", response_model=DeviceReporting)

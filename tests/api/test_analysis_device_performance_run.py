@@ -425,3 +425,7 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
         f"/api/v1/devices/{bad['id']}/reporting", json={"expected_fix_interval_s": None}, headers=h
     )
     assert cleared.json()["override"] is None and cleared.json()["expected_source"] == "learned"
+
+    # the settings tab (decisions D228 to D231): the generic type has no catalogue
+    empty = await client.get(f"/api/v1/devices/{bad['id']}/settings", headers=h)
+    assert empty.status_code == 200 and empty.json()["items"] == [] and empty.json()["known"] == 0

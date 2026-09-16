@@ -26,7 +26,73 @@ TLV_FORMATS = {
     "int8": "<b",
     "int16": "<h",
     "int32": "<i",
+    "bool": "<B",
 }
+
+
+def decode_setting_value(item: dict[str, Any], raw: bytes) -> Any:
+    """One setting's bytes as a value the catalogue's type gives: an integer, a boolean, a
+    string, or a hex string for a byte array; None when the bytes do not fit the type."""
+    kind = str(item.get("type", ""))
+    if kind == "string":
+        return raw.rstrip(b"\x00").decode("utf-8", errors="replace")
+    if kind == "byte_array":
+        return raw.hex()
+    fmt = TLV_FORMATS.get(kind)
+    if fmt is None or len(raw) != struct.calcsize(fmt):
+        return None
+    value = struct.unpack(fmt, raw)[0]
+    return bool(value) if kind == "bool" else int(value)
+
+
+def encode_setting_value(item: dict[str, Any], value: Any) -> bytes:
+    """The bytes of a value for the catalogue's type, checked against its range; raises
+    ValueError when the value does not fit."""
+    kind = str(item.get("type", ""))
+    length = int(item.get("length") or 0)
+    if kind == "string":
+        raw = str(value).encode("utf-8")
+        if length and len(raw) > length:
+            raise ValueError(f"at most {length} bytes")
+        return raw.ljust(length, b"\x00") if length else raw
+    if kind == "byte_array":
+        raw = bytes.fromhex(str(value))
+        if length and len(raw) != length:
+            raise ValueError(f"{length} bytes as hex")
+        return raw
+    fmt = TLV_FORMATS.get(kind)
+    if fmt is None:
+        raise ValueError(f"unknown type {kind}")
+    if kind == "bool":
+        number = 1 if value in (True, 1, "1", "true", "True") else 0
+    else:
+        number = int(value)
+        low, high = item.get("min"), item.get("max")
+        if isinstance(low, int | float) and number < low:
+            raise ValueError(f"at least {low}")
+        if isinstance(high, int | float) and number > high:
+            raise ValueError(f"at most {high}")
+    return struct.pack(fmt, number)
+
+
+def decode_tlv_values(
+    tlv: dict[str, str], catalog: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Every setting of a frame the catalogue names: `{name: {"id", "value", "raw_hex"}}`,
+    whatever its type; an item the catalogue does not know is left out."""
+    by_id = {int(item["id"]): item for item in catalog if "id" in item and "name" in item}
+    out: dict[str, dict[str, Any]] = {}
+    for key, value in tlv.items():
+        try:
+            item = by_id[int(str(key), 16)]
+            raw = bytes.fromhex(str(value))
+        except (KeyError, ValueError):
+            continue
+        decoded = decode_setting_value(item, raw)
+        if decoded is None:
+            continue
+        out[str(item["name"])] = {"id": int(item["id"]), "value": decoded, "raw_hex": raw.hex()}
+    return out
 
 
 def decode_tlv_settings(tlv: dict[str, str], catalog: list[dict[str, Any]]) -> dict[str, int]:

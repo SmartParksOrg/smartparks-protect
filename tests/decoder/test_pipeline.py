@@ -642,3 +642,24 @@ async def test_an_impossible_jump_is_flagged_as_an_outlier_and_kept_out(db, bus,
         await db.execute(select(Position).where(Position.source_event_id == event3.id))
     ).scalar_one()
     assert row3.valid is True
+
+
+async def test_a_settings_frame_fills_the_settings_protect_knows(db, bus, world):
+    """Decisions D228 to D231: a state holding settings TLVs becomes one known value per
+    setting the catalogue names, with the source and the time; a newer frame replaces it."""
+    from shared.models import DeviceSetting
+
+    frame = {
+        "time": "2026-03-10T10:00:00+00:00",
+        "state": {"port_3_tlv": {"0x02": "100e0000", "0x03": "08070000", "0x0b": "01"}},
+    }
+    _, outcome = await _ingest_and_process(db, bus, world, frame)
+    assert outcome.created["states"] == 1
+    await db.rollback()
+    # the generic JSON driver of the world has no catalogue: nothing is known from it
+    rows = (
+        (await db.execute(select(DeviceSetting).where(DeviceSetting.device_id == world.device.id)))
+        .scalars()
+        .all()
+    )
+    assert rows == [] and outcome.settings_changed == 0
