@@ -126,8 +126,13 @@ DEVICE_PERFORMANCE_LABELS: dict[str, str] = {
     "statuses": "Statuses",
     "battery_v": "Battery (V)",
     "battery_min_v": "Lowest battery (V)",
+    "battery_trend": "Battery trend",
     "battery_slope_mv_day": "Battery slope (mV/day)",
     "days_to_critical": "Days to critical",
+    "expected_fixes": "Fixes expected",
+    "missed_fix_network_share": "Missed fixes, lost on the network",
+    "missed_fix_device_share": "Missed fixes, not made by the device",
+    "details": "Details per device",
     "charging_days": "Charging days",
     "temperature_min_c": "Lowest temperature (°C)",
     "temperature_median_c": "Median temperature (°C)",
@@ -216,7 +221,7 @@ DEVICE_KEY_FIGURES: list[str] = [
     "temperature_max_c",
     "reboots",
     "error_share",
-    "missed_fix_share",
+    "missed_fix_device_share",
     "longest_silence_h",
     "fix_success",
     "ttf_p90_s",
@@ -233,7 +238,7 @@ DEVICE_SHORT_LABELS: dict[str, str] = {
     "temperature_max_c": "Max °C",
     "reboots": "Reboots",
     "error_share": "Errors",
-    "missed_fix_share": "Missed fixes",
+    "missed_fix_device_share": "Missed (device)",
     "longest_silence_h": "Silence (h)",
     "fix_success": "Fix success",
     "ttf_p90_s": "TTF p90",
@@ -244,6 +249,8 @@ DEVICE_SHORT_LABELS: dict[str, str] = {
 }
 #: Up to this many devices the fleet table on paper stands on its side: a row per indicator.
 FLEET_TRANSPOSE_MAX = 6
+#: The device tables whose figures the key figures block and the area cards already carry.
+DEVICE_TABLES_IN_CARDS = frozenset({"fleet", "health", "reporting", "gnss", "network"})
 
 #: The indicators of each area's card in a device's section (the frontend's `AREA_CARDS`).
 DEVICE_AREA_CARDS: list[tuple[str, list[str]]] = [
@@ -251,6 +258,7 @@ DEVICE_AREA_CARDS: list[tuple[str, list[str]]] = [
         "health",
         [
             "battery_v",
+            "battery_trend",
             "battery_slope_mv_day",
             "days_to_critical",
             "temperature_max_c",
@@ -272,6 +280,8 @@ DEVICE_AREA_CARDS: list[tuple[str, list[str]]] = [
             "declared_fix_s",
             "observed_fix_median_s",
             "missed_fix_share",
+            "missed_fix_network_share",
+            "missed_fix_device_share",
             "expected_status_s",
             "missed_status_share",
             "silences",
@@ -304,8 +314,13 @@ DEVICE_PERFORMANCE_LIMITATIONS = [
     "weigh, with the interval it assumed beside it.",
     "Lost uplinks come from the frame counter; a data source that does not deliver it shows no "
     "figure, not zero.",
-    "The battery slope is a straight line through the daily medians; a battery's curve is not "
-    "straight, so the days to critical are an indication, not a forecast.",
+    "The battery trend is a straight line through the daily medians, reported only when it "
+    "stands clear of the noise over at least five days; a lithium cell sits on a plateau for "
+    "most of its life, so a steady week predicts little and the days to critical are an "
+    "indication, not a forecast.",
+    "Missed fixes are split by the frame counter: the uplinks the network lost, scaled over "
+    "the fixes that came, estimate the fixes that left the device; the rest is the device's "
+    "own shortfall. Without a frame counter the device carries the whole share.",
     "Signal figures are the best gateway's per uplink; a moving device changes gateways, so "
     "they describe the network as the device met it.",
     "Levels come from the driver's thresholds and named defaults; they are not a verdict on "
@@ -538,6 +553,22 @@ def device_order(document: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(document.get("subjects", []), key=key)
 
 
+#: What an empty slope or days figure says, by the trend the fit found (decision D232).
+TREND_WORDS = {"steady": "steady", "rising": "rising", "falling": "over a year"}
+
+
+def trend_word(figures: dict[str, Any], key: str) -> str | None:
+    """The word in place of an empty battery slope or days-to-critical figure: "steady" when
+    the fit proved nothing, "rising" when the battery charges, "over a year" when a proven
+    fall reaches the critical voltage later than a year."""
+    if key not in ("battery_slope_mv_day", "days_to_critical") or figures.get(key) is not None:
+        return None
+    trend = figures.get("battery_trend")
+    if key == "battery_slope_mv_day" and trend == "falling":
+        return None
+    return TREND_WORDS.get(str(trend)) if trend else None
+
+
 def _with_before(value: Any, before: dict[str, Any] | None, key: str, has_comparison: bool) -> str:
     """A figure, with the comparison period's in brackets when the run has one and the figure
     exists there."""
@@ -564,7 +595,8 @@ def _device_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
         figures = main.get(sid) or {}
         cells = [
             {
-                "text": _with_before(figures.get(key), before.get(sid), key, has_comparison),
+                "text": trend_word(figures, key)
+                or _with_before(figures.get(key), before.get(sid), key, has_comparison),
                 "level": (levels.get(sid) or {}).get(key),
             }
             for key in DEVICE_KEY_FIGURES
@@ -618,12 +650,13 @@ def device_sections(
             rows = []
             for key in keys:
                 value = figures.get(key)
-                if value is None or value == []:
+                word = trend_word(figures, key)
+                if word is None and (value is None or value == []):
                     continue
                 rows.append(
                     {
                         "label": labels.get(key, key),
-                        "text": _with_before(value, before.get(sid), key, has_comparison),
+                        "text": word or _with_before(value, before.get(sid), key, has_comparison),
                         "level": (levels.get(sid) or {}).get(key),
                     }
                 )
@@ -802,10 +835,12 @@ def render_html(inp: ReportInput) -> str:
             for c in document.get("charts", [])
         ]
     )
+    # a device run prints the fleet table as its key figures and the area cards per device,
+    # so of its tables only the details, the error flags and the reboots go on paper (D234)
     tables = [
         table_block(t, labels)
         for t in document.get("tables", [])
-        if t.get("rows") and not (devices and t.get("key") == "fleet")
+        if t.get("rows") and not (devices and t.get("key") in DEVICE_TABLES_IN_CARDS)
     ]
     defaults = document.get("summary", {}).get("defaults") if devices else None
     main = next((p for p in document.get("periods", []) if p.get("key") == "main"), None)

@@ -39,6 +39,7 @@ from shared.analysis.primitives.health import (
     DAY_S,
     FlagShares,
     Reboots,
+    battery_trend,
     bucketed,
     days_to,
     flag_shares,
@@ -46,7 +47,6 @@ from shared.analysis.primitives.health import (
     percentile,
     reboots_from,
     share,
-    slope_per_day,
     versions_seen,
 )
 from shared.analysis.primitives.intervals import (
@@ -119,7 +119,7 @@ FLEET_COLUMNS = [
     "temperature_max_c",
     "reboots",
     "error_share",
-    "missed_fix_share",
+    "missed_fix_device_share",
     "longest_silence_h",
     "fix_success",
     "ttf_p90_s",
@@ -128,10 +128,27 @@ FLEET_COLUMNS = [
     "rssi_p10_dbm",
     "missed_sessions_share",
 ]
+#: The details table under the map (decision D234): one row per device with the headline
+#: figure of each area, the missed fixes split between the network and the device.
+DETAILS_COLUMNS = [
+    "battery_v",
+    "battery_trend",
+    "days_to_critical",
+    "expected_fix_s",
+    "expected_fix_source",
+    "fixes",
+    "missed_fix_network_share",
+    "missed_fix_device_share",
+    "fix_success",
+    "accuracy_median_m",
+    "lost_uplinks_share",
+    "rssi_p10_dbm",
+]
 HEALTH_COLUMNS = [
     "statuses",
     "battery_v",
     "battery_min_v",
+    "battery_trend",
     "battery_slope_mv_day",
     "days_to_critical",
     "charging_days",
@@ -157,7 +174,10 @@ REPORTING_COLUMNS = [
     "fixes",
     "observed_fix_median_s",
     "observed_fix_p90_s",
+    "expected_fixes",
     "missed_fix_share",
+    "missed_fix_network_share",
+    "missed_fix_device_share",
     "observed_status_median_s",
     "missed_status_share",
     "silences",
@@ -612,7 +632,10 @@ def health_figures(
             now_v = float(values[clean][-1])
             s["battery_v"] = round(now_v, 3)
             s["battery_min_v"] = round(float(values[clean].min()), 3)
-            slope = slope_per_day(times[clean], values[clean])
+            # a proven trend only (decision D232): a flat week says "steady", not a forecast
+            trend = battery_trend(times[clean], values[clean])
+            s["battery_trend"] = trend.kind
+            slope = trend.slope_per_day
             s["battery_slope_mv_day"] = round(slope * 1000, 2) if slope is not None else None
             floor = thresholds["battery_v"].critical_below
             s["days_to_critical"] = days_to(now_v, slope, floor) if floor is not None else None
@@ -723,6 +746,7 @@ def reporting_figures(
     fixes: IntervalReport = interval_report(fix_times, from_s, to_s, expected["fix"])
     statuses: IntervalReport = interval_report(status_times, from_s, to_s, expected["status"])
     s["fixes"] = fixes.messages
+    s["expected_fixes"] = fixes.expected_count
     s["observed_fix_median_s"] = fixes.observed_median_s
     s["observed_fix_p90_s"] = fixes.observed_p90_s
     s["missed_fix_share"] = fixes.missed_share
@@ -742,7 +766,8 @@ def reporting_figures(
     s["messages"] = messages
     s["invalid_records"] = invalid
     s["invalid_share"] = share(invalid, invalid + valid)
-    for key in ("missed_fix_share", "missed_status_share", "longest_silence_h", "invalid_share"):
+    # the missed fixes take their level after the network figures split them (D233)
+    for key in ("missed_status_share", "longest_silence_h", "invalid_share"):
         level = _level(thresholds, key, s.get(key))
         if level is not None:
             out.levels[key] = level
@@ -763,11 +788,17 @@ def gnss_figures(
     s = out.summary
     n = len(track)
     if "gnss_fix" in metrics:
+        # the attempts that succeeded (the fixes that came, or the successes the device
+        # reported, whichever is more: the short position message writes a failed attempt
+        # but no record for a fix that came) plus the attempts reported as failed
         _, values = metrics["gnss_fix"]
         clean = values[~np.isnan(values)]
-        if clean.size:
-            s["attempts"] = int(clean.size)
-            s["fix_success"] = round(float(clean.mean()), 4)
+        failed = int((clean == 0).sum())
+        succeeded = max(n + rejected, int((clean != 0).sum()))
+        attempts = succeeded + failed
+        if attempts:
+            s["attempts"] = attempts
+            s["fix_success"] = round(succeeded / attempts, 4)
     if "gnss_time_to_fix" in metrics:
         _, values = metrics["gnss_time_to_fix"]
         s["ttf_median_s"] = percentile(values, 50)
@@ -1085,9 +1116,40 @@ async def analyse_device(
     if hull is not None:
         out.geometries.append(hull)
     await network_figures(session, subject, info.id, sources, thresholds, period, bucket_s, out)
+    split_missed_fixes(out.summary, thresholds, out.levels)
     out.summary["sources"] = [s.name for s in sources]
     out.summary["level"] = worst(out.levels.values())
     return out
+
+
+def split_missed_fixes(
+    s: dict[str, Any], thresholds: dict[str, Threshold], levels: dict[str, Level]
+) -> None:
+    """Decision D233: the missed fixes split between the network and the device. The frame
+    counter says which share of the uplinks never reached a gateway; the fixes that came,
+    scaled up by it, estimate the fixes that left the device, and the difference to the
+    expected count is the device's own shortfall. The level follows the device's share; the
+    total keeps no dot of its own. Without a frame counter the device carries the total."""
+    total = s.get("missed_fix_share")
+    if total is None:
+        return
+    fixes = s.get("fixes") or 0
+    expected = s.get("expected_fixes")
+    lost = s.get("lost_uplinks_share")
+    network: float | None = None
+    if lost is not None and 0 <= lost < 1 and expected:
+        # the attempts the device itself reported as failed are its own, whatever the network
+        attempts = s.get("attempts")
+        failed = max(0, attempts - fixes - (s.get("rejected_fixes") or 0)) if attempts else 0
+        known_device = min(total, failed / expected)
+        sent = fixes / (1 - lost)
+        network = round(min(total - known_device, max(0.0, sent - fixes) / expected), 4)
+    device = round(max(0.0, total - (network or 0.0)), 4)
+    s["missed_fix_network_share"] = network
+    s["missed_fix_device_share"] = device
+    level = _level(thresholds, "missed_fix_device_share", device)
+    if level is not None:
+        levels["missed_fix_device_share"] = level
 
 
 #: The same warning over more devices than this folds into one line for the fleet.
@@ -1145,6 +1207,7 @@ def build_document(
     }
     warnings: list[Warning] = []
     fleet_rows: list[list[Any]] = []
+    details_rows: list[list[Any]] = []
     health_rows: list[list[Any]] = []
     reporting_rows: list[list[Any]] = []
     gnss_rows: list[list[Any]] = []
@@ -1183,6 +1246,10 @@ def build_document(
                     [subject.name, m.summary.get("level")]
                     + [m.summary.get(k) for k in FLEET_COLUMNS]
                 )
+                details_rows.append(
+                    [subject.name, m.summary.get("level")]
+                    + [m.summary.get(k) for k in DETAILS_COLUMNS]
+                )
                 error_rows.extend([subject.name, *row] for row in m.error_rows)
                 reboot_rows.extend([subject.name, *row] for row in m.reboot_rows)
     warnings = fold_warnings(warnings)
@@ -1201,9 +1268,11 @@ def build_document(
                 summary["ranks"].setdefault(device_id, {})[key] = rank
     order = {"critical": 0, "warn": 1, "ok": 2, None: 3}
     fleet_rows.sort(key=lambda r: (order.get(r[1], 3), r[0]))
+    details_rows.sort(key=lambda r: (order.get(r[1], 3), r[0]))
     summary["defaults"] = {key: threshold.describe() for key, threshold in DEFAULTS.items()}
     tables = [
         Table(key="fleet", columns=["device", "level", *FLEET_COLUMNS], rows=fleet_rows),
+        Table(key="details", columns=["device", "level", *DETAILS_COLUMNS], rows=details_rows),
         Table(key="health", columns=["device", "period", *HEALTH_COLUMNS], rows=health_rows),
         Table(
             key="reporting", columns=["device", "period", *REPORTING_COLUMNS], rows=reporting_rows

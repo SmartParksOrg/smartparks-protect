@@ -64,14 +64,58 @@ def slope_per_day(times_s: NDArray[np.float64], values: NDArray[np.float64]) -> 
     return slope
 
 
+#: A trend needs this many days of values before a slope is fitted at all.
+MIN_TREND_DAYS = 5
+#: Below this slope (units per day) a fit says "steady": a battery's readings step in 10 mV,
+#: so a hair of slope over a flat week is noise.
+MIN_TREND_SLOPE = 0.001
+#: Beyond this many days a forecast is "over a year", not a number.
+MAX_DAYS_TO = 365
+
+
+@dataclass(slots=True)
+class Trend:
+    """A value's trend over the days (decision D232): the slope only when it is proven, and
+    the word that says what the fit found."""
+
+    #: Units per day, None unless the trend is proven.
+    slope_per_day: float | None
+    #: "falling", "rising", "steady" (a fit that is not proven) or "unknown" (too few days).
+    kind: str
+    #: The daily points the fit stood on.
+    days: int
+
+
+def battery_trend(times_s: NDArray[np.float64], values: NDArray[np.float64]) -> Trend:
+    """The trend of the daily medians, proven or not: at least `MIN_TREND_DAYS` days, a slope
+    of at least `MIN_TREND_SLOPE` per day that stands clear of its own standard error by a
+    factor of two. A flat week with a hair of slope is "steady", not a forecast."""
+    points = bucketed(times_s, values, DAY_S)
+    if len(points) < MIN_TREND_DAYS:
+        return Trend(None, "unknown", len(points))
+    x = np.asarray([p[0] / 1000 / DAY_S for p in points], dtype=np.float64)
+    y = np.asarray([p[1] for p in points], dtype=np.float64)
+    coefficients, covariance = np.polyfit(x, y, 1, cov="unscaled")
+    slope = float(coefficients[0])
+    residuals = y - np.polyval(coefficients, x)
+    # the slope's standard error from the residuals (polyfit's unscaled covariance times the
+    # residual variance), zero for a perfectly straight line
+    dof = max(len(points) - 2, 1)
+    error = float(np.sqrt(covariance[0, 0] * (residuals @ residuals) / dof))
+    if abs(slope) < MIN_TREND_SLOPE or abs(slope) < 2 * error:
+        return Trend(None, "steady", len(points))
+    return Trend(slope, "falling" if slope < 0 else "rising", len(points))
+
+
 def days_to(value: float | None, slope_per_day_: float | None, floor: float) -> float | None:
-    """The days until a falling value reaches `floor`; None when it is not falling, zero when
-    it is there already."""
+    """The days until a falling value reaches `floor`; None when it is not falling or when
+    the answer lies more than `MAX_DAYS_TO` days away, zero when it is there already."""
     if value is None or slope_per_day_ is None or slope_per_day_ >= 0:
         return None
     if value <= floor:
         return 0.0
-    return round((value - floor) / -slope_per_day_, 1)
+    days = (value - floor) / -slope_per_day_
+    return round(days, 1) if days <= MAX_DAYS_TO else None
 
 
 def percentile(values: NDArray[np.float64], q: float) -> float | None:

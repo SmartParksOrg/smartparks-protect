@@ -281,9 +281,12 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
     # health: the failing battery falls about 6.7 mV a day, the good one hardly
     assert b["battery_slope_mv_day"] == pytest.approx(-6.7, abs=0.4)
     assert levels[bad["id"]]["battery_slope_mv_day"] == "warn"
-    assert levels[good["id"]]["battery_slope_mv_day"] == "ok"
-    # 3.5 V at the end, 6.7 mV a day: about a week to 3.45 V; the good one has years
-    assert 5 < b["days_to_critical"] < 10 and g["days_to_critical"] > 365
+    assert "battery_slope_mv_day" not in levels[good["id"]]  # nothing proven, no level
+    # 3.5 V at the end, 6.7 mV a day: about a week to 3.45 V; the good one's half a millivolt
+    # a day is below the trend's floor, so it reads steady with no forecast (decision D232)
+    assert 5 < b["days_to_critical"] < 10 and b["battery_trend"] == "falling"
+    assert g["days_to_critical"] is None and g["battery_trend"] == "steady"
+    assert g["battery_slope_mv_day"] is None
     assert levels[bad["id"]]["days_to_critical"] == "critical"
     assert b["reboots"] == 1 and g["reboots"] == 0
     assert b["error_share"] == pytest.approx(1 / 3, abs=0.01)
@@ -297,10 +300,15 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
     # a failed attempt every fifth fix leaves six-hour gaps: three quarters of the intervals
     # sit on the three-hour schedule, enough to trust it
     assert b["declared_fix_s"] == 3600 and 0.7 < b["fix_regular_share"] < 0.8
-    assert g["missed_fix_share"] == 0 and levels[good["id"]]["missed_fix_share"] == "ok"
-    # against its own schedule the bad device misses the attempts that failed: one in five
+    assert g["missed_fix_share"] == 0 and levels[good["id"]]["missed_fix_device_share"] == "ok"
+    # against its own schedule the bad device misses the attempts that failed: one in five.
+    # Its frame counter lost a quarter of the uplinks, but the failed attempts are the device's
+    # own, so the split (decision D233) leaves the whole share with the device
     assert b["missed_fix_share"] == pytest.approx(0.2, abs=0.01)
-    assert levels[bad["id"]]["missed_fix_share"] == "warn"
+    assert b["missed_fix_device_share"] == pytest.approx(0.2, abs=0.01)
+    assert b["missed_fix_network_share"] == 0
+    assert levels[bad["id"]]["missed_fix_device_share"] == "warn"
+    assert "missed_fix_share" not in levels[bad["id"]]
     assert g["silences"] == 0
     # gnss
     assert g["fix_success"] == 1.0 and b["fix_success"] == pytest.approx(0.8)
@@ -334,7 +342,12 @@ async def test_a_fleet_run_puts_the_failing_collar_first(client, db):
     ]
     # ranks: the failing device is first on the indicators that matter
     ranks = document["summary"]["ranks"]
-    assert ranks[bad["id"]]["missed_fix_share"] == 1 and ranks[good["id"]]["missed_fix_share"] == 2
+    assert (
+        ranks[bad["id"]]["missed_fix_device_share"] == 1
+        and ranks[good["id"]]["missed_fix_device_share"] == 2
+    )
+    details = tables["details"]
+    assert details["rows"][0][0] == bad["name"] and "missed_fix_device_share" in details["columns"]
     assert ranks[bad["id"]]["battery_v"] == 1
     assert "warn below 3.6 V" in document["summary"]["defaults"]["battery_v"]
     assert {c["key"] for c in document["charts"]} >= {

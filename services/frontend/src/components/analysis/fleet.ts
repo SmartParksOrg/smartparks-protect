@@ -41,6 +41,23 @@ export function showFigure(value: unknown, key: string): string {
       : value.toFixed(2);
 }
 
+/** What an empty battery slope or days-to-critical cell says, by the trend the fit found
+ * (decision D232): "steady" when nothing was proven, "rising" when the battery charges,
+ * "over a year" when a proven fall reaches the critical voltage later than a year. */
+export type TrendWord = "steady" | "rising" | "over a year";
+
+export function trendFallback(
+  main: Record<string, unknown> | null | undefined,
+  key: string,
+): TrendWord | null {
+  if (!main || (main[key] !== null && main[key] !== undefined)) return null;
+  if (key !== "days_to_critical" && key !== "battery_slope_mv_day") return null;
+  const trend = main.battery_trend;
+  if (trend === "steady" || trend === "rising") return trend;
+  if (trend === "falling" && key === "days_to_critical") return "over a year";
+  return null;
+}
+
 /** The devices of a result, the worst first: by headline level, then by the count of
  * critical and warn indicators, then by name. */
 export function orderedSubjects(document: ResultDocument) {
@@ -73,6 +90,7 @@ export const AREA_CARDS: [string, string[]][] = [
     "health",
     [
       "battery_v",
+      "battery_trend",
       "battery_slope_mv_day",
       "days_to_critical",
       "temperature_max_c",
@@ -94,6 +112,8 @@ export const AREA_CARDS: [string, string[]][] = [
       "declared_fix_s",
       "observed_fix_median_s",
       "missed_fix_share",
+      "missed_fix_network_share",
+      "missed_fix_device_share",
       "expected_status_s",
       "missed_status_share",
       "silences",

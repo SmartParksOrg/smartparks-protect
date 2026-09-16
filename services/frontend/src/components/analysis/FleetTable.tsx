@@ -9,6 +9,8 @@ import {
   type Level,
   orderedSubjects,
   showFigure,
+  trendFallback,
+  type TrendWord,
 } from "@/components/analysis/fleet";
 import {
   levelOf,
@@ -16,6 +18,31 @@ import {
   type ResultDocument,
   subjectSummary,
 } from "@/lib/analyses";
+
+/** The trend words, translated once per render. */
+function trendWords(t: (key: string) => string): Record<TrendWord, string> {
+  return {
+    steady: t("steady"),
+    rising: t("rising"),
+    "over a year": t("over a year"),
+  };
+}
+
+/** A figure as words: a list joined, a word (a source, a trend) through the labels, an empty
+ * slope or days figure as the trend's word, the rest through `showFigure`. */
+function figureText(
+  main: Record<string, unknown> | null | undefined,
+  key: string,
+  labels: Record<string, string>,
+  words: Record<TrendWord, string>,
+): string {
+  const fallback = trendFallback(main, key);
+  if (fallback) return words[fallback];
+  const value = main?.[key];
+  if (Array.isArray(value)) return (value as unknown[]).map(String).join(", ");
+  if (typeof value === "string") return labels[value] ?? value;
+  return showFigure(value, key);
+}
 
 const LEVEL_CLASS: Record<string, string> = {
   ok: "bg-emerald-500",
@@ -44,13 +71,18 @@ export function FleetTable({
   document,
   labels,
   colors,
+  tableKey = "fleet",
 }: {
   document: ResultDocument;
   labels: Record<string, string>;
   colors: Record<string, string>;
+  /** Which document table to draw: the fleet table (the summary block) or the details
+   * table under the map (decision D234); both hold a row per device with level dots. */
+  tableKey?: "fleet" | "details";
 }) {
   const { t } = useTranslation();
-  const fleet = document.tables.find((x) => x.key === "fleet");
+  const words = trendWords(t);
+  const fleet = document.tables.find((x) => x.key === tableKey);
   if (!fleet) return null;
   const columns = fleet.columns.slice(2);
   const rows = orderedSubjects(document).map((subject) => ({
@@ -67,7 +99,9 @@ export function FleetTable({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("Fleet")}</CardTitle>
+        <CardTitle>
+          {tableKey === "details" ? t("Details per device") : t("Fleet")}
+        </CardTitle>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -117,7 +151,7 @@ export function FleetTable({
                         level={levelOf(document, subject.id, c)}
                         title={`${labels[c] ?? c}: ${levelOf(document, subject.id, c)}`}
                       />
-                      {showFigure(main?.[c], c)}
+                      {figureText(main, c, labels, words)}
                     </span>
                   </td>
                 ))}
@@ -145,6 +179,7 @@ export function DeviceSections({
   colors: Record<string, string>;
 }) {
   const { t } = useTranslation();
+  const words = trendWords(t);
   const hasComparison = document.periods.some((p) => p.key === "comparison");
   const single = document.subjects.length === 1;
   // the subjects' names label their series
@@ -205,7 +240,9 @@ export function DeviceSections({
               {main ? (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {AREA_CARDS.map(([area, keys]) => {
-                    const present = keys.filter((k) => shown(main[k]));
+                    const present = keys.filter(
+                      (k) => shown(main[k]) || trendFallback(main, k) !== null,
+                    );
                     if (present.length === 0) return null;
                     return (
                       <div key={area} className="rounded-md border p-3">
@@ -225,11 +262,7 @@ export function DeviceSections({
                               </dt>
                               <dd className="flex flex-col items-end text-right tabular-nums leading-tight">
                                 <span>
-                                  {Array.isArray(main[key])
-                                    ? (main[key] as unknown[])
-                                        .map(String)
-                                        .join(", ")
-                                    : showFigure(main[key], key)}
+                                  {figureText(main, key, labels, words)}
                                 </span>
                                 {before && shown(before[key]) && (
                                   <span className="text-xs text-muted-foreground">

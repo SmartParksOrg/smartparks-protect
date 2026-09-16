@@ -43,7 +43,11 @@ export interface Presentation {
       run: AnalysisRun,
       colors: Record<string, string>,
     ) => ReactNode;
-    tables?: (document: ResultDocument, run: AnalysisRun) => ReactNode;
+    tables?: (
+      document: ResultDocument,
+      run: AnalysisRun,
+      colors: Record<string, string>,
+    ) => ReactNode;
   };
 }
 
@@ -122,6 +126,9 @@ export function grazingPresentation(
   };
 }
 
+/** The document tables drawn as plain tables under the map; the others live in the cards. */
+const TABLES_SHOWN = new Set(["errors", "reboots"]);
+
 export function devicePerformancePresentation(
   t: Translate,
   projectId: string,
@@ -149,10 +156,21 @@ export function devicePerformancePresentation(
       ),
       // the charts live in the device sections; the fleet table is the summary block
       charts: () => null,
-      tables: (document) => (
+      // the area tables repeat the cards, so under the map come the details table (a row
+      // per device with the headline figure of each area, decision D234), the error flags
+      // and the reboots
+      tables: (document, _run, colors) => (
         <>
+          <FleetTable
+            document={document}
+            labels={labels}
+            colors={colors}
+            tableKey="details"
+          />
           {document.tables
-            .filter((table) => table.key !== "fleet" && table.rows.length > 0)
+            .filter(
+              (table) => TABLES_SHOWN.has(table.key) && table.rows.length > 0,
+            )
             .map((table) => (
               <div key={table.key} className="space-y-2">
                 <h2 className="text-base font-medium">
@@ -192,8 +210,16 @@ export const devicePerformanceLabels = (
   statuses: t("Statuses"),
   battery_v: t("Battery (V)"),
   battery_min_v: t("Lowest battery (V)"),
+  battery_trend: t("Battery trend"),
   battery_slope_mv_day: t("Battery slope (mV/day)"),
   days_to_critical: t("Days to critical"),
+  falling: t("falling"),
+  rising: t("rising"),
+  steady: t("steady"),
+  expected_fixes: t("Fixes expected"),
+  missed_fix_network_share: t("Missed fixes, lost on the network"),
+  missed_fix_device_share: t("Missed fixes, not made by the device"),
+  details: t("Details per device"),
   charging_days: t("Charging days"),
   temperature_min_c: t("Lowest temperature (°C)"),
   temperature_median_c: t("Median temperature (°C)"),

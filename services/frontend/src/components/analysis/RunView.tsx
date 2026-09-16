@@ -76,7 +76,11 @@ export function RunView({
       run: AnalysisRun,
       colors: Record<string, string>,
     ) => React.ReactNode;
-    tables?: (document: ResultDocument, run: AnalysisRun) => React.ReactNode;
+    tables?: (
+      document: ResultDocument,
+      run: AnalysisRun,
+      colors: Record<string, string>,
+    ) => React.ReactNode;
   };
   /** Open the run's settings in the dialog, to change them and run again. */
   onEdit?: (run: AnalysisRun) => void;
@@ -401,7 +405,7 @@ export function RunView({
             </div>
           )}
           {render?.tables
-            ? render.tables(document, r)
+            ? render.tables(document, r, colors)
             : document.tables.map((table) => (
                 <div key={table.key} className="space-y-2">
                   <h2 className="text-base font-medium">

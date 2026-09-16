@@ -4,7 +4,13 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
-Nothing yet.
+### Changed
+
+- Device performance, after Tim's reading of a 32-device run (decisions D232 to D234): the battery trend counts only when it is proven (five days of daily medians, at least 1 mV a day, twice its standard error), otherwise the card says "steady" and days to critical stays empty; a proven fall further than a year away reads "over a year". A flat week no longer yields 243 trillion or 54 days. Missed fixes are split between the network and the device: the frame counter's lost share estimates the fixes that left the device, the rest is the device's own shortfall (the attempts it reported as failed always among it), and the level, the fleet column and the rank follow the device's share while the card shows the total and both parts. Under the map the health, reporting, GNSS and network tables, which repeated the cards, give way to one details table with a row per device (battery and trend, days to critical, expected interval and source, fixes, the missed split, fix success, accuracy, lost uplinks, RSSI) beside the error flags and the reboots; the four stay in the CSV and JSON export and the result document (`details` is a new table).
+
+### Fixed
+
+- Device performance: fix success counted only the failures for devices on firmware 7, whose short position message reports a failed attempt but nothing for a fix that came, so it read 0 percent for some devices and nothing for most. It now counts the fixes that came (or the successes reported, whichever is more) against the attempts reported as failed.
 
 ## v2.6.0, 2026-09-16
 

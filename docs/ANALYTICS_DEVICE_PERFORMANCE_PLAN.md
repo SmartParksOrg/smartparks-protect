@@ -54,7 +54,7 @@ Decision D216: a fixed catalogue per area. Every indicator is computed when its 
 | --- | --- | --- | --- |
 | Battery now | The newest battery voltage in the period | `battery_voltage` | The driver's thresholds (warn below 3.6 V, critical below 3.45 V) |
 | Battery slope | Least-squares slope of the daily median voltage, in mV per day, over the period | `battery_voltage` | warn when falling more than 5 mV a day, critical more than 15 |
-| Days to critical | The days until the slope reaches the critical threshold; "not falling" when the slope is flat or rising | derived | warn under 60 days, critical under 14 |
+| Days to critical | The days until a proven slope reaches the critical threshold; "steady" or "rising" when no fall is proven, "over a year" beyond that (revised 2026-09-16, decision D232: a flat week gave 243 trillion days) | derived | warn under 60 days, critical under 14 |
 | Charging | Days on which the charging voltage was above the battery voltage (a solar device) | `charging_voltage` | none (informative) |
 | Temperature | Minimum, median, maximum and the hours above the warn threshold | `device_temperature` | The driver's thresholds (warn above 50 °C, critical above 60) on the maximum |
 | Reboots | Count of `device_reset` events and the reasons (watchdog, software, lockup, pin) | `events` | warn at one a week, critical at one a day |
@@ -162,7 +162,8 @@ No new table: the run row and the geometries table hold everything (D202).
 
 - A missed report is inferred from the settings and the messages: a device whose interval changed in the period, or whose settings Protect never read, shows a share the reader must weigh; the document names the interval it assumed.
 - Lost uplinks come from the frame counter; a platform that does not deliver it (some Iridium and HTTP sources) shows none, not zero.
-- The battery slope is linear; a battery's curve is not, and days to critical is an indication, not a forecast.
+- The battery slope is linear; a battery's curve is not, and days to critical is an indication, not a forecast. A slope is reported only when proven (five days, 1 mV a day, twice its standard error; decision D232).
+- Missed fixes are split between the network and the device by the frame counter (decision D233); the four area tables repeat the cards, so the page and the report show a details table, the error flags and the reboots (decision D234; Tim's reading of the "Pangolins - 7days" run, 2026-09-16).
 - Signal figures are the best gateway's per uplink; a moving device changes gateways, so the figure describes the network as the device met it.
 - Levels come from the driver's thresholds and the catalogue's defaults, both named; they are not a verdict on the device, and a fleet rank says only where a device stands among the chosen ones.
 - Fix success counts attempts the device reported; a device that does not report failed attempts shows a success rate of one.

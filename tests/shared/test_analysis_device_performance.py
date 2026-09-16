@@ -9,6 +9,7 @@ import pytest
 
 from shared.analysis.primitives.health import (
     DAY_S,
+    battery_trend,
     bucketed,
     days_to,
     flag_shares,
@@ -51,6 +52,65 @@ def test_a_falling_battery_gives_its_slope_and_the_days_to_critical():
     assert slope_per_day(times[:4], values[:4]) is None  # one day of values says nothing
     daily = bucketed(times, values, DAY_S)
     assert len(daily) == 20 and daily[0][1] > daily[-1][1]
+
+
+def test_a_flat_week_is_steady_and_a_proven_fall_keeps_its_slope():
+    # decision D232: a hair of slope over a flat week is noise, not a forecast
+    days = np.arange(8, dtype=np.float64)
+    times = days * DAY_S + 3600  # seconds, one reading a day
+    flat = np.asarray([3.60, 3.59, 3.60, 3.61, 3.60, 3.58, 3.59, 3.61])
+    trend = battery_trend(times, flat)
+    assert trend.kind == "steady" and trend.slope_per_day is None and trend.days == 8
+    assert days_to(3.61, trend.slope_per_day, 3.45) is None
+    # a straight fall of 10 mV a day is proven
+    falling = battery_trend(times, 3.9 - 0.010 * days)
+    assert falling.kind == "falling" and falling.slope_per_day == pytest.approx(-0.010, rel=0.01)
+    # half a millivolt a day, however straight, is below the floor
+    assert battery_trend(times, 3.9 - 0.0005 * days).kind == "steady"
+    # a slow proven fall further than a year away has no number
+    assert days_to(3.9, -0.0011, 3.45) is None
+    assert days_to(3.6, -0.0011, 3.45) == pytest.approx(136.4, abs=0.1)
+    # four days say nothing yet
+    assert battery_trend(times[:4], flat[:4]).kind == "unknown"
+    # a noisy week around a real fall: the slope must beat twice its own error
+    noisy = 3.9 - 0.010 * days + np.asarray([0.05, -0.05, 0.05, -0.05, 0.05, -0.05, 0.05, -0.05])
+    assert battery_trend(times, noisy).kind == "steady"
+
+
+def test_missed_fixes_split_between_the_network_and_the_device():
+    from shared.analysis.modules.device_performance import split_missed_fixes
+    from shared.analysis.primitives.levels import DEFAULTS
+
+    # decision D233: 32 of 168 hourly fixes came, the frame counter lost 71 percent of the
+    # uplinks: about 110 fixes left the device, so the network took most of the missed share
+    s = {
+        "missed_fix_share": 0.8095,
+        "fixes": 32,
+        "expected_fixes": 168,
+        "lost_uplinks_share": 0.7088,
+    }
+    levels: dict = {}
+    split_missed_fixes(s, DEFAULTS, levels)
+    assert s["missed_fix_network_share"] == pytest.approx(0.463, abs=0.001)
+    assert s["missed_fix_device_share"] == pytest.approx(0.346, abs=0.001)
+    assert levels == {"missed_fix_device_share": "critical"}
+    # the attempts the device reported as failed stay with the device, whatever the network
+    s = {
+        "missed_fix_share": 0.2,
+        "fixes": 192,
+        "expected_fixes": 240,
+        "lost_uplinks_share": 0.25,
+        "attempts": 240,
+        "rejected_fixes": 0,
+    }
+    levels = {}
+    split_missed_fixes(s, DEFAULTS, levels)
+    assert s["missed_fix_network_share"] == 0 and s["missed_fix_device_share"] == 0.2
+    assert levels["missed_fix_device_share"] == "warn"
+    # no frame counter: the device carries the whole share
+    s = {"missed_fix_share": 0.5, "fixes": 10, "expected_fixes": 20}
+    split_missed_fixes(s, DEFAULTS, {})
+    assert s["missed_fix_network_share"] is None and s["missed_fix_device_share"] == 0.5
 
 
 def test_error_flags_count_per_status_and_a_settings_frame_is_not_a_status():

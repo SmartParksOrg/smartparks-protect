@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { deviceLevel, orderedSubjects, showFigure } from "./fleet";
+import {
+  deviceLevel,
+  orderedSubjects,
+  showFigure,
+  trendFallback,
+} from "./fleet";
 import {
   devicePerformanceParameters,
   levelOf,
@@ -92,5 +97,26 @@ describe("the fleet's order and words", () => {
     expect(
       devicePerformanceParameters(readFormState(new URLSearchParams()), now),
     ).toBeNull();
+  });
+});
+
+describe("trendFallback", () => {
+  it("says what an empty slope or days figure means, by the trend", () => {
+    const steady = { battery_trend: "steady", days_to_critical: null };
+    expect(trendFallback(steady, "days_to_critical")).toBe("steady");
+    expect(trendFallback(steady, "battery_slope_mv_day")).toBe("steady");
+    expect(trendFallback({ battery_trend: "rising" }, "days_to_critical")).toBe(
+      "rising",
+    );
+    // a proven fall further than a year away has a slope but no days
+    const slow = { battery_trend: "falling", battery_slope_mv_day: -1.1 };
+    expect(trendFallback(slow, "days_to_critical")).toBe("over a year");
+    expect(trendFallback(slow, "battery_slope_mv_day")).toBeNull();
+    // a figure that exists, another key, or no trend: nothing to say
+    expect(
+      trendFallback({ days_to_critical: 54.5 }, "days_to_critical"),
+    ).toBeNull();
+    expect(trendFallback({ battery_trend: "steady" }, "battery_v")).toBeNull();
+    expect(trendFallback({}, "days_to_critical")).toBeNull();
   });
 });

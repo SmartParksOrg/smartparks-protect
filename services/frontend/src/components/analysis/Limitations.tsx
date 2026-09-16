@@ -102,7 +102,12 @@ export function DevicePerformanceLimitations() {
         </li>
         <li>
           {t(
-            "The battery slope is a straight line through the daily medians; a battery's curve is not straight, so the days to critical are an indication, not a forecast.",
+            "The battery trend is a straight line through the daily medians, reported only when it stands clear of the noise over at least five days; a lithium cell sits on a plateau for most of its life, so a steady week predicts little and the days to critical are an indication, not a forecast.",
+          )}
+        </li>
+        <li>
+          {t(
+            "Missed fixes are split by the frame counter: the uplinks the network lost, scaled over the fixes that came, estimate the fixes that left the device; the rest is the device's own shortfall. Without a frame counter the device carries the whole share.",
           )}
         </li>
         <li>
