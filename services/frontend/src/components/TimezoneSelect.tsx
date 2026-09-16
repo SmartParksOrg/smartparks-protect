@@ -72,7 +72,10 @@ export function TimezoneSelect({
           />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="start">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] min-w-72 p-0"
+        align="start"
+      >
         <Command>
           <CommandInput placeholder={t("Search timezones…")} />
           <CommandList>
