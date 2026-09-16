@@ -41,7 +41,7 @@ const WINDOWS = [
   { hours: 720, label: i18n.t("Last 30 days") },
 ];
 
-/** A ChirpStack Gateway Mesh relay, marked by the sync (decision D237). */
+/** A Gateway Mesh relay, marked by the network sync (decision D237). */
 const isRelay = (gateway: Gateway) =>
   (gateway.attributes as Record<string, unknown> | undefined)?.kind === "relay";
 
