@@ -66,8 +66,9 @@ class Transformation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["time_offset", "set_valid", "value_offset", "value_scale"]
-    # up to twenty years either way: a device clock started from a wrong epoch is off by years
-    seconds: int = Field(default=0, ge=-20 * 366 * 86400, le=20 * 366 * 86400)
+    # up to a hundred years either way: a device clock started from a wrong epoch is off by
+    # decades (a collar's flash wrote its status records 39 years ahead, 2026-09-16)
+    seconds: int = Field(default=0, ge=-100 * 366 * 86400, le=100 * 366 * 86400)
     valid: bool = False
     delta: float = 0.0
     factor: float = Field(default=1.0, gt=0)

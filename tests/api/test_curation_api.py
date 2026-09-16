@@ -507,3 +507,77 @@ async def test_bulk_time_shift_preview_apply_flag_and_revert(client, db):
     )
     summary = (await client.get(f"{curation}/summary", headers=h)).json()
     assert summary["reverted_corrections"] == 3 and summary["jobs"] == {"reverted": 1}
+
+
+async def test_a_time_offset_of_decades_brings_status_records_back_and_rebuilds_the_latest_values(
+    client, db
+):
+    """SP050969's raw log (2026-09-16): the collar's flash clock ran 39 years ahead, so its
+    status records were stored invalid in 2064 while the fixes sat in 2025. Two jobs repair
+    them: validity, then a time offset of decades; the device's latest values follow."""
+    from shared.models import DeviceCurrentState, Measurement
+
+    admin, project, entity, source, device, _ = await _setup(client, db)
+    h = admin.headers
+    project_id = project.id
+    device_id = uuid.UUID(device["id"])
+    offset = 1_238_631_378  # about 39 years, the file's median store-minus-fix offset
+    rows = []
+    for i, (key, value) in enumerate((("battery_voltage", 3.63), ("device_temperature", 21.0))):
+        rows.append(
+            Measurement(
+                time=T0 + timedelta(seconds=offset, hours=i),
+                device_id=device_id,
+                project_id=project_id,
+                entity_id=uuid.UUID(entity["id"]),
+                data_source_id=uuid.UUID(source["id"]),
+                source_event_id=700 + i,
+                source_event_ingested_at=T0,
+                canonical_key=f"{device['id']}|status|{i}",
+                metric_key=key,
+                value_num=value,
+                valid=False,
+            )
+        )
+    db.add_all(rows)
+    db.add(DeviceCurrentState(device_id=device_id, latest_state={}, latest_measurements={}))
+    await db.commit()
+
+    curation = f"/api/v1/projects/{project_id}/curation"
+    window = {
+        "time_from": (T0 + timedelta(seconds=offset, hours=-1)).isoformat(),
+        "time_to": (T0 + timedelta(seconds=offset, hours=6)).isoformat(),
+    }
+    for transformation in (
+        {"kind": "set_valid", "valid": True},
+        {"kind": "time_offset", "seconds": -offset},
+    ):
+        created = await client.post(
+            f"{curation}/jobs",
+            json={
+                "target_type": "measurement",
+                "device_ids": [device["id"]],
+                **window,
+                "transformation": transformation,
+                "reason_code": "DEVICE_CLOCK_ERROR",
+                "comment": "flash clock 39 years ahead",
+            },
+            headers=h,
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["affected_count"] == 2
+        applied = await client.post(f"{curation}/jobs/{created.json()['id']}/apply", headers=h)
+        assert applied.status_code == 200, applied.text
+        await apply_job(uuid.UUID(created.json()["id"]), user_id=admin.user.id)
+    db.expire_all()
+    state = await db.get(DeviceCurrentState, device_id)
+    assert state is not None
+    latest = state.latest_measurements
+    assert latest["battery_voltage"]["value"] == 3.63
+    assert _t(latest["battery_voltage"]["time"]) == T0
+    assert _t(latest["device_temperature"]["time"]) == T0 + timedelta(hours=1)
+    assert state.battery_voltage == 3.63
+    assert state.last_seen_at == T0 + timedelta(hours=1)
+    for row in rows:
+        await db.refresh(row)
+    assert all(r.valid and r.curated_time == T0 + timedelta(hours=i) for i, r in enumerate(rows))

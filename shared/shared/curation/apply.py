@@ -19,7 +19,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.connectivity.network_location import NETWORK_RECORD_TYPE
-from shared.curation.effective import effective_time, visible
+from shared.curation.effective import effective_time, effective_value_num, visible
 from shared.domain.assignments import resolve_attribution
 from shared.enums import (
     CorrectionStatus,
@@ -328,6 +328,15 @@ async def recompute_current_state(
                 Measurement.device_id == device_id, visible(Measurement)
             )
         )
+        # the newest value per metric, the health card's figures (decision D104): a time
+        # correction that brings a collar's status records back from the future must show them
+        if last_measurement is not None:
+            device_state.latest_measurements = await _latest_measurements(
+                session, device_id, last_measurement
+            )
+            battery = device_state.latest_measurements.get("battery_voltage")
+            if isinstance(battery, dict) and isinstance(battery.get("value"), int | float):
+                device_state.battery_voltage = float(battery["value"])
         seen = [
             t
             for t in (
@@ -388,6 +397,52 @@ class _Newest:
     time: datetime
     device_id: uuid.UUID
     accuracy_m: float | None
+
+
+#: The newest value per metric is looked for within this long before the device's newest
+#: measurement, so the scan stays bounded on a device with years of rows.
+LATEST_WINDOW = timedelta(days=30)
+
+
+async def _latest_measurements(
+    session: AsyncSession, device_id: uuid.UUID, newest: datetime
+) -> dict[str, Any]:
+    """The newest visible value per metric by effective time, in the shape the decoder keeps
+    (`{key: {"value", "time"}}`), from the month before the device's newest measurement."""
+    when = effective_time(Measurement)
+    rows = (
+        await session.execute(
+            select(
+                Measurement.metric_key,
+                when.label("at"),
+                effective_value_num().label("num"),
+                Measurement.value_bool,
+                Measurement.value_text,
+                Measurement.value_json,
+            )
+            .where(
+                Measurement.device_id == device_id,
+                visible(Measurement),
+                when > newest - LATEST_WINDOW,
+                when <= newest,
+            )
+            .distinct(Measurement.metric_key)
+            .order_by(Measurement.metric_key, when.desc())
+        )
+    ).all()
+    latest: dict[str, Any] = {}
+    for row in rows:
+        value: Any = row.num
+        if value is None:
+            value = (
+                row.value_bool
+                if row.value_bool is not None
+                else row.value_text
+                if row.value_text is not None
+                else row.value_json
+            )
+        latest[row.metric_key] = {"value": value, "time": row.at.isoformat()}
+    return latest
 
 
 async def _newest_position(session: AsyncSession, owner: Any, *, network: bool) -> _Newest | None:

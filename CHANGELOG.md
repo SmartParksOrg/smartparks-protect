@@ -68,6 +68,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- A curation time offset may span a hundred years instead of twenty, and a time correction rebuilds the device's latest value per metric (the health card's figures) besides its position and last seen. Found with SP050969's raw log on 2026-09-16: the collar's flash clock ran 39 years ahead, so its 2,835 status records sat invalid in 2064 while the fixes carried satellite time; two curation jobs (validity, then the offset) bring them back, and the health card shows them once the latest values are rebuilt.
 - The Log files and Bluetooth cards on the device page showed their buttons behind `devices:write` while the upload, the browser sync and "decode again" ask the API for `devices:control`, so an Operator saw no "Upload raw log" although the upload would have been accepted; the cards follow the API's key now.
 - The tab row of the entity and device pages (Overview, Data, Connectivity, Network) showed scroll indicators on a desktop with room to spare: the row scrolled in both directions since its tabs hang one pixel below the list, so a browser that draws scrollbars drew them. The row scrolls only on a phone now, with the indicator hidden, as the layers panel's tab row does. Found by Tim on 2026-09-15.
 - The layers panel's tab row showed scrollbars on a desktop: the five tabs overran the panel's width by 52 px and its height by 1 px; they fit now. The arrangement select in the same toolbar is as tall as the search field.
