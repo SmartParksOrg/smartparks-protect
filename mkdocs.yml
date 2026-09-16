@@ -1,5 +1,6 @@
 site_name: Smart Parks Protect
 site_description: Self-hosted operational data platform for Smart Parks deployments
+site_url: https://smartparksorg.github.io/smartparks-protect/
 repo_url: https://github.com/SmartParksOrg/smartparks-protect
 edit_uri: edit/main/docs/
 strict: true

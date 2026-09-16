@@ -52,9 +52,19 @@ class Page(HTMLParser):
             self.ids.add(str(attributes["name"]))
 
 
+def site_prefix() -> str:
+    """The path of `site_url` in mkdocs.yml ("/smartparks-protect/" on GitHub Pages): the
+    built site writes root-relative links under it, which the check maps back to `site/`."""
+    for line in (ROOT / "mkdocs.yml").read_text(encoding="utf-8").splitlines():
+        if line.startswith("site_url:"):
+            return urlsplit(line.split(":", 1)[1].strip()).path.rstrip("/") + "/"
+    return "/"
+
+
 def check_links() -> list[str]:
     if not SITE.is_dir():
         return ["site/ is missing: run `uv run mkdocs build --strict` first"]
+    prefix = site_prefix()
     pages: dict[Path, Page] = {}
     for html in SITE.rglob("*.html"):
         page = Page()
@@ -69,7 +79,10 @@ def check_links() -> list[str]:
             if not parts.path:
                 target_path = html
             elif parts.path.startswith("/"):
-                target_path = (SITE / unquote(parts.path).lstrip("/")).resolve()
+                path = unquote(parts.path)
+                if path.startswith(prefix):
+                    path = path[len(prefix) :]
+                target_path = (SITE / path.lstrip("/")).resolve()
             else:
                 target_path = (html.parent / unquote(parts.path)).resolve()
             if parts.path:
