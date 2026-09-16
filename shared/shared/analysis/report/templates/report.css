@@ -248,6 +248,11 @@ section.map ul.legend li {
   align-items: center;
   gap: 1mm;
 }
+section.map ul.legend .dot,
+section.map ul.legend .swatch,
+section.map ul.legend .marker {
+  flex: none;
+}
 section.map .swatch {
   display: inline-block;
   width: 3.2mm;
