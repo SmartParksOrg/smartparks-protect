@@ -102,6 +102,7 @@ nav:
       - Movement: analytics/movement.md
       - Grazing: analytics/grazing.md
       - Analysis design (phase 1): ANALYTICS_PHASE1_PLAN.md
+      - Analysis design (device performance): ANALYTICS_DEVICE_PERFORMANCE_PLAN.md
   - Rules:
       - rules/index.md
       - Automations and notifications: rules/automations.md
