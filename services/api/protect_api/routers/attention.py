@@ -390,6 +390,20 @@ async def unknown_identities(
     return PageResponse(items=items, next_cursor=next_cursor)
 
 
+async def _first_sighting(session: AsyncSession, identity: ExternalIdentity) -> datetime | None:
+    """When the identity was first seen: the recorded first sighting, else the arrival of its
+    earliest retained event (a platform's device list gives no sighting until a message
+    comes), else nothing."""
+    if identity.first_seen_at is not None:
+        return identity.first_seen_at
+    earliest = await session.scalar(
+        select(func.min(SourceEvent.ingested_at)).where(
+            SourceEvent.external_identity_id == identity.id
+        )
+    )
+    return earliest if isinstance(earliest, datetime) else None
+
+
 async def _reprocess_identity(
     session: AsyncSession, bus: RedisStreamsBus, identity: ExternalIdentity
 ) -> int:
@@ -424,7 +438,7 @@ async def create_device_for_identity(
         valid_from = (
             require_aware(body.valid_from)
             if body.valid_from
-            else (identity.first_seen_at or device.created_at)
+            else (await _first_sighting(session, identity) or device.created_at)
         )
         session.add(
             DeviceProjectAssignment(
@@ -563,7 +577,7 @@ async def bulk_create_devices(
         await session.flush()
         identity.device_id = device.id
         await fill_serial_from_identity(session, device, identity)  # D101
-        valid_from = start or identity.first_seen_at or now
+        valid_from = start or await _first_sighting(session, identity) or now
         if body.project_id is not None:
             session.add(
                 DeviceProjectAssignment(

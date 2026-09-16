@@ -1087,7 +1087,9 @@ function AssignmentStartField({
             "From the first time the identity was seen ({{when}}); retained events from then on get the project once decoded.",
             { when: formatTime(firstSeen) },
           )
-        : t("From the first time each identity was seen.")
+        : t(
+            "No first sighting is recorded: the assignment starts at the identity's earliest retained event, or now when there is none. Choose a date to start earlier.",
+          )
       : start === "now"
         ? t("From this moment; earlier events stay without a project.")
         : t("From the date given; earlier events stay without a project.");
