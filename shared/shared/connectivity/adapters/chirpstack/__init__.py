@@ -229,6 +229,40 @@ def parse_gateway_event(source: DataSourceContext, topic: str, payload: bytes) -
     )
 
 
+def gateway_updates_from_relays(items: list[dict[str, Any]]) -> list[GatewayUpdate]:
+    """`ListRelayGateways` items (relayId, name, description, state, lastSeenAt,
+    regionConfigId) to registry updates (decision D237). A relay gateway has no backhaul: its
+    uplinks reach ChirpStack through a border gateway and are credited to that one, so a relay
+    never has receptions of its own; ChirpStack knows it from its heartbeats and keeps no
+    location or counters for it. The registry row is marked `kind: relay`, the relay id (4
+    bytes) is its external id, and a name equal to the id counts as no name."""
+    updates = []
+    for item in items:
+        relay_id = str(item.get("relayId") or "").lower()
+        if not relay_id:
+            continue
+        name = str(item.get("name") or "").strip()
+        updates.append(
+            GatewayUpdate(
+                gateway_id=relay_id,
+                name=name if name and name.lower() != relay_id else None,
+                status=GATEWAY_STATES.get(str(item.get("state") or "").upper(), "unknown"),
+                attributes={
+                    k: v
+                    for k, v in {
+                        "kind": "relay",
+                        "description": item.get("description"),
+                        "tenant_id": item.get("tenantId"),
+                        "region_config_id": item.get("regionConfigId"),
+                    }.items()
+                    if v
+                },
+                seen_at=parse_chirpstack_time(item.get("lastSeenAt")),
+            )
+        )
+    return updates
+
+
 def gateway_updates_from_listing(items: list[dict[str, Any]]) -> list[GatewayUpdate]:
     """`GET /api/gateways` items (gatewayId, name, description, location, state, lastSeenAt)
     to registry updates, for the sync action."""
@@ -344,6 +378,7 @@ class ChirpStackManagement:
         self.base = str(source.config.get("api_url", "")).strip()
         self.token = str(source.credentials.get("api_token", "") or "")
         self.tenant_id = str(source.config.get("tenant_id") or "")
+        self.name = source.name
         self._grpc: _ChirpStackCalls | None = None
 
     @property
@@ -415,8 +450,20 @@ class ChirpStackManagement:
     async def list_gateways(self) -> list[dict[str, Any]]:
         return await self.grpc.list_gateways(self.tenant_id)
 
+    async def list_relay_gateways(self) -> list[dict[str, Any]]:
+        return await self.grpc.list_relay_gateways(self.tenant_id)
+
     async def list_gateway_updates(self) -> list[GatewayUpdate]:
-        return gateway_updates_from_listing(await self.list_gateways())
+        """The tenant's gateways and, on a ChirpStack that has the Gateway Mesh (4.9 and
+        later), its relay gateways marked as such (decision D237). An older ChirpStack answers
+        the relay call with an error; the ordinary gateways still sync then."""
+        updates = gateway_updates_from_listing(await self.list_gateways())
+        try:
+            relays = await self.list_relay_gateways()
+        except ApplicationError as error:
+            log.info("relay gateways not listed", data_source=self.name, error=error.message)
+            return updates
+        return updates + gateway_updates_from_relays(relays)
 
     async def test_connection(self) -> dict[str, Any]:
         applications = await self.list_applications()

@@ -168,6 +168,32 @@ def test_gateway_events_and_listing():
     )
     assert len(updates) == 1 and updates[0].name == "North ridge" and updates[0].status == "online"
     assert updates[0].attributes["description"] == "mast" and updates[0].seen_at is not None
+    from shared.connectivity.adapters.chirpstack import gateway_updates_from_relays
+
+    relays = gateway_updates_from_relays(
+        [
+            {
+                "tenantId": "t",
+                "relayId": "F1366FF3",
+                "name": "f1366ff3",
+                "state": "ONLINE",
+                "lastSeenAt": "2026-09-16T17:27:17Z",
+                "regionConfigId": "eu868",
+            },
+            {
+                "relayId": "f1369a27",
+                "name": "Hill relay",
+                "description": "solar",
+                "state": "OFFLINE",
+            },
+            {"name": "no id"},
+        ]
+    )
+    assert [r.gateway_id for r in relays] == ["f1366ff3", "f1369a27"]
+    assert relays[0].name is None and relays[0].attributes["kind"] == "relay"
+    assert relays[0].seen_at is not None and relays[0].status == "online"
+    assert relays[1].name == "Hill relay" and relays[1].attributes["description"] == "solar"
+    assert relays[1].status == "offline" and relays[1].latitude is None
 
 
 def test_merge_endpoints_keeps_other_urls_and_replaces_our_old_token():

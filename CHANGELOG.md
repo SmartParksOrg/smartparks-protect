@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- ChirpStack Gateway Mesh relays (decision D237): Sync gateways reads the tenant's relay gateways (ChirpStack 4.9 and later) with the ordinary ones and keeps them in the registry marked `kind: relay`, with the relay id as external id, state, last seen and region; the Gateways page shows them beside the border gateways with a "Relay (mesh)" mark. A relay has no receptions of its own, since its uplinks reach the network through a border gateway and count there. An older ChirpStack without the call still syncs its gateways. The heartbeat's relay path stays in ChirpStack's MQTT topic and waits for a source whose broker is reachable (decision D238).
+
 - A data source assigned to a project (the Projects field on the Data sources page) shows its gateways in that project at once, on the Gateways page and in the search, before any device of the project reports through it; the sources a project's devices report on stay visible as before (decision D235: the assignment adds, it never hides). Needs attention names the project a source is assigned to on each unknown identity from it, and Create device, for one identity or in bulk, starts with that project chosen (decision D236).
 - The Data sources page on a phone shows one card per source (name, adapter, state, projects, capabilities and the actions) instead of a table that squeezed eight buttons into one cell; the table stays on wider screens (`cardOf` on the shared table).
 

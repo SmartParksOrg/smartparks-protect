@@ -46,6 +46,7 @@ class Recorder:
     calls: ClassVar[list[tuple[str, object, object]]] = []
     fail: ClassVar[grpc.StatusCode | None] = None
     fail_detail: ClassVar[str | None] = None
+    relays_fail: ClassVar[bool] = False
 
 
 class FakeDeviceService:
@@ -148,6 +149,22 @@ class FakeGatewayService:
         item.location.longitude = 5.13
         return api.ListGatewaysResponse(total_count=1, result=[item])
 
+    async def ListRelayGateways(self, request, metadata=None, timeout=None):  # noqa: ASYNC109
+        if Recorder.relays_fail:
+            raise FakeRpcError(grpc.StatusCode.UNIMPLEMENTED)
+        return api.ListRelayGatewaysResponse(
+            total_count=1,
+            result=[
+                api.RelayGatewayListItem(
+                    tenant_id=request.tenant_id,
+                    relay_id="f1366ff3",
+                    name="f1366ff3",
+                    state=api.GatewayState.ONLINE,
+                    region_config_id="eu868",
+                )
+            ],
+        )
+
 
 class FakeRpcError(grpc.aio.AioRpcError):
     def __init__(self, code):
@@ -205,6 +222,20 @@ async def test_management_and_commands_over_grpc():
         52.11
     )
     assert updates[0].status == "online"
+    # the Gateway Mesh relay comes as a gateway marked relay (decision D237), no name of its
+    # own since ChirpStack names it by its id; an older ChirpStack without the call still
+    # syncs the ordinary gateways
+    assert [u.gateway_id for u in updates] == ["1dee013a9b72a568", "f1366ff3"]
+    relay = updates[1]
+    assert relay.attributes["kind"] == "relay" and relay.name is None
+    assert relay.attributes["region_config_id"] == "eu868" and relay.status == "online"
+    Recorder.relays_fail = True
+    try:
+        assert [u.gateway_id for u in await management.list_gateway_updates()] == [
+            "1dee013a9b72a568"
+        ]
+    finally:
+        Recorder.relays_fail = False
     check = await management.test_connection()
     assert check["ok"] is True and check["applications"] == 1
 

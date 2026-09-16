@@ -13,6 +13,16 @@ gateway heard one of them (decision D175, ADR 0027); the all-projects scope sees
 - Gateway events: the ChirpStack adapter subscribes to `gateway/+/event/stats` (counters and
   location) and `gateway/+/state/conn` (online, offline). They are stored as source events
   without a device and update the registry; nothing is published on the bus.
+- Gateway Mesh relays (ChirpStack 4.9 and later, decision D237): a relay gateway has no
+  backhaul; its uplinks reach ChirpStack through a border gateway and are credited to that
+  one, so a relay never has receptions of its own, and ChirpStack learns of it from the
+  heartbeat it sends every stats interval. The sync reads the tenant's relay gateways with the
+  ordinary ones and keeps them in the registry marked `kind: relay` (the 4-byte relay id as
+  the external id, state, last seen, region), so the Gateways page and the map show them
+  beside the border gateways with a "Relay (mesh)" mark; a person can set a relay's location
+  like any gateway's. The relay path (which relay hears which, with the signal per hop) is only
+  in the heartbeat on ChirpStack's MQTT broker, not in the API; reading it waits for a source
+  whose broker is reachable (decision D238).
 - Sync: the ingest service reads every listing adapter's gateway list through the adapter's
   management connector (names, descriptions, locations, states) two minutes after start and
   every 24 hours after that, per data source with its API channel switched on, logging and

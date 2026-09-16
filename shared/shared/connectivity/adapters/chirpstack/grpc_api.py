@@ -136,13 +136,19 @@ class _ChirpStackCalls:
         raise NotImplementedError
 
     async def _pages(
-        self, service: str, make_request: Any, response_cls: Any, what: str
+        self,
+        service: str,
+        make_request: Any,
+        response_cls: Any,
+        what: str,
+        *,
+        method: str = "List",
     ) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         offset = 0
         while True:
             response = await self._unary(
-                service, "List", make_request(PAGE, offset), response_cls, what
+                service, method, make_request(PAGE, offset), response_cls, what
             )
             page = [to_dict(item) for item in response.result]
             items.extend(page)
@@ -188,6 +194,20 @@ class _ChirpStackCalls:
             ),
             api.ListGatewaysResponse,
             "the tenant's gateways",
+        )
+
+    async def list_relay_gateways(self, tenant_id: str) -> list[dict[str, Any]]:
+        """The tenant's Gateway Mesh relay gateways (ChirpStack 4.9 and later, decision D237):
+        relays without a backhaul that ChirpStack learns from their heartbeats through a border
+        gateway. Items carry relayId, name, description, state, lastSeenAt, regionConfigId."""
+        return await self._pages(
+            "GatewayService",
+            lambda limit, offset: api.ListRelayGatewaysRequest(
+                tenant_id=tenant_id, limit=limit, offset=offset
+            ),
+            api.ListRelayGatewaysResponse,
+            "the tenant's relay gateways",
+            method="ListRelayGateways",
         )
 
     async def get_http_integration(self, application_id: str) -> dict[str, Any] | None:

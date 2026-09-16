@@ -13,6 +13,7 @@ import { Callout } from "@/components/common/Callout";
 import { JsonView } from "@/components/common/JsonView";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/data/DataTable";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,10 @@ const WINDOWS = [
   { hours: 168, label: i18n.t("Last 7 days") },
   { hours: 720, label: i18n.t("Last 30 days") },
 ];
+
+/** A ChirpStack Gateway Mesh relay, marked by the sync (decision D237). */
+const isRelay = (gateway: Gateway) =>
+  (gateway.attributes as Record<string, unknown> | undefined)?.kind === "relay";
 
 const locationSourceLabel = (source: string, t: (k: string) => string) =>
   source === "admin"
@@ -116,6 +121,17 @@ export function GatewaysPage() {
             <span className="ml-2 font-mono text-xs text-muted-foreground">
               {row.original.external_id}
             </span>
+          )}
+          {isRelay(row.original) && (
+            <Badge
+              variant="outline"
+              className="ml-2 align-middle"
+              title={t(
+                "A Gateway Mesh relay: no backhaul of its own, its uplinks reach the network through a border gateway and count there",
+              )}
+            >
+              {t("Relay (mesh)")}
+            </Badge>
           )}
         </span>
       ),
@@ -325,7 +341,9 @@ export function GatewaysPage() {
                     "{{count}} gateways, busiest first; {{silent}} heard none of the project's devices in the window",
                     { count: shown.length, silent },
                   )
-                : t("{{count}} gateways, busiest first", { count: shown.length }))
+                : t("{{count}} gateways, busiest first", {
+                    count: shown.length,
+                  }))
             }
           />
         ) : (

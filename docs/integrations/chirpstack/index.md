@@ -67,7 +67,7 @@ JSON), and Server admin, Data sources, Status lists the channels with their stat
 
 ## Connecting an existing ChirpStack
 
-A ChirpStack v4 that already serves gateways and collars connects in one of two ways:
+A ChirpStack v4 that already serves gateways and devices connects in one of two ways:
 
 - **HTTP integration (no broker exposure).** Server admin, Data sources, New data source,
   adapter ChirpStack: a name, the ChirpStack address (the web UI's URL) and a tenant API key
@@ -164,9 +164,9 @@ Other setups:
   transport option documents `h2c`). In ChirpStack, Tenant, API keys: create a key and store it as the
 `api_token` credential. "Test connection" on the data source calls the API with it; "Sync
 devices" turns the tenant's devices into identities to link; "Sync gateways" fills the
-gateway registry.
+gateway registry, Gateway Mesh relay gateways included (marked "Relay (mesh)", decision D237).
 
-The DevEUI is the identity: register the collars' DevEUIs on the data source, or accept them
+The DevEUI is the identity: register the devices' DevEUIs on the data source, or accept them
 from Needs attention as their first uplinks arrive. While connecting, Server admin, Data
 sources, Traffic shows every message the source receives, linked to a device or not, with
 the raw payload; it refreshes every five seconds.
