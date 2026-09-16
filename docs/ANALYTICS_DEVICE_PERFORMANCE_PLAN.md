@@ -183,7 +183,7 @@ No new table: the run row and the geometries table hold everything (D202).
 - [x] **P4 the pages**: `DevicePerformancePage.tsx`, `DevicePerformanceForm.tsx` with the device picker and the type shortcut, the presentation with the fleet table and the per-device sections, the map's fix classes and gateway points in `analysisLayers.ts`; "Analyse performance" on the device page and the devices list.
 - [x] **P5 the report**: labels, key figures as the fleet table with level dots, the per-device sections; a rendered fixture test.
 - [x] **P6 docs**: `docs/analytics/device-performance.md` (what each indicator means, its default threshold, its limits), the analytics index, `DEVELOPERS.md`, the changelog, ADR 0034 (device subjects and the indicator levels).
-- [ ] **P7 dev server**: a fleet run over the FreeNature and Smart Parks collars and a deep dive of SP050969 read by Tim; the benchmark section over 100 devices; the budgets of the analytics plan held during a run.
+- [x] **P7 dev server** (the runs made and read on 2026-09-16; Tim's reading and the exit criteria below are still his): a fleet run over the FreeNature and Smart Parks collars and a deep dive of SP050969 read by Tim; the benchmark section over 100 devices; the budgets of the analytics plan held during a run.
 - [ ] **P8 release** as v2.8.0 after the exit criteria.
 
 ### Built on 2026-09-16, and where it differs from the sections above
@@ -195,6 +195,7 @@ No new table: the run row and the geometries table hold everything (D202).
 - The trajectory loader takes `by_device=True` rather than a `device_id` argument; the `Trajectory.entity_id` field then holds the device's id (the subject's id either way).
 - The limit constant is `MAX_DEVICES` (100) and the rows one device may hold per read `MAX_ROWS_PER_DEVICE` (500,000); the estimate counts the device's fixes, the run refuses beyond the bound.
 - Statuses are counted from the state history and, when it holds none in the period, from the battery readings: the state history is not curated, so SP050969's repaired clock (D212) moved its measurements into 2025 and left its states in 2064. Messages and the network figures count by arrival at Protect (a raw log counts on the day of its upload); the interface and the docs say so.
+- On the dev server (2026-09-16, commit 374ee3b): a fleet run over FreeNature's one collar and a deep dive of SP050969 over 1 June to 14 September 2025 (204,504 input rows in 13 s): battery 3.61 V falling 0.48 mV a day with 336 days to critical, 28,222 fixes of 28,285 attempts, time to fix 7 s median and 18 s at the 90th percentile, accuracy 21 m median, 2,452 statuses with 3 percent missed, the longest silence 52.9 hours (warn), no network figures because the raw log's messages arrived by file; the PDF report of it has seven pages. The benchmark: 100 devices over a month on the local 1/10 fixture, 958,175 input rows, completed in 22.7 s with a 566 kB result and 102 MB peak memory, two collars critical on their battery and twenty warn. A fleet's repeated warnings fold into one line above three devices.
 - The interface folds the charts into the device sections and lets the presentation replace the run view's chart grid and table list (`render.charts`, `render.tables`), so a run over a hundred devices does not draw a hundred series in one chart.
 
 ## 13. Exit criteria

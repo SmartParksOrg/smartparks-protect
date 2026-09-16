@@ -160,3 +160,19 @@ def test_levels_come_from_the_driver_first_and_the_defaults_second():
     # ranks: 1 is the worst; a low battery ranks first, a high loss share ranks first
     assert ranks({"a": 3.9, "b": 3.5, "c": None}, "battery_v") == {"b": 1, "a": 2}
     assert ranks({"a": 0.1, "b": 0.3, "c": 0.3}, "lost_uplinks_share") == {"b": 1, "c": 1, "a": 3}
+
+
+def test_a_fleet_folds_the_same_warning_over_many_devices_into_one_line():
+    import uuid
+
+    from shared.analysis.base import Warning as ResultWarning
+    from shared.analysis.modules.device_performance import fold_warnings
+
+    many = [
+        ResultWarning(code="interval_unknown", level="notice", subject_id=uuid.uuid4(), text="x")
+        for _ in range(5)
+    ]
+    few = [ResultWarning(code="no_data", subject_id=uuid.uuid4(), text="y") for _ in range(2)]
+    folded = fold_warnings(many + few)
+    assert [w.code for w in folded] == ["interval_unknown", "no_data", "no_data"]
+    assert folded[0].subject_id is None and "5 devices" in folded[0].text

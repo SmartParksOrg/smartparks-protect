@@ -1060,6 +1060,39 @@ async def analyse_device(
     return out
 
 
+#: The same warning over more devices than this folds into one line for the fleet.
+FOLD_WARNINGS_ABOVE = 3
+FOLDED_TEXTS = {
+    "interval_unknown": "The fix interval of {n} devices is not known; their missed fixes cannot "
+    "be counted.",
+    "no_health_fields": "The driver of {n} devices declares no health thresholds; the defaults "
+    "apply to them.",
+    "short_period": "The period holds fewer than three expected reports of {n} devices.",
+    "invalid_records": "{n} devices have records held invalid (a clock ahead, or curated out).",
+    "no_data": "{n} devices sent nothing in the period.",
+    "no_comparison_data": "{n} devices sent nothing in the comparison period.",
+}
+
+
+def fold_warnings(warnings: list[Warning]) -> list[Warning]:
+    """A fleet's warnings: the same code over many devices becomes one line with the count,
+    so a hundred collars without a known interval do not print a hundred lines."""
+    by_code: dict[str, list[Warning]] = defaultdict(list)
+    for w in warnings:
+        by_code[w.code].append(w)
+    out: list[Warning] = []
+    for code, group in by_code.items():
+        if len(group) > FOLD_WARNINGS_ABOVE and code in FOLDED_TEXTS:
+            out.append(
+                Warning(
+                    code=code, level=group[0].level, text=FOLDED_TEXTS[code].format(n=len(group))
+                )
+            )
+        else:
+            out.extend(group)
+    return out
+
+
 def build_document(
     subjects: list[Subject],
     infos: dict[uuid.UUID, DeviceInfo],
@@ -1122,6 +1155,7 @@ def build_document(
                 )
                 error_rows.extend([subject.name, *row] for row in m.error_rows)
                 reboot_rows.extend([subject.name, *row] for row in m.reboot_rows)
+    warnings = fold_warnings(warnings)
     # the fleet's ranks per indicator, over the main period
     if len(subjects) > 1:
         for key in FLEET_COLUMNS:
