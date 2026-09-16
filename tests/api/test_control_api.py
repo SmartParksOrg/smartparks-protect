@@ -56,7 +56,14 @@ async def test_actions_availability_and_reasons(client, db):
     ).status_code == 200
     actions = (await client.get(f"/api/v1/devices/{device['id']}/actions", headers=h)).json()
     keys = {a["key"]: a for a in actions}
-    assert set(keys) == {"REQUEST_STATUS", "REQUEST_POSITION", "SET_GNSS_INTERVAL", "RESET"}
+    assert set(keys) == {
+        "REQUEST_STATUS",
+        "REQUEST_POSITION",
+        "SET_GNSS_INTERVAL",
+        "REQUEST_SETTINGS",
+        "SET_SETTING",
+        "RESET",
+    }
     assert keys["RESET"]["available"] is True and keys["RESET"]["permitted"] is True
     assert (
         keys["RESET"]["confirmation"] == "privileged"

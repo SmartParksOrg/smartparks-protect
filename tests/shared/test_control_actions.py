@@ -22,7 +22,14 @@ T = datetime(2026, 9, 4, tzinfo=UTC)
 
 def test_driver_declares_actions():
     actions = actions_of(OpenCollarDriver())
-    assert set(actions) == {"REQUEST_STATUS", "REQUEST_POSITION", "SET_GNSS_INTERVAL", "RESET"}
+    assert set(actions) == {
+        "REQUEST_STATUS",
+        "REQUEST_POSITION",
+        "SET_GNSS_INTERVAL",
+        "REQUEST_SETTINGS",
+        "SET_SETTING",
+        "RESET",
+    }
     assert actions_of(object()) == {}
 
 

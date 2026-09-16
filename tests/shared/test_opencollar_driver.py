@@ -289,7 +289,8 @@ def test_short_channel_frames_are_decode_failures():
 def test_catalog_lists_the_protocol_tables():
     catalog = OpenCollarDriver.catalog()
     settings = {s["name"]: s for s in catalog["settings"]}
-    assert settings["ublox_send_interval"] == {
+    interval = settings["ublox_send_interval"]
+    assert {k: interval[k] for k in ("id", "name", "length", "type", "default", "min", "max")} == {
         "id": 2,
         "name": "ublox_send_interval",
         "length": 4,
@@ -298,6 +299,9 @@ def test_catalog_lists_the_protocol_tables():
         "min": 0,
         "max": 172800,
     }
+    # the catalogue also says where a setting belongs, its unit and the firmware it came with
+    assert interval["group"] == "u-blox GNSS" and interval["unit"] == "s"
+    assert interval["since_firmware"] == "4.4.2"
     assert len(settings) == 123
     commands = {c["name"]: c for c in catalog["commands"]}
     assert commands["cmd_flash_get_all"]["id"] == 0xBB
