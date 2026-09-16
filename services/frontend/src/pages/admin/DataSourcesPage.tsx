@@ -160,6 +160,100 @@ export function DataSourcesPage() {
         source,
       }),
   });
+  /** The actions of one source: the table's last column and the phone card's foot. */
+  const actionsFor = (source: DataSource) => {
+    const a = ADAPTERS.find((x) => x.key === source.adapter_key);
+    const caps = source.capabilities as Record<string, boolean>;
+    return (
+      <span
+        className="flex flex-wrap gap-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {(source.has_webhook_token ||
+          ADAPTERS.find((x) => x.key === source.adapter_key)?.push) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => rotate.mutate(source.id)}
+          >
+            <KeyRound className="size-4" />{" "}
+            {source.has_webhook_token
+              ? t("New token")
+              : t("Create webhook token")}
+          </Button>
+        )}
+        {a?.polling && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSince("");
+              setRescanning(source);
+            }}
+          >
+            <RefreshCw className="size-4" /> {t("Rescan")}
+          </Button>
+        )}
+        {a?.can_manage && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={testConnection.isPending}
+            onClick={() => testConnection.mutate(source)}
+          >
+            <Plug className="size-4" /> {t("Test connection")}
+          </Button>
+        )}
+        {a?.can_manage && caps.device_management && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={syncDevices.isPending}
+            onClick={() => syncDevices.mutate(source)}
+          >
+            <Cpu className="size-4" /> {t("Sync devices")}
+          </Button>
+        )}
+        {a?.can_manage && caps.gateway_management && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={syncGateways.isPending}
+            onClick={() => syncGateways.mutate(source)}
+          >
+            <Waypoints className="size-4" /> {t("Sync gateways")}
+          </Button>
+        )}
+        {a?.connects_applications && (
+          <Button variant="ghost" size="sm" onClick={() => setAppsOf(source)}>
+            <Link2 className="size-4" /> {t("Connect applications")}
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={() => setStatusOf(source)}>
+          <Activity className="size-4" /> {t("Status")}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/admin/data-sources/${source.id}/traffic`)}
+        >
+          <Radio className="size-4" /> {t("Traffic")}
+        </Button>
+        {!a?.builtin && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={t("Delete data source")}
+            onClick={() => setRemoving(source)}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        )}
+      </span>
+    );
+  };
+  const adapterLabel = (key: string) =>
+    ADAPTERS.find((a) => a.key === key)?.label ?? key;
   const columns: ColumnDef<DataSource, unknown>[] = [
     { header: t("Name"), accessorKey: "name" },
     {
@@ -196,105 +290,7 @@ export function DataSourcesPage() {
     {
       id: "token",
       header: "",
-      cell: ({ row }) => {
-        const a = ADAPTERS.find((x) => x.key === row.original.adapter_key);
-        const caps = row.original.capabilities as Record<string, boolean>;
-        return (
-          <span className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-            {(row.original.has_webhook_token ||
-              ADAPTERS.find((x) => x.key === row.original.adapter_key)
-                ?.push) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => rotate.mutate(row.original.id)}
-              >
-                <KeyRound className="size-4" />{" "}
-                {row.original.has_webhook_token
-                  ? t("New token")
-                  : t("Create webhook token")}
-              </Button>
-            )}
-            {a?.polling && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSince("");
-                  setRescanning(row.original);
-                }}
-              >
-                <RefreshCw className="size-4" /> {t("Rescan")}
-              </Button>
-            )}
-            {a?.can_manage && (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={testConnection.isPending}
-                onClick={() => testConnection.mutate(row.original)}
-              >
-                <Plug className="size-4" /> {t("Test connection")}
-              </Button>
-            )}
-            {a?.can_manage && caps.device_management && (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={syncDevices.isPending}
-                onClick={() => syncDevices.mutate(row.original)}
-              >
-                <Cpu className="size-4" /> {t("Sync devices")}
-              </Button>
-            )}
-            {a?.can_manage && caps.gateway_management && (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={syncGateways.isPending}
-                onClick={() => syncGateways.mutate(row.original)}
-              >
-                <Waypoints className="size-4" /> {t("Sync gateways")}
-              </Button>
-            )}
-            {a?.connects_applications && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setAppsOf(row.original)}
-              >
-                <Link2 className="size-4" /> {t("Connect applications")}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setStatusOf(row.original)}
-            >
-              <Activity className="size-4" /> {t("Status")}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                navigate(`/admin/data-sources/${row.original.id}/traffic`)
-              }
-            >
-              <Radio className="size-4" /> {t("Traffic")}
-            </Button>
-            {!a?.builtin && (
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={t("Delete data source")}
-                onClick={() => setRemoving(row.original)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            )}
-          </span>
-        );
-      },
+      cell: ({ row }) => actionsFor(row.original),
     },
   ];
   return (
@@ -322,6 +318,28 @@ export function DataSourcesPage() {
           data={sources.data?.items}
           searchable
           isLoading={sources.isPending}
+          cardOf={(s) => (
+            <div className="space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{s.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {adapterLabel(s.adapter_key)}
+                    {" · "}
+                    {s.enabled ? t("enabled") : t("disabled")}
+                    {" · "}
+                    {(s.project_ids ?? []).length
+                      ? t("{{count}} projects", {
+                          count: (s.project_ids ?? []).length,
+                        })
+                      : t("all projects")}
+                  </div>
+                </div>
+                <Capabilities source={s} />
+              </div>
+              {actionsFor(s)}
+            </div>
+          )}
           onRowClick={(s) => {
             setEditing(s);
             setFormKey((k) => k + 1);
@@ -337,6 +355,18 @@ export function DataSourcesPage() {
         adapters={ADAPTERS}
         projects={projects.data?.items ?? []}
         onSaved={(source) => {
+          // a source whose API channel is on connects the applications itself: the next
+          // step is that dialog, not the webhook URL to paste by hand (Tim, 2026-09-16)
+          const adapter = ADAPTERS.find((a) => a.key === source.adapter_key);
+          const config = (source.config ?? {}) as Record<string, unknown>;
+          if (
+            adapter?.connects_applications &&
+            Boolean(config.api_url) &&
+            source.has_credentials
+          ) {
+            setAppsOf(source);
+            return;
+          }
           if (source.webhook_token)
             setToken({
               token: source.webhook_token,

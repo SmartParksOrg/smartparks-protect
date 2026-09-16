@@ -62,7 +62,8 @@ type Filter = string | { eq: string };
 
 function passes(cell: unknown, filter: Filter): boolean {
   const text = cell === null || cell === undefined ? "" : String(cell);
-  if (typeof filter === "string") return text.toLowerCase().includes(filter.toLowerCase());
+  if (typeof filter === "string")
+    return text.toLowerCase().includes(filter.toLowerCase());
   return text === filter.eq;
 }
 
@@ -93,6 +94,9 @@ interface Props<T> {
   /** A filter row under the header: a choice or a text match per column, so a selection
    * (the header box takes every row that passes) can be organised in bulk. */
   columnFilters?: boolean;
+  /** With it, a phone shows one card per row (this render) in place of the table, which
+   * squeezes wide rows into tall cells; the table stays from the md breakpoint up. */
+  cardOf?: (row: T) => ReactNode;
 }
 
 /** Below this many rows a search box is noise; it still appears once a term is typed. */
@@ -114,6 +118,7 @@ export function DataTable<T>({
   defaultHidden = [],
   defaultHiddenSmall = [],
   columnFilters: withFilters,
+  cardOf,
 }: Props<T>) {
   const { t } = useTranslation();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -182,7 +187,12 @@ export function DataTable<T>({
   const table = useReactTable({
     data: data ?? [],
     columns: allColumns,
-    state: { sorting, globalFilter: search, columnVisibility, columnFilters: filters },
+    state: {
+      sorting,
+      globalFilter: search,
+      columnVisibility,
+      columnFilters: filters,
+    },
     onColumnFiltersChange: setFilters,
     defaultColumn: {
       filterFn: (row, id, filter: Filter) => passes(row.getValue(id), filter),
@@ -285,7 +295,39 @@ export function DataTable<T>({
           )}
         </div>
       )}
-      <div className="overflow-x-auto">
+      {cardOf && (
+        <ul className="divide-y md:hidden">
+          {isLoading &&
+            Array.from({ length: 3 }).map((_, i) => (
+              <li key={`c${i}`} className="px-3 py-3">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="mt-2 h-3 w-1/2" />
+              </li>
+            ))}
+          {!isLoading && table.getRowModel().rows.length === 0 && (
+            <li className="py-8 text-center text-sm text-muted-foreground">
+              {search !== "" && total > 0
+                ? t("Nothing matches the search.")
+                : emptyMessage}
+            </li>
+          )}
+          {!isLoading &&
+            table.getRowModel().rows.map((row) => (
+              <li
+                key={row.id}
+                className={cn(
+                  "px-3 py-3",
+                  onRowClick && "cursor-pointer",
+                  rowClassName?.(row.original),
+                )}
+                onClick={() => onRowClick?.(row.original)}
+              >
+                {cardOf(row.original)}
+              </li>
+            ))}
+        </ul>
+      )}
+      <div className={cn("overflow-x-auto", cardOf && "hidden md:block")}>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((group) => (
@@ -314,73 +356,92 @@ export function DataTable<T>({
                 })}
               </TableRow>
             ))}
-            {withFilters && table.getHeaderGroups().map((group) => (
-              <TableRow key={`${group.id}-filters`} className="hover:bg-transparent">
-                {group.headers.map((header) => {
-                  const column = header.column;
-                  const meta = column.columnDef.meta;
-                  const filterable =
-                    column.id !== "select" &&
-                    column.id !== "actions" &&
-                    meta?.filter !== false &&
-                    typeof column.columnDef.header === "string" &&
-                    column.columnDef.header !== "";
-                  if (!filterable)
-                    return <TableHead key={`${header.id}-filter`} className="h-8" />;
-                  const values = [...column.getFacetedUniqueValues().keys()]
-                    .filter((v) => v !== null && v !== undefined && v !== "")
-                    .map(String)
-                    .sort();
-                  const kind =
-                    meta?.filter ??
-                    (values.length <= SELECT_UP_TO ? "select" : "text");
-                  const filter = column.getFilterValue() as Filter | undefined;
-                  const current =
-                    filter === undefined ? "" : typeof filter === "string" ? filter : filter.eq;
-                  return (
-                    <TableHead key={`${header.id}-filter`} className="h-8 py-1">
-                      {kind === "select" ? (
-                        <Select
-                          value={current || "__all"}
-                          onValueChange={(v) =>
-                            column.setFilterValue(v === "__all" ? undefined : { eq: v })
-                          }
-                        >
-                          <SelectTrigger
-                            className="h-7 min-w-24 text-xs font-normal"
+            {withFilters &&
+              table.getHeaderGroups().map((group) => (
+                <TableRow
+                  key={`${group.id}-filters`}
+                  className="hover:bg-transparent"
+                >
+                  {group.headers.map((header) => {
+                    const column = header.column;
+                    const meta = column.columnDef.meta;
+                    const filterable =
+                      column.id !== "select" &&
+                      column.id !== "actions" &&
+                      meta?.filter !== false &&
+                      typeof column.columnDef.header === "string" &&
+                      column.columnDef.header !== "";
+                    if (!filterable)
+                      return (
+                        <TableHead
+                          key={`${header.id}-filter`}
+                          className="h-8"
+                        />
+                      );
+                    const values = [...column.getFacetedUniqueValues().keys()]
+                      .filter((v) => v !== null && v !== undefined && v !== "")
+                      .map(String)
+                      .sort();
+                    const kind =
+                      meta?.filter ??
+                      (values.length <= SELECT_UP_TO ? "select" : "text");
+                    const filter = column.getFilterValue() as
+                      Filter | undefined;
+                    const current =
+                      filter === undefined
+                        ? ""
+                        : typeof filter === "string"
+                          ? filter
+                          : filter.eq;
+                    return (
+                      <TableHead
+                        key={`${header.id}-filter`}
+                        className="h-8 py-1"
+                      >
+                        {kind === "select" ? (
+                          <Select
+                            value={current || "__all"}
+                            onValueChange={(v) =>
+                              column.setFilterValue(
+                                v === "__all" ? undefined : { eq: v },
+                              )
+                            }
+                          >
+                            <SelectTrigger
+                              className="h-7 min-w-24 text-xs font-normal"
+                              aria-label={t("Filter {{column}}", {
+                                column: column.columnDef.header as string,
+                              })}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__all">{t("All")}</SelectItem>
+                              {values.map((v) => (
+                                <SelectItem key={v} value={v}>
+                                  {v}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            value={current}
+                            onChange={(e) =>
+                              column.setFilterValue(e.target.value || undefined)
+                            }
+                            placeholder={t("Filter…")}
                             aria-label={t("Filter {{column}}", {
                               column: column.columnDef.header as string,
                             })}
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all">{t("All")}</SelectItem>
-                            {values.map((v) => (
-                              <SelectItem key={v} value={v}>
-                                {v}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          value={current}
-                          onChange={(e) =>
-                            column.setFilterValue(e.target.value || undefined)
-                          }
-                          placeholder={t("Filter…")}
-                          aria-label={t("Filter {{column}}", {
-                            column: column.columnDef.header as string,
-                          })}
-                          className="h-7 min-w-24 text-xs font-normal"
-                        />
-                      )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
+                            className="h-7 min-w-24 text-xs font-normal"
+                          />
+                        )}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
           </TableHeader>
           <TableBody>
             {isLoading &&

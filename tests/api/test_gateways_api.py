@@ -11,6 +11,7 @@ from shared.enums import AcquisitionChannel, IngestionMethod
 from shared.ingest import commit_and_publish, store_inbound
 from shared.models import DataSource
 from tests.api.test_network_and_map import _setup, bus  # noqa: F401
+from tests.conftest import unique_name
 
 pytestmark = pytest.mark.asyncio
 
@@ -247,3 +248,40 @@ async def test_polling_cursor_reset(client, db):
     assert (
         await client.post(f"/api/v1/data-sources/{pushed.json()['id']}/cursor", json={}, headers=h)
     ).status_code == 422
+
+
+async def test_a_source_assigned_to_the_project_shows_its_gateways_at_once(client, db, bus):  # noqa: F811
+    """Decision D235: the assignment adds visibility and never removes it. A second source with
+    a gateway and no device of the project: hidden until the source is assigned to the project,
+    listed then; the first source's gateways stay."""
+    from geoalchemy2 import WKTElement
+
+    from shared.models import DataSourceProjectScope, Gateway
+
+    admin, project, _entity, _source, _device, _ = await _setup(client, db)
+    h = admin.headers
+    other = DataSource(
+        name=unique_name("Other network"), adapter_key="http", config={}, capabilities={}
+    )
+    db.add(other)
+    await db.flush()
+    db.add(
+        Gateway(
+            data_source_id=other.id,
+            external_id="gw-other",
+            name="Far gateway",
+            geom=WKTElement("POINT(31.4 -24.8)", srid=4326),
+        )
+    )
+    await db.commit()
+    base = f"/api/v1/projects/{project.id}"
+    listed = (await client.get(f"{base}/gateways", headers=h)).json()
+    assert all(g["external_id"] != "gw-other" for g in listed)
+
+    db.add(DataSourceProjectScope(data_source_id=other.id, project_id=project.id))
+    await db.commit()
+    listed = (await client.get(f"{base}/gateways", headers=h)).json()
+    assert any(g["external_id"] == "gw-other" for g in listed)
+    # the search sees it too, and the first source's gateways with it
+    found = (await client.get("/api/v1/search", params={"q": "Far"}, headers=h)).json()
+    assert any("Far gateway" in str(item) for item in found.get("gateways", found.get("items", [])))

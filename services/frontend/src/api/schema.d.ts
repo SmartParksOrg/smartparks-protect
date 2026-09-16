@@ -4109,8 +4109,9 @@ export interface paths {
         /**
          * Project Gateways
          * @description Every gateway of the data sources the project's devices have an identity on (decision
-         *     D175): the ones that received the project's devices in the window busiest first, then the
-         *     silent ones, most recently seen first; the all scope lists the whole registry.
+         *     D175) and of the data sources assigned to the project (decision D235, the scope adds and
+         *     never removes): the ones that received the project's devices in the window busiest first,
+         *     then the silent ones, most recently seen first; the all scope lists the whole registry.
          */
         get: operations["project_gateways_api_v1_projects__project_id__gateways_get"];
         put?: never;
@@ -11481,6 +11482,10 @@ export interface components {
             adapter_key: string;
             /** Inferred Type */
             inferred_type?: string | null;
+            /** Suggested Project Id */
+            suggested_project_id?: string | null;
+            /** Suggested Project Name */
+            suggested_project_name?: string | null;
         };
         /** UserAdminDetail */
         UserAdminDetail: {

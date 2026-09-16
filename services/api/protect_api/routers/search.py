@@ -179,10 +179,22 @@ async def search(
         .order_by(Gateway.external_id)
     )
     if projects is not None:
+        # the sources assigned to the projects and the sources their devices report on
+        # (decisions D175 and D235: the assignment adds visibility, it never removes it)
         scoped = select(DataSourceProjectScope.data_source_id).where(
             DataSourceProjectScope.project_id.in_(projects)
         )
-        gateway_statement = gateway_statement.where(Gateway.data_source_id.in_(scoped))
+        reporting = (
+            select(ExternalIdentity.data_source_id)
+            .join(
+                DeviceProjectAssignment,
+                DeviceProjectAssignment.device_id == ExternalIdentity.device_id,
+            )
+            .where(DeviceProjectAssignment.project_id.in_(projects))
+        )
+        gateway_statement = gateway_statement.where(
+            or_(Gateway.data_source_id.in_(scoped), Gateway.data_source_id.in_(reporting))
+        )
     gateway_rows = (await session.execute(gateway_statement.limit(limit))).all()
 
     source_rows: Sequence[Row[Any]] = []

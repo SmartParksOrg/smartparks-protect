@@ -18005,7 +18005,7 @@
      "gateways"
     ],
     "summary": "Project Gateways",
-    "description": "Every gateway of the data sources the project's devices have an identity on (decision\nD175): the ones that received the project's devices in the window busiest first, then the\nsilent ones, most recently seen first; the all scope lists the whole registry.",
+    "description": "Every gateway of the data sources the project's devices have an identity on (decision\nD175) and of the data sources assigned to the project (decision D235, the scope adds and\nnever removes): the ones that received the project's devices in the window busiest first,\nthen the silent ones, most recently seen first; the all scope lists the whole registry.",
     "operationId": "project_gateways_api_v1_projects__project_id__gateways_get",
     "security": [
      {
@@ -39557,6 +39557,29 @@
        }
       ],
       "title": "Inferred Type"
+     },
+     "suggested_project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Suggested Project Id"
+     },
+     "suggested_project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Suggested Project Name"
      }
     },
     "type": "object",

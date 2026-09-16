@@ -192,6 +192,18 @@ async def test_unknown_device_needs_attention_then_processed(client, db, bus):
     ]
     identity = next(i for i in identities if i["external_id"] == unknown)
     assert identity["event_count"] == 1 and identity["data_source_name"] == source["name"]
+    # decision D236: a source assigned to one project proposes it for the device to create
+    assert identity["suggested_project_id"] is None
+    from shared.models import DataSourceProjectScope
+
+    db.add(DataSourceProjectScope(data_source_id=uuid.UUID(source["id"]), project_id=project.id))
+    await db.commit()
+    identities = (await client.get("/api/v1/attention/identities", headers=admin.headers)).json()[
+        "items"
+    ]
+    identity = next(i for i in identities if i["external_id"] == unknown)
+    assert identity["suggested_project_id"] == str(project.id)
+    assert identity["suggested_project_name"] == project.name
 
     created = await client.post(
         f"/api/v1/attention/identities/{identity['id']}/create-device",

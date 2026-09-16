@@ -6,6 +6,9 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- A data source assigned to a project (the Projects field on the Data sources page) shows its gateways in that project at once, on the Gateways page and in the search, before any device of the project reports through it; the sources a project's devices report on stay visible as before (decision D235: the assignment adds, it never hides). Needs attention names the project a source is assigned to on each unknown identity from it, and Create device, for one identity or in bulk, starts with that project chosen (decision D236).
+- The Data sources page on a phone shows one card per source (name, adapter, state, projects, capabilities and the actions) instead of a table that squeezed eight buttons into one cell; the table stays on wider screens (`cardOf` on the shared table).
+
 - The project timezone is chosen from a searchable list of every zone the browser knows, each with its offset from UTC beside the name and the browser's own zone and the zones other projects use at the top, on the new project dialog and the project settings page (Tim, 2026-09-16: the field was a bare text box). The same picker serves the Data explorer's strip and the export dialog, which offered nine fixed names before. The API refuses a name that is not an IANA zone (422), so a typo or an abbreviation such as "CAT" can no longer be stored to break the first export or analysis. The Data explorer and the export dialog default to the project's timezone instead of the browser's when the address names none.
 
 - The documentation site is published on GitHub Pages at https://smartparksorg.github.io/smartparks-protect/ from every green build of `main` (the `pages` job of the CI workflow, after the strict build and the link check); `site_url` in `mkdocs.yml` makes the canonical links and the search index right. Servers run tags; the site describes `main`, and the changelog maps one to the other.
@@ -16,6 +19,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- A ChirpStack source set up with the tenant API key showed the webhook token dialog with the steps for adding the HTTP integration by hand, though Connect applications adds it; after saving such a source the applications dialog opens instead. (Tim, 2026-09-16.)
 - The learned fix interval read 3570 s for devices fixing every hour, since a fix's timestamp carries the time to fix and the intervals were binned by half minutes. The intervals are binned by whole minutes now and the dominant bin snaps to the nearest sensible interval (1, 2, 3, 4, 5, 10, 15, 20, 30, 45 minutes, 1, 1.5, 2, 3, 4, 6, 8, 12 or 24 hours) when within 5 percent of it; an odd setting such as 22 minutes keeps its minute. (Tim, 2026-09-16.)
 - Device performance: fix success counted only the failures for devices on firmware 7, whose short position message reports a failed attempt but nothing for a fix that came, so it read 0 percent for some devices and nothing for most. It now counts the fixes that came (or the successes reported, whichever is more) against the attempts reported as failed.
 

@@ -26,6 +26,7 @@ from shared.enums import DeviceStatus, ProcessingStatus
 from shared.ingest import queue_identity_reprocess, republish_source_event
 from shared.models import (
     DataSource,
+    DataSourceProjectScope,
     Device,
     DeviceCurrentState,
     DeviceEntityAssignment,
@@ -107,6 +108,10 @@ class UnknownIdentity(ExternalIdentityRead):
     data_source_name: str
     adapter_key: str
     inferred_type: str | None = None
+    #: The project the identity's data source is assigned to, when it is exactly one
+    #: (decision D236): the proposal when a device is created for it, never an assignment.
+    suggested_project_id: uuid.UUID | None = None
+    suggested_project_name: str | None = None
 
 
 class CreateDeviceForIdentity(BaseModel):
@@ -378,16 +383,38 @@ async def unknown_identities(
             )
         ).all()
     }
+    suggested = await _suggested_projects(session, set(sources))
     items = [
         UnknownIdentity(
             **ExternalIdentityRead.model_validate(r).model_dump(),
             data_source_name=sources[r.data_source_id].name,
             adapter_key=sources[r.data_source_id].adapter_key,
             inferred_type=r.attributes.get("inferred_type"),
+            suggested_project_id=suggested.get(r.data_source_id, (None, None))[0],
+            suggested_project_name=suggested.get(r.data_source_id, (None, None))[1],
         )
         for r in rows
     ]
     return PageResponse(items=items, next_cursor=next_cursor)
+
+
+async def _suggested_projects(
+    session: AsyncSession, source_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
+    """Per data source assigned to exactly one project, that project (decision D236)."""
+    if not source_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(DataSourceProjectScope.data_source_id, Project.id, Project.name)
+            .join(Project, Project.id == DataSourceProjectScope.project_id)
+            .where(DataSourceProjectScope.data_source_id.in_(source_ids))
+        )
+    ).all()
+    per_source: dict[uuid.UUID, list[tuple[uuid.UUID, str]]] = {}
+    for source_id, project_id, name in rows:
+        per_source.setdefault(source_id, []).append((project_id, name))
+    return {k: v[0] for k, v in per_source.items() if len(v) == 1}
 
 
 async def _first_sighting(session: AsyncSession, identity: ExternalIdentity) -> datetime | None:

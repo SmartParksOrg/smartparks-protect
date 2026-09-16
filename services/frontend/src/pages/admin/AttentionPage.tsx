@@ -183,7 +183,10 @@ function CreateDeviceDialog({
     identity ? platformName(identity) : "",
   );
   const [typeId, setTypeId] = useState("");
-  const [projectId, setProjectId] = useState("");
+  // the source's project is the proposal when it is assigned to one (decision D236)
+  const [projectId, setProjectId] = useState(
+    () => identity?.suggested_project_id ?? "",
+  );
   const [start, setStart] = useState<AssignmentStart>("first_seen");
   const [startDate, setStartDate] = useState("");
   const create = useMutationToast({
@@ -283,6 +286,13 @@ function CreateDeviceDialog({
 }
 
 /** The name the platform knows an identity by, or its external id: what a bulk create names the device. */
+/** The project every chosen identity's source proposes, when they all propose the same. */
+const commonSuggestion = (identities: UnknownIdentity[]): string => {
+  const ids = new Set(identities.map((i) => i.suggested_project_id ?? ""));
+  const [only] = ids;
+  return ids.size === 1 && only ? only : "";
+};
+
 const platformName = (identity: UnknownIdentity) =>
   (typeof identity.attributes?.name === "string" &&
     identity.attributes.name.trim()) ||
@@ -313,7 +323,9 @@ function BulkCreateDialog({
       }),
   });
   const [typeId, setTypeId] = useState("");
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState(() =>
+    commonSuggestion(identities),
+  );
   const [entityTypeId, setEntityTypeId] = useState("");
   const [groupId, setGroupId] = useState("");
   const [start, setStart] = useState<AssignmentStart>("first_seen");
@@ -703,6 +715,22 @@ export function AttentionPage() {
         ),
     },
     { header: t("Data source"), accessorKey: "data_source_name" },
+    {
+      header: t("Project"),
+      id: "suggested_project",
+      accessorFn: (row) => row.suggested_project_name ?? "",
+      cell: ({ getValue }) =>
+        getValue<string>() ? (
+          <span
+            className="text-muted-foreground"
+            title={t("Proposed by the data source's assignment")}
+          >
+            {getValue<string>()}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">–</span>
+        ),
+    },
     { header: t("Type"), accessorKey: "identity_type" },
     {
       header: t("First seen"),
@@ -1044,6 +1072,7 @@ export function AttentionPage() {
         onClose={() => setCreating(null)}
       />
       <BulkCreateDialog
+        key={bulk.map((i) => i.id).join(",") || "none"}
         identities={bulk}
         onClose={() => setBulk([])}
         onDone={() => setSelected(new Set())}

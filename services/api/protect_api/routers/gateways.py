@@ -31,7 +31,14 @@ from protect_api.schemas.integrations import (
 )
 from shared.database import get_session
 from shared.domain.links import resolve_links
-from shared.models import DataSource, Device, ExternalIdentity, Gateway, GatewayReception
+from shared.models import (
+    DataSource,
+    DataSourceProjectScope,
+    Device,
+    ExternalIdentity,
+    Gateway,
+    GatewayReception,
+)
 from shared.permissions import Permission
 from shared.timeutil import utc_now
 
@@ -121,6 +128,32 @@ def _window(hours: int) -> tuple[datetime, datetime]:
     return until - timedelta(hours=hours), until
 
 
+async def visible_source_ids(
+    session: AsyncSession, project_id: uuid.UUID | None, device_ids: list[uuid.UUID]
+) -> set[uuid.UUID]:
+    """The data sources a project sees the network of: the ones its devices have an identity
+    on (decision D175) and the ones assigned to it on the source (decision D235). A source
+    assigned to a project is visible there before any device of the project reports."""
+    sources: set[uuid.UUID] = set()
+    if device_ids:
+        sources |= set(
+            await session.scalars(
+                select(ExternalIdentity.data_source_id)
+                .where(ExternalIdentity.device_id.in_(device_ids))
+                .distinct()
+            )
+        )
+    if project_id is not None:
+        sources |= set(
+            await session.scalars(
+                select(DataSourceProjectScope.data_source_id).where(
+                    DataSourceProjectScope.project_id == project_id
+                )
+            )
+        )
+    return sources
+
+
 @router.get("/projects/{project_id}/gateways", response_model=list[GatewayRead])
 async def project_gateways(
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
@@ -129,22 +162,18 @@ async def project_gateways(
     session: AsyncSession = Depends(get_session),
 ) -> list[GatewayRead]:
     """Every gateway of the data sources the project's devices have an identity on (decision
-    D175): the ones that received the project's devices in the window busiest first, then the
-    silent ones, most recently seen first; the all scope lists the whole registry."""
+    D175) and of the data sources assigned to the project (decision D235, the scope adds and
+    never removes): the ones that received the project's devices in the window busiest first,
+    then the silent ones, most recently seen first; the all scope lists the whole registry."""
     since, until = _window(hours)
     device_ids = await _scope_device_ids(session, context, since, until)
     stats = await _reception_stats(session, device_ids, since, until)
     statement = select(Gateway)
     if not context.is_all:
-        if not device_ids:
+        source_ids = await visible_source_ids(session, context.project_id, device_ids)
+        source_ids |= {k[0] for k in stats}
+        if not source_ids:
             return []
-        source_ids = set(
-            await session.scalars(
-                select(ExternalIdentity.data_source_id)
-                .where(ExternalIdentity.device_id.in_(device_ids))
-                .distinct()
-            )
-        ) | {k[0] for k in stats}
         statement = statement.where(Gateway.data_source_id.in_(source_ids))
     gateways = (await session.scalars(statement)).all()
     sources = await _sources(session, {g.data_source_id for g in gateways})
