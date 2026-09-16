@@ -36,6 +36,7 @@ from shared.analysis.limits import (
     MAX_ANIMALS_GRAZING,
     MAX_AREAS_GRAZING,
     MAX_DAYS,
+    MAX_DEVICES,
     MAX_QUEUED_PER_PROJECT,
     MAX_SUBJECTS_MOVEMENT,
 )
@@ -46,14 +47,32 @@ from shared.config import get_settings
 from shared.curation.effective import device_fix, effective_time, visible
 from shared.database import get_session
 from shared.enums import AnalysisStatus, ReportStatus
-from shared.models import AnalysisGeometry, AnalysisRun, Entity, EntityType, Position, User
+from shared.models import (
+    AnalysisGeometry,
+    AnalysisRun,
+    Device,
+    DeviceProjectAssignment,
+    Entity,
+    EntityType,
+    Position,
+    User,
+)
 from shared.permissions import Permission
 from shared.storage import stream_object
 from shared.timeutil import utc_now
 
 router = APIRouter(tags=["analyses"])
 MAX_GEOMETRIES_PER_CALL = 2_000
-SUBJECT_LIMITS = {"movement": MAX_SUBJECTS_MOVEMENT, "grazing": MAX_ANIMALS_GRAZING}
+SUBJECT_LIMITS = {
+    "movement": MAX_SUBJECTS_MOVEMENT,
+    "grazing": MAX_ANIMALS_GRAZING,
+    "device_performance": MAX_DEVICES,
+}
+
+
+def _subject_kind(module: Any) -> str:
+    """Entities unless the module says its subjects are devices (decision D214)."""
+    return str(getattr(module, "subject_kind", "entity"))
 
 
 def _module(key: str, context: ProjectContext) -> Any:
@@ -107,11 +126,66 @@ async def _ensure_visible(
         )
 
 
-async def _resolve_subjects(
+async def _resolve_devices(
     session: AsyncSession, context: ProjectContext, params: CommonParameters, limit: int
 ) -> list[uuid.UUID]:
+    """The subjects as device ids (decision D214): the given ids, every device of a type, or
+    every device, each assigned to the project at some point in the period and inside the
+    caller's scope. A device outside the scope or the project is refused by id and skipped
+    by type."""
+    window = func.tstzrange(params.time_from, params.time_to, "[)")
+    in_project = select(DeviceProjectAssignment.device_id).where(
+        DeviceProjectAssignment.project_id == context.project.id,
+        DeviceProjectAssignment.validity.op("&&")(window),
+    )
+    if params.device_ids:
+        found = set(
+            await session.scalars(
+                select(Device.id).where(Device.id.in_(params.device_ids), Device.id.in_(in_project))
+            )
+        )
+        missing = [str(i) for i in params.device_ids if i not in found]
+        if missing:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"Device {missing[0]} is not this project's in the period",
+            )
+        if any(not context.visibility.device_visible(i) for i in params.device_ids):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "A device is outside what you may see"
+            )
+        ids = list(dict.fromkeys(params.device_ids))
+    elif params.device_type_id is not None or params.all_devices:
+        statement = select(Device.id).where(Device.id.in_(in_project)).order_by(Device.name)
+        if params.device_type_id is not None:
+            statement = statement.where(Device.device_type_id == params.device_type_id)
+        ids = [i for i in await session.scalars(statement) if context.visibility.device_visible(i)]
+    else:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose devices, a device type or every device"
+        )
+    if not ids:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "No device to analyse")
+    if len(ids) > limit:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"{len(ids)} devices; at most {limit} in one run. Choose fewer, or split the run.",
+        )
+    return ids
+
+
+async def _resolve_subjects(
+    session: AsyncSession,
+    context: ProjectContext,
+    params: CommonParameters,
+    limit: int,
+    kind: str = "entity",
+) -> list[uuid.UUID]:
     """The subjects as entity ids inside the project and the caller's scope: the given ids
-    (an id outside the scope is refused), or a group with its subgroups, or a type."""
+    (an id outside the scope is refused), or a group with its subgroups, or a type. For a
+    module over devices, device ids the same way."""
+    if kind == "device":
+        return await _resolve_devices(session, context, params, limit)
     project_id = context.project.id
     if params.entity_ids:
         await _ensure_visible(session, context, params.entity_ids)
@@ -144,9 +218,13 @@ async def _resolve_subjects(
 
 
 async def _count_fixes(
-    session: AsyncSession, entity_ids: list[uuid.UUID], params: CommonParameters
+    session: AsyncSession,
+    entity_ids: list[uuid.UUID],
+    params: CommonParameters,
+    kind: str = "entity",
 ) -> int:
     """The device fixes the run would read over its subjects and periods, one bounded count."""
+    owner = Position.device_id if kind == "device" else Position.entity_id
     windows = [(params.time_from, params.time_to)]
     if params.comparison:
         windows.append((params.comparison.time_from, params.comparison.time_to))
@@ -156,7 +234,7 @@ async def _count_fixes(
             select(func.count())
             .select_from(Position)
             .where(
-                Position.entity_id.in_(entity_ids),
+                owner.in_(entity_ids),
                 effective_time(Position) >= time_from,
                 effective_time(Position) < time_to,
                 visible(Position),
@@ -185,8 +263,9 @@ async def _estimate(
     module = _module(key, context)
     params = _parse(module, parameters)
     limits = _limits(key)
-    subjects = await _resolve_subjects(session, context, params, limits["subjects"])
-    fixes = await _count_fixes(session, subjects, params)
+    kind = _subject_kind(module)
+    subjects = await _resolve_subjects(session, context, params, limits["subjects"], kind)
+    fixes = await _count_fixes(session, subjects, params, kind)
     days = (params.time_to - params.time_from).total_seconds() / 86_400
     # a second herd (grazing) is narrowed the same way as the subjects
     herd_b: list[uuid.UUID] = list(getattr(params, "herd_b_entity_ids", None) or [])
@@ -250,7 +329,10 @@ def _visible_run(run: AnalysisRun, context: ProjectContext) -> bool:
     if not context.visibility.limited:
         return True
     ids = run.parameters.get("entity_ids") or []
-    return all(context.visibility.entity_visible(uuid.UUID(str(i))) for i in ids)
+    devices = run.parameters.get("device_ids") or []
+    return all(context.visibility.entity_visible(uuid.UUID(str(i))) for i in ids) and all(
+        context.visibility.device_visible(uuid.UUID(str(i))) for i in devices
+    )
 
 
 async def _with_names(session: AsyncSession, reads: list[AnalysisRunRead]) -> None:
@@ -331,11 +413,16 @@ async def create_run(
             status.HTTP_429_TOO_MANY_REQUESTS,
             f"{queued} runs are queued or running in this project; wait for one to finish",
         )
-    stored = params.model_dump(mode="json")
-    stored["entity_ids"] = [str(i) for i in subjects]
-    stored.pop("group_id", None)
-    stored.pop("entity_type_id", None)
     module = _module(body.module, context)
+    stored = params.model_dump(mode="json")
+    if _subject_kind(module) == "device":
+        stored["device_ids"] = [str(i) for i in subjects]
+        stored.pop("entity_ids", None)
+    else:
+        stored["entity_ids"] = [str(i) for i in subjects]
+        stored.pop("device_ids", None)
+    for key in ("group_id", "entity_type_id", "device_type_id", "all_devices"):
+        stored.pop(key, None)
     run = AnalysisRun(
         project_id=context.project.id,
         module=body.module,

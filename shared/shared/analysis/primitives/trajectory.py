@@ -59,9 +59,13 @@ async def load_trajectory(
     time_to: datetime,
     *,
     max_fixes: int,
+    by_device: bool = False,
 ) -> Trajectory:
     """The entity's device fixes in the window, streamed in time order; two fixes at the same
-    effective time keep the first and count the other as a duplicate."""
+    effective time keep the first and count the other as a duplicate. With `by_device` the id
+    names a device and its own fixes are read, whichever entity wore it (decision D214); the
+    trajectory then carries the device's id in `entity_id`, the subject's id either way."""
+    owner = Position.device_id == entity_id if by_device else Position.entity_id == entity_id
     statement = (
         select(
             effective_time(Position).label("at"),
@@ -72,7 +76,7 @@ async def load_trajectory(
             Position.device_id,
         )
         .where(
-            Position.entity_id == entity_id,
+            owner,
             effective_time(Position) >= time_from,
             effective_time(Position) < time_to,
             visible(Position),

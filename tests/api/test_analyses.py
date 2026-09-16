@@ -135,7 +135,7 @@ async def test_catalogue_estimate_and_the_life_of_a_run(client, db, stub):
     base = f"/api/v1/projects/{project.id}/analyses"
 
     catalogue = (await client.get("/api/v1/analysis-modules", headers=h)).json()
-    assert [m["key"] for m in catalogue] == ["movement", "grazing"]
+    assert [m["key"] for m in catalogue] == ["movement", "grazing", "device_performance"]
     assert catalogue[0]["limits"]["subjects"] == 25 and catalogue[0]["limits"]["days"] == 366
 
     estimate = await client.get(

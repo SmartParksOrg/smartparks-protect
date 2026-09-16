@@ -292,10 +292,11 @@ class AnalysisStatus(StrEnum):
 
 
 class AnalysisModuleKey(StrEnum):
-    """The analysis modules of phase 1."""
+    """The analysis modules: the two of phase 1 and device performance (phase 28)."""
 
     MOVEMENT = "movement"
     GRAZING = "grazing"
+    DEVICE_PERFORMANCE = "device_performance"
 
 
 class NotificationChannel(StrEnum):

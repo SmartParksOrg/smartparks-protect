@@ -24,11 +24,14 @@ class Period(BaseModel):
 
 
 class Subject(BaseModel):
-    """An entity the analysis is about, as the result names it."""
+    """An entity or a device the analysis is about, as the result names it. A device subject
+    (decision D214) says which entity it tracked in the period, when it tracked one."""
 
     id: uuid.UUID
     name: str
     type: str | None = None
+    kind: Literal["entity", "device"] = "entity"
+    tracked: str | None = None
 
 
 class Warning(BaseModel):
@@ -116,7 +119,9 @@ class RunContext(BaseModel):
 
 class AnalysisModule(Protocol):
     """A module: a key, a label, a version string for the provenance, a parameters model the
-    API validates with, and the run itself."""
+    API validates with, and the run itself. A module may also declare `subject_kind =
+    "device"` when its subjects are devices rather than entities (decision D214); the API
+    reads it with a default of `entity`."""
 
     key: str
     label: str

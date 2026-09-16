@@ -9,16 +9,21 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field, model_validator
 
-from shared.analysis.limits import MAX_DAYS
+from shared.analysis.limits import MAX_DAYS, MAX_DEVICES
 
 
 class SubjectSelection(BaseModel):
     """Entities by id, or everything in a group (with its subgroups), or every entity of a
-    type; the API turns the latter two into ids and keeps them in `entity_ids`."""
+    type; the API turns the latter two into ids and keeps them in `entity_ids`. A module whose
+    subjects are devices (decision D214) takes devices by id, every device of a type, or every
+    device of the project instead; the API keeps the resolved ids in `device_ids`."""
 
     entity_ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)
     group_id: uuid.UUID | None = None
     entity_type_id: uuid.UUID | None = None
+    device_ids: list[uuid.UUID] = Field(default_factory=list, max_length=MAX_DEVICES)
+    device_type_id: uuid.UUID | None = None
+    all_devices: bool = False
 
 
 class Window(BaseModel):
