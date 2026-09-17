@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- AWT tracker driver (decision D241): African Wildlife Tracking LoRaWAN trackers decode to a position with the fix time, battery, temperature, HDOP, a status with the alarm flags, firmware and reporting interval, and a device error event when an alarm is on; the reporting interval feeds the expected fix interval (decision D242: any driver may state `{"settings": {"fix_interval": s}}` in a state). Built from AWT's own ChirpStack codec, kept as a fixture, and checked against it with node over synthetic frames until recorded uplinks arrive. `docs/devices/awt.md`.
+
 - Dutch reaches the strings the translation layer had missed (Tim, 2026-09-17: English descriptions on Alerts, Groups, Notifications, Automations): page descriptions and titles chosen by a condition, toasts, validation messages, button labels and the label tables of the rules editor, the exports, the backups, the AI policy and the dashboards, 130 strings in all. The shared form field translates validation messages; label tables carry the extraction marker and are translated where they render.
 
 - The server's own texts follow the chosen language (decision D240): event titles from the shipped rule templates, the drivers and the system checks, the descriptions, the explanations under events and error flags, and the warnings of an analysis run come in Dutch when the interface is Dutch. The server keeps storing English and translates on the way out by the request's `Accept-Language`, so events from before translate too, and a rule's own name or a person's words are never touched. Still English: notification mails and Telegram messages, and the PDF report (they need a language per recipient, next).

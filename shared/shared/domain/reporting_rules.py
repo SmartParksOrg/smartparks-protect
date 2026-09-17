@@ -126,8 +126,8 @@ def expected_intervals(settings: dict[str, Any]) -> dict[str, float | None]:
         return None
 
     return {
-        "fix": seconds("lr_gps_interval", "ublox_send_interval"),
-        "status": seconds("status_send_interval"),
+        "fix": seconds("fix_interval", "lr_gps_interval", "ublox_send_interval"),
+        "status": seconds("status_interval", "status_send_interval"),
         "satellite": seconds("satellite_send_interval"),
     }
 

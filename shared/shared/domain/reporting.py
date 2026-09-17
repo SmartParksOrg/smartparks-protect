@@ -103,31 +103,40 @@ async def declared_intervals(
         else None,
     )
     frames: dict[str, Any] = {}
-    if catalog:
-        rows = (
-            await session.execute(
-                select(DeviceStateHistory.state)
-                .where(DeviceStateHistory.device_id == device.id, DeviceStateHistory.time < until)
-                .order_by(DeviceStateHistory.time.desc())
-                .limit(FRAMES_TO_READ * 10)
-            )
-        ).scalars()
-        seen = 0
-        for state in rows:
-            tlvs = {
+    rows = (
+        await session.execute(
+            select(DeviceStateHistory.state)
+            .where(DeviceStateHistory.device_id == device.id, DeviceStateHistory.time < until)
+            .order_by(DeviceStateHistory.time.desc())
+            .limit(FRAMES_TO_READ * 10)
+        )
+    ).scalars()
+    seen = 0
+    for state in rows:
+        state = state or {}
+        # a driver's own settings state (decision D242: `{"settings": {"fix_interval": s}}`,
+        # the AWT tracker's reporting interval) and OpenCollar's TLV settings frames
+        plain = state.get("settings") if isinstance(state.get("settings"), dict) else None
+        tlvs = (
+            {
                 k: v
-                for k, v in (state or {}).items()
+                for k, v in state.items()
                 if k.startswith("port_") and k.endswith("_tlv") and isinstance(v, dict)
             }
-            if not tlvs:
-                continue
-            seen += 1
-            for tlv in tlvs.values():
-                # the newest frame wins: it is read first and only fills what is still empty
-                for key, value in decode_tlv_settings(tlv, catalog).items():
-                    frames.setdefault(key, value)
-            if seen >= FRAMES_TO_READ:
-                break
+            if catalog
+            else {}
+        )
+        if not plain and not tlvs:
+            continue
+        seen += 1
+        # the newest frame wins: it is read first and only fills what is still empty
+        for key, value in (plain or {}).items():
+            frames.setdefault(str(key), value)
+        for tlv in tlvs.values():
+            for key, value in decode_tlv_settings(tlv, catalog).items():
+                frames.setdefault(key, value)
+        if seen >= FRAMES_TO_READ:
+            break
     command = await session.scalar(
         select(Command.parameters[INTERVAL_PARAMETER].as_integer())
         .join(CommandExecution, CommandExecution.command_id == Command.id)

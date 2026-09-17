@@ -46,7 +46,7 @@ def test_registries():
         "actility_thingpark",
         "cra_iot",
     }
-    assert set(DRIVERS) == {"generic_json", "opencollar"}
+    assert set(DRIVERS) == {"awt", "generic_json", "opencollar"}
     assert (
         get_adapter("generic_http").key == "generic_http"
         and get_driver("generic_json").key == "generic_json"

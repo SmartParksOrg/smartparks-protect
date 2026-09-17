@@ -46,6 +46,35 @@ ERROR_FLAGS: dict[str, str] = {
     ),
 }
 
+#: The AWT tracker's alarm flags (shared/device_drivers/awt).
+ERROR_FLAGS.update(
+    {
+        "low_battery": (
+            "The device reports its battery low. Plan a battery change before it stops sending."
+        ),
+        "tamper_foil": (
+            "The tamper foil of the housing reports a break: the device may have been opened or "
+            "damaged. Check the device and the animal."
+        ),
+        "service_coverage": (
+            "The device reports no service coverage: it could not reach the network at its "
+            "last attempts and may hold records until it does."
+        ),
+        "memory_full": (
+            "The device's memory is full; the oldest stored records may be overwritten until "
+            "the backlog is sent."
+        ),
+        "self_test": (
+            "The device's self test reported a fault. Watch the next messages; a fault that "
+            "stays needs the device looked at."
+        ),
+        "humidity_alarm": (
+            "The humidity inside the housing is above the device's bound; moisture may be "
+            "getting in."
+        ),
+    }
+)
+
 RESET_REASONS: dict[str, str] = {
     "watchdog": "the firmware stopped responding and the watchdog restarted it",
     "software": "the firmware restarted itself, as after a settings change or an update",

@@ -1,0 +1,169 @@
+[
+  {
+    "frame": {
+      "kind": "synthetic",
+      "note": "standard type, a fix south of Gaborone at hourly reporting, no alarms",
+      "data_hex": "a507d121520102013b2a00022a0201836aaa68a09174330ca185ca0403090078ffd303f21b37"
+    },
+    "codec": {
+      "data": {
+        "header": 165,
+        "messageCounter": 7,
+        "command": "Not Encrypted",
+        "payloadLength": 33,
+        "headerCRC": true,
+        "subCommand": "AWT Standard payload type",
+        "masterTagID": 258,
+        "tagID": 10811,
+        "alarms": {
+          "otaTrackMode": false,
+          "lowBattery": false,
+          "tamperFoil": false,
+          "serviceCoverage": false,
+          "memoryFull": false,
+          "selfTestResult": false
+        },
+        "ackRetries": {
+          "humidityAlarm": false,
+          "pollingOn": true,
+          "bleCommandAck": false,
+          "uhfCommandAck": false,
+          "otaCommandAck": false,
+          "uploadRetry": 0
+        },
+        "softwareVersion": 42,
+        "reportingInterval": "GPS log every 1 hour",
+        "batteryVoltage": 3.87,
+        "timestamp": 1789552800,
+        "epochTime": "2026-09-16T10:00:00.000Z",
+        "latitude": -24.6541,
+        "hdop": 0,
+        "longitude": 25.9087,
+        "alarmFlag": false,
+        "movementFlag": true,
+        "globalAck": false,
+        "groundSpeed": 3,
+        "messageKey": 9,
+        "accelerometer": {
+          "x": 120,
+          "y": -45,
+          "z": 1010
+        },
+        "temperature": 27,
+        "payloadCRC": true
+      }
+    }
+  },
+  {
+    "frame": {
+      "kind": "synthetic",
+      "note": "altitude and light, low battery and tamper alarms, retries, 24 hours",
+      "data_hex": "a5c89125d905ffff01000a612b05014b6aab2100c9220ed8d162ddb40001f83001f4ffff2903ac0264d0"
+    },
+    "codec": {
+      "data": {
+        "header": 165,
+        "messageCounter": 200,
+        "command": "Encrypted",
+        "payloadLength": 37,
+        "headerCRC": true,
+        "subCommand": "AWT Standard payload type + altitude + light",
+        "masterTagID": 65535,
+        "tagID": 1,
+        "alarms": {
+          "otaTrackMode": false,
+          "lowBattery": true,
+          "tamperFoil": true,
+          "serviceCoverage": false,
+          "memoryFull": false,
+          "selfTestResult": false
+        },
+        "ackRetries": {
+          "humidityAlarm": true,
+          "pollingOn": false,
+          "bleCommandAck": false,
+          "uhfCommandAck": false,
+          "otaCommandAck": false,
+          "uploadRetry": 3
+        },
+        "softwareVersion": 43,
+        "reportingInterval": "GPS log every 24 hours",
+        "batteryVoltage": 3.31,
+        "timestamp": 1789600000,
+        "epochTime": "2026-09-16T23:06:40.000Z",
+        "latitude": -19.0154,
+        "hdop": 0,
+        "longitude": 23.4275,
+        "alarmFlag": true,
+        "movementFlag": false,
+        "globalAck": true,
+        "groundSpeed": 0,
+        "messageKey": 1,
+        "accelerometer": {
+          "x": -2000,
+          "y": 500,
+          "z": -1
+        },
+        "temperature": 41,
+        "altitude": 940,
+        "lightLevel": 612,
+        "payloadCRC": true
+      }
+    }
+  },
+  {
+    "frame": {
+      "kind": "synthetic",
+      "note": "minimal type, no fix yet (zero coordinates), clock not set",
+      "data_hex": "a501d12154000000070020002a0101920000000000000000800000000000000000000000130c"
+    },
+    "codec": {
+      "data": {
+        "header": 165,
+        "messageCounter": 1,
+        "command": "Not Encrypted",
+        "payloadLength": 33,
+        "headerCRC": true,
+        "subCommand": "AWT Minimal payload type",
+        "masterTagID": 0,
+        "tagID": 7,
+        "alarms": {
+          "otaTrackMode": false,
+          "lowBattery": false,
+          "tamperFoil": false,
+          "serviceCoverage": true,
+          "memoryFull": false,
+          "selfTestResult": false
+        },
+        "ackRetries": {
+          "humidityAlarm": false,
+          "pollingOn": false,
+          "bleCommandAck": false,
+          "uhfCommandAck": false,
+          "otaCommandAck": false,
+          "uploadRetry": 0
+        },
+        "softwareVersion": 42,
+        "reportingInterval": "GPS log every 10 minutes",
+        "batteryVoltage": 4.02,
+        "timestamp": 0,
+        "epochTime": "1970-01-01T00:00:00.000Z",
+        "latitude": 0,
+        "hdop": 0,
+        "longitude": 0,
+        "alarmFlag": false,
+        "movementFlag": false,
+        "globalAck": false,
+        "groundSpeed": 0,
+        "messageKey": 0,
+        "accelerometer": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "temperature": 19,
+        "payloadCRC": true
+      }
+    }
+  }
+]

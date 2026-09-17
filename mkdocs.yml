@@ -69,6 +69,7 @@ nav:
       - devices/index.md
       - Driver interface: devices/driver-interface.md
       - OpenCollar Edge: devices/opencollar.md
+      - AWT tracker: devices/awt.md
       - OpenCollar protocol research: devices/opencollar-protocol-research.md
       - Device control: devices/device-control.md
       - OpenCollar over Web Bluetooth: devices/opencollar-webble.md

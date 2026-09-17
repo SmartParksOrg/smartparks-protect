@@ -1,0 +1,3 @@
+{"kind": "synthetic", "note": "standard type, a fix south of Gaborone at hourly reporting, no alarms", "data_hex": "a507d121520102013b2a00022a0201836aaa68a09174330ca185ca0403090078ffd303f21b37"}
+{"kind": "synthetic", "note": "altitude and light, low battery and tamper alarms, retries, 24 hours", "data_hex": "a5c89125d905ffff01000a612b05014b6aab2100c9220ed8d162ddb40001f83001f4ffff2903ac0264d0"}
+{"kind": "synthetic", "note": "minimal type, no fix yet (zero coordinates), clock not set", "data_hex": "a501d12154000000070020002a0101920000000000000000800000000000000000000000130c"}
