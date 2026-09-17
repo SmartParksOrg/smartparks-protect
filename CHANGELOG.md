@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- The server's own texts follow the chosen language (decision D240): event titles from the shipped rule templates, the drivers and the system checks, the descriptions, the explanations under events and error flags, and the warnings of an analysis run come in Dutch when the interface is Dutch. The server keeps storing English and translates on the way out by the request's `Accept-Language`, so events from before translate too, and a rule's own name or a person's words are never touched. Still English: notification mails and Telegram messages, and the PDF report (they need a language per recipient, next).
+
 - Dutch: the whole interface (2,124 strings) in Dutch, chosen from the language selector at the foot of the navigation and remembered per browser, or taken from the browser's language on the first visit. A string that a later change adds shows in English until translated; `npm run i18n:check` names it.
 
 - A gateway the network gave no location for (a Gateway Mesh relay, a gateway on a network without a gateway API) is placed by hand (decision D239): "Set location" in the gateway's dialog on the Gateways page and in its panel on the live map, for project admins, with typed coordinates, a click on the small map, or the browser's position while standing at the gateway; "Change location" corrects one, "Clear the set location" gives it back to the platform. A location set by a person is kept over the platform's. API: `PATCH /projects/{id}/gateways/{gateway_id}/location`.

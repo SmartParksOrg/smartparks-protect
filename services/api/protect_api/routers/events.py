@@ -15,6 +15,7 @@ from protect_api.crud import geom_to_geojson, get_or_404
 from protect_api.deps import (
     ProjectContext,
     ScopeContext,
+    language,
     require_permission,
     require_scope_permission,
     require_server_admin,
@@ -31,6 +32,7 @@ from protect_api.visibility import EVERYTHING, Visibility
 from shared.database import get_session
 from shared.domain.explanations import explain_event
 from shared.enums import AlertStatus
+from shared.i18n import translate
 from shared.models import ActionDelivery, Alert, Device, Entity, Event, User
 from shared.permissions import Permission
 from shared.rules.events import close_alert
@@ -84,19 +86,24 @@ async def with_names(session: AsyncSession, reads: list[EventRead]) -> None:
         r.device_name = devices.get(r.device_id) if r.device_id else None
 
 
-def event_read(event: Event, alert: Alert | None) -> EventRead:
+def event_read(event: Event, alert: Alert | None, language: str = "en") -> EventRead:
+    """The event as the interface reads it: the title and the description the server
+    composed, and the explanation, in the request's language (decision D240)."""
     data = EventRead.model_validate(event)
     data.geometry = geom_to_geojson(event.geom)
-    data.explanation = explain_event(event.event_type, event.context)
+    data.title = translate(event.title, language) or event.title
+    if event.description:
+        data.description = translate(event.description, language)
+    data.explanation = explain_event(event.event_type, event.context, language)
     if alert is not None:
         data.alert_id = alert.id
         data.alert_status = alert.status
     return data
 
 
-def alert_read(alert: Alert, event: Event) -> AlertRead:
+def alert_read(alert: Alert, event: Event, language: str = "en") -> AlertRead:
     data = AlertRead.model_validate(alert)
-    data.title = event.title
+    data.title = translate(event.title, language) or event.title
     data.event_type = event.event_type
     data.entity_id = event.entity_id
     data.device_id = event.device_id
@@ -125,6 +132,7 @@ async def list_events_for(
     time_to: datetime | None,
     all_projects: bool = False,
     visibility: Visibility = EVERYTHING,
+    lang: str = "en",
 ) -> PageResponse[EventRead]:
     """`project_id` None is the system scope (events of no project); `all_projects` is every
     project's events at once (decision D115), never the system ones."""
@@ -155,7 +163,7 @@ async def list_events_for(
     rows = (
         await session.execute(statement.order_by(Event.time.desc()).limit(page.limit + 1))
     ).all()
-    items = [event_read(event, alert) for event, alert in rows[: page.limit]]
+    items = [event_read(event, alert, lang) for event, alert in rows[: page.limit]]
     await with_names(session, items)
     next_cursor = items[-1].time.isoformat() if len(rows) > page.limit else None
     return PageResponse(items=items, next_cursor=next_cursor)
@@ -171,6 +179,7 @@ async def list_alerts_for(
     entity_id: uuid.UUID | None,
     all_projects: bool = False,
     visibility: Visibility = EVERYTHING,
+    lang: str = "en",
 ) -> PageResponse[AlertRead]:
     statement = (
         select(Alert, Event)
@@ -195,7 +204,7 @@ async def list_alerts_for(
     rows = (
         await session.execute(statement.order_by(Alert.created_at.desc()).limit(page.limit + 1))
     ).all()
-    items = [alert_read(alert, event) for alert, event in rows[: page.limit]]
+    items = [alert_read(alert, event, lang) for alert, event in rows[: page.limit]]
     next_cursor = items[-1].created_at.isoformat() if len(rows) > page.limit else None
     return PageResponse(items=items, next_cursor=next_cursor)
 
@@ -218,6 +227,7 @@ async def _transition(
     user: User,
     to: AlertStatus,
     body: AlertAction,
+    lang: str = "en",
 ) -> AlertRead:
     alert, event = await _scoped_alert(session, alert_id, project_id)
     try:
@@ -234,7 +244,7 @@ async def _transition(
         details={"event_type": event.event_type, "note": body.note},
     )
     await session.commit()
-    return alert_read(alert, event)
+    return alert_read(alert, event, lang)
 
 
 async def event_detail_for(
@@ -243,6 +253,7 @@ async def event_detail_for(
     project_id: uuid.UUID | None,
     *,
     all_projects: bool = False,
+    lang: str = "en",
 ) -> EventDetail:
     event = await get_or_404(session, Event, event_id, "Event")
     visible = event.project_id is not None if all_projects else event.project_id == project_id
@@ -255,11 +266,11 @@ async def event_detail_for(
         .order_by(ActionDelivery.created_at)
         .limit(200)
     )
-    read = event_read(event, alert)
+    read = event_read(event, alert, lang)
     await with_names(session, [read])
     return EventDetail(
         event=read,
-        alert=alert_read(alert, event) if alert else None,
+        alert=alert_read(alert, event, lang) if alert else None,
         deliveries=[ActionDeliveryRead.model_validate(d) for d in deliveries],
     )
 
@@ -277,6 +288,7 @@ async def list_events(
     time_to: datetime | None = Query(None, alias="to"),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> PageResponse[EventRead]:
     """Newest first. The cursor is the time of the last item of the previous page."""
     return await list_events_for(
@@ -290,6 +302,7 @@ async def list_events(
         time_to=time_to,
         all_projects=context.is_all,
         visibility=context.visibility,
+        lang=lang,
     )
 
 
@@ -298,10 +311,15 @@ async def get_event(
     event_id: uuid.UUID,
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> EventDetail:
     """One event of the project, or of any project in the all scope (decision D115)."""
     return await event_detail_for(
-        session, event_id, context.project_id, all_projects=context.is_all
+        session,
+        event_id,
+        context.project_id,
+        all_projects=context.is_all,
+        lang=lang,
     )
 
 
@@ -311,6 +329,7 @@ async def map_events(
     limit: int = Query(500, ge=1, le=2000),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> dict[str, Any]:
     """Recent events with a location as GeoJSON, for the event layer of the live map. Events use
     the event marker family so they never look like entities (architecture 24.5)."""
@@ -341,7 +360,7 @@ async def map_events(
                     "project_id": str(event.project_id) if event.project_id else None,
                     "event_type": event.event_type,
                     "severity": event.severity,
-                    "title": event.title,
+                    "title": translate(event.title, lang) or event.title,
                     "time": event.time.isoformat(),
                     "entity_id": str(event.entity_id) if event.entity_id else None,
                     "alert_id": str(alert.id) if alert else None,
@@ -361,6 +380,7 @@ async def list_alerts(
     entity_id: uuid.UUID | None = None,
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> PageResponse[AlertRead]:
     return await list_alerts_for(
         session,
@@ -371,6 +391,7 @@ async def list_alerts(
         entity_id=entity_id,
         all_projects=context.is_all,
         visibility=context.visibility,
+        lang=lang,
     )
 
 
@@ -380,9 +401,16 @@ async def acknowledge_alert(
     body: AlertAction,
     context: ProjectContext = Depends(require_permission(Permission.ALERTS_WRITE)),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> AlertRead:
     return await _transition(
-        session, alert_id, context.project.id, context.user, AlertStatus.ACKNOWLEDGED, body
+        session,
+        alert_id,
+        context.project.id,
+        context.user,
+        AlertStatus.ACKNOWLEDGED,
+        body,
+        lang=lang,
     )
 
 
@@ -392,9 +420,16 @@ async def resolve_alert(
     body: AlertAction,
     context: ProjectContext = Depends(require_permission(Permission.ALERTS_WRITE)),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> AlertRead:
     return await _transition(
-        session, alert_id, context.project.id, context.user, AlertStatus.RESOLVED, body
+        session,
+        alert_id,
+        context.project.id,
+        context.user,
+        AlertStatus.RESOLVED,
+        body,
+        lang=lang,
     )
 
 
@@ -407,6 +442,7 @@ async def list_system_events(
     event_type: str | None = None,
     severity: str | None = None,
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> PageResponse[EventRead]:
     return await list_events_for(
         session,
@@ -417,14 +453,17 @@ async def list_system_events(
         entity_id=None,
         time_from=None,
         time_to=None,
+        lang=lang,
     )
 
 
 @admin_router.get("/events/{event_id}", response_model=EventDetail)
 async def get_system_event(
-    event_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    event_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> EventDetail:
-    return await event_detail_for(session, event_id, None)
+    return await event_detail_for(session, event_id, None, lang=lang)
 
 
 @admin_router.get("/alerts", response_model=PageResponse[AlertRead])
@@ -433,9 +472,16 @@ async def list_system_alerts(
     alert_status: str | None = Query(None, alias="status"),
     severity: str | None = None,
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> PageResponse[AlertRead]:
     return await list_alerts_for(
-        session, None, page, alert_status=alert_status, severity=severity, entity_id=None
+        session,
+        None,
+        page,
+        alert_status=alert_status,
+        severity=severity,
+        entity_id=None,
+        lang=lang,
     )
 
 
@@ -445,8 +491,11 @@ async def acknowledge_system_alert(
     body: AlertAction,
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> AlertRead:
-    return await _transition(session, alert_id, None, user, AlertStatus.ACKNOWLEDGED, body)
+    return await _transition(
+        session, alert_id, None, user, AlertStatus.ACKNOWLEDGED, body, lang=lang
+    )
 
 
 @admin_router.post("/alerts/{alert_id}/resolve", response_model=AlertRead)
@@ -455,5 +504,6 @@ async def resolve_system_alert(
     body: AlertAction,
     user: User = Depends(require_server_admin),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> AlertRead:
-    return await _transition(session, alert_id, None, user, AlertStatus.RESOLVED, body)
+    return await _transition(session, alert_id, None, user, AlertStatus.RESOLVED, body, lang=lang)

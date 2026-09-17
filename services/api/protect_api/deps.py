@@ -13,9 +13,9 @@ projects is not leaked through 403 versus 404.
 import uuid
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +23,7 @@ from protect_api.auth.users import current_active_user
 from protect_api.visibility import EVERYTHING, Visibility, resolve_visibility
 from shared.database import get_session
 from shared.enums import Role
+from shared.i18n import resolve_language
 from shared.models import Project, ProjectMembership, ProjectRole, User
 from shared.permissions import Permission, permissions_for
 
@@ -187,3 +188,10 @@ async def accessible_project_ids(user: User, session: AsyncSession) -> list[uuid
         select(ProjectMembership.project_id).where(ProjectMembership.user_id == user.id)
     )
     return list(rows)
+
+
+def language(accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None) -> str:
+    """The language the interface asks for (decision D240): the first supported one of the
+    `Accept-Language` header, English otherwise. The server's own texts are translated on
+    the way out with it."""
+    return resolve_language(accept_language)

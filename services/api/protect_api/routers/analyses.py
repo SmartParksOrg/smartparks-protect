@@ -21,7 +21,7 @@ from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.crud import geom_to_geojson, get_or_404
-from protect_api.deps import ProjectContext, require_permission
+from protect_api.deps import ProjectContext, language, require_permission
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.analysis import (
     AnalysisEstimate,
@@ -47,6 +47,7 @@ from shared.config import get_settings
 from shared.curation.effective import device_fix, effective_time, visible
 from shared.database import get_session
 from shared.enums import AnalysisStatus, ReportStatus
+from shared.i18n import translate
 from shared.models import (
     AnalysisGeometry,
     AnalysisRun,
@@ -348,9 +349,19 @@ async def _with_names(session: AsyncSession, reads: list[AnalysisRunRead]) -> No
         r.created_by_name = names.get(r.created_by_user_id) if r.created_by_user_id else None
 
 
-async def _read(session: AsyncSession, run: AnalysisRun) -> AnalysisRunRead:
+async def _read(session: AsyncSession, run: AnalysisRun, lang: str = "en") -> AnalysisRunRead:
     read = AnalysisRunRead.model_validate(run)
     await _with_names(session, [read])
+    if lang != "en" and isinstance(read.result, dict) and read.result.get("warnings"):
+        # the warnings the module composed, in the reader's language (decision D240); the
+        # stored document keeps its English
+        read.result = {
+            **read.result,
+            "warnings": [
+                {**w, "text": translate(w.get("text"), lang)} if isinstance(w, dict) else w
+                for w in read.result["warnings"]
+            ],
+        }
     return read
 
 
@@ -467,8 +478,9 @@ async def get_run(
     run_id: uuid.UUID,
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
 ) -> AnalysisRunRead:
-    return await _read(session, await _run_for(session, context, run_id))
+    return await _read(session, await _run_for(session, context, run_id), lang)
 
 
 @router.patch("/projects/{project_id}/analyses/{run_id}", response_model=AnalysisRunRead)

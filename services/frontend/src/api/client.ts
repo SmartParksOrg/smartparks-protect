@@ -4,6 +4,7 @@
  * without a full reload. Paths are relative to the API origin (`VITE_API_URL`, empty for same
  * origin), so the same build works behind nginx and behind the Vite dev proxy.
  */
+import i18n from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
 
 export class ApiError extends Error {
@@ -23,7 +24,11 @@ export class ApiError extends Error {
     }
     if (Array.isArray(detail)) {
       return detail
-        .map((d) => (d && typeof d === "object" && "msg" in d ? String((d as { msg: unknown }).msg) : String(d)))
+        .map((d) =>
+          d && typeof d === "object" && "msg" in d
+            ? String((d as { msg: unknown }).msg)
+            : String(d),
+        )
         .join("; ");
     }
     return `Request failed with status ${status}`;
@@ -40,7 +45,10 @@ async function errorDetail(response: Response): Promise<unknown> {
   }
 }
 
-type Query = Record<string, string | number | boolean | string[] | null | undefined>;
+type Query = Record<
+  string,
+  string | number | boolean | string[] | null | undefined
+>;
 
 export interface RequestOptions {
   query?: Query;
@@ -56,15 +64,26 @@ function buildUrl(path: string, query?: Query): string {
   const url = new URL(BASE + path, window.location.origin);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
-      if (Array.isArray(value)) for (const item of value) url.searchParams.append(key, item);
-      else if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+      if (Array.isArray(value))
+        for (const item of value) url.searchParams.append(key, item);
+      else if (value !== undefined && value !== null && value !== "")
+        url.searchParams.set(key, String(value));
     }
   }
   return url.toString();
 }
 
-async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
+async function request<T>(
+  method: string,
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    ...options.headers,
+  };
+  // the server translates its own texts by this (decision D240)
+  if (i18n.language) headers["Accept-Language"] = i18n.language;
   const token = useAuthStore.getState().token;
   if (token && !options.anonymous) headers.Authorization = `Bearer ${token}`;
   let body: BodyInit | undefined;
@@ -77,7 +96,12 @@ async function request<T>(method: string, path: string, options: RequestOptions 
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(options.body);
   }
-  const response = await fetch(buildUrl(path, options.query), { method, headers, body, signal: options.signal });
+  const response = await fetch(buildUrl(path, options.query), {
+    method,
+    headers,
+    body,
+    signal: options.signal,
+  });
   if (response.status === 401 && !options.anonymous) {
     useAuthStore.getState().expire();
   }
@@ -86,16 +110,22 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   }
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) return (await response.json()) as T;
+  if (contentType.includes("application/json"))
+    return (await response.json()) as T;
   return (await response.arrayBuffer()) as T;
 }
 
 export const api = {
-  get: <T>(path: string, options?: RequestOptions) => request<T>("GET", path, options),
-  post: <T>(path: string, options?: RequestOptions) => request<T>("POST", path, options),
-  put: <T>(path: string, options?: RequestOptions) => request<T>("PUT", path, options),
-  patch: <T>(path: string, options?: RequestOptions) => request<T>("PATCH", path, options),
-  delete: <T>(path: string, options?: RequestOptions) => request<T>("DELETE", path, options),
+  get: <T>(path: string, options?: RequestOptions) =>
+    request<T>("GET", path, options),
+  post: <T>(path: string, options?: RequestOptions) =>
+    request<T>("POST", path, options),
+  put: <T>(path: string, options?: RequestOptions) =>
+    request<T>("PUT", path, options),
+  patch: <T>(path: string, options?: RequestOptions) =>
+    request<T>("PATCH", path, options),
+  delete: <T>(path: string, options?: RequestOptions) =>
+    request<T>("DELETE", path, options),
 };
 
 /** WebSocket URL for a project stream, same origin as the API. */
@@ -108,17 +138,27 @@ export function wsUrl(projectId: string, token: string): string {
 /** A binary the API serves with the bearer token (a picture), as a blob; null when there is none. */
 export async function fetchBlob(path: string): Promise<Blob | null> {
   const token = useAuthStore.getState().token;
-  const response = await fetch(buildUrl(path), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  const response = await fetch(buildUrl(path), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (response.status === 404) return null;
-  if (!response.ok) throw new ApiError(response.status, await errorDetail(response));
+  if (!response.ok)
+    throw new ApiError(response.status, await errorDetail(response));
   return response.blob();
 }
 
 /** Download a file that needs the bearer token: fetch it, then hand the browser a blob link. */
-export async function downloadFile(path: string, fallbackName: string, query?: Query): Promise<void> {
+export async function downloadFile(
+  path: string,
+  fallbackName: string,
+  query?: Query,
+): Promise<void> {
   const token = useAuthStore.getState().token;
-  const response = await fetch(buildUrl(path, query), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-  if (!response.ok) throw new ApiError(response.status, await errorDetail(response));
+  const response = await fetch(buildUrl(path, query), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok)
+    throw new ApiError(response.status, await errorDetail(response));
   const disposition = response.headers.get("content-disposition") ?? "";
   const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallbackName;
   const url = URL.createObjectURL(await response.blob());

@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from shared.i18n import translate
+
 #: The error bits of the OpenCollar status message (research section 3.4) and the operation
 #: byte's join error, in words.
 ERROR_FLAGS: dict[str, str] = {
@@ -104,25 +106,33 @@ EVENTS: dict[str, str] = {
 }
 
 
-def explain_event(event_type: str, context: dict[str, Any] | None) -> str | None:
+def explain_event(
+    event_type: str, context: dict[str, Any] | None, language: str = "en"
+) -> str | None:
     """The explanation of an event, with the flags or the reset reason it carries spelled
-    out; None for a type without one (a custom rule's own type)."""
+    out, in `language` (decision D240); None for a type without one (a custom rule's own
+    type)."""
     base = EVENTS.get(event_type)
     if base is None:
         return None
     context = context or {}
-    parts = [base]
+    parts = [translate(base, language) or base]
     if event_type == "device_error":
         errors = context.get("errors")
         if isinstance(errors, list):
             for flag in errors:
                 text = ERROR_FLAGS.get(str(flag))
-                parts.append(f"{flag}: {text}" if text else f"{flag}: no explanation yet.")
+                parts.append(
+                    f"{flag}: {translate(text, language)}"
+                    if text
+                    else str(translate("{flag}: no explanation yet.", language)).format(flag=flag)
+                )
     if event_type == "device_reset":
         reason = context.get("reset_reason")
         if isinstance(reason, str):
-            words = [RESET_REASONS.get(r.strip()) for r in reason.split(",")]
+            words = [translate(RESET_REASONS.get(r.strip()), language) for r in reason.split(",")]
             known = [w for w in words if w]
             if known:
-                parts.append("The reason the device gives: " + "; ".join(known) + ".")
+                lead = translate("The reason the device gives: ", language) or ""
+                parts.append(lead + "; ".join(known) + ".")
     return " ".join(parts)
