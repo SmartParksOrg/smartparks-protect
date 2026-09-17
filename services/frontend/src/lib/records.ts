@@ -1,4 +1,4 @@
-import { t } from "i18next";
+import { t } from "@/lib/i18nMark";
 import type { RecordRow } from "@/api/types";
 import {
   RANGE_PRESETS,

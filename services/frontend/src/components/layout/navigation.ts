@@ -1,6 +1,6 @@
 /** Sidebar sections from architecture 28 (application navigation). Items without a route yet
  * render as disabled with the phase they arrive in. */
-import { t } from "i18next";
+import { t } from "@/lib/i18nMark";
 import type { LucideIcon } from "lucide-react";
 
 import type { PermissionKey } from "@/lib/permissions";
