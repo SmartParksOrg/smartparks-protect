@@ -401,7 +401,7 @@ function ExportForm({
             htmlFor="metrics"
             hint={
               dataset === "aggregates"
-                ? "Required"
+                ? t("Required")
                 : t("Empty means every metric")
             }
           >
@@ -434,7 +434,7 @@ function ExportForm({
                   {BUCKETS.map((b) => (
                     <SelectItem key={b} value={b}>
                       {b === "auto"
-                        ? "Automatic"
+                        ? t("Automatic")
                         : b === "all"
                           ? t("Whole range")
                           : b}
@@ -565,7 +565,7 @@ function ExportForm({
           disabled={downloading || queueInline.isPending}
         >
           <Download className="size-4" />{" "}
-          {downloading ? "Preparing…" : t("Download now")}
+          {downloading ? t("Preparing…") : t("Download now")}
         </Button>
         <Button
           onClick={() => {

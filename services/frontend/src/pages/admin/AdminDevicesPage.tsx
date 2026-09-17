@@ -184,7 +184,7 @@ function ManageDevice({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{d?.name ?? "Device"}</DialogTitle>
+          <DialogTitle>{d?.name ?? t("Device")}</DialogTitle>
           <DialogDescription>
             {t("Identities, project ownership over time, entity assignment")}
           </DialogDescription>

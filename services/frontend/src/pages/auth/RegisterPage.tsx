@@ -152,7 +152,7 @@ export function RegisterPage() {
           <Callout kind="error">{form.formState.errors.root.message}</Callout>
         )}
         <Button type="submit" disabled={register.isPending || !info}>
-          {register.isPending ? "Creating…" : t("Create account")}
+          {register.isPending ? t("Creating…") : t("Create account")}
         </Button>
       </form>
     </AuthShell>

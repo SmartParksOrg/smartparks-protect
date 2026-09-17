@@ -325,7 +325,7 @@ export function WebBleCard({
               onClick={connect}
             >
               <Bluetooth className="size-4" />{" "}
-              {busy === "Connect" ? "Connecting…" : "Connect"}
+              {busy === "Connect" ? t("Connecting…") : t("Connect")}
             </Button>
           )}
         </CardHeader>

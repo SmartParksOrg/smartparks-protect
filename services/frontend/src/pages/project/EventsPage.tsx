@@ -147,12 +147,12 @@ export function EventDetailDialog({
                 className="size-5 text-primary"
               />
             )}
-            {d?.event.title ?? "Event"}
+            {d?.event.title ?? t("Event")}
           </DialogTitle>
           <DialogDescription>
             {d
               ? `${d.event.event_type} at ${formatTime(d.event.time)}`
-              : "Loading…"}
+              : t("Loading…")}
           </DialogDescription>
         </DialogHeader>
         {detail.error && <Callout kind="error">{detail.error.message}</Callout>}
@@ -382,7 +382,7 @@ export function EventsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   return (
     <>
       <PageHeader
-        title={scope === "server" ? t("System events") : "Events"}
+        title={scope === "server" ? t("System events") : t("Events")}
         description={t(
           "Facts produced by rules, devices and integrations. An alert is an event that needs a person.",
         )}

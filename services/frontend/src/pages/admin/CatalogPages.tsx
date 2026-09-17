@@ -124,7 +124,7 @@ function CatalogPage<T extends FieldValues, R>({
       return api.post(path, { body });
     },
     invalidate: [queryKey],
-    success: editing ? "Saved" : "Created",
+    success: editing ? t("Saved") : t("Created"),
     onSuccess: () => setOpen(false),
     onError: (error) =>
       form.setError("root" as never, { message: error.message }),

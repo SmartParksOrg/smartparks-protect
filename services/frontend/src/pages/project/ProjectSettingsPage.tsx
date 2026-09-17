@@ -332,7 +332,7 @@ function IconsCard({ projectId }: { projectId: string }) {
             disabled={upload.isPending}
             onClick={() => input.current?.click()}
           >
-            {upload.isPending ? "Uploading…" : t("Upload SVG")}
+            {upload.isPending ? t("Uploading…") : t("Upload SVG")}
           </Button>
         </div>
         <ul className="grid gap-2 sm:grid-cols-2">

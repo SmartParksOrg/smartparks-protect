@@ -53,9 +53,9 @@ export function DrawBar({
   // nothing to show before the pointer moved (a circle's first tap has no radius yet)
   const measured = (m.length_m ?? 0) > 0 || (m.area_m2 ?? 0) > 0 || circle;
   const kinds: { kind: DrawKind; label: string; icon: typeof MapPin }[] = [
-    { kind: "point", label: t("Point"), icon: MapPin },
+    { kind: "point", label: "Point", icon: MapPin },
     { kind: "line", label: t("Line"), icon: Minus },
-    { kind: "polygon", label: t("Polygon"), icon: Pentagon },
+    { kind: "polygon", label: "Polygon", icon: Pentagon },
     { kind: "circle", label: t("Circle"), icon: Circle },
   ];
   return (
@@ -112,7 +112,9 @@ export function DrawBar({
           {circle && (
             <span>
               <span className="text-muted-foreground">{t("Radius")} </span>
-              <span className="font-medium">{formatLength(circle.radius_m)}</span>
+              <span className="font-medium">
+                {formatLength(circle.radius_m)}
+              </span>
             </span>
           )}
           {m.area_m2 != null && (

@@ -1023,7 +1023,7 @@ export function RuleEditor({
                   }
                   disabled={test.isPending}
                 >
-                  {test.isPending ? "Running…" : t("Run test")}
+                  {test.isPending ? t("Running…") : t("Run test")}
                 </Button>
               </div>
               {replay && (

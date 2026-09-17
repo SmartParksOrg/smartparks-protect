@@ -1073,7 +1073,7 @@ function NewJobDialog({
             disabled={!from || !to || create.isPending}
             onClick={() => create.mutate()}
           >
-            {create.isPending ? "Previewing…" : "Preview"}
+            {create.isPending ? t("Previewing…") : t("Preview")}
           </Button>
         </DialogFooter>
       </DialogContent>

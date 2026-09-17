@@ -122,7 +122,7 @@ export function DeviceSettingsTab({
         (row.description ?? "").toLowerCase().includes(filter.toLowerCase()) ||
         (row.group ?? "").toLowerCase().includes(filter.toLowerCase())),
   );
-  const groups = [...new Set(rows.map((r) => r.group ?? "Other"))].sort();
+  const groups = [...new Set(rows.map((r) => r.group ?? t("Other")))].sort();
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -200,7 +200,7 @@ export function DeviceSettingsTab({
           </div>
           <div className="text-sm">
             {rows
-              .filter((r) => (r.group ?? "Other") === group)
+              .filter((r) => (r.group ?? t("Other")) === group)
               .map((row) => {
                 const known = row.value !== null && row.value !== undefined;
                 return (

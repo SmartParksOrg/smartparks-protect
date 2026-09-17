@@ -279,7 +279,7 @@ function CurateForm({
           {t("Cancel")}
         </Button>
         <Button disabled={save.isPending} onClick={() => save.mutate()}>
-          {requiresApproval ? "Propose" : "Apply"}
+          {requiresApproval ? t("Propose") : t("Apply")}
         </Button>
       </DialogFooter>
     </>

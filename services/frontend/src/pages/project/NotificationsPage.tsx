@@ -197,7 +197,7 @@ export function NotificationsPage({
               }
             >
               <RefreshCw className="size-4" />{" "}
-              {row.original.linked ? "Relink" : t("Link code")}
+              {row.original.linked ? t("Relink") : t("Link code")}
             </Button>
           )}
           <Button

@@ -137,7 +137,7 @@ export function AlertsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
               variant="outline"
               onClick={() => setActing(row.original)}
             >
-              {row.original.status === "open" ? "Acknowledge" : "Resolve"}
+              {row.original.status === "open" ? "Acknowledge" : t("Resolve")}
             </Button>
           </span>
         ),
@@ -147,7 +147,7 @@ export function AlertsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   return (
     <>
       <PageHeader
-        title={scope === "server" ? t("System alerts") : "Alerts"}
+        title={scope === "server" ? t("System alerts") : t("Alerts")}
         description={
           scope === "server"
             ? t(

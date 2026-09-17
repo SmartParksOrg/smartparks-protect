@@ -246,7 +246,7 @@ export function EntityDialog({
               {t("Cancel")}
             </Button>
             <Button type="submit" disabled={save.isPending}>
-              {save.isPending ? "Saving…" : "Save"}
+              {save.isPending ? t("Saving…") : t("Save")}
             </Button>
           </DialogFooter>
         </form>

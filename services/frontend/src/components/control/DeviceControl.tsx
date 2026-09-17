@@ -186,13 +186,13 @@ export function CommandDetailDialog({
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {d?.command.action_key ?? "Command"}{" "}
+            {d?.command.action_key ?? t("Command")}{" "}
             {d && <StatusBadge value={d.command.status} />}
           </DialogTitle>
           <DialogDescription>
             {d
               ? `${formatTime(d.command.created_at)} by ${d.command.actor.kind as string}${d.command.route ? `, over ${d.command.route}` : ""}`
-              : "Loading…"}
+              : t("Loading…")}
           </DialogDescription>
         </DialogHeader>
         {detail.error && <Callout kind="error">{detail.error.message}</Callout>}
@@ -618,7 +618,7 @@ export function DeviceControl({
               disabled={send.isPending || (needsConfirmation && !confirmed)}
               onClick={() => chosen && send.mutate(chosen)}
             >
-              {send.isPending ? "Sending…" : "Send"}
+              {send.isPending ? t("Sending…") : t("Send")}
             </Button>
           </DialogFooter>
         </DialogContent>

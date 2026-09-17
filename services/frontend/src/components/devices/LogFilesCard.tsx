@@ -150,7 +150,7 @@ export function LogFilesCard({
                 onClick={() => input.current?.click()}
               >
                 <FileUp className="size-4" />{" "}
-                {upload.isPending ? "Uploading…" : t("Upload raw log")}
+                {upload.isPending ? t("Uploading…") : t("Upload raw log")}
               </Button>
             </>
           )}
