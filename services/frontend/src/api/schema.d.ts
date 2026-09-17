@@ -17728,7 +17728,9 @@ export interface operations {
     get_run_api_v1_projects__project_id__analyses__run_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 run_id: string;
                 project_id: string;
@@ -18377,7 +18379,9 @@ export interface operations {
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
             };
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 project_id: string;
             };
@@ -18443,7 +18447,9 @@ export interface operations {
     get_event_api_v1_projects__project_id__events__event_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 event_id: string;
                 project_id: string;
@@ -18478,7 +18484,9 @@ export interface operations {
                 hours?: number;
                 limit?: number;
             };
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 project_id: string;
             };
@@ -18518,7 +18526,9 @@ export interface operations {
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
             };
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 project_id: string;
             };
@@ -18549,7 +18559,9 @@ export interface operations {
     acknowledge_alert_api_v1_projects__project_id__alerts__alert_id__acknowledge_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 alert_id: string;
                 project_id: string;
@@ -18585,7 +18597,9 @@ export interface operations {
     resolve_alert_api_v1_projects__project_id__alerts__alert_id__resolve_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 alert_id: string;
                 project_id: string;
@@ -18627,7 +18641,9 @@ export interface operations {
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
             };
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -18656,7 +18672,9 @@ export interface operations {
     get_system_event_api_v1_admin_events__event_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 event_id: string;
             };
@@ -18693,7 +18711,9 @@ export interface operations {
                 /** @description key of the last item of the previous page */
                 cursor?: string | null;
             };
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -18722,7 +18742,9 @@ export interface operations {
     acknowledge_system_alert_api_v1_admin_alerts__alert_id__acknowledge_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 alert_id: string;
             };
@@ -18757,7 +18779,9 @@ export interface operations {
     resolve_system_alert_api_v1_admin_alerts__alert_id__resolve_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 alert_id: string;
             };

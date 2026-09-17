@@ -11524,6 +11524,22 @@
        "format": "uuid",
        "title": "Project Id"
       }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
      }
     ],
     "responses": {
@@ -12840,6 +12856,22 @@
        "title": "Cursor"
       },
       "description": "key of the last item of the previous page"
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
      }
     ],
     "responses": {
@@ -12955,6 +12987,22 @@
        "type": "string",
        "title": "Project Id"
       }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
      }
     ],
     "responses": {
@@ -13026,6 +13074,22 @@
        "minimum": 1,
        "default": 500,
        "title": "Limit"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
       }
      }
     ],
@@ -13155,6 +13219,22 @@
        "title": "Cursor"
       },
       "description": "key of the last item of the previous page"
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
      }
     ],
     "responses": {
@@ -13212,6 +13292,22 @@
        "type": "string",
        "format": "uuid",
        "title": "Project Id"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
       }
      }
     ],
@@ -13280,6 +13376,22 @@
        "type": "string",
        "format": "uuid",
        "title": "Project Id"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
       }
      }
     ],
@@ -13391,6 +13503,22 @@
        "title": "Cursor"
       },
       "description": "key of the last item of the previous page"
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
      }
     ],
     "responses": {
@@ -13438,6 +13566,22 @@
        "type": "string",
        "format": "uuid",
        "title": "Event Id"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
       }
      }
     ],
@@ -13539,6 +13683,22 @@
        "title": "Cursor"
       },
       "description": "key of the last item of the previous page"
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
      }
     ],
     "responses": {
@@ -13586,6 +13746,22 @@
        "type": "string",
        "format": "uuid",
        "title": "Alert Id"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
       }
      }
     ],
@@ -13644,6 +13820,22 @@
        "type": "string",
        "format": "uuid",
        "title": "Alert Id"
+      }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
       }
      }
     ],
