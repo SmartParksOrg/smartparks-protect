@@ -1135,9 +1135,9 @@ Release:
 - [ ] P1 `primitives/homerange.py`: the variogram, the Ornstein-Uhlenbeck fit, the effective sample size, the corrected KDE; tests on a simulated track.
 - [ ] P2 `primitives/strategy.py`: the four NSD models with the selection margin and the parameters people read; tests on synthetic curves.
 - [ ] P3 the movement module and its report: the method, the class on the cards and the table, the fitted curve on the NSD chart, the limitations.
-- [ ] P4 `environment/copernicus.py`: the openEO provider with its settings and the System health line; a recorded answer as fixture.
-- [ ] P5 the `environment_samples` cache and its migration.
-- [ ] P6 the grazing module and its report: the level 3 columns, "Use against vegetation", the weekly chart, the levels and the warnings.
+- [x] P4 `environment/copernicus.py`: the openEO provider with its settings and the System health line; a recorded answer as fixture.
+- [x] P5 the `environment_samples` cache and its migration.
+- [x] P6 the grazing module and its report: the level 3 columns, "Use against vegetation", the weekly chart, the levels and the warnings.
 - [ ] P7 docs: the analytics guides, the operations guide for the Copernicus account, `DEVELOPERS.md`, the changelog.
 - [ ] P8 the dev server: the Copernicus credentials in the vault, a movement run and a grazing run read by Tim.
 - [ ] P9 release v2.7.0.

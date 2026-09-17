@@ -126,6 +126,7 @@ nav:
       - Backup and recovery: operations/backup-and-recovery.md
       - Restore guide: operations/restore-guide.md
       - Observability: operations/observability.md
+      - Environmental data: operations/environmental-data.md
       - Benchmarks: operations/benchmarks.md
   - Troubleshooting: troubleshooting/index.md
   - API: api/index.md

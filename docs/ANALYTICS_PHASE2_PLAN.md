@@ -156,11 +156,11 @@ the plan's level 4 and wait for the users' reading of level 3.
   parameters people read; unit tests on synthetic curves.
 - [ ] P3 the movement module: the method and the classification in the document, the fitted
   curve on the NSD chart, the class on the cards and in the table, the limitations; the report.
-- [ ] P4 `environment/copernicus.py`: authentication, the process graph, the synchronous job,
+- [x] P4 `environment/copernicus.py`: authentication, the process graph, the synchronous job,
   the time series per area; a recorded answer as fixture; the settings and the System health
   line.
-- [ ] P5 the cache `environment_samples` and its migration; the reuse across runs.
-- [ ] P6 the grazing module: the level 3 columns, the table, the chart, the levels and the
+- [x] P5 the cache `environment_samples` and its migration; the reuse across runs.
+- [x] P6 the grazing module: the level 3 columns, the table, the chart, the levels and the
   warnings; the report.
 - [ ] P7 docs: `docs/analytics/movement.md` and `grazing.md`, this document's state, the
   operations guide for the Copernicus account, `DEVELOPERS.md`, the changelog.

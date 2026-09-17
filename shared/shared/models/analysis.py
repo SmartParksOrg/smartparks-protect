@@ -19,6 +19,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
     text,
 )
@@ -123,3 +124,27 @@ class AnalysisGeometry(Base):
     properties: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
+
+
+class EnvironmentSample(Base):
+    """One week of one environmental layer over one geometry (decision D245): the cache of what
+    a provider answered, so a rerun or a comparison period reads it back and the provider is
+    asked only for what is new. Keyed by the geometry's hash, not the feature: a redrawn area
+    is a new geometry."""
+
+    __tablename__ = "environment_samples"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider", "layer", "geometry_hash", "week", name="uq_environment_samples_key"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    layer: Mapped[str] = mapped_column(String(64), nullable=False)
+    geometry_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    week: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, comment="The Monday the week starts on, UTC"
+    )
+    value: Mapped[float | None] = mapped_column(Float, comment="None: no valid observation")
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

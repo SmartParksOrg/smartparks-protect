@@ -75,6 +75,9 @@ NL: dict[str, str] = {
     "An entity comes within 200 metres of any site of the project (a proximity rule, decision D140). Reminds once an hour while it stays.": "Een entiteit komt binnen 200 meter van een locatie van het project (een nabijheidsregel, beslissing D140). Herinnert eenmaal per uur zolang ze blijft.",
     "The accelerometer of the device has not changed between status messages for twelve hours (at least three messages), while the battery is fine. Checked hourly.": "De versnellingsmeter van het apparaat is twaalf uur niet veranderd tussen statusberichten (minstens drie berichten), terwijl de batterij in orde is. Elk uur gecontroleerd.",
     # the analysis warnings
+    "No vegetation layer: the server has no environmental provider configured (COPERNICUS_CLIENT_ID and COPERNICUS_CLIENT_SECRET).": "Geen vegetatielaag: de server heeft geen omgevingsdataprovider ingericht (COPERNICUS_CLIENT_ID en COPERNICUS_CLIENT_SECRET).",
+    "The vegetation layer could not be read ({error}); the run is complete without it.": "De vegetatielaag kon niet worden gelezen ({error}); de analyse is compleet zonder die laag.",
+    "{name}: only {share} percent of the weeks have a cloud-free observation.": "{name}: slechts {share} procent van de weken heeft een wolkenvrije waarneming.",
     "The subject changed device inside the period, on {when}.": "Het onderwerp wisselde binnen de periode van apparaat, op {when}.",
     "No value for '{key}' on {names}; they count as one animal each.": "Geen waarde voor '{key}' bij {names}; ze tellen elk als één dier.",
     "No fixes in the main period.": "Geen fixes in de hoofdperiode.",

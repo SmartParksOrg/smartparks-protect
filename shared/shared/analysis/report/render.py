@@ -87,6 +87,12 @@ GRAZING_LABELS: dict[str, str] = {
     "weighted_animal_days_per_ha": "Weighted use (per ha)",
     "relative_pressure": "Relative pressure",
     "pressure_rank": "Rank",
+    "vegetation": "Use against vegetation",
+    "ndvi_mean": "Vegetation index (NDVI)",
+    "ndvi_change": "Vegetation change",
+    "ndvi_valid_share": "Weeks with a clear view",
+    "ndvi_level": "Level",
+    "ndvi_weekly": "Vegetation index by week",
     "share_of_herd_time": "Share of herd time",
     "animals_used": "Animals that used it",
     "visits": "Visits",
@@ -385,6 +391,10 @@ GRAZING_LIMITATIONS = [
     "Overlapping areas double-count by design; the overlap is listed.",
     "Areas are fixed polygons without validity in time; an area that changed during the "
     "period must be two features.",
+    "The vegetation index is the weekly mean NDVI of Sentinel-2 over each area with clouds "
+    "masked; a week without a clear view is left out, and a period with few clear weeks is "
+    "marked. Greener is not more forage of the right kind; the index says how the vegetation "
+    "moved, not what it is worth to the animals.",
 ]
 
 

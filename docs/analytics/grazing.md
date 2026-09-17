@@ -47,9 +47,23 @@ The estimate line under the form names what the run cannot use before Run is pre
 
 A saved run with a name, shared with the project, is the report of phase 1; the tables export as CSV, the polygons as GeoJSON and the whole document as JSON, "Make PDF report" has the server render the run to A4 and "Download PDF" appears when it is ready (the PDF stays with the run), and "The fixes behind it" opens the export dialog with the herd's positions over the period. A monthly utilisation report as a fixed document is noted for later; the result already holds every number and the provenance it needs.
 
+## The vegetation of each area
+
+With an environmental provider configured on the server ([Environmental data](../operations/environmental-data.md), decision D246) every run also carries how each area's vegetation moved:
+
+| Figure | Meaning | Level |
+| --- | --- | --- |
+| Vegetation index (NDVI) | The mean over the period of the weekly Sentinel-2 index of the area, clouds masked | none on its own |
+| Vegetation change | The main period's index minus the comparison period's | warn from 0.10 of an index point down, critical from 0.20 |
+| Weeks with a clear view | The share of the period's weeks that had a cloud-free observation | a period under half is a warning of its own |
+
+"Use against vegetation" is one table: the areas by use per hectare with their index, its change and the level beside it, the hardest used first, so an area grazed hard while greening down comes first. One chart draws the index per area by week, the comparison period faint. The area cards carry the index with its change, and the PDF report both the table and the chart.
+
+What it does not say: greener is not more forage of the right kind, and the index says how the vegetation moved, not what it is worth to the animals. A week without a clear view is left out rather than guessed.
+
 ## Levels not built
 
-Level 2 (landscape context: vegetation class, habitat, soil, terrain, water per area), level 3 (environmental response: NDVI, biomass, rainfall, recovery as time series per area) and level 4 (management interpretation: forage demand, carrying capacity, utilisation thresholds, recommendations) would read providers through the extension point of the plan's section 11. None is a prerequisite for level 1, and the level 1 tables are complete without them.
+Level 2 (landscape context: vegetation class, habitat, soil, terrain, water per area) and level 4 (management interpretation: forage demand, carrying capacity, utilisation thresholds, recommendations) would read providers through the extension point of the plan's section 11. Level 3 is the vegetation index above; the others are not prerequisites for level 1, and the level 1 tables are complete without them.
 
 ## Switching it on and off
 

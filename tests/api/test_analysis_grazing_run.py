@@ -135,3 +135,105 @@ async def test_a_grazing_run_over_zones(client, db):
 
     modules = await client.get("/api/v1/analysis-modules", headers=h)
     assert {m["key"] for m in modules.json()} >= {"movement", "grazing"}
+
+
+class FakeNdviProvider:
+    """A provider that answers per week from a table, as a real one does (the value of a week
+    never depends on who asked for it), and counts how often it was asked: the cache must
+    spare it on a rerun (decision D245)."""
+
+    key = "fake_ndvi"
+    layers: tuple[str, ...] = ("ndvi",)
+
+    def __init__(self, before: list[float], after: list[float], split: datetime) -> None:
+        self.before = before
+        self.after = after
+        self.split = split
+        self.calls = 0
+
+    async def sample(self, layer, geometries, time_from, time_to, project_id):
+        from shared.analysis.environment import LayerSample, weeks_between
+
+        self.calls += 1
+        weeks = weeks_between(time_from, time_to)
+        return LayerSample(
+            layer=layer,
+            source="a test",
+            sampled_at=datetime.now(UTC),
+            series=[
+                [(week, (self.before if week < self.split else self.after)[i]) for week in weeks]
+                for i in range(len(geometries))
+            ],
+        )
+
+
+async def test_a_grazing_run_carries_the_vegetation_of_each_area(client, db, monkeypatch):
+    """Decision D246: the vegetation index per area over the period, its change against the
+    period before, the use-against-vegetation table and the weekly chart; the cache spares the
+    provider on a rerun, and without a provider the run says so and is complete."""
+    from shared.analysis import environment
+
+    admin, project, entity, source, device, _ = await _setup(client, db)
+    h = admin.headers
+    camp = await _zone(client, h, project, "Camp 1", _square(LAT, LON, 316.2))
+    far = await _zone(client, h, project, "Camp 2", _square(LAT + 0.05, LON, 316.2))
+    centre_lat, centre_lon = LAT + 158 / M_PER_DEG_LAT, LON + 158 / M_PER_DEG_LON
+    await _fixes(db, project, entity, device, source, centre_lat, centre_lon, hours=12)
+    base = f"/api/v1/projects/{project.id}/analyses"
+    params = {
+        "entity_ids": [entity["id"]],
+        "time_from": T0.isoformat(),
+        "time_to": (T0 + timedelta(days=14)).isoformat(),
+        "feature_ids": [camp, far],
+        "comparison": {
+            "time_from": (T0 - timedelta(days=14)).isoformat(),
+            "time_to": T0.isoformat(),
+        },
+    }
+
+    # without a provider the run is complete and says why there is no layer
+    monkeypatch.setattr(environment, "PROVIDERS", [])
+    created = await client.post(base, json={"module": "grazing", "parameters": params}, headers=h)
+    run_id = uuid.UUID(created.json()["id"])
+    await run_analysis(db, await db.get(AnalysisRun, run_id))
+    document = (await client.get(f"{base}/{run_id}", headers=h)).json()["result"]
+    assert "vegetation" not in {t["key"] for t in document["tables"]}
+    assert any(w["code"] == "landscape_unavailable" for w in document["warnings"])
+
+    # Camp 1 greens down over the period, Camp 2 holds; the week the two periods share takes
+    # the value of its own week, not of the period that asked
+    provider = FakeNdviProvider(before=[0.55, 0.52], after=[0.30, 0.50], split=T0)
+    monkeypatch.setattr(environment, "PROVIDERS", [provider])
+    created = await client.post(base, json={"module": "grazing", "parameters": params}, headers=h)
+    run_id = uuid.UUID(created.json()["id"])
+    await run_analysis(db, await db.get(AnalysisRun, run_id))
+    document = (await client.get(f"{base}/{run_id}", headers=h)).json()["result"]
+    figures = document["summary"]["main"][camp]
+    # the main period holds three weeks, the first of them still at the old value
+    assert figures["ndvi_mean"] == pytest.approx((0.55 + 0.30 + 0.30) / 3, abs=0.001)
+    assert figures["ndvi_change"] == pytest.approx(figures["ndvi_mean"] - 0.55, abs=0.001)
+    assert figures["ndvi_level"] == "warn"  # more than a tenth of an index point down
+    assert figures["ndvi_valid_share"] == 1.0
+    assert document["summary"]["main"][far]["ndvi_level"] == "ok"
+    vegetation = next(t for t in document["tables"] if t["key"] == "vegetation")
+    assert vegetation["columns"] == [
+        "area",
+        "animal_days_per_ha",
+        "ndvi_mean",
+        "ndvi_change",
+        "ndvi_valid_share",
+        "ndvi_level",
+    ]
+    assert vegetation["rows"][0][0] == "Camp 1"  # the most used area first
+    weekly = next(c for c in document["charts"] if c["key"] == "ndvi_weekly")
+    assert {s["period"] for s in weekly["series"]} == {"main", "comparison"}
+    assert len(weekly["series"][0]["data"]) >= 2
+
+    # a rerun reads the cache: the provider is not asked again
+    asked = provider.calls
+    created = await client.post(base, json={"module": "grazing", "parameters": params}, headers=h)
+    rerun_id = uuid.UUID(created.json()["id"])
+    await run_analysis(db, await db.get(AnalysisRun, rerun_id))
+    again = (await client.get(f"{base}/{rerun_id}", headers=h)).json()["result"]
+    assert again["summary"]["main"][camp]["ndvi_mean"] == pytest.approx(figures["ndvi_mean"])
+    assert provider.calls == asked

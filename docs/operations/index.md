@@ -8,4 +8,5 @@
 - [Backup and recovery](backup-and-recovery.md): what is protected, the schedule, the restore test, point-in-time recovery.
 - [Restore guide](restore-guide.md): rebuilding a server from the copies.
 - [Observability](observability.md): System health, the Trace explorer, OpenTelemetry, logs and Traffic.
+- [Environmental data](environmental-data.md): the Copernicus Data Space account behind the grazing analysis's vegetation layer, what it costs and what happens without it.
 - [Benchmarks](benchmarks.md): the 2026-09-05 run of the benchmark scripts against the synthetic dataset, since removed from the dev server.

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { pressureColor } from "@/components/map/analysisLayers";
+import { cn } from "@/lib/utils";
 import { type ResultDocument, subjectSummary } from "@/lib/analyses";
 
 interface AreaInfo {
@@ -13,6 +14,12 @@ interface AreaInfo {
 /** One card per area with the figures that answer the question (plan, section 9.4): use per
  * hectare, the relative pressure with its rank, use and rest days, the last use; the herd's
  * share inside the areas above them. */
+/** The level the module gave the area's vegetation change, as a word (decision D246). */
+const ndviLevel = (main: Record<string, unknown>): string | null => {
+  const level = main.ndvi_level;
+  return typeof level === "string" ? level : null;
+};
+
 export function AreaCards({
   document,
   labels,
@@ -111,6 +118,31 @@ export function AreaCards({
                   <dd className="text-right tabular-nums">
                     {num(main.hours_since_last_use, 0)}
                   </dd>
+                  {main.ndvi_mean != null && (
+                    <>
+                      <dt className="text-muted-foreground">
+                        {labels.ndvi_mean}
+                      </dt>
+                      <dd className="text-right tabular-nums">
+                        {num(main.ndvi_mean, 2)}
+                        {main.ndvi_change != null && (
+                          <span
+                            className={cn(
+                              "ml-1",
+                              ndviLevel(main) === "critical"
+                                ? "text-red-600"
+                                : ndviLevel(main) === "warn"
+                                  ? "text-amber-600"
+                                  : "text-muted-foreground",
+                            )}
+                          >
+                            ({main.ndvi_change > 0 ? "+" : ""}
+                            {num(main.ndvi_change, 2)})
+                          </span>
+                        )}
+                      </dd>
+                    </>
+                  )}
                 </dl>
               ) : (
                 <p className="text-sm text-muted-foreground">

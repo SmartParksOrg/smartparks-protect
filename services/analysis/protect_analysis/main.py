@@ -5,7 +5,8 @@ the core waits for it: a stopped worker leaves runs queued and the rest of Prote
 import asyncio
 import uuid
 
-import shared.analysis.modules  # noqa: F401  (registers the modules)
+import shared.analysis.modules
+import shared.analysis.providers  # noqa: F401  (registers the environmental providers)
 from shared.analysis.runner import expire_analyses, run_analysis
 from shared.bus import Message, Topic
 from shared.config import get_settings

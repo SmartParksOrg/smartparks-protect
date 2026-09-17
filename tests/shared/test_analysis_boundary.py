@@ -45,8 +45,13 @@ def test_enabled_modules_follow_the_setting(monkeypatch):
     assert enabled_modules(Settings(**base, analysis_modules="")) == []
 
 
-def test_no_environmental_provider_in_phase_1():
-    from shared.analysis.environment import PROVIDERS, provider_for
+def test_a_provider_registers_only_when_its_settings_are_there():
+    """The boundary stays empty unless a server configured a provider (decision D245): a
+    module asks for a layer and gets nothing, and the analysis carries on without it."""
+    import shared.analysis.environment as env
+    import shared.analysis.providers as providers
 
-    assert PROVIDERS == []
-    assert provider_for("ndvi") is None
+    assert env.PROVIDERS == []  # no Copernicus settings in the test environment
+    assert env.provider_for("ndvi") is None
+    providers.register_providers()  # importing the package again registers nothing either
+    assert env.PROVIDERS == []

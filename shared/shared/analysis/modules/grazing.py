@@ -35,6 +35,7 @@ from shared.analysis.base import (
     Table,
     Warning,
 )
+from shared.analysis.environment import geometry_hash, provider_for, sample_weekly
 from shared.analysis.limits import MAX_AREAS_GRAZING, MAX_FIXES_PER_SUBJECT
 from shared.analysis.parameters import CommonParameters
 from shared.analysis.primitives.spatial import CellUse, LocalGrid, hotspots
@@ -47,8 +48,10 @@ from shared.analysis.primitives.trajectory import (
     time_weights,
 )
 from shared.analysis.quality import quality_report
+from shared.logger import get_logger
 from shared.models import Entity, EntityType, Project
 
+log = get_logger("analysis.grazing")
 METHOD_VERSION = "grazing/1"
 AREA_TYPES = ("zone", "geofence")
 MIN_AREA_HA = 1.0
@@ -100,6 +103,23 @@ class GrazingParameters(CommonParameters):
     cell_m: float = Field(default=100, ge=10, le=5000)
     rest_threshold_hours: float = Field(default=0, ge=0, le=24)
     max_speed_mps: float = Field(default=5, gt=0, le=100)
+    #: The vegetation index per area from the environmental provider (decision D246), when a
+    #: provider is configured on the server.
+    landscape: bool = True
+
+
+#: Named defaults for the vegetation change against the period before (NDVI units).
+NDVI_WARN_DROP = 0.10
+NDVI_CRITICAL_DROP = 0.20
+#: Under this share of weeks with a valid observation the period counts as cloudy.
+NDVI_CLOUDY_SHARE = 0.5
+VEGETATION_COLUMNS = [
+    "animal_days_per_ha",
+    "ndvi_mean",
+    "ndvi_change",
+    "ndvi_valid_share",
+    "ndvi_level",
+]
 
 
 @dataclass(slots=True)
@@ -606,6 +626,9 @@ class GrazingModule:
                     ),
                 )
             )
+        vegetation_rows, vegetation_chart = await landscape_figures(
+            ctx, params, areas, periods, summary, warnings
+        )
         await ctx.progress(95, "document")
         unit = {
             "equal": "animals",
@@ -633,6 +656,10 @@ class GrazingModule:
                     rows=comparison_rows,
                 )
             )
+        if vegetation_rows:
+            tables.append(
+                Table(key="vegetation", columns=["area", *VEGETATION_COLUMNS], rows=vegetation_rows)
+            )
         if overlaps:
             tables.append(
                 Table(
@@ -657,6 +684,10 @@ class GrazingModule:
                 series=pressure_series,
             ),
         ]
+        if vegetation_chart:
+            charts.append(
+                Chart(key="ndvi_weekly", kind="line", unit="NDVI", series=vegetation_chart)
+            )
         counts: dict[str, int] = {}
         for g in geometries:
             counts[g.kind] = counts.get(g.kind, 0) + 1
@@ -698,6 +729,124 @@ class GrazingModule:
             ),
         )
         return RunResult(document=document, geometries=geometries)
+
+
+async def landscape_figures(
+    ctx: RunContext,
+    params: GrazingParameters,
+    areas: list[Area],
+    periods: list[Period],
+    summary: dict[str, Any],
+    warnings: list[Warning],
+) -> tuple[list[list[Any]], list[dict[str, Any]]]:
+    """Level 3 of the grazing design (decision D246): the vegetation index per area and week
+    from the environmental provider, its mean over each period, the change of the main period
+    against the comparison, the share of weeks with a valid observation, and a level from the
+    named defaults. Without a provider the run says so once and goes on; a provider failure
+    is a warning, never a failed run."""
+    if not params.landscape:
+        return [], []
+    provider = provider_for("ndvi")
+    if provider is None:
+        warnings.append(
+            Warning(
+                code="landscape_unavailable",
+                level="notice",
+                text=(
+                    "No vegetation layer: the server has no environmental provider configured "
+                    "(COPERNICUS_CLIENT_ID and COPERNICUS_CLIENT_SECRET)."
+                ),
+            )
+        )
+        return [], []
+    geometries = [a.geojson for a in areas]
+    hashes = [geometry_hash(g) for g in geometries]
+    weekly: dict[str, dict[str, dict[datetime, float | None]]] = {}
+    for period in periods:
+        try:
+            weekly[period.key] = await sample_weekly(
+                ctx.session,
+                provider,
+                "ndvi",
+                geometries,
+                period.time_from,
+                period.time_to,
+                ctx.project_id,
+            )
+        except Exception as exc:
+            log.warning("landscape layer failed", error=str(exc), period=period.key)
+            warnings.append(
+                Warning(
+                    code="landscape_failed",
+                    text=(
+                        f"The vegetation layer could not be read ({exc}); the run is "
+                        "complete without it."
+                    ),
+                )
+            )
+            return [], []
+    chart: list[dict[str, Any]] = []
+    rows: list[list[Any]] = []
+    for area, h in zip(areas, hashes, strict=True):
+        means: dict[str, float | None] = {}
+        for period in periods:
+            series = weekly[period.key].get(h, {})
+            valid = [v for v in series.values() if v is not None]
+            mean = round(sum(valid) / len(valid), 3) if valid else None
+            share = round(len(valid) / len(series), 3) if series else 0.0
+            means[period.key] = mean
+            figures = summary.setdefault(period.key, {}).setdefault(str(area.id), {})
+            figures["ndvi_mean"] = mean
+            figures["ndvi_valid_share"] = share
+            chart.append(
+                {
+                    "name": area.name,
+                    "area": str(area.id),
+                    "period": period.key,
+                    "data": [
+                        [week.timestamp() * 1000, value] for week, value in sorted(series.items())
+                    ],
+                }
+            )
+            if period.key == "main" and share < NDVI_CLOUDY_SHARE:
+                warnings.append(
+                    Warning(
+                        code="landscape_cloudy",
+                        level="notice",
+                        subject_id=area.id,
+                        text=(
+                            f"{area.name}: only {round(share * 100)} percent of the weeks "
+                            "have a cloud-free observation."
+                        ),
+                    )
+                )
+        main = summary.get("main", {}).get(str(area.id), {})
+        change = None
+        if means.get("main") is not None and means.get("comparison") is not None:
+            change = round(means["main"] - means["comparison"], 3)  # type: ignore[operator]
+        level = None
+        if change is not None:
+            level = (
+                "critical"
+                if change <= -NDVI_CRITICAL_DROP
+                else "warn"
+                if change <= -NDVI_WARN_DROP
+                else "ok"
+            )
+        main["ndvi_change"] = change
+        main["ndvi_level"] = level
+        rows.append(
+            [
+                area.name,
+                main.get("animal_days_per_ha"),
+                means.get("main"),
+                change,
+                main.get("ndvi_valid_share"),
+                level,
+            ]
+        )
+    rows.sort(key=lambda r: -(r[1] or 0))
+    return rows, chart
 
 
 def _day_ms(day: date) -> float:

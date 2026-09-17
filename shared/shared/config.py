@@ -90,6 +90,13 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = Field(
         default=None, description="One bot per installation; chats link to targets with a code"
     )
+    copernicus_client_id: str | None = Field(
+        default=None,
+        description="Copernicus Data Space OAuth client for the openEO API (decision D245): "
+        "the vegetation index per management area in the grazing analysis; empty leaves the "
+        "analysis without the landscape layer",
+    )
+    copernicus_client_secret: str | None = Field(default=None)
     webhook_timeout_seconds: float = 10.0
 
     rules_reload_seconds: int = Field(
@@ -214,6 +221,10 @@ class Settings(BaseSettings):
     @property
     def telegram_configured(self) -> bool:
         return bool(self.telegram_bot_token)
+
+    @property
+    def landscape_configured(self) -> bool:
+        return bool(self.copernicus_client_id and self.copernicus_client_secret)
 
     @property
     def mail_configured(self) -> bool:
