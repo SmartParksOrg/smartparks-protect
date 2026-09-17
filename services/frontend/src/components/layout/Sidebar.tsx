@@ -30,10 +30,10 @@ function Item({
     return (
       <span
         className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground/60"
-        title={`Arrives in phase ${item.phase}`}
+        title={t("Arrives in phase {{phase}}", { phase: item.phase })}
       >
         <Icon className="size-4" />
-        <span className="flex-1">{item.label}</span>
+        <span className="flex-1">{t(item.label)}</span>
         <span className="text-[10px] uppercase tracking-wide">
           {t("phase")} {item.phase}
         </span>
@@ -57,7 +57,7 @@ function Item({
       }
     >
       <Icon className="size-4" />
-      {item.label}
+      {t(item.label)}
     </NavLink>
   );
 }
@@ -128,7 +128,7 @@ export function Sidebar({
             return (
               <div key={section.label}>
                 <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {section.label}
+                  {t(section.label)}
                 </div>
                 <div className="space-y-0.5">
                   {items.map((item) => (
@@ -147,7 +147,7 @@ export function Sidebar({
           serverSections.map((section) => (
             <div key={section.label}>
               <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {section.label}
+                {t(section.label)}
               </div>
               <div className="space-y-0.5">
                 {section.items.map((item) => (

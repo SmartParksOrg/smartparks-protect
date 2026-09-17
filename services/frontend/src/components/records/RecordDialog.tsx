@@ -70,7 +70,9 @@ export function RecordDialog({
         <dl className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-4 gap-y-1.5 text-sm">
           {lines.map(({ column, value }) => (
             <div key={column.key} className="contents">
-              <dt className="truncate text-muted-foreground">{column.label}</dt>
+              <dt className="truncate text-muted-foreground">
+                {t(column.label)}
+              </dt>
               <dd className="min-w-0 text-right font-mono text-xs tabular-nums">
                 {structured(value) ? (
                   <pre className="max-h-40 overflow-auto rounded bg-muted p-1.5 text-left whitespace-pre-wrap break-all">

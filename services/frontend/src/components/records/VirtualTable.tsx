@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 
@@ -39,6 +40,7 @@ export function VirtualTable({
   follow?: boolean;
   height?: number | string;
 }) {
+  const { t } = useTranslation();
   const parent = useRef<HTMLDivElement | null>(null);
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -75,9 +77,9 @@ export function VirtualTable({
               key={c.key}
               className="flex shrink-0 items-center truncate px-2"
               style={{ width: cellWidth(c) }}
-              title={c.unit ? `${c.label} (${c.unit})` : c.label}
+              title={c.unit ? `${t(c.label)} (${c.unit})` : t(c.label)}
             >
-              {c.label}
+              {t(c.label)}
               {c.unit ? (
                 <span className="ml-1 text-muted-foreground">{c.unit}</span>
               ) : null}

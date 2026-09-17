@@ -89,7 +89,7 @@ export function SelectionStrip({
         <SelectContent>
           {Object.entries(RANGE_PRESETS).map(([k, p]) => (
             <SelectItem key={k} value={k}>
-              {p.label}
+              {t(p.label)}
             </SelectItem>
           ))}
           <SelectItem value="custom">{t("Custom range")}</SelectItem>

@@ -467,7 +467,7 @@ export function ExplorerPage() {
         ? t("Custom range")
         : state.range === "assignment"
           ? t("Since the device was assigned")
-          : RANGE_PRESETS[state.range].label;
+          : t(RANGE_PRESETS[state.range].label);
     return `${who} · ${period} · ${state.timezone}`;
   }, [state, names, t]);
   const loaded = records.rows.length;
@@ -560,14 +560,14 @@ export function ExplorerPage() {
         );
   const chartOptions = chartableColumns(columns).map((c) => ({
     value: c.key.slice(2),
-    label: c.label,
+    label: t(c.label),
   }));
 
   const tools = (
     <>
       {state.mode === "table" && records.rows.length > 0 && (
         <MultiSelect
-          options={columns.map((c) => ({ value: c.key, label: c.label }))}
+          options={columns.map((c) => ({ value: c.key, label: t(c.label) }))}
           value={shown.map((c) => c.key)}
           onChange={(visible) =>
             setHiddenColumns(

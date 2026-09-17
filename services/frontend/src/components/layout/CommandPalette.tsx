@@ -177,7 +177,7 @@ export function CommandPalette() {
             (!item.module || modules.includes(item.module))
           )
             out.push({
-              label: item.label,
+              label: t(item.label),
               to: item.to.startsWith("/")
                 ? item.to
                 : `/projects/${projectId}/${item.to}`,
@@ -188,7 +188,7 @@ export function CommandPalette() {
         for (const item of section.items)
           if (item.to)
             out.push({
-              label: `${t("Server admin")}: ${item.label}`,
+              label: `${t("Server admin")}: ${t(item.label)}`,
               to: item.to,
               icon: item.icon,
             });

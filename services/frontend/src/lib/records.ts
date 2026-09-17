@@ -1,3 +1,4 @@
+import { t } from "i18next";
 import type { RecordRow } from "@/api/types";
 import {
   RANGE_PRESETS,
@@ -133,28 +134,28 @@ export interface RecordColumn {
 }
 
 const FIXED: RecordColumn[] = [
-  { key: "time", label: "Time", kind: "fixed", numeric: false },
-  { key: "entity", label: "Entity", kind: "fixed", numeric: false },
-  { key: "device", label: "Device", kind: "fixed", numeric: false },
-  { key: "lat", label: "Latitude", kind: "fixed", numeric: true },
-  { key: "lon", label: "Longitude", kind: "fixed", numeric: true },
+  { key: "time", label: t("Time"), kind: "fixed", numeric: false },
+  { key: "entity", label: t("Entity"), kind: "fixed", numeric: false },
+  { key: "device", label: t("Device"), kind: "fixed", numeric: false },
+  { key: "lat", label: t("Latitude"), kind: "fixed", numeric: true },
+  { key: "lon", label: t("Longitude"), kind: "fixed", numeric: true },
   {
     key: "accuracy_m",
-    label: "Accuracy",
+    label: t("Accuracy"),
     unit: "m",
     kind: "fixed",
     numeric: true,
   },
   {
     key: "speed_kmh",
-    label: "Speed",
+    label: t("Speed"),
     unit: "km/h",
     kind: "fixed",
     numeric: true,
   },
   {
     key: "altitude_m",
-    label: "Altitude",
+    label: t("Altitude"),
     unit: "m",
     kind: "fixed",
     numeric: true,

@@ -1,5 +1,6 @@
 /** Sidebar sections from architecture 28 (application navigation). Items without a route yet
  * render as disabled with the phase they arrive in. */
+import { t } from "i18next";
 import type { LucideIcon } from "lucide-react";
 
 import type { PermissionKey } from "@/lib/permissions";
@@ -74,35 +75,39 @@ export function sectionsFor(allProjects: boolean): NavSection[] {
 
 export const projectSections: NavSection[] = [
   {
-    label: "Monitor",
+    label: t("Monitor"),
     items: [
-      { label: "Live map", allScope: true, icon: MapIcon, to: "map" },
-      { label: "Entities", allScope: true, icon: PawPrint, to: "entities" },
-      { label: "Devices", allScope: true, icon: Cpu, to: "devices" },
-      { label: "Alerts", allScope: true, icon: Bell, to: "alerts" },
+      { label: t("Live map"), allScope: true, icon: MapIcon, to: "map" },
+      { label: t("Entities"), allScope: true, icon: PawPrint, to: "entities" },
+      { label: t("Devices"), allScope: true, icon: Cpu, to: "devices" },
+      { label: t("Alerts"), allScope: true, icon: Bell, to: "alerts" },
     ],
   },
   {
-    label: "Analyze",
+    label: t("Analyze"),
     items: [
-      { label: "Data explorer", icon: ChartLine, to: "analyze/explorer" },
-      { label: "Exports", icon: FileClock, to: "analyze/exports" },
-      { label: "Dashboards", icon: LayoutDashboard, to: "analyze/dashboards" },
-      { label: "Curation", icon: PenLine, to: "analyze/curation" },
+      { label: t("Data explorer"), icon: ChartLine, to: "analyze/explorer" },
+      { label: t("Exports"), icon: FileClock, to: "analyze/exports" },
       {
-        label: "Movement",
+        label: t("Dashboards"),
+        icon: LayoutDashboard,
+        to: "analyze/dashboards",
+      },
+      { label: t("Curation"), icon: PenLine, to: "analyze/curation" },
+      {
+        label: t("Movement"),
         icon: Footprints,
         to: "analyze/movement",
         module: "movement",
       },
       {
-        label: "Grazing",
+        label: t("Grazing"),
         icon: Wheat,
         to: "analyze/grazing",
         module: "grazing",
       },
       {
-        label: "Device performance",
+        label: t("Device performance"),
         icon: Gauge,
         to: "analyze/device-performance",
         module: "device_performance",
@@ -110,26 +115,36 @@ export const projectSections: NavSection[] = [
     ],
   },
   {
-    label: "Network",
+    label: t("Network"),
     permission: "project:write",
     items: [
-      { label: "Traffic", allScope: true, icon: Radio, to: "network/traffic" },
       {
-        label: "Gateways",
+        label: t("Traffic"),
+        allScope: true,
+        icon: Radio,
+        to: "network/traffic",
+      },
+      {
+        label: t("Gateways"),
         allScope: true,
         icon: Waypoints,
         to: "network/gateways",
       },
-      { label: "Trace explorer", icon: ListTree, to: "network/traces" },
+      { label: t("Trace explorer"), icon: ListTree, to: "network/traces" },
     ],
   },
   {
-    label: "Rules",
+    label: t("Rules"),
     items: [
-      { label: "Rules", icon: GitBranch, to: "rules" },
-      { label: "Events", allScope: true, icon: Activity, to: "rules/events" },
+      { label: t("Rules"), icon: GitBranch, to: "rules" },
       {
-        label: "Automations",
+        label: t("Events"),
+        allScope: true,
+        icon: Activity,
+        to: "rules/events",
+      },
+      {
+        label: t("Automations"),
         icon: Workflow,
         to: "rules/automations",
         permission: "automations:write",
@@ -137,10 +152,10 @@ export const projectSections: NavSection[] = [
     ],
   },
   {
-    label: "Integrate",
+    label: t("Integrate"),
     items: [
       {
-        label: "Integrations",
+        label: t("Integrations"),
         icon: Plug,
         to: "integrate/integrations",
         permission: "integrations:write",
@@ -148,40 +163,40 @@ export const projectSections: NavSection[] = [
     ],
   },
   {
-    label: "Control",
+    label: t("Control"),
     items: [
-      { label: "Commands", icon: SlidersHorizontal, to: "control/commands" },
+      { label: t("Commands"), icon: SlidersHorizontal, to: "control/commands" },
     ],
   },
   {
-    label: "Project admin",
+    label: t("Project admin"),
     items: [
       {
-        label: "Members",
+        label: t("Members"),
         icon: Users,
         to: "admin/members",
         permission: "members:write",
       },
       {
-        label: "Features",
+        label: t("Features"),
         icon: Layers,
         to: "admin/features",
         permission: "features:write",
       },
       {
-        label: "Groups",
+        label: t("Groups"),
         icon: FolderTree,
         to: "admin/groups",
         permission: "entities:write",
       },
       {
-        label: "Notifications",
+        label: t("Notifications"),
         icon: Send,
         to: "admin/notifications",
         permission: "project:write",
       },
       {
-        label: "Settings",
+        label: t("Settings"),
         icon: Settings2,
         to: "admin/settings",
         permission: "project:write",
@@ -192,100 +207,100 @@ export const projectSections: NavSection[] = [
 
 export const serverSections: NavSection[] = [
   {
-    label: "Server admin",
+    label: t("Server admin"),
     items: [
       {
-        label: "Needs attention",
+        label: t("Needs attention"),
         icon: TriangleAlert,
         to: "/admin/attention",
         serverAdminOnly: true,
       },
       {
-        label: "System health",
+        label: t("System health"),
         icon: Shield,
         to: "/admin/health",
         serverAdminOnly: true,
       },
       {
-        label: "Traffic",
+        label: t("Traffic"),
         icon: Radio,
         to: "/admin/traffic",
         serverAdminOnly: true,
       },
       {
-        label: "Backup and recovery",
+        label: t("Backup and recovery"),
         icon: DatabaseBackup,
         to: "/admin/backups",
         serverAdminOnly: true,
       },
       {
-        label: "System alerts",
+        label: t("System alerts"),
         icon: Bell,
         to: "/admin/alerts",
         serverAdminOnly: true,
       },
       {
-        label: "Automations",
+        label: t("Automations"),
         icon: Workflow,
         to: "/admin/automations",
         serverAdminOnly: true,
       },
       {
-        label: "Notifications",
+        label: t("Notifications"),
         icon: Send,
         to: "/admin/notifications",
         serverAdminOnly: true,
       },
       {
-        label: "Projects",
+        label: t("Projects"),
         icon: Boxes,
         to: "/admin/projects",
         serverAdminOnly: true,
       },
       {
-        label: "Users",
+        label: t("Users"),
         icon: Users,
         to: "/admin/users",
         serverAdminOnly: true,
       },
       {
-        label: "Devices",
+        label: t("Devices"),
         icon: Cpu,
         to: "/admin/devices",
         serverAdminOnly: true,
       },
       {
-        label: "Data sources",
+        label: t("Data sources"),
         icon: Database,
         to: "/admin/data-sources",
         serverAdminOnly: true,
       },
       {
-        label: "Device types",
+        label: t("Device types"),
         icon: Cpu,
         to: "/admin/device-types",
         serverAdminOnly: true,
       },
       {
-        label: "Entity types",
+        label: t("Entity types"),
         icon: PawPrint,
         to: "/admin/entity-types",
         serverAdminOnly: true,
       },
       {
-        label: "Metrics",
+        label: t("Metrics"),
         icon: Ruler,
         to: "/admin/metrics",
         serverAdminOnly: true,
       },
       {
-        label: "Audit log",
+        label: t("Audit log"),
         icon: ScrollText,
         to: "/admin/audit",
         serverAdminOnly: true,
       },
       {
-        label: "AI clients policy",
+        label: t("AI clients policy"),
         icon: Bot,
         to: "/admin/ai-policy",
         serverAdminOnly: true,
