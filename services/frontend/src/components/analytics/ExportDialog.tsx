@@ -177,15 +177,15 @@ function ExportForm({
           }
         : rangeFor(range);
     if (!window.from || !window.to) {
-      setError("Give a start and an end");
+      setError(t("Give a start and an end"));
       return null;
     }
     if (dataset === "aggregates" && metricKeys.length === 0) {
-      setError("Aggregates need at least one metric");
+      setError(t("Aggregates need at least one metric"));
       return null;
     }
     if (dataset === "records" && entityIds.length + deviceIds.length === 0) {
-      setError("Records need at least one entity or device");
+      setError(t("Records need at least one entity or device"));
       return null;
     }
     return {
@@ -400,7 +400,9 @@ function ExportForm({
             label={t("Metrics")}
             htmlFor="metrics"
             hint={
-              dataset === "aggregates" ? "Required" : "Empty means every metric"
+              dataset === "aggregates"
+                ? "Required"
+                : t("Empty means every metric")
             }
           >
             <MultiSelect
@@ -412,7 +414,9 @@ function ExportForm({
               value={metricKeys}
               onChange={setMetricKeys}
               placeholder={
-                dataset === "aggregates" ? "Choose metrics" : "All metrics"
+                dataset === "aggregates"
+                  ? t("Choose metrics")
+                  : t("All metrics")
               }
               label={t("metrics")}
               className="w-full"
@@ -432,7 +436,7 @@ function ExportForm({
                       {b === "auto"
                         ? "Automatic"
                         : b === "all"
-                          ? "Whole range"
+                          ? t("Whole range")
                           : b}
                     </SelectItem>
                   ))}
@@ -561,7 +565,7 @@ function ExportForm({
           disabled={downloading || queueInline.isPending}
         >
           <Download className="size-4" />{" "}
-          {downloading ? "Preparing…" : "Download now"}
+          {downloading ? "Preparing…" : t("Download now")}
         </Button>
         <Button
           onClick={() => {

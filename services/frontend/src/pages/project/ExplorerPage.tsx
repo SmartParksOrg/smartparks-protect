@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -97,7 +98,7 @@ const CHART_LABELS: Record<ChartType, string> = {
   scatter: "Scatter",
   bar: "Bar",
   histogram: "Histogram",
-  state: "State timeline",
+  state: t("State timeline"),
 };
 
 /**

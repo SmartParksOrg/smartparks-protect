@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
@@ -82,14 +83,16 @@ const schema = z.object({
   metric_key: z.string(),
   every_seconds: z.number().int().min(60).max(86400),
   entity_ids: z.array(z.string()),
-  conditions: z.array(conditionSchema).min(1, "Add at least one condition"),
+  conditions: z.array(conditionSchema).min(1, t("Add at least one condition")),
   for_seconds: z.number().int().min(0),
   cooldown_seconds: z.number().int().min(0),
   event_type: z
     .string()
     .regex(
       /^[A-Z][A-Z0-9_]{1,63}$/,
-      "Upper case letters, digits and underscores, for example GEOFENCE_EXIT",
+      t(
+        "Upper case letters, digits and underscores, for example GEOFENCE_EXIT",
+      ),
     ),
   severity: z.string(),
   title: z.string().min(1).max(300),
@@ -274,7 +277,7 @@ export function RuleEditor({
   const save = useMutationToast({
     mutationFn: async (values: Values) => {
       const document = buildDocument(values);
-      if (!document) throw new Error("Fix the JSON first");
+      if (!document) throw new Error(t("Fix the JSON first"));
       if (!rule)
         return api.post<Rule>(base, {
           body: {
@@ -293,15 +296,15 @@ export function RuleEditor({
     },
     invalidate,
     success: rule
-      ? "New rule version saved"
-      : "Rule created (disabled until you enable it)",
+      ? t("New rule version saved")
+      : t("Rule created (disabled until you enable it)"),
     onSuccess: () => onOpenChange(false),
     onError: (error) => form.setError("root", { message: error.message }),
   });
   const test = useMutationToast({
     mutationFn: async (values: Values) => {
       const document = buildDocument(values);
-      if (!document) throw new Error("Fix the JSON first");
+      if (!document) throw new Error(t("Fix the JSON first"));
       const body = {
         from: new Date(range.from).toISOString(),
         to: new Date(range.to).toISOString(),
@@ -321,12 +324,14 @@ export function RuleEditor({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
-            {rule ? `Edit rule: ${rule.name}` : "New rule"}
+            {rule ? `Edit rule: ${rule.name}` : t("New rule")}
           </DialogTitle>
           <DialogDescription>
             {rule
               ? `Version ${rule.current_version}. Saving creates a new version; events keep the version that created them.`
-              : "Start from a template or build the rule from scratch. New rules start disabled."}
+              : t(
+                  "Start from a template or build the rule from scratch. New rules start disabled.",
+                )}
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="definition">
@@ -414,9 +419,9 @@ export function RuleEditor({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {TRIGGER_KINDS.map((t) => (
-                            <SelectItem key={t.value} value={t.value}>
-                              {t.label}
+                          {TRIGGER_KINDS.map((kind) => (
+                            <SelectItem key={kind.value} value={kind.value}>
+                              {t(kind.label)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -538,7 +543,7 @@ export function RuleEditor({
                             <SelectContent>
                               {CONDITION_TYPES.map((c) => (
                                 <SelectItem key={c.value} value={c.value}>
-                                  {c.label}
+                                  {t(c.label)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1018,7 +1023,7 @@ export function RuleEditor({
                   }
                   disabled={test.isPending}
                 >
-                  {test.isPending ? "Running…" : "Run test"}
+                  {test.isPending ? "Running…" : t("Run test")}
                 </Button>
               </div>
               {replay && (
@@ -1086,7 +1091,7 @@ export function RuleEditor({
             {t("Cancel")}
           </Button>
           <Button type="submit" form="rule-form" disabled={save.isPending}>
-            {rule ? "Save new version" : "Create rule"}
+            {rule ? t("Save new version") : t("Create rule")}
           </Button>
         </DialogFooter>
       </DialogContent>

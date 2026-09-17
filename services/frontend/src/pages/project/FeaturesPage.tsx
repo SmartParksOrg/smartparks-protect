@@ -223,7 +223,9 @@ export function FeaturesPage() {
             className="space-y-4"
             onSubmit={form.handleSubmit((v) => {
               if (!geometry) {
-                form.setError("root", { message: "Draw the geometry first" });
+                form.setError("root", {
+                  message: t("Draw the geometry first"),
+                });
                 return;
               }
               create.mutate(v);

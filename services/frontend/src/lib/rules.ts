@@ -12,30 +12,30 @@ export const TRIGGER_KINDS = [
   {
     value: "position",
     label: "Position",
-    hint: "Every new position of a subject",
+    hint: t("Every new position of a subject"),
   },
   {
     value: "measurement",
     label: "Measurement",
-    hint: "Every new value of a metric",
+    hint: t("Every new value of a metric"),
   },
   {
     value: "state",
-    label: "Device state",
-    hint: "Numeric entries of a device state change",
+    label: t("Device state"),
+    hint: t("Numeric entries of a device state change"),
   },
   {
     value: "schedule",
     label: "Schedule",
-    hint: "Checked on a timer, for no-data and window rules",
+    hint: t("Checked on a timer, for no-data and window rules"),
   },
 ] as const;
 export const CONDITION_TYPES = [
   { value: "threshold", label: "Threshold" },
-  { value: "spatial", label: "Geofence or area" },
-  { value: "near", label: "Near a feature or entity" },
-  { value: "no_data", label: "No data" },
-  { value: "window", label: "Window aggregate" },
+  { value: "spatial", label: t("Geofence or area") },
+  { value: "near", label: t("Near a feature or entity") },
+  { value: "no_data", label: t("No data") },
+  { value: "window", label: t("Window aggregate") },
 ] as const;
 export const RELATIONS = ["enter", "exit", "inside", "outside"] as const;
 export const FEATURE_TYPES = ["geofence", "zone", "site", "route"] as const;
@@ -287,7 +287,8 @@ const EVENT_ICONS: Record<string, string> = {
 };
 
 export function eventIcon(eventType: string): string {
-  if (eventType.startsWith("GEOFENCE")) return EVENT_ICONS[eventType] ?? "event.geofence";
+  if (eventType.startsWith("GEOFENCE"))
+    return EVENT_ICONS[eventType] ?? "event.geofence";
   if (eventType.startsWith("SYSTEM_")) return "event.device_offline";
   return EVENT_ICONS[eventType] ?? "event.alert";
 }
@@ -298,3 +299,4 @@ export const hoursLabel = (seconds: number) =>
     : seconds % 60 === 0
       ? `${seconds / 60} min`
       : `${seconds} s`;
+import { t } from "@/lib/i18nMark";

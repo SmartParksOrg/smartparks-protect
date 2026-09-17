@@ -364,7 +364,7 @@ export function DataSourceForm({
         : api.post<DataSource>("/api/v1/data-sources", { body });
     },
     invalidate: [queryKeys.dataSources],
-    success: editing ? "Data source saved" : "Data source created",
+    success: editing ? t("Data source saved") : t("Data source created"),
     onSuccess: (source) => {
       onOpenChange(false);
       onSaved(source);

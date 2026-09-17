@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
@@ -58,7 +59,7 @@ import { formatAgo, formatTime } from "@/lib/format";
 
 const deviceSchema = z.object({
   name: z.string().min(1).max(200),
-  device_type_id: z.string().min(1, "Choose a type"),
+  device_type_id: z.string().min(1, t("Choose a type")),
   serial_number: z.string().optional(),
   status: z.enum(["active", "inventory", "repair", "retired"]),
   firmware_version: z.string().optional(),

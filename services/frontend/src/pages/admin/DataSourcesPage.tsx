@@ -105,7 +105,7 @@ export function DataSourcesPage() {
   const remove = useMutationToast({
     mutationFn: (s: DataSource) => api.delete(`/api/v1/data-sources/${s.id}`),
     invalidate: [queryKeys.dataSources],
-    success: "Data source deleted",
+    success: t("Data source deleted"),
     onSuccess: () => setRemoving(null),
   });
   const [rescanning, setRescanning] = useState<DataSource | null>(null);
@@ -431,7 +431,7 @@ export function DataSourcesPage() {
                   aria-label={t("Copy token")}
                   onClick={() => {
                     void navigator.clipboard.writeText(token.token);
-                    toast.success("Token copied");
+                    toast.success(t("Token copied"));
                   }}
                 >
                   <Copy className="size-4" />
@@ -445,7 +445,7 @@ export function DataSourcesPage() {
                   </code>{" "}
                   {t("with header")}{" "}
                   <code className="rounded bg-muted px-1 text-xs">
-                    {"Authorization: Bearer <token>"}
+                    {t("Authorization: Bearer <token>")}
                   </code>
                 </div>
               )}

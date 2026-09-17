@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
@@ -15,8 +16,8 @@ import { AuthShell } from "@/pages/auth/AuthShell";
 import { useAuthStore } from "@/stores/auth";
 
 const schema = z.object({
-  email: z.email("Enter a valid email address"),
-  password: z.string().min(1, "Enter your password"),
+  email: z.email(t("Enter a valid email address")),
+  password: z.string().min(1, t("Enter your password")),
 });
 type Values = z.infer<typeof schema>;
 
@@ -26,18 +27,35 @@ export function LoginPage() {
   const { status, login } = useAuthStore();
   const version = useQuery({
     queryKey: queryKeys.version,
-    queryFn: () => api.get<{ version: string; commit: string }>("/api/version", { anonymous: true }),
+    queryFn: () =>
+      api.get<{ version: string; commit: string }>("/api/version", {
+        anonymous: true,
+      }),
   });
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: { email: "", password: "" },
+  });
   const from = params.get("from");
 
-  if (status === "authenticated") return <Navigate to={from && from.startsWith("/") ? from : "/projects"} replace />;
+  if (status === "authenticated")
+    return (
+      <Navigate
+        to={from && from.startsWith("/") ? from : "/projects"}
+        replace
+      />
+    );
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
       await login(values.email, values.password);
     } catch (error) {
-      form.setError("root", { message: error instanceof ApiError && error.status === 400 ? "Wrong email or password" : (error as Error).message });
+      form.setError("root", {
+        message:
+          error instanceof ApiError && error.status === 400
+            ? t("Wrong email or password")
+            : (error as Error).message,
+      });
     }
   });
 
@@ -47,30 +65,59 @@ export function LoginPage() {
       description={t("Sign in to your project")}
       footer={
         <>
-          <Link to="/forgot-password" className="underline">{t("Forgot your password?")}</Link>
+          <Link to="/forgot-password" className="underline">
+            {t("Forgot your password?")}
+          </Link>
           <div className="mt-3 text-xs" data-testid="api-version">
-            {version.isPending && "Connecting to the API"}
+            {version.isPending && t("Connecting to the API")}
             {version.isError && "API not reachable"}
-            {version.isSuccess && `API ${version.data.version} (${version.data.commit})`}
+            {version.isSuccess &&
+              `API ${version.data.version} (${version.data.commit})`}
           </div>
         </>
       }
     >
-      {params.get("expired") && <Callout kind="warning">{t("Your session ended. Sign in again.")}</Callout>}
+      {params.get("expired") && (
+        <Callout kind="warning">
+          {t("Your session ended. Sign in again.")}
+        </Callout>
+      )}
       <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">{t("Email")}</Label>
-          <Input id="email" type="email" autoComplete="username" aria-invalid={!!form.formState.errors.email} {...form.register("email")} />
-          {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
+          <Input
+            id="email"
+            type="email"
+            autoComplete="username"
+            aria-invalid={!!form.formState.errors.email}
+            {...form.register("email")}
+          />
+          {form.formState.errors.email && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.email.message}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">{t("Password")}</Label>
-          <Input id="password" type="password" autoComplete="current-password" aria-invalid={!!form.formState.errors.password} {...form.register("password")} />
-          {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            aria-invalid={!!form.formState.errors.password}
+            {...form.register("password")}
+          />
+          {form.formState.errors.password && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.password.message}
+            </p>
+          )}
         </div>
-        {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
+        {form.formState.errors.root && (
+          <Callout kind="error">{form.formState.errors.root.message}</Callout>
+        )}
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? "Signing in…" : "Sign in"}
+          {form.formState.isSubmitting ? t("Signing in…") : t("Sign in")}
         </Button>
       </form>
     </AuthShell>

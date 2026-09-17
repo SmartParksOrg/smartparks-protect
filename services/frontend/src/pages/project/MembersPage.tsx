@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
@@ -46,7 +47,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatTime } from "@/lib/format";
-import { CUSTOM, roleBody, roleValue, scopeSummary } from "@/components/members/roles";
+import {
+  CUSTOM,
+  roleBody,
+  roleValue,
+  scopeSummary,
+} from "@/components/members/roles";
 import { ScopeDialog } from "@/components/members/scope";
 import {
   areaLabel,
@@ -63,7 +69,7 @@ import {
  * entities and devices), custom roles composed by area, and invitations that carry both.
  */
 const inviteSchema = z.object({
-  email: z.email("Enter a valid email address"),
+  email: z.email(t("Enter a valid email address")),
   role: z.string().min(1),
 });
 type InviteValues = z.infer<typeof inviteSchema>;
@@ -72,15 +78,24 @@ export function MembersPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") === "roles" ? "roles" : params.get("tab") === "invitations" ? "invitations" : "members";
+  const tab =
+    params.get("tab") === "roles"
+      ? "roles"
+      : params.get("tab") === "invitations"
+        ? "invitations"
+        : "members";
   const base = `/api/v1/projects/${projectId}`;
   const members = useQuery({
     queryKey: queryKeys.members(projectId),
-    queryFn: () => api.get<PageType<Member>>(`${base}/members`, { query: { limit: 500 } }),
+    queryFn: () =>
+      api.get<PageType<Member>>(`${base}/members`, { query: { limit: 500 } }),
   });
   const invitations = useQuery({
     queryKey: queryKeys.invitations(projectId),
-    queryFn: () => api.get<PageType<Invitation>>(`${base}/invitations`, { query: { limit: 500 } }),
+    queryFn: () =>
+      api.get<PageType<Invitation>>(`${base}/invitations`, {
+        query: { limit: 500 },
+      }),
   });
   const roles = useQuery({
     queryKey: queryKeys.roles(projectId),
@@ -93,7 +108,9 @@ export function MembersPage() {
   });
   const [removing, setRemoving] = useState<Member | null>(null);
   const [scoping, setScoping] = useState<Member | null>(null);
-  const [editingRole, setEditingRole] = useState<ProjectRole | "new" | null>(null);
+  const [editingRole, setEditingRole] = useState<ProjectRole | "new" | null>(
+    null,
+  );
   const [deletingRole, setDeletingRole] = useState<ProjectRole | null>(null);
   const [inviteScope, setInviteScope] = useState<MemberScope | null>(null);
   const [inviteScoping, setInviteScoping] = useState(false);
@@ -106,16 +123,24 @@ export function MembersPage() {
   const roleOptions = useMemo(
     () => [
       ...BUILTIN_ROLES.map((r) => ({ value: r, label: roleLabel(r) })),
-      ...(roles.data ?? []).map((r) => ({ value: `${CUSTOM}${r.id}`, label: r.name })),
+      ...(roles.data ?? []).map((r) => ({
+        value: `${CUSTOM}${r.id}`,
+        label: r.name,
+      })),
     ],
     [roles.data],
   );
-  const roleNameOf = (value: string) => roleOptions.find((o) => o.value === value)?.label ?? value;
+  const roleNameOf = (value: string) =>
+    roleOptions.find((o) => o.value === value)?.label ?? value;
 
   const invite = useMutationToast({
     mutationFn: (values: InviteValues) =>
       api.post<Invitation>(`${base}/invitations`, {
-        body: { email: values.email, ...roleBody(values.role), scope: inviteScope },
+        body: {
+          email: values.email,
+          ...roleBody(values.role),
+          scope: inviteScope,
+        },
       }),
     invalidate: [queryKeys.invitations(projectId)],
     onSuccess: (data) => {
@@ -124,13 +149,17 @@ export function MembersPage() {
       setLastLink(
         data.mail_sent
           ? null
-          : t("The invitation was not mailed ({{reason}}). Share this registration link with the person instead: {{link}}", {
-              reason: data.mail_reason ?? t("unknown reason"),
-              link: data.registration_link ?? "",
-            }),
+          : t(
+              "The invitation was not mailed ({{reason}}). Share this registration link with the person instead: {{link}}",
+              {
+                reason: data.mail_reason ?? t("unknown reason"),
+                link: data.registration_link ?? "",
+              },
+            ),
       );
     },
-    success: (data) => (data.mail_sent ? t("Invitation sent") : t("Invitation created")),
+    success: (data) =>
+      data.mail_sent ? t("Invitation sent") : t("Invitation created"),
     onError: (error) => form.setError("root", { message: error.message }),
   });
   const changeMember = useMutationToast({
@@ -152,7 +181,13 @@ export function MembersPage() {
     success: t("Invitation revoked"),
   });
   const saveRole = useMutationToast({
-    mutationFn: ({ id, body }: { id: string | null; body: Record<string, unknown> }) =>
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string | null;
+      body: Record<string, unknown>;
+    }) =>
       id
         ? api.patch<ProjectRole>(`${base}/roles/${id}`, { body })
         : api.post<ProjectRole>(`${base}/roles`, { body }),
@@ -176,14 +211,21 @@ export function MembersPage() {
       cell: ({ row }) => (
         <Select
           value={roleValue(row.original)}
-          onValueChange={(value) => changeMember.mutate({ id: row.original.id, body: roleBody(value) })}
+          onValueChange={(value) =>
+            changeMember.mutate({ id: row.original.id, body: roleBody(value) })
+          }
         >
-          <SelectTrigger className="h-8 w-44" aria-label={t("Role of {{email}}", { email: row.original.email })}>
+          <SelectTrigger
+            className="h-8 w-44"
+            aria-label={t("Role of {{email}}", { email: row.original.email })}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {roleOptions.map((o) => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -197,19 +239,34 @@ export function MembersPage() {
           type="button"
           className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-primary"
           title={t("Change what this member sees")}
-          onClick={(e) => { e.stopPropagation(); setScoping(row.original); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setScoping(row.original);
+          }}
         >
           {scopeSummary(row.original.scope, t)}
           <Pencil className="size-3.5 text-muted-foreground" />
         </button>
       ),
     },
-    { header: t("Since"), accessorKey: "created_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
+    {
+      header: t("Since"),
+      accessorKey: "created_at",
+      cell: ({ getValue }) => formatTime(getValue<string>()),
+    },
     {
       id: "actions",
       header: "",
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" aria-label={t("Remove member")} onClick={(e) => { e.stopPropagation(); setRemoving(row.original); }}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t("Remove member")}
+          onClick={(e) => {
+            e.stopPropagation();
+            setRemoving(row.original);
+          }}
+        >
           <Trash2 className="size-4" />
         </Button>
       ),
@@ -217,23 +274,69 @@ export function MembersPage() {
   ];
   const invitationColumns: ColumnDef<Invitation, unknown>[] = [
     { header: t("Email"), accessorKey: "email" },
-    { header: t("Role"), id: "role", cell: ({ row }) => roleNameOf(roleValue({ role: row.original.role ?? "", role_id: row.original.role_id })) },
-    { header: t("Sees"), id: "scope", cell: ({ row }) => scopeSummary(row.original.scope, t) },
-    { header: t("Expires"), accessorKey: "expires_at", cell: ({ getValue }) => formatTime(getValue<string>()) },
-    { header: t("Used"), accessorKey: "used_at", cell: ({ getValue }) => formatTime(getValue<string | null>()) || t("not yet") },
-    { id: "actions", header: "", cell: ({ row }) => (row.original.used_at ? null : <Button variant="ghost" size="sm" onClick={() => revoke.mutate(row.original.id)}>{t("Revoke")}</Button>) },
+    {
+      header: t("Role"),
+      id: "role",
+      cell: ({ row }) =>
+        roleNameOf(
+          roleValue({
+            role: row.original.role ?? "",
+            role_id: row.original.role_id,
+          }),
+        ),
+    },
+    {
+      header: t("Sees"),
+      id: "scope",
+      cell: ({ row }) => scopeSummary(row.original.scope, t),
+    },
+    {
+      header: t("Expires"),
+      accessorKey: "expires_at",
+      cell: ({ getValue }) => formatTime(getValue<string>()),
+    },
+    {
+      header: t("Used"),
+      accessorKey: "used_at",
+      cell: ({ getValue }) =>
+        formatTime(getValue<string | null>()) || t("not yet"),
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) =>
+        row.original.used_at ? null : (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => revoke.mutate(row.original.id)}
+          >
+            {t("Revoke")}
+          </Button>
+        ),
+    },
   ];
 
   return (
     <>
       <PageHeader
         title={t("Members")}
-        description={t("Who can open this project, what each may do (their role) and what each sees (their scope)")}
+        description={t(
+          "Who can open this project, what each may do (their role) and what each sees (their scope)",
+        )}
       />
       <Page>
         <Tabs
           value={tab}
-          onValueChange={(v) => setParams((p) => { p.set("tab", v); return p; }, { replace: true })}
+          onValueChange={(v) =>
+            setParams(
+              (p) => {
+                p.set("tab", v);
+                return p;
+              },
+              { replace: true },
+            )
+          }
         >
           <TabsList>
             <TabsTrigger value="members">{t("Members")}</TabsTrigger>
@@ -248,8 +351,13 @@ export function MembersPage() {
             defaultHiddenSmall={["full_name", "created_at"]}
             searchable
             isLoading={members.isPending}
-            emptyMessage={t("No members yet. Invite someone under Invitations.")}
-            footer={members.data && t("{{count}} members", { count: members.data.items.length })}
+            emptyMessage={t(
+              "No members yet. Invite someone under Invitations.",
+            )}
+            footer={
+              members.data &&
+              t("{{count}} members", { count: members.data.items.length })
+            }
           />
         )}
         {tab === "roles" && (
@@ -264,37 +372,83 @@ export function MembersPage() {
         {tab === "invitations" && (
           <>
             <Card>
-              <CardHeader><CardTitle>{t("Invite someone")}</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>{t("Invite someone")}</CardTitle>
+              </CardHeader>
               <CardContent>
-                <form className="flex flex-wrap items-end gap-3" onSubmit={form.handleSubmit((v) => invite.mutate(v))} noValidate>
-                  <Field label={t("Email")} htmlFor="invite-email" error={form.formState.errors.email?.message}>
-                    <Input id="invite-email" type="email" className="w-64" {...form.register("email")} />
+                <form
+                  className="flex flex-wrap items-end gap-3"
+                  onSubmit={form.handleSubmit((v) => invite.mutate(v))}
+                  noValidate
+                >
+                  <Field
+                    label={t("Email")}
+                    htmlFor="invite-email"
+                    error={form.formState.errors.email?.message}
+                  >
+                    <Input
+                      id="invite-email"
+                      type="email"
+                      className="w-64"
+                      {...form.register("email")}
+                    />
                   </Field>
                   <Field label={t("Role")} htmlFor="invite-role">
-                    <Select value={form.watch("role")} onValueChange={(v) => form.setValue("role", v)}>
-                      <SelectTrigger id="invite-role" className="w-44"><SelectValue /></SelectTrigger>
+                    <Select
+                      value={form.watch("role")}
+                      onValueChange={(v) => form.setValue("role", v)}
+                    >
+                      <SelectTrigger id="invite-role" className="w-44">
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         {roleOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </Field>
                   <Field label={t("Sees")} htmlFor="invite-scope">
-                    <Button id="invite-scope" type="button" variant="outline" onClick={() => setInviteScoping(true)}>
+                    <Button
+                      id="invite-scope"
+                      type="button"
+                      variant="outline"
+                      onClick={() => setInviteScoping(true)}
+                    >
                       {scopeSummary(inviteScope, t)}
                     </Button>
                   </Field>
-                  <Button type="submit" disabled={invite.isPending}>{t("Send invitation")}</Button>
+                  <Button type="submit" disabled={invite.isPending}>
+                    {t("Send invitation")}
+                  </Button>
                 </form>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {t("The role says what the person may do, the scope what they see; both can be changed later under Members.")}
+                  {t(
+                    "The role says what the person may do, the scope what they see; both can be changed later under Members.",
+                  )}
                 </p>
-                {form.formState.errors.root && <Callout kind="error" className="mt-3">{form.formState.errors.root.message}</Callout>}
-                {lastLink && <Callout kind="warning" className="mt-3">{lastLink}</Callout>}
+                {form.formState.errors.root && (
+                  <Callout kind="error" className="mt-3">
+                    {form.formState.errors.root.message}
+                  </Callout>
+                )}
+                {lastLink && (
+                  <Callout kind="warning" className="mt-3">
+                    {lastLink}
+                  </Callout>
+                )}
               </CardContent>
             </Card>
-            <DataTable columns={invitationColumns} data={invitations.data?.items} defaultHiddenSmall={["expires_at", "used_at"]} searchable isLoading={invitations.isPending} emptyMessage={t("No invitations.")} />
+            <DataTable
+              columns={invitationColumns}
+              data={invitations.data?.items}
+              defaultHiddenSmall={["expires_at", "used_at"]}
+              searchable
+              isLoading={invitations.isPending}
+              emptyMessage={t("No invitations.")}
+            />
           </>
         )}
       </Page>
@@ -302,7 +456,9 @@ export function MembersPage() {
         open={removing != null}
         onOpenChange={(o) => !o && setRemoving(null)}
         title={t("Remove member")}
-        description={t("{{email}} loses access to this project.", { email: removing?.email ?? "" })}
+        description={t("{{email}} loses access to this project.", {
+          email: removing?.email ?? "",
+        })}
         confirmLabel={t("Remove")}
         onConfirm={() => removing && remove.mutate(removing.id)}
         pending={remove.isPending}
@@ -311,7 +467,10 @@ export function MembersPage() {
         open={deletingRole != null}
         onOpenChange={(o) => !o && setDeletingRole(null)}
         title={t("Delete role")}
-        description={t("The role {{name}} is deleted; a role in use cannot be deleted.", { name: deletingRole?.name ?? "" })}
+        description={t(
+          "The role {{name}} is deleted; a role in use cannot be deleted.",
+          { name: deletingRole?.name ?? "" },
+        )}
         confirmLabel={t("Delete")}
         onConfirm={() => deletingRole && deleteRole.mutate(deletingRole.id)}
         pending={deleteRole.isPending}
@@ -319,13 +478,24 @@ export function MembersPage() {
       {(scoping || inviteScoping) && (
         <ScopeDialog
           projectId={projectId}
-          title={scoping ? t("What {{email}} sees", { email: scoping.email }) : t("What the invited person sees")}
+          title={
+            scoping
+              ? t("What {{email}} sees", { email: scoping.email })
+              : t("What the invited person sees")
+          }
           value={scoping ? (scoping.scope ?? null) : inviteScope}
           pending={changeMember.isPending}
-          onClose={() => { setScoping(null); setInviteScoping(false); }}
+          onClose={() => {
+            setScoping(null);
+            setInviteScoping(false);
+          }}
           onSave={(scope) => {
-            if (scoping) changeMember.mutate({ id: scoping.id, body: { scope } });
-            else { setInviteScope(scope); setInviteScoping(false); }
+            if (scoping)
+              changeMember.mutate({ id: scoping.id, body: { scope } });
+            else {
+              setInviteScope(scope);
+              setInviteScoping(false);
+            }
           }}
         />
       )}
@@ -335,7 +505,12 @@ export function MembersPage() {
           role={editingRole === "new" ? null : editingRole}
           pending={saveRole.isPending}
           onClose={() => setEditingRole(null)}
-          onSave={(body) => saveRole.mutate({ id: editingRole === "new" ? null : editingRole.id, body })}
+          onSave={(body) =>
+            saveRole.mutate({
+              id: editingRole === "new" ? null : editingRole.id,
+              body,
+            })
+          }
         />
       )}
     </>
@@ -361,9 +536,13 @@ function RolesTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {t("A role is a named set of permissions. The four built-in roles exist on every server; compose your own from the same permissions when none fits.")}
+          {t(
+            "A role is a named set of permissions. The four built-in roles exist on every server; compose your own from the same permissions when none fits.",
+          )}
         </p>
-        <Button size="sm" onClick={onNew}><Plus className="size-4" /> {t("New role")}</Button>
+        <Button size="sm" onClick={onNew}>
+          <Plus className="size-4" /> {t("New role")}
+        </Button>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         {(catalogue?.roles ?? []).map((role) => (
@@ -375,10 +554,14 @@ function RolesTab({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <p className="text-muted-foreground">{roleDescription(role.key)}</p>
+              <p className="text-muted-foreground">
+                {roleDescription(role.key)}
+              </p>
               <div className="flex flex-wrap gap-1">
                 {role.permissions.map((p) => (
-                  <Badge key={p} variant="secondary" className="font-normal">{permissionLabel(p)}</Badge>
+                  <Badge key={p} variant="secondary" className="font-normal">
+                    {permissionLabel(p)}
+                  </Badge>
                 ))}
               </div>
             </CardContent>
@@ -390,19 +573,47 @@ function RolesTab({
               <CardTitle className="flex items-center gap-2 text-base">
                 {role.name}
                 <span className="ml-auto flex gap-1">
-                  <Button variant="ghost" size="icon" aria-label={t("Edit role")} onClick={() => onEdit(role)}><Pencil className="size-4" /></Button>
-                  <Button variant="ghost" size="icon" aria-label={t("Delete role")} disabled={role.members > 0} title={role.members > 0 ? t("{{count}} members hold this role", { count: role.members }) : undefined} onClick={() => onDelete(role)}><Trash2 className="size-4" /></Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("Edit role")}
+                    onClick={() => onEdit(role)}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("Delete role")}
+                    disabled={role.members > 0}
+                    title={
+                      role.members > 0
+                        ? t("{{count}} members hold this role", {
+                            count: role.members,
+                          })
+                        : undefined
+                    }
+                    onClick={() => onDelete(role)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              {role.description && <p className="text-muted-foreground">{role.description}</p>}
+              {role.description && (
+                <p className="text-muted-foreground">{role.description}</p>
+              )}
               <div className="flex flex-wrap gap-1">
                 {role.permissions.map((p) => (
-                  <Badge key={p} variant="secondary" className="font-normal">{permissionLabel(p)}</Badge>
+                  <Badge key={p} variant="secondary" className="font-normal">
+                    {permissionLabel(p)}
+                  </Badge>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">{t("{{count}} members", { count: role.members })}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("{{count}} members", { count: role.members })}
+              </p>
             </CardContent>
           </Card>
         ))}
@@ -423,12 +634,18 @@ function RoleDialog({
   role: ProjectRole | null;
   pending: boolean;
   onClose: () => void;
-  onSave: (body: { name: string; description: string | null; permissions: string[] }) => void;
+  onSave: (body: {
+    name: string;
+    description: string | null;
+    permissions: string[];
+  }) => void;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(role?.name ?? "");
   const [description, setDescription] = useState(role?.description ?? "");
-  const [chosen, setChosen] = useState<Set<string>>(new Set(role?.permissions ?? ["project:read"]));
+  const [chosen, setChosen] = useState<Set<string>>(
+    new Set(role?.permissions ?? ["project:read"]),
+  );
   const toggle = (key: string) =>
     setChosen((s) => {
       const next = new Set(s);
@@ -442,19 +659,35 @@ function RoleDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{role ? t("Edit role") : t("New role")}</DialogTitle>
-          <DialogDescription>{t("Tick what a member with this role may do. Seeing the project is always in.")}</DialogDescription>
+          <DialogDescription>
+            {t(
+              "Tick what a member with this role may do. Seeing the project is always in.",
+            )}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <Field label={t("Name")} htmlFor="role-name">
-            <Input id="role-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            <Input
+              id="role-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
           </Field>
           <Field label={t("Description")} htmlFor="role-description">
-            <Textarea id="role-description" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+            <Textarea
+              id="role-description"
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             {catalogue.areas.map((area) => (
               <fieldset key={area.key} className="rounded-md border p-3">
-                <legend className="px-1 text-sm font-medium">{areaLabel(area.key)}</legend>
+                <legend className="px-1 text-sm font-medium">
+                  {areaLabel(area.key)}
+                </legend>
                 <div className="space-y-2">
                   {area.permissions.map((key) => (
                     <label key={key} className="flex items-start gap-2 text-sm">
@@ -467,7 +700,9 @@ function RoleDialog({
                       />
                       <span>
                         <span className="block">{permissionLabel(key)}</span>
-                        <span className="block text-xs text-muted-foreground">{permissionHint(key)}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {permissionHint(key)}
+                        </span>
                       </span>
                     </label>
                   ))}
@@ -477,11 +712,19 @@ function RoleDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>{t("Cancel")}</Button>
+          <Button type="button" variant="outline" onClick={onClose}>
+            {t("Cancel")}
+          </Button>
           <Button
             type="button"
             disabled={pending || name.trim().length === 0}
-            onClick={() => onSave({ name: name.trim(), description: description.trim() || null, permissions: [...chosen] })}
+            onClick={() =>
+              onSave({
+                name: name.trim(),
+                description: description.trim() || null,
+                permissions: [...chosen],
+              })
+            }
           >
             {t("Save")}
           </Button>
@@ -490,4 +733,3 @@ function RoleDialog({
     </Dialog>
   );
 }
-

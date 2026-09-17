@@ -1,9 +1,10 @@
 /** Export datasets and the preset an export dialog can be opened with. */
+import { t } from "@/lib/i18nMark";
 import type { Aggregate, RangePreset } from "@/lib/analytics";
 
 export const DATASETS = {
   records: {
-    label: "Records (one row per moment)",
+    label: t("Records (one row per moment)"),
     formats: ["csv", "xlsx", "json"],
   },
   positions: {
@@ -12,19 +13,19 @@ export const DATASETS = {
   },
   measurements: { label: "Measurements", formats: ["csv", "xlsx", "json"] },
   aggregates: {
-    label: "Aggregates (Data Explorer series)",
+    label: t("Aggregates (Data Explorer series)"),
     formats: ["csv", "xlsx", "json"],
   },
   source_events: {
-    label: "Source events (raw)",
+    label: t("Source events (raw)"),
     formats: ["csv", "xlsx", "json"],
   },
   movebank_events: {
-    label: "Movebank event data (positions)",
+    label: t("Movebank event data (positions)"),
     formats: ["csv", "xlsx", "json"],
   },
   movebank_reference: {
-    label: "Movebank reference data (animals, tags, deployments)",
+    label: t("Movebank reference data (animals, tags, deployments)"),
     formats: ["csv", "xlsx", "json"],
   },
 } as const;

@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -17,10 +18,13 @@ import { useAuthStore } from "@/stores/auth";
 const schema = z
   .object({
     full_name: z.string().max(200).optional(),
-    password: z.string().min(10, "At least 10 characters"),
+    password: z.string().min(10, t("At least 10 characters")),
     confirm: z.string(),
   })
-  .refine((v) => v.password === v.confirm, { message: "Passwords do not match", path: ["confirm"] });
+  .refine((v) => v.password === v.confirm, {
+    message: t("Passwords do not match"),
+    path: ["confirm"],
+  });
 type Values = z.infer<typeof schema>;
 
 /** Registration by invitation: the token in the link decides the email and the role. */
@@ -32,27 +36,62 @@ export function RegisterPage() {
   const login = useAuthStore((s) => s.login);
   const invitation = useQuery({
     queryKey: ["invitation", token],
-    queryFn: () => api.get<InvitationInfo>("/api/v1/auth/invitation", { query: { token }, anonymous: true }),
+    queryFn: () =>
+      api.get<InvitationInfo>("/api/v1/auth/invitation", {
+        query: { token },
+        anonymous: true,
+      }),
     enabled: token.length > 0,
     retry: false,
   });
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { full_name: "", password: "", confirm: "" } });
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: { full_name: "", password: "", confirm: "" },
+  });
   const register = useMutation({
     mutationFn: (values: Values) =>
-      api.post("/api/v1/auth/register", { body: { token, password: values.password, full_name: values.full_name || null }, anonymous: true }),
+      api.post("/api/v1/auth/register", {
+        body: {
+          token,
+          password: values.password,
+          full_name: values.full_name || null,
+        },
+        anonymous: true,
+      }),
     onSuccess: async (_, values) => {
       if (invitation.data) await login(invitation.data.email, values.password);
       void navigate("/projects", { replace: true });
     },
-    onError: (error) => form.setError("root", { message: (error as Error).message }),
+    onError: (error) =>
+      form.setError("root", { message: (error as Error).message }),
   });
 
-  if (!token) return <AuthShell title={t("Invitation needed")}><Callout kind="error">{t("This page needs an invitation link. Ask a project admin to invite you.")}</Callout></AuthShell>;
+  if (!token)
+    return (
+      <AuthShell title={t("Invitation needed")}>
+        <Callout kind="error">
+          {t(
+            "This page needs an invitation link. Ask a project admin to invite you.",
+          )}
+        </Callout>
+      </AuthShell>
+    );
   if (invitation.isError) {
     const error = invitation.error as ApiError;
     return (
-      <AuthShell title={t("Invitation not valid")} footer={<Link to="/login" className="underline">{t("Back to sign in")}</Link>}>
-        <Callout kind="error">{error.status === 410 ? "This invitation was used already or has expired." : "This invitation link is not valid."}</Callout>
+      <AuthShell
+        title={t("Invitation not valid")}
+        footer={
+          <Link to="/login" className="underline">
+            {t("Back to sign in")}
+          </Link>
+        }
+      >
+        <Callout kind="error">
+          {error.status === 410
+            ? t("This invitation was used already or has expired.")
+            : t("This invitation link is not valid.")}
+        </Callout>
       </AuthShell>
     );
   }
@@ -62,27 +101,59 @@ export function RegisterPage() {
       title={t("Create your account")}
       description={info ? registrationOffer(info) : undefined}
     >
-      <form className="flex flex-col gap-4" onSubmit={form.handleSubmit((v) => register.mutate(v))} noValidate>
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={form.handleSubmit((v) => register.mutate(v))}
+        noValidate
+      >
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">{t("Email")}</Label>
           <Input id="email" value={info?.email ?? ""} disabled readOnly />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="full_name">{t("Name")}</Label>
-          <Input id="full_name" autoComplete="name" {...form.register("full_name")} />
+          <Input
+            id="full_name"
+            autoComplete="name"
+            {...form.register("full_name")}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">{t("Password")}</Label>
-          <Input id="password" type="password" autoComplete="new-password" aria-invalid={!!form.formState.errors.password} {...form.register("password")} />
-          {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            aria-invalid={!!form.formState.errors.password}
+            {...form.register("password")}
+          />
+          {form.formState.errors.password && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.password.message}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="confirm">{t("Repeat password")}</Label>
-          <Input id="confirm" type="password" autoComplete="new-password" aria-invalid={!!form.formState.errors.confirm} {...form.register("confirm")} />
-          {form.formState.errors.confirm && <p className="text-sm text-destructive">{form.formState.errors.confirm.message}</p>}
+          <Input
+            id="confirm"
+            type="password"
+            autoComplete="new-password"
+            aria-invalid={!!form.formState.errors.confirm}
+            {...form.register("confirm")}
+          />
+          {form.formState.errors.confirm && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.confirm.message}
+            </p>
+          )}
         </div>
-        {form.formState.errors.root && <Callout kind="error">{form.formState.errors.root.message}</Callout>}
-        <Button type="submit" disabled={register.isPending || !info}>{register.isPending ? "Creating…" : "Create account"}</Button>
+        {form.formState.errors.root && (
+          <Callout kind="error">{form.formState.errors.root.message}</Callout>
+        )}
+        <Button type="submit" disabled={register.isPending || !info}>
+          {register.isPending ? "Creating…" : t("Create account")}
+        </Button>
       </form>
     </AuthShell>
   );
@@ -90,8 +161,20 @@ export function RegisterPage() {
 
 /** What the link offers: server admin, the projects, or both (decision D190). */
 function registrationOffer(info: InvitationInfo): string {
-  const names = info.project_names?.length ? info.project_names : info.project_name ? [info.project_name] : [];
-  const projects = names.length === 0 ? "" : names.length === 1 && info.role ? `${names[0]} as ${info.role.replace("project-", "")}` : names.join(", ");
-  if (info.server_admin) return projects ? `You are invited as server admin and to ${projects}` : "You are invited as server admin";
+  const names = info.project_names?.length
+    ? info.project_names
+    : info.project_name
+      ? [info.project_name]
+      : [];
+  const projects =
+    names.length === 0
+      ? ""
+      : names.length === 1 && info.role
+        ? `${names[0]} as ${info.role.replace("project-", "")}`
+        : names.join(", ");
+  if (info.server_admin)
+    return projects
+      ? `You are invited as server admin and to ${projects}`
+      : t("You are invited as server admin");
   return `You are invited to ${projects || "a project"}`;
 }

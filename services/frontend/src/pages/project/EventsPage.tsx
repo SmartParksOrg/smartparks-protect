@@ -382,7 +382,7 @@ export function EventsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   return (
     <>
       <PageHeader
-        title={scope === "server" ? "System events" : "Events"}
+        title={scope === "server" ? t("System events") : "Events"}
         description={t(
           "Facts produced by rules, devices and integrations. An alert is an event that needs a person.",
         )}

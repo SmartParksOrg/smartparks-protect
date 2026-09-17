@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -67,7 +68,7 @@ import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePages } from "@/hooks/usePages";
 
 const schema = z.object({
-  name: z.string().min(1, "Give the group a name").max(200),
+  name: z.string().min(1, t("Give the group a name")).max(200),
   parent_id: z.string(),
   sort_order: z.string().regex(/^-?\d{0,4}$/, "A whole number"),
   color: z.string(),

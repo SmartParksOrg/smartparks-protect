@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- Dutch reaches the strings the translation layer had missed (Tim, 2026-09-17: English descriptions on Alerts, Groups, Notifications, Automations): page descriptions and titles chosen by a condition, toasts, validation messages, button labels and the label tables of the rules editor, the exports, the backups, the AI policy and the dashboards, 130 strings in all. The shared form field translates validation messages; label tables carry the extraction marker and are translated where they render.
+
 - The server's own texts follow the chosen language (decision D240): event titles from the shipped rule templates, the drivers and the system checks, the descriptions, the explanations under events and error flags, and the warnings of an analysis run come in Dutch when the interface is Dutch. The server keeps storing English and translates on the way out by the request's `Accept-Language`, so events from before translate too, and a rule's own name or a person's words are never touched. Still English: notification mails and Telegram messages, and the PDF report (they need a language per recipient, next).
 
 - Dutch: the whole interface (2,124 strings) in Dutch, chosen from the language selector at the foot of the navigation and remembered per browser, or taken from the browser's language on the first visit. A string that a later change adds shows in English until translated; `npm run i18n:check` names it.

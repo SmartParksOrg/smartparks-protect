@@ -107,7 +107,7 @@ export function DataTable<T>({
   columns,
   data,
   isLoading,
-  emptyMessage = "Nothing here yet.",
+  emptyMessage,
   onRowClick,
   rowClassName,
   footer,
@@ -121,6 +121,7 @@ export function DataTable<T>({
   cardOf,
 }: Props<T>) {
   const { t } = useTranslation();
+  const empty = emptyMessage ?? t("Nothing here yet.");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [filters, setFilters] = useState<ColumnFiltersState>([]);
   const [search, setSearch] = useState("");
@@ -308,7 +309,7 @@ export function DataTable<T>({
             <li className="py-8 text-center text-sm text-muted-foreground">
               {search !== "" && total > 0
                 ? t("Nothing matches the search.")
-                : emptyMessage}
+                : empty}
             </li>
           )}
           {!isLoading &&
@@ -462,7 +463,7 @@ export function DataTable<T>({
                 >
                   {search !== "" && total > 0
                     ? t("Nothing matches the search.")
-                    : emptyMessage}
+                    : empty}
                 </TableCell>
               </TableRow>
             )}

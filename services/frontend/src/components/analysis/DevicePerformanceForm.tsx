@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Play } from "lucide-react";
@@ -38,10 +39,10 @@ import { inputValue } from "@/lib/records";
 
 const MAX_DEVICES = 100;
 const RANGES: [string, string][] = [
-  ["7d", "Last 7 days"],
-  ["30d", "Last 30 days"],
-  ["90d", "Last 90 days"],
-  ["1y", "Last year"],
+  ["7d", t("Last 7 days")],
+  ["30d", t("Last 30 days")],
+  ["90d", t("Last 90 days")],
+  ["1y", t("Last year")],
 ];
 
 /**

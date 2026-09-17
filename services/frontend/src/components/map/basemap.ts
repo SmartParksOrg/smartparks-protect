@@ -9,7 +9,7 @@ export interface Basemap {
 
 export const FREE_BASEMAPS = {
   auto: {
-    label: "Follows the theme",
+    label: t("Follows the theme"),
     style: "https://tiles.openfreemap.org/styles/positron",
   },
   liberty: {
@@ -55,7 +55,8 @@ export function basemapStyle(
   maps: Record<string, Basemap>,
   darkTheme = false,
 ): string {
-  if (key === "auto") return (darkTheme ? FREE_BASEMAPS.dark : FREE_BASEMAPS.positron).style;
+  if (key === "auto")
+    return (darkTheme ? FREE_BASEMAPS.dark : FREE_BASEMAPS.positron).style;
   return (maps[key] ?? FREE_BASEMAPS.positron).style;
 }
 
@@ -79,3 +80,4 @@ export function saveBasemap(key: BasemapKey): void {
     // ignore
   }
 }
+import { t } from "@/lib/i18nMark";

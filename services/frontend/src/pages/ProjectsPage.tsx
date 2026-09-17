@@ -13,7 +13,12 @@ export function ProjectsPage() {
   const { data, isPending } = useProjects();
   const last = useProjectStore((s) => s.lastProjectId);
   const user = useAuthStore((s) => s.user);
-  if (isPending) return <Page><div className="text-muted-foreground">{t("Loading projects…")}</div></Page>;
+  if (isPending)
+    return (
+      <Page>
+        <div className="text-muted-foreground">{t("Loading projects…")}</div>
+      </Page>
+    );
   const projects = data?.items ?? [];
   const target = projects.find((p) => p.id === last) ?? projects[0];
   if (target) return <Navigate to={`/projects/${target.id}/map`} replace />;
@@ -21,7 +26,13 @@ export function ProjectsPage() {
     <Page>
       <EmptyState
         title={t("No project yet")}
-        description={user?.is_superuser ? "Create the first project under Server admin, Projects." : "You are not a member of any project. Ask a project admin to invite you."}
+        description={
+          user?.is_superuser
+            ? t("Create the first project under Server admin, Projects.")
+            : t(
+                "You are not a member of any project. Ask a project admin to invite you.",
+              )
+        }
       />
     </Page>
   );

@@ -13,7 +13,13 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isAllProjects } from "@/lib/scope";
 import { useProjects } from "@/hooks/useProjects";
@@ -34,41 +40,202 @@ export function AlertsPage({ scope: scopeProp }: { scope?: Scope } = {}) {
   const selectedEvent = params.get("event");
   const [acting, setActing] = useState<Alert | null>(null);
   const query = { status, limit: 200 };
-  const alerts = useQuery({ queryKey: queryKeys.alerts(scope, query), queryFn: () => api.get<PageType<Alert>>(`${scopeBase(scope)}/alerts`, { query }), refetchInterval: 60_000 });
+  const alerts = useQuery({
+    queryKey: queryKeys.alerts(scope, query),
+    queryFn: () =>
+      api.get<PageType<Alert>>(`${scopeBase(scope)}/alerts`, { query }),
+    refetchInterval: 60_000,
+  });
   const client = useQueryClient();
-  useProjectStream(scope === "server" ? undefined : scope, (m) => { if (m.topic === "alert.created" || m.topic === "event.created") void client.invalidateQueries({ queryKey: ["alerts", scope] }); });
+  useProjectStream(scope === "server" ? undefined : scope, (m) => {
+    if (m.topic === "alert.created" || m.topic === "event.created")
+      void client.invalidateQueries({ queryKey: ["alerts", scope] });
+  });
   const projectPath = scope === "server" ? null : `/projects/${scope}`;
 
   const allProjects = isAllProjects(scope);
   const projectList = useProjects();
-  const projectName = (id: string | null | undefined) => projectList.data?.items.find((p) => p.id === id)?.name ?? "";
+  const projectName = (id: string | null | undefined) =>
+    projectList.data?.items.find((p) => p.id === id)?.name ?? "";
   const columns: ColumnDef<Alert, unknown>[] = [
-    ...(allProjects ? [{ id: "project", header: t("Project"), accessorFn: (a: Alert) => projectName(a.project_id) } as ColumnDef<Alert, unknown>] : []),
-    { header: t("Severity"), accessorKey: "severity", cell: ({ getValue }) => <StatusBadge value={getValue<string>()} /> },
-    { header: t("Alert"), accessorKey: "title", cell: ({ row }) => <span className="inline-flex items-center gap-2"><Icon iconKey={eventIcon(row.original.event_type)} className="size-4 text-primary" />{row.original.title}</span> },
-    { header: t("Time"), accessorKey: "time", cell: ({ row }) => <span title={formatTime(row.original.time)}>{formatAgo(row.original.time)}</span> },
-    { header: t("Entity"), accessorKey: "entity_id", cell: ({ getValue }) => { const id = getValue<string | null>(); return id && projectPath ? <Link className="underline" to={`${projectPath}/map?entity=${id}`} onClick={(e) => e.stopPropagation()}>{t("on map")}</Link> : ""; } },
-    { header: t("Status"), accessorKey: "status", cell: ({ row }) => <span className="inline-flex items-center gap-2"><StatusBadge value={row.original.status} />{row.original.status === "acknowledged" && <span className="text-xs text-muted-foreground">{formatAgo(row.original.acknowledged_at)}</span>}</span> },
-    { id: "actions", header: "", cell: ({ row }) => row.original.status !== "resolved" && <span onClick={(e) => e.stopPropagation()}><Button size="sm" variant="outline" onClick={() => setActing(row.original)}>{row.original.status === "open" ? "Acknowledge" : "Resolve"}</Button></span> },
+    ...(allProjects
+      ? [
+          {
+            id: "project",
+            header: t("Project"),
+            accessorFn: (a: Alert) => projectName(a.project_id),
+          } as ColumnDef<Alert, unknown>,
+        ]
+      : []),
+    {
+      header: t("Severity"),
+      accessorKey: "severity",
+      cell: ({ getValue }) => <StatusBadge value={getValue<string>()} />,
+    },
+    {
+      header: t("Alert"),
+      accessorKey: "title",
+      cell: ({ row }) => (
+        <span className="inline-flex items-center gap-2">
+          <Icon
+            iconKey={eventIcon(row.original.event_type)}
+            className="size-4 text-primary"
+          />
+          {row.original.title}
+        </span>
+      ),
+    },
+    {
+      header: t("Time"),
+      accessorKey: "time",
+      cell: ({ row }) => (
+        <span title={formatTime(row.original.time)}>
+          {formatAgo(row.original.time)}
+        </span>
+      ),
+    },
+    {
+      header: t("Entity"),
+      accessorKey: "entity_id",
+      cell: ({ getValue }) => {
+        const id = getValue<string | null>();
+        return id && projectPath ? (
+          <Link
+            className="underline"
+            to={`${projectPath}/map?entity=${id}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {t("on map")}
+          </Link>
+        ) : (
+          ""
+        );
+      },
+    },
+    {
+      header: t("Status"),
+      accessorKey: "status",
+      cell: ({ row }) => (
+        <span className="inline-flex items-center gap-2">
+          <StatusBadge value={row.original.status} />
+          {row.original.status === "acknowledged" && (
+            <span className="text-xs text-muted-foreground">
+              {formatAgo(row.original.acknowledged_at)}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) =>
+        row.original.status !== "resolved" && (
+          <span onClick={(e) => e.stopPropagation()}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setActing(row.original)}
+            >
+              {row.original.status === "open" ? "Acknowledge" : "Resolve"}
+            </Button>
+          </span>
+        ),
+    },
   ];
 
   return (
     <>
-      <PageHeader title={scope === "server" ? "System alerts" : "Alerts"} description={scope === "server" ? "Stale workers, dead letters and lag, opened by the system checks and resolved when they clear" : "Events that need a person: acknowledge to take ownership, resolve when done"} />
+      <PageHeader
+        title={scope === "server" ? t("System alerts") : "Alerts"}
+        description={
+          scope === "server"
+            ? t(
+                "Stale workers, dead letters and lag, opened by the system checks and resolved when they clear",
+              )
+            : t(
+                "Events that need a person: acknowledge to take ownership, resolve when done",
+              )
+        }
+      />
       <Page>
-        <Tabs value={status} onValueChange={(v) => setParams((p) => { p.set("status", v); return p; }, { replace: true })}>
-          <TabsList>{STATUSES.map((s) => <TabsTrigger key={s} value={s}>{s}</TabsTrigger>)}</TabsList>
+        <Tabs
+          value={status}
+          onValueChange={(v) =>
+            setParams(
+              (p) => {
+                p.set("status", v);
+                return p;
+              },
+              { replace: true },
+            )
+          }
+        >
+          <TabsList>
+            {STATUSES.map((s) => (
+              <TabsTrigger key={s} value={s}>
+                {s}
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </Tabs>
         {alerts.error && <Callout kind="error">{alerts.error.message}</Callout>}
-        <DataTable columns={columns} data={alerts.data?.items} searchable isLoading={alerts.isPending} emptyMessage={status === "open" ? "No open alerts." : `No ${status} alerts.`} onRowClick={(a) => setParams((p) => { p.set("event", a.event_id); return p; }, { replace: true })} footer={alerts.data && `${alerts.data.items.length} alerts`} />
+        <DataTable
+          columns={columns}
+          data={alerts.data?.items}
+          searchable
+          isLoading={alerts.isPending}
+          emptyMessage={
+            status === "open" ? t("No open alerts.") : `No ${status} alerts.`
+          }
+          onRowClick={(a) =>
+            setParams(
+              (p) => {
+                p.set("event", a.event_id);
+                return p;
+              },
+              { replace: true },
+            )
+          }
+          footer={alerts.data && `${alerts.data.items.length} alerts`}
+        />
       </Page>
-      <Dialog open={acting !== null} onOpenChange={(o) => !o && setActing(null)}>
+      <Dialog
+        open={acting !== null}
+        onOpenChange={(o) => !o && setActing(null)}
+      >
         <DialogContent>
-          <DialogHeader><DialogTitle>{acting?.title}</DialogTitle><DialogDescription>{t("{{type}} at {{time}}", { type: acting?.event_type, time: formatTime(acting?.time) })}</DialogDescription></DialogHeader>
-          {acting && <AlertActions scope={scope} alert={acting} onDone={() => setActing(null)} />}
+          <DialogHeader>
+            <DialogTitle>{acting?.title}</DialogTitle>
+            <DialogDescription>
+              {t("{{type}} at {{time}}", {
+                type: acting?.event_type,
+                time: formatTime(acting?.time),
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          {acting && (
+            <AlertActions
+              scope={scope}
+              alert={acting}
+              onDone={() => setActing(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
-      <EventDetailDialog scope={scope} eventId={selectedEvent} onClose={() => setParams((p) => { p.delete("event"); return p; }, { replace: true })} />
+      <EventDetailDialog
+        scope={scope}
+        eventId={selectedEvent}
+        onClose={() =>
+          setParams(
+            (p) => {
+              p.delete("event");
+              return p;
+            },
+            { replace: true },
+          )
+        }
+      />
     </>
   );
 }

@@ -28,7 +28,10 @@ export function RulesPage() {
   const { can } = usePermissions(projectId);
   const admin = can("rules:write");
   const base = `/api/v1/projects/${projectId}/rules`;
-  const rules = useQuery({ queryKey: queryKeys.rules(projectId), queryFn: () => api.get<PageType<Rule>>(base, { query: { limit: 500 } }) });
+  const rules = useQuery({
+    queryKey: queryKeys.rules(projectId),
+    queryFn: () => api.get<PageType<Rule>>(base, { query: { limit: 500 } }),
+  });
   // a link from the map (phase 19): `?new=<template>&feature=<id>` opens the editor on that
   // template with the feature selected; the editor stays open until closed
   const [params, setParams] = useSearchParams();
@@ -51,9 +54,10 @@ export function RulesPage() {
   };
   const [removing, setRemoving] = useState<Rule | null>(null);
   const toggle = useMutationToast({
-    mutationFn: ({ rule, enabled }: { rule: Rule; enabled: boolean }) => api.patch<Rule>(`${base}/${rule.id}`, { body: { enabled } }),
+    mutationFn: ({ rule, enabled }: { rule: Rule; enabled: boolean }) =>
+      api.patch<Rule>(`${base}/${rule.id}`, { body: { enabled } }),
     invalidate: [queryKeys.rules(projectId)],
-    success: (rule) => (rule.enabled ? "Rule enabled" : "Rule disabled"),
+    success: (rule) => (rule.enabled ? t("Rule enabled") : t("Rule disabled")),
   });
   const remove = useMutationToast({
     mutationFn: (rule: Rule) => api.delete<void>(`${base}/${rule.id}`),
@@ -63,24 +67,168 @@ export function RulesPage() {
   });
 
   const columns: ColumnDef<Rule, unknown>[] = [
-    { header: t("Enabled"), accessorKey: "enabled", cell: ({ row }) => <span onClick={(e) => e.stopPropagation()}><Switch checked={row.original.enabled} disabled={!admin || (row.original.reserved_types ?? []).length > 0} aria-label={`Enable ${row.original.name}`} onCheckedChange={(v) => toggle.mutate({ rule: row.original, enabled: v })} /></span> },
-    { header: t("Name"), accessorKey: "name", cell: ({ row }) => <div><div className="font-medium">{row.original.name}</div><div className="text-xs text-muted-foreground">{describeDocument(row.original.document as Record<string, unknown>)}</div></div> },
-    { header: t("Event"), accessorFn: (r) => String((r.document as { event?: { event_type?: string } }).event?.event_type ?? ""), cell: ({ row }) => { const ev = (row.original.document as { event?: { event_type?: string; severity?: string; create_alert?: boolean } }).event; return <span className="inline-flex items-center gap-2"><code className="text-xs">{ev?.event_type}</code><StatusBadge value={ev?.severity} />{ev?.create_alert && <span className="text-xs text-muted-foreground">{t("alert")}</span>}</span>; } },
+    {
+      header: t("Enabled"),
+      accessorKey: "enabled",
+      cell: ({ row }) => (
+        <span onClick={(e) => e.stopPropagation()}>
+          <Switch
+            checked={row.original.enabled}
+            disabled={!admin || (row.original.reserved_types ?? []).length > 0}
+            aria-label={`Enable ${row.original.name}`}
+            onCheckedChange={(v) =>
+              toggle.mutate({ rule: row.original, enabled: v })
+            }
+          />
+        </span>
+      ),
+    },
+    {
+      header: t("Name"),
+      accessorKey: "name",
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.original.name}</div>
+          <div className="text-xs text-muted-foreground">
+            {describeDocument(row.original.document as Record<string, unknown>)}
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: t("Event"),
+      accessorFn: (r) =>
+        String(
+          (r.document as { event?: { event_type?: string } }).event
+            ?.event_type ?? "",
+        ),
+      cell: ({ row }) => {
+        const ev = (
+          row.original.document as {
+            event?: {
+              event_type?: string;
+              severity?: string;
+              create_alert?: boolean;
+            };
+          }
+        ).event;
+        return (
+          <span className="inline-flex items-center gap-2">
+            <code className="text-xs">{ev?.event_type}</code>
+            <StatusBadge value={ev?.severity} />
+            {ev?.create_alert && (
+              <span className="text-xs text-muted-foreground">
+                {t("alert")}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
     { header: t("Version"), accessorKey: "current_version" },
-    { header: t("Last fired"), accessorKey: "last_fired_at", cell: ({ getValue }) => formatAgo(getValue<string | null>()) },
-    { header: t("State"), id: "state", cell: ({ row }) => ((row.original.reserved_types ?? []).length > 0 ? <span className="text-xs text-brand-sand">{t("uses {{types}} (later phase)", { types: (row.original.reserved_types ?? []).join(", ") })}</span> : row.original.last_error ? <span className="text-xs text-destructive" title={row.original.last_error}>{t("failed: {{error}}", { error: row.original.last_error.slice(0, 60) })}</span> : <StatusBadge value={row.original.enabled ? "active" : "inactive"} />) },
-    { id: "actions", header: "", cell: ({ row }) => admin && <span onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" aria-label={t("Delete rule")} onClick={() => setRemoving(row.original)}><Trash2 className="size-4" /></Button></span> },
+    {
+      header: t("Last fired"),
+      accessorKey: "last_fired_at",
+      cell: ({ getValue }) => formatAgo(getValue<string | null>()),
+    },
+    {
+      header: t("State"),
+      id: "state",
+      cell: ({ row }) =>
+        (row.original.reserved_types ?? []).length > 0 ? (
+          <span className="text-xs text-brand-sand">
+            {t("uses {{types}} (later phase)", {
+              types: (row.original.reserved_types ?? []).join(", "),
+            })}
+          </span>
+        ) : row.original.last_error ? (
+          <span
+            className="text-xs text-destructive"
+            title={row.original.last_error}
+          >
+            {t("failed: {{error}}", {
+              error: row.original.last_error.slice(0, 60),
+            })}
+          </span>
+        ) : (
+          <StatusBadge value={row.original.enabled ? "active" : "inactive"} />
+        ),
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) =>
+        admin && (
+          <span onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("Delete rule")}
+              onClick={() => setRemoving(row.original)}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </span>
+        ),
+    },
   ];
 
   return (
     <>
-      <PageHeader title={t("Rules")} description={t("Versioned rules turn positions, measurements and silence into events and alerts")} actions={admin && <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> {t("New rule")}</Button>} />
+      <PageHeader
+        title={t("Rules")}
+        description={t(
+          "Versioned rules turn positions, measurements and silence into events and alerts",
+        )}
+        actions={
+          admin && (
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> {t("New rule")}
+            </Button>
+          )
+        }
+      />
       <Page>
         {rules.error && <Callout kind="error">{rules.error.message}</Callout>}
-        <DataTable columns={columns} data={rules.data?.items} searchable isLoading={rules.isPending} emptyMessage={t("No rules yet. Start from a template: geofence exit, speed limit, no data, battery low.")} onRowClick={(r) => { setEditing(r); setOpen(true); }} />
+        <DataTable
+          columns={columns}
+          data={rules.data?.items}
+          searchable
+          isLoading={rules.isPending}
+          emptyMessage={t(
+            "No rules yet. Start from a template: geofence exit, speed limit, no data, battery low.",
+          )}
+          onRowClick={(r) => {
+            setEditing(r);
+            setOpen(true);
+          }}
+        />
       </Page>
-      <RuleEditor key={linkedTemplate ?? "editor"} projectId={projectId} rule={editing} open={open} onOpenChange={setOpen} initialTemplate={linkedTemplate} initialFeatureId={linkedFeature} />
-      <ConfirmDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={`Delete rule ${removing?.name ?? ""}?`} description={t("Events created by this rule keep their reference to it, but the rule and its versions are gone.")} confirmLabel={t("Delete")} pending={remove.isPending} onConfirm={() => removing && remove.mutate(removing)} />
+      <RuleEditor
+        key={linkedTemplate ?? "editor"}
+        projectId={projectId}
+        rule={editing}
+        open={open}
+        onOpenChange={setOpen}
+        initialTemplate={linkedTemplate}
+        initialFeatureId={linkedFeature}
+      />
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        title={`Delete rule ${removing?.name ?? ""}?`}
+        description={t(
+          "Events created by this rule keep their reference to it, but the rule and its versions are gone.",
+        )}
+        confirmLabel={t("Delete")}
+        pending={remove.isPending}
+        onConfirm={() => removing && remove.mutate(removing)}
+      />
     </>
   );
 }
