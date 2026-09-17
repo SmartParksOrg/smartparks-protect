@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- Dutch: the whole interface (2,124 strings) in Dutch, chosen from the language selector at the foot of the navigation and remembered per browser, or taken from the browser's language on the first visit. A string that a later change adds shows in English until translated; `npm run i18n:check` names it.
+
 - A gateway the network gave no location for (a Gateway Mesh relay, a gateway on a network without a gateway API) is placed by hand (decision D239): "Set location" in the gateway's dialog on the Gateways page and in its panel on the live map, for project admins, with typed coordinates, a click on the small map, or the browser's position while standing at the gateway; "Change location" corrects one, "Clear the set location" gives it back to the platform. A location set by a person is kept over the platform's. API: `PATCH /projects/{id}/gateways/{gateway_id}/location`.
 
 - ChirpStack Gateway Mesh relays (decision D237): Sync gateways reads the tenant's relay gateways (ChirpStack 4.9 and later) with the ordinary ones and keeps them in the registry marked `kind: relay`, with the relay id as external id, state, last seen and region; the Gateways page shows them beside the border gateways with a "Relay (mesh)" mark. A relay has no receptions of its own, since its uplinks reach the network through a border gateway and count there. An older ChirpStack without the call still syncs its gateways. The heartbeat's relay path stays in ChirpStack's MQTT topic and waits for a source whose broker is reachable (decision D238).
