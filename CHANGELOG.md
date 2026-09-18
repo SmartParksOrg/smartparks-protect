@@ -47,6 +47,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- The base map selector did nothing while the analysis result map was full screen. A browser showing an element full screen paints only that element and what is inside it, and the menu was rendered into the page body outside it, so it opened invisibly. Menus, lists and popovers now open inside the full-screen element. (Tim, 2026-09-18.)
+- The legends under a result map sat in the bottom right corner, over the zoom controls, and the accuracy and use-intensity legends were placed at the same spot as each other. Everything along the bottom of the map now shares one column: the panel of a clicked object keeps the left, the legends are centred under it, and nothing overlaps at any width. (Tim, 2026-09-18.)
 - The gateway dialog's map covered the "Open in ..." button under it: the map is not shorter than 14 rem and the dialog gave it 12, so it spilled over what followed. (Tim, 2026-09-18.)
 - The gateway panel on the live map put its buttons inside the label-and-value grid, which pushed the rows out of line, showed the raw `admin` or `reception` key where the location's source belongs and the status as bare text. The buttons sit in the panel's footer with the others now, the source is in words, the status is a badge, and the panel folds to one line on a phone as the entity and device panels do. (Tim, 2026-09-18.)
 - The reader's language is chosen by the quality values of `Accept-Language` rather than the order its parts happen to be in, so "en;q=0.5,nl" gives Dutch; a language refused with `q=0` is skipped.

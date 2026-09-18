@@ -85,6 +85,10 @@ const trackData = (results: { data?: Track }[]): (Track | undefined)[] =>
  * period and the result polygons by kind, each toggled by a chip; a click on a polygon
  * shows its label, its area and its share.
  */
+/** The look every legend under the map shares: one centred pill in the bottom column. */
+const LEGEND =
+  "pointer-events-none flex max-w-full flex-wrap items-center justify-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow";
+
 export function ResultMap({
   projectId,
   runId,
@@ -474,144 +478,154 @@ export function ResultMap({
           </button>
         ))}
       </div>
-      {byDevice && !hidden.includes("points") && (
-        <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
-          {ACCURACY_CLASSES.map(([bound, color], i) => (
-            <span key={color} className="inline-flex items-center gap-0.5">
+      {/* Everything that sits along the bottom shares one column, so no two overlap at any
+          width and the bottom right corner stays free for the zoom controls (Tim, 2026-09-18).
+          The legends are centred, the panel of a clicked object keeps the left. */}
+      <div className="pointer-events-none absolute inset-x-2 bottom-2 z-10 flex flex-col items-center gap-1">
+        {picked && (
+          <div className="pointer-events-auto max-w-full self-start rounded-md border bg-card/95 px-3 py-2 text-xs shadow sm:max-w-[80%]">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-medium">{String(picked.label ?? "")}</p>
+              <button
+                type="button"
+                className="text-muted-foreground"
+                onClick={() => setPicked(null)}
+                aria-label={t("Close")}
+              >
+                ×
+              </button>
+            </div>
+            <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-muted-foreground">
+              {area !== null && (
+                <>
+                  <dt>{t("Area")}</dt>
+                  <dd>{t("{{value}} ha", { value: area.toFixed(1) })}</dd>
+                </>
+              )}
+              {share !== null && (
+                <>
+                  <dt>
+                    {typeof picked.time_share === "number"
+                      ? t("Time share")
+                      : t("Fix share")}
+                  </dt>
+                  <dd>{Math.round(share * 100)}%</dd>
+                </>
+              )}
+              {uplinkShare && (
+                <>
+                  <dt>{t("Uplinks heard")}</dt>
+                  <dd>
+                    {uplinkShare.uplinks} ({Math.round(uplinkShare.share * 100)}
+                    %)
+                  </dd>
+                </>
+              )}
+              {typeof picked.fixes === "number" && (
+                <>
+                  <dt>{t("Fixes")}</dt>
+                  <dd>{picked.fixes}</dd>
+                </>
+              )}
+              {typeof picked.ndvi_mean === "number" && (
+                <>
+                  <dt>{t("Vegetation (NDVI)")}</dt>
+                  <dd>{picked.ndvi_mean.toFixed(3)}</dd>
+                </>
+              )}
+              {typeof picked.relative_pressure === "number" && (
+                <>
+                  <dt>{t("Relative pressure")}</dt>
+                  <dd>
+                    {picked.relative_pressure.toFixed(2)}
+                    {typeof picked.pressure_rank === "number" &&
+                      ` (#${picked.pressure_rank})`}
+                  </dd>
+                </>
+              )}
+              {typeof picked.animal_days_per_ha === "number" && (
+                <>
+                  <dt>{t("Use")}</dt>
+                  <dd>
+                    {t("{{value}} animal-days per ha", {
+                      value: picked.animal_days_per_ha.toFixed(3),
+                    })}
+                  </dd>
+                </>
+              )}
+              {typeof picked.rest_days === "number" && (
+                <>
+                  <dt>{t("Rest days")}</dt>
+                  <dd>{picked.rest_days}</dd>
+                </>
+              )}
+              {typeof picked.visits === "number" && (
+                <>
+                  <dt>{t("Visits")}</dt>
+                  <dd>{picked.visits}</dd>
+                </>
+              )}
+              {typeof picked.period === "string" && (
+                <>
+                  <dt>{t("Period")}</dt>
+                  <dd>{labels[picked.period] ?? picked.period}</dd>
+                </>
+              )}
+            </dl>
+          </div>
+        )}
+        {byDevice && !hidden.includes("points") && (
+          <div className={LEGEND}>
+            {ACCURACY_CLASSES.map(([bound, color], i) => (
+              <span key={color} className="inline-flex items-center gap-0.5">
+                <span
+                  className="inline-block size-2.5 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                {Number.isFinite(bound)
+                  ? t("<{{m}} m", { m: bound })
+                  : t(">{{m}} m", { m: ACCURACY_CLASSES[i - 1][0] })}
+              </span>
+            ))}
+          </div>
+        )}
+        {vegetation.length > 0 &&
+          !hidden.includes("vegetation") &&
+          ndviBreaks && (
+            // each colour holds a fifth of the cells, so the value it starts at is what the
+            // reader needs; a plain low-to-high scale hid the differences (Tim, 2026-09-18)
+            <div
+              className={`${LEGEND} items-end`}
+              title={t(
+                "Each colour holds a fifth of the cells; the number is the index it starts at",
+              )}
+            >
+              {VEGETATION_RAMP.map((c, i) => (
+                <span key={c} className="flex flex-col items-center gap-0.5">
+                  <span
+                    className="inline-block size-3"
+                    style={{ backgroundColor: c }}
+                  />
+                  <span>{ndviBreaks[i].toFixed(2)}</span>
+                </span>
+              ))}
+              <span className="pb-3.5">{t("NDVI")}</span>
+            </div>
+          )}
+        {intensity.length > 0 && !hidden.includes("intensity") && (
+          <div className={LEGEND}>
+            <span>{t("less use")}</span>
+            {INTENSITY_RAMP.map((c) => (
               <span
-                className="inline-block size-2.5 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              {Number.isFinite(bound)
-                ? t("<{{m}} m", { m: bound })
-                : t(">{{m}} m", { m: ACCURACY_CLASSES[i - 1][0] })}
-            </span>
-          ))}
-        </div>
-      )}
-      {vegetation.length > 0 && !hidden.includes("vegetation") && ndviBreaks && (
-        // each colour holds a fifth of the cells, so the value it starts at is what the reader
-        // needs; a plain low-to-high scale hid the differences (Tim, 2026-09-18)
-        <div
-          className="pointer-events-none absolute right-2 bottom-10 z-10 flex items-end gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow"
-          title={t("Each colour holds a fifth of the cells; the number is the index it starts at")}
-        >
-          {VEGETATION_RAMP.map((c, i) => (
-            <span key={c} className="flex flex-col items-center gap-0.5">
-              <span
+                key={c}
                 className="inline-block size-3"
                 style={{ backgroundColor: c }}
               />
-              <span>{ndviBreaks[i].toFixed(2)}</span>
-            </span>
-          ))}
-          <span className="pb-3.5">{t("NDVI")}</span>
-        </div>
-      )}
-      {intensity.length > 0 && !hidden.includes("intensity") && (
-        <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
-          <span>{t("less use")}</span>
-          {INTENSITY_RAMP.map((c) => (
-            <span
-              key={c}
-              className="inline-block size-3"
-              style={{ backgroundColor: c }}
-            />
-          ))}
-          <span>{t("more")}</span>
-        </div>
-      )}
-      {picked && (
-        <div className="absolute bottom-2 left-2 z-10 max-w-[80%] rounded-md border bg-card/95 px-3 py-2 text-xs shadow">
-          <div className="flex items-start justify-between gap-3">
-            <p className="font-medium">{String(picked.label ?? "")}</p>
-            <button
-              type="button"
-              className="text-muted-foreground"
-              onClick={() => setPicked(null)}
-              aria-label={t("Close")}
-            >
-              ×
-            </button>
+            ))}
+            <span>{t("more")}</span>
           </div>
-          <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-muted-foreground">
-            {area !== null && (
-              <>
-                <dt>{t("Area")}</dt>
-                <dd>{t("{{value}} ha", { value: area.toFixed(1) })}</dd>
-              </>
-            )}
-            {share !== null && (
-              <>
-                <dt>
-                  {typeof picked.time_share === "number"
-                    ? t("Time share")
-                    : t("Fix share")}
-                </dt>
-                <dd>{Math.round(share * 100)}%</dd>
-              </>
-            )}
-            {uplinkShare && (
-              <>
-                <dt>{t("Uplinks heard")}</dt>
-                <dd>
-                  {uplinkShare.uplinks} ({Math.round(uplinkShare.share * 100)}%)
-                </dd>
-              </>
-            )}
-            {typeof picked.fixes === "number" && (
-              <>
-                <dt>{t("Fixes")}</dt>
-                <dd>{picked.fixes}</dd>
-              </>
-            )}
-            {typeof picked.ndvi_mean === "number" && (
-              <>
-                <dt>{t("Vegetation (NDVI)")}</dt>
-                <dd>{picked.ndvi_mean.toFixed(3)}</dd>
-              </>
-            )}
-            {typeof picked.relative_pressure === "number" && (
-              <>
-                <dt>{t("Relative pressure")}</dt>
-                <dd>
-                  {picked.relative_pressure.toFixed(2)}
-                  {typeof picked.pressure_rank === "number" &&
-                    ` (#${picked.pressure_rank})`}
-                </dd>
-              </>
-            )}
-            {typeof picked.animal_days_per_ha === "number" && (
-              <>
-                <dt>{t("Use")}</dt>
-                <dd>
-                  {t("{{value}} animal-days per ha", {
-                    value: picked.animal_days_per_ha.toFixed(3),
-                  })}
-                </dd>
-              </>
-            )}
-            {typeof picked.rest_days === "number" && (
-              <>
-                <dt>{t("Rest days")}</dt>
-                <dd>{picked.rest_days}</dd>
-              </>
-            )}
-            {typeof picked.visits === "number" && (
-              <>
-                <dt>{t("Visits")}</dt>
-                <dd>{picked.visits}</dd>
-              </>
-            )}
-            {typeof picked.period === "string" && (
-              <>
-                <dt>{t("Period")}</dt>
-                <dd>{labels[picked.period] ?? picked.period}</dd>
-              </>
-            )}
-          </dl>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
