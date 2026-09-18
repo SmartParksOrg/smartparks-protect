@@ -251,7 +251,11 @@ def test_the_extent_fits_the_points_and_the_zoom_matches_the_pixels():
     assert extent.xmin < x0 and extent.xmax > x1 and extent.ymin < y0 and extent.ymax > y1
     assert math.isclose(extent.width_m, 1000 * metres_per_pixel(extent.zoom), rel_tol=1e-9)
     assert extent_for([], 100, 100) is None
-    assert pressure_color(None) == "#E7EDE8" and pressure_color(2.5) == "#B86B5C"
+    # read from the ramp, never pinned as hex: a palette change is a design decision, not a
+    # reason for this test to fail (it did on 2026-09-18)
+    assert pressure_color(None) == PRESSURE_RAMP[0]
+    assert pressure_color(2.5) == PRESSURE_RAMP[4], "twice the average is the top step"
+    assert pressure_color(1.0) == PRESSURE_RAMP[2], "the herd's average is the middle step"
 
 
 async def _no_tiles(_extent, _width):
@@ -317,7 +321,7 @@ async def test_the_map_draws_without_a_base_map_and_says_so():
         {str(A): "#52735E"},
     )
     assert [s.kind for s in shapes] == ["area", "mcp"]  # the larger first
-    assert shapes[0].color == "#52735E"  # relative pressure 1.4 is the fourth step
+    assert shapes[0].color == PRESSURE_RAMP[3]  # relative pressure 1.4 is the fourth step
     tracks = [
         TrackLine(
             lon=[31.5, 31.51, 31.52], lat=[-24.9, -24.89, -24.88], color="#52735E", label="Rhino 14"
