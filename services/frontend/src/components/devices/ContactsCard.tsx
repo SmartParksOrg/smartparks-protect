@@ -18,7 +18,14 @@ const HOURS = 168;
  * the important part: an empty list means "it met nobody" only if the device was looking, and
  * Bluetooth scanning is off until somebody turns it on.
  */
-export function ContactsCard({ deviceId }: { deviceId: string }) {
+export function ContactsCard({
+  deviceId,
+  canScan = true,
+}: {
+  deviceId: string;
+  /** A tag scans for nothing, so its card is only about what heard it. */
+  canScan?: boolean;
+}) {
   const { t } = useTranslation();
   const now = useNow();
   const contacts = useQuery({
@@ -38,21 +45,21 @@ export function ContactsCard({ deviceId }: { deviceId: string }) {
         {contacts.isPending && (
           <p className="text-muted-foreground">{t("Loading…")}</p>
         )}
-        {data && !data.scanning.known && (
+        {data && canScan && !data.scanning.known && (
           <Callout kind="info">
             {t(
               "Protect does not know whether this device scans for Bluetooth neighbours. Read its settings to find out; scanning is off until somebody turns it on.",
             )}
           </Callout>
         )}
-        {data && data.scanning.known && !data.scanning.enabled && (
+        {data && canScan && data.scanning.known && !data.scanning.enabled && (
           <Callout kind="warning">
             {t(
               "Bluetooth scanning is off on this device, so it reports no neighbours. An empty list here says nothing about what it met.",
             )}
           </Callout>
         )}
-        {data && data.scanning.enabled && (
+        {data && canScan && data.scanning.enabled && (
           <p className="text-muted-foreground">
             {data.scanning.filter_label
               ? t("Scanning for {{what}}, last scan {{ago}}.", {
@@ -64,13 +71,16 @@ export function ContactsCard({ deviceId }: { deviceId: string }) {
                 })}
           </p>
         )}
-        {data && data.counterparts.length === 0 && data.scanning.enabled && (
-          <p className="text-muted-foreground">
-            {t("No neighbour seen in the last {{days}} days.", {
-              days: Math.round(HOURS / 24),
-            })}
-          </p>
-        )}
+        {data &&
+          canScan &&
+          data.counterparts.length === 0 &&
+          data.scanning.enabled && (
+            <p className="text-muted-foreground">
+              {t("No neighbour seen in the last {{days}} days.", {
+                days: Math.round(HOURS / 24),
+              })}
+            </p>
+          )}
         {data && data.counterparts.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -131,6 +141,47 @@ export function ContactsCard({ deviceId }: { deviceId: string }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {data && (data.heard_by ?? []).length > 0 && (
+          <div className="space-y-1">
+            <p className="font-medium">{t("Heard by")}</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1">{t("Device")}</th>
+                    <th>{t("Contacts")}</th>
+                    <th>{t("Strongest")}</th>
+                    <th>{t("Last")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.heard_by ?? []).map((r) => (
+                    <tr key={r.device_id ?? r.address} className="border-t">
+                      <td className="py-1">
+                        {r.device_name}
+                        {r.entity_name && (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {r.entity_name}
+                          </span>
+                        )}
+                      </td>
+                      <td>{r.contacts}</td>
+                      <td>
+                        {r.best_rssi_dbm == null
+                          ? ""
+                          : t("{{value}} dBm", { value: r.best_rssi_dbm })}
+                      </td>
+                      <td title={formatTime(r.last_at)}>
+                        {formatAgo(r.last_at, now)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
         {data && (data.unknown > 0 || data.ambiguous > 0) && (

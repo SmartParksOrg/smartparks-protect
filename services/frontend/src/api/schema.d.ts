@@ -7090,6 +7090,11 @@ export interface components {
             /** Counterparts */
             counterparts: components["schemas"]["ContactCounterpart"][];
             /**
+             * Heard By
+             * @description The devices that heard this one. For a tag, which reports nothing of itself, this is everything there is to know about it
+             */
+            heard_by?: components["schemas"]["ContactCounterpart"][];
+            /**
              * Ambiguous
              * @description Sightings that could be more than one device
              * @default 0

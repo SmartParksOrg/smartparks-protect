@@ -624,6 +624,11 @@ class DeviceContacts(BaseModel):
     scanning: DeviceScanning
     last_scan_at: datetime | None = None
     counterparts: list[ContactCounterpart]
+    heard_by: list[ContactCounterpart] = Field(
+        default_factory=list,
+        description="The devices that heard this one. For a tag, which reports nothing of "
+        "itself, this is everything there is to know about it",
+    )
     ambiguous: int = Field(default=0, description="Sightings that could be more than one device")
     unknown: int = Field(default=0, description="Neighbours no device of the project matches")
 

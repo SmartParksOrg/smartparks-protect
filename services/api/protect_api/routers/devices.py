@@ -1206,6 +1206,40 @@ async def device_contacts(
         )
         for row in rows
     ]
+    # the other direction: who heard this device. A tag reports nothing of itself, so this is
+    # everything there is to know about it (decision D257)
+    heard_rows = (
+        await session.execute(
+            select(
+                DeviceContact.device_id,
+                func.count().label("contacts"),
+                func.sum(DeviceContact.sightings).label("sightings"),
+                func.max(DeviceContact.rssi_dbm).label("best_rssi"),
+                func.min(DeviceContact.time).label("first_at"),
+                func.max(DeviceContact.time).label("last_at"),
+            )
+            .where(DeviceContact.contact_device_id == device.id, DeviceContact.time >= since)
+            .group_by(DeviceContact.device_id)
+            .order_by(func.max(DeviceContact.time).desc())
+            .limit(limit)
+        )
+    ).all()
+    heard_names = await _device_names(session, {r.device_id for r in heard_rows})
+    heard_by = [
+        ContactCounterpart(
+            address=device.ble_mac or "",
+            resolution="resolved",
+            device_id=row.device_id,
+            device_name=heard_names.get(row.device_id, (None, None))[0],
+            entity_name=heard_names.get(row.device_id, (None, None))[1],
+            contacts=int(row.contacts),
+            sightings=int(row.sightings or 0),
+            best_rssi_dbm=row.best_rssi,
+            first_at=row.first_at,
+            last_at=row.last_at,
+        )
+        for row in heard_rows
+    ]
     state = await session.get(DeviceCurrentState, device.id)
     scan = (state.latest_state or {}).get("ble_scan") if state else None
     scanning = await scanning_of(session, device.id)
@@ -1221,20 +1255,16 @@ async def device_contacts(
         ),
         last_scan_at=state.latest_state_time if state and scan else None,
         counterparts=counterparts,
+        heard_by=heard_by,
         ambiguous=sum(c.contacts for c in counterparts if c.resolution == "ambiguous"),
         unknown=sum(c.contacts for c in counterparts if c.resolution == "unknown"),
     )
 
 
-async def _contact_names(
-    session: AsyncSession, rows: Sequence[Any]
+async def _device_names(
+    session: AsyncSession, ids: set[uuid.UUID]
 ) -> dict[uuid.UUID, tuple[str | None, str | None]]:
-    """The device name and what it tracks today, for every device a contact could mean: the
-    resolved ones and the candidates of the ambiguous ones, so a person can judge those too."""
-    ids: set[uuid.UUID] = {r.contact_device_id for r in rows if r.contact_device_id}
-    for row in rows:
-        for candidate in _candidate_ids(row.candidates):
-            ids.add(candidate)
+    """A device's name and what it tracks today."""
     if not ids:
         return {}
     found = (
@@ -1250,6 +1280,17 @@ async def _contact_names(
         )
     ).all()
     return {row[0]: (row[1], row[2]) for row in found}
+
+
+async def _contact_names(
+    session: AsyncSession, rows: Sequence[Any]
+) -> dict[uuid.UUID, tuple[str | None, str | None]]:
+    """The device name and what it tracks today, for every device a contact could mean: the
+    resolved ones and the candidates of the ambiguous ones, so a person can judge those too."""
+    ids: set[uuid.UUID] = {r.contact_device_id for r in rows if r.contact_device_id}
+    for row in rows:
+        ids.update(_candidate_ids(row.candidates))
+    return await _device_names(session, ids)
 
 
 def _candidate_ids(raw: Any) -> list[uuid.UUID]:

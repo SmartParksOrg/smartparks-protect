@@ -771,8 +771,12 @@ export function DevicePage() {
                 canWrite={can("devices:control")}
               />
               <LogFilesCard deviceId={d.id} canWrite={can("devices:control")} />
-              {type?.driver_key === "opencollar" && (
-                <ContactsCard deviceId={d.id} />
+              {(type?.driver_key === "opencollar" ||
+                type?.driver_key === "ble_tag") && (
+                <ContactsCard
+                  deviceId={d.id}
+                  canScan={type?.driver_key !== "ble_tag"}
+                />
               )}
               {projectId && (
                 <Card className="lg:col-span-2">

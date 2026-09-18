@@ -540,3 +540,104 @@ async def test_a_clock_within_tolerance_is_believed(client, db, bus):
     ).scalar_one()
     assert abs((row.time - recent).total_seconds()) < 2, "the device's own time stands"
     assert row.device_time is None and row.clock_offset_s is None
+
+
+async def test_a_tag_on_a_rabbit_is_a_device_heard_by_a_reader(client, db, bus):
+    """The PWN shape (decision D257): a stationary reader, a tag that reports nothing of itself,
+    and a rabbit. The tag needs no special case, because its address is a real one and the
+    resolver already matches a device by the address a scanner would see."""
+    from shared.models import Entity, EntityType
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    h = admin.headers
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+
+    tag_type = (
+        await client.post(
+            "/api/v1/device-types",
+            json={
+                "key": unique_name("tag").replace("-", "_"),
+                "label": "EdgeTag",
+                "driver_key": "ble_tag",
+            },
+            headers=h,
+        )
+    ).json()
+    tag = (
+        await client.post(
+            "/api/v1/devices",
+            json={"device_type_id": tag_type["id"], "name": "EdgeTag 15", "status": "active"},
+            headers=h,
+        )
+    ).json()
+    assigned = await client.post(
+        f"/api/v1/devices/{tag['id']}/project-assignments",
+        json={"project_id": str(project.id), "valid_from": "2026-01-01T00:00:00+00:00"},
+        headers=h,
+    )
+    assert assigned.status_code in (200, 201), assigned.text
+    # the address PWN programmed onto the tag: 00:00:0f, tag 15
+    saved = await client.put(
+        f"/api/v1/devices/{tag['id']}/ble-address",
+        json={"ble_mac": "00:00:00:00:00:0f"},
+        headers=h,
+    )
+    assert saved.status_code == 200, saved.text
+
+    entity_type = EntityType(
+        key=unique_name("et").replace("-", "_"),
+        label="Rabbit",
+        group_key="tracked",
+        icon_key="wildlife.generic",
+    )
+    db.add(entity_type)
+    await db.flush()
+    rabbit = Entity(name="Rabbit 15", entity_type_id=entity_type.id, project_id=project.id)
+    db.add(rabbit)
+    await db.commit()
+    tracked = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": tag["id"],
+            "entity_id": str(rabbit.id),
+            "valid_from": "2026-01-01T00:00:00+00:00",
+        },
+        headers=h,
+    )
+    assert tracked.status_code in (200, 201), tracked.text
+
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+
+    # the frame shape PWN actually sends: one neighbour, weak signal
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0F, 0x00, 0x00]), -87)]))
+
+    # the reader's side: it saw the tag, and the tag names the rabbit
+    seen = (await client.get(f"/api/v1/devices/{reader['id']}/contacts", headers=h)).json()[
+        "counterparts"
+    ][0]
+    assert seen["resolution"] == "resolved"
+    assert seen["device_name"] == "EdgeTag 15" and seen["entity_name"] == "Rabbit 15"
+
+    # the tag's side: it reports nothing of itself, so being heard is all there is
+    mine = (await client.get(f"/api/v1/devices/{tag['id']}/contacts", headers=h)).json()
+    assert mine["counterparts"] == [], "a tag scans for nothing"
+    assert len(mine["heard_by"]) == 1
+    assert mine["heard_by"][0]["device_name"] == reader["name"]
+    assert mine["heard_by"][0]["best_rssi_dbm"] == -87
+
+    # and being heard is the only sign the tag is alive
+    await db.rollback()
+    read = (await client.get(f"/api/v1/devices/{tag['id']}", headers=h)).json()
+    assert read["last_seen_at"] is not None, "a tag that nothing heard would look dead for ever"

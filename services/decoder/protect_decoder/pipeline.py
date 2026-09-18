@@ -657,6 +657,7 @@ async def _write_contacts(
     live = delivers_live(event.acquisition_channel)
     first = await attribution_at(records.contacts[0].time)
     resolver = await resolver_for(session, first.project_id)
+    heard: dict[uuid.UUID, datetime] = {}
     for record in records.contacts:
         address = normalise_address(record.address)
         # a device clock is believed unless the delivery says it cannot be right (decision
@@ -713,6 +714,18 @@ async def _write_contacts(
         outcome.created["contacts"] += 1
         outcome.earliest = min(outcome.earliest or when, when)
         outcome.latest = max(outcome.latest or when, when)
+        if found.device_id is not None:
+            heard.setdefault(found.device_id, when)
+            heard[found.device_id] = max(heard[found.device_id], when)
+    # a tag says nothing of itself, so being heard is the only sign it is alive and in range
+    # of anything; the same is true of a collar whose own uplinks have stopped (decision D257)
+    for seen_id, when in heard.items():
+        state = await session.get(DeviceCurrentState, seen_id)
+        if state is None:
+            state = DeviceCurrentState(device_id=seen_id, latest_state={})
+            session.add(state)
+        if state.last_seen_at is None or when > state.last_seen_at:
+            state.last_seen_at = when
 
 
 async def _write_measurements(

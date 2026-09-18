@@ -27151,6 +27151,14 @@
       "type": "array",
       "title": "Counterparts"
      },
+     "heard_by": {
+      "items": {
+       "$ref": "#/components/schemas/ContactCounterpart"
+      },
+      "type": "array",
+      "title": "Heard By",
+      "description": "The devices that heard this one. For a tag, which reports nothing of itself, this is everything there is to know about it"
+     },
      "ambiguous": {
       "type": "integer",
       "title": "Ambiguous",

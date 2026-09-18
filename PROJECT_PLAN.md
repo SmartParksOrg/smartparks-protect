@@ -1181,8 +1181,11 @@ the test.
       has been scanning for a while, so 2,088 real port 11 messages were already stored and
       undecoded. 400 of them decode with zero failures. What they showed changed the design, see
       C11 to C13. Port 7 (aggregated) is still unproven: every real message is port 11.
-- [ ] C11 a `ble_tag` device type and driver for the EdgeTags (D257), so a tag is a device with
-      an address and the rabbit an entity it is assigned to.
+- [x] C11 a `ble_tag` driver for the EdgeTags (D257), so a tag is a device with an address and
+      the animal an entity it is assigned to. The driver decodes nothing on purpose: a tag has
+      no uplink and says nothing of itself, so being heard is the only sign it is alive, which
+      moves its `last_seen_at`; the contacts read answers `heard_by` as well, which for a tag is
+      everything there is to know about it.
 - [ ] C12 a device's own place, set by hand as a gateway's is (D239), and a sighting by such a
       placed device writing a `proximity` position for the seen device (D258). A device without
       a place set writes contacts only, whatever its own fixes say.
