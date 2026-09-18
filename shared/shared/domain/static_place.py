@@ -277,6 +277,34 @@ def _key_for(reader: Device) -> str:
     return f"{PROXIMITY_RECORD_TYPE}:{reader.id}"
 
 
+def stamp_static_place(state: DeviceCurrentState | EntityCurrentState, device: Device) -> None:
+    """Put a device's place on a current state that was just rebuilt from the rows.
+
+    A rebuild reads the positions a device produced, and a placed device produces none, so the
+    rebuild would blank it — an attribution job on a scanner took the whole scanner network off
+    the map. The place is not a record and no rebuild can find it; it has to be stamped back on.
+    """
+    if device.static_geom is None:
+        return
+    _place(state, device.static_geom, device.static_position_at or utc_now())
+
+
+async def placed_device_of(session: AsyncSession, entity_id: uuid.UUID) -> Device | None:
+    """The device this entity is on right now, if that device has a place set by hand."""
+    from shared.models import DeviceEntityAssignment
+
+    device_id = await session.scalar(
+        select(DeviceEntityAssignment.device_id).where(
+            DeviceEntityAssignment.entity_id == entity_id,
+            DeviceEntityAssignment.validity.op("@>")(utc_now()),
+        )
+    )
+    if device_id is None:
+        return None
+    device = await session.get(Device, device_id)
+    return device if device is not None and device.static_geom is not None else None
+
+
 def _place(state: DeviceCurrentState | EntityCurrentState, geom: Any, when: datetime) -> None:
     state.latest_position = geom
     state.latest_position_time = when

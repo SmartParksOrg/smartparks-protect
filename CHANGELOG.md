@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- `scripts/place_devices_from_tags.py` reads the coordinates some networks keep in their own device tags and sets static places from them — deliberately a script somebody runs and reads, never a mechanism (Tim, 2026-09-18). A tag is somebody else's metadata: nobody promises it is current and nothing says who last edited it, so a place taken from one silently would be a position on the map with no accountable origin. A device that already has a place is left alone, because a measurement made in the field outranks a tag.
+
 - `scripts/reprocess_source_events.py` decodes stored messages again, for data that arrived before its decoder existed. A source event is decoded once and nothing revisits it, so the 2,112 Bluetooth scans the PWN readers had sent since 8 September 2026 sat decoded into nothing. Decoding is idempotent, so a second run only counts duplicates and a half-finished run is resumed by running it again. It takes `--port`, `--device` and `--since`, and refuses to reprocess everything.
 
 - A **Bluetooth scanner** entity type, under Equipment, with EarthRanger's radar icon (Tim, 2026-09-18). The catalogue had "Stationary radio" and "Sensor" and neither says what a reader on a post does: it listens for the tags on animals, or for the phones people carry, and its place is set by hand because it does not move. Migration 0044 adds it to servers that already hold the catalogue.
@@ -68,6 +70,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 - Device performance, after Tim's reading of a 32-device run (decisions D232 to D234): the battery trend counts only when it is proven (five days of daily medians, at least 1 mV a day, twice its standard error), otherwise the card says "steady" and days to critical stays empty; a proven fall further than a year away reads "over a year". A flat week no longer yields 243 trillion or 54 days. Missed fixes are split between the network and the device: the frame counter's lost share estimates the fixes that left the device, the rest is the device's own shortfall (the attempts it reported as failed always among it), and the level, the fleet column and the rank follow the device's share while the card shows the total and both parts. Under the map the health, reporting, GNSS and network tables, which repeated the cards, give way to one details table with a row per device (battery, days to critical or the trend's word, expected interval and source, fixes, the missed split, fix success, accuracy, lost uplinks, RSSI) beside the error flags and the reboots; the four stay in the CSV and JSON export and the result document (`details` is a new table).
 
 ### Fixed
+
+- A rebuild of the current state took a placed device off the map. The rebuild reads the positions a device produced and a device placed by hand produces none, so it blanked the row — and assigning such a device to an entity queues an attribution job, which meant a scanner vanished from the map a moment after it was put there. A place is not a record and no rebuild can find it, so it is stamped back on afterwards, for the device and for the entity it is on. (2026-09-18.)
 
 - An animal wearing only a Bluetooth tag said "Last seen: never" on the live map while a reader had heard it minutes before. Being heard moved the tag's last seen but not the animal's, and for an animal with no tracker of its own there is nothing else that ever could.
 

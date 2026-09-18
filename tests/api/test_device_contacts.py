@@ -1302,3 +1302,59 @@ async def test_being_heard_is_when_the_animal_was_last_seen(client, db, bus):
         )
     ).scalar_one()
     assert seen == SCAN_AT, "the moment a reader heard it, not never"
+
+
+async def test_an_attribution_job_does_not_blank_a_placed_device(client, db, bus):
+    """Decision D261 against architecture 28.8. A rebuild of the current state reads the
+    positions a device produced, and a placed device produces none, so the rebuild blanked it:
+    assigning a scanner to an entity queues an attribution job, and the job took the whole
+    scanner off the map a moment after it was put there. A place is not a record; no rebuild can
+    find it, so it is stamped back on."""
+    from shared.curation.apply import recompute_current_state
+    from shared.models import EntityCurrentState
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=admin.headers)).json()
+    scanner_type = next(t for t in catalogue["items"] if t["key"] == "scanner")
+
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    made = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": reader["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": scanner_type["id"], "name": unique_name("Scanner")},
+        },
+        headers=admin.headers,
+    )
+    assert made.status_code == 201, made.text
+    entity_id = uuid.UUID(made.json()["entity_id"])
+
+    # what the attribution job does after the assignment, in the same shape
+    await recompute_current_state(db, uuid.UUID(reader["id"]), {entity_id})
+    await db.commit()
+
+    rows = (
+        await db.execute(
+            select(EntityCurrentState.latest_position, EntityCurrentState.latest_position_kind)
+            .where(EntityCurrentState.entity_id == entity_id)
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    assert rows[0] is not None, "the rebuild must not take a placed scanner off the map"
+    assert rows[1] == "static"
+
+    device_rows = (
+        await db.execute(
+            select(DeviceCurrentState.latest_position, DeviceCurrentState.latest_position_kind)
+            .where(DeviceCurrentState.device_id == uuid.UUID(reader["id"]))
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    assert device_rows[0] is not None and device_rows[1] == "static"

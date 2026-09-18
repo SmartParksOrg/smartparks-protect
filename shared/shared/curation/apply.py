@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.connectivity.network_location import NETWORK_RECORD_TYPE
 from shared.curation.effective import effective_time, effective_value_num, visible
 from shared.domain.assignments import resolve_attribution
+from shared.domain.static_place import placed_device_of, stamp_static_place
 from shared.enums import (
     CorrectionStatus,
     CurationField,
@@ -348,6 +349,10 @@ async def recompute_current_state(
             if t is not None
         ]
         device_state.last_seen_at = max(seen) if seen else None
+        # a place set by hand is not a record, so no rebuild from the rows can find it
+        # (decision D261); without this an attribution job blanks every placed device
+        if device is not None:
+            stamp_static_place(device_state, device)
         device_state.updated_at = utc_now()
     # rows added earlier in this transaction (the decoder's) must be visible to `get`
     await session.flush()
@@ -385,6 +390,10 @@ async def recompute_current_state(
             if t is not None
         ]
         entity_state.last_seen_at = max(seen) if seen else None
+        placed = await placed_device_of(session, entity_id)
+        if placed is not None:
+            stamp_static_place(entity_state, placed)
+            entity_state.device_id = placed.id
         entity_state.updated_at = utc_now()
     await session.flush()
 
