@@ -1249,3 +1249,56 @@ async def test_an_address_arriving_later_gives_its_sightings_a_position_too(clie
     assert len(positions) == 1, "the sighting it earned when it stopped being a stranger"
     assert positions[0].record_type == "proximity"
     assert positions[0].attributes["heard_by"] == reader["id"]
+
+
+async def test_being_heard_is_when_the_animal_was_last_seen(client, db, bus):
+    """An animal wearing only a tag is never seen by anything but a reader, so a sighting is the
+    only thing that can move its "last seen". The panel said never of a rabbit heard minutes
+    before."""
+    from shared.models import EntityCurrentState
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=admin.headers)).json()
+    rabbit = next(t for t in catalogue["items"] if t["key"] == "rabbit")
+
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    tag = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    made = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": tag["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": rabbit["id"], "name": unique_name("Rabbit")},
+        },
+        headers=admin.headers,
+    )
+    assert made.status_code == 201, made.text
+    entity_id = uuid.UUID(made.json()["entity_id"])
+
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)]))
+
+    seen = (
+        await db.execute(
+            select(EntityCurrentState.last_seen_at).where(EntityCurrentState.entity_id == entity_id)
+        )
+    ).scalar_one()
+    assert seen == SCAN_AT, "the moment a reader heard it, not never"

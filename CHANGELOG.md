@@ -69,6 +69,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- An animal wearing only a Bluetooth tag said "Last seen: never" on the live map while a reader had heard it minutes before. Being heard moved the tag's last seen but not the animal's, and for an animal with no tracker of its own there is nothing else that ever could.
+
 - Setting a device's place, or recording a device's Bluetooth address, now repairs the positions that follow from it, not only the resolution. In the field a reader is put up, it scans for a week, and only then does somebody measure where it stands and type the tags' addresses; every sighting from before that afternoon said when but never where, and for a rabbit wearing only a tag that is the whole of what could ever have been known about it. Both repairs are safe to run again and write nothing twice. (217 of the PWN sightings were in that state, 2026-09-18.)
 
 - A device given a place by hand put itself on the map but not the entity it is on, and the entity is what the map's Entities layer draws. A scanner reports nothing, so no record would ever have placed it: its entity stayed blank for ever. The place now reaches both current states, in either order — set the place first and assign the entity afterwards, or the other way round. (Found while putting the PWN readers on the map, 2026-09-18.)

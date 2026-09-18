@@ -176,6 +176,11 @@ async def place_current_state(
                 entity_id=attribution.entity_id, project_id=attribution.project_id
             )
             session.add(entity_state)
+        # being heard is the only sign a tag is alive, so it is the only thing that can ever
+        # move the animal's "last seen"; without this the panel says never of an animal a
+        # reader heard twenty minutes ago
+        if entity_state.last_seen_at is None or when > entity_state.last_seen_at:
+            entity_state.last_seen_at = when
         entity = await session.get(Entity, attribution.entity_id)
         owners.append(
             (
