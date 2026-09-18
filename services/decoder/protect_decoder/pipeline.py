@@ -714,6 +714,10 @@ async def _write_contacts(
         return resolvers[project_id]
 
     heard: dict[uuid.UUID, datetime] = {}
+    # what the device it heard was carrying at that moment, attributed like every other record
+    # (decision D103). Cached per counterpart: one scan's sightings share a time, so a herd of
+    # twenty neighbours costs twenty lookups and not twenty per sighting.
+    worn_by: dict[uuid.UUID, uuid.UUID | None] = {}
     # per scan window, the addresses heard and the strongest signal of each: one window is one
     # presence, however many addresses it carried, since one person carries several
     presence: dict[datetime, dict[str, int | None]] = {}
@@ -744,6 +748,12 @@ async def _write_contacts(
         found = (await resolver_of(attribution.project_id)).resolve(address, device.id)
         if found.resolution == ContactResolution.AMBIGUOUS:
             outcome.ambiguous_contacts += 1
+        counterpart_entity: uuid.UUID | None = None
+        if found.device_id is not None:
+            if found.device_id not in worn_by:
+                seen_at = await resolve_attribution(session, found.device_id, when)
+                worn_by[found.device_id] = seen_at.entity_id
+            counterpart_entity = worn_by[found.device_id]
         session.add(
             DeviceContact(
                 time=when,
@@ -757,6 +767,7 @@ async def _write_contacts(
                 sightings=record.sightings,
                 scan_kind=record.scan_kind,
                 contact_device_id=found.device_id,
+                contact_entity_id=counterpart_entity,
                 resolution=found.resolution,
                 candidates=[str(c) for c in found.candidates] or None,
                 canonical_key=key,

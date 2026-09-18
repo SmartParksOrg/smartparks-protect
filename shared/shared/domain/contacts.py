@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -130,13 +131,33 @@ async def resolve_waiting(session: AsyncSession, device: Device) -> int:
         ).all()
         for row in rows:
             found = resolver.resolve(row.address, row.device_id)
-            if row.resolution == found.resolution and row.contact_device_id == found.device_id:
+            entity_id = await _worn_by(session, found.device_id, row.time)
+            unchanged = (
+                row.resolution == found.resolution
+                and row.contact_device_id == found.device_id
+                and row.contact_entity_id == entity_id
+            )
+            if unchanged:
                 continue
             row.resolution = found.resolution
             row.contact_device_id = found.device_id
+            # and what that device was carrying then, which is what a pair of animals is made of
+            row.contact_entity_id = entity_id
             row.candidates = [str(c) for c in found.candidates] or None
             changed += 1
     return changed
+
+
+async def _worn_by(
+    session: AsyncSession, device_id: uuid.UUID | None, when: datetime
+) -> uuid.UUID | None:
+    """The entity a device was on at a moment, or none. Attribution at the record's own time
+    (decision D103): a collar that changed animals last week met whoever wore it then."""
+    if device_id is None:
+        return None
+    from shared.domain.assignments import resolve_attribution
+
+    return (await resolve_attribution(session, device_id, when)).entity_id
 
 
 async def unresolved_count(session: AsyncSession, device_id: uuid.UUID) -> int:

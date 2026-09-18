@@ -1585,3 +1585,110 @@ async def test_one_scan_is_filed_at_one_time(client, db, bus):
     assert contact.device_time == claimed
     assert scan_state.state["device_time"] == claimed.isoformat()
     assert scan_state.state["clock_offset_s"] > 44 * 3600
+
+
+async def test_a_sighting_records_what_the_other_device_was_carrying(client, db, bus):
+    """A pair of animals is what a contact study is about, and a device is only ever a proxy for
+    one. The counterpart's entity is attributed at the sighting's own time (decision D103), so a
+    collar that changed animals last month met whoever wore it then, not whoever wears it now."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=admin.headers)).json()
+    rabbit = next(t for t in catalogue["items"] if t["key"] == "rabbit")
+
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    seen = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    made = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": seen["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": rabbit["id"], "name": unique_name("Rabbit")},
+        },
+        headers=admin.headers,
+    )
+    assert made.status_code == 201, made.text
+    entity_id = uuid.UUID(made.json()["entity_id"])
+
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)]))
+
+    row = (
+        await db.scalars(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+        )
+    ).one()
+    assert row.contact_device_id == uuid.UUID(seen["id"])
+    assert row.contact_entity_id == entity_id
+
+
+async def test_naming_a_device_later_fills_in_what_it_was_carrying(client, db, bus):
+    """The repair has to carry the entity too, or every sighting from before the address was
+    known names a device and no animal, and the pairs a study is built on are half empty."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=admin.headers)).json()
+    rabbit = next(t for t in catalogue["items"] if t["key"] == "rabbit")
+
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    tag = await _collar(client, db, project, admin, ble_mac=None)
+    made = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": tag["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": rabbit["id"], "name": unique_name("Rabbit")},
+        },
+        headers=admin.headers,
+    )
+    entity_id = uuid.UUID(made.json()["entity_id"])
+
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)]))
+
+    waiting = (
+        await db.scalars(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+        )
+    ).one()
+    assert waiting.contact_entity_id is None, "nobody knew whose address it was"
+
+    saved = await client.put(
+        f"/api/v1/devices/{tag['id']}/ble-address",
+        json={"ble_mac": "d4:22:11:0a:41:0c"},
+        headers=admin.headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+    repaired = (
+        await db.execute(
+            select(DeviceContact.contact_device_id, DeviceContact.contact_entity_id)
+            .where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    assert repaired[0] == uuid.UUID(tag["id"])
+    assert repaired[1] == entity_id
