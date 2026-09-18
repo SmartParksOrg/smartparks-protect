@@ -6,7 +6,7 @@
 
 Self-hosted operational data platform for [Smart Parks](https://www.smartparks.org) deployments. It connects field devices and IoT platforms to one Smart Parks domain and makes that data useful: a live map, analysis and export, a rules engine that turns observations into events and alerts, device control, and durable integrations with systems such as EarthRanger.
 
-**Status: v2.6.0 released on 2026-09-16**, with connectivity and network locations, the live map's controls and its feed, one top bar and night mode, roles and a member's scope, the analysis modules (movement, grazing, device performance) with PDF reports, GNSS outliers flagged at ingest, and device settings known per device; see `CHANGELOG.md`. The documentation site is at https://smartparksorg.github.io/smartparks-protect/.
+**Status: v2.6.0 released on 2026-09-16**, with connectivity and network locations, the live map's controls and its feed, one top bar and night mode, roles and a member's scope, the analysis modules (movement, grazing, device performance) with PDF reports, GNSS outliers flagged at ingest, and device settings known per device; see `CHANGELOG.md`. Since the tag, `main` has gained a Dutch interface, the AWT tracker driver, the vegetation of each management area in the grazing analysis from Sentinel-2, a battery type per device and a gateway named by hand; these ship in the next release. The documentation site is at https://smartparksorg.github.io/smartparks-protect/.
 
 ## Core concepts
 
