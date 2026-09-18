@@ -340,6 +340,9 @@ function HealthRows({
   activity,
   uptime,
   lastResetAt,
+  contacts,
+  lastContactAt,
+  contactsTo,
   now,
   onOpenPosition,
   onOpenState,
@@ -364,6 +367,11 @@ function HealthRows({
   /** The uptime in seconds and the last reboot, when the device reports an uptime. */
   uptime?: number | null;
   lastResetAt?: string | null;
+  /** Bluetooth sightings of the last 24 hours, when the device reports scans at all, and where
+   * the row leads (Tim, 2026-09-18: a count on the panel says whether it is hearing anything). */
+  contacts?: number | null;
+  lastContactAt?: string | null;
+  contactsTo?: string;
   now: number;
   /** Opens the fix of that moment, the panel a track point opens (Tim, 2026-09-13). */
   onOpenPosition?: () => void;
@@ -506,6 +514,32 @@ function HealthRows({
             until={lastSeenAt}
           />
         </div>
+      )}
+      {contacts != null && (
+        <PanelRow
+          label={t("Contacts")}
+          title={
+            lastContactAt
+              ? t("Newest sighting {{when}}", {
+                  when: formatTime(lastContactAt),
+                })
+              : undefined
+          }
+        >
+          {contactsTo ? (
+            <Link className="underline" to={contactsTo}>
+              {t("{{count}} in 24 h", { count: contacts })}
+            </Link>
+          ) : (
+            t("{{count}} in 24 h", { count: contacts })
+          )}
+          {lastContactAt && (
+            <span className="text-muted-foreground">
+              {" "}
+              · {formatAgo(lastContactAt, now)}
+            </span>
+          )}
+        </PanelRow>
       )}
       {lastStatusAt && (
         <PanelRow label={t("Last status")} title={formatTime(lastStatusAt)}>
@@ -697,6 +731,10 @@ export function EntityPanel({
 }) {
   const { t } = useTranslation();
   const project = projectFor(projectId, props.project_id);
+  // the sightings belong to the device, so the row leads to the device's Data tab
+  const contactsHref = props.device_id
+    ? `/projects/${project}/devices/${props.device_id}?tab=data`
+    : undefined;
   return (
     <MapPanel
       title={props.name}
@@ -770,6 +808,9 @@ export function EntityPanel({
         lastStatusAt={props.last_status_at}
         uptime={props.uptime}
         lastResetAt={props.last_reset_at}
+        contacts={props.contacts_24h}
+        lastContactAt={props.last_contact_at}
+        contactsTo={contactsHref}
         now={now}
       />
       <PanelRow label={t("Device")}>
@@ -862,6 +903,7 @@ export function DevicePanel({
     allProjects && !props.project_id
       ? `/admin/devices/${props.device_id}`
       : `/projects/${projectFor(projectId, props.project_id)}/devices/${props.device_id}`;
+  const contactsHref = `${devicePath}?tab=data`;
   return (
     <MapPanel
       title={props.name}
@@ -941,6 +983,9 @@ export function DevicePanel({
         lastStatusAt={props.last_status_at}
         uptime={props.uptime}
         lastResetAt={props.last_reset_at}
+        contacts={props.contacts_24h}
+        lastContactAt={props.last_contact_at}
+        contactsTo={contactsHref}
         now={now}
       />
       {allProjects && !props.project_id && (

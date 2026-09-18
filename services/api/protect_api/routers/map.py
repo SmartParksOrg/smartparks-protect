@@ -47,6 +47,7 @@ from shared.domain.battery import resolve as resolve_battery
 from shared.domain.health import DeviceHealth, device_health
 from shared.models import (
     Device,
+    DeviceContact,
     DeviceCurrentState,
     DeviceEntityAssignment,
     DeviceProjectAssignment,
@@ -226,6 +227,7 @@ async def current_state(
                 )
             ).all()
         }
+    contacts = await _contact_counts(session, device_ids)
     # when the device tracking the entity today was assigned to it: the start of the "since the
     # device was assigned" track length in the map's track settings
     assigned_since: dict[uuid.UUID, datetime] = {}
@@ -304,6 +306,14 @@ async def current_state(
                     "battery_voltage": device_state.battery_voltage if device_state else None,
                     "battery_percent": _battery_percent(battery, device_state),
                     "battery_type": battery.key if battery else None,
+                    "contacts_24h": contacts.get(state.device_id, (None, None))[0]
+                    if state.device_id
+                    else None,
+                    "last_contact_at": (
+                        contacts[state.device_id][1].isoformat()
+                        if state.device_id in contacts
+                        else None
+                    ),
                     "last_movement_at": device_state.last_movement_at.isoformat()
                     if device_state and device_state.last_movement_at
                     else None,
@@ -405,6 +415,7 @@ async def devices_state(
                 )
             ).all()
         }
+    contacts = await _contact_counts(session, {row[0].id for row in rows})
     features = []
     for row in rows:
         device, type_key, type_icon, driver_key, type_label = row[:5]
@@ -455,6 +466,10 @@ async def devices_state(
                     "battery_voltage": state.battery_voltage if state else None,
                     "battery_percent": _battery_percent(battery, state),
                     "battery_type": battery.key if battery else None,
+                    "contacts_24h": contacts.get(device.id, (None, None))[0],
+                    "last_contact_at": (
+                        contacts[device.id][1].isoformat() if device.id in contacts else None
+                    ),
                     "last_movement_at": state.last_movement_at.isoformat()
                     if state and state.last_movement_at
                     else None,
@@ -523,6 +538,36 @@ async def current_state_tile(
         sql, {"z": z, "x": x, "y": y, "project_id": context.project_id, "limit": MAX_FEATURES}
     )
     return Response(content=bytes(tile or b""), media_type="application/vnd.mapbox-vector-tile")
+
+
+#: How far back the live map counts a device's Bluetooth sightings. A day matches the event
+#: count the map already shows, and answers the question the panel is really asking: is this
+#: device hearing anything at all just now.
+CONTACT_WINDOW_HOURS = 24
+
+
+async def _contact_counts(
+    session: AsyncSession, device_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, datetime]]:
+    """Sightings per device over the window, with the newest, for the panels (Tim, 2026-09-18).
+
+    One grouped query for every device in the answer, as the gateway statistics are read, so a
+    map of two thousand entities costs one more query and not two thousand."""
+    if not device_ids:
+        return {}
+    since = utc_now() - timedelta(hours=CONTACT_WINDOW_HOURS)
+    rows = (
+        await session.execute(
+            select(
+                DeviceContact.device_id,
+                func.count().label("contacts"),
+                func.max(DeviceContact.time).label("last_at"),
+            )
+            .where(DeviceContact.device_id.in_(device_ids), DeviceContact.time >= since)
+            .group_by(DeviceContact.device_id)
+        )
+    ).all()
+    return {row.device_id: (int(row.contacts), row.last_at) for row in rows}
 
 
 def _battery_percent(

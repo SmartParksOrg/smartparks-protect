@@ -1193,6 +1193,9 @@ the test.
       An estimate never displaces a newer device fix; a device that has never fixed at all takes
       it whatever its location setting says, since that setting is there to choose between a fix
       and an estimate and there is no fix to choose.
+- [x] C15 the live map's device and entity panels carry the Bluetooth sightings of the last
+      24 hours, when the device reports scans at all, as a link to its Data tab (Tim,
+      2026-09-18). One grouped query per map answer, as the gateway statistics are read.
 - [ ] C14 human presence (D260): a sighting under the phone filter counts as presence and never
       as an identity, with a `human_presence` event the rules engine can act on.
 - [x] C13 the clock rule for a device time implausibly far from its delivery (D259), which one

@@ -778,3 +778,49 @@ async def test_a_reader_without_a_place_only_records_the_contact(client, db, bus
         .all()
     )
     assert rows == [], "no place for the reader means no place for what it heard"
+
+
+async def test_the_live_map_carries_the_contact_count(client, db, bus):
+    """Tim, 2026-09-18: a count on the map panel says whether a device is hearing anything just
+    now. It is absent for a device that reports no scans, so the panel keeps quiet about one
+    that never listens."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    h = admin.headers
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    quiet = await _collar(client, db, project, admin, ble_mac=None)
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+    await _scan(
+        db,
+        bus,
+        source,
+        identity,
+        scan_frame([(bytes([0x0B, 0x00, 0x00]), -89), (bytes([0x0F, 0x00, 0x00]), -80)]),
+    )
+    # the reader needs a place, or it is not on the device layer at all
+    await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=h,
+    )
+
+    body = (
+        await client.get(f"/api/v1/projects/{project.id}/map/devices?limit=100", headers=h)
+    ).json()
+    by_name = {f["properties"]["name"]: f["properties"] for f in body["features"]}
+    assert by_name[reader["name"]]["contacts_24h"] == 2
+    assert by_name[reader["name"]]["last_contact_at"] is not None
+    assert by_name[quiet["name"]]["contacts_24h"] is None, (
+        "a device that never listens says nothing"
+    )
