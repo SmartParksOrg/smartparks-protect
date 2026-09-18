@@ -857,6 +857,12 @@ async def _update_current_state(
         firmware = latest_state.state.get("firmware_version")
         if firmware is not None and str(firmware) != (device.firmware_version or ""):
             device.firmware_version = str(firmware)
+    # The address is read from any state that carries it, not only the newest: it arrives in its
+    # own message (an answer to a command) which is rarely the newest thing in a delivery.
+    for state in timely_states:
+        mac = state.state.get("ble_mac") if isinstance(state.state, dict) else None
+        if mac and str(mac) != (device.ble_mac or ""):
+            device.ble_mac = str(mac).lower()
     # The newest value per metric, for the health card and the lists (decision D104).
     kept = dict(current.latest_measurements or {})
     for key, measurement in latest_measurements.items():

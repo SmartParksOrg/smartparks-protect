@@ -27,6 +27,7 @@ def test_driver_declares_actions():
         "REQUEST_POSITION",
         "SET_GNSS_INTERVAL",
         "REQUEST_SETTING",
+        "REQUEST_BLE_ADDRESS",
         "REQUEST_SETTINGS",
         "SET_SETTING",
         "RESET",

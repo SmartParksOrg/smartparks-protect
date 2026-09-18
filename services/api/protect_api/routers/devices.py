@@ -30,6 +30,7 @@ from protect_api.schemas.domain import (
     BatteryType,
     DeviceBattery,
     DeviceBatteryUpdate,
+    DeviceBleAddressUpdate,
     DeviceCreate,
     DeviceDataSpan,
     DeviceRead,
@@ -1145,6 +1146,38 @@ async def set_device_reporting(
     )
     await session.commit()
     return await device_reporting(device_id, user, session)
+
+
+@router.put("/{device_id}/ble-address", response_model=DeviceRead)
+async def set_device_ble_address(
+    device_id: uuid.UUID,
+    body: DeviceBleAddressUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceRead:
+    """The device's own Bluetooth address, set by a person (decision D252) when the device has
+    not reported it: `Request the Bluetooth address` asks the device itself, which is the way to
+    prefer, since an address typed from a label can be wrong and a wrong one quietly makes every
+    contact of that device unresolvable. Null clears it. Project admins of the device's current
+    project, or a server admin."""
+    device = await get_or_404(session, Device, device_id, "Device")
+    attribution = await resolve_attribution(session, device.id, utc_now())
+    if not user.is_superuser:
+        if attribution.project_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
+        await _require_project_admin(session, user, attribution.project_id)
+    device.ble_mac = body.ble_mac.lower() if body.ble_mac else None
+    await record_audit(
+        session,
+        user=user,
+        action="device.ble_address_set",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=attribution.project_id,
+        details={"ble_mac": device.ble_mac},
+    )
+    await session.commit()
+    return (await with_state(session, [device]))[0]
 
 
 @router.get("/{device_id}/battery", response_model=DeviceBattery)

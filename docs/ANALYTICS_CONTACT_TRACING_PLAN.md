@@ -88,8 +88,18 @@ The driver already decodes the device's own six octet address from port 31 messa
 `identity` state, and nothing reads it. Three ways in, all of them writing the same place:
 
 - the decoder, from that message;
-- the browser, which knows the address of a device it is connected to over WebBLE;
-- a person, on the device page, for a device that has told us neither.
+- a `Request the Bluetooth address` command (`cmd_get_mac`, 0xB7), which is how that message
+  comes to be sent at all, and which works over LoRaWAN, satellite or Bluetooth alike;
+- a person, on the device page, for a device that cannot be asked.
+
+The design first said the browser could read the address over WebBLE. It cannot: Web Bluetooth
+deliberately exposes an opaque per-origin id and never a MAC address, so asking the device is
+the route, and the browser's part is simply carrying the command.
+
+The address is stored the way addresses are printed, `val[5]` first. The driver had been joining
+`val[0..5]` in storage order since the message was first decoded, which nothing read and so
+nothing caught. It matters here: a scan reports `val[0..2]`, the last three octets *as printed*,
+so only an address written this way ends with what a neighbour will say about it.
 
 Stored as `devices.ble_mac`, a column rather than an attribute, because the lookup is "which
 device of this project ends with these three octets" and that wants an index. A functional index
@@ -100,7 +110,7 @@ current project or a server admin, the same rule as the battery type of D248.
 
 ### 3.3 The contacts store
 
-Migration 0041: `device_contacts`, a TimescaleDB hypertable on `time`.
+Migration 0042: `device_contacts`, a TimescaleDB hypertable on `time` (0041 is the address column above).
 
 | Column | Why |
 | --- | --- |

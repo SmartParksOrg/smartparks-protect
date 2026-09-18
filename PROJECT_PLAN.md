@@ -1154,9 +1154,12 @@ the test.
 - [x] C1 the driver decodes ports 7 and 11 (single and aggregated scans) into `DecodedContact`,
       with the golden check against the vendored reference decoders over built frames, and the
       empty scan kept as "looked and saw nothing".
-- [ ] C2 `devices.ble_mac` filled three ways (the device's own port 31 message, a WebBLE read, a
-      person), with its endpoint and the device page control.
-- [ ] C3 migration 0041, the `device_contacts` hypertable (D252), the decoder writing and
+- [x] C2 `devices.ble_mac` (migration 0041) filled by the device's own port 31 message, by the
+      `REQUEST_BLE_ADDRESS` command that asks for it, or by a person, with its endpoint and the
+      device page control. **Corrected while building**: a WebBLE read was in the design and
+      cannot work, because Web Bluetooth never exposes a MAC address; asking the device with
+      `cmd_get_mac` is the way, and it works over every route including Bluetooth.
+- [ ] C3 migration 0042, the `device_contacts` hypertable (D252), the decoder writing and
       resolving it (D253 unknown kept, D254 ambiguous marked), the re-resolve action.
 - [ ] C4 the Contacts card on the device's Data tab.
 - [ ] C5 the dev server: scanning turned on for a few collars and the first real scans read

@@ -116,3 +116,39 @@ def test_a_frame_too_short_for_its_header_is_a_clear_failure():
 def test_the_scan_ports_are_read_on_every_firmware_that_has_them(firmware):
     records = decode(11, single([(ADDRESS, -66)]), firmware=firmware)
     assert [c.address for c in records.contacts] == ["0a:41:0c"]
+
+
+def test_a_device_address_ends_with_what_a_neighbours_scan_reports_of_it():
+    """The invariant the whole of contact tracing rests on. `msg_mac_id` carries val[0..5] and a
+    scan carries val[0..2]; an address written in storage order would never end with the three
+    octets a neighbour reports, and no contact could be matched to the device that made it."""
+    from shared.device_drivers.opencollar import format_ble_mac, scan_suffix
+
+    val = bytes([0x0C, 0x41, 0x0A, 0x11, 0x22, 0xD4])  # val[0] .. val[5]
+    mac = format_ble_mac(val)
+    assert mac == "d4:22:11:0a:41:0c", "printed high octet first"
+    # and that is exactly what a scan of this device says
+    seen = decode(11, single([(val[:3], -70)])).contacts[0].address
+    assert scan_suffix(mac) == seen == "0a:41:0c"
+
+
+def test_the_device_reports_its_own_address_in_printed_order():
+    """Port 31, msg 0xFD, the answer to cmd_get_mac."""
+    frame = bytes([0xFD, 0x06, 0x0C, 0x41, 0x0A, 0x11, 0x22, 0xD4])
+    records = driver.decode(
+        SourceEventData(
+            id=1,
+            event_type="uplink",
+            payload={"fPort": 31},
+            provider_metadata={"f_port": 31},
+            network_received_at=RECEIVED,
+            ingested_at=RECEIVED,
+            device_attributes={},
+            device_type_settings={},
+            frame=frame,
+            f_port=31,
+            firmware_version="7.2",
+        )
+    )
+    state = next(s for s in records.states if "ble_mac" in s.state)
+    assert state.state["ble_mac"] == "d4:22:11:0a:41:0c"

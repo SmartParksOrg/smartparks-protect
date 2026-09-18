@@ -54,6 +54,7 @@ import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { BatteryCard } from "@/components/devices/BatteryCard";
+import { BleAddress } from "@/components/devices/BleAddress";
 import { ReportingCard } from "@/components/devices/ReportingCard";
 import { DeviceSettingsTab } from "@/components/devices/DeviceSettingsTab";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
@@ -506,6 +507,16 @@ export function DevicePage() {
                     <dd>{d.serial_number ?? "none"}</dd>
                     <dt className="text-muted-foreground">{t("Firmware")}</dt>
                     <dd>{d.firmware_version ?? "unknown"}</dd>
+                    <dt className="text-muted-foreground">{t("Bluetooth")}</dt>
+                    <dd>
+                      <BleAddress
+                        deviceId={d.id}
+                        address={d.ble_mac ?? null}
+                        canEdit={
+                          Boolean(user?.is_superuser) || can("project:write")
+                        }
+                      />
+                    </dd>
                     <dt className="text-muted-foreground">{t("Created")}</dt>
                     <dd>{formatTime(d.created_at)}</dd>
                     <dt className="text-muted-foreground">{t("Notes")}</dt>

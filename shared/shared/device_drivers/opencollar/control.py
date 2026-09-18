@@ -24,6 +24,7 @@ CMD_RESET = 0xA1
 CMD_SEND_STATUS = 0xA4
 CMD_SEND_POSITION = 0xA5
 CMD_GET_UBLOX_FIX = 0xB8
+CMD_GET_MAC = 0xB7  # the device answers with msg_mac_id 0xFD on port 31 (research 3.23)
 SETTING_UBLOX_SEND_INTERVAL = 0x02
 
 
@@ -112,6 +113,10 @@ def _encode_setting(params: BaseModel) -> EncodedCommand:
 
 def _encode_request_settings(_: BaseModel) -> EncodedCommand:
     return EncodedCommand(payload=command(CMD_SEND_ALL_SETTINGS), f_port=PORT_COMMANDS)
+
+
+def _encode_request_mac(_: BaseModel) -> EncodedCommand:
+    return EncodedCommand(payload=command(CMD_GET_MAC), f_port=PORT_COMMANDS)
 
 
 def _encode_gnss_interval(params: BaseModel) -> EncodedCommand:
@@ -205,6 +210,19 @@ CONTROL_ACTIONS: dict[str, ControlAction] = {
         ),
         parameters=SettingNameParameters,
         encode=_encode_request_setting,
+        permission=Permission.DEVICES_CONTROL,
+        confirmation=ConfirmationPolicy.NONE,
+    ),
+    "REQUEST_BLE_ADDRESS": ControlAction(
+        key="REQUEST_BLE_ADDRESS",
+        label="Request the Bluetooth address",
+        description=(
+            "Ask the device for its own Bluetooth address (cmd_get_mac). A few bytes each way. "
+            "The address is what lets a neighbour's scan of this device be recognised as this "
+            "device, so contact tracing needs it known."
+        ),
+        parameters=NoParameters,
+        encode=_encode_request_mac,
         permission=Permission.DEVICES_CONTROL,
         confirmation=ConfirmationPolicy.NONE,
     ),

@@ -918,6 +918,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/ble-address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Device Ble Address
+         * @description The device's own Bluetooth address, set by a person (decision D252) when the device has
+         *     not reported it: `Request the Bluetooth address` asks the device itself, which is the way to
+         *     prefer, since an address typed from a label can be wrong and a wrong one quietly makes every
+         *     contact of that device unresolvable. Null clears it. Project admins of the device's current
+         *     project, or a server admin.
+         */
+        put: operations["set_device_ble_address_api_v1_devices__device_id__ble_address_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/battery": {
         parameters: {
             query?: never;
@@ -6939,6 +6963,17 @@ export interface components {
              */
             battery_type?: string | null;
         };
+        /**
+         * DeviceBleAddressUpdate
+         * @description The device's own Bluetooth address (decision D252), six octets high first; null clears.
+         */
+        DeviceBleAddressUpdate: {
+            /**
+             * Ble Mac
+             * @description aa:bb:cc:dd:ee:ff, as the address is printed; a scan of this device reports its last three octets
+             */
+            ble_mac?: string | null;
+        };
         /** DeviceConnectivity */
         DeviceConnectivity: {
             /**
@@ -7187,6 +7222,11 @@ export interface components {
             status: string;
             /** Firmware Version */
             firmware_version: string | null;
+            /**
+             * Ble Mac
+             * @description The device's Bluetooth address (decision D252); a neighbour's scan reports its last three octets
+             */
+            ble_mac?: string | null;
             /** Attributes */
             attributes: {
                 [key: string]: unknown;
@@ -7519,6 +7559,11 @@ export interface components {
             status: string;
             /** Firmware Version */
             firmware_version: string | null;
+            /**
+             * Ble Mac
+             * @description The device's Bluetooth address (decision D252); a neighbour's scan reports its last three octets
+             */
+            ble_mac?: string | null;
             /** Attributes */
             attributes: {
                 [key: string]: unknown;
@@ -14374,6 +14419,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceReporting"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_device_ble_address_api_v1_devices__device_id__ble_address_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceBleAddressUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"];
                 };
             };
             /** @description Validation Error */

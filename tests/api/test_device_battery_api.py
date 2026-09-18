@@ -111,3 +111,33 @@ async def test_the_environmental_provider_is_set_up_by_a_server_admin(client, db
     assert (
         await client.get("/api/v1/admin/environment/providers", headers=member.headers)
     ).status_code == 403
+
+
+async def test_the_device_bluetooth_address_is_set_and_cleared(client, db, bus):  # noqa: F811
+    """Decision D252: a contact names three octets, so the device's own address has to be known
+    before a sighting of it can be recognised as it."""
+    from shared.enums import Role
+    from tests.api.conftest import actor, add_member
+
+    admin, project, _entity, _source, device, _ = await _setup(client, db)
+    h = admin.headers
+    base = f"/api/v1/devices/{device['id']}/ble-address"
+
+    assert (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()[
+        "ble_mac"
+    ] is None
+    saved = await client.put(base, json={"ble_mac": "D4:22:11:0A:41:0C"}, headers=h)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["ble_mac"] == "d4:22:11:0a:41:0c", "kept lowercase, as a scan reports it"
+
+    # a string that is not an address is refused rather than stored and never matched
+    for bad in ("d4:22:11:0a:41", "not-an-address", "d4-22-11-0a-41-0c"):
+        assert (await client.put(base, json={"ble_mac": bad}, headers=h)).status_code == 422
+
+    viewer = await actor(client, db)
+    await add_member(db, viewer.user, project, Role.PROJECT_VIEWER)
+    refused = await client.put(base, json={"ble_mac": "d4:22:11:0a:41:0c"}, headers=viewer.headers)
+    assert refused.status_code == 403
+
+    cleared = await client.put(base, json={"ble_mac": None}, headers=h)
+    assert cleared.json()["ble_mac"] is None

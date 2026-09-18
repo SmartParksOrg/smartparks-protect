@@ -663,3 +663,31 @@ async def test_a_settings_frame_fills_the_settings_protect_knows(db, bus, world)
         .all()
     )
     assert rows == [] and outcome.settings_changed == 0
+
+
+async def test_the_bluetooth_address_reaches_the_device_from_any_state(db, bus, world):
+    """Decision D252. The address arrives in its own message, the answer to a command, which is
+    rarely the newest thing in a delivery, so it is read from any state that carries it and not
+    only from the newest as the firmware is."""
+    from shared.models import Device
+
+    await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {
+            "time": "2026-05-03T08:00:00+00:00",
+            "state": {"ble_mac": "D4:22:11:0A:41:0C"},
+        },
+    )
+    # a newer state that says nothing about the address must not clear it
+    await _ingest_and_process(
+        db,
+        bus,
+        world,
+        {"time": "2026-05-03T09:00:00+00:00", "state": {"firmware_version": "7.2"}},
+    )
+    await db.rollback()
+    device = await db.get(Device, world.device.id)
+    await db.refresh(device)
+    assert device.ble_mac == "d4:22:11:0a:41:0c"

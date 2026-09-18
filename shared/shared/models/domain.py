@@ -184,6 +184,12 @@ class Device(UuidPrimaryKeyMixin, TimestampMixin, Base):
     serial_number: Mapped[str | None] = mapped_column(String(128), unique=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="inventory")
     firmware_version: Mapped[str | None] = mapped_column(String(64))
+    ble_mac: Mapped[str | None] = mapped_column(
+        String(17),
+        comment="The device's Bluetooth address, printed high octet first (decision D252): "
+        "from the device itself, a command's answer or a person. A neighbour's scan reports "
+        "its last three octets, which is how a contact is matched to the device that made it",
+    )
     attributes: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )

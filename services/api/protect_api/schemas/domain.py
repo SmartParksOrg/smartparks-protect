@@ -262,6 +262,11 @@ class DeviceRead(ORMModel):
     serial_number: str | None
     status: str
     firmware_version: str | None
+    ble_mac: str | None = Field(
+        default=None,
+        description="The device's Bluetooth address (decision D252); a neighbour's scan reports "
+        "its last three octets",
+    )
     attributes: dict[str, Any]
     notes: str | None
     picture_updated_at: datetime | None = Field(
@@ -581,6 +586,17 @@ class DeviceBatteryUpdate(BaseModel):
         max_length=32,
         description="The battery chemistry of this device; null gives the device type's "
         "default back",
+    )
+
+
+class DeviceBleAddressUpdate(BaseModel):
+    """The device's own Bluetooth address (decision D252), six octets high first; null clears."""
+
+    ble_mac: str | None = Field(
+        default=None,
+        pattern=r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$",
+        description="aa:bb:cc:dd:ee:ff, as the address is printed; a scan of this device "
+        "reports its last three octets",
     )
 
 

@@ -92,6 +92,26 @@ KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
 }
 NOT_CANONICAL_PORTS = {1, 5, 6, 9, 10, 15, 27, 28}
 PORT_BLE_SCAN_AGGREGATED = 7  # msg 0xF9, the buffer the device summarised (research 3.7)
+#: How many octets of an address a scan reports, and so how much of a MAC can ever be matched.
+SCAN_ADDRESS_OCTETS = 3
+
+
+def format_ble_mac(value: bytes) -> str:
+    """The device's own six octet Bluetooth address, written the way addresses are written.
+
+    `msg_mac_id` carries `bt_addr.val[0..5]` and Zephyr stores an address little endian, so the
+    printed form runs the other way: `val[5]` first. Getting this backwards is not cosmetic. A
+    scan reports `val[0..2]`, which is the *last* three octets as printed, so only an address
+    written this way ends with what a neighbour's scan will say about it, and a contact could
+    never be matched to the device that made it."""
+    return ":".join(f"{b:02x}" for b in reversed(value))
+
+
+def scan_suffix(mac: str) -> str:
+    """The part of a device's address a neighbour's scan can report: its last three octets."""
+    return ":".join(mac.lower().split(":")[-SCAN_ADDRESS_OCTETS:])
+
+
 PORT_BLE_SCAN = 11  # msg 0xFA, one scan as it happened (research 3.9)
 PORT_RF_SCAN = 8  # firmware 4.x to 6.16, removed in 7.1.0 (research 3.23)
 PORT_OPEN_SKY = 17  # firmware 6.x, removed in 7.1.0; the message has no id byte
@@ -445,9 +465,7 @@ class OpenCollarDriver:
         address can never become two neighbours."""
         return f"{data[offset + 2]:02x}:{data[offset + 1]:02x}:{data[offset]:02x}"
 
-    def _decode_ble_scan(
-        self, data: bytes, time: datetime, records: DecodedRecords
-    ) -> None:
+    def _decode_ble_scan(self, data: bytes, time: datetime, records: DecodedRecords) -> None:
         """Port 11 (`decodeLastScanMessage`): one scan, its finish time, then four bytes per
         device seen. The scan's own time is canonical for every sighting in it.
 
@@ -994,7 +1012,7 @@ class OpenCollarDriver:
             records.states.append(
                 DecodedState(
                     time=time,
-                    state={"ble_mac": ":".join(f"{b:02x}" for b in data)},
+                    state={"ble_mac": format_ble_mac(data)},
                     record_type="identity",
                 )
             )
