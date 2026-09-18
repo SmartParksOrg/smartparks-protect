@@ -1,6 +1,7 @@
 /** Pure helpers for the Data Explorer: time ranges, series naming, client side shaping. */
 import { t } from "@/lib/i18nMark";
 import type { Series, SeriesResponse } from "@/api/types";
+import { CLOCK } from "@/lib/format";
 
 export const RANGE_PRESETS = {
   "24h": { label: t("Last 24 hours"), hours: 24 },
@@ -82,10 +83,11 @@ export function formatInZone(
       timeZone: timezone,
       dateStyle: "medium",
       timeStyle: "short",
+      ...CLOCK,
       ...options,
     });
   } catch {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString(undefined, CLOCK);
   }
 }
 

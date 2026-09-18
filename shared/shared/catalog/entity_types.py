@@ -38,6 +38,9 @@ ENTITY_TYPE_SEEDS: tuple[EntityTypeSeed, ...] = (
     T("camera_trap", "Camera trap", "equipment", "device.camera_trap", "equipment"),
     T("cctv", "CCTV camera", "equipment", "device.cctv", "equipment"),
     T("radio", "Stationary radio", "equipment", "device.radio", "equipment"),
+    # A reader on a post, listening for the Bluetooth tags on animals or for the phones
+    # people carry, with a place set by hand because it does not move (Tim, 2026-09-18).
+    T("scanner", "Bluetooth scanner", "equipment", "device.scanner", "equipment"),
     T("radio_repeater", "Radio repeater", "equipment", "device.radio_repeater", "equipment"),
     T("sensor", "Sensor station", "environmental", "device.sensor", "environmental_sensor"),
     T("video_camera", "Video camera", "equipment", "device.video_camera", "equipment"),

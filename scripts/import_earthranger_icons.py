@@ -641,6 +641,14 @@ ICONS: list[Icon] = [
         "device.sensor",
         "microphone",
     ),
+    S(
+        "device.scanner",
+        "Bluetooth scanner",
+        "radar_rep.svg",
+        "device.sensor",
+        "radar",
+        "reader",
+    ),
     S("device.gps", "GPS tracker", "GPS_point_rep.svg", "device.sensor", "tracker"),
     S(
         "device.satellite",

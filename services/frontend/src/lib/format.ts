@@ -1,10 +1,18 @@
 /** Formatting helpers. Times display in the browser's timezone until the project setting exists. */
+
+/** Every displayed time is on the 24 hour clock, whatever the browser's locale would do with it
+ * (Tim, 2026-09-18). An English browser is usually en-US and writes "7:05:00 PM", which is not
+ * how a field team reads a time; Dutch already writes 21:05. The locale still decides the date
+ * order and the month names, which is what a locale is for. */
+export const CLOCK: Intl.DateTimeFormatOptions = { hourCycle: "h23" };
+
 export function formatTime(value: string | null | undefined): string {
   if (!value) return "";
   const date = new Date(value);
   return date.toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "medium",
+    ...CLOCK,
   });
 }
 
@@ -20,12 +28,16 @@ export function formatTimeShort(
     date.getMonth() === now.getMonth() &&
     date.getDate() === now.getDate();
   if (sameDay)
-    return date.toLocaleTimeString(undefined, { timeStyle: "medium" });
+    return date.toLocaleTimeString(undefined, {
+      timeStyle: "medium",
+      ...CLOCK,
+    });
   return date.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    ...CLOCK,
   });
 }
 
