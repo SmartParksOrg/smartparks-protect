@@ -39,6 +39,7 @@ from shared.analysis.limits import (
     MAX_DAYS,
     MAX_DEVICES,
     MAX_QUEUED_PER_PROJECT,
+    MAX_SUBJECTS_CONTACT,
     MAX_SUBJECTS_MOVEMENT,
 )
 from shared.analysis.parameters import CommonParameters
@@ -65,10 +66,14 @@ from shared.timeutil import utc_now
 
 router = APIRouter(tags=["analyses"])
 MAX_GEOMETRIES_PER_CALL = 2_000
+#: How many subjects each module takes in one run. A module missing here falls back to the
+#: movement limit, which is the tightest; a module whose own limit differs from this table is a
+#: limit nobody can reach, so every module belongs in it.
 SUBJECT_LIMITS = {
     "movement": MAX_SUBJECTS_MOVEMENT,
     "grazing": MAX_ANIMALS_GRAZING,
     "device_performance": MAX_DEVICES,
+    "contact_tracing": MAX_SUBJECTS_CONTACT,
 }
 
 

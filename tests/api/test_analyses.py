@@ -376,3 +376,19 @@ async def test_roles_scope_and_flags(client, db, stub, monkeypatch):
     assert (
         await client.post(base, json={"module": "movement", "parameters": _params(ids)}, headers=h)
     ).status_code == 404
+
+
+async def test_every_module_can_reach_the_subject_limit_it_declares(client, db):
+    """A module whose own cap differs from the router's table is a cap nobody can reach: the
+    module would allow forty and the request would be refused at twenty-five. Contact tracing
+    was exactly that until a real run hit it."""
+    from protect_api.routers.analyses import SUBJECT_LIMITS
+    from shared.analysis.limits import MAX_SUBJECTS_CONTACT
+
+    admin = await actor(client, db, superuser=True)
+    catalogue = (await client.get("/api/v1/analysis-modules", headers=admin.headers)).json()
+    for module in catalogue:
+        assert module["key"] in SUBJECT_LIMITS, (
+            f"{module['key']} falls back to the movement limit, which may not be its own"
+        )
+    assert SUBJECT_LIMITS["contact_tracing"] == MAX_SUBJECTS_CONTACT
