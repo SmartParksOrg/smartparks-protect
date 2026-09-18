@@ -18,7 +18,10 @@ from shapely.geometry import Point
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.connectivity.network_location import NETWORK_RECORD_TYPE
+from shared.connectivity.network_location import (
+    ESTIMATE_RECORD_TYPES,
+    NETWORK_RECORD_TYPE,
+)
 from shared.curation.effective import effective_time, effective_value_num, visible
 from shared.domain.assignments import resolve_attribution
 from shared.domain.static_place import placed_device_of, stamp_static_place
@@ -455,10 +458,12 @@ async def _latest_measurements(
 
 
 async def _newest_position(session: AsyncSession, owner: Any, *, network: bool) -> _Newest | None:
+    # "network" here means every estimate, not only a network's: a rebuild that treated a
+    # proximity position as a fix would put an animal where the hardware that heard it stands
     kind = (
-        Position.record_type == NETWORK_RECORD_TYPE
+        Position.record_type.in_(ESTIMATE_RECORD_TYPES)
         if network
-        else Position.record_type != NETWORK_RECORD_TYPE
+        else Position.record_type.not_in(ESTIMATE_RECORD_TYPES)
     )
     row = (
         await session.execute(

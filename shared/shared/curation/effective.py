@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import Float, Integer, and_, cast, func, or_
 from sqlalchemy.sql import ColumnElement
 
-from shared.connectivity.network_location import NETWORK_RECORD_TYPE
+from shared.connectivity.network_location import ESTIMATE_RECORD_TYPES
 from shared.models import Measurement, Position
 
 Curatable = type[Position] | type[Measurement]
@@ -86,15 +86,21 @@ def visible(model: Curatable) -> ColumnElement[bool]:
 
 
 def device_fix() -> ColumnElement[bool]:
-    """The device's own fixes, not a location the network provided (decision D163): every
-    reader takes these unless asked for `sources=network` or `all`."""
-    return Position.record_type != NETWORK_RECORD_TYPE
+    """The device's own fixes, not an estimate somebody else made of where it was (D163).
+
+    Every estimate, not only the network's: a place set by hand and a position from one device
+    hearing another are equally not fixes, and a reader that treats them as fixes draws a track
+    through hardware that never moved."""
+    return Position.record_type.not_in(ESTIMATE_RECORD_TYPES)
 
 
 def sources_filter(sources: str) -> ColumnElement[bool] | None:
-    """`device` (the default), `network` or `all` as a where clause, None for all."""
+    """`device` (the default), `network` or `all` as a where clause, None for all.
+
+    `network` is the reader-facing name for every estimate, not only the ones a network made:
+    the two halves have to add up to `all`, or a position would be reachable by neither."""
     if sources == "all":
         return None
     if sources == "network":
-        return Position.record_type == NETWORK_RECORD_TYPE
+        return Position.record_type.in_(ESTIMATE_RECORD_TYPES)
     return device_fix()

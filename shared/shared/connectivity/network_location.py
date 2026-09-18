@@ -23,6 +23,16 @@ STATIC_RECORD_TYPE = "static"
 #: device that heard it, which is only known when that one has a static position.
 PROXIMITY_RECORD_TYPE = "proximity"
 
+#: Every record type that is somebody else's word for where a device was, rather than a fix the
+#: device made itself. A reader that separates a fix from an estimate must use this and not one
+#: of the names above: `proximity` was added in phase 30 and `device_fix()` went on testing for
+#: `network` alone, so for a while a tag "fixed" itself at the reader that heard it, two tags at
+#: one reader read as nought metres apart, and the movement of an animal that never fixed at all
+#: was computed from where other hardware stood.
+ESTIMATE_RECORD_TYPES: frozenset[str] = frozenset(
+    {NETWORK_RECORD_TYPE, STATIC_RECORD_TYPE, PROXIMITY_RECORD_TYPE}
+)
+
 
 @dataclass(slots=True)
 class NetworkLocation:

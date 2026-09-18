@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
 from shared.connectivity.network_location import (
+    ESTIMATE_RECORD_TYPES,
     NETWORK_RECORD_TYPE,
     NetworkLocation,
 )
@@ -235,7 +236,7 @@ def _note_estimate_disagreement(event: SourceEvent, records: DecodedRecords) -> 
         (
             estimate_disagreement(satellite, p.latitude, p.longitude) or 0.0
             for p in records.positions
-            if p.record_type != NETWORK_RECORD_TYPE
+            if p.record_type not in ESTIMATE_RECORD_TYPES
         ),
         default=0.0,
     )
@@ -578,7 +579,7 @@ async def _write_positions(
             outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
         attributes = dict(record.attributes)
         outlier = None
-        if not ahead and record.record_type != NETWORK_RECORD_TYPE:
+        if not ahead and record.record_type not in ESTIMATE_RECORD_TYPES:
             previous = await _previous_fix(session, device.id, record.time)
             if previous is not None:
                 settings = get_settings()
@@ -1158,8 +1159,10 @@ async def _update_current_state(
     timely_states = [s for s in records.states if not _ahead_of_delivery(event, s.time)]
     timely_measurements = [m for m in records.measurements if not _ahead_of_delivery(event, m.time)]
     timely_events = [e for e in records.events if not _ahead_of_delivery(event, e.time)]
-    fixes = [p for p in timely_positions if p.record_type != NETWORK_RECORD_TYPE]
-    network = [p for p in timely_positions if p.record_type == NETWORK_RECORD_TYPE]
+    # an estimate of any kind is not a fix (D163): a proximity position counted as one would
+    # make the device that was heard look as though it had fixed itself at the reader
+    fixes = [p for p in timely_positions if p.record_type not in ESTIMATE_RECORD_TYPES]
+    network = [p for p in timely_positions if p.record_type in ESTIMATE_RECORD_TYPES]
     newest_fix: DecodedPosition | None = max(fixes, key=lambda p: p.time, default=None)
     newest_network: DecodedPosition | None = max(network, key=lambda p: p.time, default=None)
     latest_state = max(timely_states, key=lambda s: s.time, default=None)
@@ -1305,7 +1308,7 @@ def _apply_position(
         if newer_fix and (
             state.latest_position_time is None
             or newest_fix.time > state.latest_position_time
-            or state.latest_position_kind == NETWORK_RECORD_TYPE
+            or state.latest_position_kind in ESTIMATE_RECORD_TYPES
         ):
             _set_position(state, newest_fix, "device")
             moved = newest_fix

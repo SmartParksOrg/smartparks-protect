@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
-from shared.connectivity.network_location import NETWORK_RECORD_TYPE
+from shared.connectivity.network_location import ESTIMATE_RECORD_TYPES
 from shared.database import session_scope
 from shared.enums import ErrorCode, LocationSource, TraceClass
 from shared.logger import get_logger
@@ -329,8 +329,9 @@ async def handle_position(bus: RedisStreamsBus, cache: RuleCache, payload: dict[
             entity_type_id = await session.scalar(
                 select(Entity.entity_type_id).where(Entity.id == position.entity_id)
             )
-        if position.record_type == NETWORK_RECORD_TYPE:
-            # a network's location drives rules only for an entity that opted in (D163, D164)
+        if position.record_type in ESTIMATE_RECORD_TYPES:
+            # an estimate of any kind drives rules only for an entity that opted in (D163, D164):
+            # a geofence must not fire because a reader heard a tag near its own post
             source = (
                 await session.scalar(
                     select(Entity.location_source).where(Entity.id == position.entity_id)

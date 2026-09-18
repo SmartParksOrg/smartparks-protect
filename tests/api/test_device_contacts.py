@@ -1692,3 +1692,69 @@ async def test_naming_a_device_later_fills_in_what_it_was_carrying(client, db, b
     ).one()
     assert repaired[0] == uuid.UUID(tag["id"])
     assert repaired[1] == entity_id
+
+
+async def test_a_position_a_reader_gave_is_not_the_animals_own_fix(client, db, bus):
+    """Decision D163, and the trap phase 30 walked into. `device_fix()` tested for the network's
+    estimates alone, so when proximity positions arrived they counted as fixes: a tag looked as
+    though it had fixed itself at the reader that heard it, two tags at one reader came out nought
+    metres apart, and the movement of an animal with no GNSS at all was computed from where other
+    hardware stood. Every estimate is an estimate."""
+    from shared.analysis.primitives.trajectory import load_trajectory
+    from shared.connectivity.network_location import ESTIMATE_RECORD_TYPES
+
+    assert set(ESTIMATE_RECORD_TYPES) == {"network", "static", "proximity"}
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=admin.headers)).json()
+    rabbit = next(t for t in catalogue["items"] if t["key"] == "rabbit")
+
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    tag = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    made = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": tag["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": rabbit["id"], "name": unique_name("Rabbit")},
+        },
+        headers=admin.headers,
+    )
+    entity_id = uuid.UUID(made.json()["entity_id"])
+
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)]))
+
+    placed = (
+        await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tag["id"])))
+    ).all()
+    assert len(placed) == 1 and placed[0].record_type == "proximity", "it was heard, not fixed"
+
+    track = await load_trajectory(
+        db,
+        entity_id,
+        SCAN_AT - timedelta(days=1),
+        SCAN_AT + timedelta(days=1),
+        max_fixes=1000,
+    )
+    assert len(track) == 0, (
+        "a rabbit wearing only a tag has made no fix of its own; its analysis track is empty, "
+        "and the place a reader gave it belongs on the map and not in a trajectory"
+    )
