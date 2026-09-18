@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- `scripts/refile_scan_records.py` reports, and on `--apply` removes, the scan records an earlier version of the clock rule filed at a device's claimed time instead of at its delivery, so that a reprocess writes them back where they belong. Moving them in place is not possible: `time` partitions the hypertable and a row cannot be updated across chunks. Every row it touches is derived from a source event that is kept for ever.
+
 - A scan says how many devices it detected, and that number is now reported beside the sightings that arrived (Tim, 2026-09-18). Only what fits in one message goes over the air and the rest stays in the device's flash, so counting the sightings understates what was there: a collar in a herd detects more than it can send. The Bluetooth contacts card names both — the scans, what they detected, and what reached Protect — and says so plainly when they differ. The `ble_contacts` metric was already the device's own count, so the chart has always been the honest one.
 
 - How much a scanner hears, as a line (Tim, 2026-09-18). Every Bluetooth scan leaves one `ble_contacts` measurement — the devices it saw, zero included — so the Contacts row of the live map panel unfolds a chart the way the battery and the uptime do, over a day, a week or a month, and the same figure is a metric anywhere else: the data explorer, a dashboard, a rule. A scan that saw nothing is a zero and not a gap, because the gaps mean something different: the device was not looking. Migration 0045 registers it, and `human_presence` with it.
