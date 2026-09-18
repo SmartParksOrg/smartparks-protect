@@ -16,13 +16,21 @@ import { SOURCES } from "@/components/map/layers";
 export const ANALYSIS_SOURCE = "analysis";
 export const INTENSITY_SOURCE = "analysis-intensity";
 export const VEGETATION_SOURCE = "analysis-vegetation";
-/** Light to dark, by the share of the busiest cell: the sequential ramp of a use map. */
+/** Light to dark, by the share of the busiest cell: the sequential ramp of a use map.
+ *
+ * Warm, not green (Tim, 2026-09-18). Green belongs to the vegetation layer, where bare to green
+ * is what everyone already reads a satellite index as, and two green ramps over one another
+ * cannot be told apart. Of the candidates measured against the vegetation ramp, warm separates
+ * best under both red-green colour blindnesses (it differs in brightness and in its blue
+ * content, not along the red-green axis where those two ramps would collide) and stays furthest
+ * from the blue the base maps paint water with, which is what rules a blue ramp out. It also
+ * says the right thing: warm is how hard the ground was used, green is what it grows. */
 export const INTENSITY_RAMP = [
-  "#EEF3EF",
-  "#C9DBCF",
-  "#9DBFA8",
-  "#6E9C7E",
-  "#3E6B4E",
+  "#FDF0E3",
+  "#F8D6B0",
+  "#EFB173",
+  "#DC8A3C",
+  "#B0621B",
 ] as const;
 export const ANALYSIS_KINDS = [
   "area",
