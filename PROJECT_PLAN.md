@@ -1151,7 +1151,7 @@ the test.
 
 **Deliverables** (the tasks C1 to C5 of the design document):
 
-- [ ] C1 the driver decodes ports 7 and 11 (single and aggregated scans) into `DecodedContact`,
+- [x] C1 the driver decodes ports 7 and 11 (single and aggregated scans) into `DecodedContact`,
       with the golden check against the vendored reference decoders over built frames, and the
       empty scan kept as "looked and saw nothing".
 - [ ] C2 `devices.ble_mac` filled three ways (the device's own port 31 message, a WebBLE read, a

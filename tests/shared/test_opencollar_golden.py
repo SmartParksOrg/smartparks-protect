@@ -10,7 +10,11 @@ from pathlib import Path
 import pytest
 
 from shared.device_drivers.base import SourceEventData
-from shared.device_drivers.opencollar import HARDWARE_TYPES, OpenCollarDriver
+from shared.device_drivers.opencollar import (
+    HARDWARE_TYPES,
+    OpenCollarDriver,
+    uptime_unit_seconds,
+)
 
 GOLDEN = (
     Path(__file__).resolve().parents[1] / "fixtures" / "payloads" / "opencollar" / "golden.json"
@@ -89,7 +93,13 @@ def test_driver_matches_the_reference_decoder(entry, version, expected):
         assert close(measurements["device_temperature"], expected["temp"], 0.01)
         for axis in ("x", "y", "z"):
             assert close(measurements[f"acceleration_{axis}"], expected[f"acc_{axis}"], 0.01)
-        assert measurements["uptime"] == expected["uptime"] * 86400
+        # the reference decoder hands the raw byte over with no unit. It is days since firmware
+        # 4.0.1 and hours before it ("display uptime in days instead of hours", CHANGELOG
+        # 4.0.1), and the unit follows the version the status message itself reports, which is
+        # not the version the device is told it runs. Asserting days always passed only while
+        # the golden file was stale and held no frame from an older firmware.
+        reported = f"{expected['ver_fw_major']}.{expected['ver_fw_minor']}"
+        assert measurements["uptime"] == expected["uptime"] * uptime_unit_seconds(reported)
         assert measurements["lr_satellites"] == expected["lr_sat"]
         assert state["firmware_version"] == f"{expected['ver_fw_major']}.{expected['ver_fw_minor']}"
         assert state["hardware_version"] == f"{expected['ver_hw_major']}.{expected['ver_hw_minor']}"
@@ -109,6 +119,23 @@ def test_driver_matches_the_reference_decoder(entry, version, expected):
         ):
             assert state["errors"][ours] == bool(expected[theirs]), (ours, theirs)
         assert ("rf_scan_enabled" in state) == ("rf_scan" in expected)
+    elif port in (7, 11):
+        # the reference prints each octet with toString(16), which drops a leading zero, so
+        # "a:41:c" and our "0a:41:0c" are the same address; pad before comparing
+        def padded(mac: str) -> str:
+            return ":".join(part.rjust(2, "0") for part in mac.split(":"))
+
+        seen = [expected[str(i + 1)] for i in range(expected["N_BT_res"])]
+        assert [c.address for c in records.contacts] == [padded(r["mac"]) for r in seen]
+        assert [c.rssi_dbm for c in records.contacts] == [r["rssi"] for r in seen]
+        if port == 11:
+            # one scan: its finish time is canonical for every sighting in it
+            assert all(int(c.time.timestamp()) == expected["t"] for c in records.contacts)
+            assert all(c.sightings == 1 for c in records.contacts)
+        else:
+            # the aggregate: each record is about its own strongest sighting
+            assert [c.sightings for c in records.contacts] == [r["count"] for r in seen]
+            assert [int(c.time.timestamp()) for c in records.contacts] == [r["t"] for r in seen]
     elif port == 14:
         assert measurements["flash_used_percent"] == expected["percentage"]
         assert measurements["flash_messages"] == expected["n_msg"]

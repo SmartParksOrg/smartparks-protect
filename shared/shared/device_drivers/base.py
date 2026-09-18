@@ -68,11 +68,34 @@ class DecodedEvent:
 
 
 @dataclass(slots=True)
+class DecodedContact:
+    """One device a device saw (decision D252). `address` is the neighbour as the reporting
+    device names it, which for OpenCollar is three octets of its Bluetooth address, lowercase
+    and zero padded (`a3:41:0c`); it is not an identity until something resolves it, and three
+    octets cannot always be resolved to one device, so the resolving happens once, on the way
+    in, and is recorded on the row.
+
+    `time` is the canonical time of the sighting: when the scan finished for a single scan, the
+    strongest sighting's own time for an aggregated one. `sightings` is 1 unless the device
+    counted them itself."""
+
+    time: datetime
+    address: str
+    rssi_dbm: int | None = None
+    sightings: int = 1
+    #: `single` (a scan as it happened) or `aggregated` (a buffer the device summarised).
+    scan_kind: str = "single"
+    record_type: str = "contact"
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class DecodedRecords:
     positions: list[DecodedPosition] = field(default_factory=list)
     measurements: list[DecodedMeasurement] = field(default_factory=list)
     states: list[DecodedState] = field(default_factory=list)
     events: list[DecodedEvent] = field(default_factory=list)
+    contacts: list[DecodedContact] = field(default_factory=list)
     decoder_version: str = "1"
     notes: list[str] = field(
         default_factory=list,
@@ -84,7 +107,9 @@ class DecodedRecords:
 
     @property
     def empty(self) -> bool:
-        return not (self.positions or self.measurements or self.states or self.events)
+        return not (
+            self.positions or self.measurements or self.states or self.events or self.contacts
+        )
 
 
 @dataclass(frozen=True, slots=True)

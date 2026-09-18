@@ -26,6 +26,7 @@ from typing import Any, ClassVar
 from shared.control.actions import ControlAction
 from shared.device_drivers.base import (
     DEFAULT_DECODABLE_EVENT_TYPES,
+    DecodedContact,
     DecodedEvent,
     DecodedMeasurement,
     DecodedPosition,
@@ -89,7 +90,9 @@ KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
     27: (0x91, None),
     28: (0x90, None),
 }
-NOT_CANONICAL_PORTS = {1, 5, 6, 7, 9, 10, 11, 15, 27, 28}
+NOT_CANONICAL_PORTS = {1, 5, 6, 9, 10, 15, 27, 28}
+PORT_BLE_SCAN_AGGREGATED = 7  # msg 0xF9, the buffer the device summarised (research 3.7)
+PORT_BLE_SCAN = 11  # msg 0xFA, one scan as it happened (research 3.9)
 PORT_RF_SCAN = 8  # firmware 4.x to 6.16, removed in 7.1.0 (research 3.23)
 PORT_OPEN_SKY = 17  # firmware 6.x, removed in 7.1.0; the message has no id byte
 PORT_AIR_QUALITY = 21  # firmware 7.2.0 and later
@@ -431,6 +434,99 @@ class OpenCollarDriver:
         }
 
     @staticmethod
+    @staticmethod
+    def _address(data: bytes, offset: int) -> str:
+        """The three octets of a neighbour's Bluetooth address as the firmware sends them.
+
+        Zephyr stores an address little endian and the firmware copies `bt_addr.val[0..2]`, so
+        the three least significant octets arrive in that order and are read back highest first
+        (research 3.7). The reference decoder prints them with `toString(16)`, which drops a
+        leading zero; ours pads, so `0a:41:0c` never reads as `a:41:c` and two spellings of one
+        address can never become two neighbours."""
+        return f"{data[offset + 2]:02x}:{data[offset + 1]:02x}:{data[offset]:02x}"
+
+    def _decode_ble_scan(
+        self, data: bytes, time: datetime, records: DecodedRecords
+    ) -> None:
+        """Port 11 (`decodeLastScanMessage`): one scan, its finish time, then four bytes per
+        device seen. The scan's own time is canonical for every sighting in it.
+
+        Only the first message of a scan goes over the air when the results do not fit one
+        payload; the rest are in the device's flash, so a log file upload of the same period
+        fills in what the air left out (research 3.9)."""
+        if len(data) < 5:
+            raise _fail("BLE scan message shorter than its header", port=PORT_BLE_SCAN)
+        scan_at = _unix(struct.unpack_from("<I", data, 0)[0]) or time
+        seen = data[4]
+        length = len(data) + 2  # the declared length the reference decoder guards on
+        index, offset = 0, 5
+        while index < seen and offset < length - 1 and offset + 4 <= len(data):
+            records.contacts.append(
+                DecodedContact(
+                    time=scan_at,
+                    address=self._address(data, offset),
+                    rssi_dbm=data[offset + 3] - 128,
+                    scan_kind="single",
+                )
+            )
+            index += 1
+            offset += 4
+        self._note_scan(records, scan_at, seen, len(records.contacts), "single")
+
+    def _decode_ble_scan_aggregated(
+        self, data: bytes, time: datetime, records: DecodedRecords
+    ) -> None:
+        """Port 7 (`decodeScanMessage`): the devices the buffer held, nine bytes each, with the
+        best signal, how often it was seen and when the strongest sighting was. That last time
+        is the canonical one, since it is the moment the record is actually about.
+
+        At most five of the twenty a buffer holds are sent, and the buffer is cleared when the
+        message is composed, so these counts are what the device chose to report and not a
+        census (research 3.7)."""
+        if not data:
+            raise _fail("aggregated BLE scan message is empty", port=PORT_BLE_SCAN_AGGREGATED)
+        seen = data[0]
+        length = len(data) + 2
+        index, offset = 0, 1
+        while index < seen and offset < length - 1 and offset + 9 <= len(data):
+            best_at = _unix(struct.unpack_from("<I", data, offset + 5)[0])
+            records.contacts.append(
+                DecodedContact(
+                    time=best_at or time,
+                    address=self._address(data, offset),
+                    rssi_dbm=data[offset + 3] - 128,
+                    sightings=data[offset + 4],
+                    scan_kind="aggregated",
+                    attributes={} if best_at else {"time_from": "delivery"},
+                )
+            )
+            index += 1
+            offset += 9
+        self._note_scan(records, time, seen, len(records.contacts), "aggregated")
+
+    @staticmethod
+    def _note_scan(
+        records: DecodedRecords, scan_at: datetime, seen: int, kept: int, kind: str
+    ) -> None:
+        """Every scan leaves a state, so that a device which looked and saw nothing can be told
+        from one that never looked: with `ble_scan_report_zero_connections_found` on, an empty
+        scan is a real answer and the only record of it."""
+        records.states.append(
+            DecodedState(
+                time=scan_at,
+                state={"ble_scan": {"seen": seen, "reported": kept, "kind": kind}},
+                record_type="ble_scan",
+            )
+        )
+        if seen == 0:
+            records.notes.append(f"{kind} BLE scan saw no devices")
+        elif kept < seen:
+            records.notes.append(
+                f"{kind} BLE scan reported {kept} of the {seen} devices it saw; "
+                "the rest are in the device's flash"
+            )
+
+    @staticmethod
     def _decode_rf_scan(data: bytes, time: datetime, records: DecodedRecords) -> None:
         """Port 8 (decoders up to 6.15.x `decodeRfScannerMessage`): a version and alert byte,
         then per band start and stop in MHz times ten, a peak count and a negated RSSI."""
@@ -577,6 +673,10 @@ class OpenCollarDriver:
             self._decode_status(data, time, records, via, layout)
         elif port == PORT_AIR_QUALITY:
             self._decode_air_quality(data, time, records)
+        elif port == PORT_BLE_SCAN:
+            self._decode_ble_scan(data, time, records)
+        elif port == PORT_BLE_SCAN_AGGREGATED:
+            self._decode_ble_scan_aggregated(data, time, records)
         elif port == PORT_RF_SCAN:
             self._decode_rf_scan(data, time, records)
         elif port == PORT_OPEN_SKY:

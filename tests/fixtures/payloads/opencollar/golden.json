@@ -553,6 +553,101 @@
   "source": "wiki uplinks.jsonl"
  },
  {
+  "data_hex": "fa0db820ad6a020c410a36e1029f25",
+  "decoders": {
+   "6.11.2": {
+    "1": {
+     "mac": "a:41:c",
+     "rssi": -74
+    },
+    "2": {
+     "mac": "9f:2:e1",
+     "rssi": -91
+    },
+    "N_BT_res": 2,
+    "t": 1789731000
+   },
+   "6.15.1": {
+    "1": {
+     "mac": "a:41:c",
+     "rssi": -74
+    },
+    "2": {
+     "mac": "9f:2:e1",
+     "rssi": -91
+    },
+    "N_BT_res": 2,
+    "t": 1789731000
+   },
+   "7.2.0": {
+    "1": {
+     "mac": "a:41:c",
+     "rssi": -74
+    },
+    "2": {
+     "mac": "9f:2:e1",
+     "rssi": -91
+    },
+    "N_BT_res": 2,
+    "t": 1789731000
+   }
+  },
+  "port": 11,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
+  "data_hex": "f913020c410a49061401ad6ae1029f280104f3ac6a",
+  "decoders": {
+   "6.11.2": {
+    "1": {
+     "count": 6,
+     "mac": "a:41:c",
+     "rssi": -55,
+     "t": 1789722900
+    },
+    "2": {
+     "count": 1,
+     "mac": "9f:2:e1",
+     "rssi": -88,
+     "t": 1789719300
+    },
+    "N_BT_res": 2
+   },
+   "6.15.1": {
+    "1": {
+     "count": 6,
+     "mac": "a:41:c",
+     "rssi": -55,
+     "t": 1789722900
+    },
+    "2": {
+     "count": 1,
+     "mac": "9f:2:e1",
+     "rssi": -88,
+     "t": 1789719300
+    },
+    "N_BT_res": 2
+   },
+   "7.2.0": {
+    "1": {
+     "count": 6,
+     "mac": "a:41:c",
+     "rssi": -55,
+     "t": 1789722900
+    },
+    "2": {
+     "count": 1,
+     "mac": "9f:2:e1",
+     "rssi": -88,
+     "t": 1789719300
+    },
+    "N_BT_res": 2
+   }
+  },
+  "port": 7,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
   "data_hex": "930e8a255b75623d081f1d346f031f00",
   "decoders": {
    "6.11.2": {
@@ -676,6 +771,106 @@
   },
   "port": 4,
   "source": "kpn_thingpark/kpn_live_uplink_port4.json"
+ },
+ {
+  "data_hex": "f40e04007702994c807486212f440000",
+  "decoders": {
+   "6.11.2": {
+    "acc_x": 0.39215686274509665,
+    "acc_y": -9.019607843137251,
+    "acc_z": 5.098039215686271,
+    "bat": 3690,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 1,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "rf_scan": 0,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 20,
+    "uptime": 76,
+    "ver_fw_major": 2,
+    "ver_fw_minor": 15,
+    "ver_fw_type": 4,
+    "ver_hw_major": 2,
+    "ver_hw_minor": 1,
+    "ver_hw_type": 4
+   },
+   "6.15.1": {
+    "acc_x": 0.39215686274509665,
+    "acc_y": -9.019607843137251,
+    "acc_z": 5.098039215686271,
+    "bat": 3690,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 1,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "rf_scan": 0,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 20,
+    "uptime": 76,
+    "ver_fw_major": 2,
+    "ver_fw_minor": 15,
+    "ver_fw_type": 4,
+    "ver_hw_major": 2,
+    "ver_hw_minor": 1,
+    "ver_hw_type": 4
+   },
+   "7.2.0": {
+    "acc_x": 0.39215686274509665,
+    "acc_y": -9.019607843137251,
+    "acc_z": 5.098039215686271,
+    "bat": 3690,
+    "chg": 0,
+    "err_acc": 0,
+    "err_bat": 0,
+    "err_ble": 0,
+    "err_flash": 0,
+    "err_lr": 0,
+    "err_lr_join": 0,
+    "err_ublox": 0,
+    "err_ublox_fix": 0,
+    "fence": 0,
+    "locked": 1,
+    "lr_sat": 0,
+    "msg": 0,
+    "reset": 4,
+    "sat_support": 0,
+    "sat_try": 0,
+    "temp": 20,
+    "uptime": 76,
+    "ver_fw_major": 2,
+    "ver_fw_minor": 15,
+    "ver_fw_type": 4,
+    "ver_hw_major": 2,
+    "ver_hw_minor": 1,
+    "ver_hw_type": 4,
+    "version": "v2.15"
+   }
+  },
+  "port": 4,
+  "source": "kpn_thingpark/kpn_live_uplink_port4_geoloc.json"
  },
  {
   "data_hex": "f40e0400a0009a3c7f7f731872550000",
