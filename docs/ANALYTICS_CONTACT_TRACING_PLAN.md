@@ -44,9 +44,22 @@ Three things follow, and each one shapes the module:
    Filter 0 sees everything, 3 sees phones. The module reports the filter per device, because a
    contact count means something different under each.
 
-There are no recorded scan payloads in the repository. The driver will be checked against the
-vendored reference decoders with frames built for the purpose, as the AWT driver was, and the
-first real scans are the true test. That is the reason for building the core half first (D256).
+There were no recorded scan payloads in the repository, so the driver was checked against the
+vendored reference decoders with frames built for the purpose. The real test came sooner than
+expected: the PWN project has been scanning for a while and 2,088 port 11 messages were already
+stored and undecoded. Four hundred of them decode with zero failures.
+
+What they show is a use that this design did not have in mind, and it is the one PWN actually
+needs. The readers are **stationary** RangerEdge devices and what they watch for are **EdgeTags**:
+small tags, not OpenCollars, advertising an address that was programmed onto them, riding on
+rabbits. So a sighting is not two animals meeting. It is a fixed point noticing that a tagged
+animal came near it, which is presence, and for an animal with no GNSS it is the only position
+there will ever be. Hence D257 (a tag is a device like any other), D258 (a sighting by a reader
+whose place is known is also a position) and D259 (a device clock that is implausibly far from
+its delivery is not believed, which one of those readers needs by 45 hours).
+
+The four tags are seen weakly, between -86 and -95 dBm, and each reader sees essentially one of
+them, which is worth remembering when the analysis starts drawing conclusions from counts.
 
 ## 2. Decisions
 
