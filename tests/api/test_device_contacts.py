@@ -1529,3 +1529,59 @@ async def test_a_flash_log_counts_each_scan_on_its_own(client, db, bus):
     reported = [s.state["ble_scan"]["reported"] for s in records.states if "ble_scan" in s.state]
     assert reported == [2, 2, 2], "each scan reported two, not two then four then six"
     assert len(records.contacts) == 6
+
+
+async def test_one_scan_is_filed_at_one_time(client, db, bus):
+    """Decision D259, made whole. The clock rule reached the sightings and not the scan that made
+    them, so SP051464 — 45 hours behind — had its contacts at the delivery and the scan's own
+    state and reading two days earlier: one scan under two times, in two tables, and a chart of
+    what a reader heard that ended before its own sightings did."""
+    from shared.models import DeviceStateHistory, Measurement
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+
+    # whole seconds: a scan frame carries a unix timestamp and no finer
+    claimed = (datetime.now(UTC) - timedelta(hours=45)).replace(microsecond=0)
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)], claimed))
+
+    contact = (
+        await db.scalars(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(reader["id"]))
+        )
+    ).one()
+    scan_state = (
+        await db.scalars(
+            select(DeviceStateHistory).where(
+                DeviceStateHistory.device_id == uuid.UUID(reader["id"])
+            )
+        )
+    ).one()
+    reading = (
+        await db.scalars(
+            select(Measurement).where(
+                Measurement.device_id == uuid.UUID(reader["id"]),
+                Measurement.metric_key == "ble_contacts",
+            )
+        )
+    ).one()
+
+    assert contact.time == scan_state.time == reading.time, "one scan, one time"
+    assert contact.time > claimed, "all three moved to the delivery, not left in the past"
+    # and the device's own claim is not thrown away
+    assert contact.device_time == claimed
+    assert scan_state.state["device_time"] == claimed.isoformat()
+    assert scan_state.state["clock_offset_s"] > 44 * 3600

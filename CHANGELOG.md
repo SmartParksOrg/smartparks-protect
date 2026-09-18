@@ -77,6 +77,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- One scan was filed under two different times. The clock rule (decision D259) reached a scan's sightings but not the scan itself, so a reader whose clock runs 45 hours behind had its contacts at the delivery and the scan's own record and reading two days earlier — and the new chart of what it heard therefore ended before its own sightings did. A driver now marks the records whose time is the same clock reading its contacts carry, and those are corrected with them. Only those: a genuine backfill over a live channel carries the past on purpose, and positions are still left alone, since rewriting when an animal was somewhere moves tracks and attribution.
+
 - A stored log carries many scans into one delivery, and each scan claimed to have reported its own sightings plus every sighting before it in the stream. The count is per scan now. Only a flash log or a Bluetooth download reaches this; a scan over the air is one message and was always right.
 
 - A rebuild of the current state took a placed device off the map. The rebuild reads the positions a device produced and a device placed by hand produces none, so it blanked the row — and assigning such a device to an entity queues an attribution job, which meant a scanner vanished from the map a moment after it was put there. A place is not a record and no rebuild can find it, so it is stamped back on afterwards, for the device and for the entity it is on. (2026-09-18.)

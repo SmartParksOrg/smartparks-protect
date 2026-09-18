@@ -548,6 +548,7 @@ class OpenCollarDriver:
                 time=scan_at,
                 state={"ble_scan": {"seen": seen, "reported": kept, "kind": kind}},
                 record_type="ble_scan",
+                device_clock=True,
             )
         )
         # and a number, so a scanner's activity draws as a line like any other value. A scan
@@ -559,6 +560,7 @@ class OpenCollarDriver:
                 metric_key=BLE_CONTACTS_METRIC,
                 value=float(seen),
                 record_type="ble_scan",
+                device_clock=True,
             )
         )
         if seen == 0:

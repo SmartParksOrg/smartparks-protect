@@ -170,6 +170,35 @@ def _ahead_of_delivery(event: SourceEvent, record_time: datetime) -> float:
     return clock_ahead(record_time, received, get_settings().clock_ahead_tolerance_seconds)
 
 
+def _behind_delivery(event: SourceEvent, record_time: datetime) -> float:
+    """Seconds the record's device time runs behind its delivery beyond the tolerance (D259).
+
+    Only on a path that delivers as it happens: a log file carries the past on purpose, and a
+    device out of coverage delivers late for good reasons. Zero when the clock is believable."""
+    if not delivers_live(event.acquisition_channel):
+        return 0.0
+    return clock_behind(
+        record_time, event.ingested_at, get_settings().clock_behind_tolerance_seconds
+    )
+
+
+def _believed_time(event: SourceEvent, record_time: datetime) -> tuple[datetime, float]:
+    """When a record is filed, and by how far its device disagreed (decision D259).
+
+    Every record of one scan has to be filed the same way, or the scan lands twice under two
+    times: SP051464's clock runs 45 hours behind, and its sightings were corrected while the scan
+    that made them was not, so the same scan sat 45 hours apart in two tables and the chart of
+    what a reader heard ended two days before its own sightings did.
+
+    Only records the driver marks `device_clock`, which are the ones whose time is the same
+    reading the contacts carry. Not every old record in a delivery: a genuine backfill over a
+    live channel carries the past on purpose and moving it would be a lie of its own. And not
+    positions, since rewriting when an animal was somewhere moves tracks and attribution, which
+    is a heavier thing than moving a reading and is Tim's to decide."""
+    behind = _behind_delivery(event, record_time)
+    return (event.ingested_at if behind else record_time), behind
+
+
 def event_age(record_time: datetime, ingested_at: datetime) -> float:
     """Seconds between the canonical time of a record and its arrival (architecture 25.8)."""
     return (ingested_at - record_time).total_seconds()
@@ -670,8 +699,6 @@ async def _write_contacts(
     while the row itself was attributed correctly."""
     if not records.contacts:
         return
-    settings = get_settings()
-    live = delivers_live(event.acquisition_channel)
     # what the device was looking for decides what a sighting can mean (decision D260): under
     # the phone filter nothing is resolved, because a phone's address is random and a match
     # would be a coincidence, and nothing is moved by it
@@ -696,16 +723,11 @@ async def _write_contacts(
         # D259): only on a path that arrives as it happens, since a log file carries the past
         # on purpose. The device's own claim stays on the row, so nothing is lost.
         claimed = record.time
-        when = record.time
-        behind = (
-            clock_behind(record.time, event.ingested_at, settings.clock_behind_tolerance_seconds)
-            if live
-            else 0.0
-        )
+        when, behind = _believed_time(event, record.time)
         ahead = _ahead_of_delivery(event, record.time)
-        if behind or ahead:
+        if ahead:
             when = event.ingested_at
-            outcome.clock_ahead += 1 if ahead else 0
+            outcome.clock_ahead += 1
             outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
         # the address is part of the key, so one scan's several sightings are several contacts
         # and the same scan redelivered is one each, as a position redelivered is one position
@@ -923,11 +945,10 @@ async def _write_measurements(
     created_ids: list[int] = []
     for record in records.measurements:
         extra = record.metric_key + (f":{record.fingerprint}" if record.fingerprint else "")
-        key = canonical_key(device.id, record.time, record.record_type, extra)
+        filed = _believed_time(event, record.time)[0] if record.device_clock else record.time
+        key = canonical_key(device.id, filed, record.record_type, extra)
         existing = await session.scalar(
-            select(Measurement).where(
-                Measurement.canonical_key == key, Measurement.time == record.time
-            )
+            select(Measurement).where(Measurement.canonical_key == key, Measurement.time == filed)
         )
         if existing is not None:
             outcome.duplicates += 1
@@ -938,13 +959,16 @@ async def _write_measurements(
             continue
         columns, value_type = _value_columns(record.value)
         await _ensure_metric(session, record.metric_key, value_type)
-        attribution = await attribution_at(record.time)
+        # a reading of a scan follows that scan's sightings (D259); everything else keeps the
+        # time it was given, because a backfill carries the past on purpose
+        when = filed
+        attribution = await attribution_at(when)
         ahead = _ahead_of_delivery(event, record.time)
         if ahead:
             outcome.clock_ahead += 1
             outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
         measurement = Measurement(
-            time=record.time,
+            time=when,
             device_id=device.id,
             project_id=attribution.project_id,
             entity_id=attribution.entity_id,
@@ -986,22 +1010,35 @@ async def _write_states(
     attribution_at: AttributionAt,
 ) -> None:
     for record in records.states:
-        attribution = await attribution_at(record.time)
+        # the same correction its sightings get, or one scan lands twice under two times (D259)
+        when, behind = (
+            _believed_time(event, record.time) if record.device_clock else (record.time, 0.0)
+        )
+        state = (
+            {
+                **record.state,
+                "device_time": record.time.isoformat(),
+                "clock_offset_s": round(behind),
+            }
+            if behind
+            else record.state
+        )
+        attribution = await attribution_at(when)
         exists = await session.scalar(
             select(DeviceStateHistory.id).where(
-                DeviceStateHistory.device_id == device.id, DeviceStateHistory.time == record.time
+                DeviceStateHistory.device_id == device.id, DeviceStateHistory.time == when
             )
         )
         if exists is not None:
             outcome.duplicates += 1
             continue
         row = DeviceStateHistory(
-            time=record.time,
+            time=when,
             device_id=device.id,
             project_id=attribution.project_id,
             source_event_id=event.id,
             source_event_ingested_at=event.ingested_at,
-            state=record.state,
+            state=state,
         )
         session.add(row)
         await session.flush()

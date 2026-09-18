@@ -139,6 +139,8 @@ list whenever the filter is the phone one.
 Some OpenCollar firmware sets the device clock wrongly; one PWN reader is 45 hours behind. On a
 path that delivers as it happens, a contact whose device time is further behind its delivery than
 `CLOCK_BEHIND_TOLERANCE_SECONDS` (a day) is recorded at the delivery time instead, with the
-device's own claim and the offset kept on the row (decision D259). A log file carries the past on
+device's own claim and the offset kept on the row (decision D259). The whole scan moves together
+— its sightings, the record of the scan and the count it reported — because they are one reading
+of one clock and filing them apart would put the same scan in two places. A log file carries the past on
 purpose and is never moved this way, and a device out of coverage for a few hours delivers late
 for good reasons, which is why the tolerance is generous.

@@ -45,6 +45,12 @@ class DecodedMeasurement:
     value: float | bool | str | dict[str, Any]
     record_type: str = "measurement"
     fingerprint: str | None = None
+    #: This time came from the device's own clock at the moment the record is about, and it is
+    #: the same reading the delivery's contacts carry. A clock too far from its delivery is not
+    #: believed (decision D259), and a record marked here is corrected with them, so one scan
+    #: never lands twice under two times. Records whose time the network supplied, and records
+    #: of an unrelated moment in the same delivery, leave it false.
+    device_clock: bool = False
 
 
 @dataclass(slots=True)
@@ -52,6 +58,12 @@ class DecodedState:
     time: datetime
     state: dict[str, Any]
     record_type: str = "state"
+    #: This time came from the device's own clock at the moment the record is about, and it is
+    #: the same reading the delivery's contacts carry. A clock too far from its delivery is not
+    #: believed (decision D259), and a record marked here is corrected with them, so one scan
+    #: never lands twice under two times. Records whose time the network supplied, and records
+    #: of an unrelated moment in the same delivery, leave it false.
+    device_clock: bool = False
 
 
 @dataclass(slots=True)
