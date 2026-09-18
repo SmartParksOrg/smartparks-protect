@@ -1229,8 +1229,14 @@ would be written against frames nobody has seen in the field.
 
 **Deliverables** (the tasks C6 to C10 of the design document):
 
-- [ ] C6 `primitives/contacts.py` and `primitives/proximity.py`, the time sweep over pairs with
-      tests on synthetic tracks.
+- [x] C6 `primitives/contacts.py` and `primitives/proximity.py`, the time sweep over pairs with
+      tests on synthetic tracks. Proximity takes, per fix, the nearest fix of the other subject
+      **in time**, so which track arrived first cannot change the answer; a run of close samples
+      is cut where the fixes stop being close **and where the record falls silent**, since a pair
+      together at dawn and together at noon had all morning to wander apart and calling that one
+      six-hour meeting is true of the record and false of the animals (found by writing the
+      tests). Sightings group into meetings per unordered pair, keep whether each heard the
+      other, and band the signal rather than converting it to metres.
 - [ ] C7 the module, its parameters (`max_distance_m`, `max_time_s` and the rest), the three
       warnings that stop the figures misleading (the fix interval against the time window, the
       accuracy against the distance, no network locations), the tables and charts.
