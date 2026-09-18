@@ -1237,9 +1237,18 @@ would be written against frames nobody has seen in the field.
       six-hour meeting is true of the record and false of the animals (found by writing the
       tests). Sightings group into meetings per unordered pair, keep whether each heard the
       other, and band the signal rather than converting it to metres.
-- [ ] C7 the module, its parameters (`max_distance_m`, `max_time_s` and the rest), the three
+- [x] C7 the module, its parameters (`max_distance_m`, `max_time_s` and the rest), the three
       warnings that stop the figures misleading (the fix interval against the time window, the
       accuracy against the distance, no network locations), the tables and charts.
+      **Changed while building**: the sampling warning measures the interval a subject *actually*
+      reported at rather than the one its settings declare (D225 to D227). A collar set to five
+      minutes that manages an hour because the sky is poor would pass a check against the setting
+      and fail reality, and it is reality that decides whether a proximity means anything.
+      A pair is labelled by its two names in alphabetical order, not by whichever id sorted
+      first, which was an implementation detail leaking into the table.
+      `device_contacts.contact_entity_id` had existed since migration 0042 and nothing wrote to
+      it; the decoder and the repair both fill it now, since a pair of animals is what a study is
+      about and a device is only ever a proxy for one.
 - [ ] C8 the `network` chart kind and the `contact` geometry kind, in the interface and the PDF.
 - [ ] C9 docs: the analytics guide for the module. The rest was done with phase 30: the
       device guide's scanning section (`docs/devices/bluetooth-contacts.md`), the OpenCollar

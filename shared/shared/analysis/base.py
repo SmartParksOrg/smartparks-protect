@@ -61,7 +61,9 @@ class Chart(BaseModel):
     """Chart data the interface draws; never styling."""
 
     key: str
-    kind: Literal["line", "bar", "rose", "stacked"]
+    #: `network` is the contact study's picture: nodes and edges rather than points, so
+    #: its series carry `nodes` and `edges` instead of `points` (design section 4.3).
+    kind: Literal["line", "bar", "rose", "stacked", "network"]
     unit: str | None = None
     series: list[dict[str, Any]]
 
