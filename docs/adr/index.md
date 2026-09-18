@@ -39,3 +39,6 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0031 Analysis as an isolated, optional subsystem](0031-analysis-as-an-isolated-optional-subsystem.md)
 - [0032 Attribution repair as a background job with progress](0032-attribution-as-a-background-job.md)
 - [0033 PDF reports of analyses made on the server](0033-pdf-reports-made-on-the-server.md)
+- [0034 Devices as analysis subjects, with levels](0034-devices-as-analysis-subjects-with-levels.md)
+- [0035 Device settings known per device, from the type's catalogue](0035-device-settings-known-per-device.md)
+- [0036 Contacts as a canonical record type, and a place a device does not report](0036-contacts-as-a-canonical-record-type.md)
