@@ -117,6 +117,9 @@ async def place_sightings(
     written = 0
     newest: dict[uuid.UUID, datetime] = {}
     for sighting in rows:
+        # every sighting counts towards where the device is now, even one whose position was
+        # already written: a repair has to leave the state right, not only the rows
+        newest[sighting.seen_id] = max(newest.get(sighting.seen_id, sighting.when), sighting.when)
         key = keys[(sighting.seen_id, sighting.when)]
         if key in known:
             continue
@@ -139,7 +142,6 @@ async def place_sightings(
             )
         )
         written += 1
-        newest[sighting.seen_id] = max(newest.get(sighting.seen_id, sighting.when), sighting.when)
     # only the newest sighting per device can change where that device is now, and the rule
     # below reads three rows per call, which over a repair of thousands is worth not repeating
     for seen_id, when in newest.items():
