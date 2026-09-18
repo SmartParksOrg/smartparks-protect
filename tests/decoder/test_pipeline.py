@@ -58,7 +58,13 @@ async def test_json_payload_becomes_position_measurements_and_state(db, bus, wor
     }
     event, outcome = await _ingest_and_process(db, bus, world, payload)
     assert outcome.status == ProcessingStatus.PROCESSED
-    assert outcome.created == {"positions": 1, "measurements": 3, "states": 1, "events": 1}
+    assert outcome.created == {
+        "positions": 1,
+        "measurements": 3,
+        "states": 1,
+        "events": 1,
+        "contacts": 0,
+    }
 
     position = await db.scalar(select(Position).where(Position.device_id == world.device.id))
     assert position is not None

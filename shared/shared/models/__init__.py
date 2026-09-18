@@ -49,6 +49,7 @@ from shared.models.settings import DeviceSetting
 from shared.models.timeseries import (
     HYPERTABLES,
     ConnectivityState,
+    DeviceContact,
     DeviceCurrentState,
     DeviceStateHistory,
     EntityCurrentState,
@@ -82,6 +83,7 @@ __all__ = [
     "DataSourceCursor",
     "DataSourceProjectScope",
     "Device",
+    "DeviceContact",
     "DeviceCurrentState",
     "DeviceEntityAssignment",
     "DeviceLogFile",

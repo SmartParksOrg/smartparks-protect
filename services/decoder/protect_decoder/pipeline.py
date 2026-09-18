@@ -43,6 +43,8 @@ from shared.device_drivers.base import (
 )
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import Attribution, resolve_attribution
+from shared.domain.contacts import normalise as normalise_address
+from shared.domain.contacts import resolver_for
 from shared.domain.device_settings import record_settings_frame
 from shared.domain.movement import MOVEMENT_THRESHOLD_MPS2, derive_activity, previous_sample
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
@@ -52,6 +54,7 @@ from shared.domain.reboot import detect_reboots, previous_uptime
 from shared.enums import (
     AcquisitionChannel,
     ConnectivityStatus,
+    ContactResolution,
     ErrorCode,
     LocationSource,
     ProcessingStatus,
@@ -63,6 +66,7 @@ from shared.logger import get_logger
 from shared.models import (
     ConnectivityState,
     Device,
+    DeviceContact,
     DeviceCurrentState,
     DeviceStateHistory,
     DeviceType,
@@ -93,7 +97,13 @@ class Outcome:
     source_event_id: int
     status: ProcessingStatus
     created: dict[str, int] = field(
-        default_factory=lambda: {"positions": 0, "measurements": 0, "states": 0, "events": 0}
+        default_factory=lambda: {
+            "positions": 0,
+            "measurements": 0,
+            "states": 0,
+            "events": 0,
+            "contacts": 0,
+        }
     )
     duplicates: int = 0
     messages: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
@@ -111,6 +121,8 @@ class Outcome:
     outlier_times: set[datetime] = field(default_factory=set)
     # settings the device reported that changed what Protect knew (decision D229)
     settings_changed: int = 0
+    # contacts whose address named more than one device, so they belong to neither (D254)
+    ambiguous_contacts: int = 0
 
 
 async def _previous_fix(
@@ -398,6 +410,7 @@ async def process_source_event(
             await _write_measurements(session, event, device, records, outcome, attribution_at)
             await _write_states(session, event, device, records, outcome, attribution_at)
             await _write_events(session, event, device, records, outcome, attribution_at)
+            await _write_contacts(session, event, device, records, outcome, attribution_at)
             total = sum(outcome.created.values())
             step.metadata.update(created=total, duplicates=outcome.duplicates)
             if outcome.settings_changed:
@@ -624,6 +637,63 @@ async def _ensure_metric(session: AsyncSession, key: str, value_type: ValueType)
         )
         await session.flush()
         log.warning("metric registered automatically, set its unit and category", metric_key=key)
+
+
+async def _write_contacts(
+    session: AsyncSession,
+    event: SourceEvent,
+    device: Device,
+    records: DecodedRecords,
+    outcome: Outcome,
+    attribution_at: AttributionAt,
+) -> None:
+    """A sighting becomes a contact (decision D252), resolved once here and never re-guessed.
+
+    The resolver is read once per delivery rather than per sighting: a scan carries up to twenty
+    of them and they all look at the same fleet."""
+    if not records.contacts:
+        return
+    first = await attribution_at(records.contacts[0].time)
+    resolver = await resolver_for(session, first.project_id)
+    for record in records.contacts:
+        address = normalise_address(record.address)
+        # the address is part of the key, so one scan's several sightings are several contacts
+        # and the same scan redelivered is one each, as a position redelivered is one position
+        key = canonical_key(device.id, record.time, f"contact:{address}")
+        existing = await session.scalar(
+            select(DeviceContact.id).where(
+                DeviceContact.canonical_key == key, DeviceContact.time == record.time
+            )
+        )
+        if existing is not None:
+            outcome.duplicates += 1
+            continue
+        attribution = await attribution_at(record.time)
+        found = resolver.resolve(address, device.id)
+        if found.resolution == ContactResolution.AMBIGUOUS:
+            outcome.ambiguous_contacts += 1
+        session.add(
+            DeviceContact(
+                time=record.time,
+                device_id=device.id,
+                project_id=attribution.project_id,
+                entity_id=attribution.entity_id,
+                address=address,
+                rssi_dbm=record.rssi_dbm,
+                sightings=record.sightings,
+                scan_kind=record.scan_kind,
+                contact_device_id=found.device_id,
+                resolution=found.resolution,
+                candidates=[str(c) for c in found.candidates] or None,
+                canonical_key=key,
+                data_source_id=event.data_source_id,
+                source_event_id=event.id,
+                source_event_ingested_at=event.ingested_at,
+            )
+        )
+        outcome.created["contacts"] += 1
+        outcome.earliest = min(outcome.earliest or record.time, record.time)
+        outcome.latest = max(outcome.latest or record.time, record.time)
 
 
 async def _write_measurements(

@@ -28,7 +28,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from shared.enums import AcquisitionChannel, ConnectivityStatus, IngestionMethod, ProcessingStatus
+from shared.enums import (
+    AcquisitionChannel,
+    ConnectivityStatus,
+    ContactResolution,
+    IngestionMethod,
+    ProcessingStatus,
+)
 from shared.models.base import Base, enum_check
 
 HYPERTABLES: dict[str, str] = {
@@ -421,3 +427,79 @@ class ConnectivityState(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class DeviceContact(Base):
+    """One device a device saw (decision D252): a canonical record beside positions,
+    measurements, states and events.
+
+    A sighting is not an identity. An OpenCollar reports three octets of a neighbour's Bluetooth
+    address, which is what `address` holds, and `resolution` records what was made of it once, on
+    the way in: `resolved` to a device we know, `unknown` when no device of the project ends with
+    those octets (kept all the same, decision D253), or `ambiguous` when more than one does
+    (never guessed, decision D254). Nothing re-decides it on a later read.
+    """
+
+    __tablename__ = "device_contacts"
+    __table_args__ = (
+        Index("uq_device_contacts_canonical_key", "canonical_key", "time", unique=True),
+        Index("ix_device_contacts_device_time", "device_id", "time"),
+        Index("ix_device_contacts_project_time", "project_id", "time"),
+        Index("ix_device_contacts_contact_time", "contact_device_id", "time"),
+        Index("ix_device_contacts_address_time", "address", "time"),
+        enum_check("resolution", ContactResolution, "ck_device_contacts_resolution"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    time: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    device_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey("devices.id", ondelete="RESTRICT"),
+        nullable=False,
+        comment="The device that did the scanning",
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="SET NULL"), comment="Resolved at canonical time"
+    )
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("entities.id", ondelete="SET NULL"), comment="Resolved at canonical time"
+    )
+    address: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        comment="The neighbour as the device names it: three octets, lowercase, aa:bb:cc",
+    )
+    rssi_dbm: Mapped[int | None] = mapped_column(
+        Integer, comment="The strongest signal of the sighting; not a distance"
+    )
+    sightings: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1"), comment="1 unless the device counted"
+    )
+    scan_kind: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="single", comment="single or aggregated"
+    )
+    contact_device_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("devices.id", ondelete="SET NULL"),
+        comment="The device it resolved to; null when unknown or ambiguous",
+    )
+    contact_entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("entities.id", ondelete="SET NULL"),
+        comment="What that device tracked at the time of the sighting",
+    )
+    resolution: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="unknown", comment="resolved, unknown, ambiguous"
+    )
+    candidates: Mapped[list[Any] | None] = mapped_column(
+        JSONB, comment="The device ids an ambiguous address matched, so a person can judge"
+    )
+    canonical_key: Mapped[str] = mapped_column(String(256), nullable=False)
+    data_source_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("data_sources.id", ondelete="SET NULL")
+    )
+    source_event_id: Mapped[int | None] = mapped_column(BigInteger)
+    source_event_ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

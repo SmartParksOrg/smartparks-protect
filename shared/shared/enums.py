@@ -378,3 +378,11 @@ class BackupStatus(StrEnum):
     OK = "ok"
     FAILED = "failed"
     SKIPPED = "skipped"
+
+
+class ContactResolution(StrEnum):
+    """What was made of a sighting's address once, on the way in (decisions D253, D254)."""
+
+    RESOLVED = "resolved"  # exactly one device of the project ends with those octets
+    UNKNOWN = "unknown"  # none does, and the sighting is kept as an unknown neighbour
+    AMBIGUOUS = "ambiguous"  # more than one does, so it is never attributed to either

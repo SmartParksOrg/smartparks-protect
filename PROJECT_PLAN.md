@@ -1159,8 +1159,10 @@ the test.
       device page control. **Corrected while building**: a WebBLE read was in the design and
       cannot work, because Web Bluetooth never exposes a MAC address; asking the device with
       `cmd_get_mac` is the way, and it works over every route including Bluetooth.
-- [ ] C3 migration 0042, the `device_contacts` hypertable (D252), the decoder writing and
-      resolving it (D253 unknown kept, D254 ambiguous marked), the re-resolve action.
+- [x] C3 migration 0042, the `device_contacts` hypertable (D252), the decoder writing and
+      resolving it (D253 unknown kept, D254 ambiguous marked), and the repair: setting a
+      device's address re-resolves the sightings that were waiting for it, in both directions
+      (a second device with the same octets makes an old confident reading ambiguous again).
 - [ ] C4 the Contacts card on the device's Data tab.
 - [ ] C5 the dev server: scanning turned on for a few collars and the first real scans read
       against the decoder. This is the gate to phase 31.

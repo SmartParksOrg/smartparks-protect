@@ -69,6 +69,7 @@ from shared.domain.attribution import active_job, publish_job, recent_jobs
 from shared.domain.battery import BATTERY_ATTRIBUTE
 from shared.domain.battery import PROFILES as BATTERY_PROFILES
 from shared.domain.battery import resolve as resolve_battery
+from shared.domain.contacts import resolve_waiting
 from shared.domain.device_settings import known_settings, record_setting
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
@@ -1167,6 +1168,10 @@ async def set_device_ble_address(
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
         await _require_project_admin(session, user, attribution.project_id)
     device.ble_mac = body.ble_mac.lower() if body.ble_mac else None
+    # the sightings that were waiting for this address stop being unknown neighbours; without
+    # this they stay unknown for ever and read as "never met" (decision D253)
+    await session.flush()
+    repaired = await resolve_waiting(session, device)
     await record_audit(
         session,
         user=user,
@@ -1174,7 +1179,7 @@ async def set_device_ble_address(
         object_type="device",
         object_id=str(device.id),
         project_id=attribution.project_id,
-        details={"ble_mac": device.ble_mac},
+        details={"ble_mac": device.ble_mac, "contacts_resolved": repaired},
     )
     await session.commit()
     return (await with_state(session, [device]))[0]
