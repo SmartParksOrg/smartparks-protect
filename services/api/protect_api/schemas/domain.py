@@ -548,6 +548,42 @@ class DeviceReporting(BaseModel):
     status_source: str | None
 
 
+class BatteryType(BaseModel):
+    """One battery chemistry to choose from (decision D248)."""
+
+    key: str
+    label: str
+    full_v: float
+    empty_v: float
+    warn_v: float
+    critical_v: float
+    reliable: bool
+    note: str
+
+
+class DeviceBattery(BaseModel):
+    """The battery type this device is judged by (decision D248): the type in force and where
+    it came from, the last voltage read with that chemistry, and the types to choose from."""
+
+    battery_type: str | None
+    source: str
+    default_battery_type: str | None
+    default_source: str
+    voltage: float | None
+    percent: int | None
+    level: str | None
+    types: list[BatteryType]
+
+
+class DeviceBatteryUpdate(BaseModel):
+    battery_type: str | None = Field(
+        default=None,
+        max_length=32,
+        description="The battery chemistry of this device; null gives the device type's "
+        "default back",
+    )
+
+
 class DeviceReportingUpdate(BaseModel):
     expected_fix_interval_s: int | None = Field(
         default=None,

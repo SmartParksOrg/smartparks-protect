@@ -42,6 +42,8 @@ from shared.curation.effective import (
 )
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
+from shared.domain.battery import BatteryProfile
+from shared.domain.battery import resolve as resolve_battery
 from shared.domain.health import DeviceHealth, device_health
 from shared.models import (
     Device,
@@ -198,7 +200,8 @@ async def current_state(
     rows = (await session.execute(base.order_by(EntityCurrentState.entity_id).limit(limit))).all()
     device_ids = {row[0].device_id for row in rows if row[0].device_id}
     device_states: dict[uuid.UUID, DeviceCurrentState] = {}
-    drivers_by_device: dict[uuid.UUID, str | None] = {}
+    # the driver key and what the battery type is resolved from, per device (decision D248)
+    drivers_by_device: dict[uuid.UUID, tuple[str | None, dict[str, Any], dict[str, Any]]] = {}
     if device_ids:
         device_states = {
             s.device_id: s
@@ -209,10 +212,15 @@ async def current_state(
             ).all()
         }
         drivers_by_device = {
-            row[0]: row[1]
+            row[0]: (row[1], row[2] or {}, row[3] or {})
             for row in (
                 await session.execute(
-                    select(Device.id, DeviceType.driver_key)
+                    select(
+                        Device.id,
+                        DeviceType.driver_key,
+                        Device.attributes,
+                        DeviceType.default_settings,
+                    )
                     .join(DeviceType, DeviceType.id == Device.device_type_id)
                     .where(Device.id.in_(device_ids))
                 )
@@ -245,8 +253,13 @@ async def current_state(
 
         device_state = device_states.get(state.device_id) if state.device_id else None
         health = None
+        battery = None
         if device_state is not None:
-            driver = DRIVERS.get(drivers_by_device.get(state.device_id) or "")
+            driver_key, attributes, defaults = drivers_by_device.get(
+                state.device_id, (None, {}, {})
+            )
+            driver = DRIVERS.get(driver_key or "")
+            battery = resolve_battery(attributes, defaults, driver).profile
             health = device_health(
                 getattr(driver, "health", None),
                 latest_measurements=device_state.latest_measurements,
@@ -255,6 +268,7 @@ async def current_state(
                 last_seen_at=device_state.last_seen_at,
                 last_movement_at=device_state.last_movement_at,
                 last_reset_at=device_state.last_reset_at,
+                battery=battery,
             )
 
         features.append(
@@ -288,6 +302,8 @@ async def current_state(
                     "active_alert_count": state.active_alert_count,
                     "health_level": health.level if health else None,
                     "battery_voltage": device_state.battery_voltage if device_state else None,
+                    "battery_percent": _battery_percent(battery, device_state),
+                    "battery_type": battery.key if battery else None,
                     "last_movement_at": device_state.last_movement_at.isoformat()
                     if device_state and device_state.last_movement_at
                     else None,
@@ -350,6 +366,7 @@ async def devices_state(
         assigned.c.since,
         assigned.c.project_id,
         func.ST_AsGeoJSON(DeviceCurrentState.latest_position),
+        DeviceType.default_settings,
     )
     if context.is_all:
         # the all scope (decision D120): devices in no project come too, with project None
@@ -392,9 +409,11 @@ async def devices_state(
     for row in rows:
         device, type_key, type_icon, driver_key, type_label = row[:5]
         state, since, device_project_id, geojson = row[5:9]
+        type_defaults = row[9]
         health = None
+        driver = DRIVERS.get(driver_key or "")
+        battery = resolve_battery(device.attributes, type_defaults, driver).profile
         if state is not None:
-            driver = DRIVERS.get(driver_key or "")
             health = device_health(
                 getattr(driver, "health", None),
                 latest_measurements=state.latest_measurements,
@@ -403,6 +422,7 @@ async def devices_state(
                 last_seen_at=state.last_seen_at,
                 last_movement_at=state.last_movement_at,
                 last_reset_at=state.last_reset_at,
+                battery=battery,
             )
         entity = tracking.get(device.id)
         features.append(
@@ -433,6 +453,8 @@ async def devices_state(
                     "accuracy_m": state.latest_accuracy_m if state else None,
                     "health_level": health.level if health else None,
                     "battery_voltage": state.battery_voltage if state else None,
+                    "battery_percent": _battery_percent(battery, state),
+                    "battery_type": battery.key if battery else None,
                     "last_movement_at": state.last_movement_at.isoformat()
                     if state and state.last_movement_at
                     else None,
@@ -501,6 +523,15 @@ async def current_state_tile(
         sql, {"z": z, "x": x, "y": y, "project_id": context.project_id, "limit": MAX_FEATURES}
     )
     return Response(content=bytes(tile or b""), media_type="application/vnd.mapbox-vector-tile")
+
+
+def _battery_percent(
+    battery: BatteryProfile | None, state: DeviceCurrentState | None
+) -> int | None:
+    """The share of charge the device's battery type makes of its last voltage (D248)."""
+    if battery is None or state is None or state.battery_voltage is None:
+        return None
+    return battery.percent(state.battery_voltage)
 
 
 def _latest_value(state: DeviceCurrentState | None, key: str) -> float | None:
@@ -648,6 +679,11 @@ async def device_state(
         last_seen_at=current.last_seen_at,
         last_movement_at=current.last_movement_at,
         last_reset_at=current.last_reset_at,
+        battery=resolve_battery(
+            device.attributes,
+            device_type.default_settings if device_type else None,
+            driver,
+        ).profile,
     )
     row = await session.scalar(
         select(DeviceStateHistory)

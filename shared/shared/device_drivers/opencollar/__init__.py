@@ -279,8 +279,11 @@ def _unix(value: int) -> datetime | None:
 
 
 # The device's health (decision D104): the port 4 status message every device sends on its
-# interval, plus the last fix. Battery thresholds follow the firmware's own low battery
-# behaviour (research 3.4); GNSS accuracy above 30 m is a poor fix.
+# interval, plus the last fix. The battery thresholds here are the fallback for a device with no
+# battery type: they assume a primary lithium cell, which is why the driver declares that type
+# (decision D248). A device with a rechargeable cell is given its own type on the device page,
+# and then the chemistry's thresholds and its share of charge take over. GNSS accuracy above
+# 30 m is a poor fix.
 OPENCOLLAR_HEALTH: tuple[HealthField, ...] = (
     HealthField("battery_voltage", "Battery", unit="V", warn_below=3.6, critical_below=3.45),
     HealthField("charging_voltage", "Charging", unit="V"),
@@ -302,6 +305,7 @@ class OpenCollarDriver:
     key: ClassVar[str] = "opencollar"
     label: ClassVar[str] = "OpenCollar Edge"
     health: ClassVar[tuple[HealthField, ...]] = OPENCOLLAR_HEALTH
+    default_battery_type: ClassVar[str] = "primary_lithium"
     capabilities: ClassVar[frozenset[str]] = frozenset(
         {
             "gnss",

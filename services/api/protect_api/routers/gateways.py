@@ -28,6 +28,7 @@ from protect_api.schemas.integrations import (
     GatewayDetail,
     GatewayDeviceStat,
     GatewayLocationRequest,
+    GatewayNameRequest,
     GatewayRead,
     GatewayUpdateRequest,
 )
@@ -422,6 +423,47 @@ def _set_location(gateway: Gateway, latitude: float, longitude: float) -> None:
     gateway.location_at = utc_now()
 
 
+async def _in_scope_or_404(session: AsyncSession, context: ScopeContext, gateway: Gateway) -> None:
+    """A gateway a project may edit: one of the sources the project sees (decision D239). The
+    all scope, a server admin, reaches every gateway."""
+    if context.is_all:
+        return
+    since, until = _window(MAX_HOURS)
+    device_ids = await _scope_device_ids(session, context, since, until)
+    visible = await visible_source_ids(session, context.project_id, device_ids)
+    if gateway.data_source_id not in visible:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Gateway not found")
+
+
+@router.patch("/projects/{project_id}/gateways/{gateway_id}", response_model=GatewayRead)
+async def rename_gateway(
+    gateway_id: uuid.UUID,
+    body: GatewayNameRequest,
+    context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> GatewayRead:
+    """A project admin names a gateway (decision D247): the platform's own name is often the
+    gateway id or a name nobody in the field recognises, and the name is what every list, the
+    map and the reports show. An empty name gives the platform's back. The gateway must be one
+    the project sees."""
+    gateway = await get_or_404(session, Gateway, gateway_id, "Gateway")
+    await _in_scope_or_404(session, context, gateway)
+    name = (body.name or "").strip()
+    gateway.name_override = name or None
+    await record_audit(
+        session,
+        user=context.user,
+        action="gateway.renamed",
+        object_type="gateway",
+        object_id=str(gateway.id),
+        project_id=context.project_id,
+        details={"name_override": gateway.name_override},
+    )
+    await session.commit()
+    source = await session.get(DataSource, gateway.data_source_id)
+    return gateway_read(gateway, source)
+
+
 @router.patch("/projects/{project_id}/gateways/{gateway_id}/location", response_model=GatewayRead)
 async def set_gateway_location(
     gateway_id: uuid.UUID,
@@ -435,12 +477,7 @@ async def set_gateway_location(
     together set it, both empty clear a location set by hand (the platform's next sync may
     fill it again). The all scope, a server admin, reaches every gateway."""
     gateway = await get_or_404(session, Gateway, gateway_id, "Gateway")
-    if not context.is_all:
-        since, until = _window(MAX_HOURS)
-        device_ids = await _scope_device_ids(session, context, since, until)
-        visible = await visible_source_ids(session, context.project_id, device_ids)
-        if gateway.data_source_id not in visible:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Gateway not found")
+    await _in_scope_or_404(session, context, gateway)
     if (body.latitude is None) != (body.longitude is None):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "latitude and longitude go together"

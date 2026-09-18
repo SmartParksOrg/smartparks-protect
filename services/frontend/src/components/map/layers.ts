@@ -67,6 +67,9 @@ export interface EntityFeatureProperties {
   active_alert_count: number;
   health_level?: string | null;
   battery_voltage?: number | null;
+  /** The share of charge the device's battery type makes of the voltage (decision D248). */
+  battery_percent?: number | null;
+  battery_type?: string | null;
   /** The last status message whose accelerometer changed (Tim, 2026-09-14), and the newest
    * change itself; absent for a device that reports no accelerometer. */
   last_movement_at?: string | null;
@@ -101,6 +104,9 @@ export interface DeviceFeatureProperties {
   accuracy_m?: number | null;
   health_level?: string | null;
   battery_voltage?: number | null;
+  /** The share of charge the device's battery type makes of the voltage (decision D248). */
+  battery_percent?: number | null;
+  battery_type?: string | null;
   /** The last status message whose accelerometer changed (Tim, 2026-09-14), and the newest
    * change itself; absent for a device that reports no accelerometer. */
   last_movement_at?: string | null;

@@ -142,6 +142,9 @@ class DeviceDriver(Protocol):
     # Drivers without it accept no commands.
     # Optional: `health: ClassVar[tuple[HealthField, ...]]`, the lines of the device's health
     # card and the compact health line (decision D104). Drivers without it show last seen only.
+    # Optional: `default_battery_type: ClassVar[str]`, a key of `shared.domain.battery.PROFILES`
+    # the family usually carries (decision D248). A device type or a device overrides it; without
+    # it the driver's own `HealthField` thresholds judge the battery as before.
 
     def decode(self, event: SourceEventData) -> DecodedRecords: ...
 

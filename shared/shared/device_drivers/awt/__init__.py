@@ -43,6 +43,13 @@ as `battery_voltage`, the temperature as `device_temperature`, a `status` state 
 flags, the firmware and the reporting interval, a `settings` state with the fix interval the
 device says it keeps (read by the expected-interval rules, decision D242), and a `device_error`
 event when a problem flag is on.
+
+What does not come out, and why (reviewed 2026-09-18): the movement line (decision D204) is
+derived from `acceleration_x/y/z` in a status message, in metres per second squared. AWT's
+accelerometer arrives as three signed counts whose full scale the codec does not state, so the
+axes are kept raw under `accelerometer` in the status and no movement is derived; a made-up
+scale would give a made-up threshold. With AWT's scale the three values become
+`acceleration_x/y/z` and the movement line follows without further work.
 """
 
 from __future__ import annotations

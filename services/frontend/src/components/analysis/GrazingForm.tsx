@@ -490,6 +490,19 @@ export function GrazingForm({
             />
             {t("Rows per season")}
           </label>
+          <label
+            className="flex items-center gap-2 text-sm"
+            title={t(
+              "The vegetation index per area from satellite imagery. It asks an outside provider and is the slowest part of the run; without it everything else is the same.",
+            )}
+          >
+            <Switch
+              checked={state.grazing.landscape}
+              onCheckedChange={(on) => grazing({ landscape: on })}
+              aria-label={t("Vegetation")}
+            />
+            {t("Vegetation per area (slow)")}
+          </label>
           <Button
             type="button"
             variant="ghost"

@@ -918,6 +918,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/battery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Battery
+         * @description The battery type the device is judged by and what the last voltage means with it
+         *     (decision D248), plus every type to choose from.
+         */
+        get: operations["device_battery_api_v1_devices__device_id__battery_get"];
+        /**
+         * Set Device Battery
+         * @description The battery type a person sets for this device (decision D248), kept on the device's
+         *     attributes with who set it and when; null gives the device type's default back. Project
+         *     admins of the device's current project, or a server admin.
+         */
+        put: operations["set_device_battery_api_v1_devices__device_id__battery_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/attribution-jobs": {
         parameters: {
             query?: never;
@@ -1644,6 +1671,69 @@ export interface paths {
         head?: never;
         /** Update Organization */
         patch: operations["update_organization_api_v1_admin_organizations__organization_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/environment/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Providers
+         * @description What the server can read environmental layers from, and whether it is set up.
+         */
+        get: operations["list_providers_api_v1_admin_environment_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/environment/providers/copernicus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Copernicus
+         * @description The account the server uses. An omitted secret keeps the one stored, so the page can
+         *     save the client id or the switch without the secret being typed again; an empty secret
+         *     clears it.
+         */
+        put: operations["set_copernicus_api_v1_admin_environment_providers_copernicus_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/environment/providers/copernicus/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Copernicus
+         * @description Ask the provider for a token and the collection, which costs no processing quota. The
+         *     stored account is tested, or the environment's when nothing is stored.
+         */
+        post: operations["test_copernicus_api_v1_admin_environment_providers_copernicus_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/ingest/http/{data_source_id}": {
@@ -4136,7 +4226,14 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Rename Gateway
+         * @description A project admin names a gateway (decision D247): the platform's own name is often the
+         *     gateway id or a name nobody in the field recognises, and the name is what every list, the
+         *     map and the reports show. An empty name gives the platform's back. The gateway must be one
+         *     the project sees.
+         */
+        patch: operations["rename_gateway_api_v1_projects__project_id__gateways__gateway_id__patch"];
         trace?: never;
     };
     "/api/v1/projects/{project_id}/connectivity": {
@@ -5120,6 +5217,8 @@ export interface components {
             method_version: string;
             /** Progress */
             progress: number;
+            /** Progress Step */
+            progress_step?: string | null;
             /** Cancel Requested */
             cancel_requested: boolean;
             /** Input Count */
@@ -5604,6 +5703,28 @@ export interface components {
             latest: {
                 [key: string]: components["schemas"]["BackupRunRead"];
             };
+        };
+        /**
+         * BatteryType
+         * @description One battery chemistry to choose from (decision D248).
+         */
+        BatteryType: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Full V */
+            full_v: number;
+            /** Empty V */
+            empty_v: number;
+            /** Warn V */
+            warn_v: number;
+            /** Critical V */
+            critical_v: number;
+            /** Reliable */
+            reliable: boolean;
+            /** Note */
+            note: string;
         };
         /** BearerResponse */
         BearerResponse: {
@@ -6787,6 +6908,37 @@ export interface components {
             /** Error */
             error?: string | null;
         };
+        /**
+         * DeviceBattery
+         * @description The battery type this device is judged by (decision D248): the type in force and where
+         *     it came from, the last voltage read with that chemistry, and the types to choose from.
+         */
+        DeviceBattery: {
+            /** Battery Type */
+            battery_type: string | null;
+            /** Source */
+            source: string;
+            /** Default Battery Type */
+            default_battery_type: string | null;
+            /** Default Source */
+            default_source: string;
+            /** Voltage */
+            voltage: number | null;
+            /** Percent */
+            percent: number | null;
+            /** Level */
+            level: string | null;
+            /** Types */
+            types: components["schemas"]["BatteryType"][];
+        };
+        /** DeviceBatteryUpdate */
+        DeviceBatteryUpdate: {
+            /**
+             * Battery Type
+             * @description The battery chemistry of this device; null gives the device type's default back
+             */
+            battery_type?: string | null;
+        };
         /** DeviceConnectivity */
         DeviceConnectivity: {
             /**
@@ -7851,6 +8003,49 @@ export interface components {
              */
             location_fallback_hours?: number | null;
         };
+        /**
+         * EnvironmentProviderRead
+         * @description An environmental data provider as the server has it (decision D250).
+         */
+        EnvironmentProviderRead: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Layers */
+            layers: string[];
+            /** Enabled */
+            enabled: boolean;
+            /** Client Id */
+            client_id: string;
+            /** Secret Set */
+            secret_set: boolean;
+            /** Configured */
+            configured: boolean;
+            /** From Environment */
+            from_environment: boolean;
+            /** Active */
+            active: boolean;
+        };
+        /** EnvironmentProviderUpdate */
+        EnvironmentProviderUpdate: {
+            /** Client Id */
+            client_id?: string | null;
+            /**
+             * Client Secret
+             * @description Omitted keeps the stored secret; empty clears it
+             */
+            client_secret?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+        };
+        /** EnvironmentTestResult */
+        EnvironmentTestResult: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+        };
         /** ErrorModel */
         ErrorModel: {
             /** Detail */
@@ -8286,6 +8481,14 @@ export interface components {
             /** Altitude M */
             altitude_m?: number | null;
         };
+        /**
+         * GatewayNameRequest
+         * @description The name a person gives a gateway (decision D247): empty gives the platform's name back.
+         */
+        GatewayNameRequest: {
+            /** Name */
+            name?: string | null;
+        };
         /** GatewayRead */
         GatewayRead: {
             /**
@@ -8455,6 +8658,8 @@ export interface components {
             level?: string | null;
             /** At */
             at?: string | null;
+            /** Percent */
+            percent?: number | null;
         };
         /**
          * HeatResponse
@@ -14182,6 +14387,72 @@ export interface operations {
             };
         };
     };
+    device_battery_api_v1_devices__device_id__battery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceBattery"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_device_battery_api_v1_devices__device_id__battery_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceBatteryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceBattery"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     attribution_jobs_api_v1_devices__device_id__attribution_jobs_get: {
         parameters: {
             query?: never;
@@ -15959,6 +16230,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_providers_api_v1_admin_environment_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentProviderRead"][];
+                };
+            };
+        };
+    };
+    set_copernicus_api_v1_admin_environment_providers_copernicus_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnvironmentProviderUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentProviderRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_copernicus_api_v1_admin_environment_providers_copernicus_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentTestResult"];
                 };
             };
         };
@@ -21181,6 +21525,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GatewayDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_gateway_api_v1_projects__project_id__gateways__gateway_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gateway_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatewayNameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayRead"];
                 };
             };
             /** @description Validation Error */

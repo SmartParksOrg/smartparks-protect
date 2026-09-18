@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 
 import type { AnalysisRun } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
+import { ProgressBar } from "@/components/common/ProgressBar";
 import { Badge } from "@/components/ui/badge";
 import { formatAgo, formatTime } from "@/lib/format";
 import { isActive } from "@/lib/analyses";
@@ -42,15 +43,23 @@ export function RunStatus({
         )}
         {label[run.status] ?? run.status}
       </Badge>
-      {run.status === "running" && (
-        <span className="text-muted-foreground">{run.progress}%</span>
-      )}
       <span
         className="text-muted-foreground"
         title={formatTime(run.created_at)}
       >
         {t("Started {{ago}}", { ago: formatAgo(run.created_at, now) })}
       </span>
+      {isActive(run.status) && (
+        // a bar rather than a number (Tim, 2026-09-18): it shows that the run moves and how
+        // fast, and the step says what it is busy with (decision D249)
+        <div className="basis-full space-y-1">
+          <ProgressBar percent={run.progress} className="max-w-md" />
+          <div className="text-xs text-muted-foreground">
+            {run.progress}%
+            {run.progress_step ? ` · ${run.progress_step}` : ""}
+          </div>
+        </div>
+      )}
       {run.status === "queued" && workerSilent && (
         <Callout kind="warning" className="basis-full">
           {t(

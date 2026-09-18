@@ -4270,6 +4270,112 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/battery": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Battery",
+    "description": "The battery type the device is judged by and what the last voltage means with it\n(decision D248), plus every type to choose from.",
+    "operationId": "device_battery_api_v1_devices__device_id__battery_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceBattery"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Set Device Battery",
+    "description": "The battery type a person sets for this device (decision D248), kept on the device's\nattributes with who set it and when; null gives the device type's default back. Project\nadmins of the device's current project, or a server admin.",
+    "operationId": "set_device_battery_api_v1_devices__device_id__battery_put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeviceBatteryUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceBattery"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/attribution-jobs": {
    "get": {
     "tags": [
@@ -7209,6 +7315,111 @@
       }
      }
     }
+   }
+  },
+  "/api/v1/admin/environment/providers": {
+   "get": {
+    "tags": [
+     "environment"
+    ],
+    "summary": "List Providers",
+    "description": "What the server can read environmental layers from, and whether it is set up.",
+    "operationId": "list_providers_api_v1_admin_environment_providers_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/EnvironmentProviderRead"
+         },
+         "type": "array",
+         "title": "Response List Providers Api V1 Admin Environment Providers Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/admin/environment/providers/copernicus": {
+   "put": {
+    "tags": [
+     "environment"
+    ],
+    "summary": "Set Copernicus",
+    "description": "The account the server uses. An omitted secret keeps the one stored, so the page can\nsave the client id or the switch without the secret being typed again; an empty secret\nclears it.",
+    "operationId": "set_copernicus_api_v1_admin_environment_providers_copernicus_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EnvironmentProviderUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EnvironmentProviderRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/admin/environment/providers/copernicus/test": {
+   "post": {
+    "tags": [
+     "environment"
+    ],
+    "summary": "Test Copernicus",
+    "description": "Ask the provider for a token and the collection, which costs no processing quota. The\nstored account is tested, or the environment's when nothing is stored.",
+    "operationId": "test_copernicus_api_v1_admin_environment_providers_copernicus_test_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EnvironmentTestResult"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
    }
   },
   "/api/v1/ingest/http/{data_source_id}": {
@@ -18334,6 +18545,72 @@
       }
      }
     }
+   },
+   "patch": {
+    "tags": [
+     "gateways"
+    ],
+    "summary": "Rename Gateway",
+    "description": "A project admin names a gateway (decision D247): the platform's own name is often the\ngateway id or a name nobody in the field recognises, and the name is what every list, the\nmap and the reports show. An empty name gives the platform's back. The gateway must be one\nthe project sees.",
+    "operationId": "rename_gateway_api_v1_projects__project_id__gateways__gateway_id__patch",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "gateway_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Gateway Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GatewayNameRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GatewayRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/api/v1/projects/{project_id}/connectivity": {
@@ -21813,6 +22090,17 @@
       "type": "integer",
       "title": "Progress"
      },
+     "progress_step": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Progress Step"
+     },
      "cancel_requested": {
       "type": "boolean",
       "title": "Cancel Requested"
@@ -23158,6 +23446,55 @@
     ],
     "title": "BackupStatusRead",
     "description": "The Backup and recovery status of architecture 28.11."
+   },
+   "BatteryType": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "full_v": {
+      "type": "number",
+      "title": "Full V"
+     },
+     "empty_v": {
+      "type": "number",
+      "title": "Empty V"
+     },
+     "warn_v": {
+      "type": "number",
+      "title": "Warn V"
+     },
+     "critical_v": {
+      "type": "number",
+      "title": "Critical V"
+     },
+     "reliable": {
+      "type": "boolean",
+      "title": "Reliable"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "full_v",
+     "empty_v",
+     "warn_v",
+     "critical_v",
+     "reliable",
+     "note"
+    ],
+    "title": "BatteryType",
+    "description": "One battery chemistry to choose from (decision D248)."
    },
    "BearerResponse": {
     "properties": {
@@ -26285,6 +26622,112 @@
     ],
     "title": "DependencyStatus"
    },
+   "DeviceBattery": {
+    "properties": {
+     "battery_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Battery Type"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "default_battery_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Default Battery Type"
+     },
+     "default_source": {
+      "type": "string",
+      "title": "Default Source"
+     },
+     "voltage": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Voltage"
+     },
+     "percent": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Percent"
+     },
+     "level": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Level"
+     },
+     "types": {
+      "items": {
+       "$ref": "#/components/schemas/BatteryType"
+      },
+      "type": "array",
+      "title": "Types"
+     }
+    },
+    "type": "object",
+    "required": [
+     "battery_type",
+     "source",
+     "default_battery_type",
+     "default_source",
+     "voltage",
+     "percent",
+     "level",
+     "types"
+    ],
+    "title": "DeviceBattery",
+    "description": "The battery type this device is judged by (decision D248): the type in force and where\nit came from, the last voltage read with that chemistry, and the types to choose from."
+   },
+   "DeviceBatteryUpdate": {
+    "properties": {
+     "battery_type": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 32
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Battery Type",
+      "description": "The battery chemistry of this device; null gives the device type's default back"
+     }
+    },
+    "type": "object",
+    "title": "DeviceBatteryUpdate"
+   },
    "DeviceConnectivity": {
     "properties": {
      "device_id": {
@@ -29314,6 +29757,123 @@
     "type": "object",
     "title": "EntityUpdate"
    },
+   "EnvironmentProviderRead": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "layers": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Layers"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "client_id": {
+      "type": "string",
+      "title": "Client Id"
+     },
+     "secret_set": {
+      "type": "boolean",
+      "title": "Secret Set"
+     },
+     "configured": {
+      "type": "boolean",
+      "title": "Configured"
+     },
+     "from_environment": {
+      "type": "boolean",
+      "title": "From Environment"
+     },
+     "active": {
+      "type": "boolean",
+      "title": "Active"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "layers",
+     "enabled",
+     "client_id",
+     "secret_set",
+     "configured",
+     "from_environment",
+     "active"
+    ],
+    "title": "EnvironmentProviderRead",
+    "description": "An environmental data provider as the server has it (decision D250)."
+   },
+   "EnvironmentProviderUpdate": {
+    "properties": {
+     "client_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Client Id"
+     },
+     "client_secret": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 400
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Client Secret",
+      "description": "Omitted keeps the stored secret; empty clears it"
+     },
+     "enabled": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Enabled"
+     }
+    },
+    "type": "object",
+    "title": "EnvironmentProviderUpdate"
+   },
+   "EnvironmentTestResult": {
+    "properties": {
+     "ok": {
+      "type": "boolean",
+      "title": "Ok"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ok",
+     "detail"
+    ],
+    "title": "EnvironmentTestResult"
+   },
    "ErrorModel": {
     "properties": {
      "detail": {
@@ -30577,6 +31137,25 @@
     "title": "GatewayLocationRequest",
     "description": "A location set by a person for a gateway the platform gave none (decision D239): both\ncoordinates, or both empty to clear a location set by hand."
    },
+   "GatewayNameRequest": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "title": "GatewayNameRequest",
+    "description": "The name a person gives a gateway (decision D247): empty gives the platform's name back."
+   },
    "GatewayRead": {
     "properties": {
      "id": {
@@ -31066,6 +31645,17 @@
        }
       ],
       "title": "At"
+     },
+     "percent": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Percent"
      }
     },
     "type": "object",

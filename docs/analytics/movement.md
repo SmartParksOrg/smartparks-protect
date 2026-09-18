@@ -19,7 +19,7 @@ The line under the form estimates the run: how many animals, days and fixes it w
 
 ## The run
 
-The analysis worker computes a run, one at a time per server, with its own statement and wall-clock timeouts. A run is unsaved until it is given a name with "Save…"; an unsaved run expires a few days after it finished (`ANALYSIS_RETENTION_DAYS`, 7 by default) and a saved one never. A run is visible to the person who ran it only, until they switch "Shared with the project" on; project admins see every run of the project and may rename, share or delete it. Anyone with `project:read` sees the runs they may see, inside their scope; `analysis:run` (Analysts and Admins) starts, saves, shares, cancels and deletes their own runs.
+The analysis worker computes a run, one at a time per server, with its own statement and wall-clock timeouts. While it runs, the page polls it and shows a bar with the percentage and the step it is busy with, so a long run can be seen to be moving (decision D249). A run is unsaved until it is given a name with "Save…"; an unsaved run expires a few days after it finished (`ANALYSIS_RETENTION_DAYS`, 7 by default) and a saved one never. A run is visible to the person who ran it only, until they switch "Shared with the project" on; project admins see every run of the project and may rename, share or delete it. Anyone with `project:read` sees the runs they may see, inside their scope; `analysis:run` (Analysts and Admins) starts, saves, shares, cancels and deletes their own runs.
 
 ## What the result holds
 

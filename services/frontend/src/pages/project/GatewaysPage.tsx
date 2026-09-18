@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
-import { MapPin } from "lucide-react";
+import { MapPin, Pencil } from "lucide-react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -14,6 +14,7 @@ import { JsonView } from "@/components/common/JsonView";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { GatewayLocationDialog } from "@/components/network/GatewayLocationDialog";
+import { GatewayNameDialog } from "@/components/network/GatewayNameDialog";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/useProjects";
 import { DataTable } from "@/components/data/DataTable";
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatAgo, formatTime } from "@/lib/format";
+import { gatewayCoords, isRelay, locationSourceLabel } from "@/lib/gateways";
 
 const WINDOWS = [
   { hours: 1, label: i18n.t("Last hour") },
@@ -43,20 +45,7 @@ const WINDOWS = [
   { hours: 720, label: i18n.t("Last 30 days") },
 ];
 
-/** A Gateway Mesh relay, marked by the network sync (decision D237). */
-const isRelay = (gateway: Gateway) =>
-  (gateway.attributes as Record<string, unknown> | undefined)?.kind === "relay";
-
-const locationSourceLabel = (source: string, t: (k: string) => string) =>
-  source === "admin"
-    ? t("an administrator")
-    : source === "reception"
-      ? t("the coordinates on an uplink")
-      : t("the platform's gateway list");
-const coords = (g: Gateway) => {
-  const c = (g.geometry as { coordinates?: number[] } | null)?.coordinates;
-  return c ? `${c[1].toFixed(4)}, ${c[0].toFixed(4)}` : "";
-};
+const coords = (g: Gateway) => gatewayCoords(g);
 const signal = (
   rssi: number | null | undefined,
   snr: number | null | undefined,
@@ -104,6 +93,7 @@ export function GatewaysPage() {
   const silent = shown?.filter((g) => g.receptions === 0).length ?? 0;
   const [selected, setSelected] = useState<Gateway | null>(null);
   const [placing, setPlacing] = useState<Gateway | null>(null);
+  const [renaming, setRenaming] = useState<Gateway | null>(null);
   const { can } = usePermissions(projectId);
   // where the picking map looks for a gateway without a location: another gateway of the
   // same source that has one, else nothing
@@ -413,17 +403,26 @@ export function GatewaysPage() {
                 </div>
               )}
               {can("project:write") && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPlacing(selected)}
-                >
-                  <MapPin className="size-4" />{" "}
-                  {coords(selected) ? t("Change location") : t("Set location")}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRenaming(selected)}
+                  >
+                    <Pencil className="size-4" /> {t("Rename")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPlacing(selected)}
+                  >
+                    <MapPin className="size-4" />{" "}
+                    {coords(selected) ? t("Change location") : t("Set location")}
+                  </Button>
+                </div>
               )}
               {selected.geometry && (
-                <div className="h-48">
+                <div className="h-56">
                   <MiniMap
                     point={
                       (selected.geometry as { coordinates: [number, number] })
@@ -499,6 +498,15 @@ export function GatewaysPage() {
           )}
         </DialogContent>
       </Dialog>
+      <GatewayNameDialog
+        key={`name-${renaming?.id ?? "none"}`}
+        projectId={projectId}
+        gateway={renaming}
+        onClose={() => {
+          setRenaming(null);
+          setSelected(null);
+        }}
+      />
       <GatewayLocationDialog
         key={placing?.id ?? "none"}
         projectId={projectId}

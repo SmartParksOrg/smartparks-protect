@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+
+import { batteryTypeLabel } from "@/lib/battery";
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
@@ -35,24 +37,45 @@ const RANGE_LABELS: Record<string, string> = {
 export function BatteryValue({
   deviceId,
   voltage,
+  percent,
+  batteryType,
   open,
   onToggle,
   className,
 }: {
   deviceId: string | null | undefined;
   voltage: number;
+  /** The share of charge the device's battery type makes of the voltage (decision D248). */
+  percent?: number | null;
+  /** Which chemistry judged it, for the explanation behind the value. */
+  batteryType?: string | null;
   open: boolean;
   onToggle: () => void;
   className?: string;
 }) {
   const { t } = useTranslation();
-  const label = `${voltage.toFixed(2)} V`;
-  if (!deviceId) return <span className={className}>{label}</span>;
+  const label =
+    percent != null
+      ? `${voltage.toFixed(2)} V · ${percent}%`
+      : `${voltage.toFixed(2)} V`;
+  // a voltage says nothing without the chemistry it is read against (Tim, 2026-09-18)
+  const explain = batteryType
+    ? t("{{percent}}% left, read as {{type}}", {
+        percent: percent ?? 0,
+        type: batteryTypeLabel(batteryType, t),
+      })
+    : t("No battery type known for this device, so the voltage is judged by the driver.");
+  if (!deviceId)
+    return (
+      <span className={className} title={explain}>
+        {label}
+      </span>
+    );
   return (
     <button
       type="button"
       className={`underline underline-offset-2 hover:text-primary ${className ?? ""}`}
-      title={open ? t("Hide the battery trend") : t("Show the battery trend")}
+      title={`${explain} ${open ? t("Hide the battery trend") : t("Show the battery trend")}`}
       aria-expanded={open}
       onClick={onToggle}
     >

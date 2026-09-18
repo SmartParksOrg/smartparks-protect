@@ -14,12 +14,14 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
+from cryptography.fernet import InvalidToken
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.models import EnvironmentSample
+from shared.models import EnvironmentSample, ServerSetting
+from shared.secrets import decrypt_json
 
 WEEK = timedelta(days=7)
 
@@ -61,6 +63,55 @@ def register(provider: EnvironmentalDataProvider) -> None:
 
 def provider_for(layer: str) -> EnvironmentalDataProvider | None:
     return next((p for p in PROVIDERS if layer in p.layers), None)
+
+
+#: The server setting a server admin fills in from the interface (decision D250). The secret is
+#: stored as a Fernet token, the way a data source's credentials are.
+PROVIDER_SETTING = "environment_providers"
+
+
+def _provider_from(key: str, config: dict[str, Any]) -> EnvironmentalDataProvider | None:
+    """One configured provider, built from its stored settings; None when it is off or its
+    credentials are incomplete. Unknown keys are ignored, so a setting from a newer version
+    does not break an older server."""
+    if key != "copernicus" or not config.get("enabled", True):
+        return None
+    client_id = str(config.get("client_id") or "")
+    secret = config.get("client_secret")
+    client_secret = ""
+    if isinstance(secret, str) and secret:
+        try:
+            client_secret = str(decrypt_json(secret.encode()).get("client_secret") or "")
+        except InvalidToken:
+            return None
+    if not client_id or not client_secret:
+        return None
+    from shared.analysis.providers.copernicus import CopernicusProvider
+
+    return CopernicusProvider(client_id=client_id, client_secret=client_secret)
+
+
+async def stored_providers(session: AsyncSession) -> list[EnvironmentalDataProvider]:
+    """The providers a server admin set up in the interface (decision D250)."""
+    row = await session.get(ServerSetting, PROVIDER_SETTING)
+    if row is None or not isinstance(row.value, dict):
+        return []
+    built = [
+        _provider_from(key, config) for key, config in row.value.items() if isinstance(config, dict)
+    ]
+    return [p for p in built if p is not None]
+
+
+async def configured_provider(
+    session: AsyncSession, layer: str
+) -> EnvironmentalDataProvider | None:
+    """The provider for a layer: what a server admin set up in the interface first, so a change
+    there takes effect without a restart, and the environment variables after it (decision
+    D250). None when the server has neither."""
+    for provider in await stored_providers(session):
+        if layer in provider.layers:
+            return provider
+    return provider_for(layer)
 
 
 def geometry_hash(geometry: dict[str, Any]) -> str:
@@ -117,36 +168,47 @@ async def sample_weekly(
     time_to: datetime,
     project_id: uuid.UUID,
 ) -> dict[str, dict[datetime, float | None]]:
-    """The layer per geometry (by hash) and week over the period, from the cache where every
-    week of every geometry is there, from the provider otherwise (its whole answer is cached)."""
+    """The layer per geometry (by hash) and week over the period: from the cache where it has
+    the week, from the provider for the weeks it does not.
+
+    Only a week that has ended is cached. A week still running has no final answer yet, and a
+    week whose satellite passes were all cloudy is cached as "nothing seen" so a rerun does not
+    ask again (Tim, 2026-09-18: the layer is the slow part of a run; a period that ends today
+    used to refetch its whole span every time)."""
     hashes = [geometry_hash(g) for g in geometries]
     weeks = weeks_between(time_from, time_to)
+    if not weeks:
+        return {h: {} for h in hashes}
     conditions = [
         EnvironmentSample.provider == provider.key,
         EnvironmentSample.layer == layer,
         EnvironmentSample.geometry_hash.in_(hashes),
+        EnvironmentSample.week >= weeks[0],
+        EnvironmentSample.week <= weeks[-1],
     ]
-    if weeks:
-        conditions.append(EnvironmentSample.week >= weeks[0])
-        conditions.append(EnvironmentSample.week <= weeks[-1])
     rows = (await session.execute(select(EnvironmentSample).where(*conditions))).scalars()
     cached: dict[str, dict[datetime, float | None]] = {h: {} for h in hashes}
     for row in rows:
         cached[row.geometry_hash][row.week] = row.value
-    if weeks and all(set(weeks) <= set(cached[h]) for h in hashes):
+    # a week is done when every geometry has it; one geometry short and the week is asked again
+    missing = [week for week in weeks if any(week not in cached[h] for h in hashes)]
+    if not missing:
         return cached
-    # whole weeks, so the same week always covers the same seven days whichever run asks for
-    # it and the cache stays sound across periods that share a boundary week
-    sample = await provider.sample(layer, geometries, weeks[0], weeks[-1] + WEEK, project_id)
+    sample = await provider.sample(layer, geometries, missing[0], missing[-1] + WEEK, project_id)
+    if len(sample.series) != len(geometries):
+        raise ValueError(
+            f"{provider.key} answered {len(sample.series)} series for {len(geometries)} "
+            "geometries; the module cannot tell which belongs to which"
+        )
     fetched_at = datetime.now(UTC)
     values: list[dict[str, Any]] = []
-    for h, series in zip(hashes, sample.series, strict=False):
-        by_week: dict[datetime, float | None] = dict.fromkeys(weeks)
+    for h, series in zip(hashes, sample.series, strict=True):
+        fresh: dict[datetime, float | None] = dict.fromkeys(missing)
         for when, value in series:
-            week = nearest_week(when, weeks)
+            week = nearest_week(when, missing)
             if week is not None:
-                by_week[week] = value
-        cached[h] = by_week
+                fresh[week] = value
+        cached[h].update(fresh)
         values.extend(
             {
                 "provider": provider.key,
@@ -156,7 +218,9 @@ async def sample_weekly(
                 "value": value,
                 "fetched_at": fetched_at,
             }
-            for week, value in by_week.items()
+            for week, value in fresh.items()
+            # a week that has not ended may still gain a cloud-free pass
+            if week + WEEK <= fetched_at
         )
     if values:
         statement = insert(EnvironmentSample).values(values)

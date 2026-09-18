@@ -65,6 +65,9 @@ class AnalysisRun(UuidPrimaryKeyMixin, Base):
     )
     method_version: Mapped[str] = mapped_column(String(32), nullable=False)
     progress: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    progress_step: Mapped[str | None] = mapped_column(
+        String(120), comment="What the run is working on now, for the progress bar (D249)"
+    )
     cancel_requested: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )

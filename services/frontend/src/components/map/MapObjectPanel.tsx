@@ -215,6 +215,8 @@ export function PanelSummary({
   positionKind,
   accuracy,
   batteryVoltage,
+  batteryPercent,
+  batteryType,
   batteryProject,
   batteryDevice,
   healthLevel,
@@ -227,6 +229,9 @@ export function PanelSummary({
   positionKind?: string | null;
   accuracy?: number | null;
   batteryVoltage: number | null | undefined;
+  /** The share of charge and the chemistry it was read against (decision D248). */
+  batteryPercent?: number | null;
+  batteryType?: string | null;
   /** Where the battery trend reads from: the project and the device (Tim, 2026-09-14). */
   batteryProject?: string;
   batteryDevice?: string | null;
@@ -272,6 +277,8 @@ export function PanelSummary({
             <BatteryValue
               deviceId={batteryDevice}
               voltage={batteryVoltage}
+              percent={batteryPercent}
+              batteryType={batteryType}
               open={trendOpen}
               onToggle={() => setTrendOpen((o) => !o)}
             />
@@ -323,6 +330,8 @@ function HealthRows({
   positionKind,
   accuracy,
   batteryVoltage,
+  batteryPercent,
+  batteryType,
   batteryProject,
   batteryDevice,
   healthLevel,
@@ -341,6 +350,9 @@ function HealthRows({
   /** Accuracy in metres of the position shown; above the threshold the row warns (D193). */
   accuracy?: number | null;
   batteryVoltage: number | null | undefined;
+  /** The share of charge and the chemistry it was read against (decision D248). */
+  batteryPercent?: number | null;
+  batteryType?: string | null;
   /** Where the battery trend reads from: the project and the device (Tim, 2026-09-14). */
   batteryProject?: string;
   batteryDevice?: string | null;
@@ -420,6 +432,8 @@ function HealthRows({
             <BatteryValue
               deviceId={batteryDevice}
               voltage={batteryVoltage}
+              percent={batteryPercent}
+              batteryType={batteryType}
               open={trendOpen}
               onToggle={() => setTrendOpen((o) => !o)}
             />
@@ -712,6 +726,8 @@ export function EntityPanel({
           positionKind={props.position_kind}
           accuracy={props.accuracy_m}
           batteryVoltage={props.battery_voltage}
+          batteryPercent={props.battery_percent}
+          batteryType={props.battery_type}
           batteryProject={projectFor(projectId, props.project_id)}
           batteryDevice={props.device_id}
           healthLevel={props.health_level}
@@ -744,6 +760,8 @@ export function EntityPanel({
         onOpenPosition={onOpenPosition}
         onOpenState={onOpenState}
         batteryVoltage={props.battery_voltage}
+        batteryPercent={props.battery_percent}
+        batteryType={props.battery_type}
         batteryProject={projectFor(projectId, props.project_id)}
         batteryDevice={props.device_id}
         healthLevel={props.health_level}
@@ -879,6 +897,8 @@ export function DevicePanel({
           positionKind={props.position_kind}
           accuracy={props.accuracy_m}
           batteryVoltage={props.battery_voltage}
+          batteryPercent={props.battery_percent}
+          batteryType={props.battery_type}
           batteryProject={projectFor(projectId, props.project_id)}
           batteryDevice={props.device_id}
           healthLevel={props.health_level}
@@ -911,6 +931,8 @@ export function DevicePanel({
         onOpenPosition={onOpenPosition}
         onOpenState={onOpenState}
         batteryVoltage={props.battery_voltage}
+        batteryPercent={props.battery_percent}
+        batteryType={props.battery_type}
         batteryProject={projectFor(projectId, props.project_id)}
         batteryDevice={props.device_id}
         healthLevel={props.health_level}

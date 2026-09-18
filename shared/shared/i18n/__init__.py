@@ -25,18 +25,36 @@ _PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 
 def resolve_language(accept_language: str | None) -> str:
-    """The first supported language of an `Accept-Language` header ("nl-NL,nl;q=0.9,en;q=0.8"
-    gives "nl"); English when the header names none."""
+    """The most wanted supported language of an `Accept-Language` header
+    ("nl-NL,nl;q=0.9,en;q=0.8" gives "nl"); English when the header names none. The quality
+    values decide, not the order the parts happen to be in, so "en;q=0.5,nl" gives "nl"
+    (reviewed 2026-09-18: the order alone gave "en")."""
     if not accept_language:
         return DEFAULT
-    for part in accept_language.split(","):
-        code = part.split(";")[0].strip().lower()
+    best: tuple[float, int, str] | None = None
+    for position, part in enumerate(accept_language.split(",")):
+        code, _, parameters = part.partition(";")
+        code = code.strip().lower()
         if not code:
             continue
         base = code.split("-")[0]
-        if base in SUPPORTED:
-            return base
-    return DEFAULT
+        if base not in SUPPORTED:
+            continue
+        quality = 1.0
+        for parameter in parameters.split(";"):
+            name, _, value = parameter.partition("=")
+            if name.strip().lower() == "q":
+                try:
+                    quality = float(value)
+                except ValueError:
+                    quality = 0.0
+        if quality <= 0:
+            continue  # q=0 refuses that language
+        # the highest quality wins; equal qualities keep the order of the header
+        candidate = (quality, -position, base)
+        if best is None or candidate > best:
+            best = candidate
+    return best[2] if best else DEFAULT
 
 
 @lru_cache(maxsize=8)

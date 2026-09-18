@@ -113,7 +113,9 @@ export function ResultMap({
   // the result's polygons are the picture; the tracks, fixes and heatmap start hidden and
   // the chips switch them on (Tim, 2026-09-15)
   const [hidden, setHidden] = useState<string[]>(() => {
-    const off: string[] = ["tracks", "points", "heatmap"];
+    // the vegetation layer covers the same areas as the pressure one, so it starts off and
+    // the chip brings it up (Tim, 2026-09-18)
+    const off: string[] = ["tracks", "points", "heatmap", "vegetation"];
     // the hotspot outlines repeat what the intensity cells show; start folded away
     if (document.summary.intensity) off.push("hotspot");
     return off;
@@ -398,6 +400,7 @@ export function ResultMap({
     points: t("Fixes"),
     heatmap: t("Heatmap"),
     area: t("Areas by pressure"),
+    vegetation: t("Vegetation (NDVI)"),
     mcp: t("MCP 95%"),
     kde: t("KDE 50% and 95%"),
     hotspot: t("Hotspots"),
@@ -524,6 +527,22 @@ export function ResultMap({
               <>
                 <dt>{t("Fixes")}</dt>
                 <dd>{picked.fixes}</dd>
+              </>
+            )}
+            {typeof picked.ndvi_mean === "number" && (
+              <>
+                <dt>{t("Vegetation (NDVI)")}</dt>
+                <dd>
+                  {picked.ndvi_mean.toFixed(3)}
+                  {typeof picked.ndvi_change === "number" &&
+                    ` (${picked.ndvi_change >= 0 ? "+" : ""}${picked.ndvi_change.toFixed(3)})`}
+                </dd>
+                {typeof picked.ndvi_valid_share === "number" && (
+                  <>
+                    <dt>{t("Cloud-free weeks")}</dt>
+                    <dd>{Math.round(picked.ndvi_valid_share * 100)}%</dd>
+                  </>
+                )}
               </>
             )}
             {typeof picked.relative_pressure === "number" && (

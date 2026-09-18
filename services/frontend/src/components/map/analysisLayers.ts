@@ -25,6 +25,7 @@ export const INTENSITY_RAMP = [
 ] as const;
 export const ANALYSIS_KINDS = [
   "area",
+  "vegetation",
   "mcp",
   "kde",
   "hotspot",
@@ -36,6 +37,7 @@ export type AnalysisKind = (typeof ANALYSIS_KINDS)[number];
 
 const FILL_OPACITY: Record<string, number> = {
   area: 0.35,
+  vegetation: 0.55,
   mcp: 0.08,
   kde: 0.22,
   hotspot: 0.45,
@@ -70,6 +72,27 @@ export const PRESSURE_RAMP = [
   "#B86B5C",
 ] as const;
 
+/** Bare to green for the vegetation index of an area (Tim, 2026-09-18), a sequential ramp
+ * apart from the pressure one so the two layers never read as the same thing. `level` is the
+ * index scaled to 0 to 1 by the module. */
+export const VEGETATION_RAMP = [
+  "#D9C8A6",
+  "#BFC78F",
+  "#94B277",
+  "#5F9455",
+  "#2F6B3A",
+] as const;
+
+export function vegetationColor(level: number | null | undefined): string {
+  if (level === null || level === undefined || Number.isNaN(level))
+    return VEGETATION_RAMP[0];
+  const step = Math.min(
+    VEGETATION_RAMP.length - 1,
+    Math.max(0, Math.floor(level * VEGETATION_RAMP.length)),
+  );
+  return VEGETATION_RAMP[step];
+}
+
 export function pressureColor(level: number | null | undefined): string {
   if (level === null || level === undefined || !Number.isFinite(level))
     return PRESSURE_RAMP[0];
@@ -90,6 +113,7 @@ export function decorateAnalysisFeatures(
   const rank = (f: GeoJSON.Feature): number => {
     const kind = String(f.properties?.kind ?? "");
     const level = Number(f.properties?.level ?? 0);
+    if (kind === "vegetation") return -1.5;
     if (kind === "area") return -1;
     if (kind === "coverage") return -0.5;
     if (kind === "mcp") return 0;
@@ -107,7 +131,12 @@ export function decorateAnalysisFeatures(
         ...f,
         properties: {
           ...f.properties,
-          color: kind === "area" ? pressureColor(level) : colorOf(subject),
+          color:
+            kind === "area"
+              ? pressureColor(level)
+              : kind === "vegetation"
+                ? vegetationColor(level)
+                : colorOf(subject),
           opacity: FILL_OPACITY[kind] ?? 0.2,
         },
       };

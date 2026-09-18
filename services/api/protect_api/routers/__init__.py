@@ -21,6 +21,7 @@ from protect_api.routers.data import router as data_router
 from protect_api.routers.data_sources import router as data_sources_router
 from protect_api.routers.devices import router as devices_router
 from protect_api.routers.entities import router as entities_router
+from protect_api.routers.environment import router as environment_router
 from protect_api.routers.events import admin_router as admin_events_router
 from protect_api.routers.events import router as events_router
 from protect_api.routers.exports import router as exports_router
@@ -54,6 +55,7 @@ for router in (
     catalog_router,
     data_sources_router,
     admin_router,
+    environment_router,
     ingest_router,
     attention_router,
     data_router,

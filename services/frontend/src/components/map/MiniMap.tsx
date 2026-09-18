@@ -18,7 +18,11 @@ const LATEST = "mini-latest";
 
 /** A still map of where something is (decision D124): the newest position with a short trail,
  * fitted to the trail; no gestures, so the page scrolls as usual, and the whole map is a link to
- * the live map on the object. */
+ * the live map on the object.
+ *
+ * The map fills its container and never shrinks below `min-h-56`, so a caller that sets a height
+ * gives it `h-56` or more; a shorter box lets the map spill over what follows it (Tim,
+ * 2026-09-18: the gateway dialog's "Open in ..." button sat under the map). */
 export function MiniMap({
   positions = [],
   point,

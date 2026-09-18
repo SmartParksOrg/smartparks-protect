@@ -184,6 +184,20 @@ class CopernicusProvider:
             raise ProviderError(f"Copernicus identity refused the client ({response.status_code})")
         return {"Authorization": "Bearer oidc/CDSE/" + str(response.json().get("access_token", ""))}
 
+    async def check(self) -> str:
+        """Test connection for the Environmental data page (decision D250): the credentials
+        are exchanged for a token and the collection is asked for, which costs no processing
+        quota. Raises `ProviderError` with what went wrong."""
+        async with self._client() as client:
+            headers = await self._token(client)
+            response = await client.get(f"{API}/collections/{COLLECTION}", headers=headers)
+            if response.status_code != 200:
+                raise ProviderError(
+                    f"openEO answered {response.status_code} for {COLLECTION}; the client is "
+                    "known but may lack access to the collection"
+                )
+        return f"Connected; {COLLECTION} is available"
+
     async def sample(
         self,
         layer: str,

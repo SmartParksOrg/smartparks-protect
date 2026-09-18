@@ -27,6 +27,9 @@ from protect_api.schemas.domain import (
     AssignmentEnd,
     AssignmentStart,
     AttributionJobRead,
+    BatteryType,
+    DeviceBattery,
+    DeviceBatteryUpdate,
     DeviceCreate,
     DeviceDataSpan,
     DeviceRead,
@@ -62,6 +65,9 @@ from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import resolve_attribution
 from shared.domain.attribution import active_job, publish_job, recent_jobs
+from shared.domain.battery import BATTERY_ATTRIBUTE
+from shared.domain.battery import PROFILES as BATTERY_PROFILES
+from shared.domain.battery import resolve as resolve_battery
 from shared.domain.device_settings import known_settings, record_setting
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
@@ -245,6 +251,11 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
             last_seen_at=state.last_seen_at,
             last_movement_at=state.last_movement_at,
             last_reset_at=state.last_reset_at,
+            battery=resolve_battery(
+                device.attributes,
+                device_type.default_settings if device_type else None,
+                driver,
+            ).profile,
         )
     return reads
 
@@ -1134,6 +1145,92 @@ async def set_device_reporting(
     )
     await session.commit()
     return await device_reporting(device_id, user, session)
+
+
+@router.get("/{device_id}/battery", response_model=DeviceBattery)
+async def device_battery(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceBattery:
+    """The battery type the device is judged by and what the last voltage means with it
+    (decision D248), plus every type to choose from."""
+    device = await _visible_device(session, user, device_id)
+    device_type = await session.get(DeviceType, device.device_type_id)
+    driver = DRIVERS.get(device_type.driver_key) if device_type else None
+    choice = resolve_battery(
+        device.attributes, device_type.default_settings if device_type else None, driver
+    )
+    # what the device falls back to when a person clears its own type
+    fallback = resolve_battery(None, device_type.default_settings if device_type else None, driver)
+    state = await session.get(DeviceCurrentState, device.id)
+    volts = state.battery_voltage if state else None
+    profile = choice.profile
+    return DeviceBattery(
+        battery_type=profile.key if profile else None,
+        source=choice.source,
+        default_battery_type=fallback.profile.key if fallback.profile else None,
+        default_source=fallback.source,
+        voltage=volts,
+        percent=profile.percent(volts) if profile and volts is not None else None,
+        level=profile.level(volts) if profile and volts is not None else None,
+        types=[
+            BatteryType(
+                key=p.key,
+                label=p.label,
+                full_v=p.full_v,
+                empty_v=p.empty_v,
+                warn_v=p.warn_v,
+                critical_v=p.critical_v,
+                reliable=p.reliable,
+                note=p.note,
+            )
+            for p in BATTERY_PROFILES.values()
+        ],
+    )
+
+
+@router.put("/{device_id}/battery", response_model=DeviceBattery)
+async def set_device_battery(
+    device_id: uuid.UUID,
+    body: DeviceBatteryUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceBattery:
+    """The battery type a person sets for this device (decision D248), kept on the device's
+    attributes with who set it and when; null gives the device type's default back. Project
+    admins of the device's current project, or a server admin."""
+    device = await get_or_404(session, Device, device_id, "Device")
+    attribution = await resolve_attribution(session, device.id, utc_now())
+    if not user.is_superuser:
+        if attribution.project_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
+        await _require_project_admin(session, user, attribution.project_id)
+    if body.battery_type is not None and body.battery_type not in BATTERY_PROFILES:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unknown battery type {body.battery_type}"
+        )
+    attributes = dict(device.attributes or {})
+    if body.battery_type is None:
+        attributes.pop(BATTERY_ATTRIBUTE, None)
+    else:
+        attributes[BATTERY_ATTRIBUTE] = {
+            "key": body.battery_type,
+            "set_by": str(user.id),
+            "set_at": utc_now().isoformat(),
+        }
+    device.attributes = attributes
+    await record_audit(
+        session,
+        user=user,
+        action="device.battery_set",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=attribution.project_id,
+        details={"battery_type": body.battery_type},
+    )
+    await session.commit()
+    return await device_battery(device_id, user, session)
 
 
 @router.get("/{device_id}/attribution-jobs", response_model=list[AttributionJobRead])

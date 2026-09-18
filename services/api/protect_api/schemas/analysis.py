@@ -40,6 +40,7 @@ class AnalysisRunRead(ORMModel):
     parameters: dict[str, Any]
     method_version: str
     progress: int
+    progress_step: str | None = None
     cancel_requested: bool
     input_count: int | None
     excluded_count: int | None

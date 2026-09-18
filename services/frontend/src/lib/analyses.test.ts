@@ -173,6 +173,7 @@ describe("analysis form state", () => {
       weight_key: "lsu",
       herd_b: "g2",
       seasons: false,
+      landscape: true,
       absence: 12,
       rest: 0,
     });

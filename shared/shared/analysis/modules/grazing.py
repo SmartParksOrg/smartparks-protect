@@ -35,7 +35,7 @@ from shared.analysis.base import (
     Table,
     Warning,
 )
-from shared.analysis.environment import geometry_hash, provider_for, sample_weekly
+from shared.analysis.environment import configured_provider, geometry_hash, sample_weekly
 from shared.analysis.limits import MAX_AREAS_GRAZING, MAX_FIXES_PER_SUBJECT
 from shared.analysis.parameters import CommonParameters
 from shared.analysis.primitives.spatial import CellUse, LocalGrid, hotspots
@@ -629,6 +629,7 @@ class GrazingModule:
         vegetation_rows, vegetation_chart = await landscape_figures(
             ctx, params, areas, periods, summary, warnings
         )
+        geometries.extend(vegetation_geometries(areas, summary))
         await ctx.progress(95, "document")
         unit = {
             "equal": "animals",
@@ -746,15 +747,15 @@ async def landscape_figures(
     is a warning, never a failed run."""
     if not params.landscape:
         return [], []
-    provider = provider_for("ndvi")
+    provider = await configured_provider(ctx.session, "ndvi")
     if provider is None:
         warnings.append(
             Warning(
                 code="landscape_unavailable",
                 level="notice",
                 text=(
-                    "No vegetation layer: the server has no environmental provider configured "
-                    "(COPERNICUS_CLIENT_ID and COPERNICUS_CLIENT_SECRET)."
+                    "No vegetation layer: this server has no environmental data provider yet. "
+                    "A server admin sets one up under Server admin, Environmental data."
                 ),
             )
         )
@@ -762,7 +763,13 @@ async def landscape_figures(
     geometries = [a.geojson for a in areas]
     hashes = [geometry_hash(g) for g in geometries]
     weekly: dict[str, dict[str, dict[datetime, float | None]]] = {}
-    for period in periods:
+    # the layer is the slow part of the run: a batch job at the provider takes minutes, so the
+    # bar says so per period rather than standing still (Tim, 2026-09-18)
+    for index, period in enumerate(periods):
+        await ctx.progress(
+            85 + int(index * 8 / max(1, len(periods))),
+            f"reading the vegetation layer ({period.key})",
+        )
         try:
             weekly[period.key] = await sample_weekly(
                 ctx.session,
@@ -847,6 +854,42 @@ async def landscape_figures(
         )
     rows.sort(key=lambda r: -(r[1] or 0))
     return rows, chart
+
+
+#: The vegetation index a management area can hold, for the colour ramp on the result map.
+NDVI_LOW = 0.1
+NDVI_HIGH = 0.8
+
+
+def vegetation_geometries(areas: list[Area], summary: dict[str, Any]) -> list[Geometry]:
+    """The areas again, this time carrying their vegetation index (Tim, 2026-09-18), so the
+    result map can shade them by how green the land was over the period beside how hard it was
+    used. `level` is the index scaled to 0 to 1, which is what the ramp reads; an area without a
+    cloud-free observation is left out rather than drawn as bare ground."""
+    out: list[Geometry] = []
+    for area in areas:
+        figures = summary.get("main", {}).get(str(area.id), {})
+        mean = figures.get("ndvi_mean")
+        if mean is None:
+            continue
+        scaled = (float(mean) - NDVI_LOW) / (NDVI_HIGH - NDVI_LOW)
+        out.append(
+            Geometry(
+                kind="vegetation",
+                label=area.name,
+                level=round(max(0.0, min(1.0, scaled)), 3),
+                geojson=area.geojson,
+                properties={
+                    "area_id": str(area.id),
+                    "period": "main",
+                    "ndvi_mean": mean,
+                    "ndvi_change": figures.get("ndvi_change"),
+                    "ndvi_valid_share": figures.get("ndvi_valid_share"),
+                    "ndvi_level": figures.get("ndvi_level"),
+                },
+            )
+        )
+    return out
 
 
 def _day_ms(day: date) -> float:

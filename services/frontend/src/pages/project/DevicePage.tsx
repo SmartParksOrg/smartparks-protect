@@ -53,6 +53,7 @@ import { AssignEntityDialog } from "@/components/devices/AssignEntityDialog";
 import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
+import { BatteryCard } from "@/components/devices/BatteryCard";
 import { ReportingCard } from "@/components/devices/ReportingCard";
 import { DeviceSettingsTab } from "@/components/devices/DeviceSettingsTab";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
@@ -530,6 +531,10 @@ export function DevicePage() {
                   }
                 />
               )}
+              <BatteryCard
+                deviceId={d.id}
+                canEdit={Boolean(user?.is_superuser) || can("project:write")}
+              />
               <ReportingCard
                 deviceId={d.id}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}

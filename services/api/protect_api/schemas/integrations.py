@@ -170,6 +170,12 @@ class GatewayUpdateRequest(BaseModel):
     description: str | None = None
 
 
+class GatewayNameRequest(BaseModel):
+    """The name a person gives a gateway (decision D247): empty gives the platform's name back."""
+
+    name: str | None = Field(default=None, max_length=200)
+
+
 class GatewayLocationRequest(BaseModel):
     """A location set by a person for a gateway the platform gave none (decision D239): both
     coordinates, or both empty to clear a location set by hand."""

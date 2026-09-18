@@ -102,6 +102,9 @@ export interface GrazingOptions {
   /** The group of the second herd; its members become `herd_b_entity_ids`. */
   herd_b: string | null;
   seasons: boolean;
+  /** The vegetation layer per area (decision D246); it asks a satellite provider and is the
+   * slow part of the run, so it can be left out (Tim, 2026-09-18). */
+  landscape: boolean;
   /** Hours away from an area before a new visit. */
   absence: number;
   /** Animal-hours at or below which a day counts as rest. */
@@ -114,6 +117,7 @@ export const DEFAULT_GRAZING: GrazingOptions = {
   weight_key: null,
   herd_b: null,
   seasons: false,
+  landscape: true,
   absence: 6,
   rest: 0,
 };
@@ -185,6 +189,7 @@ export function readFormState(params: URLSearchParams): FormState {
       weight_key: params.get("weight_key"),
       herd_b: params.get("herd_b"),
       seasons: params.get("seasons") === "1",
+      landscape: params.get("landscape") !== "0",
       absence: numberOr(params.get("absence"), DEFAULT_GRAZING.absence),
       rest: params.get("rest") === null ? 0 : numberOr(params.get("rest"), 0),
     },
@@ -220,6 +225,7 @@ export function writeFormState(state: FormState): URLSearchParams {
   if (g.weight_key) params.set("weight_key", g.weight_key);
   if (g.herd_b) params.set("herd_b", g.herd_b);
   if (g.seasons) params.set("seasons", "1");
+  if (!g.landscape) params.set("landscape", "0");
   if (g.absence !== DEFAULT_GRAZING.absence)
     params.set("absence", String(g.absence));
   if (g.rest) params.set("rest", String(g.rest));
@@ -253,6 +259,7 @@ export function grazingParameters(
       ? { weight_key: g.weight_key }
       : {}),
     seasons: g.seasons,
+    landscape: g.landscape,
     ...(herdB.length ? { herd_b_entity_ids: herdB } : {}),
     gap_hours: state.method.gap,
     min_absence_hours: g.absence,
@@ -640,6 +647,7 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
       weight_key: typeof p.weight_key === "string" ? p.weight_key : null,
       herd_b: null,
       seasons,
+      landscape: p.landscape !== false,
       absence: num("min_absence_hours", DEFAULT_GRAZING.absence),
       rest: num("rest_threshold_hours", 0),
     },

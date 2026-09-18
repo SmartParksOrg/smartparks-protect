@@ -60,6 +60,7 @@ export const queryKeys = {
   devices: (params: Record<string, unknown>) => ["devices", params] as const,
   device: (id: string) => ["devices", id] as const,
   deviceReporting: (id: string) => ["devices", id, "reporting"] as const,
+  deviceBattery: (id: string) => ["devices", id, "battery"] as const,
   deviceSettings: (id: string) => ["devices", id, "settings"] as const,
   deviceSpan: (id: string) => ["devices", id, "span"] as const,
   attributionJobs: (id: string) => ["devices", id, "attribution-jobs"] as const,

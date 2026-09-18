@@ -342,3 +342,53 @@ async def test_a_project_admin_places_a_gateway_the_platform_gave_no_location(cl
     cleared = await client.patch(base, json={}, headers=h)
     assert cleared.status_code == 200 and cleared.json()["geometry"] is None
     assert cleared.json()["location_source"] is None
+
+
+async def test_a_project_admin_names_a_gateway(client, db, bus):  # noqa: F811
+    """Decision D247: the platform's name is often the gateway id, so a project admin gives the
+    gateway the name the field uses; a viewer cannot, another project's admin does not see it,
+    and an empty name gives the platform's name back."""
+    from shared.enums import Role
+    from shared.models import DataSourceProjectScope, Gateway
+    from tests.api.conftest import actor, add_member, create_project
+
+    admin, project, _entity, _source, _device, _ = await _setup(client, db)
+    h = admin.headers
+    other = DataSource(
+        name=unique_name("Mesh network"), adapter_key="http", config={}, capabilities={}
+    )
+    db.add(other)
+    await db.flush()
+    gateway = Gateway(
+        data_source_id=other.id, external_id="f1366ff3", name="f1366ff3", status="online"
+    )
+    db.add(gateway)
+    db.add(DataSourceProjectScope(data_source_id=other.id, project_id=project.id))
+    await db.commit()
+    base = f"/api/v1/projects/{project.id}/gateways/{gateway.id}"
+    named = await client.patch(base, json={"name": "  North ridge  "}, headers=h)
+    assert named.status_code == 200, named.text
+    assert named.json()["name_override"] == "North ridge"
+    assert named.json()["display_name"] == "North ridge"
+    # the list shows it too
+    listed = (await client.get(f"/api/v1/projects/{project.id}/gateways", headers=h)).json()
+    assert [g["display_name"] for g in listed if g["id"] == str(gateway.id)] == ["North ridge"]
+    # a viewer may not, another project's admin does not see the gateway
+    viewer = await actor(client, db)
+    await add_member(db, viewer.user, project, Role.PROJECT_VIEWER)
+    assert (
+        await client.patch(base, json={"name": "Theirs"}, headers=viewer.headers)
+    ).status_code == 403
+    elsewhere = await create_project(db)
+    stranger = await actor(client, db)
+    await add_member(db, stranger.user, elsewhere, Role.PROJECT_ADMIN)
+    refused = await client.patch(
+        f"/api/v1/projects/{elsewhere.id}/gateways/{gateway.id}",
+        json={"name": "Theirs"},
+        headers=stranger.headers,
+    )
+    assert refused.status_code == 404
+    # an empty name gives the platform's name back
+    cleared = await client.patch(base, json={"name": ""}, headers=h)
+    assert cleared.status_code == 200 and cleared.json()["name_override"] is None
+    assert cleared.json()["display_name"] == "f1366ff3"

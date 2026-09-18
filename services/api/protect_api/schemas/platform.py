@@ -54,6 +54,38 @@ class AiActionInfo(BaseModel):
     mode: str
 
 
+class EnvironmentProviderRead(BaseModel):
+    """An environmental data provider as the server has it (decision D250)."""
+
+    key: str
+    label: str
+    layers: list[str]
+    enabled: bool
+    client_id: str
+    #: Whether a secret is stored; the secret itself never leaves the server.
+    secret_set: bool
+    configured: bool
+    #: The server also has the account in its environment variables, which stands in.
+    from_environment: bool
+    #: Whether an analysis can read this provider's layers today.
+    active: bool
+
+
+class EnvironmentProviderUpdate(BaseModel):
+    client_id: str | None = Field(default=None, max_length=200)
+    client_secret: str | None = Field(
+        default=None,
+        max_length=400,
+        description="Omitted keeps the stored secret; empty clears it",
+    )
+    enabled: bool | None = None
+
+
+class EnvironmentTestResult(BaseModel):
+    ok: bool
+    detail: str
+
+
 class AiPolicyRead(BaseModel):
     policy: dict[str, str]
     actions: list[AiActionInfo]

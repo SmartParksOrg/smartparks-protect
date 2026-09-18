@@ -27,6 +27,7 @@ import {
   Plug,
   Radio,
   Ruler,
+  Satellite,
   ScrollText,
   Send,
   Settings2,
@@ -297,6 +298,12 @@ export const serverSections: NavSection[] = [
         label: t("Audit log"),
         icon: ScrollText,
         to: "/admin/audit",
+        serverAdminOnly: true,
+      },
+      {
+        label: t("Environmental data"),
+        icon: Satellite,
+        to: "/admin/environment",
         serverAdminOnly: true,
       },
       {

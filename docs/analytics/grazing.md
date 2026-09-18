@@ -49,7 +49,7 @@ A saved run with a name, shared with the project, is the report of phase 1; the 
 
 ## The vegetation of each area
 
-With an environmental provider configured on the server ([Environmental data](../operations/environmental-data.md), decision D246) every run also carries how each area's vegetation moved:
+With an environmental provider set up on the server ([Environmental data](../operations/environmental-data.md), decision D246) every run also carries how each area's vegetation moved. It is the slowest part of a run, so the **Vegetation per area** switch under the method options leaves it out when it is not wanted:
 
 | Figure | Meaning | Level |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ With an environmental provider configured on the server ([Environmental data](..
 | Vegetation change | The main period's index minus the comparison period's | warn from 0.10 of an index point down, critical from 0.20 |
 | Weeks with a clear view | The share of the period's weeks that had a cloud-free observation | a period under half is a warning of its own |
 
-"Use against vegetation" is one table: the areas by use per hectare with their index, its change and the level beside it, the hardest used first, so an area grazed hard while greening down comes first. One chart draws the index per area by week, the comparison period faint. The area cards carry the index with its change, and the PDF report both the table and the chart.
+"Use against vegetation" is one table: the areas by use per hectare with their index, its change and the level beside it, the hardest used first, so an area grazed hard while greening down comes first. One chart draws the index per area by week, the comparison period faint. The area cards carry the index with its change, and the PDF report both the table and the chart. The result map has a **Vegetation (NDVI)** layer, off until the chip switches it on, which shades each area from bare to green by its index over the period; a click on an area gives the index, its change and the share of cloud-free weeks. An area with no cloud-free view in the whole period is left out of the layer rather than drawn as bare ground.
 
 What it does not say: greener is not more forage of the right kind, and the index says how the vegetation moved, not what it is worth to the animals. A week without a clear view is left out rather than guessed.
 

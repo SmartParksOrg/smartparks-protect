@@ -61,7 +61,9 @@ async def run_analysis(session: AsyncSession, run: AnalysisRun) -> None:
     await session.execute(text(f"SET LOCAL statement_timeout = {timeout_ms}"))
 
     async def progress(percent: int, step: str) -> None:
-        await _write(run_id, progress=max(0, min(100, percent)))
+        # the step travels with the percentage (decision D249): a bar that only counts leaves a
+        # reader guessing what a long run is busy with
+        await _write(run_id, progress=max(0, min(100, percent)), progress_step=step[:120] or None)
         if await _cancel_requested(run_id):
             raise AnalysisCancelled(step)
 
@@ -160,6 +162,7 @@ async def _finish(
     run.error_message = error_message[:2000] if error_message else None
     run.finished_at = finished
     run.progress = 100 if status == AnalysisStatus.COMPLETED else run.progress
+    run.progress_step = None
     if run.name is None:
         run.expires_at = finished + timedelta(days=get_settings().analysis_retention_days)
     await session.commit()

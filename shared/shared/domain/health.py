@@ -8,6 +8,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from shared.device_drivers.base import HealthField
+from shared.domain.battery import METRIC_KEY as BATTERY_METRIC
+from shared.domain.battery import BatteryProfile
 from shared.domain.movement import movement_text
 from shared.domain.reboot import reboot_note
 from shared.timeutil import utc_now
@@ -24,6 +26,8 @@ class HealthValue(BaseModel):
     text: str | None = None
     level: str | None = None
     at: datetime | None = None
+    #: The share of charge left, on the battery line of a device with a battery type (D248).
+    percent: int | None = None
 
 
 class DeviceHealth(BaseModel):
@@ -87,11 +91,14 @@ def device_health(
     last_seen_at: datetime | None,
     last_movement_at: datetime | None = None,
     last_reset_at: datetime | None = None,
+    battery: BatteryProfile | None = None,
     now: datetime | None = None,
 ) -> DeviceHealth:
     """The health of one device from what its driver declares and the current state holds:
     the device's own status, never the network's (architecture 20, decision D161). A device
-    that reports `activity` gets a movement line: moving, or still for so long."""
+    that reports `activity` gets a movement line: moving, or still for so long. With a battery
+    type known for the device (decision D248) that chemistry's thresholds judge the battery
+    line instead of the driver's one-size ones, and the line carries the share of charge."""
     health = DeviceHealth(last_seen_at=last_seen_at, last_status_at=latest_state_time)
     if not fields:
         return health
@@ -127,6 +134,11 @@ def device_health(
             continue
         level = _level_of(field, value)
         text = _text_of(field, value)
+        percent: int | None = None
+        if field.key == BATTERY_METRIC and battery is not None and isinstance(value, int | float):
+            level = battery.level(float(value))
+            percent = battery.percent(float(value))
+            text = f"{float(value):g} V, {percent}%"
         if field.key == "uptime":
             # a reboot in the last day warns on the uptime line (Tim, 2026-09-14)
             note, note_level = reboot_note(last_reset_at, state, now or utc_now())
@@ -145,6 +157,7 @@ def device_health(
                 text=text,
                 level=level,
                 at=at,
+                percent=percent,
             )
         )
     health.level = LEVELS[worst] if worst >= 0 else None

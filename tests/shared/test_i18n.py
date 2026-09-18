@@ -12,6 +12,11 @@ def test_the_language_comes_from_the_header():
     assert resolve_language("nl-NL,nl;q=0.9,en;q=0.8") == "nl"
     assert resolve_language("de-DE,de;q=0.9") == "en"
     assert resolve_language("fr, nl;q=0.5") == "nl"
+    # the quality values decide, not the order the parts stand in (reviewed 2026-09-18)
+    assert resolve_language("en;q=0.5,nl") == "nl"
+    assert resolve_language("nl;q=0.2,en;q=0.9") == "en"
+    assert resolve_language("nl;q=0,en") == "en", "q=0 refuses that language"
+    assert resolve_language("nl;q=zero,en;q=0.4") == "en", "an unreadable q is no preference"
 
 
 def test_exact_texts_and_templates_translate_and_unknown_text_stays():

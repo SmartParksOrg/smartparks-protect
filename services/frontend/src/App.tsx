@@ -88,6 +88,11 @@ const AiPolicyPage = lazy(() =>
     default: m.AiPolicyPage,
   })),
 );
+const EnvironmentPage = lazy(() =>
+  import("@/pages/admin/EnvironmentPage").then((m) => ({
+    default: m.EnvironmentPage,
+  })),
+);
 const MembersPage = lazy(() =>
   import("@/pages/project/MembersPage").then((m) => ({
     default: m.MembersPage,
@@ -340,6 +345,7 @@ export default function App() {
               <Route path="metrics" element={<MetricsPage />} />
               <Route path="audit" element={<AuditPage />} />
               <Route path="ai-policy" element={<AiPolicyPage />} />
+              <Route path="environment" element={<EnvironmentPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Route>
