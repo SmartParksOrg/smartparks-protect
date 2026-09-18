@@ -155,3 +155,57 @@ async def unresolved_count(session: AsyncSession, device_id: uuid.UUID) -> int:
         )
         or 0
     )
+
+
+#: The scan settings that decide whether a device could report a contact at all (D228 to D231).
+SCAN_SETTINGS = ("ble_scan_interval", "ble_scan_aggregated_interval", "ble_scan_filter")
+#: What `ble_scan_filter` means, from the firmware (research 3.7).
+SCAN_FILTERS = {
+    0: "every device",
+    1: "Smart Parks devices",
+    2: "one manufacturer",
+    3: "phones",
+}
+
+
+@dataclass(slots=True)
+class Scanning:
+    """Whether a device was looking, and for what.
+
+    Without this a contact list cannot be read: no rows means "they never met" only if the
+    device was scanning, and both intervals default to 0, which is off. The filter matters as
+    much, since the default looks only for Smart Parks devices and a count under it means
+    something different from a count that included every phone that walked past."""
+
+    enabled: bool
+    interval_s: float | None = None
+    aggregated_interval_s: float | None = None
+    filter_key: int | None = None
+    filter_label: str | None = None
+    known: bool = False
+
+
+async def scanning_of(session: AsyncSession, device_id: uuid.UUID) -> Scanning:
+    """What the device's settings say about its Bluetooth scanning, as far as Protect knows."""
+    from shared.domain.device_settings import known_settings
+
+    rows = await known_settings(session, device_id)
+    values: dict[str, float] = {}
+    for name in SCAN_SETTINGS:
+        row = rows.get(name)
+        if row is not None and isinstance(row.value, int | float):
+            values[name] = float(row.value)
+    if not values:
+        return Scanning(enabled=False, known=False)
+    single = values.get("ble_scan_interval")
+    aggregated = values.get("ble_scan_aggregated_interval")
+    chosen = values.get("ble_scan_filter")
+    key = int(chosen) if chosen is not None else None
+    return Scanning(
+        enabled=bool(single) or bool(aggregated),
+        interval_s=single,
+        aggregated_interval_s=aggregated,
+        filter_key=key,
+        filter_label=SCAN_FILTERS.get(key) if key is not None else None,
+        known=True,
+    )

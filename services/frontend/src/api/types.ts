@@ -34,6 +34,7 @@ export type UnknownIdentity = Schemas["UnknownIdentity"];
 export type DeviceDataSpan = Schemas["DeviceDataSpan"];
 export type DeviceReporting = Schemas["DeviceReporting"];
 export type DeviceBattery = Schemas["DeviceBattery"];
+export type DeviceContacts = Schemas["DeviceContacts"];
 export type EnvironmentProvider = Schemas["EnvironmentProviderRead"];
 export type EnvironmentTestResult = Schemas["EnvironmentTestResult"];
 export type DeviceSettings = Schemas["DeviceSettingsRead"];

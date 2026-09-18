@@ -589,6 +589,45 @@ class DeviceBatteryUpdate(BaseModel):
     )
 
 
+class ContactCounterpart(BaseModel):
+    """One neighbour a device saw over the period, with what is known of it (D253, D254)."""
+
+    address: str
+    resolution: str
+    device_id: uuid.UUID | None = None
+    device_name: str | None = None
+    entity_name: str | None = None
+    candidate_names: list[str] = Field(default_factory=list)
+    contacts: int
+    sightings: int
+    best_rssi_dbm: int | None = None
+    first_at: datetime
+    last_at: datetime
+
+
+class DeviceScanning(BaseModel):
+    """Whether the device was looking at all, and for what: no contacts means "they never met"
+    only when it was (decisions D228 to D231 already know the settings)."""
+
+    enabled: bool
+    known: bool
+    interval_s: float | None = None
+    aggregated_interval_s: float | None = None
+    filter_key: int | None = None
+    filter_label: str | None = None
+
+
+class DeviceContacts(BaseModel):
+    """What a device saw over a period, grouped by neighbour."""
+
+    hours: int
+    scanning: DeviceScanning
+    last_scan_at: datetime | None = None
+    counterparts: list[ContactCounterpart]
+    ambiguous: int = Field(default=0, description="Sightings that could be more than one device")
+    unknown: int = Field(default=0, description="Neighbours no device of the project matches")
+
+
 class DeviceBleAddressUpdate(BaseModel):
     """The device's own Bluetooth address (decision D252), six octets high first; null clears."""
 

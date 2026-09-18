@@ -3,14 +3,16 @@ device is a handover that closes one assignment and opens the next (architecture
 
 import csv
 import io
+import json
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from itertools import pairwise
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import Text, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,14 +30,17 @@ from protect_api.schemas.domain import (
     AssignmentStart,
     AttributionJobRead,
     BatteryType,
+    ContactCounterpart,
     DeviceBattery,
     DeviceBatteryUpdate,
     DeviceBleAddressUpdate,
+    DeviceContacts,
     DeviceCreate,
     DeviceDataSpan,
     DeviceRead,
     DeviceReporting,
     DeviceReportingUpdate,
+    DeviceScanning,
     DeviceSettingRead,
     DeviceSettingsRead,
     DeviceSettingWrite,
@@ -69,7 +74,7 @@ from shared.domain.attribution import active_job, publish_job, recent_jobs
 from shared.domain.battery import BATTERY_ATTRIBUTE
 from shared.domain.battery import PROFILES as BATTERY_PROFILES
 from shared.domain.battery import resolve as resolve_battery
-from shared.domain.contacts import resolve_waiting
+from shared.domain.contacts import resolve_waiting, scanning_of
 from shared.domain.device_settings import known_settings, record_setting
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
@@ -88,6 +93,7 @@ from shared.models import (
     ConnectivityState,
     DataSource,
     Device,
+    DeviceContact,
     DeviceCurrentState,
     DeviceEntityAssignment,
     DeviceLogFile,
@@ -1147,6 +1153,120 @@ async def set_device_reporting(
     )
     await session.commit()
     return await device_reporting(device_id, user, session)
+
+
+@router.get("/{device_id}/contacts", response_model=DeviceContacts)
+async def device_contacts(
+    device_id: uuid.UUID,
+    hours: int = Query(168, ge=1, le=24 * 90),
+    limit: int = Query(100, ge=1, le=500),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceContacts:
+    """What this device saw over the period, grouped by neighbour (phase 30): the counterparts
+    with how often and how strongly, the unknown ones among them, and whether the device was
+    scanning at all, since no contacts means "they never met" only if it was looking."""
+    device = await _visible_device(session, user, device_id)
+    since = utc_now() - timedelta(hours=hours)
+    rows = (
+        await session.execute(
+            select(
+                DeviceContact.address,
+                DeviceContact.resolution,
+                DeviceContact.contact_device_id,
+                func.count().label("contacts"),
+                func.sum(DeviceContact.sightings).label("sightings"),
+                func.max(DeviceContact.rssi_dbm).label("best_rssi"),
+                func.min(DeviceContact.time).label("first_at"),
+                func.max(DeviceContact.time).label("last_at"),
+                func.max(func.cast(DeviceContact.candidates, Text)).label("candidates"),
+            )
+            .where(DeviceContact.device_id == device.id, DeviceContact.time >= since)
+            .group_by(
+                DeviceContact.address, DeviceContact.resolution, DeviceContact.contact_device_id
+            )
+            .order_by(func.max(DeviceContact.time).desc())
+            .limit(limit)
+        )
+    ).all()
+    named = await _contact_names(session, rows)
+    counterparts = [
+        ContactCounterpart(
+            address=row.address,
+            resolution=row.resolution,
+            device_id=row.contact_device_id,
+            device_name=named.get(row.contact_device_id, (None, None))[0],
+            entity_name=named.get(row.contact_device_id, (None, None))[1],
+            candidate_names=_candidate_names(row.candidates, named),
+            contacts=int(row.contacts),
+            sightings=int(row.sightings or 0),
+            best_rssi_dbm=row.best_rssi,
+            first_at=row.first_at,
+            last_at=row.last_at,
+        )
+        for row in rows
+    ]
+    state = await session.get(DeviceCurrentState, device.id)
+    scan = (state.latest_state or {}).get("ble_scan") if state else None
+    scanning = await scanning_of(session, device.id)
+    return DeviceContacts(
+        hours=hours,
+        scanning=DeviceScanning(
+            enabled=scanning.enabled,
+            known=scanning.known,
+            interval_s=scanning.interval_s,
+            aggregated_interval_s=scanning.aggregated_interval_s,
+            filter_key=scanning.filter_key,
+            filter_label=scanning.filter_label,
+        ),
+        last_scan_at=state.latest_state_time if state and scan else None,
+        counterparts=counterparts,
+        ambiguous=sum(c.contacts for c in counterparts if c.resolution == "ambiguous"),
+        unknown=sum(c.contacts for c in counterparts if c.resolution == "unknown"),
+    )
+
+
+async def _contact_names(
+    session: AsyncSession, rows: Sequence[Any]
+) -> dict[uuid.UUID, tuple[str | None, str | None]]:
+    """The device name and what it tracks today, for every device a contact could mean: the
+    resolved ones and the candidates of the ambiguous ones, so a person can judge those too."""
+    ids: set[uuid.UUID] = {r.contact_device_id for r in rows if r.contact_device_id}
+    for row in rows:
+        for candidate in _candidate_ids(row.candidates):
+            ids.add(candidate)
+    if not ids:
+        return {}
+    found = (
+        await session.execute(
+            select(Device.id, Device.name, Entity.name)
+            .outerjoin(
+                DeviceEntityAssignment,
+                (DeviceEntityAssignment.device_id == Device.id)
+                & DeviceEntityAssignment.validity.op("@>")(utc_now()),
+            )
+            .outerjoin(Entity, Entity.id == DeviceEntityAssignment.entity_id)
+            .where(Device.id.in_(ids))
+        )
+    ).all()
+    return {row[0]: (row[1], row[2]) for row in found}
+
+
+def _candidate_ids(raw: Any) -> list[uuid.UUID]:
+    if not raw:
+        return []
+    values = json.loads(raw) if isinstance(raw, str) else raw
+    out = []
+    for value in values if isinstance(values, list) else []:
+        try:
+            out.append(uuid.UUID(str(value)))
+        except ValueError:
+            continue
+    return out
+
+
+def _candidate_names(raw: Any, named: dict[uuid.UUID, tuple[str | None, str | None]]) -> list[str]:
+    return [named.get(c, (str(c), None))[0] or str(c) for c in _candidate_ids(raw)]
 
 
 @router.put("/{device_id}/ble-address", response_model=DeviceRead)

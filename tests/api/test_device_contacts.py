@@ -5,7 +5,7 @@ as an unknown neighbour, and an address two collars could be is never attributed
 
 import struct
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -32,9 +32,9 @@ async def bus():
     await bus.close()
 
 
-def scan_frame(addresses: list[tuple[bytes, int]]) -> str:
+def scan_frame(addresses: list[tuple[bytes, int]], at: datetime = SCAN_AT) -> str:
     """A port 11 single scan, built to the firmware's layout (research 3.9)."""
-    body = struct.pack("<I", int(SCAN_AT.timestamp())) + bytes([len(addresses)])
+    body = struct.pack("<I", int(at.timestamp())) + bytes([len(addresses)])
     for octets, rssi in addresses:
         body += octets + bytes([rssi + 128])
     return (bytes([0xFA, len(body)]) + body).hex()
@@ -378,3 +378,99 @@ async def test_a_second_device_with_the_same_octets_makes_the_old_reading_ambigu
     assert row.resolution == ContactResolution.AMBIGUOUS
     assert row.contact_device_id is None
     assert set(row.candidates) == {first["id"], second["id"]}
+
+
+async def test_the_read_groups_by_neighbour_and_says_whether_the_device_was_looking(
+    client, db, bus
+):
+    """The card's read (phase 30, C4). No contacts means "they never met" only when the device
+    was scanning, so the scan settings travel with the list."""
+    from shared.domain.device_settings import record_setting
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    known = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+
+    base = f"/api/v1/devices/{watcher['id']}/contacts"
+    empty = (await client.get(base, headers=admin.headers)).json()
+    assert empty["counterparts"] == []
+    assert empty["scanning"]["known"] is False, "nothing known about whether it was looking"
+
+    await _scan(
+        db,
+        bus,
+        source,
+        identity,
+        scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74), (bytes([0xE1, 0x02, 0x9F]), -88)]),
+    )
+    # a later scan sees the same neighbour again, weaker: the group keeps the best signal
+    later = SCAN_AT + timedelta(minutes=10)
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -90)], later))
+
+    # what the device's settings say about its scanning (decisions D228 to D231)
+    for name, value in (("ble_scan_interval", 600), ("ble_scan_filter", 1)):
+        await record_setting(
+            db,
+            device_id=uuid.UUID(watcher["id"]),
+            key=name,
+            value=value,
+            source="frame",
+            observed_at=SCAN_AT,
+        )
+    await db.commit()
+
+    body = (await client.get(base, headers=admin.headers)).json()
+    assert body["scanning"]["enabled"] is True and body["scanning"]["known"] is True
+    assert body["scanning"]["filter_label"] == "Smart Parks devices"
+    by_address = {c["address"]: c for c in body["counterparts"]}
+    named = by_address["0a:41:0c"]
+    assert named["device_name"] == known["name"] and named["resolution"] == "resolved"
+    assert named["contacts"] == 2, "two scans saw it"
+    assert named["best_rssi_dbm"] == -74, "the strongest of the two, not the latest"
+    assert named["last_at"] > named["first_at"], "the group spans both scans"
+    stranger = by_address["9f:02:e1"]
+    assert stranger["resolution"] == "unknown" and stranger["device_name"] is None
+    assert body["unknown"] == 1 and body["ambiguous"] == 0
+
+
+async def test_an_ambiguous_neighbour_names_the_devices_it_could_be(client, db, bus):
+    """Decision D254: the reader is given the candidates rather than a guess."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    a = await _collar(client, db, project, admin, ble_mac="aa:bb:cc:99:88:77")
+    b = await _collar(client, db, project, admin, ble_mac="11:22:33:99:88:77")
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x77, 0x88, 0x99]), -60)]))
+
+    body = (
+        await client.get(f"/api/v1/devices/{watcher['id']}/contacts", headers=admin.headers)
+    ).json()
+    unsure = body["counterparts"][0]
+    assert unsure["resolution"] == "ambiguous" and unsure["device_name"] is None
+    assert set(unsure["candidate_names"]) == {a["name"], b["name"]}
+    assert body["ambiguous"] == 1

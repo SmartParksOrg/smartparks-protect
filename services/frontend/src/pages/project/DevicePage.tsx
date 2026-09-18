@@ -34,6 +34,7 @@ import {
   RecordHistoryDialog,
 } from "@/components/curation/CurationDialogs";
 import { HealthCard } from "@/components/devices/HealthCard";
+import { ContactsCard } from "@/components/devices/ContactsCard";
 import { LogFilesCard } from "@/components/devices/LogFilesCard";
 import { TrafficTable } from "@/components/network/TrafficTable";
 import {
@@ -770,6 +771,9 @@ export function DevicePage() {
                 canWrite={can("devices:control")}
               />
               <LogFilesCard deviceId={d.id} canWrite={can("devices:control")} />
+              {type?.driver_key === "opencollar" && (
+                <ContactsCard deviceId={d.id} />
+              )}
               {projectId && (
                 <Card className="lg:col-span-2">
                   <CardHeader>

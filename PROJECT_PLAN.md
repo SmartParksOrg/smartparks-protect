@@ -1163,7 +1163,9 @@ the test.
       resolving it (D253 unknown kept, D254 ambiguous marked), and the repair: setting a
       device's address re-resolves the sightings that were waiting for it, in both directions
       (a second device with the same octets makes an old confident reading ambiguous again).
-- [ ] C4 the Contacts card on the device's Data tab.
+- [x] C4 the Contacts card on the device's Data tab: the neighbours of the last week grouped,
+      with the scan settings above them, since an empty list means "it met nobody" only when
+      the device was looking and scanning is off until somebody turns it on.
 - [ ] C5 the dev server: scanning turned on for a few collars and the first real scans read
       against the decoder. This is the gate to phase 31.
 

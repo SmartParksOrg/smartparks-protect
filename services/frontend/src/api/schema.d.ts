@@ -918,6 +918,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Contacts
+         * @description What this device saw over the period, grouped by neighbour (phase 30): the counterparts
+         *     with how often and how strongly, the unknown ones among them, and whether the device was
+         *     scanning at all, since no contacts means "they never met" only if it was looking.
+         */
+        get: operations["device_contacts_api_v1_devices__device_id__contacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/ble-address": {
         parameters: {
             query?: never;
@@ -6300,6 +6322,40 @@ export interface components {
              */
             expires_at: string;
         };
+        /**
+         * ContactCounterpart
+         * @description One neighbour a device saw over the period, with what is known of it (D253, D254).
+         */
+        ContactCounterpart: {
+            /** Address */
+            address: string;
+            /** Resolution */
+            resolution: string;
+            /** Device Id */
+            device_id?: string | null;
+            /** Device Name */
+            device_name?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /** Candidate Names */
+            candidate_names?: string[];
+            /** Contacts */
+            contacts: number;
+            /** Sightings */
+            sightings: number;
+            /** Best Rssi Dbm */
+            best_rssi_dbm?: number | null;
+            /**
+             * First At
+             * Format: date-time
+             */
+            first_at: string;
+            /**
+             * Last At
+             * Format: date-time
+             */
+            last_at: string;
+        };
         /** CorrectionCreate */
         CorrectionCreate: {
             /** Target Type */
@@ -7021,6 +7077,31 @@ export interface components {
             /** Sources */
             sources: components["schemas"]["SourceConnectivity"][];
         };
+        /**
+         * DeviceContacts
+         * @description What a device saw over a period, grouped by neighbour.
+         */
+        DeviceContacts: {
+            /** Hours */
+            hours: number;
+            scanning: components["schemas"]["DeviceScanning"];
+            /** Last Scan At */
+            last_scan_at?: string | null;
+            /** Counterparts */
+            counterparts: components["schemas"]["ContactCounterpart"][];
+            /**
+             * Ambiguous
+             * @description Sightings that could be more than one device
+             * @default 0
+             */
+            ambiguous: number;
+            /**
+             * Unknown
+             * @description Neighbours no device of the project matches
+             * @default 0
+             */
+            unknown: number;
+        };
         /** DeviceCreate */
         DeviceCreate: {
             /**
@@ -7316,6 +7397,25 @@ export interface components {
              * @description Seconds between fixes the device is expected to keep; null clears the override so the settings and the data decide again
              */
             expected_fix_interval_s?: number | null;
+        };
+        /**
+         * DeviceScanning
+         * @description Whether the device was looking at all, and for what: no contacts means "they never met"
+         *     only when it was (decisions D228 to D231 already know the settings).
+         */
+        DeviceScanning: {
+            /** Enabled */
+            enabled: boolean;
+            /** Known */
+            known: boolean;
+            /** Interval S */
+            interval_s?: number | null;
+            /** Aggregated Interval S */
+            aggregated_interval_s?: number | null;
+            /** Filter Key */
+            filter_key?: number | null;
+            /** Filter Label */
+            filter_label?: string | null;
         };
         /**
          * DeviceSettingRead
@@ -14419,6 +14519,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceReporting"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_contacts_api_v1_devices__device_id__contacts_get: {
+        parameters: {
+            query?: {
+                hours?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceContacts"];
                 };
             };
             /** @description Validation Error */
