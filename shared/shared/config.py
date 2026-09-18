@@ -164,6 +164,13 @@ class Settings(BaseSettings):
         description="A fix closer than this to the last valid fix is never an outlier, whatever "
         "the speed: GPS scatter over a short interval must not trigger",
     )
+    contact_position_accuracy_m: float = Field(
+        default=100.0,
+        gt=0,
+        description="The radius put on a position that comes from one device hearing another "
+        "(decision D258). Bluetooth range depends on the tag, the antenna and what stands "
+        "between them, so this is a stated assumption and not a measurement",
+    )
     clock_behind_tolerance_seconds: int = Field(
         default=86400,
         ge=0,

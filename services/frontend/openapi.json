@@ -4270,6 +4270,65 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/static-position": {
+   "put": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Set Device Static Position",
+    "description": "Where a device is, for hardware that does not move and does not report its place\n(decision D261): a Bluetooth scanner on a post, a fence monitor. Setting it says the device\ndoes not move, so nothing it sends moves its position afterwards, and it appears on the map\nat once rather than waiting for a fix that will never come. It also gives the sightings it\nmakes a place (decision D258). Both coordinates together set it, both empty clear it.\nProject admins of the device's current project, or a server admin.",
+    "operationId": "set_device_static_position_api_v1_devices__device_id__static_position_put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeviceStaticPositionUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/contacts": {
    "get": {
     "tags": [
@@ -27770,6 +27829,31 @@
       "title": "Ble Mac",
       "description": "The device's Bluetooth address (decision D252); a neighbour's scan reports its last three octets"
      },
+     "static_position": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Static Position",
+      "description": "Where the device is, set by a person (decision D261), as GeoJSON; null when it has none"
+     },
+     "static_position_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Static Position At"
+     },
      "attributes": {
       "additionalProperties": true,
       "type": "object",
@@ -28401,6 +28485,39 @@
     "title": "DeviceStateRead",
     "description": "A device's last status (Tim, 2026-09-13): the driver's health lines with their levels,\nthe raw status document, and the source event it came from."
    },
+   "DeviceStaticPositionUpdate": {
+    "properties": {
+     "latitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 90.0,
+        "minimum": -90.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latitude"
+     },
+     "longitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 180.0,
+        "minimum": -180.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Longitude"
+     }
+    },
+    "type": "object",
+    "title": "DeviceStaticPositionUpdate",
+    "description": "Where a device is, for hardware that does not move and does not report its place\n(decision D261). Both coordinates together set it; both empty clear it."
+   },
    "DeviceStatus": {
     "type": "string",
     "enum": [
@@ -28804,6 +28921,31 @@
       ],
       "title": "Ble Mac",
       "description": "The device's Bluetooth address (decision D252); a neighbour's scan reports its last three octets"
+     },
+     "static_position": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Static Position",
+      "description": "Where the device is, set by a person (decision D261), as GeoJSON; null when it has none"
+     },
+     "static_position_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Static Position At"
      },
      "attributes": {
       "additionalProperties": true,
@@ -34155,7 +34297,8 @@
     "enum": [
      "device",
      "network",
-     "device_else_network"
+     "device_else_network",
+     "static"
     ],
     "title": "LocationSource",
     "description": "Which positions decide an entity's or a device's current position (decision D164)."

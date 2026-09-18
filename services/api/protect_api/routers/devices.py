@@ -11,7 +11,9 @@ from itertools import pairwise
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
+from geoalchemy2.shape import from_shape
 from pydantic import BaseModel, Field
+from shapely.geometry import Point
 from sqlalchemy import Text, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +22,7 @@ from protect_api.attribution import hold_while_attributing, job_read, queue_job
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
-from protect_api.crud import apply_patch, flush_or_409, get_or_404, range_bounds
+from protect_api.crud import apply_patch, flush_or_409, geom_to_geojson, get_or_404, range_bounds
 from protect_api.deps import accessible_project_ids, require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
@@ -44,6 +46,7 @@ from protect_api.schemas.domain import (
     DeviceSettingRead,
     DeviceSettingsRead,
     DeviceSettingWrite,
+    DeviceStaticPositionUpdate,
     DeviceUpdate,
     DeviceWithAssignments,
     ExternalIdentityCreate,
@@ -63,6 +66,7 @@ from protect_api.serial import fill_serial_from_identity
 from protect_api.visibility import group_and_subgroups, visibility_for
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
+from shared.connectivity.network_location import STATIC_RECORD_TYPE
 from shared.connectivity.registry import ADAPTERS
 from shared.connectivity.satellite import SatelliteSession
 from shared.curation.apply import recompute_current_state
@@ -87,7 +91,7 @@ from shared.domain.reporting import (
     expected_fix_interval,
 )
 from shared.domain.reporting_rules import decode_setting_value, encode_setting_value
-from shared.enums import AcquisitionChannel, DeviceStatus, Role
+from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource, Role
 from shared.models import (
     AttributionJob,
     ConnectivityState,
@@ -185,6 +189,8 @@ async def _visible_device(session: AsyncSession, user: User, device_id: uuid.UUI
 async def with_state(session: AsyncSession, devices: list[Device]) -> list[DeviceRead]:
     """Device reads with last seen and health from the current state, one query for all."""
     reads = [DeviceRead.model_validate(d) for d in devices]
+    for device, read in zip(devices, reads, strict=True):
+        read.static_position = geom_to_geojson(device.static_geom)
     if not devices:
         return reads
     ids = [d.id for d in devices]
@@ -1153,6 +1159,67 @@ async def set_device_reporting(
     )
     await session.commit()
     return await device_reporting(device_id, user, session)
+
+
+@router.put("/{device_id}/static-position", response_model=DeviceRead)
+async def set_device_static_position(
+    device_id: uuid.UUID,
+    body: DeviceStaticPositionUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceRead:
+    """Where a device is, for hardware that does not move and does not report its place
+    (decision D261): a Bluetooth scanner on a post, a fence monitor. Setting it says the device
+    does not move, so nothing it sends moves its position afterwards, and it appears on the map
+    at once rather than waiting for a fix that will never come. It also gives the sightings it
+    makes a place (decision D258). Both coordinates together set it, both empty clear it.
+    Project admins of the device's current project, or a server admin."""
+    device = await get_or_404(session, Device, device_id, "Device")
+    attribution = await resolve_attribution(session, device.id, utc_now())
+    if not user.is_superuser:
+        if attribution.project_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
+        await _require_project_admin(session, user, attribution.project_id)
+    if (body.latitude is None) != (body.longitude is None):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "latitude and longitude go together"
+        )
+    now = utc_now()
+    if body.latitude is not None and body.longitude is not None:
+        device.static_geom = from_shape(Point(body.longitude, body.latitude), srid=4326)
+        device.static_position_at = now
+        device.location_source = LocationSource.STATIC
+        await _show_static_position(session, device, now)
+    else:
+        device.static_geom = None
+        device.static_position_at = None
+        if device.location_source == LocationSource.STATIC:
+            device.location_source = LocationSource.DEVICE
+    await record_audit(
+        session,
+        user=user,
+        action="device.static_position_set",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=attribution.project_id,
+        details={"latitude": body.latitude, "longitude": body.longitude},
+    )
+    await session.commit()
+    return (await with_state(session, [device]))[0]
+
+
+async def _show_static_position(session: AsyncSession, device: Device, now: datetime) -> None:
+    """Put the place on the device's current state at once: a device that does not report its
+    position would otherwise stay off the map for ever, which is the whole reason for setting
+    one by hand."""
+    state = await session.get(DeviceCurrentState, device.id)
+    if state is None:
+        state = DeviceCurrentState(device_id=device.id, latest_state={})
+        session.add(state)
+    state.latest_position = device.static_geom
+    state.latest_position_time = now
+    state.latest_position_kind = STATIC_RECORD_TYPE
+    state.latest_accuracy_m = None
 
 
 @router.get("/{device_id}/contacts", response_model=DeviceContacts)

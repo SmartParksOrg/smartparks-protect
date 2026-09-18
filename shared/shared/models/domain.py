@@ -184,6 +184,14 @@ class Device(UuidPrimaryKeyMixin, TimestampMixin, Base):
     serial_number: Mapped[str | None] = mapped_column(String(128), unique=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="inventory")
     firmware_version: Mapped[str | None] = mapped_column(String(64))
+    static_geom: Mapped[Any | None] = mapped_column(
+        Geometry(geometry_type="POINT", srid=4326, spatial_index=True),
+        comment="Where this device is, set by a person, for hardware that does not move and "
+        "does not report its place (decision D261): a scanner on a post, a fence monitor",
+    )
+    static_position_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), comment="When the static place was last set"
+    )
     ble_mac: Mapped[str | None] = mapped_column(
         String(17),
         comment="The device's Bluetooth address, printed high octet first (decision D252): "

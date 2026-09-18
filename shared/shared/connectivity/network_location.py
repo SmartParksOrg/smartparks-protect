@@ -16,6 +16,12 @@ from shared.connectivity.satellite import SatelliteSession
 from shared.timeutil import require_aware
 
 NETWORK_RECORD_TYPE = "network"
+#: A place a person set for hardware that does not move (decision D261). Like a network
+#: location it is not a device fix, so every reader that separates the two treats it the same.
+STATIC_RECORD_TYPE = "static"
+#: Where a device was because something heard it there (decision D258): the place of the
+#: device that heard it, which is only known when that one has a static position.
+PROXIMITY_RECORD_TYPE = "proximity"
 
 
 @dataclass(slots=True)

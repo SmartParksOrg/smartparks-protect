@@ -918,6 +918,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/static-position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Device Static Position
+         * @description Where a device is, for hardware that does not move and does not report its place
+         *     (decision D261): a Bluetooth scanner on a post, a fence monitor. Setting it says the device
+         *     does not move, so nothing it sends moves its position afterwards, and it appears on the map
+         *     at once rather than waiting for a fix that will never come. It also gives the sightings it
+         *     makes a place (decision D258). Both coordinates together set it, both empty clear it.
+         *     Project admins of the device's current project, or a server admin.
+         */
+        put: operations["set_device_static_position_api_v1_devices__device_id__static_position_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/contacts": {
         parameters: {
             query?: never;
@@ -7313,6 +7338,15 @@ export interface components {
              * @description The device's Bluetooth address (decision D252); a neighbour's scan reports its last three octets
              */
             ble_mac?: string | null;
+            /**
+             * Static Position
+             * @description Where the device is, set by a person (decision D261), as GeoJSON; null when it has none
+             */
+            static_position?: {
+                [key: string]: unknown;
+            } | null;
+            /** Static Position At */
+            static_position_at?: string | null;
             /** Attributes */
             attributes: {
                 [key: string]: unknown;
@@ -7523,6 +7557,17 @@ export interface components {
             source_event_ingested_at?: string | null;
         };
         /**
+         * DeviceStaticPositionUpdate
+         * @description Where a device is, for hardware that does not move and does not report its place
+         *     (decision D261). Both coordinates together set it; both empty clear it.
+         */
+        DeviceStaticPositionUpdate: {
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+        };
+        /**
          * DeviceStatus
          * @enum {string}
          */
@@ -7669,6 +7714,15 @@ export interface components {
              * @description The device's Bluetooth address (decision D252); a neighbour's scan reports its last three octets
              */
             ble_mac?: string | null;
+            /**
+             * Static Position
+             * @description Where the device is, set by a person (decision D261), as GeoJSON; null when it has none
+             */
+            static_position?: {
+                [key: string]: unknown;
+            } | null;
+            /** Static Position At */
+            static_position_at?: string | null;
             /** Attributes */
             attributes: {
                 [key: string]: unknown;
@@ -9564,7 +9618,7 @@ export interface components {
          * @description Which positions decide an entity's or a device's current position (decision D164).
          * @enum {string}
          */
-        LocationSource: "device" | "network" | "device_else_network";
+        LocationSource: "device" | "network" | "device_else_network" | "static";
         /** MapConfig */
         MapConfig: {
             /** Maptiler Key */
@@ -14524,6 +14578,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceReporting"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_device_static_position_api_v1_devices__device_id__static_position_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceStaticPositionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"];
                 };
             };
             /** @description Validation Error */

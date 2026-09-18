@@ -21,8 +21,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
-from shared.config import get_settings
-from shared.connectivity.network_location import NETWORK_RECORD_TYPE, NetworkLocation
+from shared.config import Settings, get_settings
+from shared.connectivity.network_location import (
+    NETWORK_RECORD_TYPE,
+    PROXIMITY_RECORD_TYPE,
+    NetworkLocation,
+)
 from shared.connectivity.satellite import SatelliteSession, estimate_disagreement
 from shared.control.commands import (
     apply_provider_signal,
@@ -726,6 +730,116 @@ async def _write_contacts(
             session.add(state)
         if state.last_seen_at is None or when > state.last_seen_at:
             state.last_seen_at = when
+    # and where it was, when the device that heard it has a place of its own (decision D258).
+    # Only a device whose place a person set: a collar's own last fix says where the collar was,
+    # not where the thing it heard was.
+    if device.static_geom is not None and heard:
+        await _place_heard_devices(session, event, device, heard, outcome)
+
+
+async def _place_heard_devices(
+    session: AsyncSession,
+    event: SourceEvent,
+    reader: Device,
+    heard: dict[uuid.UUID, datetime],
+    outcome: Outcome,
+) -> None:
+    """A position for every device this reader heard, at the reader (decision D258).
+
+    It is an estimate with a radius, not a fix, and it carries a record type of its own so that
+    every reader of positions which already separates a fix from an estimate treats it correctly
+    without being taught anything new. For an animal wearing a tag and no GNSS it is the only
+    position there will ever be."""
+    settings = get_settings()
+    for seen_id, when in heard.items():
+        key = canonical_key(seen_id, when, f"{PROXIMITY_RECORD_TYPE}:{reader.id}")
+        already = await session.scalar(
+            select(Position.id).where(Position.canonical_key == key, Position.time == when)
+        )
+        if already is not None:
+            continue
+        attribution = await resolve_attribution(session, seen_id, when)
+        session.add(
+            Position(
+                time=when,
+                device_id=seen_id,
+                project_id=attribution.project_id,
+                entity_id=attribution.entity_id,
+                record_type=PROXIMITY_RECORD_TYPE,
+                canonical_key=key,
+                geom=reader.static_geom,
+                accuracy_m=settings.contact_position_accuracy_m,
+                attributes={"heard_by": str(reader.id), "heard_by_name": reader.name},
+                data_source_id=event.data_source_id,
+                source_event_id=event.id,
+                source_event_ingested_at=event.ingested_at,
+            )
+        )
+        outcome.created["positions"] += 1
+        await _place_current_state(session, seen_id, attribution, reader, when, settings)
+
+
+async def _place_current_state(
+    session: AsyncSession,
+    seen_id: uuid.UUID,
+    attribution: Attribution,
+    reader: Device,
+    when: datetime,
+    settings: Settings,
+) -> None:
+    """Put the heard device, and the animal it is on, at the reader.
+
+    An estimate never displaces a newer device fix: a collar that fixes for itself keeps its own
+    position and the sighting is only a contact. A device that has never fixed at all, which is
+    every tag, takes the estimate whatever its location setting says, because that setting is
+    there to choose between a fix and an estimate and there is no fix to choose."""
+    seen = await session.get(Device, seen_id)
+    if seen is None:
+        return
+    estimate = DecodedPosition(
+        time=when,
+        latitude=0.0,
+        longitude=0.0,
+        record_type=PROXIMITY_RECORD_TYPE,
+        accuracy_m=settings.contact_position_accuracy_m,
+    )
+    owners: list[tuple[Any, str, int]] = []
+    device_state = await session.get(DeviceCurrentState, seen_id)
+    if device_state is not None:
+        owners.append((device_state, seen.location_source, seen.location_fallback_hours))
+    if device_state is not None and device_state.last_seen_at is None:
+        device_state.last_seen_at = when
+    if attribution.entity_id is not None and attribution.project_id is not None:
+        entity_state = await session.get(EntityCurrentState, attribution.entity_id)
+        if entity_state is None:
+            # an animal wearing only a tag has never had a record of its own, so its state row
+            # does not exist yet; without creating it the first sighting places nothing
+            entity_state = EntityCurrentState(
+                entity_id=attribution.entity_id, project_id=attribution.project_id
+            )
+            session.add(entity_state)
+        entity = await session.get(Entity, attribution.entity_id)
+        if entity_state is not None:
+            owners.append(
+                (
+                    entity_state,
+                    entity.location_source if entity else LocationSource.DEVICE,
+                    entity.location_fallback_hours if entity else 24,
+                )
+            )
+    for state, source, fallback in owners:
+        never_fixed = state.latest_fix_time is None
+        newer = state.latest_position_time is None or when > state.latest_position_time
+        stale = never_fixed or (when - state.latest_fix_time) > timedelta(hours=max(0, fallback))
+        allowed = never_fixed or source in (
+            LocationSource.NETWORK,
+            LocationSource.DEVICE_ELSE_NETWORK,
+        )
+        if newer and allowed and (source == LocationSource.NETWORK or stale):
+            _set_position(state, estimate, PROXIMITY_RECORD_TYPE)
+            state.latest_position = reader.static_geom
+            if isinstance(state, EntityCurrentState):
+                state.device_id = seen_id
 
 
 async def _write_measurements(

@@ -16,7 +16,7 @@ from shared.bus import RedisStreamsBus
 from shared.connectivity.base import InboundMessage
 from shared.enums import AcquisitionChannel, ContactResolution, IngestionMethod
 from shared.ingest import commit_and_publish, store_inbound
-from shared.models import DataSource, DeviceContact
+from shared.models import DataSource, DeviceContact, DeviceCurrentState
 from tests.api.conftest import actor, create_project
 from tests.conftest import unique_name
 
@@ -641,3 +641,140 @@ async def test_a_tag_on_a_rabbit_is_a_device_heard_by_a_reader(client, db, bus):
     await db.rollback()
     read = (await client.get(f"/api/v1/devices/{tag['id']}", headers=h)).json()
     assert read["last_seen_at"] is not None, "a tag that nothing heard would look dead for ever"
+
+
+async def test_a_reader_with_a_place_puts_the_rabbit_on_the_map(client, db, bus):
+    """Decisions D261 and D258, the whole PWN point: the readers do not report their positions
+    because they do not move, so a person sets the place, and then a sighting is the only
+    position a rabbit with no GNSS will ever have."""
+    from shared.connectivity.network_location import PROXIMITY_RECORD_TYPE
+    from shared.models import Entity, EntityCurrentState, EntityType, Position
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    h = admin.headers
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+
+    # the place of SP051345, as Tim gave it
+    placed = await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=h,
+    )
+    assert placed.status_code == 200, placed.text
+    assert placed.json()["location_source"] == "static"
+    assert placed.json()["static_position"]["coordinates"] == [4.612521, 52.530929]
+
+    # a reader that never reports a fix is on the map the moment its place is set
+    await db.rollback()
+    reader_state = await db.get(DeviceCurrentState, uuid.UUID(reader["id"]))
+    assert reader_state is not None and reader_state.latest_position is not None
+
+    tag_type = (
+        await client.post(
+            "/api/v1/device-types",
+            json={
+                "key": unique_name("tag").replace("-", "_"),
+                "label": "EdgeTag",
+                "driver_key": "ble_tag",
+            },
+            headers=h,
+        )
+    ).json()
+    tag = (
+        await client.post(
+            "/api/v1/devices",
+            json={"device_type_id": tag_type["id"], "name": "EdgeTag 11", "status": "active"},
+            headers=h,
+        )
+    ).json()
+    await client.post(
+        f"/api/v1/devices/{tag['id']}/project-assignments",
+        json={"project_id": str(project.id), "valid_from": "2026-01-01T00:00:00+00:00"},
+        headers=h,
+    )
+    await client.put(
+        f"/api/v1/devices/{tag['id']}/ble-address",
+        json={"ble_mac": "00:00:00:00:00:0b"},
+        headers=h,
+    )
+    entity_type = EntityType(
+        key=unique_name("et").replace("-", "_"),
+        label="Rabbit",
+        group_key="tracked",
+        icon_key="wildlife.generic",
+    )
+    db.add(entity_type)
+    await db.flush()
+    rabbit = Entity(name="Rabbit 11", entity_type_id=entity_type.id, project_id=project.id)
+    db.add(rabbit)
+    await db.commit()
+    await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": tag["id"],
+            "entity_id": str(rabbit.id),
+            "valid_from": "2026-01-01T00:00:00+00:00",
+        },
+        headers=h,
+    )
+
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0B, 0x00, 0x00]), -89)]))
+
+    await db.rollback()
+    # the tag has a position, at the reader, as an estimate with a radius and never as a fix
+    position = (
+        await db.execute(select(Position).where(Position.device_id == uuid.UUID(tag["id"])))
+    ).scalar_one()
+    assert position.record_type == PROXIMITY_RECORD_TYPE
+    assert position.accuracy_m == 100.0
+    assert position.entity_id == rabbit.id
+    assert position.attributes["heard_by_name"] == reader["name"]
+
+    # and the rabbit is on the map, which is the whole point
+    state = await db.get(EntityCurrentState, rabbit.id)
+    assert state is not None and state.latest_position is not None
+    assert state.latest_position_kind == PROXIMITY_RECORD_TYPE
+    assert state.latest_accuracy_m == 100.0
+
+
+async def test_a_reader_without_a_place_only_records_the_contact(client, db, bus):
+    """A sighting says where something was only when the device that heard it has a place."""
+    from shared.models import Position
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    tag = await _collar(client, db, project, admin, ble_mac="00:00:00:00:00:0b")
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0B, 0x00, 0x00]), -89)]))
+    await db.rollback()
+    rows = (
+        (await db.execute(select(Position).where(Position.device_id == uuid.UUID(tag["id"]))))
+        .scalars()
+        .all()
+    )
+    assert rows == [], "no place for the reader means no place for what it heard"

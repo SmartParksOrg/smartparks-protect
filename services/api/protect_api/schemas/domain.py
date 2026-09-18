@@ -267,6 +267,12 @@ class DeviceRead(ORMModel):
         description="The device's Bluetooth address (decision D252); a neighbour's scan reports "
         "its last three octets",
     )
+    static_position: dict[str, Any] | None = Field(
+        default=None,
+        description="Where the device is, set by a person (decision D261), as GeoJSON; null "
+        "when it has none",
+    )
+    static_position_at: datetime | None = None
     attributes: dict[str, Any]
     notes: str | None
     picture_updated_at: datetime | None = Field(
@@ -631,6 +637,14 @@ class DeviceContacts(BaseModel):
     )
     ambiguous: int = Field(default=0, description="Sightings that could be more than one device")
     unknown: int = Field(default=0, description="Neighbours no device of the project matches")
+
+
+class DeviceStaticPositionUpdate(BaseModel):
+    """Where a device is, for hardware that does not move and does not report its place
+    (decision D261). Both coordinates together set it; both empty clear it."""
+
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 class DeviceBleAddressUpdate(BaseModel):

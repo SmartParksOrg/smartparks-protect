@@ -57,6 +57,7 @@ import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { BatteryCard } from "@/components/devices/BatteryCard";
 import { BleAddress } from "@/components/devices/BleAddress";
 import { ReportingCard } from "@/components/devices/ReportingCard";
+import { StaticPositionCard } from "@/components/devices/StaticPositionCard";
 import { DeviceSettingsTab } from "@/components/devices/DeviceSettingsTab";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
 import { lastPositionsWindow } from "@/lib/positionsWindow";
@@ -545,6 +546,10 @@ export function DevicePage() {
               )}
               <BatteryCard
                 deviceId={d.id}
+                canEdit={Boolean(user?.is_superuser) || can("project:write")}
+              />
+              <StaticPositionCard
+                device={d}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}
               />
               <ReportingCard

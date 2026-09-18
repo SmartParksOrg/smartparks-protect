@@ -263,3 +263,25 @@ wants the pairwise work proven first. Wi-Fi scans, which arrive in the same shap
 10 and would drop into the same store. The CMDQ records of port 15, which carry a cardiac
 monitor's Bluetooth advertisement and are a different question. Alerting on a contact as it
 happens, which belongs to the rules engine and not to an analysis run.
+
+## 8. A device's own place (decision D261)
+
+The PWN scanners do not report their positions: the positions are known and fixed, so reporting
+them would be a waste of power and airtime. The same is true of a FenceEdge. Such a device would
+never appear on the map, waiting for a fix that will never come, and the sightings it makes
+would say when but never where.
+
+So any device may be given a place by hand, on its page. Setting one is a statement that the
+device does not move: `location_source` becomes `static`, the place goes on the current state at
+once, and nothing the device sends moves it afterwards. Clearing it gives the device back to
+whatever it reports.
+
+A sighting by a placed device then writes a `proximity` position for the device it heard, at the
+reader, with `CONTACT_POSITION_ACCURACY_M` as the radius. That radius is a stated assumption and
+not a measurement: Bluetooth range depends on the tag, the antenna and what stands between them.
+
+Whether that estimate becomes the animal's position follows the rule that already governs network
+locations, with one addition. An estimate never displaces a newer device fix, so a collar that
+fixes for itself keeps its own position and the sighting is only a contact. But a device that has
+never fixed at all, which is every tag, takes the estimate whatever its location setting says:
+that setting is there to choose between a fix and an estimate, and there is no fix to choose.

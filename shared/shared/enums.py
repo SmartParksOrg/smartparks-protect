@@ -58,6 +58,9 @@ class LocationSource(StrEnum):
     DEVICE = "device"
     NETWORK = "network"
     DEVICE_ELSE_NETWORK = "device_else_network"
+    #: The place a person set, for hardware that does not move and does not report where it is
+    #: (decision D261): a scanner on a post, a fence monitor. Nothing the device sends moves it.
+    STATIC = "static"
 
 
 class DeviceStatus(StrEnum):
