@@ -69,6 +69,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- A reader whose clock is far behind resolved nothing it saw. The clock rule (decision D259) moves such a sighting to its delivery time, and the row is attributed to the project it belongs to then; but the fleet it was read against was chosen from the time the device itself claimed, which for a reader 45 hours behind lay before it had joined the project at all. So it was read against an empty fleet and a tag standing a metre away came out as an unknown neighbour: 165 of the PWN sightings, beside 1,059 identical ones that resolved. The fleet now comes from the project the row lands in. (Found while reading the reprocessed PWN history, 2026-09-18.)
+
 - Every displayed time is on the 24 hour clock (Tim, 2026-09-18). An English browser is usually en-US, whose locale writes "7:05:00 PM", which is not how a field team reads a time; the live map's Position row showed it. The locale still decides the date order and the month names, which is what a locale is for.
 
 - Clicking an entity standing inside a geofence, zone or site on the live map opened the area instead of the entity. The areas are drawn under the markers, but a map calls the handler of every layer with something under the cursor whatever the drawing order, and the area's was bound last, so it had the final say. An area now gives way to anything drawn over it: entities, devices, events, gateways, track points and clusters. (Tim, 2026-09-18.)

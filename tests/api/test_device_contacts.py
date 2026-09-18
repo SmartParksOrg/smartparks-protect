@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import pytest_asyncio
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import Range
 
 from protect_decoder.pipeline import process_source_event
 from shared.bus import RedisStreamsBus
@@ -1009,3 +1010,50 @@ async def test_an_unknown_filter_claims_nothing_either_way(client, db, bus):
             )
         )
     ).all() == []
+
+
+async def test_a_clock_far_behind_still_resolves_what_it_saw(client, db, bus):
+    """The resolver belongs to the project the row lands in, not to the project the device's own
+    clock pointed at. A reader 45 hours behind claims times from before it joined the project;
+    the clock rule (D259) moves the row to the delivery, and the sighting must be read against
+    the fleet of the project it is then attributed to. It was read against an empty fleet, so a
+    tag standing a metre away came out as an unknown neighbour."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    known = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+
+    # the reader joined the project an hour ago; its clock says two days ago
+    joined = datetime.now(UTC) - timedelta(hours=1)
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    assignments = await client.get(f"/api/v1/devices/{reader['id']}", headers=admin.headers)
+    assignment_id = assignments.json()["project_assignments"][0]["id"]
+    from shared.models import DeviceProjectAssignment
+
+    row = await db.get(DeviceProjectAssignment, uuid.UUID(assignment_id))
+    row.validity = Range(joined, None, bounds="[)")
+    await db.commit()
+
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+
+    claimed = datetime.now(UTC) - timedelta(hours=45)
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)], claimed))
+
+    contact = (
+        await db.scalars(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(reader["id"]))
+        )
+    ).one()
+    assert contact.project_id == project.id, "the corrected time is inside the assignment"
+    assert contact.resolution == ContactResolution.RESOLVED
+    assert contact.contact_device_id == uuid.UUID(known["id"])

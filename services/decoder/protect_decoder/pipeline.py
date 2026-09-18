@@ -661,19 +661,31 @@ async def _write_contacts(
 ) -> None:
     """A sighting becomes a contact (decision D252), resolved once here and never re-guessed.
 
-    The resolver is read once per delivery rather than per sighting: a scan carries up to twenty
-    of them and they all look at the same fleet."""
+    The resolver belongs to the project the row is attributed to, and is read once per project
+    rather than once per sighting: a scan carries up to twenty of them and they all look at the
+    same fleet. Once per project and not once per delivery, because the time a row is attributed
+    at is not always the time the device claimed: a clock far behind its delivery is corrected
+    first (decision D259), and a reader 45 hours behind claimed times from before it had joined
+    the project at all, which left every one of its sightings unresolved against an empty fleet
+    while the row itself was attributed correctly."""
     if not records.contacts:
         return
     settings = get_settings()
     live = delivers_live(event.acquisition_channel)
-    first = await attribution_at(records.contacts[0].time)
     # what the device was looking for decides what a sighting can mean (decision D260): under
     # the phone filter nothing is resolved, because a phone's address is random and a match
     # would be a coincidence, and nothing is moved by it
     scanning = await scanning_of(session, device.id)
     people = watches_for_people(scanning)
-    resolver = Resolver(by_suffix={}) if people else await resolver_for(session, first.project_id)
+    resolvers: dict[uuid.UUID | None, Resolver] = {}
+
+    async def resolver_of(project_id: uuid.UUID | None) -> Resolver:
+        if people:
+            return Resolver(by_suffix={})
+        if project_id not in resolvers:
+            resolvers[project_id] = await resolver_for(session, project_id)
+        return resolvers[project_id]
+
     heard: dict[uuid.UUID, datetime] = {}
     # per scan window, the addresses heard and the strongest signal of each: one window is one
     # presence, however many addresses it carried, since one person carries several
@@ -707,7 +719,7 @@ async def _write_contacts(
             outcome.duplicates += 1
             continue
         attribution = await attribution_at(when)
-        found = resolver.resolve(address, device.id)
+        found = (await resolver_of(attribution.project_id)).resolve(address, device.id)
         if found.resolution == ContactResolution.AMBIGUOUS:
             outcome.ambiguous_contacts += 1
         session.add(
