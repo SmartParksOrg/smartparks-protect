@@ -448,7 +448,9 @@ export function ResultMap({
   return (
     <div
       ref={frame}
-      className={`relative overflow-hidden rounded-md border bg-card ${fullscreen ? "" : "h-80 lg:h-[26rem]"}`}
+      // the height has a floor: the tool strip hangs from the top right and the zoom strip from
+      // the bottom right, and a shorter box makes the two overlap on a phone (Tim, 2026-09-18)
+      className={`relative overflow-hidden rounded-md border bg-card ${fullscreen ? "" : "h-[25rem] lg:h-[26rem]"}`}
     >
       <div ref={container} className="absolute! inset-0 z-0" />
       {stripHost && createPortal(<ControlStrip items={toolItems} />, stripHost)}
