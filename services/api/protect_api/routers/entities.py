@@ -49,6 +49,7 @@ from shared.curation.apply import recompute_current_state
 from shared.database import get_session
 from shared.domain.assignments import resolve_attribution
 from shared.domain.attribution import QueueResult, publish_job
+from shared.domain.static_place import place_entity_of
 from shared.models import (
     Device,
     DeviceEntityAssignment,
@@ -536,6 +537,10 @@ async def create_entity_assignment(
     )
     session.add(assignment)
     await flush_or_409(session, "Entity assignment")
+    # A device with a place set by hand carries it to its new entity at once (decision D261):
+    # a scanner reports nothing, so no record will ever put that entity on the map.
+    if body.valid_to is None:
+        await place_entity_of(session, body.device_id, body.valid_from)
     # Records already decoded inside the range get the entity through a job (D103, D206).
     queued = await queue_job(
         session,

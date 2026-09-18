@@ -66,7 +66,6 @@ from protect_api.serial import fill_serial_from_identity
 from protect_api.visibility import group_and_subgroups, visibility_for
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
-from shared.connectivity.network_location import STATIC_RECORD_TYPE
 from shared.connectivity.registry import ADAPTERS
 from shared.connectivity.satellite import SatelliteSession
 from shared.curation.apply import recompute_current_state
@@ -91,6 +90,7 @@ from shared.domain.reporting import (
     expected_fix_interval,
 )
 from shared.domain.reporting_rules import decode_setting_value, encode_setting_value
+from shared.domain.static_place import show_static_place
 from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource, Role
 from shared.models import (
     AttributionJob,
@@ -1189,7 +1189,7 @@ async def set_device_static_position(
         device.static_geom = from_shape(Point(body.longitude, body.latitude), srid=4326)
         device.static_position_at = now
         device.location_source = LocationSource.STATIC
-        await _show_static_position(session, device, now)
+        await show_static_place(session, device, now)
     else:
         device.static_geom = None
         device.static_position_at = None
@@ -1206,20 +1206,6 @@ async def set_device_static_position(
     )
     await session.commit()
     return (await with_state(session, [device]))[0]
-
-
-async def _show_static_position(session: AsyncSession, device: Device, now: datetime) -> None:
-    """Put the place on the device's current state at once: a device that does not report its
-    position would otherwise stay off the map for ever, which is the whole reason for setting
-    one by hand."""
-    state = await session.get(DeviceCurrentState, device.id)
-    if state is None:
-        state = DeviceCurrentState(device_id=device.id, latest_state={})
-        session.add(state)
-    state.latest_position = device.static_geom
-    state.latest_position_time = now
-    state.latest_position_kind = STATIC_RECORD_TYPE
-    state.latest_accuracy_m = None
 
 
 @router.get("/{device_id}/contacts", response_model=DeviceContacts)

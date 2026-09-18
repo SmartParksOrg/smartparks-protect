@@ -1057,3 +1057,76 @@ async def test_a_clock_far_behind_still_resolves_what_it_saw(client, db, bus):
     assert contact.project_id == project.id, "the corrected time is inside the assignment"
     assert contact.resolution == ContactResolution.RESOLVED
     assert contact.contact_device_id == uuid.UUID(known["id"])
+
+
+async def test_a_placed_device_puts_its_entity_on_the_map_too(client, db, bus):
+    """Decision D261. A scanner reports nothing, so no record will ever place the entity it is
+    on: the place has to reach the entity's current state as well as the device's, whichever of
+    the two came first. The entity was left blank on the live map before this."""
+    from shared.models import EntityCurrentState
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    # the catalogue's own scanner sub-type, seeded by migration 0044
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=admin.headers)).json()
+    entity_type = next(t for t in catalogue["items"] if t["key"] == "scanner")
+
+    # the place is set first, the entity made afterwards: the order a reader is really set up in
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    placed = await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    assert placed.status_code == 200, placed.text
+    assert placed.json()["location_source"] == "static"
+
+    made = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": reader["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": entity_type["id"], "name": unique_name("Scanner")},
+        },
+        headers=admin.headers,
+    )
+    assert made.status_code == 201, made.text
+    entity_id = uuid.UUID(made.json()["entity_id"])
+
+    placed_row = (
+        await db.execute(
+            select(EntityCurrentState.latest_position, EntityCurrentState.latest_position_kind)
+            .where(EntityCurrentState.entity_id == entity_id)
+            .execution_options(populate_existing=True)
+        )
+    ).one_or_none()
+    assert placed_row is not None and placed_row[0] is not None, (
+        "the entity of a placed device is on the map"
+    )
+    assert placed_row[1] == "static"
+
+    # and the other order: the place set while the entity is already there
+    other = await _collar(client, db, project, admin, ble_mac=None)
+    second = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": other["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": entity_type["id"], "name": unique_name("Scanner")},
+        },
+        headers=admin.headers,
+    )
+    assert second.status_code == 201, second.text
+    await client.put(
+        f"/api/v1/devices/{other['id']}/static-position",
+        json={"latitude": 52.528591, "longitude": 4.609628},
+        headers=admin.headers,
+    )
+    second_row = (
+        await db.execute(
+            select(EntityCurrentState.latest_position).where(
+                EntityCurrentState.entity_id == uuid.UUID(second.json()["entity_id"])
+            )
+        )
+    ).one_or_none()
+    assert second_row is not None and second_row[0] is not None
