@@ -293,7 +293,8 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D251 | The vegetation layer is a mosaic on the analysis grid, not a colour per area | The areas and the cells of the grid go to the provider in one job, so the areas keep their exact mean and the mosaic costs no second run; the cell size doubles until the selection fits 600 cells, and the five colours divide the cells evenly by rank, since a landscape is not spread evenly over its range | Tim (2026-09-18), on seeing one uniform green: one polygon per area is one colour, and a fixed 0.1 to 0.8 scale paints a temperate landscape (0.7 to 0.9) all the same green |
 | D250 | The environmental provider's account is a server setting, edited in the interface | The credentials live in `server_settings` with the secret encrypted as a data source's are, set under Server admin, Environmental data, with a test that costs no processing quota; the environment variables stay as a fallback and the page says when they stand in | Tim (2026-09-18): setting up the account belonged to whoever could edit the server's environment, which is not who runs the server; it also supersedes the settings-only half of D245 |
 | D257 | A Bluetooth tag is a device like any other | An EdgeTag becomes a device of a `ble_tag` type whose address is the one it was programmed with, assigned to the animal it rides on; the resolver needs no special case, since it already matches a device by the address a scanner would see. Assignments carry the history when a tag moves to another animal, and attribution puts each sighting in the right project and entity | Tim (2026-09-18), with the PWN readers already scanning: the addresses are self-defined on the tags, so they are real addresses and not a separate kind of identifier |
-| D258 | A sighting by a reader whose place is known is also a position | The tagged animal gets a position at the reader, `record_type` `proximity`, with the Bluetooth range as its accuracy, through the network-location machinery of D162 to D164 so the map, the rules and the analyses treat it as the estimate it is and never as a fix. For animals carrying a tag and no GNSS this is the only position they will ever have | Tim (2026-09-18) |
+| D258 | Only a device whose place is set by hand turns a sighting into a position | The seen device gets a position at the reader, `record_type` `proximity`, with the Bluetooth range as its accuracy, through the network-location machinery of D162 to D164, so the map, the rules and the analyses treat it as the estimate it is and never as a fix. A collar worn by an animal places nothing, whatever its own last fix says: a sighting is a contact and the pair's own positions are already recorded | Tim (2026-09-18), over also placing from a mobile observer's recent fix |
+| D260 | A phone is presence, never an identity | Phones rotate their Bluetooth address every few minutes, so two sightings can never be known to be the same phone and a count of addresses is not a count of people. A sighting under the phone filter is stored like any other but never resolves to a device and never becomes one; what is reported is presence in a window, and a `human_presence` event carries it so a rule can act on it, which is the operational reason to scan for phones in a reserve at all | Tim (2026-09-18) |
 | D259 | A device clock that is implausibly far from its delivery is not believed | A record whose device time is further from its delivery than the tolerance is stored at the delivery time with the device's own claim kept on the row and a note on the trace; D119 already refuses a clock running ahead, and this extends the same distrust to one running behind, as one PWN reader is doing by 45 hours | Tim (2026-09-18) |
 | D252 | Bluetooth contacts are a canonical record type of their own | A `device_contacts` hypertable beside positions, measurements, states and events, attributed at the record's device-origin time like every canonical row; contacts are raw device output, so they belong in the core and not in the analysis subsystem's tables | Tim (2026-09-18), over keeping them as JSONB in the state history, which no index could serve |
 | D253 | A sighting that resolves to no known device is kept | An unknown counterpart named by its three octets, listed beside the resolved ones; a collar meeting the same unknown address nightly is a finding, and the platform retains what it cannot identify everywhere else | Tim (2026-09-18) |
@@ -1140,7 +1141,14 @@ Release:
 
 ### Phase 30: Bluetooth contacts as canonical data (v2.8.0)
 
-**Goal.** An OpenCollar with scanning on reports the devices it sees. Protect stores those
+**Goal.** An OpenCollar with scanning on reports the devices it sees, and it is used three ways
+that all have to work: a collar on an animal seeing other collars (who met whom), a stationary
+reader watching for tags on animals that carry no GNSS (where an animal was), and a collar or
+reader watching for phones (whether people were about). The three differ in what a sighting
+means, not in what arrives, so one store and one resolver carry all of them and the differences
+sit in what is made of the result.
+
+An OpenCollar with scanning on reports the devices it sees. Protect stores those
 sightings today as source events and decodes nothing, so nobody can ask who a collar met. This
 phase makes a contact a record like a position: decoded, attributed, resolved to a device where
 it can be, and visible on the device's Data tab. No analysis yet, on purpose: there is not one
@@ -1175,10 +1183,17 @@ the test.
       C11 to C13. Port 7 (aggregated) is still unproven: every real message is port 11.
 - [ ] C11 a `ble_tag` device type and driver for the EdgeTags (D257), so a tag is a device with
       an address and the rabbit an entity it is assigned to.
-- [ ] C12 a reader's own place, set by hand as a gateway's is (D239), and a sighting by a
-      placed reader writing a `proximity` position for the tagged animal (D258).
-- [ ] C13 the clock rule for a device time implausibly far from its delivery (D259), which one
-      PWN reader needs by 45 hours.
+- [ ] C12 a device's own place, set by hand as a gateway's is (D239), and a sighting by such a
+      placed device writing a `proximity` position for the seen device (D258). A device without
+      a place set writes contacts only, whatever its own fixes say.
+- [ ] C14 human presence (D260): a sighting under the phone filter counts as presence and never
+      as an identity, with a `human_presence` event the rules engine can act on.
+- [x] C13 the clock rule for a device time implausibly far from its delivery (D259), which one
+      PWN reader needs by 45 hours. Only on a path that delivers as it happens, and with its own
+      generous tolerance (`CLOCK_BEHIND_TOLERANCE_SECONDS`, a day): a log file carries the past
+      on purpose and a device out of coverage delivers late for good reasons, so only an
+      implausible gap is the clock's fault. Applied to contacts; whether positions should follow
+      is Tim's to say, since rewriting a position's time moves tracks and attribution.
 
 **Exit criteria.** A collar with scanning on shows contacts on its Data tab within a fix
 interval; an address of another collar in the project resolves to it by name; an unknown address

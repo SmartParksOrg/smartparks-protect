@@ -43,6 +43,19 @@ def upgrade() -> None:
             comment="The neighbour as the device names it: three octets, lowercase, aa:bb:cc",
         ),
         sa.Column(
+            "device_time",
+            sa.DateTime(timezone=True),
+            nullable=True,
+            comment="What the device said the time was, when it was not believed (decision "
+            "D259); null when `time` is the device's own",
+        ),
+        sa.Column(
+            "clock_offset_s",
+            sa.Integer(),
+            nullable=True,
+            comment="Seconds the device's clock was out, positive behind and negative ahead",
+        ),
+        sa.Column(
             "rssi_dbm",
             sa.Integer(),
             nullable=True,

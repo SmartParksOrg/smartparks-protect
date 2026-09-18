@@ -80,7 +80,7 @@ from shared.models import (
     SourceEvent,
 )
 from shared.storage import get_object
-from shared.timeutil import clock_ahead, utc_now
+from shared.timeutil import clock_ahead, clock_behind, delivers_live, utc_now
 from shared.trace import ApplicationError, Tracer
 
 log = get_logger("decoder")
@@ -653,28 +653,47 @@ async def _write_contacts(
     of them and they all look at the same fleet."""
     if not records.contacts:
         return
+    settings = get_settings()
+    live = delivers_live(event.acquisition_channel)
     first = await attribution_at(records.contacts[0].time)
     resolver = await resolver_for(session, first.project_id)
     for record in records.contacts:
         address = normalise_address(record.address)
+        # a device clock is believed unless the delivery says it cannot be right (decision
+        # D259): only on a path that arrives as it happens, since a log file carries the past
+        # on purpose. The device's own claim stays on the row, so nothing is lost.
+        claimed = record.time
+        when = record.time
+        behind = (
+            clock_behind(record.time, event.ingested_at, settings.clock_behind_tolerance_seconds)
+            if live
+            else 0.0
+        )
+        ahead = _ahead_of_delivery(event, record.time)
+        if behind or ahead:
+            when = event.ingested_at
+            outcome.clock_ahead += 1 if ahead else 0
+            outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
         # the address is part of the key, so one scan's several sightings are several contacts
         # and the same scan redelivered is one each, as a position redelivered is one position
-        key = canonical_key(device.id, record.time, f"contact:{address}")
+        key = canonical_key(device.id, when, f"contact:{address}")
         existing = await session.scalar(
             select(DeviceContact.id).where(
-                DeviceContact.canonical_key == key, DeviceContact.time == record.time
+                DeviceContact.canonical_key == key, DeviceContact.time == when
             )
         )
         if existing is not None:
             outcome.duplicates += 1
             continue
-        attribution = await attribution_at(record.time)
+        attribution = await attribution_at(when)
         found = resolver.resolve(address, device.id)
         if found.resolution == ContactResolution.AMBIGUOUS:
             outcome.ambiguous_contacts += 1
         session.add(
             DeviceContact(
-                time=record.time,
+                time=when,
+                device_time=claimed if when != claimed else None,
+                clock_offset_s=round(behind or -ahead) if (behind or ahead) else None,
                 device_id=device.id,
                 project_id=attribution.project_id,
                 entity_id=attribution.entity_id,
@@ -692,8 +711,8 @@ async def _write_contacts(
             )
         )
         outcome.created["contacts"] += 1
-        outcome.earliest = min(outcome.earliest or record.time, record.time)
-        outcome.latest = max(outcome.latest or record.time, record.time)
+        outcome.earliest = min(outcome.earliest or when, when)
+        outcome.latest = max(outcome.latest or when, when)
 
 
 async def _write_measurements(

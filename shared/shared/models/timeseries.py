@@ -472,6 +472,15 @@ class DeviceContact(Base):
         nullable=False,
         comment="The neighbour as the device names it: three octets, lowercase, aa:bb:cc",
     )
+    device_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="What the device said the time was, when it was not believed (decision D259); "
+        "null when `time` is the device's own",
+    )
+    clock_offset_s: Mapped[int | None] = mapped_column(
+        Integer,
+        comment="Seconds the device's clock was out, positive behind and negative ahead",
+    )
     rssi_dbm: Mapped[int | None] = mapped_column(
         Integer, comment="The strongest signal of the sighting; not a distance"
     )

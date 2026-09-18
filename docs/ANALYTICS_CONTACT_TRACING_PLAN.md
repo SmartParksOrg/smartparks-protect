@@ -4,6 +4,18 @@ Design for phases 30 and 31, written on 2026-09-18 from Tim's ask and from the O
 protocol research (`docs/devices/opencollar-protocol-research.md`, sections 3.7 and 3.9).
 Decisions D252 to D256.
 
+Bluetooth scanning is used three ways and all of them have to work:
+
+1. **A collar on an animal seeing other collars.** Who met whom, which is contact tracing proper.
+2. **A stationary reader watching for tags.** Where an animal was, for animals carrying a tag and
+   no GNSS at all. This is what PWN has been doing for a while.
+3. **A collar or reader watching for phones.** Whether people were about, which is presence and
+   never identity, because a phone changes its address every few minutes (decision D260).
+
+What arrives is the same in all three: a device, a time, an address and a signal. The differences
+are in what may be made of it, so there is one store and one resolver, and the three uses part
+company only at the end.
+
 Two devices are in contact when one saw the other, or when both were in the same place at the
 same time. The first is what an OpenCollar reports itself; the second is what any two tracked
 things tell us through their fixes. The module treats them as two kinds of evidence for one

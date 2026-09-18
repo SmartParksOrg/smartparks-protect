@@ -164,6 +164,14 @@ class Settings(BaseSettings):
         description="A fix closer than this to the last valid fix is never an outlier, whatever "
         "the speed: GPS scatter over a short interval must not trigger",
     )
+    clock_behind_tolerance_seconds: int = Field(
+        default=86400,
+        ge=0,
+        description="On a path that delivers as it happens, a record whose device time is "
+        "further behind its delivery than this is recorded at the delivery time instead "
+        "(decision D259). Generous on purpose: a device out of coverage for a few hours "
+        "delivers late for good reasons, and only an implausible gap is the clock's fault",
+    )
     clock_ahead_tolerance_seconds: int = Field(
         default=3600,
         ge=0,

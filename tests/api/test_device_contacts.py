@@ -22,7 +22,8 @@ from tests.conftest import unique_name
 
 pytestmark = pytest.mark.asyncio
 
-SCAN_AT = datetime(2026, 9, 18, 11, 30, tzinfo=UTC)
+# relative to now, so the clock rule of D259 judges these as the live scans they stand for
+SCAN_AT = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=20)
 
 
 @pytest_asyncio.fixture
@@ -474,3 +475,68 @@ async def test_an_ambiguous_neighbour_names_the_devices_it_could_be(client, db, 
     assert unsure["resolution"] == "ambiguous" and unsure["device_name"] is None
     assert set(unsure["candidate_names"]) == {a["name"], b["name"]}
     assert body["ambiguous"] == 1
+
+
+async def test_a_clock_far_behind_its_delivery_is_not_believed(client, db, bus):
+    """Decision D259. Some OpenCollar firmware sets the clock wrongly, and a PWN reader times
+    its scans 45 hours before they arrive. On a path that delivers as it happens that cannot be
+    right, so the delivery decides and the device's own claim is kept beside it."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+
+    long_ago = datetime.now(UTC) - timedelta(hours=45)
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -87)], long_ago))
+
+    await db.rollback()
+    row = (
+        await db.execute(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+        )
+    ).scalar_one()
+    assert row.time > long_ago + timedelta(hours=40), "recorded when it arrived"
+    assert row.device_time is not None, "what the device claimed is kept, not thrown away"
+    assert abs((row.device_time - long_ago).total_seconds()) < 2
+    assert row.clock_offset_s is not None and row.clock_offset_s > 44 * 3600
+
+
+async def test_a_clock_within_tolerance_is_believed(client, db, bus):
+    """A scan a couple of minutes out is the ordinary drift of a device and is left alone."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+
+    recent = datetime.now(UTC) - timedelta(minutes=3)
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -87)], recent))
+    await db.rollback()
+    row = (
+        await db.execute(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+        )
+    ).scalar_one()
+    assert abs((row.time - recent).total_seconds()) < 2, "the device's own time stands"
+    assert row.device_time is None and row.clock_offset_s is None
