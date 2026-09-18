@@ -107,6 +107,7 @@ nav:
       - Analysis design (phase 1): ANALYTICS_PHASE1_PLAN.md
       - Analysis design (device performance): ANALYTICS_DEVICE_PERFORMANCE_PLAN.md
       - Analysis design (phase 2): ANALYTICS_PHASE2_PLAN.md
+      - Analysis design (contact tracing): ANALYTICS_CONTACT_TRACING_PLAN.md
   - Rules:
       - rules/index.md
       - Automations and notifications: rules/automations.md

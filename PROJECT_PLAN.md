@@ -19,7 +19,7 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 | Active phase | 29 (analytics phase 2): P4 to P6 done and the vegetation layer reviewed by Tim on the dev server; P1 to P3 (the corrected home range, the movement strategy, the movement module) still to build, and they are the next work. The whole of 2026-09-18 went on Tim's feedback from testing, all of it released to the dev server: the gateway rename and the two gateway layout faults (D247), the battery type per device (D248), the progress bar with its step (D249), the Copernicus account as a server setting with its own admin page (D250), the vegetation switch in the run form, the vegetation mosaic on the analysis grid (D251) with its colours divided by rank, the map's legends rebuilt as one component, warm palettes for use intensity and areas by pressure so green means only vegetation, menus that work in full screen, and the review of 2026-09-17's work. Migrations at 0040.
 | Latest release | v2.6.0 (2026-09-16): phases 22 to 28, connectivity and network locations through device performance and device settings |
 | Last session | 2026-09-18 |
-| Next item | Phase 29 P1 to P3: `primitives/homerange.py` (the variogram, the Ornstein-Uhlenbeck fit, the effective sample size, the corrected KDE), `primitives/strategy.py` (the four NSD models), then the movement module and its report; after them P7 to P9. Waiting on Tim: put the Copernicus account into Server admin, Environmental data on the dev server (it runs on the environment variables today); set the battery type on the 27 devices reading above 3.70 V, which cannot be primary lithium (listed in the session log of 2026-09-18); read a grazing run over months rather than days. Offered and not built: the progress bar still stands still at 85 percent while the satellite provider works, which a progress report per poll would cure.
+| Next item | Tim's word on which comes first: phase 29 P1 to P3 (the movement methods: the corrected home range, the strategy from the NSD curve, the module and its report) or phase 30, the core half of contact tracing (the driver decoding the two Bluetooth scan messages, each device's address, the `device_contacts` store, the Data tab card), which is the gate to phase 31. Waiting on Tim either way: put the Copernicus account into Server admin, Environmental data on the dev server (it runs on the environment variables today); set the battery type on the 27 devices reading above 3.70 V, which cannot be primary lithium (listed in the session log of 2026-09-18); read a grazing run over months rather than days. Offered and not built: the progress bar still stands still at 85 percent while the satellite provider works, which a progress report per poll would cure.
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); Cloudloop and Rock7 are connected to the dev server (2026-09-10) but no Iridium device has spoken since 2026-07-10, so a field message and a command wait; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -292,6 +292,11 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D249 | A running analysis shows a bar and the step it is on | The step a module reports beside its percentage is kept on the run (`analysis_runs.progress_step`, migration 0040) and the status is a progress bar with that step, not a percentage beside a spinner | Tim (2026-09-18), because a long run gave no sign it was moving; the vegetation layer reports its own steps so the bar does not stand still |
 | D251 | The vegetation layer is a mosaic on the analysis grid, not a colour per area | The areas and the cells of the grid go to the provider in one job, so the areas keep their exact mean and the mosaic costs no second run; the cell size doubles until the selection fits 600 cells, and the five colours divide the cells evenly by rank, since a landscape is not spread evenly over its range | Tim (2026-09-18), on seeing one uniform green: one polygon per area is one colour, and a fixed 0.1 to 0.8 scale paints a temperate landscape (0.7 to 0.9) all the same green |
 | D250 | The environmental provider's account is a server setting, edited in the interface | The credentials live in `server_settings` with the secret encrypted as a data source's are, set under Server admin, Environmental data, with a test that costs no processing quota; the environment variables stay as a fallback and the page says when they stand in | Tim (2026-09-18): setting up the account belonged to whoever could edit the server's environment, which is not who runs the server; it also supersedes the settings-only half of D245 |
+| D252 | Bluetooth contacts are a canonical record type of their own | A `device_contacts` hypertable beside positions, measurements, states and events, attributed at the record's device-origin time like every canonical row; contacts are raw device output, so they belong in the core and not in the analysis subsystem's tables | Tim (2026-09-18), over keeping them as JSONB in the state history, which no index could serve |
+| D253 | A sighting that resolves to no known device is kept | An unknown counterpart named by its three octets, listed beside the resolved ones; a collar meeting the same unknown address nightly is a finding, and the platform retains what it cannot identify everywhere else | Tim (2026-09-18) |
+| D254 | A sighting matching more than one device is ambiguous, never guessed | Kept and shown with its candidates, left out of every pair figure, counted in a warning; a wrong contact between two named animals is worse than a missing one. Three octets is 16.7 million values, so a collision is unlikely in one project and not unlikely across a server | Tim (2026-09-18), over resolving it with the positions or counting it for every candidate |
+| D255 | Bluetooth sightings and position proximity are one module | Two kinds of evidence for one question, so a pair seen by both can be read against itself; the Bluetooth half needs OpenCollar, the proximity half works for anything that reports a fix | Tim (2026-09-18) |
+| D256 | The core half of contact tracing ships before the module | The driver, the address per device, the store and the Data tab go live first, so the decoding is read against real collars before an analysis is built on it; there is not one recorded scan payload in the repository | Tim (2026-09-18) |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
 
 ### Open decisions from architecture section 32
@@ -362,6 +367,7 @@ From architecture section 2, used when reviewing a change. These are never done;
 | (folded into v2.6.0) | 22 | Analysis as modules: a framework for computed results (selection, parameters, a job, a stored result with map, chart and table blocks) and the movement and grazing modules |
 | (folded into v2.6.0) | 28 | Device performance analysis: devices as subjects, the indicator catalogue with levels, the fleet table and the deep dive, the map of fixes and gateways, the PDF report |
 | v2.7.0 | 29 | Analytics phase 2: the autocorrelation-corrected home range, the movement strategy from the NSD curve, Sentinel-2 vegetation per management area in the grazing analysis (D243 to D246) |
+| v2.8.0 | 30, 31 | Contact tracing: Bluetooth sightings as a canonical record type with each device's address known (D252 to D254, D256), then the module that reads them beside position proximity (D255) |
 
 ## Architecture coverage map
 
@@ -1126,6 +1132,75 @@ Release:
 **Exit criteria.** A fleet run over a project's devices on the dev server puts the device with the lowest battery, the one that reboots and the one that fixes worst at the top, each with the reason readable in its cells, and Tim agrees with the order; a deep dive of SP050969 over its raw log period shows the battery slope, the reboot, the error flags by kind, the fix success and time to fix, and no network block, and its PDF reads on paper; a member scoped to one device sees only that device; a run over 100 devices and a month finishes within the worker's budget without touching the live map's or ingest's figures. Tim read the runs and the PDF on the dev server and closed the phase on 2026-09-16.
 
 **Later, not here.** The all-projects fleet run for server admins, scheduled monthly fleet reports, rule templates from the indicators, a cost of connectivity per source (the design document's section 14).
+
+---
+
+### Phase 30: Bluetooth contacts as canonical data (v2.8.0)
+
+**Goal.** An OpenCollar with scanning on reports the devices it sees. Protect stores those
+sightings today as source events and decodes nothing, so nobody can ask who a collar met. This
+phase makes a contact a record like a position: decoded, attributed, resolved to a device where
+it can be, and visible on the device's Data tab. No analysis yet, on purpose: there is not one
+recorded scan payload in the repository, so the decoding is read against real collars before
+anything is built on it (decision D256). Design: `docs/ANALYTICS_CONTACT_TRACING_PLAN.md`,
+decisions D252 to D256.
+
+**Why here.** It is a prerequisite for phase 31 and useful on its own, and it is the honest
+order: the driver ships checked only against the reference decoder, so the first real scans are
+the test.
+
+**Deliverables** (the tasks C1 to C5 of the design document):
+
+- [ ] C1 the driver decodes ports 7 and 11 (single and aggregated scans) into `DecodedContact`,
+      with the golden check against the vendored reference decoders over built frames, and the
+      empty scan kept as "looked and saw nothing".
+- [ ] C2 `devices.ble_mac` filled three ways (the device's own port 31 message, a WebBLE read, a
+      person), with its endpoint and the device page control.
+- [ ] C3 migration 0041, the `device_contacts` hypertable (D252), the decoder writing and
+      resolving it (D253 unknown kept, D254 ambiguous marked), the re-resolve action.
+- [ ] C4 the Contacts card on the device's Data tab.
+- [ ] C5 the dev server: scanning turned on for a few collars and the first real scans read
+      against the decoder. This is the gate to phase 31.
+
+**Exit criteria.** A collar with scanning on shows contacts on its Data tab within a fix
+interval; an address of another collar in the project resolves to it by name; an unknown address
+is kept and named by its octets; the Settings tab shows the scan interval and filter that
+produced them; a flash log upload of the same period yields the scans the air truncated.
+
+---
+
+### Phase 31: contact tracing as an analysis module (v2.8.0)
+
+**Goal.** Who met whom, from two kinds of evidence in one module (decision D255): the sightings
+a collar reported, and the proximity two things' fixes show when they were in the same place
+within configurable limits of time and distance. Design:
+`docs/ANALYTICS_CONTACT_TRACING_PLAN.md`.
+
+**Why here.** After phase 30 the contacts are real data that can be read; before it, the module
+would be written against frames nobody has seen in the field.
+
+**Deliverables** (the tasks C6 to C10 of the design document):
+
+- [ ] C6 `primitives/contacts.py` and `primitives/proximity.py`, the time sweep over pairs with
+      tests on synthetic tracks.
+- [ ] C7 the module, its parameters (`max_distance_m`, `max_time_s` and the rest), the three
+      warnings that stop the figures misleading (the fix interval against the time window, the
+      accuracy against the distance, no network locations), the tables and charts.
+- [ ] C8 the `network` chart kind and the `contact` geometry kind, in the interface and the PDF.
+- [ ] C9 docs: the analytics guide, the device guide's scanning section, `DEVELOPERS.md`, the
+      changelog, and an ADR for the new canonical type.
+- [ ] C10 release v2.8.0.
+
+**Exit criteria.** A run over two collars known to be together shows contacts from both kinds of
+evidence and the pair's total time is within a fix interval of the truth; a run with the
+Bluetooth half off gives proximity alone and the counts fall to what the positions support; a
+run over an animal whose fix interval is longer than the time window carries the sampling
+warning; an ambiguous address is counted in the warning and absent from the pairs; the PDF
+carries the network and the pair table.
+
+**Later, not here.** Contact chains over time, which is what tracing means and wants the
+pairwise work proven first; Wi-Fi scans, the same shape on ports 6 and 10; the CMDQ records of
+port 15; alerting on a contact as it happens, which belongs to the rules engine.
 
 ---
 
@@ -2184,7 +2259,8 @@ Listed by the phase where they are first needed.
 - The red build and the outage, on the record. CI failed on `tests/shared/test_analysis_report.py`: two assertions pinned the pressure ramp as literal hex, so changing the palette turned them red although the code was right. After changing `mapimage.py` I had run the analysis tests and the grazing API test but not `tests/shared`, where the report suite lives. Worse, the wait-for-CI and the deploy were one shell chain, so the deploy started on the red build; stopping the chain killed the playbook with the app containers down and the dev server answered 502 for a few minutes. It came back in seconds (`docker compose up -d`, the images were already built) and `verify-server.sh` passed on every check. The tests read `PRESSURE_RAMP` by index now and assert what the indexes mean. Two habits to keep: wait for green and deploy as separate steps, never one chain, and run the whole Python suite before pushing rather than the subset that looks relevant.
 - Tim, after the documentation was called done: clicking an entity standing in an area on the live map selected the area. Not a stacking fault, the areas are drawn under the markers: a map calls the handler of every layer under the cursor whatever the drawing order, and the page shows what the last handler decides, and `bindFeatureClicks` is bound last in `MapPage`. An area yields to `ABOVE_FEATURES` now (entities, devices, events, gateways, track points, clusters), which the same click had been swallowing for all of them, not only entities. The map double in `layers.test.ts` could not see layers or answer what lies under a click, so the old tests would have passed either way; it can now, and the six new cases were checked to fail without the guard. Left alone deliberately: where a device marker sits on its entity's, the device still wins as it does today, since nobody has reported it. Deployed at 62d2dff.
 - Deployed through the day: 27fba1c, 34f9ea9, b17247c, b01b7a3, 4e99fa1, bf0c7a6, 9a44d2e, 99093f5 and 62d2dff, each after CI went green except the one noted above. The dev server runs 62d2dff and `verify-server.sh` passes on every check.
-- Next: phase 29 P1 to P3, the movement methods. Nothing is half-built: every change of the day is on main, green and deployed.
+- Tim: add a contact tracing module to the analysis section. OpenCollar devices scan for nearby Bluetooth devices and report an address and an RSSI per contact; depending on the scan mode those may be other OpenCollar devices the server knows, so each device's own address has to be known too; and contact tracing can also be done from GNSS positions within configurable limits of time and space. Researched before designing, and one premise needed correcting: the firmware sends **three** octets of the neighbour's address, not six (`bt_addr.val[0..2]`, research 3.7 and 3.9), which is what makes an ambiguous match possible and shapes D254. Also found: ports 7 and 11 are already stored as source events and sit in the driver's `NOT_CANONICAL_PORTS`, so nothing is decoded; the device's own six octet address is already decoded from port 31 message 0xFD and nothing reads it; scanning is off by default (`ble_scan_interval` and `ble_scan_aggregated_interval` default to 0) and the default filter is the Smart Parks manufacturer id, so the common case is a collar seeing only our own devices; and there is not one recorded scan payload in the repository. Five decisions asked and taken (D252 to D256, all the recommended option), written up as `docs/ANALYTICS_CONTACT_TRACING_PLAN.md` with phases 30 and 31 in this plan. Nothing built yet: the plan is the deliverable.
+- Next: phase 29 P1 to P3 (the movement methods) or phase 30 (the core half of contact tracing), Tim's choice. Nothing is half-built: every change of the day is on main, green and deployed.
 
 ### 2026-09-17 (Claude and Tim)
 
