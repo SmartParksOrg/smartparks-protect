@@ -157,6 +157,25 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
         "a device-specific index for other drivers",
     ),
     MetricSeed(
+        "ble_contacts",
+        "Bluetooth contacts",
+        None,
+        N,
+        "behaviour",
+        "Devices a Bluetooth scan saw, one sample per scan window; zero means the device looked "
+        "and saw nothing, which is a different thing from not having looked",
+    ),
+    MetricSeed(
+        "human_presence",
+        "Human presence",
+        None,
+        N,
+        "behaviour",
+        "1 when a scan under the phone filter heard a device people carry (decision D260). "
+        "Presence in a window and never an identity: addresses rotate, so this is never a count "
+        "of people",
+    ),
+    MetricSeed(
         "acceleration_x", "Acceleration X", "m/s²", N, "behaviour", "Acceleration along the X axis"
     ),
     MetricSeed(

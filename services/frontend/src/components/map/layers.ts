@@ -72,6 +72,8 @@ export interface EntityFeatureProperties {
   battery_type?: string | null;
   /** Bluetooth sightings of the last 24 hours, and the newest (Tim, 2026-09-18). Absent for a
    * device that reports no scans, so the panel keeps quiet about a device that never listens. */
+  heard_by?: string | null;
+  heard_by_name?: string | null;
   contacts_24h?: number | null;
   last_contact_at?: string | null;
   /** The last status message whose accelerometer changed (Tim, 2026-09-14), and the newest
@@ -113,6 +115,8 @@ export interface DeviceFeatureProperties {
   battery_type?: string | null;
   /** Bluetooth sightings of the last 24 hours, and the newest (Tim, 2026-09-18). Absent for a
    * device that reports no scans, so the panel keeps quiet about a device that never listens. */
+  heard_by?: string | null;
+  heard_by_name?: string | null;
   contacts_24h?: number | null;
   last_contact_at?: string | null;
   /** The last status message whose accelerometer changed (Tim, 2026-09-14), and the newest

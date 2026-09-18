@@ -6,6 +6,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- How much a scanner hears, as a line (Tim, 2026-09-18). Every Bluetooth scan leaves one `ble_contacts` measurement — the devices it saw, zero included — so the Contacts row of the live map panel unfolds a chart the way the battery and the uptime do, over a day, a week or a month, and the same figure is a metric anywhere else: the data explorer, a dashboard, a rule. A scan that saw nothing is a zero and not a gap, because the gaps mean something different: the device was not looking. Migration 0045 registers it, and `human_presence` with it.
+
+- A device placed by a sighting says who heard it: a **Heard by** row on the live map panel of the tag and of the animal it is on, linking to that scanner on the same map (Tim, 2026-09-18). A proximity position is somebody else's word for where a device was, and the somebody is the point — a rabbit is at a place because a named reader heard it, and a person reading that wants to go to the reader.
+
 - `scripts/place_devices_from_tags.py` reads the coordinates some networks keep in their own device tags and sets static places from them — deliberately a script somebody runs and reads, never a mechanism (Tim, 2026-09-18). A tag is somebody else's metadata: nobody promises it is current and nothing says who last edited it, so a place taken from one silently would be a position on the map with no accountable origin. A device that already has a place is left alone, because a measurement made in the field outranks a tag.
 
 - `scripts/reprocess_source_events.py` decodes stored messages again, for data that arrived before its decoder existed. A source event is decoded once and nothing revisits it, so the 2,112 Bluetooth scans the PWN readers had sent since 8 September 2026 sat decoded into nothing. Decoding is idempotent, so a second run only counts duplicates and a half-finished run is resumed by running it again. It takes `--port`, `--device` and `--since`, and refuses to reprocess everything.

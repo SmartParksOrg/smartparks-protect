@@ -93,6 +93,9 @@ KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
 NOT_CANONICAL_PORTS = {1, 5, 6, 9, 10, 15, 27, 28}
 PORT_BLE_SCAN_AGGREGATED = 7  # msg 0xF9, the buffer the device summarised (research 3.7)
 #: How many octets of an address a scan reports, and so how much of a MAC can ever be matched.
+#: The devices a scan saw, one sample per scan window, zero when it looked and saw none.
+BLE_CONTACTS_METRIC = "ble_contacts"
+
 SCAN_ADDRESS_OCTETS = 3
 
 
@@ -533,6 +536,17 @@ class OpenCollarDriver:
             DecodedState(
                 time=scan_at,
                 state={"ble_scan": {"seen": seen, "reported": kept, "kind": kind}},
+                record_type="ble_scan",
+            )
+        )
+        # and a number, so a scanner's activity draws as a line like any other value. A scan
+        # that saw nothing is a zero and not a gap: the gaps are the times it was not looking,
+        # which is the other thing a reader of this chart needs to tell apart.
+        records.measurements.append(
+            DecodedMeasurement(
+                time=scan_at,
+                metric_key=BLE_CONTACTS_METRIC,
+                value=float(seen),
                 record_type="ble_scan",
             )
         )

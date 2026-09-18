@@ -253,6 +253,38 @@ export function UptimeTrend({
   );
 }
 
+/** How much a scanner hears, over the period (Tim, 2026-09-18).
+ *
+ * One sample per scan window, and a scan that saw nothing is a zero, so the line falling to the
+ * floor means the reader looked and the tags were out of range. A gap in the line means
+ * something else entirely: the reader was not looking, or said nothing at all. */
+export function ContactsTrend({
+  projectId,
+  deviceId,
+  until,
+}: {
+  projectId: string;
+  deviceId: string;
+  until?: string | null;
+}) {
+  const { t } = useTranslation();
+  return (
+    <MetricTrend
+      projectId={projectId}
+      deviceId={deviceId}
+      until={until}
+      spec={{
+        metric: "ble_contacts",
+        label: t("Bluetooth contacts"),
+        unit: "",
+        decimals: 0,
+        floor: 0,
+        ariaLabel: t("Devices seen per scan over the period"),
+      }}
+    />
+  );
+}
+
 /** One metric of a device over the last day, week or month from the analytics series: the
  * battery, movement and uptime trends above, and any numeric metric of the registry from the
  * status panels (Tim, 2026-09-15, `trendSpecFor`). */

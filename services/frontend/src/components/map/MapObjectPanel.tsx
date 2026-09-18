@@ -24,6 +24,7 @@ import { useIsPhone } from "@/hooks/useMediaQuery";
 import {
   BatteryTrend,
   BatteryValue,
+  ContactsTrend,
   MovementTrend,
   MovementValue,
   UptimeTrend,
@@ -352,6 +353,8 @@ function HealthRows({
   activity,
   uptime,
   lastResetAt,
+  heardByName,
+  heardByTo,
   contacts,
   lastContactAt,
   contactsTo,
@@ -381,6 +384,9 @@ function HealthRows({
   lastResetAt?: string | null;
   /** Bluetooth sightings of the last 24 hours, when the device reports scans at all, and where
    * the row leads (Tim, 2026-09-18: a count on the panel says whether it is hearing anything). */
+  /** The device that heard this one, when its position came from a sighting (D258). */
+  heardByName?: string | null;
+  heardByTo?: string;
   contacts?: number | null;
   lastContactAt?: string | null;
   contactsTo?: string;
@@ -396,6 +402,7 @@ function HealthRows({
   const [trendOpen, setTrendOpen] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
   const [uptimeOpen, setUptimeOpen] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
   const hasMovement = activity !== undefined && activity !== null;
   const rebooted =
     lastResetAt != null && now - Date.parse(lastResetAt) < 24 * 3_600_000;
@@ -451,6 +458,20 @@ function HealthRows({
           <AccuracyWarning accuracyM={accuracy as number} />
         )}
       </PanelRow>
+      {heardByName && (
+        // the reader is the point of a proximity position: a tag is where it is because a
+        // named device heard it, and a person reading that wants to go to that device
+        // (Tim, 2026-09-18)
+        <PanelRow label={t("Heard by")}>
+          {heardByTo ? (
+            <Link className="underline" to={heardByTo}>
+              {heardByName}
+            </Link>
+          ) : (
+            heardByName
+          )}
+        </PanelRow>
+      )}
       {batteryVoltage != null && (
         <PanelRow label={t("Battery")} className={batteryClass(healthLevel)}>
           {batteryProject ? (
@@ -543,7 +564,21 @@ function HealthRows({
               : undefined
           }
         >
-          {contactsTo ? (
+          {batteryProject && batteryDevice ? (
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-primary"
+              title={
+                contactsOpen
+                  ? t("Hide how much it hears")
+                  : t("Show how much it hears")
+              }
+              aria-expanded={contactsOpen}
+              onClick={() => setContactsOpen((o) => !o)}
+            >
+              {t("{{count}} in 24 h", { count: contacts })}
+            </button>
+          ) : contactsTo ? (
             <Link className="underline" to={contactsTo}>
               {t("{{count}} in 24 h", { count: contacts })}
             </Link>
@@ -557,6 +592,23 @@ function HealthRows({
             </span>
           )}
         </PanelRow>
+      )}
+      {contacts != null && contactsOpen && batteryProject && batteryDevice && (
+        <div className="col-span-2 space-y-1 rounded-md border bg-muted/30 p-2">
+          <ContactsTrend
+            projectId={batteryProject}
+            deviceId={batteryDevice}
+            until={lastSeenAt}
+          />
+          {contactsTo && (
+            <Link
+              className="block text-xs underline text-muted-foreground"
+              to={contactsTo}
+            >
+              {t("Who it heard")}
+            </Link>
+          )}
+        </div>
       )}
       {lastStatusAt && (
         <PanelRow label={t("Last status")} title={formatTime(lastStatusAt)}>
@@ -752,6 +804,10 @@ export function EntityPanel({
   const contactsHref = props.device_id
     ? `/projects/${project}/devices/${props.device_id}?tab=data`
     : undefined;
+  // a sighting names the device that made it; the link opens that device on this same map
+  const heardByTo = props.heard_by
+    ? `/projects/${project}/map?device=${props.heard_by}&devices=1`
+    : undefined;
   return (
     <MapPanel
       title={props.name}
@@ -825,6 +881,8 @@ export function EntityPanel({
         lastStatusAt={props.last_status_at}
         uptime={props.uptime}
         lastResetAt={props.last_reset_at}
+        heardByName={props.heard_by_name}
+        heardByTo={heardByTo}
         contacts={props.contacts_24h}
         lastContactAt={props.last_contact_at}
         contactsTo={contactsHref}
@@ -921,6 +979,9 @@ export function DevicePanel({
       ? `/admin/devices/${props.device_id}`
       : `/projects/${projectFor(projectId, props.project_id)}/devices/${props.device_id}`;
   const contactsHref = `${devicePath}?tab=data`;
+  const heardByTo = props.heard_by
+    ? `/projects/${projectFor(projectId, props.project_id)}/map?device=${props.heard_by}&devices=1`
+    : undefined;
   return (
     <MapPanel
       title={props.name}
@@ -1000,6 +1061,8 @@ export function DevicePanel({
         lastStatusAt={props.last_status_at}
         uptime={props.uptime}
         lastResetAt={props.last_reset_at}
+        heardByName={props.heard_by_name}
+        heardByTo={heardByTo}
         contacts={props.contacts_24h}
         lastContactAt={props.last_contact_at}
         contactsTo={contactsHref}

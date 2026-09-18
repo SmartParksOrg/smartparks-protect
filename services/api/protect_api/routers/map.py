@@ -29,7 +29,7 @@ from protect_api.deps import (
     require_scope_permission,
 )
 from protect_api.routers.data import PositionRead, position_read
-from shared.connectivity.network_location import NETWORK_RECORD_TYPE
+from shared.connectivity.network_location import NETWORK_RECORD_TYPE, PROXIMITY_RECORD_TYPE
 from shared.curation.effective import (
     at_time,
     device_fix,
@@ -228,6 +228,7 @@ async def current_state(
             ).all()
         }
     contacts = await _contact_counts(session, device_ids)
+    readers = await _heard_by(session, device_ids)
     # when the device tracking the entity today was assigned to it: the start of the "since the
     # device was assigned" track length in the map's track settings
     assigned_since: dict[uuid.UUID, datetime] = {}
@@ -301,6 +302,13 @@ async def current_state(
                     else None,
                     "position_kind": state.latest_position_kind,
                     "accuracy_m": state.latest_accuracy_m,
+                    # who put it there, when a reader did (decision D258)
+                    "heard_by": readers.get(state.device_id, (None, None))[0]
+                    if state.device_id
+                    else None,
+                    "heard_by_name": readers.get(state.device_id, (None, None))[1]
+                    if state.device_id
+                    else None,
                     "active_alert_count": state.active_alert_count,
                     "health_level": health.level if health else None,
                     "battery_voltage": device_state.battery_voltage if device_state else None,
@@ -415,7 +423,9 @@ async def devices_state(
                 )
             ).all()
         }
-    contacts = await _contact_counts(session, {row[0].id for row in rows})
+    device_id_set = {row[0].id for row in rows}
+    contacts = await _contact_counts(session, device_id_set)
+    readers = await _heard_by(session, device_id_set)
     features = []
     for row in rows:
         device, type_key, type_icon, driver_key, type_label = row[:5]
@@ -462,6 +472,8 @@ async def devices_state(
                     else None,
                     "position_kind": state.latest_position_kind if state else None,
                     "accuracy_m": state.latest_accuracy_m if state else None,
+                    "heard_by": readers.get(device.id, (None, None))[0],
+                    "heard_by_name": readers.get(device.id, (None, None))[1],
                     "health_level": health.level if health else None,
                     "battery_voltage": state.battery_voltage if state else None,
                     "battery_percent": _battery_percent(battery, state),
@@ -568,6 +580,34 @@ async def _contact_counts(
         )
     ).all()
     return {row.device_id: (int(row.contacts), row.last_at) for row in rows}
+
+
+async def _heard_by(
+    session: AsyncSession, device_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, tuple[str, str | None]]:
+    """Which reader put each device where it is (decision D258), for the panels.
+
+    A position of type `proximity` is somebody else's word for where this device was, and the
+    somebody is the point: a rabbit wearing only a tag is at a place because a named reader heard
+    it, and a person reading that wants to go to the reader. The reader travels on the position's
+    attributes, so this is one query for the whole answer rather than a join on every row."""
+    if not device_ids:
+        return {}
+    newest = (
+        select(
+            Position.device_id,
+            Position.attributes["heard_by"].astext.label("reader_id"),
+            Position.attributes["heard_by_name"].astext.label("reader_name"),
+        )
+        .where(
+            Position.device_id.in_(device_ids),
+            Position.record_type == PROXIMITY_RECORD_TYPE,
+        )
+        .distinct(Position.device_id)
+        .order_by(Position.device_id, Position.time.desc())
+    )
+    rows = (await session.execute(newest)).all()
+    return {row.device_id: (row.reader_id, row.reader_name) for row in rows if row.reader_id}
 
 
 def _battery_percent(

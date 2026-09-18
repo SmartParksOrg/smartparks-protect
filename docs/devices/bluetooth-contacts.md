@@ -64,7 +64,16 @@ means something entirely different from a count that included every phone that w
 The filters come from the firmware: every device, Smart Parks devices, one manufacturer, phones.
 
 On the live map, a device's panel and the panel of the entity it is on show **Bluetooth
-sightings** of the last 24 hours when the device reports scans at all, as a link to this card.
+sightings** of the last 24 hours when the device reports scans at all. The figure unfolds a chart
+of how much the device hears, over a day, a week or a month, the way the battery does, with a
+link to the list underneath. Every scan window leaves one `ble_contacts` measurement — the
+devices it saw — so the same figure is available in the data explorer, on a dashboard and to a
+rule. A scan that saw nothing is a **zero**; a gap in the line means the device was not looking
+at all, which is a different thing.
+
+A device whose position came from a sighting carries a **Heard by** row naming the reader, as a
+link to it on the same map. That is the point of such a position: the animal is there because a
+named device heard it.
 
 ## A tag is a device
 

@@ -101,6 +101,12 @@ async def _scan(db, bus, source, external_id, frame_hex):
     return outcome
 
 
+def _map_features(body) -> list:
+    """The map answer wraps its collection differently per endpoint; this reads either shape."""
+    features = body["features"]
+    return features["features"] if isinstance(features, dict) else features
+
+
 async def test_a_scan_resolves_names_keeps_unknowns_and_refuses_to_guess(client, db, bus):
     admin = await actor(client, db, superuser=True)
     project = await create_project(db)
@@ -1358,3 +1364,111 @@ async def test_an_attribution_job_does_not_blank_a_placed_device(client, db, bus
         )
     ).one()
     assert device_rows[0] is not None and device_rows[1] == "static"
+
+
+async def test_the_map_names_the_reader_that_heard_a_tag(client, db, bus):
+    """Tim, 2026-09-18: a proximity position is somebody else's word for where a device was, and
+    the somebody is the point. The panel says "Heard by SP051313" as a link, so the map answer
+    has to carry the reader's id and name on both layers."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=admin.headers)).json()
+    rabbit = next(t for t in catalogue["items"] if t["key"] == "rabbit")
+
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    tag = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    made = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": tag["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": rabbit["id"], "name": unique_name("Rabbit")},
+        },
+        headers=admin.headers,
+    )
+    assert made.status_code == 201, made.text
+
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)]))
+
+    entities = (
+        await client.get(f"/api/v1/projects/{project.id}/map/current", headers=admin.headers)
+    ).json()
+    animal = next(
+        f for f in _map_features(entities) if f["properties"].get("position_kind") == "proximity"
+    )
+    assert animal["properties"]["heard_by"] == reader["id"]
+    assert animal["properties"]["heard_by_name"] == reader["name"]
+
+    devices = (
+        await client.get(f"/api/v1/projects/{project.id}/map/devices", headers=admin.headers)
+    ).json()
+    heard = next(f for f in _map_features(devices) if f["properties"]["device_id"] == tag["id"])
+    assert heard["properties"]["heard_by_name"] == reader["name"]
+
+    # the reader itself was heard by nobody: its own place is not somebody else's word
+    scanner = next(
+        f for f in _map_features(devices) if f["properties"]["device_id"] == reader["id"]
+    )
+    assert scanner["properties"]["heard_by"] is None
+
+
+async def test_every_scan_counts_as_a_number_even_when_it_saw_nothing(client, db, bus):
+    """A scanner's activity draws as a line like a battery does (Tim, 2026-09-18), so every scan
+    window leaves one `ble_contacts` sample. A scan that saw nothing is a zero and not a gap:
+    the gaps are the times the device was not looking, which is the other thing worth telling
+    apart."""
+    from shared.models import Measurement
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+
+    await _scan(
+        db,
+        bus,
+        source,
+        identity,
+        scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74), (bytes([0xE1, 0x02, 0x9F]), -88)]),
+    )
+    await _scan(db, bus, source, identity, scan_frame([], SCAN_AT + timedelta(minutes=10)))
+
+    values = (
+        await db.scalars(
+            select(Measurement.value_num)
+            .where(
+                Measurement.device_id == uuid.UUID(watcher["id"]),
+                Measurement.metric_key == "ble_contacts",
+            )
+            .order_by(Measurement.time)
+        )
+    ).all()
+    assert list(values) == [2.0, 0.0], "the empty scan is a zero, not a missing sample"
