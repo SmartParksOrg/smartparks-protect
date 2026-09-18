@@ -1196,8 +1196,13 @@ the test.
 - [x] C15 the live map's device and entity panels carry the Bluetooth sightings of the last
       24 hours, when the device reports scans at all, as a link to its Data tab (Tim,
       2026-09-18). One grouped query per map answer, as the gateway statistics are read.
-- [ ] C14 human presence (D260): a sighting under the phone filter counts as presence and never
-      as an identity, with a `human_presence` event the rules engine can act on.
+- [x] C14 human presence (D260): a sighting under the phone filter resolves to no device, even
+      when the octets match one, and each scan window that heard something raises one
+      `human_presence` event with how many addresses and the strongest signal. One per window
+      and not per address, since one person carries a phone, a watch and earbuds.
+      **Corrected while building**: the rules engine's event triggers are still reserved
+      (`shared/rules/schema.py`), so an event alone could not be acted on; presence also writes
+      a `human_presence` measurement of 1, which a threshold rule can use today.
 - [x] C13 the clock rule for a device time implausibly far from its delivery (D259), which one
       PWN reader needs by 45 hours. Only on a path that delivers as it happens, and with its own
       generous tolerance (`CLOCK_BEHIND_TOLERANCE_SECONDS`, a day): a log file carries the past
@@ -1230,8 +1235,10 @@ would be written against frames nobody has seen in the field.
       warnings that stop the figures misleading (the fix interval against the time window, the
       accuracy against the distance, no network locations), the tables and charts.
 - [ ] C8 the `network` chart kind and the `contact` geometry kind, in the interface and the PDF.
-- [ ] C9 docs: the analytics guide, the device guide's scanning section, `DEVELOPERS.md`, the
-      changelog, and an ADR for the new canonical type.
+- [ ] C9 docs: the analytics guide for the module. The rest was done with phase 30: the
+      device guide's scanning section (`docs/devices/bluetooth-contacts.md`), the OpenCollar
+      port table, the domain model's record types, `DEVELOPERS.md`, the changelog and ADR 0036,
+      which records why a contact is a record type of its own.
 - [ ] C10 release v2.8.0.
 
 **Exit criteria.** A run over two collars known to be together shows contacts from both kinds of

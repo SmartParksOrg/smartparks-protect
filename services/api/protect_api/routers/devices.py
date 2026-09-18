@@ -78,7 +78,7 @@ from shared.domain.attribution import active_job, publish_job, recent_jobs
 from shared.domain.battery import BATTERY_ATTRIBUTE
 from shared.domain.battery import PROFILES as BATTERY_PROFILES
 from shared.domain.battery import resolve as resolve_battery
-from shared.domain.contacts import resolve_waiting, scanning_of
+from shared.domain.contacts import resolve_waiting, scanning_of, watches_for_people
 from shared.domain.device_settings import known_settings, record_setting
 from shared.domain.health import device_health
 from shared.domain.links import resolve_links
@@ -1319,6 +1319,7 @@ async def device_contacts(
             aggregated_interval_s=scanning.aggregated_interval_s,
             filter_key=scanning.filter_key,
             filter_label=scanning.filter_label,
+            watches_for_people=watches_for_people(scanning),
         ),
         last_scan_at=state.latest_state_time if state and scan else None,
         counterparts=counterparts,

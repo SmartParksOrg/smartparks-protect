@@ -59,6 +59,13 @@ export function ContactsCard({
             )}
           </Callout>
         )}
+        {data && canScan && data.scanning.watches_for_people && (
+          <Callout kind="info">
+            {t(
+              "This device watches for phones and other devices people carry, so what it reports is that somebody was near it. It is never who: a phone changes its Bluetooth address every few minutes, so the same phone an hour later is a different address and the number of addresses is not a number of people. Each scan that heard one raises a Human presence event.",
+            )}
+          </Callout>
+        )}
         {data && canScan && data.scanning.enabled && (
           <p className="text-muted-foreground">
             {data.scanning.filter_label

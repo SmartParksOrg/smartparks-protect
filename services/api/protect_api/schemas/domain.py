@@ -621,6 +621,11 @@ class DeviceScanning(BaseModel):
     aggregated_interval_s: float | None = None
     filter_key: int | None = None
     filter_label: str | None = None
+    watches_for_people: bool = Field(
+        default=False,
+        description="The filter is the phone one, so these sightings are human presence and "
+        "never an identity (decision D260); none of them resolves to a device",
+    )
 
 
 class DeviceContacts(BaseModel):

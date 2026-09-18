@@ -209,3 +209,26 @@ async def scanning_of(session: AsyncSession, device_id: uuid.UUID) -> Scanning:
         filter_label=SCAN_FILTERS.get(key) if key is not None else None,
         known=True,
     )
+
+
+#: The filter value that watches for phones and other human-worn Bluetooth devices.
+PHONE_FILTER = 3
+#: The event a sighting under that filter raises, and the metric a rule can threshold on.
+HUMAN_PRESENCE_EVENT = "human_presence"
+HUMAN_PRESENCE_METRIC = "human_presence"
+#: Said on every row and every event, because it is the whole point of decision D260.
+HUMAN_PRESENCE_NOTE = (
+    "A phone changes its Bluetooth address every few minutes, so these sightings are presence "
+    "in a window and never an identity, and the number of addresses is not a number of people."
+)
+
+
+def watches_for_people(scanning: Scanning) -> bool:
+    """Whether what this device reports is people rather than devices Protect could name.
+
+    Only a device Protect knows the filter of: an unknown filter is not assumed to be anything,
+    because guessing wrong in either direction is worse than saying nothing. Under the phone
+    filter a sighting is never resolved to a device and never moves one (decision D260); it
+    could only ever resolve by coincidence, since a phone's advertised address is random.
+    """
+    return scanning.known and scanning.filter_key == PHONE_FILTER

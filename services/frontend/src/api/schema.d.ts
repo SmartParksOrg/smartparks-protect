@@ -7455,6 +7455,12 @@ export interface components {
             filter_key?: number | null;
             /** Filter Label */
             filter_label?: string | null;
+            /**
+             * Watches For People
+             * @description The filter is the phone one, so these sightings are human presence and never an identity (decision D260); none of them resolves to a device
+             * @default false
+             */
+            watches_for_people: boolean;
         };
         /**
          * DeviceSettingRead

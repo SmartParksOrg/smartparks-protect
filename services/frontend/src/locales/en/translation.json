@@ -2172,6 +2172,7 @@
   "This device type declares no control actions.": "This device type declares no control actions.",
   "This device type declares no health fields.": "This device type declares no health fields.",
   "This device type's driver publishes no settings catalogue.": "This device type's driver publishes no settings catalogue.",
+  "This device watches for phones and other devices people carry, so what it reports is that somebody was near it. It is never who: a phone changes its Bluetooth address every few minutes, so the same phone an hour later is a different address and the number of addresses is not a number of people. Each scan that heard one raises a Human presence event.": "This device watches for phones and other devices people carry, so what it reports is that somebody was near it. It is never who: a phone changes its Bluetooth address every few minutes, so the same phone an hour later is a different address and the number of addresses is not a number of people. Each scan that heard one raises a Human presence event.",
   "This document uses nesting the form cannot show, so it is edited as JSON": "This document uses nesting the form cannot show, so it is edited as JSON",
   "This file was uploaded before for this device.": "This file was uploaded before for this device.",
   "This invitation link is not valid.": "This invitation link is not valid.",

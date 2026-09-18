@@ -47,8 +47,16 @@ from shared.device_drivers.base import (
 )
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import Attribution, resolve_attribution
+from shared.domain.contacts import (
+    HUMAN_PRESENCE_EVENT,
+    HUMAN_PRESENCE_METRIC,
+    HUMAN_PRESENCE_NOTE,
+    Resolver,
+    resolver_for,
+    scanning_of,
+    watches_for_people,
+)
 from shared.domain.contacts import normalise as normalise_address
-from shared.domain.contacts import resolver_for
 from shared.domain.device_settings import record_settings_frame
 from shared.domain.movement import MOVEMENT_THRESHOLD_MPS2, derive_activity, previous_sample
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
@@ -660,8 +668,16 @@ async def _write_contacts(
     settings = get_settings()
     live = delivers_live(event.acquisition_channel)
     first = await attribution_at(records.contacts[0].time)
-    resolver = await resolver_for(session, first.project_id)
+    # what the device was looking for decides what a sighting can mean (decision D260): under
+    # the phone filter nothing is resolved, because a phone's address is random and a match
+    # would be a coincidence, and nothing is moved by it
+    scanning = await scanning_of(session, device.id)
+    people = watches_for_people(scanning)
+    resolver = Resolver(by_suffix={}) if people else await resolver_for(session, first.project_id)
     heard: dict[uuid.UUID, datetime] = {}
+    # per scan window, the addresses heard and the strongest signal of each: one window is one
+    # presence, however many addresses it carried, since one person carries several
+    presence: dict[datetime, dict[str, int | None]] = {}
     for record in records.contacts:
         address = normalise_address(record.address)
         # a device clock is believed unless the delivery says it cannot be right (decision
@@ -718,6 +734,11 @@ async def _write_contacts(
         outcome.created["contacts"] += 1
         outcome.earliest = min(outcome.earliest or when, when)
         outcome.latest = max(outcome.latest or when, when)
+        if people:
+            window = presence.setdefault(when, {})
+            best = window.get(address)
+            if best is None or (record.rssi_dbm is not None and record.rssi_dbm > best):
+                window[address] = record.rssi_dbm
         if found.device_id is not None:
             heard.setdefault(found.device_id, when)
             heard[found.device_id] = max(heard[found.device_id], when)
@@ -735,6 +756,120 @@ async def _write_contacts(
     # not where the thing it heard was.
     if device.static_geom is not None and heard:
         await _place_heard_devices(session, event, device, heard, outcome)
+    if presence:
+        await _write_human_presence(session, event, device, presence, outcome, attribution_at)
+
+
+async def _write_human_presence(
+    session: AsyncSession,
+    event: SourceEvent,
+    device: Device,
+    presence: dict[datetime, dict[str, int | None]],
+    outcome: Outcome,
+    attribution_at: AttributionAt,
+) -> None:
+    """One event and one measurement per scan window that heard a phone (decision D260).
+
+    Per window and not per sighting, because one person carries a phone, a watch and a pair of
+    earbuds and each of those advertises separately; and never a count of people, because the
+    addresses rotate every few minutes, so the same phone an hour apart is two addresses and two
+    phones in one window may be one person. What the platform states is that something human-worn
+    was within Bluetooth range of this device at this time, which is the operational reason to
+    scan for phones in a reserve at all.
+
+    The measurement exists because the rules engine triggers on measurements and its event
+    triggers are still reserved (`shared/rules/schema.py`): a rule that says "tell me when
+    somebody is at the north gate" needs a number to threshold, and the number is 1.
+    """
+    for when, window in sorted(presence.items()):
+        attribution = await attribution_at(when)
+        if attribution.project_id is None:
+            log.warning(
+                "human presence without project skipped",
+                device_id=str(device.id),
+                time=when.isoformat(),
+            )
+            continue
+        dedup = fingerprint([str(device.id), when.isoformat(), HUMAN_PRESENCE_EVENT])
+        exists = await session.scalar(
+            select(Event.id).where(Event.context["dedup"].astext == dedup)
+        )
+        if exists is not None:
+            outcome.duplicates += 1
+            continue
+        strongest = max((r for r in window.values() if r is not None), default=None)
+        row = Event(
+            time=when,
+            project_id=attribution.project_id,
+            entity_id=attribution.entity_id,
+            device_id=device.id,
+            event_type=HUMAN_PRESENCE_EVENT,
+            severity=Severity.INFO,
+            title="Human presence",
+            description=(
+                f"{device.name} heard {len(window)} human-worn Bluetooth "
+                f"{'device' if len(window) == 1 else 'devices'}"
+            ),
+            # at the reader when a person placed it, so the event lands on the map where the
+            # hardware is; a device that reports its own position has no place to claim here
+            geom=device.static_geom,
+            context={
+                "addresses": len(window),
+                "strongest_rssi_dbm": strongest,
+                "note": HUMAN_PRESENCE_NOTE,
+                "dedup": dedup,
+            },
+            source_event_id=event.id,
+            source_event_ingested_at=event.ingested_at,
+            trace_id=event.trace_id,
+        )
+        session.add(row)
+        await session.flush()
+        outcome.created["events"] += 1
+        outcome.messages.append(
+            (
+                Topic.EVENT_CREATED,
+                {
+                    "event_id": str(row.id),
+                    "project_id": str(attribution.project_id),
+                    "event_type": HUMAN_PRESENCE_EVENT,
+                    "time": when.isoformat(),
+                },
+            )
+        )
+        key = canonical_key(device.id, when, HUMAN_PRESENCE_METRIC)
+        already = await session.scalar(
+            select(Measurement.id).where(Measurement.canonical_key == key, Measurement.time == when)
+        )
+        if already is not None:
+            continue
+        await _ensure_metric(session, HUMAN_PRESENCE_METRIC, ValueType.NUMERIC)
+        measurement = Measurement(
+            time=when,
+            device_id=device.id,
+            project_id=attribution.project_id,
+            entity_id=attribution.entity_id,
+            data_source_id=event.data_source_id,
+            source_event_id=event.id,
+            source_event_ingested_at=event.ingested_at,
+            metric_key=HUMAN_PRESENCE_METRIC,
+            canonical_key=key,
+            value_num=1.0,
+            trace_id=event.trace_id,
+        )
+        session.add(measurement)
+        await session.flush()
+        outcome.created["measurements"] += 1
+        outcome.messages.append(
+            (
+                Topic.MEASUREMENT_CREATED,
+                {
+                    "measurement_ids": [measurement.id],
+                    "device_id": str(device.id),
+                    "source_event_id": event.id,
+                },
+            )
+        )
 
 
 async def _place_heard_devices(

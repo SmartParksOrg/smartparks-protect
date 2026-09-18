@@ -824,3 +824,188 @@ async def test_the_live_map_carries_the_contact_count(client, db, bus):
     assert by_name[quiet["name"]]["contacts_24h"] is None, (
         "a device that never listens says nothing"
     )
+
+
+async def test_a_scan_for_phones_is_presence_and_never_an_identity(client, db, bus):
+    """Decision D260. Under the phone filter a sighting says somebody was near the device and
+    nothing more: it resolves to no device even when the octets happen to match one, because a
+    phone's advertised address is random and a match would be a coincidence, and one scan raises
+    one presence however many addresses it heard, since one person carries several."""
+    from shared.domain.device_settings import record_setting
+    from shared.models import Event, Measurement
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    # a collar in the same project whose address ends with the octets a phone happens to show
+    decoy = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+    for name, value in (("ble_scan_interval", 600), ("ble_scan_filter", 3)):
+        await record_setting(
+            db,
+            device_id=uuid.UUID(watcher["id"]),
+            key=name,
+            value=value,
+            source="frame",
+            observed_at=SCAN_AT - timedelta(hours=1),
+        )
+    await db.commit()
+
+    await _scan(
+        db,
+        bus,
+        source,
+        identity,
+        scan_frame(
+            [
+                (bytes([0x0C, 0x41, 0x0A]), -61),  # the decoy collar's octets
+                (bytes([0xE1, 0x02, 0x9F]), -77),  # a watch
+                (bytes([0x33, 0x22, 0x11]), -83),  # earbuds
+            ]
+        ),
+    )
+
+    rows = (
+        await db.scalars(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+        )
+    ).all()
+    assert len(rows) == 3, "every sighting is still stored, like any other"
+    assert {r.resolution for r in rows} == {ContactResolution.UNKNOWN}, (
+        "a phone is never a device we know, whatever its octets say"
+    )
+    assert all(r.contact_device_id is None for r in rows)
+    decoy_state = await db.get(DeviceCurrentState, uuid.UUID(decoy["id"]))
+    assert decoy_state is None or decoy_state.last_seen_at is None, (
+        "the decoy was not heard; a coincidence of three octets must not bring it to life"
+    )
+
+    events = (
+        await db.scalars(
+            select(Event).where(
+                Event.device_id == uuid.UUID(watcher["id"]), Event.event_type == "human_presence"
+            )
+        )
+    ).all()
+    assert len(events) == 1, "one scan window is one presence, not one per address"
+    assert events[0].time == SCAN_AT
+    assert events[0].context["addresses"] == 3
+    assert events[0].context["strongest_rssi_dbm"] == -61
+    assert "never an identity" in events[0].context["note"]
+
+    # the rules engine triggers on measurements, not on events, so presence carries a number
+    values = (
+        await db.scalars(
+            select(Measurement.value_num).where(
+                Measurement.device_id == uuid.UUID(watcher["id"]),
+                Measurement.metric_key == "human_presence",
+            )
+        )
+    ).all()
+    assert list(values) == [1.0], "presence in a window, not a count of people"
+
+    body = (
+        await client.get(f"/api/v1/devices/{watcher['id']}/contacts", headers=admin.headers)
+    ).json()
+    assert body["scanning"]["watches_for_people"] is True
+    assert body["scanning"]["filter_label"] == "phones"
+
+
+async def test_a_scan_for_devices_raises_no_presence(client, db, bus):
+    """The other filters mean what they always meant: the same frame under filter 1 resolves a
+    collar and says nothing about people."""
+    from shared.domain.device_settings import record_setting
+    from shared.models import Event
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    known = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+    await record_setting(
+        db,
+        device_id=uuid.UUID(watcher["id"]),
+        key="ble_scan_filter",
+        value=1,
+        source="frame",
+        observed_at=SCAN_AT - timedelta(hours=1),
+    )
+    await db.commit()
+
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -61)]))
+
+    row = (
+        await db.scalars(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+        )
+    ).one()
+    assert row.resolution == ContactResolution.RESOLVED
+    assert row.contact_device_id == uuid.UUID(known["id"])
+    events = (
+        await db.scalars(
+            select(Event).where(
+                Event.device_id == uuid.UUID(watcher["id"]), Event.event_type == "human_presence"
+            )
+        )
+    ).all()
+    assert events == [], "nothing about people was claimed"
+
+
+async def test_an_unknown_filter_claims_nothing_either_way(client, db, bus):
+    """A device whose settings Protect has never read is not assumed to be watching for people,
+    and not assumed not to be: the sightings are stored and resolved as usual, and no presence
+    is claimed from a guess."""
+    from shared.models import Event
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0xE1, 0x02, 0x9F]), -77)]))
+
+    assert (
+        await db.scalars(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+        )
+    ).one().resolution == ContactResolution.UNKNOWN
+    assert (
+        await db.scalars(
+            select(Event).where(
+                Event.device_id == uuid.UUID(watcher["id"]), Event.event_type == "human_presence"
+            )
+        )
+    ).all() == []

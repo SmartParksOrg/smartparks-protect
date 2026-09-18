@@ -1778,6 +1778,7 @@
   "This device type declares no control actions.": "Dit apparaattype declareert geen besturingsacties.",
   "This device type declares no health fields.": "Dit apparaattype declareert geen gezondheidsvelden.",
   "This device type's driver publishes no settings catalogue.": "De driver van dit apparaattype publiceert geen instellingencatalogus.",
+  "This device watches for phones and other devices people carry, so what it reports is that somebody was near it. It is never who: a phone changes its Bluetooth address every few minutes, so the same phone an hour later is a different address and the number of addresses is not a number of people. Each scan that heard one raises a Human presence event.": "Dit apparaat let op telefoons en andere apparaten die mensen bij zich dragen, dus wat het meldt is dat er iemand in de buurt was. Nooit wie: een telefoon wisselt elke paar minuten van Bluetooth-adres, dus dezelfde telefoon is een uur later een ander adres en het aantal adressen is geen aantal mensen. Elke scan die er een hoorde levert een gebeurtenis Menselijke aanwezigheid op.",
   "This document uses nesting the form cannot show, so it is edited as JSON": "Dit document gebruikt een nesting die het formulier niet kan tonen, dus het wordt als JSON bewerkt",
   "This file was uploaded before for this device.": "Dit bestand is al eerder voor dit apparaat geüpload.",
   "This invitation link is not valid.": "Deze uitnodigingslink is niet geldig.",

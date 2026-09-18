@@ -226,19 +226,23 @@ other, which is what the data can carry.
 
 ## 5. Tasks
 
-- [ ] C1 the driver: ports 7 and 11 decoded, `DecodedContact`, the golden check against the
+Phase 30 (C1 to C5, and C11 to C15 which the real data added) is done and live on the dev
+server; `PROJECT_PLAN.md` phase 30 carries the full list with what each turned out to be.
+
+- [x] C1 the driver: ports 7 and 11 decoded, `DecodedContact`, the golden check against the
       reference decoders with built frames, the empty scan case.
-- [ ] C2 `devices.ble_mac` with its three ways in, the endpoint, the device page control.
-- [ ] C3 migration 0041, the `device_contacts` hypertable, the decoder writing and resolving,
+- [x] C2 `devices.ble_mac` with its three ways in, the endpoint, the device page control.
+- [x] C3 migration 0041, the `device_contacts` hypertable, the decoder writing and resolving,
       the re-resolve action.
-- [ ] C4 the Contacts card on the device's Data tab.
-- [ ] C5 the dev server: scanning turned on for a few collars, the first real scans read against
+- [x] C4 the Contacts card on the device's Data tab.
+- [x] C5 the dev server: scanning turned on for a few collars, the first real scans read against
       the decoder. **The gate between the phases.**
 - [ ] C6 `primitives/contacts.py` and `primitives/proximity.py` with tests on synthetic tracks.
 - [ ] C7 the module, its parameters, the three warnings, the tables and charts.
 - [ ] C8 the `network` chart kind and the `contact` geometry kind, in the interface and the PDF.
-- [ ] C9 docs: an analytics guide, the device guide's scanning section, `DEVELOPERS.md`, the
-      changelog; an ADR for the new canonical type.
+- [ ] C9 docs: an analytics guide for the module. Done with phase 30: the device guide's
+      scanning section (`docs/devices/bluetooth-contacts.md`), the OpenCollar port table, the
+      domain model's record types, `DEVELOPERS.md`, the changelog and ADR 0036.
 - [ ] C10 release.
 
 ## 6. Exit criteria

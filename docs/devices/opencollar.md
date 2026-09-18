@@ -24,7 +24,8 @@ The protocol catalogue (settings, commands and readable values of firmware 7.3.0
 | 29 | Flash log | Each stored record is decoded as if it had arrived on its own port; positions keep their fix time, clockless messages take the store timestamp | Per record |
 | 31 | Command confirmation, BLE MAC, requested last position | State `last_command`, state `ble_mac`, Position (firmware byte order: longitude first) | Fix timestamp for the position |
 | 3, 30 | Settings and values readback | State with the raw `id: hex` list | Network receive time |
-| 1, 5, 6, 7, 9, 10, 11, 15, 21, 27, 28 | LR11xx NAV, satellite lists, Wi-Fi and BLE scans, cardiac monitor, air quality, Memfault, messaging | Accepted, no canonical rows yet (the LR11xx NAV needs an external solver) | |
+| 7, 11 | BLE scan, aggregated over a window and one at a time | One contact per sighting, with the three octets the scan carries, the signal strength and how the address resolved; under the phone filter also a `human_presence` event and measurement, and from a device with a place set, a `proximity` position for what it heard. See [Bluetooth contacts](bluetooth-contacts.md) | The scan's own timestamp, unless it is implausibly far behind its delivery (decision D259) |
+| 1, 5, 6, 9, 10, 15, 21, 27, 28 | LR11xx NAV, satellite lists, Wi-Fi scans, cardiac monitor, air quality, Memfault, messaging | Accepted, no canonical rows yet (the LR11xx NAV needs an external solver) | |
 
 Unknown ports, wrong message ids and length mismatches raise `PAYLOAD_DECODE_FAILED` and land in Needs Attention.
 

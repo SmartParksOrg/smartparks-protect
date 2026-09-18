@@ -15,7 +15,7 @@ Both use a half-open range `[start, end)` and a database exclusion constraint, s
 
 ## Attribution uses canonical time
 
-Every canonical record (position, measurement, state, event) is attributed to the project and entity that were assigned to the device **at the device-origin time of the record**, not at the moment the record arrived. A raw log uploaded on 20 August that contains a GPS fix from 15 July belongs to the project that owned the device on 15 July. The single function that answers this is `shared.domain.assignments.resolve_attribution`. The resolved ids are stored on the record for fast queries; the assignment tables stay the source of truth for audits and recomputation.
+Every canonical record (position, measurement, state, event, contact) is attributed to the project and entity that were assigned to the device **at the device-origin time of the record**, not at the moment the record arrived. A raw log uploaded on 20 August that contains a GPS fix from 15 July belongs to the project that owned the device on 15 July. The single function that answers this is `shared.domain.assignments.resolve_attribution`. The resolved ids are stored on the record for fast queries; the assignment tables stay the source of truth for audits and recomputation.
 
 ### Assignment dates and records before an assignment
 
@@ -43,7 +43,7 @@ An **external identity** maps `(data source, external id)`, such as a DevEUI, to
 | --- | --- | --- |
 | Raw | `source_events` | The inbound message exactly as received, immutable |
 | Decoded | driver output | Provider or device specific interpretation |
-| Normalized | `positions`, `measurements`, `device_state_history`, `events` | Canonical rows with stable schemas |
+| Normalized | `positions`, `measurements`, `device_state_history`, `events`, `device_contacts` | Canonical rows with stable schemas |
 | Aggregated | server-side buckets | Time buckets and statistics for charts and dashboards |
 
 Maps, charts, rules and exports use the normalized level. Provenance always leads back to the raw level.
@@ -66,4 +66,6 @@ unless a person asks for the network's locations, and the current position of an
 device follows its location source setting: the device's fixes, the network's locations, or
 the device with the network standing in after a period without a fix. Network locations draw
 on the live map's Coverage tab as circles of their radius. A change of the setting rebuilds the current position at once from the positions held, so it does not wait for the next position to arrive.
+
+Two more kinds exist since phase 30 (ADR 0036). A device that does not move can be given a place by hand on its page: its location source becomes `static` and nothing it sends moves it afterwards. A sighting by such a placed device writes a position of type `proximity` for the device it heard, at the reader, with a stated radius — which for an animal wearing only a Bluetooth tag is the only position there will ever be. An estimate never displaces a newer fix a device made itself, but a device that has never fixed at all takes it whatever its location setting says. The map panels name every kind that is not the device's own fix, so an estimate is never read as one. See [Bluetooth contacts](../devices/bluetooth-contacts.md).
 

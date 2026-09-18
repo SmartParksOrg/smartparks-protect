@@ -73,6 +73,7 @@ nav:
       - OpenCollar protocol research: devices/opencollar-protocol-research.md
       - Device control: devices/device-control.md
       - OpenCollar over Web Bluetooth: devices/opencollar-webble.md
+      - Bluetooth contacts: devices/bluetooth-contacts.md
       - Raw log files: devices/raw-log-files.md
   - Integrations:
       - integrations/index.md
@@ -169,3 +170,4 @@ nav:
       - adr/0033-pdf-reports-made-on-the-server.md
       - adr/0034-devices-as-analysis-subjects-with-levels.md
       - adr/0035-device-settings-known-per-device.md
+      - adr/0036-contacts-as-a-canonical-record-type.md
