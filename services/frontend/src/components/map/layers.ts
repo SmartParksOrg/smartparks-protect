@@ -773,7 +773,7 @@ const FEATURE_CLICK_LAYERS = [
  * A feature is drawn under the markers, but MapLibre calls the handler of every layer with
  * something under the cursor, whatever the drawing order, and the handler bound last decides
  * what the page shows. The feature's is bound last, so an animal standing in a geofence opened
- * the geofence (Tim, 2026-09-19). An area is the largest thing on the map and the last one a
+ * the geofence (Tim, 2026-09-18). An area is the largest thing on the map and the last one a
  * person means to click, so it yields to all of these. */
 const ABOVE_FEATURES = [
   "entity-markers",

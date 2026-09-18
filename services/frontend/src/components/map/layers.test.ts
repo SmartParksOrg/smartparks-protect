@@ -152,7 +152,7 @@ describe("map click binding", () => {
     expect(count()).toBe(0);
   });
 
-  it("lets an area give way to a marker standing on it (Tim, 2026-09-19)", () => {
+  it("lets an area give way to a marker standing on it (Tim, 2026-09-18)", () => {
     // an animal inside a geofence: MapLibre calls both handlers, and the area's is bound last
     const { map, fire } = fakeMap(["entity-markers"]);
     const seen: string[] = [];
