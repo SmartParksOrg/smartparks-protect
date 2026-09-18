@@ -38,7 +38,7 @@ from shared.analysis.base import (
 from shared.analysis.environment import configured_provider, geometry_hash, sample_weekly
 from shared.analysis.limits import MAX_AREAS_GRAZING, MAX_FIXES_PER_SUBJECT
 from shared.analysis.parameters import CommonParameters
-from shared.analysis.primitives.spatial import CellUse, LocalGrid, hotspots
+from shared.analysis.primitives.spatial import M_PER_DEG_LAT, CellUse, LocalGrid, hotspots
 from shared.analysis.primitives.timeagg import local_days, seasons
 from shared.analysis.primitives.trajectory import (
     Trajectory,
@@ -629,7 +629,6 @@ class GrazingModule:
         vegetation_rows, vegetation_chart = await landscape_figures(
             ctx, params, areas, periods, summary, warnings
         )
-        geometries.extend(vegetation_geometries(areas, summary))
         await ctx.progress(95, "document")
         unit = {
             "equal": "animals",
@@ -760,7 +759,11 @@ async def landscape_figures(
             )
         )
         return [], []
-    geometries = [a.geojson for a in areas]
+    # the areas keep their exact mean, and the mosaic's cells ride along in the same job
+    # (Tim, 2026-09-18): one polygon per area was one flat colour, which is no map
+    grid, cells_by_area = vegetation_grid(areas, params.cell_m)
+    cell_keys = [(area.id, key) for area in areas for key in cells_by_area[area.id]]
+    geometries = [a.geojson for a in areas] + [cell_geojson(grid, key) for _, key in cell_keys]
     hashes = [geometry_hash(g) for g in geometries]
     weekly: dict[str, dict[str, dict[datetime, float | None]]] = {}
     # the layer is the slow part of the run: a batch job at the provider takes minutes, so the
@@ -792,9 +795,10 @@ async def landscape_figures(
                 )
             )
             return [], []
+    _write_mosaic(grid, cell_keys, hashes[len(areas) :], weekly, summary)
     chart: list[dict[str, Any]] = []
     rows: list[list[Any]] = []
-    for area, h in zip(areas, hashes, strict=True):
+    for area, h in zip(areas, hashes[: len(areas)], strict=True):
         means: dict[str, float | None] = {}
         for period in periods:
             series = weekly[period.key].get(h, {})
@@ -856,40 +860,87 @@ async def landscape_figures(
     return rows, chart
 
 
-#: The vegetation index a management area can hold, for the colour ramp on the result map.
-NDVI_LOW = 0.1
-NDVI_HIGH = 0.8
+#: At most this many cells of the vegetation mosaic in one run; the cell size is doubled until
+#: the areas fit, so a large park answers coarser rather than refusing (architecture 13.10).
+MAX_VEGETATION_CELLS = 600
+#: The mosaic is never finer than Sentinel-2 itself, nor coarser than this.
+MIN_VEGETATION_CELL_M = 20.0
+MAX_VEGETATION_CELL_M = 2000.0
 
 
-def vegetation_geometries(areas: list[Area], summary: dict[str, Any]) -> list[Geometry]:
-    """The areas again, this time carrying their vegetation index (Tim, 2026-09-18), so the
-    result map can shade them by how green the land was over the period beside how hard it was
-    used. `level` is the index scaled to 0 to 1, which is what the ramp reads; an area without a
-    cloud-free observation is left out rather than drawn as bare ground."""
-    out: list[Geometry] = []
-    for area in areas:
-        figures = summary.get("main", {}).get(str(area.id), {})
-        mean = figures.get("ndvi_mean")
-        if mean is None:
+def vegetation_grid(
+    areas: list[Area], cell_m: float
+) -> tuple[LocalGrid, dict[uuid.UUID, list[tuple[int, int]]]]:
+    """The cells of the mosaic: a square grid over the areas, every cell whose centre lies in an
+    area (Tim, 2026-09-18, who expected a mosaic and got one flat colour per area). The cell size
+    doubles until the whole selection fits `MAX_VEGETATION_CELLS`, so a large park is drawn
+    coarser instead of refused; the size that was used travels with the grid."""
+    centre = shapely.union_all([a.geometry for a in areas]).centroid
+    size = min(MAX_VEGETATION_CELL_M, max(MIN_VEGETATION_CELL_M, cell_m))
+    while True:
+        grid = LocalGrid(float(centre.y), float(centre.x), size)
+        cells = {area.id: _cells_in(area, grid) for area in areas}
+        if sum(len(c) for c in cells.values()) <= MAX_VEGETATION_CELLS:
+            return grid, cells
+        if size >= MAX_VEGETATION_CELL_M:
+            # as coarse as it goes: keep the busiest areas' cells within the bound
+            trimmed: dict[uuid.UUID, list[tuple[int, int]]] = {}
+            left = MAX_VEGETATION_CELLS
+            for area_id, keys in sorted(cells.items(), key=lambda kv: len(kv[1])):
+                trimmed[area_id] = keys[:left]
+                left = max(0, left - len(trimmed[area_id]))
+            return grid, trimmed
+        size *= 2
+
+
+def _cells_in(area: Area, grid: LocalGrid) -> list[tuple[int, int]]:
+    """The grid cells whose centre lies inside the area, in reading order."""
+    west, south, east, north = area.geometry.bounds
+    x0, y0 = grid.cells_of(np.array([south]), np.array([west]))
+    x1, y1 = grid.cells_of(np.array([north]), np.array([east]))
+    xs = np.arange(int(x0[0]), int(x1[0]) + 1)
+    ys = np.arange(int(y0[0]), int(y1[0]) + 1)
+    if xs.size == 0 or ys.size == 0:
+        return []
+    mesh_x, mesh_y = np.meshgrid(xs, ys)
+    flat_x, flat_y = mesh_x.ravel(), mesh_y.ravel()
+    lon = grid.origin_lon + (flat_x + 0.5) * grid.cell_m / grid.m_per_deg_lon
+    lat = grid.origin_lat + (flat_y + 0.5) * grid.cell_m / M_PER_DEG_LAT
+    inside = shapely.contains_xy(area.geometry, lon, lat)
+    return [(int(x), int(y)) for x, y in zip(flat_x[inside], flat_y[inside], strict=True)]
+
+
+def cell_geojson(grid: LocalGrid, key: tuple[int, int]) -> dict[str, Any]:
+    return {"type": "Polygon", "coordinates": [grid.polygon(*key)]}
+
+
+def _write_mosaic(
+    grid: LocalGrid,
+    cell_keys: list[tuple[uuid.UUID, tuple[int, int]]],
+    cell_hashes: list[str],
+    weekly: dict[str, dict[str, dict[datetime, float | None]]],
+    summary: dict[str, Any],
+) -> None:
+    """The vegetation mosaic as the page draws it, shaped like the use intensity grid so the two
+    line up cell for cell: the grid, and per area its cells with the mean index of the main
+    period. A cell with no cloud-free week in the period is left out rather than drawn as bare
+    ground."""
+    main = weekly.get("main", {})
+    mosaic: dict[str, list[list[float]]] = {}
+    for (area_id, (ix, iy)), cell_hash in zip(cell_keys, cell_hashes, strict=True):
+        valid = [v for v in main.get(cell_hash, {}).values() if v is not None]
+        if not valid:
             continue
-        scaled = (float(mean) - NDVI_LOW) / (NDVI_HIGH - NDVI_LOW)
-        out.append(
-            Geometry(
-                kind="vegetation",
-                label=area.name,
-                level=round(max(0.0, min(1.0, scaled)), 3),
-                geojson=area.geojson,
-                properties={
-                    "area_id": str(area.id),
-                    "period": "main",
-                    "ndvi_mean": mean,
-                    "ndvi_change": figures.get("ndvi_change"),
-                    "ndvi_valid_share": figures.get("ndvi_valid_share"),
-                    "ndvi_level": figures.get("ndvi_level"),
-                },
-            )
-        )
-    return out
+        mosaic.setdefault(str(area_id), []).append([ix, iy, round(sum(valid) / len(valid), 3)])
+    if not mosaic:
+        return
+    summary["vegetation"] = {
+        "origin_lat": grid.origin_lat,
+        "origin_lon": grid.origin_lon,
+        "cell_m": grid.cell_m,
+        "m_per_deg_lon": round(grid.m_per_deg_lon, 3),
+        "areas": mosaic,
+    }
 
 
 def _day_ms(day: date) -> float:

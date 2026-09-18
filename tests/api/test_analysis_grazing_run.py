@@ -160,8 +160,13 @@ class FakeNdviProvider:
             layer=layer,
             source="a test",
             sampled_at=datetime.now(UTC),
+            # one series per geometry asked, whatever the count: the areas come first and the
+            # mosaic's cells after them (Tim, 2026-09-18), so the cells cycle the same values
             series=[
-                [(week, (self.before if week < self.split else self.after)[i]) for week in weeks]
+                [
+                    (week, (self.before if week < self.split else self.after)[i % len(self.before)])
+                    for week in weeks
+                ]
                 for i in range(len(geometries))
             ],
         )
@@ -215,6 +220,15 @@ async def test_a_grazing_run_carries_the_vegetation_of_each_area(client, db, mon
     assert figures["ndvi_level"] == "warn"  # more than a tenth of an index point down
     assert figures["ndvi_valid_share"] == 1.0
     assert document["summary"]["main"][far]["ndvi_level"] == "ok"
+    # the mosaic: cells on the analysis grid, not one flat colour per area (Tim, 2026-09-18)
+    mosaic = document["summary"]["vegetation"]
+    assert mosaic["cell_m"] > 0 and set(mosaic["areas"]) == {camp, far}
+    assert all(len(cells) > 1 for cells in mosaic["areas"].values()), "an area is many cells"
+    assert all(
+        len(cell) == 3 and isinstance(cell[2], float)
+        for cells in mosaic["areas"].values()
+        for cell in cells
+    )
     vegetation = next(t for t in document["tables"] if t["key"] == "vegetation")
     assert vegetation["columns"] == [
         "area",

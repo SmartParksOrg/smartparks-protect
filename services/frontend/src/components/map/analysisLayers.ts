@@ -15,6 +15,7 @@ import { SOURCES } from "@/components/map/layers";
  */
 export const ANALYSIS_SOURCE = "analysis";
 export const INTENSITY_SOURCE = "analysis-intensity";
+export const VEGETATION_SOURCE = "analysis-vegetation";
 /** Light to dark, by the share of the busiest cell: the sequential ramp of a use map. */
 export const INTENSITY_RAMP = [
   "#EEF3EF",
@@ -25,7 +26,6 @@ export const INTENSITY_RAMP = [
 ] as const;
 export const ANALYSIS_KINDS = [
   "area",
-  "vegetation",
   "mcp",
   "kde",
   "hotspot",
@@ -37,7 +37,6 @@ export type AnalysisKind = (typeof ANALYSIS_KINDS)[number];
 
 const FILL_OPACITY: Record<string, number> = {
   area: 0.35,
-  vegetation: 0.55,
   mcp: 0.08,
   kde: 0.22,
   hotspot: 0.45,
@@ -83,16 +82,6 @@ export const VEGETATION_RAMP = [
   "#2F6B3A",
 ] as const;
 
-export function vegetationColor(level: number | null | undefined): string {
-  if (level === null || level === undefined || Number.isNaN(level))
-    return VEGETATION_RAMP[0];
-  const step = Math.min(
-    VEGETATION_RAMP.length - 1,
-    Math.max(0, Math.floor(level * VEGETATION_RAMP.length)),
-  );
-  return VEGETATION_RAMP[step];
-}
-
 export function pressureColor(level: number | null | undefined): string {
   if (level === null || level === undefined || !Number.isFinite(level))
     return PRESSURE_RAMP[0];
@@ -113,7 +102,6 @@ export function decorateAnalysisFeatures(
   const rank = (f: GeoJSON.Feature): number => {
     const kind = String(f.properties?.kind ?? "");
     const level = Number(f.properties?.level ?? 0);
-    if (kind === "vegetation") return -1.5;
     if (kind === "area") return -1;
     if (kind === "coverage") return -0.5;
     if (kind === "mcp") return 0;
@@ -131,12 +119,7 @@ export function decorateAnalysisFeatures(
         ...f,
         properties: {
           ...f.properties,
-          color:
-            kind === "area"
-              ? pressureColor(level)
-              : kind === "vegetation"
-                ? vegetationColor(level)
-                : colorOf(subject),
+          color: kind === "area" ? pressureColor(level) : colorOf(subject),
           opacity: FILL_OPACITY[kind] ?? 0.2,
         },
       };
@@ -277,13 +260,15 @@ export function bindAnalysisClicks(
   const leave = () => {
     map.getCanvas().style.cursor = "";
   };
-  for (const id of ["analysis-fill", "analysis-points"]) {
+  // the vegetation mosaic answers too, so a cell can be read (Tim, 2026-09-18)
+  const layers = ["analysis-fill", "analysis-points", "vegetation-fill"];
+  for (const id of layers) {
     map.on("click", id, onClick);
     map.on("mouseenter", id, enter);
     map.on("mouseleave", id, leave);
   }
   return () => {
-    for (const id of ["analysis-fill", "analysis-points"]) {
+    for (const id of layers) {
       map.off("click", id, onClick);
       map.off("mouseenter", id, enter);
       map.off("mouseleave", id, leave);
@@ -371,6 +356,62 @@ export function setIntensityFeatures(
 ): void {
   const source = map.getSource(INTENSITY_SOURCE) as GeoJSONSource | undefined;
   source?.setData({ type: "FeatureCollection", features });
+}
+
+/** The vegetation mosaic (grazing): the index per cell on the same grid as the use intensity,
+ * so the two can be read against each other. Its own source, so either can be shown alone. */
+export function ensureVegetationLayers(map: MapLibreMap): void {
+  if (map.getSource(VEGETATION_SOURCE)) return;
+  map.addSource(VEGETATION_SOURCE, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  const before = map.getLayer("intensity-fill")
+    ? "intensity-fill"
+    : map.getLayer("analysis-fill")
+      ? "analysis-fill"
+      : undefined;
+  map.addLayer(
+    {
+      id: "vegetation-fill",
+      type: "fill",
+      source: VEGETATION_SOURCE,
+      paint: {
+        "fill-color": [
+          "step",
+          ["get", "level"],
+          VEGETATION_RAMP[0],
+          0.2,
+          VEGETATION_RAMP[1],
+          0.4,
+          VEGETATION_RAMP[2],
+          0.6,
+          VEGETATION_RAMP[3],
+          0.8,
+          VEGETATION_RAMP[4],
+        ],
+        "fill-opacity": 0.8,
+      },
+    },
+    before,
+  );
+}
+
+export function setVegetationFeatures(
+  map: MapLibreMap,
+  features: GeoJSON.Feature[],
+): void {
+  const source = map.getSource(VEGETATION_SOURCE) as GeoJSONSource | undefined;
+  source?.setData({ type: "FeatureCollection", features });
+}
+
+export function setVegetationVisible(map: MapLibreMap, visible: boolean): void {
+  if (map.getLayer("vegetation-fill"))
+    map.setLayoutProperty(
+      "vegetation-fill",
+      "visibility",
+      visible ? "visible" : "none",
+    );
 }
 
 export function setIntensityVisible(map: MapLibreMap, visible: boolean): void {

@@ -31,7 +31,10 @@ COLLECTION = "SENTINEL2_L2A"
 #: How long a job may take before the provider gives up, and how often it looks.
 JOB_TIMEOUT_S = 20 * 60
 POLL_S = 15
-MAX_GEOMETRIES = 50
+#: Areas and the cells of the vegetation mosaic go up in one job (Tim, 2026-09-18), so the cap
+#: sits above `grazing.MAX_VEGETATION_CELLS` plus the areas. The pixels processed decide the
+#: cost, not the number of polygons the result is aggregated onto.
+MAX_GEOMETRIES = 700
 
 MEAN = {
     "process_graph": {

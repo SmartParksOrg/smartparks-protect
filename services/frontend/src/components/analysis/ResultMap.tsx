@@ -27,12 +27,16 @@ import {
   ensureAnalysisLayers,
   ensureFixLayer,
   ensureIntensityLayers,
+  ensureVegetationLayers,
   setAnalysisFeatures,
   setAnalysisKinds,
   setFixFeatures,
   setFixesVisible,
   setIntensityFeatures,
   setIntensityVisible,
+  setVegetationFeatures,
+  setVegetationVisible,
+  VEGETATION_RAMP,
   setTracksVisible,
 } from "@/components/map/analysisLayers";
 import {
@@ -63,7 +67,12 @@ import { useMapConfig } from "@/hooks/useMapConfig";
 import { usePreference } from "@/hooks/usePreference";
 import { useTheme } from "@/hooks/useTheme";
 import { boundsOfTracks } from "@/lib/explore";
-import { intensityFeatures, type ResultDocument } from "@/lib/analyses";
+import {
+  intensityFeatures,
+  vegetationFeatures,
+  vegetationRange,
+  type ResultDocument,
+} from "@/lib/analyses";
 
 const TRACK_POINTS = 5000;
 const HEAT_RADIUS_M = 60;
@@ -116,6 +125,7 @@ export function ResultMap({
     // the vegetation layer covers the same areas as the pressure one, so it starts off and
     // the chip brings it up (Tim, 2026-09-18)
     const off: string[] = ["tracks", "points", "heatmap", "vegetation"];
+
     // the hotspot outlines repeat what the intensity cells show; start folded away
     if (document.summary.intensity) off.push("hotspot");
     return off;
@@ -123,8 +133,11 @@ export function ResultMap({
   const [picked, setPicked] = useState<Record<string, unknown> | null>(null);
   const shown = available.filter((k) => !hidden.includes(k));
   const intensity = useMemo(() => intensityFeatures(document), [document]);
+  const vegetation = useMemo(() => vegetationFeatures(document), [document]);
+  const ndviRange = useMemo(() => vegetationRange(document), [document]);
   const toggles: string[] = [
     ...(intensity.length ? ["intensity"] : []),
+    ...(vegetation.length ? ["vegetation"] : []),
     ...available,
     "tracks",
     "points",
@@ -225,6 +238,7 @@ export function ResultMap({
       map.setLayoutProperty("track-points", "visibility", "none");
     ensureAnalysisLayers(map);
     ensureIntensityLayers(map);
+    ensureVegetationLayers(map);
     ensureFixLayer(map);
     ensureHeatLayer(map);
     raiseMarkers(map);
@@ -275,6 +289,7 @@ export function ResultMap({
     setTracks(map, trackLayers);
     setAnalysisFeatures(map, features);
     setIntensityFeatures(map, intensity);
+    setVegetationFeatures(map, vegetation);
     setHeatPoints(map, pointFeatures);
     setFixFeatures(map, byDevice ? pointFeatures : []);
     if (fitted.current || (available.length > 0 && features.length === 0))
@@ -292,6 +307,7 @@ export function ResultMap({
     pointFeatures,
     features,
     intensity,
+    vegetation,
     available.length,
     byDevice,
   ]);
@@ -301,6 +317,7 @@ export function ResultMap({
     if (!map || !ready) return;
     setAnalysisKinds(map, shown);
     setIntensityVisible(map, !hidden.includes("intensity"));
+    setVegetationVisible(map, !hidden.includes("vegetation"));
     setTracksVisible(map, !hidden.includes("tracks"));
     // a device's fixes draw in their accuracy colours instead of the track points
     if (map.getLayer("track-points"))
@@ -396,11 +413,11 @@ export function ResultMap({
   ];
   const kindLabel: Record<string, string> = {
     intensity: t("Use intensity"),
+    vegetation: t("Vegetation (NDVI)"),
     tracks: t("Tracks"),
     points: t("Fixes"),
     heatmap: t("Heatmap"),
     area: t("Areas by pressure"),
-    vegetation: t("Vegetation (NDVI)"),
     mcp: t("MCP 95%"),
     kde: t("KDE 50% and 95%"),
     hotspot: t("Hotspots"),
@@ -472,6 +489,19 @@ export function ResultMap({
           ))}
         </div>
       )}
+      {vegetation.length > 0 && !hidden.includes("vegetation") && ndviRange && (
+        <div className="pointer-events-none absolute right-2 bottom-10 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
+          <span>{ndviRange[0].toFixed(2)}</span>
+          {VEGETATION_RAMP.map((c) => (
+            <span
+              key={c}
+              className="inline-block size-3"
+              style={{ backgroundColor: c }}
+            />
+          ))}
+          <span>{t("{{value}} NDVI", { value: ndviRange[1].toFixed(2) })}</span>
+        </div>
+      )}
       {intensity.length > 0 && !hidden.includes("intensity") && (
         <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
           <span>{t("less use")}</span>
@@ -532,17 +562,7 @@ export function ResultMap({
             {typeof picked.ndvi_mean === "number" && (
               <>
                 <dt>{t("Vegetation (NDVI)")}</dt>
-                <dd>
-                  {picked.ndvi_mean.toFixed(3)}
-                  {typeof picked.ndvi_change === "number" &&
-                    ` (${picked.ndvi_change >= 0 ? "+" : ""}${picked.ndvi_change.toFixed(3)})`}
-                </dd>
-                {typeof picked.ndvi_valid_share === "number" && (
-                  <>
-                    <dt>{t("Cloud-free weeks")}</dt>
-                    <dd>{Math.round(picked.ndvi_valid_share * 100)}%</dd>
-                  </>
-                )}
+                <dd>{picked.ndvi_mean.toFixed(3)}</dd>
               </>
             )}
             {typeof picked.relative_pressure === "number" && (

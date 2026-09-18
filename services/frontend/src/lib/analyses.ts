@@ -567,6 +567,63 @@ const M_PER_DEG_LAT = 111_320;
 /** The intensity cells as square features with their hours and their share of the busiest
  * cell, for a choropleth of use inside the areas (the convention of grazing distribution
  * maps: time per cell over the paddock). */
+/** The vegetation mosaic as the document carries it (Tim, 2026-09-18): the same grid shape as
+ * the use intensity, with the mean index per cell instead of animal-hours, so the two layers
+ * line up cell for cell. The ramp is stretched over the range in view rather than a fixed
+ * scale: a temperate landscape sits between 0.7 and 0.9 and a fixed scale paints it all one
+ * green. `level` is the cell's place in that range, 0 to 1. */
+export function vegetationFeatures(document: ResultDocument): GeoJSON.Feature[] {
+  const grid = document.summary.vegetation as IntensityGrid | undefined;
+  if (!grid || !grid.areas) return [];
+  const cells = Object.entries(grid.areas).flatMap(([area, list]) =>
+    list.map(([ix, iy, ndvi]) => ({ area, ix, iy, ndvi })),
+  );
+  if (cells.length === 0) return [];
+  const values = cells.map((c) => c.ndvi);
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  // a landscape with no spread at all keeps one colour rather than dividing by zero
+  const span = high - low;
+  const dx = grid.cell_m / grid.m_per_deg_lon;
+  const dy = grid.cell_m / M_PER_DEG_LAT;
+  return cells.map((c) => {
+    const x0 = grid.origin_lon + c.ix * dx;
+    const y0 = grid.origin_lat + c.iy * dy;
+    return {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [x0, y0],
+            [x0 + dx, y0],
+            [x0 + dx, y0 + dy],
+            [x0, y0 + dy],
+            [x0, y0],
+          ],
+        ],
+      },
+      properties: {
+        kind: "vegetation",
+        area_id: c.area,
+        ndvi_mean: c.ndvi,
+        level: span > 1e-6 ? (c.ndvi - low) / span : 0.5,
+      },
+    } satisfies GeoJSON.Feature;
+  });
+}
+
+/** The lowest and highest index of the mosaic, for the legend under the map. */
+export function vegetationRange(
+  document: ResultDocument,
+): [number, number] | null {
+  const grid = document.summary.vegetation as IntensityGrid | undefined;
+  const values = Object.values(grid?.areas ?? {}).flatMap((list) =>
+    list.map(([, , ndvi]) => ndvi),
+  );
+  return values.length ? [Math.min(...values), Math.max(...values)] : null;
+}
+
 export function intensityFeatures(document: ResultDocument): GeoJSON.Feature[] {
   const grid = document.summary.intensity as IntensityGrid | undefined;
   if (!grid || !grid.areas) return [];

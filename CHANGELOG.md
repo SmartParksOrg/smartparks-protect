@@ -14,7 +14,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - The vegetation layer of a grazing run can be left out: a **Vegetation per area** switch in the run's method options (Tim, 2026-09-18). It is the slowest part of a run, and without it everything else is the same.
 
-- The grazing result map has a **Vegetation (NDVI)** layer, off until the chip switches it on: each management area shaded from bare to green by its index over the period, with the index, its change and the share of cloud-free weeks on a click. An area with no cloud-free view in the whole period is left out rather than drawn as bare ground.
+- The grazing result map has a **Vegetation (NDVI)** layer, off until the chip switches it on: a mosaic of the index on the same grid as the use intensity, so where the herd grazed hardest can be read against where the grass was poorest, cell for cell. The colours stretch over the range of the run rather than a fixed scale, with the lowest and highest index named in the legend, and a click gives a cell's index. The cells ride up to the provider in the same job as the areas, so the areas keep their exact mean and the mosaic costs no second run; a large selection is drawn with coarser cells rather than refused. A cell with no cloud-free week is left out rather than drawn as bare ground. (Tim, 2026-09-18: one flat colour per area is not a map.)
 
 - While an analysis runs, its status is a progress bar with the step it is busy with ("North block (2026-08)", "reading the vegetation layer") instead of a percentage beside a spinner (Tim, 2026-09-18; decision D249). The vegetation layer reports its own progress, so the bar no longer stands still at 85 percent for the minutes the satellite provider takes.
 

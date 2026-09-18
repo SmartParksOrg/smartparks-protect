@@ -4,13 +4,30 @@ core module imports it, the registry lists what is enabled, and the provider bou
 import importlib
 import sys
 
+import pytest
+
 from shared.config import Settings
 
 
+def _analysis_modules() -> list[str]:
+    return [k for k in sys.modules if k == "shared.analysis" or k.startswith("shared.analysis.")]
+
+
+@pytest.fixture(autouse=True)
+def _keep_the_analysis_modules():
+    """The check below tears `shared.analysis` out of `sys.modules` to see whether importing a
+    core module pulls it back in. Put back what was there afterwards, or a later test patching
+    `shared.analysis.environment` patches a different module object than the analysis modules
+    already loaded elsewhere hold, and its provider is never seen (found 2026-09-18)."""
+    saved = {k: sys.modules[k] for k in _analysis_modules()}
+    yield
+    for key in _analysis_modules():
+        del sys.modules[key]
+    sys.modules.update(saved)
+
+
 def _fresh_import(name: str) -> None:
-    for key in [
-        k for k in sys.modules if k == "shared.analysis" or k.startswith("shared.analysis.")
-    ]:
+    for key in _analysis_modules():
         del sys.modules[key]
     importlib.import_module(name)
 
@@ -39,7 +56,11 @@ def test_enabled_modules_follow_the_setting(monkeypatch):
         "jwt_secret": "s" * 32,
         "credentials_key": "c" * 16,
     }
-    assert enabled_modules(Settings(**base)) == ["movement", "grazing"]
+    # the default offers what this deployment ships, in the catalogue's order; the exact list
+    # depends on which modules are registered, so the setting is what this checks
+    default = enabled_modules(Settings(**base))
+    assert {"movement", "grazing"} <= set(default)
+    assert default == [key for key in MODULES if key in default]
     assert enabled_modules(Settings(**base, analysis_modules="grazing")) == ["grazing"]
     assert enabled_modules(Settings(**base, analysis_modules="grazing, unknown")) == ["grazing"]
     assert enabled_modules(Settings(**base, analysis_modules="")) == []

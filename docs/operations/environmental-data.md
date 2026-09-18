@@ -44,7 +44,8 @@ come, so a period that runs up to today asks for its last week again every time.
 
 The vegetation index (NDVI) per area and week: Sentinel-2 level 2A, the scene classification's
 cloud mask, the red and near-infrared bands, the weekly mean per pixel and then the mean per
-area. Protect stores the weekly numbers, never the imagery. Weeks without a cloud-free
+area and per cell of the map's mosaic (both go up in one job, so the mosaic costs no second
+run). Protect stores the weekly numbers, never the imagery. Weeks without a cloud-free
 observation are kept as gaps, and a period where fewer than half the weeks have one is marked
 in the run's warnings.
 
