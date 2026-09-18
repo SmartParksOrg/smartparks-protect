@@ -34,6 +34,19 @@ export interface ResultTable {
   columns: string[];
   rows: unknown[][];
 }
+export interface ResultNetworkNode {
+  id: string;
+  name: string;
+  contacts: number;
+  type?: string | null;
+}
+export interface ResultNetworkEdge {
+  source: string;
+  target: string;
+  contacts: number;
+  hours: number;
+  evidence: string;
+}
 export interface ResultChartSeries {
   subject?: string;
   period?: string;
@@ -41,11 +54,14 @@ export interface ResultChartSeries {
   /** Grazing: the area the series belongs to, and the herd when two are compared. */
   area?: string;
   herd?: string;
-  data: [number | string, number | null][];
+  data?: [number | string, number | null][];
+  /** Contact tracing: a network has nodes and edges where every other chart has points. */
+  nodes?: ResultNetworkNode[];
+  edges?: ResultNetworkEdge[];
 }
 export interface ResultChart {
   key: string;
-  kind: "line" | "bar" | "rose" | "stacked";
+  kind: "line" | "bar" | "rose" | "stacked" | "network";
   unit?: string | null;
   series: ResultChartSeries[];
 }

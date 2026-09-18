@@ -562,3 +562,87 @@ def test_a_gateway_point_draws_as_a_marker_sized_by_its_share():
     assert extent is not None
     png = draw_map(extent, None, [], shapes, width_px=400, height_px=300)
     assert Image.open(io.BytesIO(png)).size == (800, 600)
+
+
+def test_a_contact_network_draws_on_the_printed_page():
+    """The network is the one picture that makes a contact study legible (design 4.3), so it has
+    to survive into the PDF and not only the screen."""
+    from shared.analysis.report.charts import chart_svg
+
+    chart = {
+        "key": "network",
+        "kind": "network",
+        "series": [
+            {
+                "name": "network",
+                "nodes": [
+                    {"id": "a", "name": "Anna", "contacts": 6},
+                    {"id": "b", "name": "Bram", "contacts": 4},
+                    {"id": "c", "name": "Cees", "contacts": 0},
+                ],
+                "edges": [
+                    {
+                        "source": "a",
+                        "target": "b",
+                        "contacts": 4,
+                        "hours": 2.5,
+                        "evidence": "bluetooth + proximity",
+                    }
+                ],
+            }
+        ],
+    }
+    svg = chart_svg(chart, {}, {})
+    assert svg.startswith("<?xml")
+    for name in ("Anna", "Bram", "Cees"):
+        assert name in svg, "a subject that met nobody is still on the picture"
+
+
+def test_a_network_with_nothing_in_it_still_draws():
+    """An empty result is a result: a run that found no contacts must not fail its report."""
+    from shared.analysis.report.charts import chart_svg
+
+    empty = {"key": "network", "kind": "network", "series": [{"nodes": [], "edges": []}]}
+    assert chart_svg(empty, {}, {}).startswith("<?xml")
+    assert chart_svg({"key": "network", "kind": "network", "series": []}, {}, {}).startswith(
+        "<?xml"
+    )
+
+
+def test_the_network_puts_the_same_animal_in_the_same_place_every_run():
+    """A document somebody prints, files and compares against last month's cannot move its nodes
+    between runs, which is why the layout is a circle and not a force simulation."""
+    from shared.analysis.report.charts import chart_svg
+
+    chart = {
+        "key": "network",
+        "kind": "network",
+        "series": [
+            {
+                "nodes": [
+                    {"id": "a", "name": "Anna", "contacts": 3},
+                    {"id": "b", "name": "Bram", "contacts": 3},
+                ],
+                "edges": [
+                    {
+                        "source": "a",
+                        "target": "b",
+                        "contacts": 3,
+                        "hours": 1,
+                        "evidence": "bluetooth",
+                    }
+                ],
+            }
+        ],
+    }
+    assert _drawing(chart_svg(chart, {}, {})) == _drawing(chart_svg(chart, {}, {}))
+
+
+def _drawing(svg: str) -> str:
+    """The shapes of an SVG without what matplotlib stamps anew on every render: the date it
+    was made and the ids it generates. Those differ between two identical drawings and say
+    nothing about where anything was put."""
+    import re
+
+    without_date = re.sub(r"<dc:date>.*?</dc:date>", "", svg)
+    return re.sub(r'(id|xlink:href|clip-path)="[^"]*"', "", without_date)

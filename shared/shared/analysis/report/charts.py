@@ -32,6 +32,9 @@ PALETTE = [
 ]
 TEXT = "#3F4A44"
 GRID = "#DCE3DE"
+#: An edge of the contact network carries data, so it is drawn darker than a gridline: on paper
+#: a pale dashed line at this width disappears, and the pairs it stands for are the finding.
+EDGE = "#9AA8A0"
 
 plt.rcParams.update(
     {
@@ -90,6 +93,8 @@ def chart_svg(
     fig = Figure(figsize=(width_in, height_in), dpi=100)
     if kind == "rose":
         _rose(fig, series, labels, colors)
+    elif kind == "network":
+        _network(fig, series, labels)
     else:
         _cartesian(fig, kind, series, chart.get("unit"), labels, colors)
     buffer = io.StringIO()
@@ -237,3 +242,71 @@ def _rose(
     ax.set_xticklabels(categories, fontsize=6)
     if len(series) > 1:
         ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1), fontsize=6.5, frameon=False)
+
+
+def _network(fig: Figure, series: list[dict[str, Any]], labels: dict[str, str]) -> None:
+    """The contact network on the printed page (design section 4.3).
+
+    Laid out on a circle rather than by a force simulation. A force layout is prettier on screen
+    and it settles somewhere different every time it runs, which is exactly wrong for a document
+    somebody prints, files and compares against the one from last month. A circle in the subjects'
+    own order puts the same animal in the same place every run, and what a reader is looking for
+    here is which lines are thick and who has none, not the shape of the cloud.
+    """
+    ax: Any = fig.add_subplot(111)
+    ax.set_axis_off()
+    if not series:
+        return
+    nodes: list[dict[str, Any]] = series[0].get("nodes", [])
+    edges: list[dict[str, Any]] = series[0].get("edges", [])
+    n = len(nodes)
+    if n == 0:
+        return
+    angles = np.linspace(np.pi / 2, np.pi / 2 - 2 * np.pi, n, endpoint=False)
+    at = {
+        str(node["id"]): (float(np.cos(a)), float(np.sin(a)))
+        for node, a in zip(nodes, angles, strict=True)
+    }
+    heaviest = max((int(e.get("contacts", 0)) for e in edges), default=1) or 1
+    for edge in edges:
+        start, end = at.get(str(edge.get("source"))), at.get(str(edge.get("target")))
+        if start is None or end is None:
+            continue
+        weight = int(edge.get("contacts", 0)) / heaviest
+        ax.plot(
+            [start[0], end[0]],
+            [start[1], end[1]],
+            color=EDGE,
+            alpha=0.5 + 0.5 * weight,
+            linewidth=0.5 + 2.0 * weight,
+            # one kind of evidence is a weaker claim than two, and the line says so
+            linestyle="-" if "+" in str(edge.get("evidence", "")) else (0, (3, 2)),
+            solid_capstyle="round",
+            zorder=1,
+        )
+    busiest = max((int(node.get("contacts", 0)) for node in nodes), default=1) or 1
+    for node, angle in zip(nodes, angles, strict=True):
+        x, y = at[str(node["id"])]
+        contacts = int(node.get("contacts", 0))
+        ax.scatter(
+            [x],
+            [y],
+            s=20 + 140 * float(np.sqrt(contacts / busiest)),
+            color=PALETTE[0] if contacts else EDGE,
+            edgecolors="white",
+            linewidths=0.6,
+            zorder=2,
+        )
+        # the label leans outwards, so the names never cross the lines they belong to
+        outward = 1.18
+        ax.text(
+            x * outward,
+            y * outward,
+            labels.get(str(node["id"]), str(node.get("name", ""))),
+            fontsize=5.5,
+            ha="left" if np.cos(angle) >= 0 else "right",
+            va="center",
+        )
+    ax.set_xlim(-1.75, 1.75)
+    ax.set_ylim(-1.35, 1.35)
+    ax.set_aspect("equal")

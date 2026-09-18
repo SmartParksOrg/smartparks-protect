@@ -19,8 +19,10 @@ export function RestStrip({
   const series = (timeline?.series ?? []).filter(
     (s) => s.period === "main" && !("herd" in s && s.herd !== "A"),
   );
-  if (series.length === 0) return null;
-  const days = series[0].data.map((d) => Number(d[0]));
+  // the grazing timeline is always a points chart; the guard is for the type, since a chart
+  // series may now carry a network instead
+  const days = (series[0]?.data ?? []).map((d) => Number(d[0]));
+  if (series.length === 0 || days.length === 0) return null;
   const fmt = new Intl.DateTimeFormat(undefined, {
     day: "numeric",
     month: "short",
@@ -51,11 +53,11 @@ export function RestStrip({
         </thead>
         <tbody>
           {series.map((s) => {
-            const max = Math.max(...s.data.map((d) => Number(d[1] ?? 0)), 0);
+            const max = Math.max(...(s.data ?? []).map((d) => Number(d[1] ?? 0)), 0);
             return (
               <tr key={s.area ?? s.name}>
                 <td className="whitespace-nowrap pr-2">{s.name}</td>
-                {s.data.map((d) => {
+                {(s.data ?? []).map((d) => {
                   const hours = Number(d[1] ?? 0);
                   const rest = hours <= restThreshold;
                   return (

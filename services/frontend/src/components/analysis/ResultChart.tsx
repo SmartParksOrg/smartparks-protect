@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { BarChart, LineChart } from "echarts/charts";
+import { BarChart, GraphChart, LineChart } from "echarts/charts";
 import {
   GridComponent,
   LegendComponent,
@@ -20,6 +20,7 @@ import { PALETTE, chartTheme } from "@/lib/chartStyle";
 echarts.use([
   LineChart,
   BarChart,
+  GraphChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
@@ -27,8 +28,8 @@ echarts.use([
   CanvasRenderer,
 ]);
 
-/** A chart of a result document: a line or bar over time, a stacked bar, or a rose of
- * directions; the data comes from the document, the look from the brand palette. */
+/** A chart of a result document: a line or bar over time, a stacked bar, a rose of directions,
+ * or the contact network; the data comes from the document, the look from the brand palette. */
 export function ResultChart({
   chart,
   labels,
@@ -82,6 +83,10 @@ export function ResultChart({
     const colors = chart.series.map(
       (s, i) => colorOf?.(s) ?? PALETTE[i % PALETTE.length],
     );
+    if (chart.kind === "network") {
+      instance.current?.setOption(networkOption(chart, th, dark, t), true);
+      return;
+    }
     const option: echarts.EChartsCoreOption = {
       animation: false,
       color: colors,
@@ -108,7 +113,7 @@ export function ResultChart({
             polar: { center: ["50%", legend ? "58%" : "52%"], radius: "60%" },
             angleAxis: {
               type: "category",
-              data: chart.series[0]?.data.map((d) => String(d[0])) ?? [],
+              data: chart.series[0]?.data?.map((d) => String(d[0])) ?? [],
               axisLabel: { color: th.text, fontSize: 10 },
             },
             radiusAxis: {
@@ -119,7 +124,7 @@ export function ResultChart({
         : {
             xAxis: {
               type:
-                typeof chart.series[0]?.data[0]?.[0] === "number"
+                typeof chart.series[0]?.data?.[0]?.[0] === "number"
                   ? "time"
                   : "category",
               axisLabel: {
@@ -127,8 +132,8 @@ export function ResultChart({
                 fontSize: 10,
                 hideOverlap: true,
                 // a few long category names (areas) all show, shortened
-                ...(typeof chart.series[0]?.data[0]?.[0] === "string" &&
-                (chart.series[0]?.data.length ?? 0) <= 8
+                ...(typeof chart.series[0]?.data?.[0]?.[0] === "string" &&
+                (chart.series[0]?.data?.length ?? 0) <= 8
                   ? { interval: 0, width: 90, overflow: "truncate" as const }
                   : {}),
               },
@@ -148,7 +153,7 @@ export function ResultChart({
         type: chart.kind === "line" ? "line" : "bar",
         coordinateSystem: rose ? "polar" : "cartesian2d",
         stack: chart.kind === "stacked" ? "all" : undefined,
-        data: rose ? s.data.map((d) => d[1]) : s.data,
+        data: rose ? (s.data ?? []).map((d) => d[1]) : (s.data ?? []),
         showSymbol: false,
         connectNulls: true,
         lineStyle: {
@@ -167,9 +172,96 @@ export function ResultChart({
   return (
     <div
       ref={container}
-      className={className ?? "h-56 w-full"}
+      className={className ?? (chart.kind === "network" ? "h-80 w-full" : "h-56 w-full")}
       role="img"
       aria-label={labels?.[chart.key] ?? chart.key}
     />
   );
+}
+
+/** The contact network: subjects as nodes, pairs that met as edges (design section 4.3).
+ *
+ * The one picture that makes a contact study legible. A node is sized by how many contacts the
+ * subject had, so the animals at the centre of the network are the ones that stand out; an edge
+ * is thicker the more the pair met, and dashed when only one kind of evidence saw them, because
+ * a pair both kinds found is a different claim from one only the fixes support.
+ *
+ * A subject that met nobody stays on the picture as a small unattached dot. Leaving it out would
+ * answer a different question: "who met" rather than "who met whom", and the animals that met
+ * nothing at all are often the finding.
+ */
+function networkOption(
+  chart: ResultChartData,
+  th: ReturnType<typeof chartTheme>,
+  dark: boolean,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): echarts.EChartsCoreOption {
+  const series = chart.series[0];
+  const nodes = series?.nodes ?? [];
+  const edges = series?.edges ?? [];
+  const busiest = Math.max(1, ...nodes.map((n) => n.contacts));
+  const heaviest = Math.max(1, ...edges.map((e) => e.contacts));
+  return {
+    animation: false,
+    tooltip: {
+      backgroundColor: th.tooltipBg,
+      textStyle: { color: th.tooltipText, fontSize: 11 },
+      formatter: (params: { dataType?: string; data?: Record<string, unknown> }) => {
+        const data = params.data ?? {};
+        if (params.dataType === "edge") {
+          return t("{{contacts}} contacts · {{hours}} h · {{evidence}}", {
+            contacts: data.contacts,
+            hours: data.hours,
+            evidence: data.evidence,
+          });
+        }
+        return t("{{name}}: {{contacts}} contacts", {
+          name: data.name,
+          contacts: data.contacts,
+        });
+      },
+    },
+    series: [
+      {
+        type: "graph",
+        layout: "force",
+        roam: true,
+        draggable: true,
+        force: { repulsion: 220, edgeLength: [40, 120], gravity: 0.08 },
+        label: {
+          show: true,
+          position: "right",
+          color: th.text,
+          fontSize: 10,
+          formatter: (p: { data?: { name?: string } }) => p.data?.name ?? "",
+        },
+        emphasis: { focus: "adjacency" },
+        data: nodes.map((n) => ({
+          id: n.id,
+          name: n.name,
+          contacts: n.contacts,
+          symbolSize: 8 + 22 * Math.sqrt(n.contacts / busiest),
+          itemStyle: {
+            color: n.contacts ? PALETTE[0] : dark ? "#4b5563" : "#cbd5e1",
+            borderColor: dark ? "#0b1220" : "#ffffff",
+            borderWidth: 1,
+          },
+        })),
+        links: edges.map((e) => ({
+          source: e.source,
+          target: e.target,
+          contacts: e.contacts,
+          hours: e.hours,
+          evidence: e.evidence,
+          lineStyle: {
+            width: 1 + 4 * (e.contacts / heaviest),
+            opacity: 0.65,
+            color: th.grid,
+            // one kind of evidence is a weaker claim than two, and the line says so
+            type: e.evidence.includes("+") ? "solid" : "dashed",
+          },
+        })),
+      },
+    ],
+  };
 }

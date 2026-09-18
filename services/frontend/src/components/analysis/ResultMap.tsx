@@ -469,6 +469,7 @@ export function ResultMap({
     cluster: t("Clusters"),
     coverage: t("Coverage of the fixes"),
     gateway: t("Gateways heard"),
+    contact: t("Where pairs met"),
   };
   const uplinkShare =
     typeof picked?.share === "number" && typeof picked?.uplinks === "number"

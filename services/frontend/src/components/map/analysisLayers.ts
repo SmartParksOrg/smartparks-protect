@@ -182,14 +182,29 @@ export function ensureAnalysisLayers(map: MapLibreMap): void {
     },
     before,
   );
-  // the gateways heard (device performance): a point sized by its share of the uplinks
+  // the gateways heard (device performance): a point sized by its share of the uplinks, and
+  // where a pair met (contact tracing): a point sized by how often, since the question a map
+  // answers that a table cannot is *where* animals meet, and the answer is usually one place
   map.addLayer({
     id: "analysis-points",
     type: "circle",
     source: ANALYSIS_SOURCE,
     filter: ["==", ["geometry-type"], "Point"],
     paint: {
-      "circle-radius": ["+", 5, ["*", 12, ["coalesce", ["get", "level"], 0]]],
+      "circle-radius": [
+        "case",
+        ["==", ["get", "kind"], "contact"],
+        [
+          "interpolate",
+          ["linear"],
+          ["coalesce", ["get", "contacts"], 1],
+          1,
+          5,
+          50,
+          18,
+        ],
+        ["+", 5, ["*", 12, ["coalesce", ["get", "level"], 0]]],
+      ],
       "circle-color": ["coalesce", ["get", "color"], "#52735E"],
       "circle-opacity": 0.85,
       "circle-stroke-color": "#ffffff",
