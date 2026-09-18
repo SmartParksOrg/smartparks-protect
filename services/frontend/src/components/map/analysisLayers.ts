@@ -1,4 +1,5 @@
 import type {
+  ExpressionSpecification,
   FilterSpecification,
   GeoJSONSource,
   Map as MapLibreMap,
@@ -15,6 +16,8 @@ import { SOURCES } from "@/components/map/layers";
  */
 export const ANALYSIS_SOURCE = "analysis";
 export const INTENSITY_SOURCE = "analysis-intensity";
+/** The share of the busiest cell each colour of the use intensity starts at. */
+export const INTENSITY_STEPS = [0, 0.05, 0.2, 0.4, 0.7] as const;
 export const VEGETATION_SOURCE = "analysis-vegetation";
 /** Light to dark, by the share of the busiest cell: the sequential ramp of a use map.
  *
@@ -69,19 +72,27 @@ export function accuracyColor(accuracy: number | null | undefined): string {
   return ACCURACY_UNKNOWN;
 }
 
-/** A five-step ramp in the brand palette for an area's relative grazing pressure: 1.0 is
- * the herd's average over the chosen areas. Null (no use anywhere) is the lightest step. */
+/** A five-step ramp for an area's relative grazing pressure: 1.0 is the herd's average over the
+ * chosen areas. Null (no use anywhere) is the lightest step.
+ *
+ * Warm like the use intensity it summarises, since both say how hard the ground was worked and
+ * green is the vegetation layer's (Tim, 2026-09-18). It ran green to coral before, which was not
+ * only a second green: coral is lighter than the dark green under it, so "twice the average"
+ * came out paler than "above average" and the ramp reversed at its most important step. */
 export const PRESSURE_RAMP = [
-  "#E7EDE8",
-  "#B9CCBF",
-  "#8FAF98",
-  "#52735E",
-  "#B86B5C",
+  "#F6F0EA",
+  "#E6D6C6",
+  "#D2B096",
+  "#BE8663",
+  "#AF4436",
 ] as const;
 
 /** Bare to green for the vegetation index of an area (Tim, 2026-09-18), a sequential ramp
  * apart from the pressure one so the two layers never read as the same thing. `level` is the
  * index scaled to 0 to 1 by the module. */
+/** The five colours divide the cells into fifths by rank, so each starts a fifth of the way up. */
+export const VEGETATION_STEPS = [0, 0.2, 0.4, 0.6, 0.8] as const;
+
 export const VEGETATION_RAMP = [
   "#D9C8A6",
   "#BFC78F",
@@ -321,6 +332,18 @@ export const _sourcesOfTheLiveMap = SOURCES;
 
 /** The use intensity cells (grazing) under the analysis polygons: a choropleth of hours per
  * cell, the darker the more. */
+/** A MapLibre `step` expression from a ramp and the value each colour starts at. The first
+ * colour is the floor, so the thresholds after it are what the expression names. */
+function rampExpression(
+  property: string,
+  ramp: readonly string[],
+  steps: readonly number[],
+): ExpressionSpecification {
+  const out: unknown[] = ["step", ["get", property], ramp[0]];
+  for (let i = 1; i < ramp.length; i++) out.push(steps[i], ramp[i]);
+  return out as ExpressionSpecification;
+}
+
 export function ensureIntensityLayers(map: MapLibreMap): void {
   if (map.getSource(INTENSITY_SOURCE)) return;
   map.addSource(INTENSITY_SOURCE, {
@@ -338,19 +361,8 @@ export function ensureIntensityLayers(map: MapLibreMap): void {
       type: "fill",
       source: INTENSITY_SOURCE,
       paint: {
-        "fill-color": [
-          "step",
-          ["get", "share"],
-          INTENSITY_RAMP[0],
-          0.05,
-          INTENSITY_RAMP[1],
-          0.2,
-          INTENSITY_RAMP[2],
-          0.4,
-          INTENSITY_RAMP[3],
-          0.7,
-          INTENSITY_RAMP[4],
-        ],
+        // the thresholds live beside the ramp, so the layer and its legend cannot drift apart
+        "fill-color": rampExpression("share", INTENSITY_RAMP, INTENSITY_STEPS),
         "fill-opacity": 0.8,
       },
     },
@@ -385,19 +397,11 @@ export function ensureVegetationLayers(map: MapLibreMap): void {
       type: "fill",
       source: VEGETATION_SOURCE,
       paint: {
-        "fill-color": [
-          "step",
-          ["get", "level"],
-          VEGETATION_RAMP[0],
-          0.2,
-          VEGETATION_RAMP[1],
-          0.4,
-          VEGETATION_RAMP[2],
-          0.6,
-          VEGETATION_RAMP[3],
-          0.8,
-          VEGETATION_RAMP[4],
-        ],
+        "fill-color": rampExpression(
+          "level",
+          VEGETATION_RAMP,
+          VEGETATION_STEPS,
+        ),
         "fill-opacity": 0.8,
       },
     },

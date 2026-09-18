@@ -52,7 +52,9 @@ TILE_CONCURRENCY = 4
 MAPTILER_ATTRIBUTION = "© MapTiler © OpenStreetMap contributors"
 OSM_ATTRIBUTION = "© OpenStreetMap contributors"
 BACKGROUND = "#F1F4F2"
-PRESSURE_RAMP = ["#E7EDE8", "#B9CCBF", "#8FAF98", "#52735E", "#B86B5C"]
+#: The areas by pressure, warm like the use they summarise (Tim, 2026-09-18); the same five
+#: steps as the interface's `PRESSURE_RAMP`, so a report and the map read alike.
+PRESSURE_RAMP = ["#F6F0EA", "#E6D6C6", "#D2B096", "#BE8663", "#AF4436"]
 FILL_ALPHA = {"area": 0.45, "mcp": 0.12, "kde": 0.2, "cluster": 0.25, "hotspot": 0.35}
 
 Bounds = tuple[float, float, float, float]  # xmin, xmax, ymin, ymax in Mercator metres

@@ -1,4 +1,8 @@
 import type { AnalysisRun, EntityGroup, Feature } from "@/api/types";
+import {
+  INTENSITY_STEPS,
+  VEGETATION_STEPS,
+} from "@/components/map/analysisLayers";
 import { PALETTE } from "@/lib/chartStyle";
 import type { ExportPreset } from "@/lib/exports";
 
@@ -577,7 +581,9 @@ const M_PER_DEG_LAT = 111_320;
  * looked as uniform as the flat colour it replaced. Ranking gives each colour a fifth of the
  * cells, which is what makes the poorer ground inside an area visible; the legend carries the
  * value each colour starts at, and a click gives the cell's own index, so nothing is hidden. */
-export function vegetationFeatures(document: ResultDocument): GeoJSON.Feature[] {
+export function vegetationFeatures(
+  document: ResultDocument,
+): GeoJSON.Feature[] {
   const grid = document.summary.vegetation as IntensityGrid | undefined;
   if (!grid || !grid.areas) return [];
   const cells = Object.entries(grid.areas).flatMap(([area, list]) =>
@@ -626,6 +632,20 @@ export function vegetationFeatures(document: ResultDocument): GeoJSON.Feature[] 
   });
 }
 
+/** The hours each colour of the use intensity starts at, lowest first, for the legend under the
+ * map. The layer steps on a cell's share of the busiest cell, so the hours are those shares of
+ * the longest-used cell; a legend that says only "less" and "more" leaves the reader guessing
+ * whether more means an hour or a week. */
+export function intensityBreaks(document: ResultDocument): number[] | null {
+  const grid = document.summary.intensity as IntensityGrid | undefined;
+  const hours = Object.values(grid?.areas ?? {}).flatMap((list) =>
+    list.map(([, , value]) => value),
+  );
+  if (hours.length === 0) return null;
+  const max = Math.max(...hours);
+  return INTENSITY_STEPS.map((share) => share * max);
+}
+
 /** The index each colour of the mosaic starts at, lowest first, for the legend under the map:
  * five values, since the colours divide the cells into fifths by rank. */
 export function vegetationBreaks(document: ResultDocument): number[] | null {
@@ -636,7 +656,7 @@ export function vegetationBreaks(document: ResultDocument): number[] | null {
   if (values.length === 0) return null;
   // the first cell of each fifth, by the same rank the features are coloured on
   const last = values.length - 1;
-  return [0, 0.2, 0.4, 0.6, 0.8].map(
+  return VEGETATION_STEPS.map(
     (share) => values[Math.min(last, Math.ceil(share * last))],
   );
 }

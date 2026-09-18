@@ -41,6 +41,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- The areas by pressure are warm too, so green on a result map means vegetation and nothing else (Tim, 2026-09-18). That ramp ran green to coral, which was not only a second green: coral is lighter than the dark green below it, so "twice the herd average" came out paler than "above average" and the ramp reversed at its most important step. The PDF report uses the same five colours as the map.
+
+- The legends under a result map are built alike: the same label column, the same swatch width and the value each colour starts at under it, so two of them stacked line up. The use intensity says the animal-hours each colour begins at instead of only "less use" and "more", which left the reader guessing whether more meant an hour or a week.
+
 - The use intensity layer of a grazing result map is warm instead of green (Tim, 2026-09-18). Green belongs to the vegetation layer, where bare-to-green is how everyone already reads a satellite index, and two green ramps over one another cannot be told apart. Measured against the vegetation ramp, warm separates best of the candidates under both red-green colour blindnesses, and unlike a blue ramp it is never mistaken for the water the base maps draw. It also says the right thing: warm is how hard the ground was used, green is what it grows. The green cells had been hard to see even on their own, sitting on the green wash of the areas.
 
 - The vegetation layer asks the satellite provider only for the weeks the cache does not hold, instead of the whole period whenever one week was missing, so a rerun or a report over an overlapping period costs only what is new. A week that has not ended is no longer cached, because a cloud-free pass may still come for it.

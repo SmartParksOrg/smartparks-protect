@@ -70,6 +70,7 @@ import { boundsOfTracks } from "@/lib/explore";
 import {
   intensityFeatures,
   vegetationFeatures,
+  intensityBreaks,
   vegetationBreaks,
   type ResultDocument,
 } from "@/lib/analyses";
@@ -85,9 +86,48 @@ const trackData = (results: { data?: Track }[]): (Track | undefined)[] =>
  * period and the result polygons by kind, each toggled by a chip; a click on a polygon
  * shows its label, its area and its share.
  */
-/** The look every legend under the map shares: one centred pill in the bottom column. */
-const LEGEND =
-  "pointer-events-none flex max-w-full flex-wrap items-center justify-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow";
+/** One legend under a result map: what it names, its ramp, and the value each colour starts at.
+ * Every legend is built from this, with the same label column and the same swatch width, so two
+ * of them stacked line up instead of each finding its own shape (Tim, 2026-09-18). */
+function MapLegend({
+  title,
+  colors,
+  values,
+  hint,
+}: {
+  title: string;
+  colors: readonly string[];
+  /** One per colour, shown under it; the same count as `colors`. */
+  values: string[];
+  /** What the reader should know about how the colours were divided. */
+  hint?: string;
+}) {
+  return (
+    <div
+      className="pointer-events-none flex max-w-full items-end gap-1.5 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow"
+      title={hint ?? title}
+    >
+      <span className="w-24 shrink-0 truncate pb-3.5 text-right">{title}</span>
+      {colors.map((color, i) => (
+        <span key={color} className="flex w-9 flex-col items-center gap-0.5">
+          <span
+            className="block h-3 w-full rounded-[2px]"
+            style={{ backgroundColor: color }}
+          />
+          <span className="tabular-nums">{values[i]}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** An hour count in the few characters a legend has: 0, 2, 17, 1.2k. */
+function shortHours(hours: number): string {
+  if (hours >= 1000) return `${(hours / 1000).toFixed(1)}k`;
+  if (hours >= 10) return String(Math.round(hours));
+  if (hours >= 1) return hours.toFixed(1);
+  return hours > 0 ? hours.toFixed(1) : "0";
+}
 
 export function ResultMap({
   projectId,
@@ -139,6 +179,7 @@ export function ResultMap({
   const intensity = useMemo(() => intensityFeatures(document), [document]);
   const vegetation = useMemo(() => vegetationFeatures(document), [document]);
   const ndviBreaks = useMemo(() => vegetationBreaks(document), [document]);
+  const useBreaks = useMemo(() => intensityBreaks(document), [document]);
   const toggles: string[] = [
     ...(intensity.length ? ["intensity"] : []),
     ...(vegetation.length ? ["vegetation"] : []),
@@ -577,55 +618,37 @@ export function ResultMap({
           </div>
         )}
         {byDevice && !hidden.includes("points") && (
-          <div className={LEGEND}>
-            {ACCURACY_CLASSES.map(([bound, color], i) => (
-              <span key={color} className="inline-flex items-center gap-0.5">
-                <span
-                  className="inline-block size-2.5 rounded-full"
-                  style={{ backgroundColor: color }}
-                />
-                {Number.isFinite(bound)
-                  ? t("<{{m}} m", { m: bound })
-                  : t(">{{m}} m", { m: ACCURACY_CLASSES[i - 1][0] })}
-              </span>
-            ))}
-          </div>
+          <MapLegend
+            title={t("Fix accuracy (m)")}
+            colors={ACCURACY_CLASSES.map(([, color]) => color)}
+            values={ACCURACY_CLASSES.map(([bound], i) =>
+              Number.isFinite(bound)
+                ? `<${bound}`
+                : `>${ACCURACY_CLASSES[i - 1][0]}`,
+            )}
+          />
         )}
         {vegetation.length > 0 &&
           !hidden.includes("vegetation") &&
           ndviBreaks && (
-            // each colour holds a fifth of the cells, so the value it starts at is what the
-            // reader needs; a plain low-to-high scale hid the differences (Tim, 2026-09-18)
-            <div
-              className={`${LEGEND} items-end`}
-              title={t(
+            <MapLegend
+              title={t("Vegetation (NDVI)")}
+              colors={VEGETATION_RAMP}
+              values={ndviBreaks.map((v) => v.toFixed(2))}
+              hint={t(
                 "Each colour holds a fifth of the cells; the number is the index it starts at",
               )}
-            >
-              {VEGETATION_RAMP.map((c, i) => (
-                <span key={c} className="flex flex-col items-center gap-0.5">
-                  <span
-                    className="inline-block size-3"
-                    style={{ backgroundColor: c }}
-                  />
-                  <span>{ndviBreaks[i].toFixed(2)}</span>
-                </span>
-              ))}
-              <span className="pb-3.5">{t("NDVI")}</span>
-            </div>
+            />
           )}
-        {intensity.length > 0 && !hidden.includes("intensity") && (
-          <div className={LEGEND}>
-            <span>{t("less use")}</span>
-            {INTENSITY_RAMP.map((c) => (
-              <span
-                key={c}
-                className="inline-block size-3"
-                style={{ backgroundColor: c }}
-              />
-            ))}
-            <span>{t("more")}</span>
-          </div>
+        {intensity.length > 0 && !hidden.includes("intensity") && useBreaks && (
+          <MapLegend
+            title={t("Use (hours)")}
+            colors={INTENSITY_RAMP}
+            values={useBreaks.map(shortHours)}
+            hint={t(
+              "Animal-hours in a cell; the number is the hours each colour starts at",
+            )}
+          />
         )}
       </div>
     </div>
