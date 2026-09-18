@@ -70,7 +70,7 @@ import { boundsOfTracks } from "@/lib/explore";
 import {
   intensityFeatures,
   vegetationFeatures,
-  vegetationRange,
+  vegetationBreaks,
   type ResultDocument,
 } from "@/lib/analyses";
 
@@ -134,7 +134,7 @@ export function ResultMap({
   const shown = available.filter((k) => !hidden.includes(k));
   const intensity = useMemo(() => intensityFeatures(document), [document]);
   const vegetation = useMemo(() => vegetationFeatures(document), [document]);
-  const ndviRange = useMemo(() => vegetationRange(document), [document]);
+  const ndviBreaks = useMemo(() => vegetationBreaks(document), [document]);
   const toggles: string[] = [
     ...(intensity.length ? ["intensity"] : []),
     ...(vegetation.length ? ["vegetation"] : []),
@@ -489,17 +489,23 @@ export function ResultMap({
           ))}
         </div>
       )}
-      {vegetation.length > 0 && !hidden.includes("vegetation") && ndviRange && (
-        <div className="pointer-events-none absolute right-2 bottom-10 z-10 flex items-center gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow">
-          <span>{ndviRange[0].toFixed(2)}</span>
-          {VEGETATION_RAMP.map((c) => (
-            <span
-              key={c}
-              className="inline-block size-3"
-              style={{ backgroundColor: c }}
-            />
+      {vegetation.length > 0 && !hidden.includes("vegetation") && ndviBreaks && (
+        // each colour holds a fifth of the cells, so the value it starts at is what the reader
+        // needs; a plain low-to-high scale hid the differences (Tim, 2026-09-18)
+        <div
+          className="pointer-events-none absolute right-2 bottom-10 z-10 flex items-end gap-1 rounded-md border bg-card/95 px-2 py-1 text-[10px] text-muted-foreground shadow"
+          title={t("Each colour holds a fifth of the cells; the number is the index it starts at")}
+        >
+          {VEGETATION_RAMP.map((c, i) => (
+            <span key={c} className="flex flex-col items-center gap-0.5">
+              <span
+                className="inline-block size-3"
+                style={{ backgroundColor: c }}
+              />
+              <span>{ndviBreaks[i].toFixed(2)}</span>
+            </span>
           ))}
-          <span>{t("{{value}} NDVI", { value: ndviRange[1].toFixed(2) })}</span>
+          <span className="pb-3.5">{t("NDVI")}</span>
         </div>
       )}
       {intensity.length > 0 && !hidden.includes("intensity") && (

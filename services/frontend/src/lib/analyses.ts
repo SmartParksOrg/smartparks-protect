@@ -569,9 +569,14 @@ const M_PER_DEG_LAT = 111_320;
  * maps: time per cell over the paddock). */
 /** The vegetation mosaic as the document carries it (Tim, 2026-09-18): the same grid shape as
  * the use intensity, with the mean index per cell instead of animal-hours, so the two layers
- * line up cell for cell. The ramp is stretched over the range in view rather than a fixed
- * scale: a temperate landscape sits between 0.7 and 0.9 and a fixed scale paints it all one
- * green. `level` is the cell's place in that range, 0 to 1. */
+ * line up cell for cell.
+ *
+ * The colours divide the cells evenly by rank, not by value. A landscape is not spread evenly
+ * over its range: a run over Horsterwold read 0.40 to 0.90, but nine in ten cells sat above
+ * 0.86, so a scale drawn straight from lowest to highest put almost everything in one green and
+ * looked as uniform as the flat colour it replaced. Ranking gives each colour a fifth of the
+ * cells, which is what makes the poorer ground inside an area visible; the legend carries the
+ * value each colour starts at, and a click gives the cell's own index, so nothing is hidden. */
 export function vegetationFeatures(document: ResultDocument): GeoJSON.Feature[] {
   const grid = document.summary.vegetation as IntensityGrid | undefined;
   if (!grid || !grid.areas) return [];
@@ -579,11 +584,19 @@ export function vegetationFeatures(document: ResultDocument): GeoJSON.Feature[] 
     list.map(([ix, iy, ndvi]) => ({ area, ix, iy, ndvi })),
   );
   if (cells.length === 0) return [];
-  const values = cells.map((c) => c.ndvi);
-  const low = Math.min(...values);
-  const high = Math.max(...values);
-  // a landscape with no spread at all keeps one colour rather than dividing by zero
-  const span = high - low;
+  const sorted = [...cells.map((c) => c.ndvi)].sort((a, b) => a - b);
+  const last = Math.max(1, sorted.length - 1);
+  /** The cell's place among the others, 0 to 1; equal values share the lower place. */
+  const rankOf = (value: number): number => {
+    let lo = 0;
+    let hi = sorted.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sorted[mid] < value) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo / last;
+  };
   const dx = grid.cell_m / grid.m_per_deg_lon;
   const dy = grid.cell_m / M_PER_DEG_LAT;
   return cells.map((c) => {
@@ -607,21 +620,25 @@ export function vegetationFeatures(document: ResultDocument): GeoJSON.Feature[] 
         kind: "vegetation",
         area_id: c.area,
         ndvi_mean: c.ndvi,
-        level: span > 1e-6 ? (c.ndvi - low) / span : 0.5,
+        level: rankOf(c.ndvi),
       },
     } satisfies GeoJSON.Feature;
   });
 }
 
-/** The lowest and highest index of the mosaic, for the legend under the map. */
-export function vegetationRange(
-  document: ResultDocument,
-): [number, number] | null {
+/** The index each colour of the mosaic starts at, lowest first, for the legend under the map:
+ * five values, since the colours divide the cells into fifths by rank. */
+export function vegetationBreaks(document: ResultDocument): number[] | null {
   const grid = document.summary.vegetation as IntensityGrid | undefined;
-  const values = Object.values(grid?.areas ?? {}).flatMap((list) =>
-    list.map(([, , ndvi]) => ndvi),
+  const values = Object.values(grid?.areas ?? {})
+    .flatMap((list) => list.map(([, , ndvi]) => ndvi))
+    .sort((a, b) => a - b);
+  if (values.length === 0) return null;
+  // the first cell of each fifth, by the same rank the features are coloured on
+  const last = values.length - 1;
+  return [0, 0.2, 0.4, 0.6, 0.8].map(
+    (share) => values[Math.min(last, Math.ceil(share * last))],
   );
-  return values.length ? [Math.min(...values), Math.max(...values)] : null;
 }
 
 export function intensityFeatures(document: ResultDocument): GeoJSON.Feature[] {
