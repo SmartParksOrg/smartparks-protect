@@ -392,3 +392,17 @@ async def test_every_module_can_reach_the_subject_limit_it_declares(client, db):
             f"{module['key']} falls back to the movement limit, which may not be its own"
         )
     assert SUBJECT_LIMITS["contact_tracing"] == MAX_SUBJECTS_CONTACT
+
+
+def test_every_registered_module_is_a_key_the_database_admits():
+    """A run row's module is checked against `AnalysisModuleKey` in the database. A module that
+    registers itself without an entry there reaches the catalogue, passes validation, and fails
+    on the INSERT with a 500 — which is how contact tracing first behaved on the dev server."""
+    from shared.analysis import MODULES
+    from shared.enums import AnalysisModuleKey
+
+    known = {k.value for k in AnalysisModuleKey}
+    assert set(MODULES) <= known, (
+        f"{sorted(set(MODULES) - known)} would be refused by ck_analysis_runs_module; "
+        "add the key to AnalysisModuleKey and a migration that widens the check"
+    )

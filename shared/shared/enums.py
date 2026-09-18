@@ -297,11 +297,14 @@ class AnalysisStatus(StrEnum):
 
 
 class AnalysisModuleKey(StrEnum):
-    """The analysis modules: the two of phase 1 and device performance (phase 28)."""
+    """The analysis modules: the two of phase 1, device performance (phase 28) and contact
+    tracing (phase 31). A run row's module is checked against this in the database, so a new
+    module needs a migration that widens the check as well as an entry here."""
 
     MOVEMENT = "movement"
     GRAZING = "grazing"
     DEVICE_PERFORMANCE = "device_performance"
+    CONTACT_TRACING = "contact_tracing"
 
 
 class NotificationChannel(StrEnum):
