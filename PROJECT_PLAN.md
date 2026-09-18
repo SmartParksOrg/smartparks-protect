@@ -1249,7 +1249,11 @@ would be written against frames nobody has seen in the field.
       `device_contacts.contact_entity_id` had existed since migration 0042 and nothing wrote to
       it; the decoder and the repair both fill it now, since a pair of animals is what a study is
       about and a device is only ever a proxy for one.
-- [ ] C8 the `network` chart kind and the `contact` geometry kind, in the interface and the PDF.
+- [x] C8 the `network` chart kind and the `contact` geometry kind, in the interface and the
+      PDF. The screen gets a force layout it can drag; the page gets a circle in the
+      subjects' own order, because a printed document compared against last month's cannot
+      move its nodes between runs. An edge is dashed when only one kind of evidence saw the
+      pair, and a subject that met nobody stays on the picture.
 - [ ] C9 docs: the analytics guide for the module. The rest was done with phase 30: the
       device guide's scanning section (`docs/devices/bluetooth-contacts.md`), the OpenCollar
       port table, the domain model's record types, `DEVELOPERS.md`, the changelog and ADR 0036,

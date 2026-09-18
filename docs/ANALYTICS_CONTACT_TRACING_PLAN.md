@@ -239,7 +239,7 @@ server; `PROJECT_PLAN.md` phase 30 carries the full list with what each turned o
       the decoder. **The gate between the phases.**
 - [x] C6 `primitives/contacts.py` and `primitives/proximity.py` with tests on synthetic tracks.
 - [x] C7 the module, its parameters, the three warnings, the tables and charts.
-- [ ] C8 the `network` chart kind and the `contact` geometry kind, in the interface and the PDF.
+- [x] C8 the `network` chart kind and the `contact` geometry kind, in the interface and the PDF.
 - [ ] C9 docs: an analytics guide for the module. Done with phase 30: the device guide's
       scanning section (`docs/devices/bluetooth-contacts.md`), the OpenCollar port table, the
       domain model's record types, `DEVELOPERS.md`, the changelog and ADR 0036.
