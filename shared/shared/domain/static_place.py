@@ -220,7 +220,8 @@ async def place_past_sightings(session: AsyncSession, reader: Device) -> int:
             .limit(MAX_PAST_SIGHTINGS)
         )
     ).all()
-    sightings = [_sighting_of(r, r.contact_device_id) for r in rows]
+    # the query already excludes a null counterpart; the narrowing is for the type checker
+    sightings = [_sighting_of(r, r.contact_device_id) for r in rows if r.contact_device_id]
     return await place_sightings(session, reader, sightings)
 
 
