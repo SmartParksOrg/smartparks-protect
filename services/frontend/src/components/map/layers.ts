@@ -768,13 +768,39 @@ const FEATURE_CLICK_LAYERS = [
   "features-point",
 ];
 
+/** What an area gives way to when both lie under the same click: everything drawn on top of it.
+ *
+ * A feature is drawn under the markers, but MapLibre calls the handler of every layer with
+ * something under the cursor, whatever the drawing order, and the handler bound last decides
+ * what the page shows. The feature's is bound last, so an animal standing in a geofence opened
+ * the geofence (Tim, 2026-09-19). An area is the largest thing on the map and the last one a
+ * person means to click, so it yields to all of these. */
+const ABOVE_FEATURES = [
+  "entity-markers",
+  "entity-clusters",
+  "device-markers",
+  "device-clusters",
+  "event-markers",
+  "gateway-markers",
+  "track-points",
+  "track-point-selected",
+];
+
 /** Bind the feature click (phase 19: a feature opens a panel); the returned function unbinds
- * it. The fill, the line and the point layers all answer, whichever is under the cursor. */
+ * it. The fill, the line and the point layers all answer, whichever is under the cursor, unless
+ * something the person is likelier to have meant is under it too. */
 export function bindFeatureClicks(
   map: MapLibreMap,
   onClick: (props: MapFeatureProperties) => void,
 ): () => void {
   const handler = (e: MapLayerMouseEvent) => {
+    // only the layers this style has: queryRenderedFeatures refuses an id it does not know
+    const above = ABOVE_FEATURES.filter((id) => map.getLayer(id));
+    if (
+      above.length > 0 &&
+      map.queryRenderedFeatures(e.point, { layers: above }).length > 0
+    )
+      return;
     const feature = e.features?.[0];
     if (feature) onClick(feature.properties as unknown as MapFeatureProperties);
   };

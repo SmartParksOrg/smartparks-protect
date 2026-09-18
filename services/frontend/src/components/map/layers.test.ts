@@ -13,8 +13,9 @@ import {
 
 type Listener = (e: unknown) => void;
 
-/** A map that only records layer listeners, enough to prove binding and unbinding pair up. */
-function fakeMap() {
+/** A map that records layer listeners and answers what lies under a click, enough to prove
+ * binding and unbinding pair up and that a handler yields to what is drawn over it. */
+function fakeMap(under: string[] = []) {
   const bound = new Map<string, Listener[]>();
   const map = {
     on: (type: string, layer: string, listener: Listener) => {
@@ -28,6 +29,13 @@ function fakeMap() {
         (bound.get(key) ?? []).filter((l) => l !== listener),
       );
     },
+    // every layer the style knows: the ones bound plus whatever is said to be under the click
+    getLayer: (id: string) =>
+      under.includes(id) || [...bound.keys()].some((k) => k.endsWith(`:${id}`))
+        ? { id }
+        : undefined,
+    queryRenderedFeatures: (_point: unknown, options?: { layers?: string[] }) =>
+      (options?.layers ?? []).filter((id) => under.includes(id)).map((id) => ({ layer: { id } })),
   };
   const fire = (layer: string, e: unknown) =>
     (bound.get(`click:${layer}`) ?? []).forEach((l) => l(e));
@@ -142,6 +150,50 @@ describe("map click binding", () => {
     expect(count()).toBe(3);
     unbind();
     expect(count()).toBe(0);
+  });
+
+  it("lets an area give way to a marker standing on it (Tim, 2026-09-19)", () => {
+    // an animal inside a geofence: MapLibre calls both handlers, and the area's is bound last
+    const { map, fire } = fakeMap(["entity-markers"]);
+    const seen: string[] = [];
+    bindFeatureClicks(map, (props) => seen.push(props.id));
+    fire("features-fill", {
+      point: { x: 10, y: 10 },
+      features: [
+        { properties: { id: "f1", name: "Fence", feature_type: "geofence" } },
+      ],
+    });
+    expect(seen).toEqual([]);
+  });
+
+  it("still opens the area where nothing is drawn on top of it", () => {
+    const { map, fire } = fakeMap([]);
+    const seen: string[] = [];
+    bindFeatureClicks(map, (props) => seen.push(props.id));
+    fire("features-fill", {
+      point: { x: 10, y: 10 },
+      features: [
+        { properties: { id: "f1", name: "Fence", feature_type: "geofence" } },
+      ],
+    });
+    expect(seen).toEqual(["f1"]);
+  });
+
+  it.each([
+    "device-markers",
+    "event-markers",
+    "gateway-markers",
+    "track-points",
+    "entity-clusters",
+  ])("gives way to %s as well", (layer) => {
+    const { map, fire } = fakeMap([layer]);
+    const seen: string[] = [];
+    bindFeatureClicks(map, (props) => seen.push(props.id));
+    fire("features-fill", {
+      point: { x: 1, y: 1 },
+      features: [{ properties: { id: "f1", name: "F", feature_type: "zone" } }],
+    });
+    expect(seen).toEqual([]);
   });
 });
 
