@@ -13,6 +13,8 @@ The same feature is used in three ways, and what a contact means differs in each
 | A reader on a post | tags on animals that carry no GNSS | an animal came near a known place |
 | A collar or a reader | phones and other devices people carry | somebody was there |
 
+The analysis built on these sightings is [Contact tracing](../analytics/contact-tracing.md).
+
 ## What a device actually reports
 
 A scan reports how many devices it **detected**, then the **last three octets** of each address

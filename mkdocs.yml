@@ -105,6 +105,7 @@ nav:
       - Movement: analytics/movement.md
       - Grazing: analytics/grazing.md
       - Device performance: analytics/device-performance.md
+      - Contact tracing: analytics/contact-tracing.md
       - Analysis design (phase 1): ANALYTICS_PHASE1_PLAN.md
       - Analysis design (device performance): ANALYTICS_DEVICE_PERFORMANCE_PLAN.md
       - Analysis design (phase 2): ANALYTICS_PHASE2_PLAN.md

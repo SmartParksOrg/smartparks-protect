@@ -1254,7 +1254,7 @@ would be written against frames nobody has seen in the field.
       subjects' own order, because a printed document compared against last month's cannot
       move its nodes between runs. An edge is dashed when only one kind of evidence saw the
       pair, and a subject that met nobody stays on the picture.
-- [ ] C9 docs: the analytics guide for the module. The rest was done with phase 30: the
+- [x] C9 docs: the analytics guide for the module. The rest was done with phase 30: the
       device guide's scanning section (`docs/devices/bluetooth-contacts.md`), the OpenCollar
       port table, the domain model's record types, `DEVELOPERS.md`, the changelog and ADR 0036,
       which records why a contact is a record type of its own.
