@@ -7131,6 +7131,24 @@ export interface components {
              * @default 0
              */
             unknown: number;
+            /**
+             * Scans
+             * @description Scan windows the device reported over the period
+             * @default 0
+             */
+            scans: number;
+            /**
+             * Detected
+             * @description Devices the scans say they detected, the device's own count. A scan detects more than fits in one payload, so this is the honest answer to how much it heard, while the sightings below are the honest answer to who, by name
+             * @default 0
+             */
+            detected: number;
+            /**
+             * Reported
+             * @description How many of those detections reached Protect over the air
+             * @default 0
+             */
+            reported: number;
         };
         /** DeviceCreate */
         DeviceCreate: {

@@ -15,8 +15,15 @@ The same feature is used in three ways, and what a contact means differs in each
 
 ## What a device actually reports
 
-A scan reports the **last three octets** of each address it heard, not the whole address, and a
-signal strength in dBm. Three octets are not an identity: several devices can end with the same
+A scan reports how many devices it **detected**, then the **last three octets** of each address
+it heard — not the whole address — and a signal strength in dBm.
+
+Those are two different numbers and the difference matters. Only as many sightings as fit in one
+message go over the air; the rest stay in the device's flash until a log is uploaded. So a collar
+in a herd detects more than it can send, and counting the sightings that arrived understates what
+was there. The device's own count is the honest answer to *how much did it hear*; the sightings
+are the honest answer to *who, by name*. Protect keeps both, reports both on the card when they
+differ, and the `ble_contacts` metric behind the chart is the device's own count. Three octets are not an identity: several devices can end with the same
 three. Protect resolves each sighting once, on the way in, and says which of three things it
 found:
 

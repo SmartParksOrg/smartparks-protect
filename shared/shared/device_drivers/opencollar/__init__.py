@@ -479,6 +479,10 @@ class OpenCollarDriver:
             raise _fail("BLE scan message shorter than its header", port=PORT_BLE_SCAN)
         scan_at = _unix(struct.unpack_from("<I", data, 0)[0]) or time
         seen = data[4]
+        # what this message decoded, not what the whole delivery holds: a flash log carries many
+        # scans into one record set, and counting the set would report each scan's total plus
+        # every scan before it
+        before = len(records.contacts)
         length = len(data) + 2  # the declared length the reference decoder guards on
         index, offset = 0, 5
         while index < seen and offset < length - 1 and offset + 4 <= len(data):
@@ -492,7 +496,7 @@ class OpenCollarDriver:
             )
             index += 1
             offset += 4
-        self._note_scan(records, scan_at, seen, len(records.contacts), "single")
+        self._note_scan(records, scan_at, seen, len(records.contacts) - before, "single")
 
     def _decode_ble_scan_aggregated(
         self, data: bytes, time: datetime, records: DecodedRecords
@@ -507,6 +511,7 @@ class OpenCollarDriver:
         if not data:
             raise _fail("aggregated BLE scan message is empty", port=PORT_BLE_SCAN_AGGREGATED)
         seen = data[0]
+        before = len(records.contacts)
         length = len(data) + 2
         index, offset = 0, 1
         while index < seen and offset < length - 1 and offset + 9 <= len(data):
@@ -523,7 +528,7 @@ class OpenCollarDriver:
             )
             index += 1
             offset += 9
-        self._note_scan(records, time, seen, len(records.contacts), "aggregated")
+        self._note_scan(records, time, seen, len(records.contacts) - before, "aggregated")
 
     @staticmethod
     def _note_scan(
@@ -531,7 +536,13 @@ class OpenCollarDriver:
     ) -> None:
         """Every scan leaves a state, so that a device which looked and saw nothing can be told
         from one that never looked: with `ble_scan_report_zero_connections_found` on, an empty
-        scan is a real answer and the only record of it."""
+        scan is a real answer and the only record of it.
+
+        `seen` is the device's own count of what it detected and `reported` is how many of them
+        fitted in the payload. They are not the same number and the difference matters: a collar
+        in a herd detects more than it can send, so counting the sightings that arrived
+        understates what was there. `seen` is the honest answer to "how much did it hear"; the
+        sightings are the honest answer to "who, by name". Both are kept."""
         records.states.append(
             DecodedState(
                 time=scan_at,

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFi
 from geoalchemy2.shape import from_shape
 from pydantic import BaseModel, Field
 from shapely.geometry import Point
-from sqlalchemy import Text, exists, func, or_, select
+from sqlalchemy import Integer, Text, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -106,6 +106,7 @@ from shared.models import (
     DeviceEntityAssignment,
     DeviceLogFile,
     DeviceProjectAssignment,
+    DeviceStateHistory,
     DeviceType,
     Entity,
     EntityType,
@@ -1308,6 +1309,7 @@ async def device_contacts(
     state = await session.get(DeviceCurrentState, device.id)
     scan = (state.latest_state or {}).get("ble_scan") if state else None
     scanning = await scanning_of(session, device.id)
+    totals = await _scan_totals(session, device.id, since)
     return DeviceContacts(
         hours=hours,
         scanning=DeviceScanning(
@@ -1324,7 +1326,39 @@ async def device_contacts(
         heard_by=heard_by,
         ambiguous=sum(c.contacts for c in counterparts if c.resolution == "ambiguous"),
         unknown=sum(c.contacts for c in counterparts if c.resolution == "unknown"),
+        scans=totals[0],
+        detected=totals[1],
+        reported=totals[2],
     )
+
+
+async def _scan_totals(
+    session: AsyncSession, device_id: uuid.UUID, since: datetime
+) -> tuple[int, int, int]:
+    """Scan windows over the period, what they say they detected, and what reached us.
+
+    The device counts what it detected; only what fitted in the payload is sent (research 3.9),
+    so the sightings that arrived understate what was there and the device's own count is the
+    honest answer to "how much did it hear". Both are reported, because they answer different
+    questions and a reader who takes one for the other is wrong in a direction that matters."""
+    row = (
+        await session.execute(
+            select(
+                func.count().label("scans"),
+                func.sum(
+                    func.cast(DeviceStateHistory.state["ble_scan"]["seen"].astext, Integer)
+                ).label("detected"),
+                func.sum(
+                    func.cast(DeviceStateHistory.state["ble_scan"]["reported"].astext, Integer)
+                ).label("reported"),
+            ).where(
+                DeviceStateHistory.device_id == device_id,
+                DeviceStateHistory.time >= since,
+                DeviceStateHistory.state.has_key("ble_scan"),
+            )
+        )
+    ).one()
+    return int(row.scans or 0), int(row.detected or 0), int(row.reported or 0)
 
 
 async def _device_names(

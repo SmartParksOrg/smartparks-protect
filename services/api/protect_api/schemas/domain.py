@@ -642,6 +642,16 @@ class DeviceContacts(BaseModel):
     )
     ambiguous: int = Field(default=0, description="Sightings that could be more than one device")
     unknown: int = Field(default=0, description="Neighbours no device of the project matches")
+    scans: int = Field(default=0, description="Scan windows the device reported over the period")
+    detected: int = Field(
+        default=0,
+        description="Devices the scans say they detected, the device's own count. A scan detects "
+        "more than fits in one payload, so this is the honest answer to how much it heard, "
+        "while the sightings below are the honest answer to who, by name",
+    )
+    reported: int = Field(
+        default=0, description="How many of those detections reached Protect over the air"
+    )
 
 
 class DeviceStaticPositionUpdate(BaseModel):

@@ -1472,3 +1472,60 @@ async def test_every_scan_counts_as_a_number_even_when_it_saw_nothing(client, db
         )
     ).all()
     assert list(values) == [2.0, 0.0], "the empty scan is a zero, not a missing sample"
+
+
+async def test_the_read_says_what_was_detected_beside_what_arrived(client, db, bus):
+    """Tim, 2026-09-18: the scan message carries the device's own count of what it detected, and
+    that is the important number. Only what fits in one payload is sent, so counting the
+    sightings that arrived understates what was there; both are reported, because they answer
+    different questions."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+
+    # a scan that says it saw nine and carries two: the air cut it short
+    body = struct.pack("<I", int(SCAN_AT.timestamp())) + bytes([9])
+    for octets, rssi in ((bytes([0x0C, 0x41, 0x0A]), -70), (bytes([0xE1, 0x02, 0x9F]), -80)):
+        body += octets + bytes([rssi + 128])
+    await _scan(db, bus, source, identity, (bytes([0xFA, len(body)]) + body).hex())
+
+    read = (
+        await client.get(f"/api/v1/devices/{watcher['id']}/contacts", headers=admin.headers)
+    ).json()
+    assert read["scans"] == 1
+    assert read["detected"] == 9, "the device's own count, not what fitted in the message"
+    assert read["reported"] == 2
+    assert sum(c["contacts"] for c in read["counterparts"]) == 2, "two could be named"
+
+
+async def test_a_flash_log_counts_each_scan_on_its_own(client, db, bus):
+    """A stored log carries many scans into one delivery. The count of what a scan reported has
+    to be that scan's, and it was the whole delivery's: the second scan in a stream claimed to
+    have reported its own sightings plus every sighting before it."""
+    from shared.device_drivers.base import DecodedRecords
+    from shared.device_drivers.registry import get_driver
+
+    driver = get_driver("opencollar")
+    records = DecodedRecords()
+    for index in range(3):
+        at = SCAN_AT + timedelta(minutes=index)
+        body = struct.pack("<I", int(at.timestamp())) + bytes([2])
+        body += bytes([0x0C, 0x41, 0x0A]) + bytes([-70 + 128])
+        body += bytes([0xE1, 0x02, 0x9F]) + bytes([-80 + 128])
+        driver._decode_ble_scan(body, at, records)
+
+    reported = [s.state["ble_scan"]["reported"] for s in records.states if "ble_scan" in s.state]
+    assert reported == [2, 2, 2], "each scan reported two, not two then four then six"
+    assert len(records.contacts) == 6

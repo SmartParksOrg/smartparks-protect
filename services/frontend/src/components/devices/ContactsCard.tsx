@@ -66,6 +66,18 @@ export function ContactsCard({
             )}
           </Callout>
         )}
+        {data && canScan && data.detected > data.reported && (
+          <Callout kind="info">
+            {t(
+              "Over this period the device detected {{detected}} devices in {{scans}} scans and could send {{reported}} of them; a scan reports only what fits in one message and keeps the rest in its flash. The list below is who it could name, not everything it heard.",
+              {
+                detected: data.detected,
+                scans: data.scans,
+                reported: data.reported,
+              },
+            )}
+          </Callout>
+        )}
         {data && canScan && data.scanning.enabled && (
           <p className="text-muted-foreground">
             {data.scanning.filter_label
@@ -76,6 +88,15 @@ export function ContactsCard({
               : t("Scanning, last scan {{ago}}.", {
                   ago: formatAgo(data.last_scan_at, now),
                 })}
+            {data.scans > 0 && (
+              <>
+                {" "}
+                {t("{{scans}} scans detected {{detected}} devices.", {
+                  scans: data.scans,
+                  detected: data.detected,
+                })}
+              </>
+            )}
           </p>
         )}
         {data &&
