@@ -69,6 +69,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- Setting a device's place, or recording a device's Bluetooth address, now repairs the positions that follow from it, not only the resolution. In the field a reader is put up, it scans for a week, and only then does somebody measure where it stands and type the tags' addresses; every sighting from before that afternoon said when but never where, and for a rabbit wearing only a tag that is the whole of what could ever have been known about it. Both repairs are safe to run again and write nothing twice. (217 of the PWN sightings were in that state, 2026-09-18.)
+
 - A device given a place by hand put itself on the map but not the entity it is on, and the entity is what the map's Entities layer draws. A scanner reports nothing, so no record would ever have placed it: its entity stayed blank for ever. The place now reaches both current states, in either order — set the place first and assign the entity afterwards, or the other way round. (Found while putting the PWN readers on the map, 2026-09-18.)
 
 - A reader whose clock is far behind resolved nothing it saw. The clock rule (decision D259) moves such a sighting to its delivery time, and the row is attributed to the project it belongs to then; but the fleet it was read against was chosen from the time the device itself claimed, which for a reader 45 hours behind lay before it had joined the project at all. So it was read against an empty fleet and a tag standing a metre away came out as an unknown neighbour: 165 of the PWN sightings, beside 1,059 identical ones that resolved. The fleet now comes from the project the row lands in. (Found while reading the reprocessed PWN history, 2026-09-18.)

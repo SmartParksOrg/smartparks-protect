@@ -93,6 +93,11 @@ heard, **at the reader** (decision D258). It is an estimate with a radius
 the antenna and what stands between them, so the radius is a stated assumption. For a rabbit
 wearing a tag and no GNSS it is the only position there will ever be.
 
+Setting a place also repairs the past: the sightings that reader already made get their
+positions, which matters because a reader is put up first and measured later. The same happens
+from the other side, when a device's address is recorded: its sightings stop being unknown
+neighbours and the positions they earned are written then. Neither writes anything twice.
+
 An estimate never displaces a newer fix a device made itself. A device that has never fixed at
 all takes the estimate whatever its location setting says: that setting is there to choose
 between a fix and an estimate, and there is no fix to choose.

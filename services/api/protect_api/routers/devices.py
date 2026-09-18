@@ -90,7 +90,11 @@ from shared.domain.reporting import (
     expected_fix_interval,
 )
 from shared.domain.reporting_rules import decode_setting_value, encode_setting_value
-from shared.domain.static_place import show_static_place
+from shared.domain.static_place import (
+    place_past_sightings,
+    place_past_sightings_of,
+    show_static_place,
+)
 from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource, Role
 from shared.models import (
     AttributionJob,
@@ -1190,7 +1194,11 @@ async def set_device_static_position(
         device.static_position_at = now
         device.location_source = LocationSource.STATIC
         await show_static_place(session, device, now)
+        # the sightings it already made say when but never where until now (decision D258):
+        # a reader is measured long after it has been scanning
+        placed = await place_past_sightings(session, device)
     else:
+        placed = 0
         device.static_geom = None
         device.static_position_at = None
         if device.location_source == LocationSource.STATIC:
@@ -1202,7 +1210,11 @@ async def set_device_static_position(
         object_type="device",
         object_id=str(device.id),
         project_id=attribution.project_id,
-        details={"latitude": body.latitude, "longitude": body.longitude},
+        details={
+            "latitude": body.latitude,
+            "longitude": body.longitude,
+            "sightings_placed": placed,
+        },
     )
     await session.commit()
     return (await with_state(session, [device]))[0]
@@ -1387,6 +1399,10 @@ async def set_device_ble_address(
     # this they stay unknown for ever and read as "never met" (decision D253)
     await session.flush()
     repaired = await resolve_waiting(session, device)
+    # and the place that follows from being named: a reader with a place had heard this device
+    # while it was still an unknown neighbour, so the position it earned was never written
+    await session.flush()
+    placed = await place_past_sightings_of(session, device)
     await record_audit(
         session,
         user=user,
@@ -1394,7 +1410,11 @@ async def set_device_ble_address(
         object_type="device",
         object_id=str(device.id),
         project_id=attribution.project_id,
-        details={"ble_mac": device.ble_mac, "contacts_resolved": repaired},
+        details={
+            "ble_mac": device.ble_mac,
+            "contacts_resolved": repaired,
+            "sightings_placed": placed,
+        },
     )
     await session.commit()
     return (await with_state(session, [device]))[0]

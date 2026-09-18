@@ -17,7 +17,7 @@ from shared.bus import RedisStreamsBus
 from shared.connectivity.base import InboundMessage
 from shared.enums import AcquisitionChannel, ContactResolution, IngestionMethod
 from shared.ingest import commit_and_publish, store_inbound
-from shared.models import DataSource, DeviceContact, DeviceCurrentState
+from shared.models import DataSource, DeviceContact, DeviceCurrentState, Position
 from tests.api.conftest import actor, create_project
 from tests.conftest import unique_name
 
@@ -1130,3 +1130,122 @@ async def test_a_placed_device_puts_its_entity_on_the_map_too(client, db, bus):
         )
     ).one_or_none()
     assert second_row is not None and second_row[0] is not None
+
+
+async def test_a_place_set_afterwards_gives_the_old_sightings_a_position(client, db, bus):
+    """Decision D258, repairing the past. A reader is put up, it scans for a week, and only then
+    does somebody measure where it stands. Without this, every sighting from before that
+    afternoon says when but never where, and for a rabbit wearing only a tag that is the whole
+    of what could ever have been known about it."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    tag = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+
+    # it scans twice while nobody has measured where it stands
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)]))
+    await _scan(
+        db,
+        bus,
+        source,
+        identity,
+        scan_frame([(bytes([0x0C, 0x41, 0x0A]), -70)], SCAN_AT + timedelta(minutes=5)),
+    )
+    before = (
+        await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tag["id"])))
+    ).all()
+    assert before == [], "nothing knows where the reader is, so nothing knows where the tag was"
+
+    placed = await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    assert placed.status_code == 200, placed.text
+
+    after = (
+        await db.scalars(
+            select(Position)
+            .where(Position.device_id == uuid.UUID(tag["id"]))
+            .order_by(Position.time)
+        )
+    ).all()
+    assert len(after) == 2, "both sightings, not only the newest"
+    assert {p.record_type for p in after} == {"proximity"}
+    assert all(p.attributes["heard_by"] == reader["id"] for p in after)
+
+    # and setting it again writes nothing twice
+    again = await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    assert again.status_code == 200
+    assert (
+        len(
+            (
+                await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tag["id"])))
+            ).all()
+        )
+        == 2
+    )
+
+
+async def test_an_address_arriving_later_gives_its_sightings_a_position_too(client, db, bus):
+    """The other half of the same repair. The reader had a place all along, but the tag was an
+    unknown neighbour, so no position could be written for a device nobody could name. Recording
+    the address resolves the sightings (decision D253); the place has to follow, or the rabbit
+    stays off the map for the whole period before somebody typed its address."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    tag = await _collar(client, db, project, admin, ble_mac=None)
+    placed = await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    assert placed.status_code == 200
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(reader["id"])
+        )
+    )
+    await db.commit()
+
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)]))
+    assert (
+        await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tag["id"])))
+    ).all() == []
+
+    saved = await client.put(
+        f"/api/v1/devices/{tag['id']}/ble-address",
+        json={"ble_mac": "d4:22:11:0a:41:0c"},
+        headers=admin.headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+    positions = (
+        await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tag["id"])))
+    ).all()
+    assert len(positions) == 1, "the sighting it earned when it stopped being a stranger"
+    assert positions[0].record_type == "proximity"
+    assert positions[0].attributes["heard_by"] == reader["id"]
