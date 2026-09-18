@@ -32,6 +32,11 @@ import {
 import { movementLevel } from "@/lib/movement";
 import { imprecise } from "@/lib/accuracy";
 import { formatAgo, formatTime } from "@/lib/format";
+import {
+  isDeviceFix,
+  positionKindExplanation,
+  positionKindLabel,
+} from "@/lib/positionKind";
 import { projectFor } from "@/lib/scope";
 
 /**
@@ -253,10 +258,17 @@ export function PanelSummary({
         {t("Seen {{ago}}", { ago: formatAgo(lastSeenAt, now) })}
       </span>
       {positionTime && (
-        <span title={formatTime(positionTime)}>
-          {positionKind === "network"
-            ? t("Estimate {{ago}}", { ago: formatAgo(positionTime, now) })
-            : t("Fix {{ago}}", { ago: formatAgo(positionTime, now) })}
+        <span
+          title={
+            positionKindExplanation(positionKind, t) ?? formatTime(positionTime)
+          }
+        >
+          {isDeviceFix(positionKind)
+            ? t("Fix {{ago}}", { ago: formatAgo(positionTime, now) })
+            : t("{{kind}} {{ago}}", {
+                kind: positionKindLabel(positionKind, t, true),
+                ago: formatAgo(positionTime, now),
+              })}
         </span>
       )}
       {positionTime && imprecise(accuracy) && (
@@ -410,10 +422,15 @@ function HealthRows({
         ) : (
           t("none yet")
         )}
-        {positionTime && positionKind === "network" && (
-          <span className="text-muted-foreground">
+        {positionTime && !isDeviceFix(positionKind) && (
+          // a position that is not the device's own fix says so here, or it reads as one and a
+          // reader draws the wrong conclusion from it (Tim, 2026-09-18)
+          <span
+            className="text-muted-foreground"
+            title={positionKindExplanation(positionKind, t)}
+          >
             {" "}
-            · {phone ? t("estimate") : t("network estimate")}
+            · {positionKindLabel(positionKind, t, phone)}
           </span>
         )}
         {positionTime &&
