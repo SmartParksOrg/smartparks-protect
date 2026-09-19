@@ -3,6 +3,7 @@ the session on the traffic row and the trace, a redelivery kept as a duplicate, 
 session counter, the sessions on the device's connectivity read, and the network's estimates on the map."""
 
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -16,8 +17,17 @@ pytestmark = pytest.mark.asyncio
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "payloads" / "rock7"
 
 
+#: The fixture is a live capture with a fixed `transmit_time`, and the reads below ask for the
+#: last thirty days. Left alone the test passes until the capture ages past that window and then
+#: fails for ever, on a date nobody chose. A delivery that has just arrived is also the truer
+#: fixture: this is what the adapter sees in the field.
+def _recent(body: dict) -> dict:
+    body["transmit_time"] = (datetime.now(UTC) - timedelta(hours=1)).strftime("%y-%m-%d %H:%M:%S")
+    return body
+
+
 def delivery(momsn: int, status: int, cep: float) -> dict:
-    body = json.loads((FIXTURE / "delivery_live_sp051890.json").read_text())
+    body = _recent(json.loads((FIXTURE / "delivery_live_sp051890.json").read_text()))
     body.update(
         {
             "momsn": str(momsn),
