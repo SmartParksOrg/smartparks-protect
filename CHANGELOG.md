@@ -85,6 +85,12 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- Contact tracing's two charts drew empty boxes with titles. The module put its series under `points` where every other module and the interface use `data`, so "Contacts per day" and "Contacts by hour of day" had their figures and showed nothing, indistinguishable from a run that found nothing. The tests asserted the wrong key too, which is why they passed. (Tim, 2026-09-19.)
+
+- A contact point on a result map said where a pair met and not when. Clicking one now gives the contacts, the hours, the first and last time and which evidence saw them. (Tim, 2026-09-19.)
+
+- The contact network was drawn in a half-width card with a force layout that nothing bounds, so a study of forty subjects pushed most of them off the canvas and showed nine. It takes the full width now, and past a dozen subjects it lays out on a circle as the PDF does: every subject visible, and in the same place on every run. Its edges are drawn darker than a gridline, as they carry data.
+
 - A result map dropped any geometry kind it had not been told about. It took a fixed list of kinds and kept the ones the run had, so contact tracing's "Where pairs met" points were filtered out of the layer and offered no chip, silently. The run now says which kinds it has and the fixed list only decides the drawing order, so a module that emits something new draws it instead of vanishing.
 
 - A contact found only by Bluetooth had no place on the map. The design gives a contact the midpoint of a proximity **or the place of the device that did the hearing**, and only the first half was built — so for a study of fixed readers, where every contact is a sighting and the reader's place is known exactly, the map was empty while the answer sat in a column. A sighting now takes the observer's place: its post when it stands on one, its nearest fix when it was walking about. The device that was heard has no say, since it is the one whose position the sighting was meant to establish.

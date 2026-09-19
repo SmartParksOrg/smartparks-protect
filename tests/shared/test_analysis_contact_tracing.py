@@ -200,7 +200,7 @@ class TestCharts:
     def test_the_hour_rose_has_a_slot_for_every_hour(self):
         a, b = _subject("Anna"), _subject("Bram")
         pairs = [_pair_from_tracks(a, b, 10, _params())]
-        points = hour_series(pairs)[0]["points"]
+        points = hour_series(pairs)[0]["data"]
         assert len(points) == 24
         assert sum(n for _, n in points) == 1
         assert points[START.hour][1] == 1
@@ -215,7 +215,7 @@ class TestCharts:
             ]
         )[key]
         points = daily_series([Pair(a=key[0], b=key[1], period="main", sightings=sightings)])[0][
-            "points"
+            "data"
         ]
         assert [d for d, _ in points] == ["2026-09-10", "2026-09-12"]
 
@@ -361,3 +361,25 @@ class TestSightingPlaces:
     def test_an_observer_nobody_can_place_yields_no_point(self):
         a, b = _subject("Anna"), _subject("Bram")
         assert sighting_places(self._pair(a, b), {}, {}) == []
+
+
+def test_the_charts_put_their_points_under_the_key_the_interface_reads():
+    """Every module's series carries `data`, and so must this one. Under any other name the
+    chart draws an empty box with a title and nobody can tell it from a run that found nothing
+    — which is what it did until somebody looked at the page (Tim, 2026-09-19)."""
+    a, b = _subject("Anna"), _subject("Bram")
+    pairs = [_pair_from_tracks(a, b, 10, _params())]
+    for series in (daily_series(pairs), hour_series(pairs)):
+        assert "data" in series[0], series[0].keys()
+        assert "points" not in series[0]
+        assert len(series[0]["data"]) > 0
+
+
+def test_a_contact_point_says_when_it_happened():
+    """A point on the map answers "where"; a person clicking it asks "when"."""
+    a, b = _subject("Anna"), _subject("Bram")
+    pair = _pair_from_tracks(a, b, 10, _params())
+    pair.places = [(52.0, 4.0)]
+    properties = contact_geometries([pair], [a, b])[0].properties
+    assert properties["first"] == pair.first_at.isoformat()
+    assert properties["last"] == pair.last_at.isoformat()

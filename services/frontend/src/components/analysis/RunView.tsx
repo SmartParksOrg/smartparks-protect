@@ -387,7 +387,14 @@ export function RunView({
           ) : (
             <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
               {document.charts.map((chart) => (
-                <Card key={chart.key}>
+                // a network is the picture of a whole run and needs the room; the others are
+                // strips that read well two to a row
+                <Card
+                  key={chart.key}
+                  className={
+                    chart.kind === "network" ? "lg:col-span-2" : undefined
+                  }
+                >
                   <CardHeader>
                     <CardTitle>{labels[chart.key] ?? chart.key}</CardTitle>
                   </CardHeader>

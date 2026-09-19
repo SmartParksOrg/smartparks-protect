@@ -172,7 +172,9 @@ export function ResultChart({
   return (
     <div
       ref={container}
-      className={className ?? (chart.kind === "network" ? "h-80 w-full" : "h-56 w-full")}
+      className={
+        className ?? (chart.kind === "network" ? "h-80 w-full" : "h-56 w-full")
+      }
       role="img"
       aria-label={labels?.[chart.key] ?? chart.key}
     />
@@ -201,12 +203,21 @@ function networkOption(
   const edges = series?.edges ?? [];
   const busiest = Math.max(1, ...nodes.map((n) => n.contacts));
   const heaviest = Math.max(1, ...edges.map((e) => e.contacts));
+  // A force layout reads well while it fits: it groups the animals that met each other, which
+  // is the thing worth seeing. It does not fit for long — nothing bounds it to the box, so a
+  // study of forty subjects pushes most of them off the canvas and shows nine. Past a dozen the
+  // circle wins, as it does in the PDF: every subject is visible and in the same place each
+  // time, and with many subjects the edges carry the structure anyway.
+  const crowded = nodes.length > 12;
   return {
     animation: false,
     tooltip: {
       backgroundColor: th.tooltipBg,
       textStyle: { color: th.tooltipText, fontSize: 11 },
-      formatter: (params: { dataType?: string; data?: Record<string, unknown> }) => {
+      formatter: (params: {
+        dataType?: string;
+        data?: Record<string, unknown>;
+      }) => {
         const data = params.data ?? {};
         if (params.dataType === "edge") {
           return t("{{contacts}} contacts · {{hours}} h · {{evidence}}", {
@@ -224,9 +235,10 @@ function networkOption(
     series: [
       {
         type: "graph",
-        layout: "force",
+        layout: crowded ? "circular" : "force",
+        circular: { rotateLabel: false },
         roam: true,
-        draggable: true,
+        draggable: !crowded,
         force: { repulsion: 220, edgeLength: [40, 120], gravity: 0.08 },
         label: {
           show: true,
@@ -255,8 +267,11 @@ function networkOption(
           evidence: e.evidence,
           lineStyle: {
             width: 1 + 4 * (e.contacts / heaviest),
-            opacity: 0.65,
-            color: th.grid,
+            // an edge carries data, so it is drawn darker than a gridline and fades with its
+            // own weight rather than with the grid; at the gridline colour a thin dashed line
+            // is invisible and the pairs it stands for are the finding
+            opacity: 0.45 + 0.45 * (e.contacts / heaviest),
+            color: dark ? "#6b7f75" : "#9AA8A0",
             // one kind of evidence is a weaker claim than two, and the line says so
             type: e.evidence.includes("+") ? "solid" : "dashed",
           },

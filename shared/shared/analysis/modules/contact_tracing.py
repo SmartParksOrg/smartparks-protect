@@ -408,7 +408,9 @@ def daily_series(pairs: list[Pair]) -> list[dict[str, Any]]:
     for pair in pairs:
         for when in _moments(pair):
             per_day[when.date().isoformat()] += 1
-    return [{"name": "contacts", "points": [[d, n] for d, n in sorted(per_day.items())]}]
+    # `data`, as every other module's series does and as the interface reads: under any other
+    # name the chart draws an empty box with a title, which is what it did
+    return [{"name": "contacts", "data": [[d, n] for d, n in sorted(per_day.items())]}]
 
 
 def hour_series(pairs: list[Pair]) -> list[dict[str, Any]]:
@@ -417,7 +419,7 @@ def hour_series(pairs: list[Pair]) -> list[dict[str, Any]]:
     for pair in pairs:
         for when in _moments(pair):
             hours[when.astimezone(UTC).hour] += 1
-    return [{"name": "contacts", "points": [[h, n] for h, n in enumerate(hours)]}]
+    return [{"name": "contacts", "data": [[h, n] for h, n in enumerate(hours)]}]
 
 
 def _moments(pair: Pair) -> list[datetime]:
@@ -478,6 +480,9 @@ def contact_geometries(pairs: list[Pair], subjects: list[Subject]) -> list[Geome
                     "hours": _hours(pair.seconds),
                     "evidence": pair.evidence,
                     "period": pair.period,
+                    # when, which is the first thing somebody clicking a point asks
+                    "first": pair.first_at.isoformat() if pair.first_at else None,
+                    "last": pair.last_at.isoformat() if pair.last_at else None,
                 },
             )
         )

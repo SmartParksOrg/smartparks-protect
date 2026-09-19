@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
+import { formatTime } from "@/lib/format";
 import type { Track } from "@/api/types";
 import {
   ACCURACY_CLASSES,
@@ -580,6 +581,38 @@ export function ResultMap({
                 <>
                   <dt>{t("Fixes")}</dt>
                   <dd>{picked.fixes}</dd>
+                </>
+              )}
+              {/* a contact point answers where; the first thing asked of it is when
+                  (Tim, 2026-09-19) */}
+              {typeof picked.contacts === "number" && (
+                <>
+                  <dt>{t("Contacts")}</dt>
+                  <dd>
+                    {picked.contacts}
+                    {typeof picked.hours === "number"
+                      ? t(" · {{hours}} h", { hours: picked.hours })
+                      : ""}
+                  </dd>
+                </>
+              )}
+              {typeof picked.first === "string" && (
+                <>
+                  <dt>{t("First")}</dt>
+                  <dd>{formatTime(picked.first)}</dd>
+                </>
+              )}
+              {typeof picked.last === "string" &&
+                picked.last !== picked.first && (
+                  <>
+                    <dt>{t("Last")}</dt>
+                    <dd>{formatTime(picked.last)}</dd>
+                  </>
+                )}
+              {typeof picked.evidence === "string" && (
+                <>
+                  <dt>{t("Evidence")}</dt>
+                  <dd>{picked.evidence}</dd>
                 </>
               )}
               {typeof picked.ndvi_mean === "number" && (
