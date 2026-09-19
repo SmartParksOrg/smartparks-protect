@@ -21,7 +21,7 @@ from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.analysis.base import (
@@ -52,7 +52,8 @@ from shared.analysis.primitives.proximity import (
 )
 from shared.analysis.primitives.trajectory import Trajectory, load_trajectory
 from shared.enums import ContactResolution
-from shared.models import DeviceContact, Entity, EntityType
+from shared.models import Device, DeviceContact, DeviceEntityAssignment, Entity, EntityType
+from shared.timeutil import utc_now
 
 METHOD_VERSION = "contact_tracing/1"
 
@@ -194,6 +195,59 @@ async def load_sightings(
             )
         )
     return sightings, unknown, ambiguous
+
+
+async def standing_places(
+    session: AsyncSession, subjects: list[Subject]
+) -> dict[uuid.UUID, tuple[float, float]]:
+    """Where a subject is, for the subjects carried by a device that does not move (D261).
+
+    A reader on a post is the commonest observer there is, and its place is known exactly. That
+    is the whole answer to "where did this contact happen" for a deployment of fixed readers,
+    and without it the map of such a study is empty while the place sits in a column."""
+    if not subjects:
+        return {}
+    rows = (
+        await session.execute(
+            select(
+                DeviceEntityAssignment.entity_id,
+                func.ST_Y(Device.static_geom),
+                func.ST_X(Device.static_geom),
+            )
+            .join(Device, Device.id == DeviceEntityAssignment.device_id)
+            .where(
+                DeviceEntityAssignment.entity_id.in_([s.id for s in subjects]),
+                DeviceEntityAssignment.validity.op("@>")(utc_now()),
+                Device.static_geom.is_not(None),
+            )
+        )
+    ).all()
+    return {row[0]: (float(row[1]), float(row[2])) for row in rows}
+
+
+def sighting_places(
+    pair: Pair,
+    standing: dict[uuid.UUID, tuple[float, float]],
+    tracks: dict[uuid.UUID, Trajectory],
+) -> list[tuple[float, float]]:
+    """Where the sightings of a pair happened: the observer's own place at the time.
+
+    A sighting says one device heard another, so the place of the meeting is the place of the
+    one that did the hearing — exactly, when that one stands on a post, and from its nearest fix
+    when it was walking about. The device that was heard has no say: it is the one whose position
+    the sighting was meant to establish."""
+    out: list[tuple[float, float]] = []
+    for meeting in pair.sightings.meetings if pair.sightings else []:
+        for observer in sorted(meeting.observers, key=str):
+            if observer in standing:
+                out.append(standing[observer])
+                break
+            track = tracks.get(observer)
+            if track is not None and len(track):
+                i = int(np.argmin(np.abs(track.times - meeting.start.timestamp())))
+                out.append((float(track.lat[i]), float(track.lon[i])))
+                break
+    return out
 
 
 def median_interval_s(track: Trajectory) -> float | None:
@@ -604,6 +658,12 @@ class ContactTracingModule:
                         pair.fixes = near
                         pair.places = _midpoints(tracks[first.id], tracks[second.id], near)
             done += 1
+            # a pair the fixes found already has a midpoint; one only a sighting found takes the
+            # place of whichever device did the hearing (design section 4.3)
+            standing = await standing_places(session, subjects)
+            for pair in index.values():
+                if not pair.places:
+                    pair.places = sighting_places(pair, standing, tracks)
             pairs.extend(index.values())
 
         await ctx.progress(95, "document")

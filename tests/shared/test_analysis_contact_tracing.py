@@ -24,6 +24,7 @@ from shared.analysis.modules.contact_tracing import (
     network_series,
     pair_rows,
     sampling_warnings,
+    sighting_places,
     subject_rows,
 )
 from shared.analysis.primitives.contacts import Sighting, by_pair, pair_key
@@ -309,3 +310,54 @@ def test_accuracy_ignores_the_fixes_that_claim_none():
     assert median_accuracy_m(track) == pytest.approx(20)
     blank: Trajectory = _track(a, 0.0, n=3)
     assert median_accuracy_m(blank) is None
+
+
+class TestSightingPlaces:
+    """A contact found only by Bluetooth still has a place: where the device that heard it was
+    (design 4.3). Without this the map of a fixed-reader study is empty while the answer sits in
+    a column, which is what the first real PWN run showed."""
+
+    def _pair(self, a: Subject, b: Subject, minutes=(0, 5)) -> Pair:
+        key = pair_key(a.id, b.id)
+        heard = by_pair(
+            [
+                Sighting(time=START + timedelta(minutes=m), observer=a.id, seen=b.id, rssi_dbm=-70)
+                for m in minutes
+            ]
+        )[key]
+        return Pair(a=key[0], b=key[1], period="main", sightings=heard)
+
+    def test_a_reader_on_a_post_gives_its_sighting_its_own_place(self):
+        reader, tag = _subject("Reader"), _subject("Rabbit")
+        pair = self._pair(reader, tag)
+        places = sighting_places(pair, {reader.id: (52.53, 4.61)}, {})
+        assert places == [(52.53, 4.61)], "one meeting, at the post"
+
+    def test_a_walking_observer_gives_the_fix_nearest_the_sighting(self):
+        walker, other = _subject("Walker"), _subject("Other")
+        pair = self._pair(walker, other, minutes=(0,))
+        track = trajectory_from(
+            walker.id,
+            [START.timestamp() - 600, START.timestamp() + 30],
+            [LAT, LAT + 1000 / M_PER_DEG_LAT],
+            [LON, LON],
+        )
+        places = sighting_places(pair, {}, {walker.id: track})
+        assert places[0][0] == pytest.approx(LAT + 1000 / M_PER_DEG_LAT), "the nearer fix in time"
+
+    def test_the_device_that_was_heard_does_not_decide_the_place(self):
+        """It is the one whose position the sighting was meant to establish; using it would be
+        circular."""
+        reader, tag = _subject("Reader"), _subject("Rabbit")
+        pair = self._pair(reader, tag)
+        assert sighting_places(pair, {tag.id: (1.0, 2.0)}, {}) == []
+
+    def test_a_pair_the_fixes_already_placed_is_left_alone(self):
+        a, b = _subject("Anna"), _subject("Bram")
+        pair = _pair_from_tracks(a, b, 10, _params())
+        pair.places = [(52.0, 4.0)]
+        assert pair.places == [(52.0, 4.0)]
+
+    def test_an_observer_nobody_can_place_yields_no_point(self):
+        a, b = _subject("Anna"), _subject("Bram")
+        assert sighting_places(self._pair(a, b), {}, {}) == []
