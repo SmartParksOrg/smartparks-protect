@@ -21,8 +21,16 @@ FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "payloads" / "rock7
 #: last thirty days. Left alone the test passes until the capture ages past that window and then
 #: fails for ever, on a date nobody chose. A delivery that has just arrived is also the truer
 #: fixture: this is what the adapter sees in the field.
+#:
+#: One time for the whole run, not one per delivery: a redelivery is recognised by the payload's
+#: hash, and a `transmit_time` taken afresh for each delivery changed by a second between the
+#: first and its retry often enough to make the duplicate read "received" one CI run in a few
+#: (2026-09-19, the flake this comment's author had introduced the day before).
+TRANSMIT_TIME = (datetime.now(UTC) - timedelta(hours=1)).strftime("%y-%m-%d %H:%M:%S")
+
+
 def _recent(body: dict) -> dict:
-    body["transmit_time"] = (datetime.now(UTC) - timedelta(hours=1)).strftime("%y-%m-%d %H:%M:%S")
+    body["transmit_time"] = TRANSMIT_TIME
     return body
 
 
