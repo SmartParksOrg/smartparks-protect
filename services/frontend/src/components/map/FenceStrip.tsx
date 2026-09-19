@@ -14,7 +14,8 @@ import { formatLength } from "@/lib/geodesy";
  * section in its level's colour, a tick where each monitor stands. Reads in a second on a
  * phone, and a long fence with many sections stays one bar. With `labels` the monitors are
  * named under their ticks, as HTML placed by percentage rather than SVG text, so the bar can
- * stretch to any width without stretching the letters.
+ * stretch to any width without stretching the letters; not on a phone, where three names on
+ * a 300 px bar overlap and the sections table below names them anyway.
  */
 export function FenceStrip({
   lengthM,
@@ -84,7 +85,7 @@ export function FenceStrip({
         ))}
       </svg>
       {labels && placed.length > 0 && (
-        <div className="relative h-5 text-[11px] text-muted-foreground">
+        <div className="relative hidden h-5 text-[11px] text-muted-foreground sm:block">
           {placed.map((m) => (
             <span
               key={m.entity_id}
