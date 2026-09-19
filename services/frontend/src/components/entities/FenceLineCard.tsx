@@ -104,7 +104,7 @@ export function FenceLineCard({
               <FenceLevelDot level={m.level} /> {fenceLevelLabel(m.level, t)}{" "}
               <Link
                 className="underline"
-                to={`/projects/${projectId}/map?feature=${m.feature_id}`}
+                to={`/projects/${projectId}/features/${m.feature_id}/fence`}
               >
                 {m.feature_name}
               </Link>

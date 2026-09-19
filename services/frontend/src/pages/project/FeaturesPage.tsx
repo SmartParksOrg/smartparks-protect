@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Plus, Trash2, Wheat } from "lucide-react";
+import { Plus, Trash2, Wheat, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router";
@@ -165,6 +165,21 @@ export function FeaturesPage() {
       header: "",
       cell: ({ row }) => (
         <span className="flex items-center justify-end gap-1">
+          {row.original.feature_type === "fence" && (
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              aria-label={t("Fence line")}
+              title={t("Fence line")}
+            >
+              <Link
+                to={`/projects/${projectId}/features/${row.original.id}/fence`}
+              >
+                <Zap className="size-4" />
+              </Link>
+            </Button>
+          )}
           {grazingOn &&
             ["zone", "geofence"].includes(row.original.feature_type) && (
               <Button

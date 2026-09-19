@@ -1,24 +1,21 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useState } from "react";
 import { Link } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { FenceStatus } from "@/api/types";
-import { MetricTrend } from "@/components/map/BatteryTrend";
+import { FenceStrip } from "@/components/map/FenceStrip";
 import { PanelRow } from "@/components/map/MapObjectPanel";
-import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useNow } from "@/hooks/useNow";
 import {
   type FenceMonitor,
   type FenceSection,
   fenceColor,
   fenceLevelLabel,
-  kilovolts,
+  fenceSummary,
 } from "@/lib/fence";
 import { formatAgo, formatTime } from "@/lib/format";
-import { formatLength } from "@/lib/geodesy";
 
 export function FenceLevelDot({ level }: { level: string | null | undefined }) {
   return (
@@ -44,8 +41,6 @@ export function FenceRows({
 }) {
   const { t } = useTranslation();
   const now = useNow();
-  const phone = useIsPhone();
-  const [open, setOpen] = useState<string | null>(null);
   const status = useQuery({
     queryKey: [...queryKeys.features(projectId), featureId, "fence"],
     queryFn: () =>
@@ -64,9 +59,11 @@ export function FenceRows({
   }
   const sections = s.sections as unknown as FenceSection[];
   const monitors = s.monitors as unknown as FenceMonitor[];
-  const monitorName = (id: string) =>
-    monitors.find((m) => m.entity_id === id)?.name ?? "?";
-  const toggle = (id: string) => setOpen((o) => (o === id ? null : id));
+  const newest = monitors
+    .map((m) => m.measured_at)
+    .filter((v): v is string => Boolean(v))
+    .sort()
+    .pop();
   return (
     <>
       <PanelRow label={t("Fence")}>
@@ -82,126 +79,34 @@ export function FenceRows({
           </span>
         )}
       </PanelRow>
-      <PanelRow
-        label={t("Thresholds")}
-        title={t("live at {{ok}}, down under {{down}}", {
-          ok: kilovolts(s.thresholds.ok_v),
-          down: kilovolts(s.thresholds.down_v),
-        })}
-      >
-        {phone
-          ? `${kilovolts(s.thresholds.ok_v)} / ${kilovolts(s.thresholds.down_v)}`
-          : t("live at {{ok}}, down under {{down}}", {
-              ok: kilovolts(s.thresholds.ok_v),
-              down: kilovolts(s.thresholds.down_v),
-            })}
+      {/* the essentials and nothing more (Tim, 2026-09-19): the line as one bar, one sentence
+          naming what is wrong and where, and the way to the page that has the rest */}
+      <div className="col-span-2 space-y-1">
+        <FenceStrip
+          lengthM={s.length_m}
+          sections={sections}
+          monitors={monitors}
+        />
+        <p className="text-xs text-muted-foreground">
+          {fenceSummary(sections, monitors, t)}
+          {monitors.length > 0 && newest && (
+            <>
+              {" · "}
+              {t("{{count}} monitors", { count: monitors.length })}
+              {", "}
+              {t("newest reading {{ago}}", { ago: formatAgo(newest, now) })}
+            </>
+          )}
+        </p>
+      </div>
+      <PanelRow label={t("Details")}>
+        <Link
+          className="underline"
+          to={`/projects/${projectId}/features/${featureId}/fence`}
+        >
+          {t("sections, monitors and history")}
+        </Link>
       </PanelRow>
-      {monitors.length === 0 ? (
-        <PanelRow label={t("Monitors")}>
-          <span className="text-muted-foreground">
-            {t(
-              "No fence monitor on this line yet. Attach one on its entity page.",
-            )}
-          </span>
-        </PanelRow>
-      ) : (
-        <>
-          {/* the sections as their own block across both columns: a range and the monitors
-              at its ends read as one line each, where the narrow value column wrapped every
-              word (Tim, 2026-09-19) */}
-          <div className="col-span-2 space-y-1 text-xs">
-            <div className="text-muted-foreground">{t("Sections")}</div>
-            {sections.map((section, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <FenceLevelDot level={section.level} />
-                <span className="shrink-0 tabular-nums">
-                  {formatLength(section.from_m)} – {formatLength(section.to_m)}
-                </span>
-                <span className="min-w-0 truncate text-muted-foreground">
-                  {section.monitor_ids?.map(monitorName).join(" · ")}
-                </span>
-              </div>
-            ))}
-          </div>
-          {/* one line per monitor: its name, then what it reads, wrapping to a second line on
-              a phone and never into the narrow value column */}
-          <div className="col-span-2 space-y-1 text-sm">
-            {monitors.map((m) => (
-              <Fragment key={m.entity_id}>
-                <div
-                  className="flex flex-wrap items-center gap-x-2"
-                  title={m.measured_at ? formatTime(m.measured_at) : undefined}
-                >
-                  <FenceLevelDot level={m.level} />
-                  <Link
-                    className="min-w-0 font-medium hover:underline"
-                    to={`/projects/${projectId}/entities/${m.entity_id}`}
-                  >
-                    {m.name}
-                  </Link>
-                  {/* the reading sits at the right when the line is wide enough and drops
-                      to a line of its own when it is not; a name is never cut short */}
-                  <span className="ml-auto whitespace-nowrap">
-                    {m.device_id ? (
-                      <button
-                        type="button"
-                        className="underline underline-offset-2 hover:text-primary"
-                        title={
-                          open === m.entity_id
-                            ? t("Hide the fence voltage")
-                            : t("Show the fence voltage")
-                        }
-                        aria-expanded={open === m.entity_id}
-                        onClick={() => toggle(m.entity_id)}
-                      >
-                        {kilovolts(m.voltage_v)}
-                      </button>
-                    ) : (
-                      kilovolts(m.voltage_v)
-                    )}
-                    {m.pulses != null && (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {t("{{count}} pulses", { count: m.pulses })}
-                      </span>
-                    )}
-                    {m.failed && (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {t("measurement failed")}
-                      </span>
-                    )}
-                    {m.measured_at && (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {formatAgo(m.measured_at, now)}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                {open === m.entity_id && m.device_id && (
-                  <div className="rounded-md border bg-muted/30 p-2">
-                    <MetricTrend
-                      projectId={projectId}
-                      deviceId={m.device_id}
-                      spec={{
-                        metric: "fence_voltage",
-                        label: t("Fence voltage"),
-                        unit: "kV",
-                        scale: 0.001,
-                        decimals: 2,
-                        floor: 0,
-                        ariaLabel: t("Fence voltage"),
-                      }}
-                      until={m.measured_at ?? null}
-                    />
-                  </div>
-                )}
-              </Fragment>
-            ))}
-          </div>
-        </>
-      )}
     </>
   );
 }

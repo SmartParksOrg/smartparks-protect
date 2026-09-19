@@ -108,6 +108,11 @@ const FeaturesPage = lazy(() =>
     default: m.FeaturesPage,
   })),
 );
+const FenceLinePage = lazy(() =>
+  import("@/pages/project/FenceLinePage").then((m) => ({
+    default: m.FenceLinePage,
+  })),
+);
 const ProjectSettingsPage = lazy(() =>
   import("@/pages/project/ProjectSettingsPage").then((m) => ({
     default: m.ProjectSettingsPage,
@@ -312,6 +317,10 @@ export default function App() {
                 }
               >
                 <Route path="admin/features" element={<FeaturesPage />} />
+                <Route
+                  path="features/:featureId/fence"
+                  element={<FenceLinePage />}
+                />
               </Route>
               <Route
                 element={

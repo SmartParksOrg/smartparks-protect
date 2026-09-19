@@ -53,6 +53,72 @@ export interface FenceMonitor {
   level: string;
 }
 
+/** Consecutive sections of one level, as a person names a stretch: "Middle to South corner". */
+export interface FenceRun {
+  level: string;
+  from_m: number;
+  to_m: number;
+  monitor_ids: string[];
+}
+
+export function fenceRuns(sections: FenceSection[]): FenceRun[] {
+  const runs: FenceRun[] = [];
+  for (const s of sections) {
+    const last = runs[runs.length - 1];
+    if (last && last.level === s.level && last.to_m === s.from_m) {
+      last.to_m = s.to_m;
+      for (const id of s.monitor_ids ?? [])
+        if (!last.monitor_ids.includes(id)) last.monitor_ids.push(id);
+    } else {
+      runs.push({
+        level: s.level,
+        from_m: s.from_m,
+        to_m: s.to_m,
+        monitor_ids: [...(s.monitor_ids ?? [])],
+      });
+    }
+  }
+  return runs;
+}
+
+/** The one sentence a panel needs (Tim, 2026-09-19): what is wrong and where, or that all is
+ * well. "2 of 4 sections down, Middle to South corner"; "all 4 sections live"; "no monitor". */
+export function fenceSummary(
+  sections: FenceSection[],
+  monitors: FenceMonitor[],
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  if (monitors.length === 0) return t("No fence monitor on this line yet.");
+  const total = sections.length;
+  const name = (id: string) =>
+    monitors.find((m) => m.entity_id === id)?.name ?? "?";
+  const where = (run: FenceRun): string => {
+    const names = run.monitor_ids.map(name);
+    if (names.length === 0) return "";
+    if (names.length === 1) return names[0];
+    return t("{{from}} to {{to}}", {
+      from: names[0],
+      to: names[names.length - 1],
+    });
+  };
+  const runs = fenceRuns(sections);
+  for (const level of ["down", "unknown", "low"] as const) {
+    const bad = runs.filter((r) => r.level === level);
+    if (bad.length === 0) continue;
+    const count = sections.filter((s) => s.level === level).length;
+    const places = bad.map(where).filter(Boolean).join("; ");
+    // three plain calls rather than one with a chosen key, so the catalogue sees each
+    const head =
+      level === "down"
+        ? t("{{count}} of {{total}} sections down", { count, total })
+        : level === "unknown"
+          ? t("{{count}} of {{total}} sections unknown", { count, total })
+          : t("{{count}} of {{total}} sections low", { count, total });
+    return places ? `${head}, ${places}` : head;
+  }
+  return t("all {{count}} sections live", { count: total });
+}
+
 export function kilovolts(voltageV: number | null | undefined): string {
   return voltageV == null ? "–" : `${(voltageV / 1000).toFixed(2)} kV`;
 }

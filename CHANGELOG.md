@@ -12,6 +12,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - The live map's entity and device panels carry the fence port's readings (Tim, 2026-09-19): a **Fence** row with the newest voltage in kV and the pulses, amber under 4 kV and red under 2 kV or without pulses, and a **Trap** row reading closed or open; each unfolds its trend the way the battery does. The device's health card and last-status panel show the same lines, the voltage in kV with the stored volts unchanged.
 
+- A **fence line page** (Tim, 2026-09-19: the panel was too crowded, and a fence with more sections would be worse). The live map's panel shows the essentials only: the level and since when, the line as one bar with each section in its colour and a tick per monitor, one sentence naming what is wrong and where, and the monitors' count and newest reading. Everything else moved to a page of its own, opened from the panel, the Features list or a monitor's entity page: the bar large with the monitors named, the sections table, every monitor with its reading and voltage chart, the status history, and the thresholds, which project admins edit there. API: `GET /projects/{id}/features/{feature_id}/fence/events`.
+
 ### Fixed
 
 - An entity whose device reports readings but no positions read "Last seen: never" on the live map — a fence monitor with a place set by hand, a scanner, a trap — while its readings arrived every hour. The decoder marked the entity as seen only when a position came in; any record of the device does now, and a position still moves it. (Tim, 2026-09-19, on the demo projects.)

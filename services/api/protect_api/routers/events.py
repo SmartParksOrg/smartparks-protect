@@ -312,6 +312,34 @@ async def list_events(
     )
 
 
+@router.get(
+    "/projects/{project_id}/features/{feature_id}/fence/events", response_model=list[EventRead]
+)
+async def fence_history(
+    feature_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=500),
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+    lang: str = Depends(language),
+) -> list[EventRead]:
+    """A fence line's status history (phase 32, decision D265): the FENCE_STATUS events raised
+    on it, newest first, each naming the stretch that changed and what it reads now."""
+    rows = (
+        await session.execute(
+            select(Event, Alert)
+            .outerjoin(Alert, Alert.event_id == Event.id)
+            .where(
+                Event.project_id == context.project.id,
+                Event.event_type == "FENCE_STATUS",
+                Event.context["feature_id"].astext == str(feature_id),
+            )
+            .order_by(Event.time.desc())
+            .limit(limit)
+        )
+    ).all()
+    return [event_read(event, alert, lang) for event, alert in rows]
+
+
 @router.get("/projects/{project_id}/events/{event_id}", response_model=EventDetail)
 async def get_event(
     event_id: uuid.UUID,
