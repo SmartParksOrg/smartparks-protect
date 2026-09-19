@@ -1,7 +1,9 @@
 """Movement ecology (docs/ANALYTICS_PHASE1_PLAN.md, section 8): what the fixes of the chosen
 animals say about how far, how fast and where they moved, per subject and period, with the
 comparison table and the quality warnings. The spatial layers (home range, clusters) come from
-the primitives of M2 and are attached here when their methods are on."""
+the primitives of M2 and are attached here when their methods are on. Phase 2
+(docs/ANALYTICS_PHASE2_PLAN.md, sections 3 and 4) adds the autocorrelation-corrected range as
+a fourth method and the movement strategy read off the net squared displacement."""
 
 from __future__ import annotations
 
@@ -31,7 +33,13 @@ from shared.analysis.base import (
 )
 from shared.analysis.limits import KDE_MAX_CELLS, MAX_FIXES_PER_SUBJECT
 from shared.analysis.parameters import CommonParameters
-from shared.analysis.primitives.homerange import isopleths, kde_grid, mcp, reference_bandwidth
+from shared.analysis.primitives.homerange import (
+    corrected_range,
+    isopleths,
+    kde_grid,
+    mcp,
+    reference_bandwidth,
+)
 from shared.analysis.primitives.spatial import (
     LocalGrid,
     clusters_sql,
@@ -39,6 +47,7 @@ from shared.analysis.primitives.spatial import (
     hotspots,
     residence,
 )
+from shared.analysis.primitives.strategy import Strategy, classify
 from shared.analysis.primitives.timeagg import local_days, sun_class
 from shared.analysis.primitives.trajectory import (
     Steps,
@@ -53,8 +62,8 @@ from shared.analysis.primitives.trajectory import (
 from shared.analysis.quality import quality_report
 from shared.models import Entity, EntityType, Project
 
-METHOD_VERSION = "movement/1"
-Method = Literal["mcp", "kde", "clusters"]
+METHOD_VERSION = "movement/2"
+Method = Literal["mcp", "kde", "clusters", "akde_like"]
 FEW_FIXES = 30
 NSD_POINTS = 500
 CLUSTER_MIN_POINTS = 5
@@ -96,6 +105,16 @@ METRICS: list[str] = [
     "kde50_ha",
     "kde95_ha",
     "kde_bandwidth_m",
+    "akde50_ha",
+    "akde95_ha",
+    "akde_bandwidth_m",
+    "autocorrelation_h",
+    "effective_fixes",
+    "strategy",
+    "strategy_margin",
+    "strategy_distance_km",
+    "departure_day",
+    "return_day",
     "hotspot_count",
     "cluster_count",
     "missing_share",
@@ -111,15 +130,17 @@ class MovementParameters(CommonParameters):
     stationary_min_minutes: float = Field(default=30, ge=1, le=1440)
     cell_m: float = Field(default=100, ge=10, le=5000)
     revisit_hours: float = Field(default=12, ge=1, le=720)
-    methods: list[Method] = Field(default=["mcp", "kde", "clusters"])
+    methods: list[Method] = Field(default=["mcp", "kde", "clusters", "akde_like"])
     kde_bandwidth_m: float | None = Field(default=None, gt=0, le=50_000)
+    #: Read the movement strategy off the net squared displacement (phase 2, section 4).
+    strategy: bool = True
 
 
 @dataclass(slots=True)
 class SubjectMetrics:
     """One subject in one period: the summary figures, the chart series and the warnings."""
 
-    summary: dict[str, float | None]
+    summary: dict[str, float | str | None]
     daily_km: list[list[float]]  # [ms at local midnight, km]
     speed_hist: list[list[Any]]  # [bin start in m/s as a label, fixes]
     hour_km: list[list[Any]]  # [hour of the day, km]
@@ -129,6 +150,8 @@ class SubjectMetrics:
     warnings: list[Warning] = field(default_factory=list)
     hotspot_cells: list[tuple[list[list[float]], float, int]] = field(default_factory=list)
     figures: dict[str, float] = field(default_factory=dict)
+    #: The fitted strategy curve over the period, [ms, km²], drawn dashed over the NSD.
+    nsd_fit: list[list[float]] = field(default_factory=list)
 
 
 def _ms(seconds: float) -> float:
@@ -168,7 +191,7 @@ def analyse_trajectory(
     s = steps(track, gap_s)
     window_s = (period.time_to - period.time_from).total_seconds()
     n = len(track)
-    summary: dict[str, float | None] = dict.fromkeys(METRICS)
+    summary: dict[str, float | str | None] = dict.fromkeys(METRICS)
     summary["fixes"] = float(n)
     summary["excluded_fixes"] = float(excluded)
     warnings, figures = quality_report(
@@ -216,6 +239,15 @@ def analyse_trajectory(
         [_ms(track.times[i]), round(float(from_first[i] / 1000) ** 2, 4)]
         for i in range(0, n, stride)
     ]
+    nsd_fit: list[list[float]] = []
+    if params.strategy:
+        start_s = period.time_from.timestamp()
+        found = classify(
+            (track.times - start_s) / 86_400,
+            (from_first / 1000) ** 2,
+            window_s / 86_400,
+        )
+        nsd_fit = _strategy_figures(summary, warnings, found, track.entity_id, start_s)
 
     speeds = s.speed_mps[moving & (s.dt_s > 0)]
     if speeds.size:
@@ -273,6 +305,7 @@ def analyse_trajectory(
     metrics = SubjectMetrics(
         summary, daily_km, speed_hist, hour_km, turning_hist, nsd, class_km, warnings
     )
+    metrics.nsd_fit = nsd_fit
     if n >= FEW_FIXES:
         grid = LocalGrid.around(track, params.cell_m)
         cells = residence(track, time_weights(track, gap_s), grid, params.revisit_hours * 3600)
@@ -285,6 +318,47 @@ def analyse_trajectory(
         ]
     metrics.figures = figures
     return metrics
+
+
+def _strategy_figures(
+    summary: dict[str, float | str | None],
+    warnings: list[Warning],
+    found: Strategy,
+    subject_id: uuid.UUID,
+    start_s: float,
+) -> list[list[float]]:
+    """The class and its figures into the summary, the reason there is none into the
+    warnings, and the fitted curve back for the chart. The days a fit names are days into the
+    period; the summary keeps them so, since a reader has the period in front of them."""
+    if found.strategy is None:
+        warnings.append(
+            Warning(
+                code="strategy_not_fitted",
+                level="notice",
+                subject_id=subject_id,
+                text=f"No movement strategy: {found.reason}.",
+            )
+        )
+        return []
+    summary["strategy"] = found.strategy
+    summary["strategy_margin"] = found.margin
+    distance = found.figures.get("distance_km", found.figures.get("range_km"))
+    summary["strategy_distance_km"] = distance
+    summary["departure_day"] = found.figures.get("departure_day")
+    summary["return_day"] = found.figures.get("return_day")
+    if found.strategy == "unclear":
+        warnings.append(
+            Warning(
+                code="strategy_unclear",
+                level="notice",
+                subject_id=subject_id,
+                text=(
+                    "The movement strategy is unclear: two of the four curves fit the net "
+                    "squared displacement about equally well, so no class is claimed."
+                ),
+            )
+        )
+    return [[_ms(start_s + day * 86_400), value] for day, value in found.curve]
 
 
 def _round(value: float | None) -> float | None:
@@ -304,7 +378,7 @@ def build_document(
     """The result document from the per-subject metrics: the summary, one table subject by
     period, the charts, the warnings, the provenance, and the count of geometries per kind."""
     geometries = geometries or {}
-    summary: dict[str, dict[str, dict[str, float | None]]] = {}
+    summary: dict[str, dict[str, dict[str, float | str | None]]] = {}
     warnings: list[Warning] = []
     rows: list[list[Any]] = []
     for period in periods:
@@ -328,7 +402,7 @@ def build_document(
             mean_row: list[Any] = ["mean", period.key]
             sd_row: list[Any] = ["sd", period.key]
             for key in METRICS:
-                column = [v[key] for v in values if v[key] is not None]
+                column = [v[key] for v in values if isinstance(v[key], int | float)]
                 if len(column) >= 2:
                     arr = np.asarray(column, dtype=np.float64)
                     mean_row.append(_round(float(arr.mean())))
@@ -357,7 +431,7 @@ def build_document(
         ),
         Chart(key="hour_profile", kind="bar", unit="km", series=series(lambda m: m.hour_km)),
         Chart(key="turning", kind="rose", unit="steps", series=series(lambda m: m.turning_hist)),
-        Chart(key="nsd", kind="line", unit="km²", series=series(lambda m: m.nsd)),
+        Chart(key="nsd", kind="line", unit="km²", series=nsd_series(subjects, periods, results)),
         Chart(
             key="day_night",
             kind="stacked",
@@ -389,6 +463,33 @@ def build_document(
             sources=["positions (device fixes, effective time and geometry, valid rows)"],
         ),
     )
+
+
+def nsd_series(
+    subjects: list[Subject],
+    periods: list[Period],
+    results: dict[tuple[str, uuid.UUID], SubjectMetrics],
+) -> list[dict[str, Any]]:
+    """The net squared displacement per subject and period, each followed by its fitted
+    strategy curve when there is one, marked `fit` so the chart draws it dashed in the
+    subject's colour rather than as a subject of its own."""
+    out: list[dict[str, Any]] = []
+    for period in periods:
+        for subject in subjects:
+            m = results.get((period.key, subject.id))
+            if m is None:
+                continue
+            out.append({"subject": str(subject.id), "period": period.key, "data": m.nsd})
+            if m.nsd_fit:
+                out.append(
+                    {
+                        "subject": str(subject.id),
+                        "period": period.key,
+                        "fit": True,
+                        "data": m.nsd_fit,
+                    }
+                )
+    return out
 
 
 def hotspot_geometries(subject: Subject, period: Period, m: SubjectMetrics) -> list[Geometry]:
@@ -456,6 +557,50 @@ async def spatial_layers(
                         "bandwidth_m": round(bandwidth, 1),
                         "cell_m": round(kde.cell_m, 1),
                     },
+                )
+            )
+    if "akde_like" in params.methods:
+        window_s = (period.time_to - period.time_from).total_seconds()
+        corrected = corrected_range(track.times, track.lat, track.lon, window_s)
+        if corrected.autocorrelation_s is not None:
+            m.summary["autocorrelation_h"] = round(corrected.autocorrelation_s / 3600, 1)
+        if corrected.stationary and corrected.bandwidth_m is not None:
+            m.summary["effective_fixes"] = round(corrected.effective_fixes or 0.0, 1)
+            m.summary["akde_bandwidth_m"] = round(corrected.bandwidth_m, 1)
+            kde = kde_grid(track.lat, track.lon, corrected.bandwidth_m, KDE_MAX_CELLS, weights)
+            for isopleth in isopleths(kde, [0.5, 0.95]):
+                geojson = mapping(isopleth.geometry)
+                area = await hectares(session, geojson)
+                percent = round(isopleth.level * 100)
+                m.summary[f"akde{percent}_ha"] = round(area, 2)
+                out.append(
+                    Geometry(
+                        kind="akde",
+                        subject_id=subject.id,
+                        label=f"{subject.name}: corrected KDE {percent}%",
+                        level=isopleth.level,
+                        geojson=geojson,
+                        properties={
+                            "period": period.key,
+                            "hectares": round(area, 2),
+                            "bandwidth_m": round(corrected.bandwidth_m, 1),
+                            "cell_m": round(kde.cell_m, 1),
+                            "effective_fixes": round(corrected.effective_fixes or 0.0, 1),
+                            "autocorrelation_h": round(corrected.autocorrelation_s / 3600, 1)
+                            if corrected.autocorrelation_s
+                            else None,
+                        },
+                    )
+                )
+        else:
+            m.warnings.append(
+                Warning(
+                    code="range_not_stationary",
+                    subject_id=subject.id,
+                    text=(
+                        f"No corrected home range for {subject.name}: {corrected.reason}. "
+                        "The plain KDE and MCP still describe the fixes, not the range."
+                    ),
                 )
             )
     if "clusters" in params.methods:

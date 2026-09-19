@@ -56,6 +56,16 @@ MOVEMENT_LABELS: dict[str, str] = {
     "kde50_ha": "KDE 50% (ha)",
     "kde95_ha": "KDE 95% (ha)",
     "kde_bandwidth_m": "KDE bandwidth (m)",
+    "akde50_ha": "Corrected KDE 50% (ha)",
+    "akde95_ha": "Corrected KDE 95% (ha)",
+    "akde_bandwidth_m": "Corrected KDE bandwidth (m)",
+    "autocorrelation_h": "Autocorrelation time (h)",
+    "effective_fixes": "Effective fixes",
+    "strategy": "Strategy",
+    "strategy_margin": "Strategy margin (AICc)",
+    "strategy_distance_km": "Strategy distance (km)",
+    "departure_day": "Departure (day of period)",
+    "return_day": "Return (day of period)",
     "hotspot_count": "Hotspots",
     "cluster_count": "Clusters",
     "missing_share": "Missing fixes share",
@@ -346,6 +356,8 @@ MOVEMENT_KEY_FIGURES: list[tuple[str, str]] = [
     ("stationary_share", "%"),
     ("mcp95_ha", "ha"),
     ("kde95_ha", "ha"),
+    ("akde95_ha", "ha"),
+    ("strategy", ""),
     ("fixes", ""),
 ]
 GRAZING_KEY_FIGURES: list[tuple[str, str]] = [
@@ -363,6 +375,7 @@ OPTION_LABELS: list[tuple[str, str]] = [
     ("revisit_hours", "Revisit after (hours)"),
     ("methods", "Home range methods"),
     ("kde_bandwidth_m", "KDE bandwidth (m)"),
+    ("strategy", "Movement strategy"),
     ("weighting", "Weighting"),
     ("weight_key", "Attribute key"),
     ("min_absence_hours", "New visit after (hours away)"),
@@ -376,6 +389,14 @@ MOVEMENT_LIMITATIONS = [
     "The KDE is an estimate of space use that depends on the bandwidth and the grid; its "
     "isopleths are unions of cells, not smooth contours.",
     "The MCP includes ground never visited between far fixes.",
+    "The corrected KDE is our own approximation, not the AKDE of the reference implementation: "
+    "a variogram of the fixes gives the time their position takes to decorrelate, the effective "
+    "number of independent fixes follows, and the bandwidth widens with it. It needs the period "
+    "to show the whole range; when the fixes are still spreading it reports that instead of an "
+    "area.",
+    "The movement strategy is the best of four curves fitted to the net squared displacement; a "
+    "margin under two AICc units reads unclear, and a period under sixty days gets no class. "
+    "The migratory curve keeps one pace for the way out and the way back.",
     "Residence time on a regular grid depends on the cell size and is biased by irregular "
     "sampling.",
     "Day and night follow the sun's elevation, not the animal's own rhythm or the cloud cover.",
@@ -435,7 +456,8 @@ def subject_colors(document: dict[str, Any]) -> dict[str, str]:
 def fmt_figure(value: Any, unit: str) -> str:
     """The cards' number format: a percentage, or two, one or no decimals by size."""
     if value is None or not isinstance(value, int | float):
-        return "-" if value is None else str(value)
+        # a class rather than a figure (the movement strategy): a word, capitalised
+        return "-" if value is None else str(value).capitalize()
     v = float(value)
     if unit == "%":
         return f"{round(v * 100)}%"
@@ -780,6 +802,8 @@ KIND_LEGEND: dict[str, str] = {
     "area": "Areas by relative grazing pressure, from little use to heavy use",
     "mcp": "MCP 95% home range: the outline around 95% of the fixes, a faint fill",
     "kde": "KDE isopleths: the 50% core darker inside the 95% range",
+    "akde": "KDE corrected for autocorrelation: the same two isopleths, wider where the fixes "
+    "are few independent looks at the range",
     "hotspot": "Hotspots: the cells that hold most of the time",
     "cluster": "Clusters of fixes",
     "coverage": "Coverage of the fixes: the hull around a device's valid fixes, in its colour",
@@ -795,7 +819,7 @@ def map_legend(document: dict[str, Any], colors: dict[str, str]) -> list[dict[st
     entries: list[dict[str, Any]] = []
     subjects = document.get("subjects", [])
     kinds = [k for k, n in (document.get("geometries") or {}).items() if n]
-    coloured = {"mcp", "kde", "hotspot", "cluster", "coverage", "gateway"}
+    coloured = {"mcp", "kde", "akde", "hotspot", "cluster", "coverage", "gateway"}
     if any(k in coloured for k in kinds):
         if len(subjects) <= LEGEND_MAX_SUBJECTS:
             entries.extend(

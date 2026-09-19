@@ -23,12 +23,12 @@ START = datetime(2026, 5, 1, tzinfo=UTC)
 
 
 def _params(**extra):
-    return MovementParameters(
-        entity_ids=[uuid.uuid4()],
-        time_from=START,
-        time_to=START + timedelta(days=10),
-        **extra,
-    )
+    base = {
+        "entity_ids": [uuid.uuid4()],
+        "time_from": START,
+        "time_to": START + timedelta(days=10),
+    }
+    return MovementParameters(**{**base, **extra})
 
 
 def _period():
@@ -89,7 +89,8 @@ def test_few_fixes_leave_the_spatial_figures_out():
     track = _straight_walk(fixes=10)
     m = analyse_trajectory(track, _params(), _period(), "UTC")
     assert m.summary["hotspot_count"] is None
-    assert [w.code for w in m.warnings] == ["few_fixes"]
+    # ten days: too few fixes for the spatial figures, too short for a strategy, and it says so
+    assert [w.code for w in m.warnings] == ["few_fixes", "strategy_not_fitted"]
 
 
 def test_the_document_holds_subjects_periods_and_the_mean_row():
@@ -150,13 +151,62 @@ def test_the_document_holds_subjects_periods_and_the_mean_row():
     )
 
 
+def _resident_year(entity_id=None, *, days=365, sigma_m=800.0, tau_h=48.0):
+    """A year of hourly fixes wandering about a fixed range: an Ornstein-Uhlenbeck walk."""
+    rng = np.random.default_rng(21)
+    n = days * 24
+    decay = np.exp(-1 / tau_h)
+    kick = sigma_m * np.sqrt(1 - decay**2)
+    x = np.zeros(n)
+    y = np.zeros(n)
+    for i in range(1, n):
+        x[i] = x[i - 1] * decay + rng.normal(0, kick)
+        y[i] = y[i - 1] * decay + rng.normal(0, kick)
+    times = [START.timestamp() + i * 3600 for i in range(n)]
+    lon = LON + x / (M_PER_DEG_LAT * np.cos(np.radians(LAT)))
+    return trajectory_from(
+        entity_id or uuid.uuid4(), times, list(LAT + y / M_PER_DEG_LAT), list(lon)
+    )
+
+
+def test_a_year_at_home_reads_resident_and_the_chart_carries_the_fit():
+    """Phase 2, section 4: the class on the summary, the fitted curve dashed over the NSD."""
+    track = _resident_year()
+    period = Period(time_from=START, time_to=START + timedelta(days=365))
+    params = _params(time_to=START + timedelta(days=365))
+    m = analyse_trajectory(track, params, period, "UTC")
+    assert m.summary["strategy"] == "resident", m.summary
+    assert isinstance(m.summary["strategy_margin"], float)
+    assert m.summary["strategy_distance_km"] is not None
+    assert m.nsd_fit and len(m.nsd_fit) >= 300
+    subject = Subject(id=track.entity_id, name="Aldo", type="Elephant")
+    document = build_document(
+        [subject], [period], {("main", subject.id): m}, params, input_count=0, excluded_count=0
+    )
+    nsd = next(c for c in document.charts if c.key == "nsd")
+    assert [s.get("fit", False) for s in nsd.series] == [False, True]
+    assert nsd.series[1]["subject"] == str(subject.id)
+    # the mean row skips the class, which is a word and not a number
+    assert ResultDocument.model_validate(document.model_dump(mode="json"))
+
+
+def test_the_strategy_can_be_switched_off():
+    track = _resident_year(days=90)
+    period = Period(time_from=START, time_to=START + timedelta(days=90))
+    m = analyse_trajectory(
+        track, _params(time_to=START + timedelta(days=90), strategy=False), period, "UTC"
+    )
+    assert m.summary["strategy"] is None and m.nsd_fit == []
+    assert not [w for w in m.warnings if w.code.startswith("strategy")]
+
+
 def test_the_module_is_in_the_catalogue():
     import shared.analysis.modules  # noqa: F401
     from shared.analysis import MODULES
 
     # the boundary test re-imports the package, so compare by name, not identity
     module = MODULES["movement"]
-    assert module.key == "movement" and module.version == "movement/1"
+    assert module.key == "movement" and module.version == "movement/2"
     assert module.parameters.__name__ == MovementParameters.__name__
 
 

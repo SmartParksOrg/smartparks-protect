@@ -53,6 +53,14 @@ const RANGES: [string, string][] = [
  * under it says how much the run will read and what to change when a bound is crossed; Run
  * queues the analysis and hands the run back.
  */
+/** The short names of the home range methods on the folded method line. */
+const METHOD_SHORT: Record<string, string> = {
+  mcp: "MCP",
+  kde: "KDE",
+  akde_like: "KDE+",
+  clusters: "CLUSTERS",
+};
+
 export function MovementForm({
   projectId,
   state,
@@ -309,12 +317,16 @@ export function MovementForm({
                 gap: state.method.gap,
                 speed: state.method.speed_max,
                 cell: state.method.cell,
-                methods:
+                methods: [
                   state.method.methods.length === 0
                     ? t("no home range")
                     : state.method.methods
-                        .map((m) => m.toUpperCase())
+                        .map((m) => METHOD_SHORT[m] ?? m.toUpperCase())
                         .join(", "),
+                  state.method.strategy ? t("Movement strategy") : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
               },
             )}
           </span>
@@ -365,9 +377,19 @@ export function MovementForm({
                 ? t("MCP 95%")
                 : m === "kde"
                   ? t("KDE 50% and 95%")
-                  : t("Clusters")}
+                  : m === "akde_like"
+                    ? t("KDE, corrected for autocorrelation")
+                    : t("Clusters")}
             </label>
           ))}
+          <label className="flex items-center gap-2 text-sm">
+            <Switch
+              checked={state.method.strategy}
+              onCheckedChange={(on) => method({ strategy: on })}
+              aria-label={t("Movement strategy")}
+            />
+            {t("Movement strategy")}
+          </label>
           {state.method.methods.includes("kde") && (
             <div className="space-y-1">
               <Label className="text-xs">{t("KDE bandwidth (m)")}</Label>

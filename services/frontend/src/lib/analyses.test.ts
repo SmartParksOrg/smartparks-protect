@@ -76,6 +76,7 @@ describe("analysis form state", () => {
       cell: 100,
       methods: ["mcp"],
       kde_bandwidth: 250,
+      strategy: true,
     });
     expect(writeFormState(state).toString()).toBe(
       "entity=a&gap=6&methods=mcp&kde=250",
@@ -108,7 +109,8 @@ describe("analysis form state", () => {
       gap_hours: 4,
       max_speed_mps: 15,
       cell_m: 50,
-      methods: ["mcp", "kde", "clusters"],
+      methods: ["mcp", "kde", "akde_like", "clusters"],
+      strategy: true,
     });
     expect(parameters).not.toHaveProperty("kde_bandwidth_m");
   });

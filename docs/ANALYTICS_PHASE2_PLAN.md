@@ -63,6 +63,15 @@ How, in `shared/shared/analysis/primitives/homerange.py`:
 What it is not: the full AKDE of the reference implementation (a fitted continuous-time
 movement model with its own kernel). The document's limitations say so in one line.
 
+As built (2026-09-19): step 2's rule is an eighth of the period, not half. The lags drawn reach
+a quarter of the period, and the plateau has to lie inside them to be measured rather than
+extrapolated; over a month a random walk and a range that takes a week to cross fit the same
+rising curve, and the simulated random walks of the tests passed the half rule as stationary.
+Step 4 uses the fitted range variance in the reference rule as well as the effective sample
+size, which is the same rule with better inputs. Step 5 holds on average over eight simulated
+tracks rather than on any one: forty days of a two-day range is ten to twenty independent
+looks, and one track's own spread is that far from the process's either way.
+
 ## 4. Movement: the strategy from the net squared displacement
 
 What: a classification per subject of the NSD curve the module already computes into
@@ -83,6 +92,13 @@ How, in `primitives/strategy.py`:
    curve without a class and says why.
 5. Tests on synthetic NSD curves of each shape, with noise, and one real track from the
    fixtures.
+
+As built (2026-09-19): the migratory curve keeps one time scale for the way out and the way
+back (four parameters, not five), and a departure must lie at least a week inside the period —
+a step before the first fix is a plateau and belongs to the resident curve, a step after the
+last fix is a line and belongs to the nomad's; without that bound the dispersal curve imitated
+both and a simulated resident year read "unclear". No real track is in the fixtures yet; the
+dev-server run of P8 is that test.
 
 ## 5. Landscape: the first environmental provider
 
@@ -150,11 +166,11 @@ the plan's level 4 and wait for the users' reading of level 3.
 
 ## 8. Tasks
 
-- [ ] P1 `primitives/homerange.py`: the variogram, the Ornstein-Uhlenbeck fit, the effective
+- [x] P1 `primitives/homerange.py`: the variogram, the Ornstein-Uhlenbeck fit, the effective
   sample size, the corrected KDE; unit tests on a simulated track.
-- [ ] P2 `primitives/strategy.py`: the four NSD models, the selection with its margin, the
+- [x] P2 `primitives/strategy.py`: the four NSD models, the selection with its margin, the
   parameters people read; unit tests on synthetic curves.
-- [ ] P3 the movement module: the method and the classification in the document, the fitted
+- [x] P3 the movement module: the method and the classification in the document, the fitted
   curve on the NSD chart, the class on the cards and in the table, the limitations; the report.
 - [x] P4 `environment/copernicus.py`: authentication, the process graph, the synchronous job,
   the time series per area; a recorded answer as fixture; the settings and the System health

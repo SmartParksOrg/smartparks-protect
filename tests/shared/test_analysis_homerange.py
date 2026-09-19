@@ -67,3 +67,102 @@ def test_weights_move_the_density():
     heavy = kde_grid(lat, lon, 200.0, 100, weights=np.array([9.0, 1.0]))
     fifty = isopleths(heavy, [0.5])[0]
     assert fifty.geometry.contains(Point(LON, LAT))
+
+
+# --- the autocorrelation-corrected range (docs/ANALYTICS_PHASE2_PLAN.md, section 3) ---
+
+from shared.analysis.primitives.homerange import (  # noqa: E402
+    corrected_range,
+    effective_sample_size,
+    variogram,
+)
+
+
+def _ou_track(
+    tau_s: float, sigma_m: float, days: int, interval_s: float = 3600.0, seed: int = 11
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """An Ornstein-Uhlenbeck walk with a known range: per-axis standard deviation `sigma_m`
+    at rest, decorrelating over `tau_s`, sampled every `interval_s`."""
+    rng = np.random.default_rng(seed)
+    n = int(days * 86_400 / interval_s)
+    decay = np.exp(-interval_s / tau_s)
+    kick = sigma_m * np.sqrt(1 - decay**2)
+    x = np.zeros(n)
+    y = np.zeros(n)
+    x[0], y[0] = rng.normal(0, sigma_m), rng.normal(0, sigma_m)
+    for i in range(1, n):
+        x[i] = x[i - 1] * decay + rng.normal(0, kick)
+        y[i] = y[i - 1] * decay + rng.normal(0, kick)
+    times = np.arange(n) * interval_s
+    return times, LAT + y / M_PER_DEG_LAT, LON + x / M_PER_DEG_LON
+
+
+def test_the_variogram_of_an_ou_walk_rises_to_its_plateau():
+    tau, sigma = 2 * 86_400.0, 500.0
+    times, lat, lon = _ou_track(tau, sigma, days=120)
+    v = variogram(times, lat, lon, max_lag_s=30 * 86_400)
+    assert v.lag_s.size >= 10
+    # the semivariance of two axes with variance sigma² each rises to 2 sigma²
+    assert v.semivariance_m2[-1] == pytest.approx(2 * sigma**2, rel=0.3)
+    assert v.semivariance_m2[0] < v.semivariance_m2[-1] / 5
+
+
+def test_hourly_fixes_two_days_apart_in_memory_are_few_independent_ones():
+    n_eff = effective_sample_size(720, 3600.0, 2 * 86_400.0)
+    assert 5 < n_eff < 20, n_eff
+    assert effective_sample_size(720, 3600.0, 60.0) == pytest.approx(720, rel=0.05)
+
+
+def test_the_corrected_range_recovers_a_known_range_where_the_plain_kde_falls_short():
+    """The exit criterion of the phase: simulated tracks with a known range, the corrected 95
+    percent area within twenty percent of the truth where the plain KDE is far below it.
+
+    Over several tracks and not one: forty days of a range that takes two days to cross is
+    ten or twenty independent looks at it, and a single track's own spread is that far from
+    the process's either way. What an estimator can promise is to be right on average, and
+    the plain KDE is not."""
+    tau, sigma, days = 2 * 86_400.0, 500.0, 40
+    truth_ha = math.pi * sigma**2 * (-2 * math.log(0.05)) / 10_000
+    corrected: list[float] = []
+    plain: list[float] = []
+    for seed in range(11, 19):
+        times, lat, lon = _ou_track(tau, sigma, days=days, seed=seed)
+        found = corrected_range(times, lat, lon, days * 86_400.0)
+        assert found.stationary, found.reason
+        assert found.autocorrelation_s == pytest.approx(tau, rel=0.6)
+        assert found.effective_fixes is not None and found.effective_fixes < len(times) / 10
+        assert found.bandwidth_m is not None
+        corrected.append(
+            isopleths(kde_grid(lat, lon, found.bandwidth_m, KDE_MAX_CELLS), [0.95])[0].hectares
+        )
+        plain.append(
+            isopleths(kde_grid(lat, lon, reference_bandwidth(lat, lon), KDE_MAX_CELLS), [0.95])[
+                0
+            ].hectares
+        )
+    assert np.mean(corrected) == pytest.approx(truth_ha, rel=0.2), (np.mean(corrected), truth_ha)
+    assert np.mean(plain) < 0.8 * truth_ha, (np.mean(plain), truth_ha)
+
+
+@pytest.mark.parametrize("seed", [5, 6, 7])
+def test_a_walk_that_never_settles_is_reported_not_computed(seed):
+    rng = np.random.default_rng(seed)
+    n = 24 * 30
+    x = np.cumsum(rng.normal(0, 200, n))
+    y = np.cumsum(rng.normal(0, 200, n))
+    times = np.arange(n) * 3600.0
+    found = corrected_range(times, LAT + y / M_PER_DEG_LAT, LON + x / M_PER_DEG_LON, n * 3600.0)
+    assert not found.stationary
+    assert found.reason is not None
+    assert found.bandwidth_m is None
+
+
+def test_a_range_that_decorrelates_slower_than_half_the_period_is_not_stationary_either():
+    times, lat, lon = _ou_track(20 * 86_400.0, 500.0, days=30, seed=2)
+    found = corrected_range(times, lat, lon, 30 * 86_400.0)
+    assert not found.stationary
+
+
+def test_too_few_fixes_give_no_variogram():
+    found = corrected_range(np.arange(5) * 3600.0, np.full(5, LAT), np.full(5, LON), 86_400.0)
+    assert not found.stationary and found.reason is not None

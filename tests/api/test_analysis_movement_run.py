@@ -99,7 +99,7 @@ async def test_a_movement_run_over_fixes(client, db):
     created = await client.post(base, json={"module": "movement", "parameters": params}, headers=h)
     assert created.status_code == 201, created.text
     run_id = uuid.UUID(created.json()["id"])
-    assert created.json()["method_version"] == "movement/1"
+    assert created.json()["method_version"] == "movement/2"
 
     await run_analysis(db, await db.get(AnalysisRun, run_id))
     read = await client.get(f"{base}/{run_id}", headers=h)
@@ -120,7 +120,11 @@ async def test_a_movement_run_over_fixes(client, db):
     assert document["subjects"][0]["type"] == "Animal"
     assert {c["key"] for c in document["charts"]} >= {"daily_distance", "turning", "nsd"}
     # half the day has no fixes at all, which is missing data, not a gap between fixes
-    assert [w["code"] for w in document["warnings"] if w["level"] == "warning"] == ["missing_fixes"]
+    # a day's straight walk settles into no range, and the corrected KDE says so (phase 29)
+    assert [w["code"] for w in document["warnings"] if w["level"] == "warning"] == [
+        "missing_fixes",
+        "range_not_stationary",
+    ]
 
     stored = (
         await db.execute(
@@ -142,6 +146,10 @@ async def test_a_movement_run_over_fixes(client, db):
     kde = {row.level: row.area_m2 for row in by_kind["kde"]}
     assert set(kde) == {0.5, 0.95} and 0 < kde[0.5] < kde[0.95]
     assert summary["kde95_ha"] == pytest.approx(kde[0.95] / 10_000, rel=0.01)
+    # a day's straight walk settles into no range and is too short for a strategy; both say so
+    codes = {w["code"] for w in document["warnings"]}
+    assert {"range_not_stationary", "strategy_not_fitted"} <= codes, codes
+    assert summary["akde95_ha"] is None and summary["strategy"] is None
     assert summary["mcp95_ha"] == 0 and summary["kde_bandwidth_m"] > 0
     # a hundred-metre cell over hundred-metre steps: the walk and the rest are clusters
     assert summary["cluster_count"] == len(by_kind["cluster"]) >= 1

@@ -51,6 +51,8 @@ export interface ResultChartSeries {
   subject?: string;
   period?: string;
   name?: string;
+  /** Movement: a fitted curve over the subject's own series, drawn dashed in its colour. */
+  fit?: boolean;
   /** Grazing: the area the series belongs to, and the herd when two are compared. */
   area?: string;
   herd?: string;
@@ -102,15 +104,18 @@ export interface MethodOptions {
   methods: string[];
   /** Metres, or null for the reference bandwidth. */
   kde_bandwidth: number | null;
+  /** Read the movement strategy off the net squared displacement (phase 2, section 4). */
+  strategy: boolean;
 }
 
-export const ALL_METHODS = ["mcp", "kde", "clusters"];
+export const ALL_METHODS = ["mcp", "kde", "akde_like", "clusters"];
 export const DEFAULT_METHOD: MethodOptions = {
   gap: 4,
   speed_max: 15,
   cell: 100,
   methods: ALL_METHODS,
   kde_bandwidth: null,
+  strategy: true,
 };
 
 /** The grazing page's own choices (plan, section 9.4): the areas, the weighting, the second
@@ -230,6 +235,7 @@ export function readFormState(params: URLSearchParams): FormState {
       kde_bandwidth: params.get("kde")
         ? numberOr(params.get("kde"), 0) || null
         : null,
+      strategy: params.get("strategy") !== "0",
     },
     grazing: {
       areas: params.getAll("area"),
@@ -271,6 +277,7 @@ export function writeFormState(state: FormState): URLSearchParams {
   if (m.methods.join(",") !== ALL_METHODS.join(","))
     params.set("methods", m.methods.join(","));
   if (m.kde_bandwidth) params.set("kde", String(m.kde_bandwidth));
+  if (!m.strategy) params.set("strategy", "0");
   const c = state.contact;
   if (!c.bluetooth) params.set("bluetooth", "0");
   if (!c.proximity) params.set("proximity", "0");
@@ -349,6 +356,7 @@ export function movementParameters(
     cell_m: m.cell,
     methods: m.methods,
     ...(m.kde_bandwidth ? { kde_bandwidth_m: m.kde_bandwidth } : {}),
+    strategy: m.strategy,
   };
 }
 
@@ -521,12 +529,12 @@ export function subjectSummary(
   document: ResultDocument,
   period: string,
   subjectId: string,
-): Record<string, number | null> | null {
+): Record<string, number | string | null> | null {
   const block = document.summary[period];
   if (!block || typeof block !== "object") return null;
   const row = (block as Record<string, unknown>)[subjectId];
   return row && typeof row === "object"
-    ? (row as Record<string, number | null>)
+    ? (row as Record<string, number | string | null>)
     : null;
 }
 
@@ -811,6 +819,7 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
         : ALL_METHODS,
       kde_bandwidth:
         typeof p.kde_bandwidth_m === "number" ? p.kde_bandwidth_m : null,
+      strategy: p.strategy !== false,
     },
     grazing: {
       areas: list("feature_ids"),

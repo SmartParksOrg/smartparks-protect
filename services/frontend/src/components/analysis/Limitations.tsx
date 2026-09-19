@@ -26,6 +26,16 @@ export function MovementLimitations() {
         <li>{t("The MCP includes ground never visited between far fixes.")}</li>
         <li>
           {t(
+            "The corrected KDE is our own approximation, not the AKDE of the reference implementation: a variogram of the fixes gives the time their position takes to decorrelate, the effective number of independent fixes follows, and the bandwidth widens with it. It needs the period to show the whole range; when the fixes are still spreading it reports that instead of an area.",
+          )}
+        </li>
+        <li>
+          {t(
+            "The movement strategy is the best of four curves fitted to the net squared displacement; a margin under two AICc units reads unclear, and a period under sixty days gets no class. The migratory curve keeps one pace for the way out and the way back.",
+          )}
+        </li>
+        <li>
+          {t(
             "Residence time on a regular grid depends on the cell size and is biased by irregular sampling.",
           )}
         </li>

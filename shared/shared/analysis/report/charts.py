@@ -75,6 +75,8 @@ def series_name(series: dict[str, Any], labels: dict[str, str]) -> str:
         parts.append(f"herd {series['herd']}")
     if series.get("period") == "comparison":
         parts.append("before")
+    if series.get("fit"):
+        parts.append("fitted")
     name = " · ".join(str(p) for p in parts if p)
     return name[:40] + "…" if len(name) > 41 else name
 
@@ -133,12 +135,13 @@ def _cartesian(
             x, _ = _x_values([d[0] for d in data])
             y = np.array([np.nan if d[1] is None else float(d[1]) for d in data])
             comparison = s.get("period") == "comparison"
+            fit = bool(s.get("fit"))
             ax.plot(
                 x,
                 y,
                 color=_color(s, i, colors),
-                linewidth=1.2,
-                linestyle="--" if comparison else "-",
+                linewidth=1.0 if fit else 1.2,
+                linestyle=":" if fit else "--" if comparison else "-",
                 alpha=0.55 if comparison else 1.0,
                 label=series_name(s, labels),
             )

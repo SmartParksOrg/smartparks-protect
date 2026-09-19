@@ -4,6 +4,12 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+### Added
+
+- The movement analysis has a fourth home range method, **KDE corrected for autocorrelation** (phase 29, decision D244). Hourly fixes of an animal whose position takes two days to decorrelate are not seven hundred independent looks at its range but a few dozen, and a plain KDE drawn from them is too small. The method draws a variogram of the fixes, fits an Ornstein-Uhlenbeck curve to it, takes the effective number of independent fixes from the autocorrelation time it finds, and widens the kernel accordingly; on simulated tracks with a known range it is right on average where the plain KDE runs thirty percent short. It is our own approximation and is named as such, never AKDE. When the period does not show the whole range — the fixes are still spreading at the longest lags drawn — it says so instead of drawing one. The autocorrelation time and the effective fixes stand beside the area so a reader sees why it is larger.
+
+- The movement analysis reads a **movement strategy** off the net squared displacement (phase 29): resident, migratory, dispersal or nomadic, from the four curves of Bunnefeld and others (2011) fitted to the NSD per day, the lowest corrected Akaike information winning. The class is on the subject's card and in the table with the figures a reader wants beside it — the departure and return days and the distance between ranges for a migrant, the departure and distance for a disperser — and the fitted curve is drawn dotted over the NSD chart. A margin under two AICc units reads "unclear" rather than a class the data does not support, and a period under sixty days gets no class and says why. The switch is on by default and in the method options.
+
 ### Fixed
 
 - Clearing a device's fixed place left it standing there. The place is stamped on the current states and no record put it there, so nothing but a rebuild takes it off: the device and the entity it is on stayed at the old place, marked "fixed place", after the place was cleared. Clearing now rebuilds both from what the device reports, which for a reader that reports nothing is nowhere. (Review of the two days' work, 2026-09-19.)

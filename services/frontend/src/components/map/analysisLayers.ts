@@ -39,6 +39,7 @@ export const ANALYSIS_KINDS = [
   "area",
   "mcp",
   "kde",
+  "akde",
   "hotspot",
   "cluster",
   "coverage",
@@ -50,6 +51,7 @@ const FILL_OPACITY: Record<string, number> = {
   area: 0.35,
   mcp: 0.08,
   kde: 0.22,
+  akde: 0.16,
   hotspot: 0.45,
   cluster: 0.18,
   coverage: 0.1,
@@ -124,6 +126,7 @@ export function decorateAnalysisFeatures(
     if (kind === "area") return -1;
     if (kind === "coverage") return -0.5;
     if (kind === "mcp") return 0;
+    if (kind === "akde") return level >= 0.9 ? 0.5 : 1.5;
     if (kind === "kde") return level >= 0.9 ? 1 : 2;
     if (kind === "cluster") return 3;
     return 4;

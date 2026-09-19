@@ -72,6 +72,7 @@ export function ResultChart({
           : ([
               labels?.[s.subject ?? ""] ?? s.subject,
               s.period === "comparison" ? t("before") : null,
+              s.fit ? t("fitted") : null,
             ]
               .filter(Boolean)
               .join(" · ") ?? `${i}`),
@@ -157,12 +158,16 @@ export function ResultChart({
         showSymbol: false,
         connectNulls: true,
         lineStyle: {
-          width: 1.5,
-          type: s.period === "comparison" ? "dashed" : "solid",
+          width: s.fit ? 1.2 : 1.5,
+          type: s.fit
+            ? "dotted"
+            : s.period === "comparison"
+              ? "dashed"
+              : "solid",
         },
         itemStyle: s.period === "comparison" ? { opacity: 0.55 } : undefined,
         areaStyle:
-          chart.kind === "line" && chart.series.length === 1
+          chart.kind === "line" && chart.series.length === 1 && !s.fit
             ? { opacity: 0.1 }
             : undefined,
       })),

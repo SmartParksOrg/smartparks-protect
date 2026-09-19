@@ -54,9 +54,17 @@ export function AreaCards({
       )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {areas.map((area) => {
-          const main = subjectSummary(document, "main", area.id);
+          // an area's figures are all numbers; the summary type also admits the movement
+          // strategy's word, which never appears here
+          const main = subjectSummary(document, "main", area.id) as Record<
+            string,
+            number | null
+          > | null;
           const before = hasComparison
-            ? subjectSummary(document, "comparison", area.id)
+            ? (subjectSummary(document, "comparison", area.id) as Record<
+                string,
+                number | null
+              > | null)
             : null;
           const pressure = main?.relative_pressure ?? null;
           return (

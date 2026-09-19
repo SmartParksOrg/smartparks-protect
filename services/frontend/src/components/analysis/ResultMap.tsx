@@ -477,6 +477,7 @@ export function ResultMap({
     area: t("Areas by pressure"),
     mcp: t("MCP 95%"),
     kde: t("KDE 50% and 95%"),
+    akde: t("Corrected KDE 50% and 95%"),
     hotspot: t("Hotspots"),
     cluster: t("Clusters"),
     coverage: t("Coverage of the fixes"),

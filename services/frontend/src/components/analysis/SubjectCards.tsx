@@ -18,8 +18,13 @@ export function SubjectCards({
 }) {
   const { t } = useTranslation();
   const hasComparison = document.periods.some((p) => p.key === "comparison");
-  const show = (v: number | null | undefined, unit: string): string => {
+  const show = (
+    v: number | string | null | undefined,
+    unit: string,
+  ): string => {
     if (v === null || v === undefined) return "–";
+    // a class rather than a figure (the movement strategy) reads by its label
+    if (typeof v === "string") return labels[`strategy_${v}`] ?? v;
     if (unit === "%") return `${Math.round(v * 100)}%`;
     const text =
       Math.abs(v) >= 100
