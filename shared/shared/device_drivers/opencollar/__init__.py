@@ -56,6 +56,13 @@ MIN_VALID_UNIX = 1_000_000_000  # 2001; the firmware's init_time default is 2020
 PORT_POSITION = 2
 PORT_SETTINGS = 3
 PORT_STATUS = 4
+#: Error flags that describe an attempt rather than a fault. A GPS attempt that got no fix is a
+#: fact about the sky and the antenna, not about the device, and it comes with every status of
+#: a device under canopy; raising a device error event on it drowns the one that matters — the
+#: `ublox` flag, which says the receiver itself did not answer and usually needs a person to go
+#: and look (Tim, 2026-09-19). The flag stays in the state, on the health card and in the device
+#: performance figures; it only raises no event.
+ROUTINE_ERROR_FLAGS: frozenset[str] = frozenset({"ublox_fix"})
 PORT_FENCE = 12
 PORT_SHORT_POSITION = 13
 PORT_FLASH_STATUS = 14
@@ -973,7 +980,9 @@ class OpenCollarDriver:
             **({"rf_scan_enabled": bool(features & 2)} if layout.rf_scan_bit else {}),
         }
         records.states.append(DecodedState(time=time, state=state, record_type="status"))
-        active_errors = [name for name, on in errors.items() if on]
+        active_errors = [
+            name for name, on in errors.items() if on and name not in ROUTINE_ERROR_FLAGS
+        ]
         if active_errors:
             records.events.append(
                 DecodedEvent(

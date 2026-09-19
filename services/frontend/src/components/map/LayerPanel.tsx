@@ -10,8 +10,16 @@ import {
   Route,
   X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
+import { GATEWAY_COLORS } from "@/components/map/layers";
 import type {
   CoverageResponse,
   EntityGroup,
@@ -53,6 +61,7 @@ import {
   showAllFeatures,
   showAllGateways,
   isGatewayVisible,
+  gatewayGroup,
 } from "@/components/map/layerChoices";
 import type {
   DeviceFeatureProperties,
@@ -1100,6 +1109,20 @@ export function LayerPanel({
   const placed = gateways
     .filter((g) => g.geometry)
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  // the two groups of the gateway layer (Tim, 2026-09-19): the network hears these, and it
+  // does not hear those, which is what somebody opening the panel wants to know first
+  const gatewayGroups: ["online" | "offline", Gateway[], boolean][] = [
+    [
+      "online",
+      placed.filter((g) => gatewayGroup(g.status) === "online"),
+      choices.online_gateways ?? true,
+    ],
+    [
+      "offline",
+      placed.filter((g) => gatewayGroup(g.status) === "offline"),
+      choices.offline_gateways ?? true,
+    ],
+  ];
   const PERIODS = [24, 168, 720, 2160];
   const periodLabel = (hours: number) =>
     hours < 48
@@ -1550,68 +1573,115 @@ export function LayerPanel({
           </div>
         )}
         {gatewaysOpen &&
-          placed
-            .filter((g) => matches(g.display_name, term))
-            .map((g) => {
-              const on =
-                choices.gateways && !choices.hidden_gateways.includes(g.id);
-              const heard = heardBy.get(g.id);
-              return (
-                <Row key={g.id} depth={1}>
-                  <Check
-                    checked={on}
-                    label={g.display_name}
-                    onChange={(v) =>
-                      onChange(
-                        v
-                          ? showGateway(
-                              choices,
-                              g.id,
-                              placed.map((x) => x.id),
-                            )
-                          : {
-                              ...choices,
-                              hidden_gateways: toggleInList(
-                                choices.hidden_gateways,
-                                g.id,
-                                false,
-                              ),
-                            },
-                      )
-                    }
-                  />
-                  <RadioTower
-                    className={`size-4 shrink-0 ${on ? "text-primary" : "text-muted-foreground"}`}
-                  />
-                  <button
-                    type="button"
-                    className={`${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
-                    onClick={() => onPickGateway(g.id)}
-                  >
-                    {g.display_name}
-                  </button>
-                  {choices.coverage && heard ? (
-                    <span
-                      className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline"
-                      title={t("Heard positions and share")}
-                    >
-                      {heard.heard} · {Math.round(heard.share * 100)}%
-                    </span>
-                  ) : (
-                    <span
-                      className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline"
-                      title={formatTime(g.last_seen_at)}
-                    >
-                      {formatAgo(g.last_seen_at, now)}
-                    </span>
-                  )}
-                  <Locate
-                    label={t("Show on map")}
-                    onClick={() => onPickGateway(g.id)}
-                  />
-                </Row>
-              );
-            })}
+          gatewayGroups.map(([group, members, on]) => (
+            <Fragment key={group}>
+              <Row depth={1}>
+                <Check
+                  checked={choices.gateways && on}
+                  label={
+                    group === "online"
+                      ? t("Online gateways")
+                      : t("Offline gateways")
+                  }
+                  onChange={(v) =>
+                    onChange({
+                      ...choices,
+                      gateways: v ? true : choices.gateways,
+                      [group === "online"
+                        ? "online_gateways"
+                        : "offline_gateways"]: v,
+                    })
+                  }
+                />
+                <span
+                  className="inline-block size-2.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor:
+                      group === "online"
+                        ? GATEWAY_COLORS.online
+                        : GATEWAY_COLORS.offline,
+                  }}
+                  aria-hidden
+                />
+                <span className={`${nameClass} font-medium`}>
+                  {group === "online"
+                    ? t("Online")
+                    : t("Offline or never seen")}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {members.length}
+                </span>
+              </Row>
+              {members
+                .filter((g) => matches(g.display_name, term))
+                .map((g) => {
+                  const on = isGatewayVisible(g.id, choices, g.status);
+                  const heard = heardBy.get(g.id);
+                  return (
+                    <Row key={g.id} depth={2}>
+                      <Check
+                        checked={on}
+                        label={g.display_name}
+                        onChange={(v) =>
+                          onChange(
+                            v
+                              ? showGateway(
+                                  choices,
+                                  g.id,
+                                  placed.map((x) => x.id),
+                                  g.status,
+                                )
+                              : {
+                                  ...choices,
+                                  hidden_gateways: toggleInList(
+                                    choices.hidden_gateways,
+                                    g.id,
+                                    false,
+                                  ),
+                                },
+                          )
+                        }
+                      />
+                      <RadioTower
+                        className="size-4 shrink-0"
+                        style={{
+                          color: on
+                            ? (GATEWAY_COLORS[g.status] ??
+                              GATEWAY_COLORS.online)
+                            : undefined,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className={`${nameClass} text-left ${on ? "" : "text-muted-foreground"}`}
+                        onClick={() => onPickGateway(g.id)}
+                      >
+                        {g.display_name}
+                      </button>
+                      {choices.coverage && heard ? (
+                        <span
+                          className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline"
+                          title={t("Heard positions and share")}
+                        >
+                          {heard.heard} · {Math.round(heard.share * 100)}%
+                        </span>
+                      ) : (
+                        <span
+                          className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline"
+                          title={formatTime(g.last_seen_at)}
+                        >
+                          {formatAgo(g.last_seen_at, now)}
+                        </span>
+                      )}
+                      <Locate
+                        label={t("Show on map")}
+                        onClick={() => onPickGateway(g.id)}
+                      />
+                    </Row>
+                  );
+                })}
+            </Fragment>
+          ))}
         {gatewaysOpen && gateways.length > placed.length && (
           <div className="px-2 py-2 text-xs text-muted-foreground">
             {t("{{count}} gateways without a position are not on the map.", {
@@ -1622,7 +1692,7 @@ export function LayerPanel({
       </div>
       {footer(
         ["cov", "gw"],
-        placed.filter((g) => isGatewayVisible(g.id, choices)).length,
+        placed.filter((g) => isGatewayVisible(g.id, choices, g.status)).length,
         placed.length,
         () => onChange(showAllGateways(choices)),
         () => onChange(hideAllGateways(choices)),

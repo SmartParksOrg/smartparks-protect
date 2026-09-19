@@ -920,7 +920,28 @@ export interface GatewayFeatureProperties {
   gateway_id: string;
   name: string;
   last_seen_at: string | null;
+  /** The network's word for it: online, offline or unknown (never seen). */
+  status: string;
 }
+
+/** A gateway's colour by its state: a live one in the map's dark green, an offline one in the
+ * red a critical marker uses, because an offline gateway is the thing a person opening the map
+ * needs to see first (Tim, 2026-09-19); one the network has never seen in grey. */
+export const GATEWAY_COLORS: Record<string, string> = {
+  online: "#2F4A3A",
+  offline: "#A13D2D",
+  unknown: "#8A9590",
+};
+
+const gatewayColor = [
+  "match",
+  ["get", "status"],
+  "offline",
+  GATEWAY_COLORS.offline,
+  "unknown",
+  GATEWAY_COLORS.unknown,
+  GATEWAY_COLORS.online,
+];
 
 /** Gateways as small squares under the entities: the network, not the animals. The coverage
  * analysis of decision D107 will draw on the same source later. */
@@ -938,7 +959,7 @@ export function ensureGatewayLayers(map: MapLibreMap): void {
       source: SOURCES.gateways,
       paint: {
         "circle-radius": 6,
-        "circle-color": "#2F4A3A",
+        "circle-color": gatewayColor as unknown as string,
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": 2,
         "circle-opacity": 0.9,
@@ -961,7 +982,7 @@ export function ensureGatewayLayers(map: MapLibreMap): void {
         "text-optional": true,
       },
       paint: {
-        "text-color": "#2F4A3A",
+        "text-color": gatewayColor as unknown as string,
         "text-halo-color": "#ffffff",
         "text-halo-width": 1,
       },

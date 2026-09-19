@@ -462,3 +462,25 @@ def test_uptime_is_hours_before_firmware_4_and_days_since():
     new = bytes(old[:10]) + bytes([0x72]) + bytes(old[11:])
     records = OpenCollarDriver().decode(event(4, (bytes([0xF4, 14]) + new).hex()))
     assert {m.metric_key: m.value for m in records.measurements}["uptime"] == 12 * 86400
+
+
+def _status_frame(err: int) -> str:
+    """The fixture's status message (id 0xF4, a length byte, fourteen bytes) with its error
+    byte replaced."""
+    frame = bytearray(bytes.fromhex(load()[4]["data_hex"]))
+    frame[3] = err  # id, length, reset reason, then the error flags
+    return frame.hex()
+
+
+def test_a_failed_fix_attempt_is_no_device_error_event():
+    """A GPS attempt without a fix is routine under canopy and raises nothing; the flag stays
+    on the state where the health card and the device performance figures read it (Tim,
+    2026-09-19). The receiver not answering at all is the error that needs somebody."""
+    routine = driver.decode(event(4, _status_frame(32)))  # ublox_fix alone
+    assert routine.states[0].state["errors"]["ublox_fix"] is True
+    assert [e.event_type for e in routine.events] == []
+
+    fault = driver.decode(event(4, _status_frame(4 | 32)))  # ublox, with a failed fix beside it
+    assert [e.event_type for e in fault.events] == ["device_error"]
+    assert fault.events[0].context["errors"] == ["ublox"]
+    assert "ublox_fix" not in fault.events[0].title

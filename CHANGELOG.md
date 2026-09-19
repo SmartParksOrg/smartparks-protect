@@ -2,6 +2,14 @@
 
 All notable changes to Smart Parks Protect are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [semantic versioning](https://semver.org/). Servers run tagged releases, never `main`.
 
+## Unreleased
+
+### Changed
+
+- A GPS attempt that got no fix no longer raises a device error event (Tim, 2026-09-19). The `ublox_fix` flag is a fact about the sky and the antenna, not about the device, and it comes with every status of a device under canopy; an event on each one drowned the flag that matters, `ublox`, which says the receiver itself did not answer and usually needs a person to go and look. The flag stays in the state, on the health card and in the device performance figures; it only raises no event, so no automation fires on it.
+
+- An offline gateway is a red dot on the live map, not a green one (Tim, 2026-09-19): the same red a critical marker uses, because an offline gateway is the thing a person opening the map needs to see first. A gateway the network has never seen is grey. The layers panel lists the gateways in two groups, online and offline, each switched as a whole; ticking a gateway switches its group on.
+
 ## v2.9.0, 2026-09-19
 
 Phase 29 closed: the movement methods that the v2.8.0 tag left unbuilt — the autocorrelation-corrected home range and the movement strategy — read by Tim on the dev server over SP050969 (corrected 95% range 38.9 ha against the plain KDE's 25.6, resident with a clear margin) and released the same day. With them the review of the two days' contact tracing work and the satellite test flake, found to be a test's own doing. No migration; the schema stays at revision 0046.

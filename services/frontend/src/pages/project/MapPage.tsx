@@ -1209,7 +1209,7 @@ export function MapPage() {
     setGateways(
       map,
       gateways.data
-        .filter((g) => g.geometry && isGatewayVisible(g.id, layers))
+        .filter((g) => g.geometry && isGatewayVisible(g.id, layers, g.status))
         .map((g) => ({
           type: "Feature",
           geometry: g.geometry as unknown as GeoJSON.Geometry,
@@ -1217,6 +1217,7 @@ export function MapPage() {
             gateway_id: g.id,
             name: g.display_name,
             last_seen_at: g.last_seen_at,
+            status: g.status,
           },
         })),
     );
@@ -1373,7 +1374,11 @@ export function MapPage() {
         next = revealDevice(layers, selectedDeviceId);
     } else if (selectedGatewayId) {
       if (!isGatewayVisible(selectedGatewayId, layers))
-        next = revealGateway(layers, selectedGatewayId);
+        next = revealGateway(
+          layers,
+          selectedGatewayId,
+          gateways.data?.find((g) => g.id === selectedGatewayId)?.status,
+        );
     } else if (key === "gateways") {
       if (!layers.gateways) next = { ...layers, gateways: true };
     } else if (featureParamValue) {

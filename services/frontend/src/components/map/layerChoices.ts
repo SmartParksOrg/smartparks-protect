@@ -18,6 +18,10 @@ export interface LayerChoices {
   hidden_event_types: string[];
   gateways: boolean;
   hidden_gateways: string[];
+  /** The two groups of the gateway layer (Tim, 2026-09-19): the ones the network hears and
+   * the ones it does not, each switched as a whole; absent in an older preference means on. */
+  online_gateways?: boolean;
+  offline_gateways?: boolean;
   coverage: boolean;
   coverage_hours: number;
   /** Network locations (decisions D162 and D163): where the networks placed the devices, as
@@ -41,6 +45,8 @@ export const DEFAULT_LAYERS: LayerChoices = {
   hidden_event_types: [],
   gateways: true,
   hidden_gateways: [],
+  online_gateways: true,
+  offline_gateways: true,
   coverage: false,
   coverage_hours: 168,
   network_locations: false,
@@ -170,11 +176,26 @@ export function isFeatureVisible(
   );
 }
 
+/** Which of the two gateway groups a gateway belongs to: the network hears it, or it does not
+ * (offline, or never seen at all). */
+export function gatewayGroup(
+  status: string | null | undefined,
+): "online" | "offline" {
+  return status === "online" ? "online" : "offline";
+}
+
 export function isGatewayVisible(
   gatewayId: string,
   choices: LayerChoices,
+  status: string | null | undefined = "online",
 ): boolean {
-  return choices.gateways && !choices.hidden_gateways.includes(gatewayId);
+  const group =
+    gatewayGroup(status) === "online"
+      ? (choices.online_gateways ?? true)
+      : (choices.offline_gateways ?? true);
+  return (
+    choices.gateways && group && !choices.hidden_gateways.includes(gatewayId)
+  );
 }
 
 export function isEventVisible(
@@ -327,10 +348,12 @@ export function showGateway(
   choices: LayerChoices,
   id: string,
   all: string[],
+  status: string | null | undefined = "online",
 ): LayerChoices {
   return {
     ...choices,
     gateways: true,
+    ...groupOn(status),
     hidden_gateways: onlyThis(
       choices.hidden_gateways,
       id,
@@ -338,6 +361,13 @@ export function showGateway(
       choices.gateways,
     ),
   };
+}
+
+/** Switching a gateway on switches its group on as well, or the tick would show nothing. */
+function groupOn(status: string | null | undefined): Partial<LayerChoices> {
+  return gatewayGroup(status) === "online"
+    ? { online_gateways: true }
+    : { offline_gateways: true };
 }
 
 export function showFeatureType(
@@ -450,10 +480,12 @@ export function revealDevice(
 export function revealGateway(
   choices: LayerChoices,
   gatewayId: string,
+  status: string | null | undefined = "online",
 ): LayerChoices {
   return {
     ...choices,
     gateways: true,
+    ...groupOn(status),
     hidden_gateways: without(choices.hidden_gateways, [gatewayId]),
   };
 }
