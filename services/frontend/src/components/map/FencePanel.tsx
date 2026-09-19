@@ -134,12 +134,14 @@ export function FenceRows({
                 >
                   <FenceLevelDot level={m.level} />
                   <Link
-                    className="min-w-0 flex-1 truncate font-medium hover:underline"
+                    className="min-w-0 font-medium hover:underline"
                     to={`/projects/${projectId}/entities/${m.entity_id}`}
                   >
                     {m.name}
                   </Link>
-                  <span className="whitespace-nowrap">
+                  {/* the reading sits at the right when the line is wide enough and drops
+                      to a line of its own when it is not; a name is never cut short */}
+                  <span className="ml-auto whitespace-nowrap">
                     {m.device_id ? (
                       <button
                         type="button"
