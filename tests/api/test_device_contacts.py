@@ -346,6 +346,58 @@ async def test_an_address_arriving_later_repairs_the_sightings_that_waited(clien
     assert row.contact_device_id == uuid.UUID(seen["id"])
 
 
+async def test_clearing_an_address_takes_its_contacts_with_it(client, db, bus):
+    """An address typed from a label can be wrong, and the correction has to undo what the
+    wrong one did: the sightings it resolved go back to unknown neighbours, or a device would
+    keep contacts it never had (reviewed 2026-09-19: clearing left them resolved)."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    watcher = await _collar(client, db, project, admin, ble_mac=None)
+    seen = await _collar(client, db, project, admin, ble_mac="d4:22:11:0a:41:0c")
+    source = DataSource(name=unique_name("cs"), adapter_key="chirpstack", config={})
+    db.add(source)
+    await db.flush()
+    identity = unique_name("eui").replace("-", "")[:16]
+    from shared.models import ExternalIdentity
+
+    db.add(
+        ExternalIdentity(
+            data_source_id=source.id, external_id=identity, device_id=uuid.UUID(watcher["id"])
+        )
+    )
+    await db.commit()
+    await _scan(db, bus, source, identity, scan_frame([(bytes([0x0C, 0x41, 0x0A]), -74)]))
+
+    await db.rollback()
+    row = (
+        await db.execute(
+            select(DeviceContact).where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+        )
+    ).scalar_one()
+    assert row.resolution == ContactResolution.RESOLVED
+    assert row.contact_device_id == uuid.UUID(seen["id"])
+
+    cleared = await client.put(
+        f"/api/v1/devices/{seen['id']}/ble-address",
+        json={"ble_mac": None},
+        headers=admin.headers,
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["ble_mac"] is None
+
+    await db.rollback()
+    row = (
+        await db.execute(
+            select(DeviceContact)
+            .where(DeviceContact.device_id == uuid.UUID(watcher["id"]))
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one()
+    assert row.resolution == ContactResolution.UNKNOWN, "nobody has that address any more"
+    assert row.contact_device_id is None
+    assert row.contact_entity_id is None
+
+
 async def test_a_second_device_with_the_same_octets_makes_the_old_reading_ambiguous(
     client, db, bus
 ):
@@ -1136,6 +1188,63 @@ async def test_a_placed_device_puts_its_entity_on_the_map_too(client, db, bus):
         )
     ).one_or_none()
     assert second_row is not None and second_row[0] is not None
+
+
+async def test_clearing_the_place_gives_the_device_back_to_what_it_reports(client, db, bus):
+    """Decision D261, the other way. A place is stamped on the current states and no record put
+    it there, so nothing but a rebuild takes it off: before this the device and its entity stood
+    at the old place, marked "fixed place", after the place was cleared (reviewed 2026-09-19)."""
+    from shared.models import DeviceCurrentState, EntityCurrentState
+
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=admin.headers)).json()
+    entity_type = next(t for t in catalogue["items"] if t["key"] == "scanner")
+    reader = await _collar(client, db, project, admin, ble_mac=None)
+    made = await client.post(
+        f"/api/v1/projects/{project.id}/entity-assignments",
+        json={
+            "device_id": reader["id"],
+            "valid_from": "2026-01-02T00:00:00+00:00",
+            "new_entity": {"entity_type_id": entity_type["id"], "name": unique_name("Scanner")},
+        },
+        headers=admin.headers,
+    )
+    assert made.status_code == 201, made.text
+    entity_id = uuid.UUID(made.json()["entity_id"])
+    placed = await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": 52.530929, "longitude": 4.612521},
+        headers=admin.headers,
+    )
+    assert placed.status_code == 200, placed.text
+
+    cleared = await client.put(
+        f"/api/v1/devices/{reader['id']}/static-position",
+        json={"latitude": None, "longitude": None},
+        headers=admin.headers,
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["static_position"] is None
+    assert cleared.json()["location_source"] == "device"
+
+    await db.rollback()
+    device_row = (
+        await db.execute(
+            select(DeviceCurrentState.latest_position, DeviceCurrentState.latest_position_kind)
+            .where(DeviceCurrentState.device_id == uuid.UUID(reader["id"]))
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    assert device_row == (None, None), "the reader reports nothing, so it is nowhere"
+    entity_row = (
+        await db.execute(
+            select(EntityCurrentState.latest_position, EntityCurrentState.latest_position_kind)
+            .where(EntityCurrentState.entity_id == entity_id)
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    assert entity_row == (None, None), "and neither is the entity it is on"
 
 
 async def test_a_place_set_afterwards_gives_the_old_sightings_a_position(client, db, bus):

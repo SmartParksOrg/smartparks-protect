@@ -101,7 +101,9 @@ Resolution is stored, not computed at read time, so it can be stale: the re-reso
 for that, and the decoder repairs both directions on every new address. A contact read before an
 address was known will say `unknown` until it is repaired.
 
-The clock rule applies to contacts on live channels only, and not yet to positions. Whether a
-position with the same implausible offset should be moved the same way is open and is Tim's to
-decide; it changes where animals appear to have been, which is a heavier thing to rewrite than a
-sighting.
+The clock rule applies to contacts on live channels and to the records of the scan that made
+them, and stops there (decision D262, Tim, 2026-09-19). A position with the same implausible
+offset keeps the time its device claimed: moving it would rewrite where an animal appears to have
+been, which changes tracks, attribution and every analysis built on them, and the record would
+say the animal was somewhere it was not. A device with a bad clock therefore files its fixes in
+the past, visibly, rather than having them invented into the present.

@@ -92,7 +92,9 @@ async def resolver_for(session: AsyncSession, project_id: uuid.UUID | None) -> R
     return Resolver(by_suffix=by_suffix)
 
 
-async def resolve_waiting(session: AsyncSession, device: Device) -> int:
+async def resolve_waiting(
+    session: AsyncSession, device: Device, *, previous: str | None = None
+) -> int:
     """Give the contacts that were waiting for this device's address the device they meant.
 
     A collar is often seen before anyone asks it its own address, and those sightings are stored
@@ -102,12 +104,15 @@ async def resolve_waiting(session: AsyncSession, device: Device) -> int:
     projects the device has belonged to, and only for the exact octets a scan of it would show.
 
     A second device sharing those octets makes both readings ambiguous rather than resolved
-    (decision D254), including any that had already resolved to the other one. Returns how many
-    rows changed."""
+    (decision D254), including any that had already resolved to the other one. `previous` is
+    the address the device had before, when it was changed or cleared: the rows that named it
+    are read again too, so a corrected address takes its wrong contacts with it instead of
+    leaving them resolved to a device that never had that address. Returns how many rows
+    changed."""
     from shared.models import DeviceContact
 
-    suffix = suffix_of(device.ble_mac)
-    if suffix is None:
+    suffixes = {s for s in (suffix_of(device.ble_mac), suffix_of(previous)) if s is not None}
+    if not suffixes:
         return 0
     projects = list(
         await session.scalars(
@@ -125,7 +130,7 @@ async def resolve_waiting(session: AsyncSession, device: Device) -> int:
             await session.scalars(
                 select(DeviceContact).where(
                     DeviceContact.project_id == project_id,
-                    DeviceContact.address == suffix,
+                    DeviceContact.address.in_(suffixes),
                 )
             )
         ).all()
@@ -237,11 +242,21 @@ PHONE_FILTER = 3
 #: The event a sighting under that filter raises, and the metric a rule can threshold on.
 HUMAN_PRESENCE_EVENT = "human_presence"
 HUMAN_PRESENCE_METRIC = "human_presence"
-#: Said on every row and every event, because it is the whole point of decision D260.
+#: The event's title and its two descriptions, fixed texts the translation layer knows (D240).
+HUMAN_PRESENCE_TITLE = "Human presence"
+HUMAN_PRESENCE_ONE = "{device} heard {n} human-worn Bluetooth device"
+HUMAN_PRESENCE_MANY = "{device} heard {n} human-worn Bluetooth devices"
+#: Carried in the context of every such event, because it is the whole point of decision D260.
 HUMAN_PRESENCE_NOTE = (
     "A phone changes its Bluetooth address every few minutes, so these sightings are presence "
     "in a window and never an identity, and the number of addresses is not a number of people."
 )
+
+
+def human_presence_description(device_name: str, addresses: int) -> str:
+    """What the event says: the reader and how many addresses it heard, never who."""
+    template = HUMAN_PRESENCE_ONE if addresses == 1 else HUMAN_PRESENCE_MANY
+    return template.format(device=device_name, n=addresses)
 
 
 def watches_for_people(scanning: Scanning) -> bool:

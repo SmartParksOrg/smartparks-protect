@@ -47,9 +47,9 @@ The sampling warning measures **what a subject actually did**, not what its sett
 
 **The subject table**: how many *others* each subject met, how many contacts that came to, and how many hours. Meeting one animal ten times is not the same as meeting ten animals, and this is the column that separates them.
 
-**The charts**: contacts per day, and a rose of the hour of day, since when animals meet is half the question.
+**The charts**: contacts per day, and a rose of the hour of day, since when animals meet is half the question. Both count on the project's own clock, as the movement and grazing modules do.
 
-**The map**: a point where each pair met, sized by how often — the midpoint of the two, because neither of them is the place and the meeting is. Usually a water hole, which is the answer a map gives that a table cannot. The "Where pairs met" chip switches it.
+**The map**: a point where each pair met, sized by how often. For a pair the fixes found it is the midpoint of the two, because neither of them is the place and the meeting is — usually a water hole, which is the answer a map gives that a table cannot. For a pair only a sighting found it is the place of the device that did the hearing: exactly, when that device stands on a post with a place set by hand, and its nearest fix when it was walking about (decision D261). The device that was heard has no say, since its position is what the sighting was meant to establish. Clicking a point gives the contacts, the hours, the first and last time and which evidence saw them. The "Where pairs met" chip switches the layer.
 
 **What was set aside** is in the summary and not hidden: sightings whose neighbour no device of the project matches (an unknown neighbour is a real finding, decision D253, but it is not a pair) and sightings whose three octets could be more than one device, which are deliberately in no pair figure at all (D254).
 
@@ -57,7 +57,7 @@ The sampling warning measures **what a subject actually did**, not what its sett
 
 Sightings come from `device_contacts`, resolved on the way in and never re-guessed, and only those whose counterpart resolved to a device that was carrying one of the chosen subjects at that moment. Proximity reads `positions` through the same `device_fix()` the rules and the tracks use, so a curated or invalidated fix is treated identically everywhere.
 
-Both are attributed at the record's own time (decision D103): a collar that changed animals last month met whoever wore it then.
+Both are attributed at the record's own time (decision D103): a collar that changed animals last month met whoever wore it then. The one exception is the place of a fixed reader, which is read from the device the subject is on today: a post does not change animals.
 
 ## Switches
 

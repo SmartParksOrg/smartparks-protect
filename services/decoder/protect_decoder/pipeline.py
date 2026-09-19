@@ -51,7 +51,9 @@ from shared.domain.contacts import (
     HUMAN_PRESENCE_EVENT,
     HUMAN_PRESENCE_METRIC,
     HUMAN_PRESENCE_NOTE,
+    HUMAN_PRESENCE_TITLE,
     Resolver,
+    human_presence_description,
     resolver_for,
     scanning_of,
     watches_for_people,
@@ -858,11 +860,8 @@ async def _write_human_presence(
             device_id=device.id,
             event_type=HUMAN_PRESENCE_EVENT,
             severity=Severity.INFO,
-            title="Human presence",
-            description=(
-                f"{device.name} heard {len(window)} human-worn Bluetooth "
-                f"{'device' if len(window) == 1 else 'devices'}"
-            ),
+            title=HUMAN_PRESENCE_TITLE,
+            description=human_presence_description(device.name, len(window)),
             # at the reader when a person placed it, so the event lands on the map where the
             # hardware is; a device that reports its own position has no place to claim here
             geom=device.static_geom,

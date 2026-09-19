@@ -97,4 +97,12 @@ NL: dict[str, str] = {
     "{n} devices have records held invalid (a clock ahead, or curated out).": "{n} apparaten hebben ongeldige records (een voorlopende klok, of weggecureerd).",
     "{n} devices sent nothing in the period.": "{n} apparaten hebben in de periode niets gestuurd.",
     "{n} devices sent nothing in the comparison period.": "{n} apparaten hebben in de vergelijkingsperiode niets gestuurd.",
+    # a scan for phones (decision D260)
+    "Human presence": "Menselijke aanwezigheid",
+    "{device} heard {n} human-worn Bluetooth device": (
+        "{device} heeft {n} door een mens gedragen Bluetooth-apparaat gehoord"
+    ),
+    "{device} heard {n} human-worn Bluetooth devices": (
+        "{device} heeft {n} door mensen gedragen Bluetooth-apparaten gehoord"
+    ),
 }

@@ -6,6 +6,18 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- Clearing a device's fixed place left it standing there. The place is stamped on the current states and no record put it there, so nothing but a rebuild takes it off: the device and the entity it is on stayed at the old place, marked "fixed place", after the place was cleared. Clearing now rebuilds both from what the device reports, which for a reader that reports nothing is nowhere. (Review of the two days' work, 2026-09-19.)
+
+- Clearing or correcting a device's Bluetooth address left the contacts the old address had resolved pointing at the device. An address typed from a label can be wrong, and the correction has to undo what the wrong one did: the sightings that named the old address are read again, and go back to unknown neighbours or to the one device that does carry those octets.
+
+- The **Human presence** event and its description came in English on a Dutch interface; both are in the catalogue now (decision D240).
+
+- The contact tracing charts counted in UTC: the rose of the hour of day and the contacts per day were two hours off for a Dutch project. Both count on the project's own clock now, as the movement and grazing modules do.
+
+- A contact tracing run with a comparison period showed every sampling warning twice, once per period. Each is shown once.
+
+- ADR 0036 still called the clock rule's reach over positions an open question; it was decided on 2026-09-19 (D262: positions keep the time their device claimed) and the ADR says so. The contact tracing guide now describes where a sighting-only pair is put on the map, which was built and not written down.
+
 - Devices bolted to posts read "moving". A still device's accelerometer does not read the same twice: the OpenCollar's is 8-bit over ±100 m/s² in two-count steps, so as the temperature drifts it reports changes of 0.784 m/s² per axis — 1.36 when all three drift at once — and the rule called anything above 1.0 movement. Measured on the 45 PWN scanners over eleven days: 540 false crossings, and 33 of the 45 shown as moving. Movement now needs one change of 2.0 m/s², or two of 1.4 running, which leaves about 25 of those 540 while a single clear jump — somebody picking the device up — still counts at once. (Tim, 2026-09-19.)
 
 ## v2.8.0, 2026-09-19

@@ -1204,6 +1204,12 @@ async def set_device_static_position(
         device.static_position_at = None
         if device.location_source == LocationSource.STATIC:
             device.location_source = LocationSource.DEVICE
+        # the place was stamped on the current states and no record put it there, so only a
+        # rebuild takes it off: the device goes back to whatever it reports, and so does the
+        # entity it is on (reviewed 2026-09-19: both kept standing at the old place, marked
+        # "fixed place", after the place was cleared)
+        await session.flush()
+        await recompute_current_state(session, device.id, {attribution.entity_id})
     await record_audit(
         session,
         user=user,
@@ -1428,11 +1434,14 @@ async def set_device_ble_address(
         if attribution.project_id is None:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
         await _require_project_admin(session, user, attribution.project_id)
+    previous = device.ble_mac
     device.ble_mac = body.ble_mac.lower() if body.ble_mac else None
     # the sightings that were waiting for this address stop being unknown neighbours; without
-    # this they stay unknown for ever and read as "never met" (decision D253)
+    # this they stay unknown for ever and read as "never met" (decision D253). And the ones
+    # that named the old address stop naming this device, or the correction would leave the
+    # contacts of a wrong address resolved to it for ever
     await session.flush()
-    repaired = await resolve_waiting(session, device)
+    repaired = await resolve_waiting(session, device, previous=previous)
     # and the place that follows from being named: a reader with a place had heard this device
     # while it was still an unknown neighbour, so the position it earned was never written
     await session.flush()

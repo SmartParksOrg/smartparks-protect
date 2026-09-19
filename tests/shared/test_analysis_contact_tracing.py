@@ -205,6 +205,17 @@ class TestCharts:
         assert sum(n for _, n in points) == 1
         assert points[START.hour][1] == 1
 
+    def test_the_hour_rose_keeps_the_project_clock(self):
+        """Six in the morning UTC is eight in the Netherlands in September, and a reader who
+        keeps that clock wants the rose to say so (reviewed 2026-09-19: it was in UTC)."""
+        from zoneinfo import ZoneInfo
+
+        a, b = _subject("Anna"), _subject("Bram")
+        pairs = [_pair_from_tracks(a, b, 10, _params())]
+        points = hour_series(pairs, ZoneInfo("Europe/Amsterdam"))[0]["data"]
+        assert points[START.hour + 2][1] == 1
+        assert points[START.hour][1] == 0
+
     def test_contacts_per_day_is_dated_and_ordered(self):
         a, b = _subject("Anna"), _subject("Bram")
         key = pair_key(a.id, b.id)

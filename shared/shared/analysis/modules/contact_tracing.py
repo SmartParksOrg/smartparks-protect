@@ -16,8 +16,9 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -52,7 +53,14 @@ from shared.analysis.primitives.proximity import (
 )
 from shared.analysis.primitives.trajectory import Trajectory, load_trajectory
 from shared.enums import ContactResolution
-from shared.models import Device, DeviceContact, DeviceEntityAssignment, Entity, EntityType
+from shared.models import (
+    Device,
+    DeviceContact,
+    DeviceEntityAssignment,
+    Entity,
+    EntityType,
+    Project,
+)
 from shared.timeutil import utc_now
 
 METHOD_VERSION = "contact_tracing/1"
@@ -402,23 +410,28 @@ def subject_rows(pairs: list[Pair], subjects: list[Subject]) -> list[list[Any]]:
     return sorted(rows, key=lambda r: (-int(r[2]), -float(r[4])))
 
 
-def daily_series(pairs: list[Pair]) -> list[dict[str, Any]]:
-    """Contacts per day, both kinds together: when the meeting happened at all."""
+def daily_series(pairs: list[Pair], zone: tzinfo = UTC) -> list[dict[str, Any]]:
+    """Contacts per day, both kinds together: when the meeting happened at all.
+
+    A day is the project's day, as the movement and grazing modules count theirs: a meeting at
+    one in the morning in the Netherlands belongs to that night, not to the UTC day before."""
     per_day: dict[str, int] = defaultdict(int)
     for pair in pairs:
         for when in _moments(pair):
-            per_day[when.date().isoformat()] += 1
+            per_day[when.astimezone(zone).date().isoformat()] += 1
     # `data`, as every other module's series does and as the interface reads: under any other
     # name the chart draws an empty box with a title, which is what it did
     return [{"name": "contacts", "data": [[d, n] for d, n in sorted(per_day.items())]}]
 
 
-def hour_series(pairs: list[Pair]) -> list[dict[str, Any]]:
-    """The hour of day a contact started. When animals meet is half the question (design 4.3)."""
+def hour_series(pairs: list[Pair], zone: tzinfo = UTC) -> list[dict[str, Any]]:
+    """The hour of day a contact started, in the project's own time. When animals meet is half
+    the question (design 4.3), and "at dawn" is only readable on the clock the reader keeps
+    (reviewed 2026-09-19: the rose was in UTC, two hours off for the PWN project)."""
     hours = [0] * 24
     for pair in pairs:
         for when in _moments(pair):
-            hours[when.astimezone(UTC).hour] += 1
+            hours[when.astimezone(zone).hour] += 1
     return [{"name": "contacts", "data": [[h, n] for h, n in enumerate(hours)]}]
 
 
@@ -501,6 +514,7 @@ def build_document(
     unknown: int,
     ambiguous: int,
     geometries: dict[str, int] | None = None,
+    zone: tzinfo = UTC,
 ) -> ResultDocument:
     """The result document: the network, the tables, the charts and what was set aside."""
     met = [p for p in pairs if p.contacts]
@@ -531,8 +545,8 @@ def build_document(
         ),
     ]
     charts = [
-        Chart(key="contacts_per_day", kind="bar", unit=None, series=daily_series(met)),
-        Chart(key="contacts_by_hour", kind="rose", unit=None, series=hour_series(met)),
+        Chart(key="contacts_per_day", kind="bar", unit=None, series=daily_series(met, zone)),
+        Chart(key="contacts_by_hour", kind="rose", unit=None, series=hour_series(met, zone)),
         Chart(key="network", kind="network", unit=None, series=network_series(met, subjects)),
     ]
     return ResultDocument(
@@ -579,6 +593,8 @@ class ContactTracingModule:
         subjects = [
             Subject(id=r.id, name=r.name, type=r.label) for r in rows[:MAX_SUBJECTS_CONTACT]
         ]
+        tz = await session.scalar(select(Project.timezone).where(Project.id == ctx.project_id))
+        zone = ZoneInfo(tz) if tz else UTC
         periods = [Period(key="main", time_from=params.time_from, time_to=params.time_to)]
         if params.comparison:
             periods.append(
@@ -672,6 +688,16 @@ class ContactTracingModule:
             pairs.extend(index.values())
 
         await ctx.progress(95, "document")
+        # once each: a comparison period runs the sampling checks a second time over the same
+        # subjects, and a warning shown twice reads as two problems
+        seen: set[tuple[str, uuid.UUID | None, str]] = set()
+        once: list[Warning] = []
+        for warning in warnings:
+            mark = (warning.code, warning.subject_id, warning.text)
+            if mark not in seen:
+                seen.add(mark)
+                once.append(warning)
+        warnings = once
         geometries = contact_geometries([p for p in pairs if p.contacts], subjects)
         counts: dict[str, int] = {}
         for geometry in geometries:
@@ -687,6 +713,7 @@ class ContactTracingModule:
             unknown=unknown_total,
             ambiguous=ambiguous_total,
             geometries=counts,
+            zone=zone,
         )
         return RunResult(document=document, geometries=geometries)
 

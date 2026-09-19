@@ -1,6 +1,7 @@
 """The server's texts in the reader's language (decision D240)."""
 
 from shared.analysis.modules.device_performance import FOLDED_TEXTS
+from shared.domain.contacts import HUMAN_PRESENCE_MANY, HUMAN_PRESENCE_ONE, HUMAN_PRESENCE_TITLE
 from shared.domain.explanations import ERROR_FLAGS, EVENTS, RESET_REASONS, explain_event
 from shared.i18n import resolve_language, translate
 from shared.i18n.nl import NL
@@ -55,6 +56,9 @@ def test_every_fixed_server_text_has_its_dutch():
         *ERROR_FLAGS.values(),
         *RESET_REASONS.values(),
         *FOLDED_TEXTS.values(),
+        HUMAN_PRESENCE_TITLE,
+        HUMAN_PRESENCE_ONE,
+        HUMAN_PRESENCE_MANY,
     ]
     for template in TEMPLATES.values():
         fixed.append(template["description"])
