@@ -14,7 +14,11 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - A **fence line page** (Tim, 2026-09-19: the panel was too crowded, and a fence with more sections would be worse). The live map's panel shows the essentials only: the level and since when, the line as one bar with each section in its colour and a tick per monitor, one sentence naming what is wrong and where, and the monitors' count and newest reading. Everything else moved to a page of its own, opened from the panel, the Features list or a monitor's entity page: the bar large with the monitors named, the sections table, every monitor with its reading and voltage chart, the status history, and the thresholds, which project admins edit there. API: `GET /projects/{id}/features/{feature_id}/fence/events`.
 
+- A fence line is set up in one place (Tim, 2026-09-19): under **Setup** on the fence line page, project admins rename the line, correct it on a map by dragging its vertices (the monitors' places and the sections follow at once), set the thresholds, and manage the monitors on it — put an existing Fence monitor on, take one off, or make a new one with its name, its FenceEdge and the place the post stands. The Features page has a **New fence line** button; the drawing map is shared with the New feature dialog and can start from an existing shape.
+
 ### Fixed
+
+- An entity's page showed no map for an entity whose device has a place set by hand: the small map draws position rows and a fixed place has none. It takes the current position instead when there is nothing else to draw. (Tim, 2026-09-19.)
 
 - An entity whose device reports readings but no positions read "Last seen: never" on the live map — a fence monitor with a place set by hand, a scanner, a trap — while its readings arrived every hour. The decoder marked the entity as seen only when a position came in; any record of the device does now, and a position still moves it. (Tim, 2026-09-19, on the demo projects.)
 

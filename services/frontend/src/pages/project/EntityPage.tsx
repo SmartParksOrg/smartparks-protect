@@ -118,14 +118,19 @@ export function EntityPage() {
     queryFn: () => api.get<Device>(`/api/v1/devices/${current?.device_id}`),
     enabled: Boolean(current),
   });
-  const live = useMemo(
+  const liveFeature = useMemo(
     () =>
       (
         state.data?.features as unknown as
-          { properties: EntityFeatureProperties }[] | undefined
-      )?.find((f) => f.properties.entity_id === entityId)?.properties ?? null,
+          | {
+              geometry: GeoJSON.Geometry | null;
+              properties: EntityFeatureProperties;
+            }[]
+          | undefined
+      )?.find((f) => f.properties.entity_id === entityId) ?? null,
     [state.data, entityId],
   );
+  const live = liveFeature?.properties ?? null;
   const events = useQuery({
     queryKey: queryKeys.events(projectId, { entity_id: entityId, limit: 10 }),
     queryFn: () =>
@@ -271,6 +276,12 @@ export function EntityPage() {
   const admin = can("entities:write");
   const point =
     e?.geometry?.type === "Point" ? (e.geometry.coordinates as number[]) : null;
+  // a place set by hand has no position rows (decision D261), so the small map takes the
+  // current position instead when there is nothing else to draw (Tim, 2026-09-19)
+  const fixedPlace =
+    positionsEmpty(positions.data) && liveFeature?.geometry?.type === "Point"
+      ? (liveFeature.geometry.coordinates as [number, number])
+      : undefined;
   if (entity.isError)
     return (
       <Page>
@@ -543,6 +554,7 @@ export function EntityPage() {
               />
               <MiniMap
                 positions={positions.data ?? []}
+                point={fixedPlace}
                 to={`/projects/${projectId}/map?entity=${e.id}`}
               />
               <Card className="lg:col-span-2">
@@ -839,4 +851,8 @@ export function EntityPage() {
       )}
     </>
   );
+}
+
+function positionsEmpty(positions: unknown[] | undefined): boolean {
+  return positions !== undefined && positions.length === 0;
 }

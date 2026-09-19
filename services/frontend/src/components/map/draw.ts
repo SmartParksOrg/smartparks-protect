@@ -39,11 +39,18 @@ export interface DrawState {
   circle: { centre: [number, number]; radius_m: number } | null;
 }
 
-export const EMPTY_DRAW: DrawState = { geometry: null, live: null, circle: null };
+export const EMPTY_DRAW: DrawState = {
+  geometry: null,
+  live: null,
+  circle: null,
+};
 
 export interface DrawSession {
   /** Start drawing a kind of geometry; a finished feature stays editable. */
   begin(kind: DrawKind): void;
+  /** Start from an existing shape instead, selected so its vertices can be dragged, added
+   * on a midpoint or deleted (a fence line being corrected, phase 32). */
+  load(kind: DrawKind, geometry: GeoJSON.Geometry): void;
   /** The current state. */
   state(): DrawState;
   /** Remove everything drawn. */
@@ -121,13 +128,21 @@ export function createDrawSession(
           linestring: {
             feature: {
               draggable: true,
-              coordinates: { midpoints: true, draggable: true, deletable: true },
+              coordinates: {
+                midpoints: true,
+                draggable: true,
+                deletable: true,
+              },
             },
           },
           polygon: {
             feature: {
               draggable: true,
-              coordinates: { midpoints: true, draggable: true, deletable: true },
+              coordinates: {
+                midpoints: true,
+                draggable: true,
+                deletable: true,
+              },
             },
           },
           circle: { feature: { draggable: true } },
@@ -149,14 +164,16 @@ export function createDrawSession(
   draw.start();
 
   const shapes = () =>
-    draw.getSnapshot().filter(
-      (f) =>
-        !f.properties.midPoint &&
-        !f.properties.selectionPoint &&
-        !f.properties.coordinatePoint &&
-        !f.properties.closingPoint &&
-        !f.properties.snappingPoint,
-    );
+    draw
+      .getSnapshot()
+      .filter(
+        (f) =>
+          !f.properties.midPoint &&
+          !f.properties.selectionPoint &&
+          !f.properties.coordinatePoint &&
+          !f.properties.closingPoint &&
+          !f.properties.snappingPoint,
+      );
   const current = (): DrawState => {
     const all = shapes();
     const done = all.filter((f) => !f.properties.currentlyDrawing);
@@ -192,6 +209,19 @@ export function createDrawSession(
       draw.clear();
       draw.setMode(MODE_OF[kind]);
       onChange(EMPTY_DRAW);
+    },
+    load(kind, geometry) {
+      draw.clear();
+      const [added] = draw.addFeatures([
+        {
+          type: "Feature",
+          geometry: geometry as never,
+          properties: { mode: MODE_OF[kind] },
+        },
+      ]);
+      draw.setMode("select");
+      if (added?.valid && added.id != null) draw.selectFeature(added.id);
+      emit();
     },
     state: current,
     clear() {

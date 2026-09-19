@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Plus, Trash2, Wheat, Zap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router";
 import { z } from "zod";
@@ -16,17 +16,8 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
-import {
-  basemapsFor,
-  basemapStyle,
-  loadBasemap,
-} from "@/components/map/basemap";
-import {
-  createDrawSession,
-  type DrawKind,
-  type DrawSession,
-} from "@/components/map/draw";
-import { useMap } from "@/components/map/useMap";
+import { DrawMap } from "@/components/map/DrawMap";
+import { drawKindFor } from "@/components/map/featureTools";
 import { Button } from "@/components/ui/button";
 import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import {
@@ -46,74 +37,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMutationToast } from "@/hooks/useMutationToast";
-import { useTheme } from "@/hooks/useTheme";
 
 const schema = z.object({
   name: z.string().min(1).max(200),
   feature_type: z.enum(["site", "zone", "geofence", "route", "fence"]),
 });
 type Values = z.infer<typeof schema>;
-
-/** The drawing map of the New feature dialog: the shared terra-draw session (decision D139),
- * the kind following the feature type. Sites are a single point, routes a line, the rest a
- * polygon. */
-function DrawMap({
-  kind,
-  onChange,
-}: {
-  kind: Values["feature_type"];
-  onChange: (geometry: GeoJSON.Geometry | null) => void;
-}) {
-  const { t } = useTranslation();
-  const container = useRef<HTMLDivElement | null>(null);
-  const { resolved: resolvedTheme } = useTheme();
-  const { mapRef, ready } = useMap(
-    container,
-    basemapStyle(loadBasemap(), basemapsFor(null), resolvedTheme === "dark"),
-    [31.5, -24.9],
-    6,
-  );
-  const session = useRef<DrawSession | null>(null);
-  const drawKind: DrawKind =
-    kind === "site"
-      ? "point"
-      : kind === "route" || kind === "fence"
-        ? "line"
-        : "polygon";
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !ready) return;
-    const s = createDrawSession(map, (state) => onChange(state.geometry));
-    session.current = s;
-    s.begin(drawKind);
-    return () => {
-      s.destroy();
-      session.current = null;
-    };
-  }, [mapRef, ready, drawKind, onChange]);
-  return (
-    <div className="space-y-2">
-      <div ref={container} className="z-0 h-72 w-full rounded-md border" />
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          {drawKind === "point"
-            ? t("Click to place the site")
-            : t(
-                "Click to add vertices, click the last one again or press Enter to finish",
-              )}
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => session.current?.clear()}
-        >
-          {t("Clear")}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 export function FeaturesPage() {
   const { t } = useTranslation();
@@ -214,9 +143,20 @@ export function FeaturesPage() {
         title={t("Features")}
         description={t("Sites, zones, geofences and routes drawn on the map")}
         actions={
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="size-4" /> {t("New feature")}
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                form.setValue("feature_type", "fence");
+                setOpen(true);
+              }}
+            >
+              <Zap className="size-4" /> {t("New fence line")}
+            </Button>
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="size-4" /> {t("New feature")}
+            </Button>
+          </>
         }
       />
       <Page>
@@ -282,7 +222,7 @@ export function FeaturesPage() {
             {open && (
               <DrawMap
                 key={form.watch("feature_type")}
-                kind={form.watch("feature_type")}
+                kind={drawKindFor(form.watch("feature_type"))}
                 onChange={setGeometry}
               />
             )}

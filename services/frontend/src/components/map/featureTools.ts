@@ -19,3 +19,15 @@ export function ruleTemplateFor(featureType: string): string | null {
   if (featureType === "site" || featureType === "zone") return "near_site";
   return null;
 }
+
+/** The drawing kind a feature type needs: a site a point, a route or a fence line a line,
+ * the rest a polygon. */
+export function drawKindFor(
+  featureType: string,
+): "point" | "line" | "polygon" | "circle" {
+  return featureType === "site"
+    ? "point"
+    : featureType === "route" || featureType === "fence"
+      ? "line"
+      : "polygon";
+}
