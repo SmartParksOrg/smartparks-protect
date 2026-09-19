@@ -167,6 +167,12 @@ class HealthField:
     warn_above: float | None = None
     critical_above: float | None = None
     flags_are_problems: bool = False  # a `flags` field whose true keys mean trouble
+    #: Shown as value times `scale` with `decimals`: a fence voltage stored in volts and read
+    #: in kV. The thresholds stay on the stored value.
+    scale: float | None = None
+    decimals: int | None = None
+    #: A `bool` field's words for true and false ("closed", "open") instead of yes and no.
+    words: tuple[str, str] | None = None
 
 
 class DeviceDriver(Protocol):

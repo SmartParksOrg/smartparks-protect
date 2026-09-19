@@ -327,6 +327,10 @@ async def current_state(
                     else None,
                     "activity": _latest_value(device_state, "activity"),
                     "uptime": _latest_value(device_state, "uptime"),
+                    # the fence port (phase 32): what the wire and the trap door last read
+                    "fence_voltage": _latest_value(device_state, "fence_voltage"),
+                    "fence_pulses": _latest_value(device_state, "fence_pulse_count"),
+                    "trap_closed": _latest_value(device_state, "trap_triggered"),
                     "last_reset_at": device_state.last_reset_at.isoformat()
                     if device_state and device_state.last_reset_at
                     else None,
@@ -487,6 +491,9 @@ async def devices_state(
                     else None,
                     "activity": _latest_value(state, "activity"),
                     "uptime": _latest_value(state, "uptime"),
+                    "fence_voltage": _latest_value(state, "fence_voltage"),
+                    "fence_pulses": _latest_value(state, "fence_pulse_count"),
+                    "trap_closed": _latest_value(state, "trap_triggered"),
                     "last_reset_at": state.last_reset_at.isoformat()
                     if state and state.last_reset_at
                     else None,

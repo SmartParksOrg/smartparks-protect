@@ -67,12 +67,44 @@ const SPECIAL: Record<string, (t: Translate) => TrendSpec> = {
     ariaLabel: t("Uptime over the period"),
   }),
 };
+SPECIAL.fence_voltage = (t) => ({
+  metric: "fence_voltage",
+  label: t("Fence voltage"),
+  unit: "kV",
+  decimals: 2,
+  step: 0.5,
+  floor: 0,
+  scale: 0.001,
+  ariaLabel: t("Fence voltage over the period"),
+});
+SPECIAL.fence_pulse_count = (t) => ({
+  metric: "fence_pulse_count",
+  label: t("Fence pulses"),
+  unit: "",
+  decimals: 0,
+  step: 1,
+  floor: 0,
+  ariaLabel: t("Fence pulses over the period"),
+});
+SPECIAL.trap_triggered = (t) => ({
+  metric: "trap_triggered",
+  label: t("Trap"),
+  unit: "",
+  decimals: 0,
+  step: 1,
+  floor: 0,
+  ariaLabel: t("The trap's door over the period, 1 closed and 0 open"),
+});
 SPECIAL.movement = SPECIAL.activity;
 
 /** The trend a status value can unfold (Tim, 2026-09-15): one of the shaped ones, else any
  * numeric metric of the registry with its label and unit; null for text, flags and values
  * the registry does not know, which stay plain. */
-export function trendSpecFor(key: string, metric: Metric | undefined, t: Translate): TrendSpec | null {
+export function trendSpecFor(
+  key: string,
+  metric: Metric | undefined,
+  t: Translate,
+): TrendSpec | null {
   const special = SPECIAL[key];
   if (special) return special(t);
   if (!metric || metric.value_type !== "numeric") return null;

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
+import { Fragment, useState } from "react";
 import { Link } from "react-router";
 
 import { api } from "@/api/client";
@@ -42,6 +43,7 @@ export function FenceRows({
 }) {
   const { t } = useTranslation();
   const now = useNow();
+  const [open, setOpen] = useState<string | null>(null);
   const status = useQuery({
     queryKey: [...queryKeys.features(projectId), featureId, "fence"],
     queryFn: () =>
@@ -62,6 +64,7 @@ export function FenceRows({
   const monitors = s.monitors as unknown as FenceMonitor[];
   const monitorName = (id: string) =>
     monitors.find((m) => m.entity_id === id)?.name ?? "?";
+  const toggle = (id: string) => setOpen((o) => (o === id ? null : id));
   return (
     <>
       <PanelRow label={t("Fence")}>
@@ -91,54 +94,74 @@ export function FenceRows({
         </PanelRow>
       ) : (
         <>
-          <PanelRow label={t("Sections")}>
-            <ul className="space-y-0.5">
-              {sections.map((section, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs">
-                  <FenceLevelDot level={section.level} />
-                  <span>
-                    {formatLength(section.from_m)} –{" "}
-                    {formatLength(section.to_m)}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {section.monitor_ids?.map(monitorName).join(" · ")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </PanelRow>
+          {/* the sections as their own block across both columns: a range and the monitors
+              at its ends read as one line each, where the narrow value column wrapped every
+              word (Tim, 2026-09-19) */}
+          <div className="col-span-2 space-y-1 text-xs">
+            <div className="text-muted-foreground">{t("Sections")}</div>
+            {sections.map((section, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <FenceLevelDot level={section.level} />
+                <span className="shrink-0 tabular-nums">
+                  {formatLength(section.from_m)} – {formatLength(section.to_m)}
+                </span>
+                <span className="min-w-0 truncate text-muted-foreground">
+                  {section.monitor_ids?.map(monitorName).join(" · ")}
+                </span>
+              </div>
+            ))}
+          </div>
           {monitors.map((m) => (
-            <PanelRow key={m.entity_id} label={m.name}>
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-x-2 text-xs">
-                  <FenceLevelDot level={m.level} />
-                  <span>{kilovolts(m.voltage_v)}</span>
-                  {m.pulses != null && (
-                    <span className="text-muted-foreground">
-                      {t("{{count}} pulses", { count: m.pulses })}
-                    </span>
-                  )}
-                  {m.failed && (
-                    <span className="text-muted-foreground">
-                      {t("measurement failed")}
-                    </span>
-                  )}
-                  {m.measured_at && (
-                    <span
-                      className="text-muted-foreground"
-                      title={formatTime(m.measured_at)}
-                    >
-                      {formatAgo(m.measured_at, now)}
-                    </span>
-                  )}
-                  <Link
-                    className="underline"
-                    to={`/projects/${projectId}/entities/${m.entity_id}`}
+            <Fragment key={m.entity_id}>
+              <PanelRow
+                label={m.name}
+                title={m.measured_at ? formatTime(m.measured_at) : undefined}
+              >
+                <FenceLevelDot level={m.level} />{" "}
+                {m.device_id ? (
+                  <button
+                    type="button"
+                    className="underline underline-offset-2 hover:text-primary"
+                    title={
+                      open === m.entity_id
+                        ? t("Hide the fence voltage")
+                        : t("Show the fence voltage")
+                    }
+                    aria-expanded={open === m.entity_id}
+                    onClick={() => toggle(m.entity_id)}
                   >
-                    {t("entity")}
-                  </Link>
-                </div>
-                {m.device_id && (
+                    {kilovolts(m.voltage_v)}
+                  </button>
+                ) : (
+                  kilovolts(m.voltage_v)
+                )}
+                {m.pulses != null && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {t("{{count}} pulses", { count: m.pulses })}
+                  </span>
+                )}
+                {m.failed && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {t("measurement failed")}
+                  </span>
+                )}
+                {m.measured_at && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {formatAgo(m.measured_at, now)}
+                  </span>
+                )}{" "}
+                <Link
+                  className="underline"
+                  to={`/projects/${projectId}/entities/${m.entity_id}`}
+                >
+                  {t("entity")}
+                </Link>
+              </PanelRow>
+              {open === m.entity_id && m.device_id && (
+                <div className="col-span-2 rounded-md border bg-muted/30 p-2">
                   <MetricTrend
                     projectId={projectId}
                     deviceId={m.device_id}
@@ -153,9 +176,9 @@ export function FenceRows({
                     }}
                     until={m.measured_at ?? null}
                   />
-                )}
-              </div>
-            </PanelRow>
+                </div>
+              )}
+            </Fragment>
           ))}
         </>
       )}

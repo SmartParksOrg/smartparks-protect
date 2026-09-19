@@ -83,6 +83,11 @@ export interface EntityFeatureProperties {
   activity?: number | null;
   /** The uptime in seconds and the last reboot the uptime showed (Tim, 2026-09-14). */
   uptime?: number | null;
+  /** The fence port (phase 32): the wire's newest voltage in volts and pulses, and whether
+   * the trap door reads closed. */
+  fence_voltage?: number | null;
+  fence_pulses?: number | null;
+  trap_closed?: number | null;
   last_reset_at?: string | null;
   last_status_at?: string | null;
   device_last_seen_at?: string | null;
@@ -126,6 +131,11 @@ export interface DeviceFeatureProperties {
   activity?: number | null;
   /** The uptime in seconds and the last reboot the uptime showed (Tim, 2026-09-14). */
   uptime?: number | null;
+  /** The fence port (phase 32): the wire's newest voltage in volts and pulses, and whether
+   * the trap door reads closed. */
+  fence_voltage?: number | null;
+  fence_pulses?: number | null;
+  trap_closed?: number | null;
   last_reset_at?: string | null;
   last_status_at?: string | null;
   picture_updated_at?: string | null;

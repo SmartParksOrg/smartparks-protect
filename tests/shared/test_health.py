@@ -133,3 +133,26 @@ def test_a_reboot_in_the_last_day_warns_on_the_uptime_line():
     uptime = next(f for f in health.fields if f.key == "uptime")
     assert uptime.text == "0 h, rebooted 2 h ago (watchdog)" and uptime.level == "warn"
     assert health.level == "warn"
+
+
+def test_the_fence_port_lines_read_in_kilovolts_and_in_words():
+    """Phase 32: a fence voltage stored in volts reads in kV on the health line with the
+    driver's default thresholds, and a trap reads closed or open rather than yes or no."""
+    from shared.device_drivers.opencollar import OPENCOLLAR_HEALTH
+
+    health = device_health(
+        OPENCOLLAR_HEALTH,
+        latest_measurements={
+            "fence_voltage": {"value": 3100.0, "time": "2026-09-19T10:00:00+00:00"},
+            "fence_pulse_count": {"value": 0.0, "time": "2026-09-19T10:00:00+00:00"},
+            "trap_triggered": {"value": True, "time": "2026-09-19T10:00:00+00:00"},
+        },
+        latest_state={},
+        latest_state_time=None,
+        last_seen_at=None,
+    )
+    by_key = {f.key: f for f in health.fields}
+    assert by_key["fence_voltage"].text == "3.10" and by_key["fence_voltage"].unit == "kV"
+    assert by_key["fence_voltage"].level == "warn"
+    assert by_key["fence_pulse_count"].level == "warn"
+    assert by_key["trap_triggered"].text == "closed"

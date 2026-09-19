@@ -331,6 +331,21 @@ OPENCOLLAR_HEALTH: tuple[HealthField, ...] = (
     HealthField("gnss_time_to_fix", "Time to the last fix", unit="s", warn_above=120),
     HealthField("lr_satellites", "LoRa satellites"),
     HealthField("flash_used_percent", "Flash used", unit="%", warn_above=80, critical_above=95),
+    # the fence port (phase 32): the wire a FenceEdge listens on, and the switch a TrapEdge
+    # watches; the fence thresholds here are the driver's defaults, a fence line's own
+    # thresholds judge the line
+    HealthField(
+        "fence_voltage",
+        "Fence voltage",
+        unit="kV",
+        scale=0.001,
+        decimals=2,
+        warn_below=4000,
+        critical_below=2000,
+    ),
+    HealthField("fence_pulse_count", "Fence pulses", warn_below=1),
+    HealthField("trap_triggered", "Trap", kind="bool", words=("closed", "open")),
+    HealthField("switch_active", "Switch", kind="bool", words=("active", "inactive")),
 )
 
 

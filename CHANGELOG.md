@@ -10,7 +10,11 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - **Traps** (decision D266). A Trap entity with a TrapEdge on it: the switch becomes a `trap_triggered` reading, a change raises `TRAP_CLOSED` (a warning: somebody has to go) or `TRAP_OPENED`, the shipped rule Trap closed alerts and makes the trap read critical on the map. Whether an active switch means closed is set on the device page, since it depends on the wiring.
 
+- The live map's entity and device panels carry the fence port's readings (Tim, 2026-09-19): a **Fence** row with the newest voltage in kV and the pulses, amber under 4 kV and red under 2 kV or without pulses, and a **Trap** row reading closed or open; each unfolds its trend the way the battery does. The device's health card and last-status panel show the same lines, the voltage in kV with the stored volts unchanged.
+
 ### Changed
+
+- The fence line's panel on the live map reads as one line per section — the range and the monitors at its ends — with each monitor's voltage chart folded behind its reading, instead of every word wrapping in the narrow value column and three charts stacked open (Tim, 2026-09-19, after looking at it on a phone, a tablet and a desktop).
 
 - A GPS attempt that got no fix no longer raises a device error event (Tim, 2026-09-19). The `ublox_fix` flag is a fact about the sky and the antenna, not about the device, and it comes with every status of a device under canopy; an event on each one drowned the flag that matters, `ublox`, which says the receiver itself did not answer and usually needs a person to go and look. The flag stays in the state, on the health card and in the device performance figures; it only raises no event, so no automation fires on it.
 

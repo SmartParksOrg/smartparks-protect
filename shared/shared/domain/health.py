@@ -76,7 +76,13 @@ def _text_of(field: HealthField, value: Any) -> str | None:
         hours = rest // 3600
         return f"{days} d {hours} h" if days else f"{hours} h"
     if field.kind == "bool":
+        if field.words:
+            return field.words[0] if value else field.words[1]
         return "yes" if value else "no"
+    if field.scale is not None and isinstance(value, int | float):
+        return (
+            f"{float(value) * field.scale:.{field.decimals if field.decimals is not None else 2}f}"
+        )
     if isinstance(value, float):
         return f"{value:g}"
     return str(value)

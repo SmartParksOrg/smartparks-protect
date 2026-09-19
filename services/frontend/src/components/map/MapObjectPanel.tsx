@@ -21,10 +21,13 @@ import type {
 } from "@/components/map/layers";
 import { Button } from "@/components/ui/button";
 import { useIsPhone } from "@/hooks/useMediaQuery";
+import { kilovolts } from "@/lib/fence";
+import { trendSpecFor } from "@/lib/trend";
 import {
   BatteryTrend,
   BatteryValue,
   ContactsTrend,
+  MetricTrend,
   MovementTrend,
   MovementValue,
   UptimeTrend,
@@ -358,6 +361,9 @@ function HealthRows({
   contacts,
   lastContactAt,
   contactsTo,
+  fenceVoltage,
+  fencePulses,
+  trapClosed,
   now,
   onOpenPosition,
   onOpenState,
@@ -390,6 +396,11 @@ function HealthRows({
   contacts?: number | null;
   lastContactAt?: string | null;
   contactsTo?: string;
+  /** The fence port (phase 32): the wire's newest voltage in volts and pulses, and whether
+   * the trap door reads closed; each unfolds its trend the way the battery does. */
+  fenceVoltage?: number | null;
+  fencePulses?: number | null;
+  trapClosed?: number | null;
   now: number;
   /** Opens the fix of that moment, the panel a track point opens (Tim, 2026-09-13). */
   onOpenPosition?: () => void;
@@ -403,6 +414,8 @@ function HealthRows({
   const [movementOpen, setMovementOpen] = useState(false);
   const [uptimeOpen, setUptimeOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
+  const [fenceOpen, setFenceOpen] = useState(false);
+  const [trapOpen, setTrapOpen] = useState(false);
   const hasMovement = activity !== undefined && activity !== null;
   const rebooted =
     lastResetAt != null && now - Date.parse(lastResetAt) < 24 * 3_600_000;
@@ -549,6 +562,88 @@ function HealthRows({
           <UptimeTrend
             projectId={batteryProject}
             deviceId={batteryDevice}
+            until={lastSeenAt}
+          />
+        </div>
+      )}
+      {fenceVoltage != null && (
+        <PanelRow
+          label={t("Fence")}
+          className={
+            fenceVoltage < 2000 || fencePulses === 0
+              ? "text-destructive"
+              : fenceVoltage < 4000
+                ? "text-brand-sand"
+                : ""
+          }
+        >
+          {batteryProject && batteryDevice ? (
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-primary"
+              title={
+                fenceOpen
+                  ? t("Hide the fence voltage")
+                  : t("Show the fence voltage")
+              }
+              aria-expanded={fenceOpen}
+              onClick={() => setFenceOpen((o) => !o)}
+            >
+              {kilovolts(fenceVoltage)}
+            </button>
+          ) : (
+            kilovolts(fenceVoltage)
+          )}
+          {fencePulses != null && (
+            <span className="text-muted-foreground">
+              {" "}
+              · {t("{{count}} pulses", { count: fencePulses })}
+            </span>
+          )}
+        </PanelRow>
+      )}
+      {fenceVoltage != null && fenceOpen && batteryProject && batteryDevice && (
+        <div className="col-span-2 rounded-md border bg-muted/30 p-2">
+          <MetricTrend
+            projectId={batteryProject}
+            deviceId={batteryDevice}
+            spec={trendSpecFor("fence_voltage", undefined, t)!}
+            until={lastSeenAt}
+          />
+        </div>
+      )}
+      {trapClosed != null && (
+        <PanelRow
+          label={t("Trap")}
+          className={trapClosed ? "text-destructive" : ""}
+        >
+          {batteryProject && batteryDevice ? (
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-primary"
+              title={
+                trapOpen
+                  ? t("Hide the trap's history")
+                  : t("Show the trap's history")
+              }
+              aria-expanded={trapOpen}
+              onClick={() => setTrapOpen((o) => !o)}
+            >
+              {trapClosed ? t("closed") : t("open")}
+            </button>
+          ) : trapClosed ? (
+            t("closed")
+          ) : (
+            t("open")
+          )}
+        </PanelRow>
+      )}
+      {trapClosed != null && trapOpen && batteryProject && batteryDevice && (
+        <div className="col-span-2 rounded-md border bg-muted/30 p-2">
+          <MetricTrend
+            projectId={batteryProject}
+            deviceId={batteryDevice}
+            spec={trendSpecFor("trap_triggered", undefined, t)!}
             until={lastSeenAt}
           />
         </div>
@@ -886,6 +981,9 @@ export function EntityPanel({
         contacts={props.contacts_24h}
         lastContactAt={props.last_contact_at}
         contactsTo={contactsHref}
+        fenceVoltage={props.fence_voltage}
+        fencePulses={props.fence_pulses}
+        trapClosed={props.trap_closed}
         now={now}
       />
       <PanelRow label={t("Device")}>
@@ -1066,6 +1164,9 @@ export function DevicePanel({
         contacts={props.contacts_24h}
         lastContactAt={props.last_contact_at}
         contactsTo={contactsHref}
+        fenceVoltage={props.fence_voltage}
+        fencePulses={props.fence_pulses}
+        trapClosed={props.trap_closed}
         now={now}
       />
       {allProjects && !props.project_id && (
