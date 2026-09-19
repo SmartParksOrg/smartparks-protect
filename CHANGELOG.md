@@ -4,6 +4,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- Devices bolted to posts read "moving". A still device's accelerometer does not read the same twice: the OpenCollar's is 8-bit over ±100 m/s² in two-count steps, so as the temperature drifts it reports changes of 0.784 m/s² per axis — 1.36 when all three drift at once — and the rule called anything above 1.0 movement. Measured on the 45 PWN scanners over eleven days: 540 false crossings, and 33 of the 45 shown as moving. Movement now needs one change of 2.0 m/s², or two of 1.4 running, which leaves about 25 of those 540 while a single clear jump — somebody picking the device up — still counts at once. (Tim, 2026-09-19.)
+
 ## v2.8.0, 2026-09-19
 
 Contact tracing end to end, built between 2026-09-18 and 2026-09-19 from the PWN project's own data: Bluetooth sightings as a canonical record type of their own (phase 30), then the analysis module that reads them beside position proximity (phase 31). With them the grazing analysis's Sentinel-2 vegetation layer and the day of Tim's testing that preceded it. Migrations 0039 to 0046; the schema is at revision 0046.

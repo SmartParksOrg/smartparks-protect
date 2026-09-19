@@ -58,7 +58,7 @@ from shared.domain.contacts import (
 )
 from shared.domain.contacts import normalise as normalise_address
 from shared.domain.device_settings import record_settings_frame
-from shared.domain.movement import MOVEMENT_THRESHOLD_MPS2, derive_activity, previous_sample
+from shared.domain.movement import derive_activity, movement_times, previous_sample
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.domain.outliers import EVENT_TYPE as OUTLIER_EVENT_TYPE
 from shared.domain.outliers import outlier_of
@@ -657,6 +657,13 @@ async def _write_positions(
         )
 
 
+def _stored_number(state: DeviceCurrentState, metric: str) -> float | None:
+    """The newest value a current state holds for a metric, when it is a number."""
+    entry = (state.latest_measurements or {}).get(metric)
+    value = entry.get("value") if isinstance(entry, dict) else None
+    return float(value) if isinstance(value, int | float) else None
+
+
 def _value_columns(value: Any) -> tuple[dict[str, Any], ValueType]:
     if isinstance(value, bool):
         return {"value_bool": value}, ValueType.BOOLEAN
@@ -1182,6 +1189,9 @@ async def _update_current_state(
     if current is None:
         current = DeviceCurrentState(device_id=device.id, latest_state={})
         session.add(current)
+    # read before this delivery's values overwrite it below: the movement rule needs the
+    # activity the device had *before* now, to see two above the threshold in a row
+    previous_activity = _stored_number(current, "activity")
     if current.last_seen_at is None or seen_at > current.last_seen_at:
         current.last_seen_at = seen_at
     latest_position = _apply_position(
@@ -1217,17 +1227,16 @@ async def _update_current_state(
         latest_measurements["battery_voltage"].value, int | float
     ):
         current.battery_voltage = float(latest_measurements["battery_voltage"].value)
-    movement_times = [
-        m.time
+    # a device moved when two activity samples in a row cross the threshold, not one: a device
+    # on a post drifts past any single threshold as its temperature changes
+    activities = sorted(
+        (m.time, float(m.value))
         for m in timely_measurements
-        if m.metric_key == "activity"
-        and isinstance(m.value, int | float)
-        and m.value >= MOVEMENT_THRESHOLD_MPS2
-    ]
-    if movement_times and (
-        current.last_movement_at is None or max(movement_times) > current.last_movement_at
-    ):
-        current.last_movement_at = max(movement_times)
+        if m.metric_key == "activity" and isinstance(m.value, int | float)
+    )
+    moved_at = movement_times(activities, previous_activity)
+    if moved_at and (current.last_movement_at is None or max(moved_at) > current.last_movement_at):
+        current.last_movement_at = max(moved_at)
     reboots = [e.time for e in timely_events if e.event_type == "device_reset"]
     if reboots and (current.last_reset_at is None or max(reboots) > current.last_reset_at):
         current.last_reset_at = max(reboots)

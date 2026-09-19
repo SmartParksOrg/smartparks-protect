@@ -158,3 +158,58 @@ def test_the_module_is_in_the_catalogue():
     module = MODULES["movement"]
     assert module.key == "movement" and module.version == "movement/1"
     assert module.parameters.__name__ == MovementParameters.__name__
+
+
+class TestMovementFromNoise:
+    """The rule that decides a device moved, against the noise a device that cannot move makes.
+
+    Measured on the 45 PWN scanners bolted to posts, 10,177 activity samples over eleven days
+    (Tim, 2026-09-19: they read "moving" while bolted down). Their accelerometer is 8-bit over
+    ±100 m/s² reported in two-count steps, so a still device reports changes in multiples of
+    0.784 m/s² as the temperature drifts: 0.784 on one axis, 1.109 on two, 1.358 on three.
+    """
+
+    def _times(self, values, previous=None):
+        from shared.domain.movement import movement_times
+
+        start = datetime(2026, 9, 10, tzinfo=UTC)
+        samples = [(start + timedelta(hours=i), v) for i, v in enumerate(values)]
+        return movement_times(samples, previous)
+
+    def test_the_quantisation_of_a_still_device_is_not_movement(self):
+        """One step on each of the three axes is 1.358 m/s² and means the sensor read itself
+        differently, not that anything happened. This is 3,236 of the scanners' samples."""
+        from shared.domain.movement import MOVEMENT_THRESHOLD_MPS2, SENSOR_STEP_MPS2
+
+        one_axis = SENSOR_STEP_MPS2
+        two_axes = SENSOR_STEP_MPS2 * 2**0.5
+        three_axes = SENSOR_STEP_MPS2 * 3**0.5
+        assert three_axes < MOVEMENT_THRESHOLD_MPS2, (
+            "the threshold has to clear the noise floor of a device that cannot move"
+        )
+        assert self._times([one_axis, two_axes, three_axes, three_axes]) == []
+
+    def test_a_single_drift_between_quiet_messages_is_not_movement(self):
+        """A bolted device crossing 1.4 once, with quiet either side: temperature, not motion."""
+        assert self._times([0.0, 1.57, 0.0, 0.784]) == []
+
+    def test_two_moderate_changes_running_are_movement(self):
+        """An animal that moves produces a run, which is what tells it from drift."""
+        found = self._times([0.0, 1.5, 1.6, 0.0])
+        assert len(found) == 1, "the second of the pair confirms it"
+
+    def test_one_clear_jump_is_movement_without_waiting(self):
+        """Somebody picking the device up. Waiting for a second sample would lose the moment."""
+        from shared.domain.movement import MOVEMENT_ALONE_MPS2
+
+        assert len(self._times([0.0, 5.0, 0.0])) == 1
+        assert MOVEMENT_ALONE_MPS2 > 1.358, "still above the three-axis quantisation"
+
+    def test_a_run_carried_over_from_the_delivery_before(self):
+        """The device does not stop moving because a message boundary fell in the middle."""
+        assert len(self._times([1.6], previous=1.5)) == 1
+        assert self._times([1.6], previous=0.0) == []
+        assert self._times([1.6], previous=None) == [], "nothing known before: wait for a second"
+
+    def test_a_still_device_reports_nothing(self):
+        assert self._times([0.0] * 10) == []

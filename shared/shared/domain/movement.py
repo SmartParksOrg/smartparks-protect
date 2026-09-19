@@ -15,10 +15,22 @@ from typing import Any
 from shared.device_drivers.base import DecodedMeasurement
 
 AXES = ("acceleration_x", "acceleration_y", "acceleration_z")
-#: Below this change of the acceleration vector between two status messages the device is
-#: taken as still: a worn device moves by 1.5 to 6 m/s² between hourly messages, a device
-#: lying on the ground by 0.0.
-MOVEMENT_THRESHOLD_MPS2 = 1.0
+#: What one step of an OpenCollar's accelerometer is worth: an 8-bit sample over ±100 m/s²,
+#: reported in steps of two counts. A device bolted to a post still reports changes in
+#: multiples of this as the temperature drifts, and those changes are the sensor's resolution
+#: rather than anything that happened (Tim, 2026-09-19, of the PWN scanners reading "moving").
+SENSOR_STEP_MPS2 = 0.784
+#: Below this change of the acceleration vector between two status messages the device is taken
+#: as still. Above the square root of three times the step, the 1.36 m/s2 a bolted-down device
+#: shows when all three axes drift by one step at once, because below that a change cannot be
+#: told from the sensor reading itself differently. A worn device moves by 1.5 to 6 m/s2 between
+#: hourly messages.
+MOVEMENT_THRESHOLD_MPS2 = 1.4
+#: A change this large is movement on its own, without waiting for a second. A device on a post
+#: crossed it 7 times in eleven days against 540 crossings of the threshold above, and a jump of
+#: this size is a person handling the hardware or an animal getting up — either way something
+#: happened. Without it a single clear jump between two quiet messages would be thrown away.
+MOVEMENT_ALONE_MPS2 = 2.0
 #: Hours without movement before the health line warns, and before it is critical.
 STILL_WARN_HOURS = 12
 STILL_CRITICAL_HOURS = 24
@@ -81,6 +93,39 @@ def derive_activity(
             )
         if last is None or time > last[1]:
             last = (sample, time)
+    return out
+
+
+def movement_times(
+    activities: Iterable[tuple[datetime, float]], previous: float | None
+) -> list[datetime]:
+    """The moments a device is taken to have moved, from its activity samples in time order.
+
+    One big change, or two moderate ones in a row. A device on a post drifts past any single
+    moderate threshold now and then — the PWN scanners did it 540 times in eleven days, and 33 of
+    the 45 read "moving" because of it — while an animal that moves produces a run. But a single
+    clear jump is movement too: waiting for a second would throw away the moment a person picks
+    the device up, and that is exactly what somebody looking at the record wants to find.
+
+    Measured over those eleven days on the 45 devices bolted to posts: 540 crossings of the old
+    single 1.0 threshold become about 25 under this rule, while samples from devices that really
+    move are kept in full above the larger bar and in runs below it.
+
+    `previous` is the newest activity the device already had, so a run that begins in one
+    delivery and continues in the next is not missed.
+    """
+    out: list[datetime] = []
+    last = previous
+    for time, value in activities:
+        alone = value >= MOVEMENT_ALONE_MPS2
+        sustained = (
+            value >= MOVEMENT_THRESHOLD_MPS2
+            and last is not None
+            and last >= MOVEMENT_THRESHOLD_MPS2
+        )
+        if alone or sustained:
+            out.append(time)
+        last = value
     return out
 
 
