@@ -15,7 +15,23 @@ import { useTheme } from "@/hooks/useTheme";
 import { type FenceSection, fenceColor, nearestOnLine } from "@/lib/fence";
 
 const LINE = "fence-setup-line";
+const SNAP = "fence-setup-snap";
 export const DRAG_TYPE = "application/x-protect-fence-monitor";
+
+/** A monitor on the map: a point on the line in its level's colour, never a label (Tim,
+ * 2026-09-19). The name is the tooltip and the list beside the map. */
+function dot(color: string): HTMLDivElement {
+  const element = document.createElement("div");
+  element.style.width = "18px";
+  element.style.height = "18px";
+  element.style.borderRadius = "9999px";
+  element.style.border = "3px solid #ffffff";
+  element.style.boxShadow =
+    "0 0 0 1px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.3)";
+  element.style.background = color;
+  element.style.cursor = "grab";
+  return element;
+}
 
 /**
  * The map a fence line is set up on (Tim, 2026-09-19): the line in its sections' colours and
@@ -27,12 +43,15 @@ export function FenceSetupMap({
   line,
   sections,
   monitors,
+  levels,
   onPlace,
 }: {
   line: GeoJSON.LineString;
   sections: FenceSection[];
   /** The monitors on this line, with where they stand. */
   monitors: FenceMonitorItem[];
+  /** Each monitor's level, for the colour of its point. */
+  levels: Record<string, string>;
   onPlace: (entityId: string, lon: number, lat: number) => void;
 }) {
   const { t } = useTranslation();
@@ -79,11 +98,46 @@ export function FenceSetupMap({
           "line-width": 5,
         },
       });
+      // where a dragged monitor will land: a ring on the line that follows the pointer
+      map.addSource(SNAP, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: SNAP,
+        type: "circle",
+        source: SNAP,
+        paint: {
+          "circle-radius": 11,
+          "circle-color": "#ffffff",
+          "circle-opacity": 0.6,
+          "circle-stroke-color": "#2F4A3A",
+          "circle-stroke-width": 2,
+        },
+      });
       const bounds = geometryBounds([{ geometry: line }]);
       if (bounds)
         map.fitBounds(bounds, { padding: 60, duration: 0, maxZoom: 15 });
     }
   }, [mapRef, ready, line]);
+  const showSnap = (lon: number, lat: number) => {
+    (mapRef.current?.getSource(SNAP) as GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "Point", coordinates: [lon, lat] },
+        },
+      ],
+    });
+  };
+  const hideSnap = () => {
+    (mapRef.current?.getSource(SNAP) as GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: [],
+    });
+  };
 
   // the sections in their colours (one piece per section, like the live map)
   useEffect(() => {
@@ -114,30 +168,37 @@ export function FenceSetupMap({
       if (m.longitude == null || m.latitude == null) continue;
       seen.add(m.entity_id);
       let marker = markers.current.get(m.entity_id);
+      const color = fenceColor(levels[m.entity_id]);
       if (!marker) {
-        const element = document.createElement("div");
-        element.className =
-          "flex cursor-grab items-center gap-1 rounded-md border bg-card px-2 py-1 text-xs shadow";
-        element.textContent = m.name;
-        element.title = t("Drag along the line to move it");
+        const element = dot(color);
+        element.title = `${m.name} · ${t("Drag along the line to move it")}`;
         marker = new maplibregl.Marker({
           element,
           draggable: true,
-          anchor: "bottom",
+          anchor: "center",
         })
           .setLngLat([m.longitude, m.latitude])
           .addTo(map);
         const id = m.entity_id;
+        // while it is dragged, the ring shows where on the line it will land; when it is
+        // let go it goes there, so a point never sits beside the line
+        marker.on("drag", () => {
+          const { lng, lat } = marker!.getLngLat();
+          const at = nearestOnLine(coordinates, lng, lat);
+          showSnap(at.lon, at.lat);
+        });
         marker.on("dragend", () => {
           const { lng, lat } = marker!.getLngLat();
           const at = nearestOnLine(coordinates, lng, lat);
           marker!.setLngLat([at.lon, at.lat]);
+          hideSnap();
           placeRef.current(id, at.lon, at.lat);
         });
         markers.current.set(m.entity_id, marker);
       } else {
         marker.setLngLat([m.longitude, m.latitude]);
-        marker.getElement().textContent = m.name;
+        marker.getElement().style.background = color;
+        marker.getElement().title = `${m.name} · ${t("Drag along the line to move it")}`;
       }
     }
     for (const [id, marker] of markers.current) {
@@ -146,7 +207,7 @@ export function FenceSetupMap({
         markers.current.delete(id);
       }
     }
-  }, [mapRef, ready, monitors, coordinates, t]);
+  }, [mapRef, ready, monitors, levels, coordinates, t]);
   useEffect(() => {
     const held = markers.current;
     return () => {
@@ -155,18 +216,24 @@ export function FenceSetupMap({
     };
   }, []);
 
-  // a monitor from the list, dropped on the map
-  const drop = (event: React.DragEvent<HTMLDivElement>) => {
-    const id = event.dataTransfer.getData(DRAG_TYPE);
+  // a monitor from the list, dragged over the map and dropped: the ring shows where on the
+  // line it will land, and it lands there
+  const under = (event: React.DragEvent<HTMLDivElement>) => {
     const map = mapRef.current;
-    if (!id || !map || !container.current) return;
-    event.preventDefault();
+    if (!map || !container.current) return null;
     const rect = container.current.getBoundingClientRect();
     const { lng, lat } = map.unproject([
       event.clientX - rect.left,
       event.clientY - rect.top,
     ]);
-    const at = nearestOnLine(coordinates, lng, lat);
+    return nearestOnLine(coordinates, lng, lat);
+  };
+  const drop = (event: React.DragEvent<HTMLDivElement>) => {
+    const id = event.dataTransfer.getData(DRAG_TYPE);
+    const at = under(event);
+    hideSnap();
+    if (!id || !at) return;
+    event.preventDefault();
     placeRef.current(id, at.lon, at.lat);
   };
   return (
@@ -174,8 +241,12 @@ export function FenceSetupMap({
       ref={container}
       className="h-80 w-full rounded-md border"
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes(DRAG_TYPE)) e.preventDefault();
+        if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+        e.preventDefault();
+        const at = under(e);
+        if (at) showSnap(at.lon, at.lat);
       }}
+      onDragLeave={hideSnap}
       onDrop={drop}
       role="application"
       aria-label={t(

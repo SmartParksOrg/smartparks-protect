@@ -560,6 +560,12 @@ function MonitorsSection({
             line={geometry}
             sections={status.sections as unknown as FenceSection[]}
             monitors={onLine}
+            levels={Object.fromEntries(
+              (status.monitors as unknown as FenceMonitor[]).map((m) => [
+                m.entity_id,
+                m.level,
+              ]),
+            )}
             onPlace={(entityId, lon, lat) =>
               place.mutate({ entityId, lon, lat })
             }
