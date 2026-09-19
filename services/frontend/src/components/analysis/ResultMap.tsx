@@ -162,7 +162,18 @@ export function ResultMap({
   const main = document.periods.find((p) => p.key === "main");
   // device subjects (decision D214) read their own tracks and colour the fixes by accuracy
   const byDevice = document.subjects.some((s) => s.kind === "device");
-  const available = ANALYSIS_KINDS.filter((k) => document.geometries[k]);
+  // every kind the run actually produced, the known ones first so the drawing order and the
+  // chips read the same as always. Not a fixed list filtered by the document: a module that
+  // emits a kind the map has never heard of should still show it, and `contact` was silently
+  // dropped for exactly that reason until this run was looked at.
+  const available = [
+    ...ANALYSIS_KINDS.filter((k) => document.geometries[k]),
+    ...Object.keys(document.geometries).filter(
+      (k) =>
+        document.geometries[k] &&
+        !(ANALYSIS_KINDS as readonly string[]).includes(k),
+    ),
+  ];
   // the result's polygons are the picture; the tracks, fixes and heatmap start hidden and
   // the chips switch them on (Tim, 2026-09-15)
   const [hidden, setHidden] = useState<string[]>(() => {
