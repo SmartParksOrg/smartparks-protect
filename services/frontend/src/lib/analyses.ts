@@ -142,6 +142,29 @@ export const DEFAULT_GRAZING: GrazingOptions = {
   rest: 0,
 };
 
+export interface ContactOptions {
+  /** Both kinds of evidence are on by default (decision D255); either can be left out. */
+  bluetooth: boolean;
+  proximity: boolean;
+  /** How close two fixes must be to count as a proximity, and how close in time. The two
+   * limits Tim asked to be configurable. */
+  distance: number;
+  window: number;
+  /** A floor on a sighting's signal, off by default; what it drops is reported, not lost. */
+  rssi: number | null;
+  /** Encounters shorter than this are left out. */
+  shortest: number;
+}
+
+export const DEFAULT_CONTACT: ContactOptions = {
+  bluetooth: true,
+  proximity: true,
+  distance: 100,
+  window: 600,
+  rssi: null,
+  shortest: 0,
+};
+
 /** The subjects and the period as the pages keep them in the URL. */
 export interface FormState {
   entities: string[];
@@ -163,6 +186,7 @@ export interface FormState {
   run: string | null;
   method: MethodOptions;
   grazing: GrazingOptions;
+  contact: ContactOptions;
 }
 
 export const DEFAULT_RANGE = "30d";
@@ -187,6 +211,14 @@ export function readFormState(params: URLSearchParams): FormState {
     to: params.get("to"),
     compare: params.get("compare"),
     run: params.get("run"),
+    contact: {
+      bluetooth: params.get("bluetooth") !== "0",
+      proximity: params.get("proximity") !== "0",
+      distance: numberOr(params.get("distance"), DEFAULT_CONTACT.distance),
+      window: numberOr(params.get("window"), DEFAULT_CONTACT.window),
+      rssi: params.get("rssi") ? Number(params.get("rssi")) : null,
+      shortest: Number(params.get("shortest") ?? 0) || 0,
+    },
     method: {
       gap: numberOr(params.get("gap"), DEFAULT_METHOD.gap),
       speed_max: numberOr(params.get("speed_max"), DEFAULT_METHOD.speed_max),
@@ -239,6 +271,15 @@ export function writeFormState(state: FormState): URLSearchParams {
   if (m.methods.join(",") !== ALL_METHODS.join(","))
     params.set("methods", m.methods.join(","));
   if (m.kde_bandwidth) params.set("kde", String(m.kde_bandwidth));
+  const c = state.contact;
+  if (!c.bluetooth) params.set("bluetooth", "0");
+  if (!c.proximity) params.set("proximity", "0");
+  if (c.distance !== DEFAULT_CONTACT.distance)
+    params.set("distance", String(c.distance));
+  if (c.window !== DEFAULT_CONTACT.window)
+    params.set("window", String(c.window));
+  if (c.rssi !== null) params.set("rssi", String(c.rssi));
+  if (c.shortest) params.set("shortest", String(c.shortest));
   const g = state.grazing;
   for (const id of g.areas) params.append("area", id);
   if (g.weighting !== "equal") params.set("weighting", g.weighting);
@@ -308,6 +349,30 @@ export function movementParameters(
     cell_m: m.cell,
     methods: m.methods,
     ...(m.kde_bandwidth ? { kde_bandwidth_m: m.kde_bandwidth } : {}),
+  };
+}
+
+/** The parameters the contact tracing module takes: the subjects, the period, which kinds of
+ * evidence to use and the two limits a proximity is judged by; null while no subject is
+ * chosen or a custom range lacks a date. */
+export function contactTracingParameters(
+  state: FormState,
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  const window = windowOf(state, now);
+  if (!window || state.entities.length === 0) return null;
+  const comparison = comparisonOf(state, window);
+  const c = state.contact;
+  return {
+    entity_ids: state.entities,
+    ...window,
+    ...(comparison ? { comparison } : {}),
+    bluetooth: c.bluetooth,
+    proximity: c.proximity,
+    max_distance_m: c.distance,
+    max_time_s: c.window,
+    ...(c.rssi !== null ? { min_rssi_dbm: c.rssi } : {}),
+    min_contact_s: c.shortest,
   };
 }
 
@@ -760,6 +825,14 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
       landscape: p.landscape !== false,
       absence: num("min_absence_hours", DEFAULT_GRAZING.absence),
       rest: num("rest_threshold_hours", 0),
+    },
+    contact: {
+      bluetooth: p.bluetooth !== false,
+      proximity: p.proximity !== false,
+      distance: num("max_distance_m", DEFAULT_CONTACT.distance),
+      window: num("max_time_s", DEFAULT_CONTACT.window),
+      rssi: typeof p.min_rssi_dbm === "number" ? p.min_rssi_dbm : null,
+      shortest: num("min_contact_s", 0),
     },
   };
 }

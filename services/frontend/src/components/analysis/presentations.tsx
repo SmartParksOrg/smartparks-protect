@@ -2,12 +2,14 @@ import type { ReactNode } from "react";
 
 import type { AnalysisRun } from "@/api/types";
 import { AreaCards } from "@/components/analysis/AreaCards";
+import { ContactSummary } from "@/components/analysis/ContactSummary";
 import {
   DeviceSections,
   FleetTable,
   LevelDefaults,
 } from "@/components/analysis/FleetTable";
 import {
+  ContactTracingLimitations,
   DevicePerformanceLimitations,
   GrazingLimitations,
   MovementLimitations,
@@ -122,6 +124,29 @@ export function grazingPresentation(
           <GrazingLimitations />
         </>
       ),
+    },
+  };
+}
+
+export function contactTracingPresentation(
+  t: Translate,
+  projectId: string,
+): Presentation {
+  const labels = contactTracingLabels(t);
+  return {
+    labels,
+    render: {
+      summary: (document) => <ContactSummary document={document} />,
+      map: (document, run, colors) => (
+        <ResultMap
+          projectId={projectId}
+          runId={run.id}
+          document={document}
+          labels={labels}
+          colors={colors}
+        />
+      ),
+      after: () => <ContactTracingLimitations />,
     },
   };
 }
@@ -342,6 +367,28 @@ export const movementLabels = (t: Translate): Record<string, string> => ({
 });
 
 /** The human names of the grazing result's keys; every header says use, not grazing. */
+export const contactTracingLabels = (t: Translate): Record<string, string> => ({
+  pairs: t("Pairs"),
+  subjects: t("Subjects"),
+  pair: t("Pair"),
+  period: t("Period"),
+  contacts: t("Contacts"),
+  hours: t("Hours"),
+  evidence: t("Evidence"),
+  sightings: t("Sightings"),
+  signal: t("Signal"),
+  closest_m: t("Closest (m)"),
+  first: t("First"),
+  last: t("Last"),
+  others_met: t("Others met"),
+  subject: t("Subject"),
+  contacts_per_day: t("Contacts per day"),
+  contacts_by_hour: t("Contacts by hour of day"),
+  network: t("Contact network"),
+  main: t("This period"),
+  comparison: t("Before"),
+});
+
 export const grazingLabels = (t: Translate): Record<string, string> => ({
   area: t("Area"),
   period: t("Period"),

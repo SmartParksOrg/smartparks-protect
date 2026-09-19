@@ -134,3 +134,39 @@ export function DevicePerformanceLimitations() {
     </details>
   );
 }
+
+/** What a contact study can and cannot say. The module writes its own limitations into the
+ * result (design 4.4); these are the ones that hold whatever the run found, and the first is
+ * the one somebody will otherwise assume the opposite of. */
+export function ContactTracingLimitations() {
+  const { t } = useTranslation();
+  return (
+    <details className="rounded-md border px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {t("What these figures can and cannot say")}
+      </summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+        <li>
+          {t(
+            "A contact is evidence that two subjects were near each other. It is not evidence that anything passed between them; nothing here infers transmission.",
+          )}
+        </li>
+        <li>
+          {t(
+            "A signal is banded — near, middling, far — and never converted to metres: that needs a calibration per device and per what stands between them, which nobody has.",
+          )}
+        </li>
+        <li>
+          {t(
+            "A proximity is an inference from two sets of fixes that do not line up. What it means depends on how often each subject reports, which is what the warnings above are about.",
+          )}
+        </li>
+        <li>
+          {t(
+            "Only subjects chosen for the run are counted. An animal that met something outside the selection shows nothing here.",
+          )}
+        </li>
+      </ul>
+    </details>
+  );
+}

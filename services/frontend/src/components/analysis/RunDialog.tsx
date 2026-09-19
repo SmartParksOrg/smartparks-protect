@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 
 import type { AnalysisRun } from "@/api/types";
+import { ContactTracingForm } from "@/components/analysis/ContactTracingForm";
 import { DevicePerformanceForm } from "@/components/analysis/DevicePerformanceForm";
 import { GrazingForm } from "@/components/analysis/GrazingForm";
 import { MovementForm } from "@/components/analysis/MovementForm";
@@ -27,7 +28,7 @@ export function RunDialog({
   onCreated,
 }: {
   projectId: string;
-  module: "movement" | "grazing" | "device_performance";
+  module: "movement" | "grazing" | "device_performance" | "contact_tracing";
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The form's first state: defaults, a deep link's choices, or an existing run's. */
@@ -47,7 +48,9 @@ export function RunDialog({
                 ? t("New movement analysis")
                 : module === "grazing"
                   ? t("New grazing analysis")
-                  : t("New device performance analysis")}
+                  : module === "contact_tracing"
+                    ? t("New contact tracing analysis")
+                    : t("New device performance analysis")}
           </DialogTitle>
           <DialogDescription>
             {editing
@@ -85,7 +88,7 @@ function RunDialogBody({
   onCreated,
 }: {
   projectId: string;
-  module: "movement" | "grazing" | "device_performance";
+  module: "movement" | "grazing" | "device_performance" | "contact_tracing";
   initial: FormState;
   editing: AnalysisRun | null;
   onCreated: (run: AnalysisRun, replaced: AnalysisRun | null) => void;
@@ -103,5 +106,6 @@ function RunDialogBody({
   };
   if (module === "movement") return <MovementForm {...props} />;
   if (module === "grazing") return <GrazingForm {...props} />;
+  if (module === "contact_tracing") return <ContactTracingForm {...props} />;
   return <DevicePerformanceForm {...props} />;
 }
