@@ -178,12 +178,14 @@ the plan's level 4 and wait for the users' reading of level 3.
 - [x] P5 the cache `environment_samples` and its migration; the reuse across runs.
 - [x] P6 the grazing module: the level 3 columns, the table, the chart, the levels and the
   warnings; the report.
-- [ ] P7 docs: `docs/analytics/movement.md` and `grazing.md`, this document's state, the
+- [x] P7 docs: `docs/analytics/movement.md` and `grazing.md`, this document's state, the
   operations guide for the Copernicus account, `DEVELOPERS.md`, the changelog.
-- [ ] P8 the dev server: a Copernicus account and its credentials in the vault; a movement run
-  over the Okonjima devices with the corrected range and the strategy; a grazing run over the
-  Smart Parks cows with the vegetation columns; Tim's reading.
-- [ ] P9 release v2.7.0 after the exit criteria.
+- [x] P8 the dev server: the Copernicus account through its own page (D250); the grazing run
+  over the management areas read on 2026-09-18; the movement run over SP050969 (FreeNature,
+  the one subject on dev with more than sixty days of fixes; Okonjima has none there) with the
+  corrected range and the strategy, read on 2026-09-19.
+- [x] P9 released: the landscape half as v2.8.0 (2026-09-19, the v2.7.0 number skipped), the
+  movement half as v2.9.0 the same day.
 
 ## 9. Exit criteria
 

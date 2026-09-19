@@ -2,7 +2,9 @@
 
 All notable changes to Smart Parks Protect are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [semantic versioning](https://semver.org/). Servers run tagged releases, never `main`.
 
-## Unreleased
+## v2.9.0, 2026-09-19
+
+Phase 29 closed: the movement methods that the v2.8.0 tag left unbuilt — the autocorrelation-corrected home range and the movement strategy — read by Tim on the dev server over SP050969 (corrected 95% range 38.9 ha against the plain KDE's 25.6, resident with a clear margin) and released the same day. With them the review of the two days' contact tracing work and the satellite test flake, found to be a test's own doing. No migration; the schema stays at revision 0046.
 
 ### Added
 
