@@ -65,7 +65,7 @@ The API also applies the staleness rule when it reads the status, so a line whos
 - [x] F5 the rules: the three templates, the Dutch of their titles.
 - [x] F6 the interface: the feature form, the map layer and the fence panel, the monitor's card on the entity page, the trap card on the device page, Dutch.
 - [x] F7 docs: `docs/devices/fences-and-traps.md`, the OpenCollar driver row, the pages guide, `DEVELOPERS.md`, the changelog, this document's state.
-- [ ] F8 the dev server: no FenceEdge or TrapEdge reports there yet; a fence line drawn over a test project with simulated measurements, then Tim's field devices when they report.
+- [ ] F8 the dev server: the simulated half done on 2026-09-19 (the Fence demo and Trap demo projects, a day of frames through the real decoder); Tim's field devices when they report.
 
 ## 6. Exit criteria
 
