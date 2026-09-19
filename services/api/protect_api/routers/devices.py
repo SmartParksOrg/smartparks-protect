@@ -11,9 +11,7 @@ from itertools import pairwise
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
-from geoalchemy2.shape import from_shape
 from pydantic import BaseModel, Field
-from shapely.geometry import Point
 from sqlalchemy import Integer, Text, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,9 +91,8 @@ from shared.domain.reporting import (
 )
 from shared.domain.reporting_rules import decode_setting_value, encode_setting_value
 from shared.domain.static_place import (
-    place_past_sightings,
+    place_device,
     place_past_sightings_of,
-    show_static_place,
 )
 from shared.domain.trap import TRAP_ATTRIBUTE, closed_when_active
 from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource, Role
@@ -1194,13 +1191,9 @@ async def set_device_static_position(
         )
     now = utc_now()
     if body.latitude is not None and body.longitude is not None:
-        device.static_geom = from_shape(Point(body.longitude, body.latitude), srid=4326)
-        device.static_position_at = now
-        device.location_source = LocationSource.STATIC
-        await show_static_place(session, device, now)
         # the sightings it already made say when but never where until now (decision D258):
         # a reader is measured long after it has been scanning
-        placed = await place_past_sightings(session, device)
+        placed = await place_device(session, device, body.longitude, body.latitude, now)
     else:
         placed = 0
         device.static_geom = None

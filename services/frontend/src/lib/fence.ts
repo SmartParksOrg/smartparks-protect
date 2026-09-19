@@ -174,6 +174,51 @@ export function sliceLine(
   return out;
 }
 
+/** The point of the line nearest to a place, and how far along the line it is: where a
+ * monitor dropped near the line goes, shown at once while the server does the same. */
+export function nearestOnLine(
+  coordinates: number[][],
+  lon: number,
+  lat: number,
+): { lon: number; lat: number; metres: number } {
+  const metres = flat(coordinates);
+  const lat0 =
+    (coordinates.reduce((s, c) => s + c[1], 0) / coordinates.length) *
+    (Math.PI / 180);
+  const lon0 = coordinates.reduce((s, c) => s + c[0], 0) / coordinates.length;
+  const px = (lon - lon0) * EARTH_RADIUS_M * Math.cos(lat0) * (Math.PI / 180);
+  const py = (lat - lat0 * (180 / Math.PI)) * EARTH_RADIUS_M * (Math.PI / 180);
+  let best = Infinity;
+  let at = { lon: coordinates[0][0], lat: coordinates[0][1], metres: 0 };
+  let walked = 0;
+  for (let i = 0; i < metres.length - 1; i += 1) {
+    const [ax, ay] = metres[i];
+    const [bx, by] = metres[i + 1];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const length2 = dx * dx + dy * dy;
+    const t =
+      length2 === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / length2));
+    const cx = ax + t * dx;
+    const cy = ay + t * dy;
+    const d2 = (px - cx) ** 2 + (py - cy) ** 2;
+    if (d2 < best) {
+      best = d2;
+      at = {
+        lon:
+          coordinates[i][0] + t * (coordinates[i + 1][0] - coordinates[i][0]),
+        lat:
+          coordinates[i][1] + t * (coordinates[i + 1][1] - coordinates[i][1]),
+        metres: walked + t * Math.sqrt(length2),
+      };
+    }
+    walked += Math.sqrt(length2);
+  }
+  return at;
+}
+
 /** A fence line as one map feature per section, each carrying its level; any other feature,
  * or a fence without sections, as itself. */
 export function fenceSectionFeatures(feature: Feature): GeoJSON.Feature[] {

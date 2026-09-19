@@ -5,6 +5,7 @@ import {
   fenceRuns,
   fenceSectionFeatures,
   fenceSummary,
+  nearestOnLine,
   sliceLine,
 } from "@/lib/fence";
 
@@ -88,5 +89,19 @@ describe("the fence summary sentence", () => {
     expect(
       fenceSummary([{ from_m: 0, to_m: 1, level: "unknown" }], [], t),
     ).toBe("No fence monitor on this line yet.");
+  });
+});
+
+describe("nearestOnLine", () => {
+  it("moves a point beside the line onto it", () => {
+    const at = nearestOnLine(LINE, 4.6049, 52.4991);
+    expect(at.lat).toBeCloseTo(52.5, 5);
+    expect(at.lon).toBeCloseTo(4.6049, 3);
+    expect(Math.round(at.metres / 100) * 100).toBe(300);
+  });
+  it("lands on the second stretch past the corner", () => {
+    const at = nearestOnLine(LINE, 4.6155, 52.503);
+    expect(at.lon).toBeCloseTo(4.6147, 5);
+    expect(at.metres).toBeGreaterThan(1000);
   });
 });

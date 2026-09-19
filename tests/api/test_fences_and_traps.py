@@ -337,3 +337,72 @@ async def test_a_trap_shuts_and_opens(client, db, bus):
         .limit(1)
     )
     assert newest is True
+
+
+async def test_a_monitor_dropped_near_the_line_lands_on_it(client, db, bus):
+    """Tim, 2026-09-19: a monitor is placed by dragging it onto the line on a map. The drop
+    point is moved onto the line, the device's fixed place follows (over one it had), the
+    monitor is on the line, and a monitor without a device cannot be placed."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    h = admin.headers
+    base = f"/api/v1/projects/{project.id}"
+    line = await client.post(
+        f"{base}/features",
+        json={"feature_type": "fence", "name": unique_name("Dune fence"), "geometry": LINE},
+        headers=h,
+    )
+    fence_id = line.json()["id"]
+    device, entity_id, _source, _identity = await _device(
+        client,
+        db,
+        project,
+        admin,
+        entity_type_key="fence_monitor",
+        name=unique_name("Gate"),
+        place=(4.5000, 52.4000),  # far from the line: the place it had before it was moved
+    )
+    listed = (await client.get(f"{base}/fence-monitors", headers=h)).json()
+    mine = next(m for m in listed if m["entity_id"] == entity_id)
+    assert mine["device_id"] == device["id"] and mine["feature_id"] is None
+
+    # dropped 100 m south of the line, a third of the way along
+    dropped = await client.put(
+        f"{base}/features/{fence_id}/monitors/{entity_id}",
+        json={"longitude": 4.6049, "latitude": 52.4991},
+        headers=h,
+    )
+    assert dropped.status_code == 200, dropped.text
+    status = dropped.json()
+    assert [m["entity_id"] for m in status["monitors"]] == [entity_id]
+    assert round(status["monitors"][0]["position_m"], -2) == 300
+    moved = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()
+    lon, lat = moved["static_position"]["coordinates"]
+    assert abs(lat - 52.5) < 1e-5, "on the line, not beside it"
+    assert 4.604 < lon < 4.606
+    listed = (await client.get(f"{base}/fence-monitors", headers=h)).json()
+    mine = next(m for m in listed if m["entity_id"] == entity_id)
+    assert mine["feature_id"] == fence_id and abs(mine["latitude"] - 52.5) < 1e-5
+
+    # dragged along the line: the place moves with it
+    again = await client.put(
+        f"{base}/features/{fence_id}/monitors/{entity_id}",
+        json={"longitude": 4.6120, "latitude": 52.5008},
+        headers=h,
+    )
+    assert round(again.json()["monitors"][0]["position_m"], -2) == 800
+
+    # a monitor without a device has nothing to place
+    catalogue = (await client.get("/api/v1/entity-types?limit=400", headers=h)).json()
+    entity_type = next(t for t in catalogue["items"] if t["key"] == "fence_monitor")
+    bare = await client.post(
+        f"{base}/entities",
+        json={"entity_type_id": entity_type["id"], "name": unique_name("Bare")},
+        headers=h,
+    )
+    refused = await client.put(
+        f"{base}/features/{fence_id}/monitors/{bare.json()['id']}",
+        json={"longitude": 4.6049, "latitude": 52.4991},
+        headers=h,
+    )
+    assert refused.status_code == 422

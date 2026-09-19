@@ -8,10 +8,10 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
   Device,
-  Entity,
   EntityType,
   EventItem,
   Feature,
+  FenceMonitorItem,
   FenceStatus,
   Page as PageType,
 } from "@/api/types";
@@ -19,6 +19,7 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { MetricTrend } from "@/components/map/BatteryTrend";
 import { FenceLevelDot } from "@/components/map/FencePanel";
 import { DrawMap } from "@/components/map/DrawMap";
+import { DRAG_TYPE, FenceSetupMap } from "@/components/map/FenceSetupMap";
 import { FenceStrip } from "@/components/map/FenceStrip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -301,7 +302,7 @@ export function FenceLinePage() {
           <FenceSetupCard
             projectId={projectId}
             feature={feature.data}
-            monitors={monitors}
+            status={s}
           />
         )}
       </Page>
@@ -318,11 +319,11 @@ export function FenceLinePage() {
 function FenceSetupCard({
   projectId,
   feature,
-  monitors,
+  status,
 }: {
   projectId: string;
   feature: Feature;
-  monitors: FenceMonitor[];
+  status: FenceStatus | undefined;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(feature.name);
@@ -396,11 +397,13 @@ function FenceSetupCard({
           </p>
         </section>
         <ThresholdsSection projectId={projectId} feature={feature} />
-        <MonitorsSection
-          projectId={projectId}
-          feature={feature}
-          monitors={monitors}
-        />
+        {status && (
+          <MonitorsSection
+            projectId={projectId}
+            feature={feature}
+            status={status}
+          />
+        )}
       </CardContent>
       <Dialog open={drawing} onOpenChange={setDrawing}>
         <DialogContent className="sm:max-w-2xl">
@@ -441,20 +444,26 @@ function FenceSetupCard({
   );
 }
 
-/** The monitors on the line: take one off, put an existing Fence monitor on, or make one. */
+/**
+ * The monitors on the line, on a map (Tim, 2026-09-19): the ones on the line drag along it,
+ * a free one from the list beside the map is dropped on the line, and a drop is the device's
+ * fixed place from then on. A monitor without a device cannot be placed: the place is the
+ * device's. A new monitor asks for a name and its device, nothing else.
+ */
 function MonitorsSection({
   projectId,
   feature,
-  monitors,
+  status,
 }: {
   projectId: string;
   feature: Feature;
-  monitors: FenceMonitor[];
+  status: FenceStatus;
 }) {
   const { t } = useTranslation();
   const invalidate = [
     queryKeys.features(projectId),
     queryKeys.entities(projectId),
+    ["projects", projectId, "fence-monitors"],
   ];
   const types = useQuery({
     queryKey: queryKeys.entityTypes,
@@ -464,12 +473,12 @@ function MonitorsSection({
       }),
   });
   const monitorType = types.data?.items.find((x) => x.key === "fence_monitor");
-  const entities = useQuery({
-    queryKey: queryKeys.entities(projectId),
+  const all = useQuery({
+    queryKey: ["projects", projectId, "fence-monitors"],
     queryFn: () =>
-      api.get<PageType<Entity>>(`/api/v1/projects/${projectId}/entities`, {
-        query: { limit: 500 },
-      }),
+      api.get<FenceMonitorItem[]>(
+        `/api/v1/projects/${projectId}/fence-monitors`,
+      ),
   });
   const devices = useQuery({
     queryKey: queryKeys.devices({ projectId, forFence: true }),
@@ -478,18 +487,24 @@ function MonitorsSection({
         query: { project_id: projectId, limit: 500 },
       }),
   });
-  const onLine = new Set(monitors.map((m) => m.entity_id));
-  const candidates = (entities.data?.items ?? []).filter(
-    (e) =>
-      monitorType && e.entity_type_id === monitorType.id && !onLine.has(e.id),
-  );
-  const attach = useMutationToast({
-    mutationFn: (entityId: string) =>
-      api.put(`/api/v1/projects/${projectId}/entities/${entityId}/fence`, {
-        body: { feature_id: feature.id },
-      }),
-    invalidate,
-    success: t("Monitor put on the line"),
+  const onLine = (all.data ?? []).filter((m) => m.feature_id === feature.id);
+  const free = (all.data ?? []).filter((m) => m.feature_id !== feature.id);
+  const place = useMutationToast({
+    mutationFn: ({
+      entityId,
+      lon,
+      lat,
+    }: {
+      entityId: string;
+      lon: number;
+      lat: number;
+    }) =>
+      api.put<FenceStatus>(
+        `/api/v1/projects/${projectId}/features/${feature.id}/monitors/${entityId}`,
+        { body: { longitude: lon, latitude: lat } },
+      ),
+    invalidate: [...invalidate, ["devices"]],
+    success: t("Monitor placed on the line"),
   });
   const detach = useMutationToast({
     mutationFn: (entityId: string) =>
@@ -501,158 +516,143 @@ function MonitorsSection({
   });
   const [newName, setNewName] = useState("");
   const [newDevice, setNewDevice] = useState("none");
-  const [lat, setLat] = useState("");
-  const [lon, setLon] = useState("");
-  const placeGiven = lat.trim() !== "" || lon.trim() !== "";
-  const placeValid =
-    !placeGiven ||
-    (lat.trim() !== "" &&
-      lon.trim() !== "" &&
-      Number.isFinite(Number(lat)) &&
-      Number.isFinite(Number(lon)) &&
-      Math.abs(Number(lat)) <= 90 &&
-      Math.abs(Number(lon)) <= 180);
   const create = useMutationToast({
     mutationFn: async () => {
       if (!monitorType)
         throw new Error(
           t("The Fence monitor type is missing from the catalogue"),
         );
-      let entityId: string;
-      if (newDevice !== "none") {
-        const made = await api.post<{ entity_id: string }>(
-          `/api/v1/projects/${projectId}/entity-assignments`,
-          {
-            body: {
-              device_id: newDevice,
-              valid_from: new Date().toISOString(),
-              new_entity: {
-                entity_type_id: monitorType.id,
-                name: newName.trim(),
-              },
+      if (newDevice !== "none")
+        await api.post(`/api/v1/projects/${projectId}/entity-assignments`, {
+          body: {
+            device_id: newDevice,
+            valid_from: new Date().toISOString(),
+            new_entity: {
+              entity_type_id: monitorType.id,
+              name: newName.trim(),
             },
           },
-        );
-        entityId = made.entity_id;
-        if (placeGiven)
-          await api.put(`/api/v1/devices/${newDevice}/static-position`, {
-            body: { latitude: Number(lat), longitude: Number(lon) },
-          });
-      } else {
-        const made = await api.post<Entity>(
-          `/api/v1/projects/${projectId}/entities`,
-          { body: { entity_type_id: monitorType.id, name: newName.trim() } },
-        );
-        entityId = made.id;
-      }
-      await api.put(
-        `/api/v1/projects/${projectId}/entities/${entityId}/fence`,
-        {
-          body: { feature_id: feature.id },
-        },
-      );
+        });
+      else
+        await api.post(`/api/v1/projects/${projectId}/entities`, {
+          body: { entity_type_id: monitorType.id, name: newName.trim() },
+        });
     },
     invalidate: [...invalidate, ["devices"]],
-    success: t("Monitor made and put on the line"),
+    success: t("Monitor made; drag it onto the line"),
     onSuccess: () => {
       setNewName("");
       setNewDevice("none");
-      setLat("");
-      setLon("");
     },
   });
+  const geometry = feature.geometry as unknown as GeoJSON.Geometry | null;
   return (
     <section className="space-y-3">
-      <h3 className="font-medium">{t("Monitors on the line")}</h3>
-      {monitors.length === 0 ? (
-        <p className="text-muted-foreground">{t("None yet.")}</p>
-      ) : (
-        <ul className="space-y-1">
-          {monitors.map((m) => (
-            <li
-              key={m.entity_id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1"
-            >
-              <FenceLevelDot level={m.level} />
-              <Link
-                className="hover:underline"
-                to={`/projects/${projectId}/entities/${m.entity_id}`}
-              >
-                {m.name}
-              </Link>
-              <span className="text-xs text-muted-foreground">
-                {m.position_m != null
-                  ? t("at {{at}} along the line", {
-                      at: formatLength(m.position_m),
-                    })
-                  : t("no place yet: set one on its device")}
-              </span>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="ml-auto h-7"
-                disabled={detach.isPending}
-                onClick={() => detach.mutate(m.entity_id)}
-              >
-                {t("Take off")}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="space-y-1">
-        <Label>{t("Put an existing monitor on the line")}</Label>
-        <Select
-          value="none"
-          onValueChange={(v) => v !== "none" && attach.mutate(v)}
-        >
-          <SelectTrigger
-            className="w-64"
-            aria-label={t("Existing fence monitors")}
-          >
-            <SelectValue placeholder={t("Choose a fence monitor")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none" disabled>
-              {candidates.length === 0
-                ? t("No fence monitor free in the project")
-                : t("Choose a fence monitor")}
-            </SelectItem>
-            {candidates.map((e) => (
-              <SelectItem key={e.id} value={e.id}>
-                {e.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-        <div className="font-medium">{t("New fence monitor")}</div>
-        <p className="text-xs text-muted-foreground">
-          {t(
-            "A monitor is an entity of the Fence monitor type. Give it its FenceEdge and the place the post stands, and it colours its stretch of the line from its first reading.",
-          )}
-        </p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="monitor-name">{t("Name")}</Label>
+      <h3 className="font-medium">{t("Monitors")}</h3>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          "Drag a monitor from the list onto the line, or a monitor on the line along it. Where you let go becomes its device's fixed place; a device that stood elsewhere is moved.",
+        )}
+      </p>
+      <div className="grid gap-3 lg:grid-cols-[1fr_18rem]">
+        {geometry?.type === "LineString" && (
+          <FenceSetupMap
+            line={geometry}
+            sections={status.sections as unknown as FenceSection[]}
+            monitors={onLine}
+            onPlace={(entityId, lon, lat) =>
+              place.mutate({ entityId, lon, lat })
+            }
+          />
+        )}
+        <div className="space-y-3">
+          <div>
+            <div className="text-xs text-muted-foreground">
+              {t("On the line")}
+            </div>
+            {onLine.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("None yet.")}</p>
+            ) : (
+              <ul className="space-y-1 text-sm">
+                {onLine.map((m) => (
+                  <li key={m.entity_id} className="flex items-center gap-2">
+                    <Link
+                      className="min-w-0 flex-1 truncate hover:underline"
+                      to={`/projects/${projectId}/entities/${m.entity_id}`}
+                    >
+                      {m.name}
+                    </Link>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7"
+                      disabled={detach.isPending}
+                      onClick={() => detach.mutate(m.entity_id)}
+                    >
+                      {t("Take off")}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">
+              {t("Free monitors: drag one onto the line")}
+            </div>
+            {free.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("None free.")}</p>
+            ) : (
+              <ul className="space-y-1 text-sm">
+                {free.map((m) => (
+                  <li
+                    key={m.entity_id}
+                    draggable={Boolean(m.device_id)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(DRAG_TYPE, m.entity_id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    className={
+                      m.device_id
+                        ? "cursor-grab rounded-md border bg-card px-2 py-1"
+                        : "rounded-md border border-dashed px-2 py-1 text-muted-foreground"
+                    }
+                    title={
+                      m.device_id
+                        ? t("Drag onto the line")
+                        : t("Give it a device first")
+                    }
+                  >
+                    {m.name}
+                    {m.feature_name && (
+                      <span className="text-xs text-muted-foreground">
+                        {" "}
+                        · {m.feature_name}
+                      </span>
+                    )}
+                    {!m.device_id && (
+                      <span className="text-xs"> · {t("no device")}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="space-y-2 rounded-md border bg-muted/30 p-2">
+            <div className="text-sm font-medium">{t("New fence monitor")}</div>
             <Input
-              id="monitor-name"
-              className="w-56"
+              aria-label={t("Name")}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder={t("North gate")}
             />
-          </div>
-          <div className="space-y-1">
-            <Label>{t("Device")}</Label>
             <Select value={newDevice} onValueChange={setNewDevice}>
-              <SelectTrigger className="w-56" aria-label={t("Device")}>
+              <SelectTrigger aria-label={t("Device")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">{t("Later")}</SelectItem>
+                <SelectItem value="none">{t("Device later")}</SelectItem>
                 {(devices.data?.items ?? []).map((d) => (
                   <SelectItem key={d.id} value={d.id}>
                     {d.name}
@@ -660,39 +660,15 @@ function MonitorsSection({
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!newName.trim() || create.isPending || !monitorType}
+              onClick={() => create.mutate()}
+            >
+              {t("Make")}
+            </Button>
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="monitor-lat">{t("Latitude")}</Label>
-            <Input
-              id="monitor-lat"
-              className="w-32"
-              inputMode="decimal"
-              value={lat}
-              onChange={(e) => setLat(e.target.value)}
-              disabled={newDevice === "none"}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="monitor-lon">{t("Longitude")}</Label>
-            <Input
-              id="monitor-lon"
-              className="w-32"
-              inputMode="decimal"
-              value={lon}
-              onChange={(e) => setLon(e.target.value)}
-              disabled={newDevice === "none"}
-            />
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            disabled={
-              !newName.trim() || !placeValid || create.isPending || !monitorType
-            }
-            onClick={() => create.mutate()}
-          >
-            {t("Make and put on the line")}
-          </Button>
         </div>
       </div>
     </section>

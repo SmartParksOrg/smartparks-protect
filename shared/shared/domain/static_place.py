@@ -81,6 +81,25 @@ async def show_static_place(session: AsyncSession, device: Device, when: datetim
     _place(entity_state, device.static_geom, when)
 
 
+async def place_device(
+    session: AsyncSession, device: Device, longitude: float, latitude: float, when: datetime
+) -> int:
+    """Give a device a place by hand (decision D261): the place, the source, the current
+    states of the device and its entity, and the sightings it already made (D258). Returns how
+    many past sightings got a position. The device page's control and the fence line's map
+    (a monitor dropped on the line, phase 32) both come here, so a moved device is moved the
+    same way whichever was used."""
+    from geoalchemy2.shape import from_shape
+    from shapely.geometry import Point
+
+    device.static_geom = from_shape(Point(longitude, latitude), srid=4326)
+    device.static_position_at = when
+    device.location_source = LocationSource.STATIC
+    await session.flush()
+    await show_static_place(session, device, when)
+    return await place_past_sightings(session, device)
+
+
 async def place_entity_of(session: AsyncSession, device_id: uuid.UUID, when: datetime) -> bool:
     """Give the entity a device was just assigned to the device's place, if it has one.
 

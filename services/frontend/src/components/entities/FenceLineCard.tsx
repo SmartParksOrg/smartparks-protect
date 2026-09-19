@@ -7,19 +7,9 @@ import { queryKeys } from "@/api/queryKeys";
 import type { EntityFence, Feature, Page as PageType } from "@/api/types";
 import { FenceLevelDot } from "@/components/map/FencePanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { type FenceMonitor, fenceLevelLabel, kilovolts } from "@/lib/fence";
 import { formatAgo, formatTime } from "@/lib/format";
-
-const NONE = "none";
 
 /**
  * Which fence line a Fence monitor stands on (phase 32, decision D263), and what it last
@@ -50,19 +40,6 @@ export function FenceLineCard({
         query: { feature_type: "fence", limit: 200 },
       }),
   });
-  const save = useMutationToast({
-    mutationFn: (featureId: string | null) =>
-      api.put<EntityFence>(
-        `/api/v1/projects/${projectId}/entities/${entityId}/fence`,
-        { body: { feature_id: featureId } },
-      ),
-    invalidate: [
-      [...queryKeys.entity(projectId, entityId), "fence"],
-      queryKeys.features(projectId),
-    ],
-    success: (r) =>
-      r.feature_id ? t("Fence line saved") : t("Taken off the fence line"),
-  });
   const m = mine.data;
   const reading = (m?.monitor ?? null) as FenceMonitor | null;
   return (
@@ -76,27 +53,15 @@ export function FenceLineCard({
             "The stretch of fence this monitor watches. The line reads its status from the monitors on it, section by section.",
           )}
         </p>
-        {canEdit ? (
-          <Select
-            value={m?.feature_id ?? NONE}
-            onValueChange={(v) => save.mutate(v === NONE ? null : v)}
-            disabled={save.isPending || !lines.data}
-          >
-            <SelectTrigger aria-label={t("Fence line")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>{t("No fence line")}</SelectItem>
-              {(lines.data?.items ?? []).map((line) => (
-                <SelectItem key={line.id} value={line.id}>
-                  {line.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <p>{m?.feature_name ?? t("No fence line")}</p>
-        )}
+        <p>
+          {m?.feature_id
+            ? null
+            : canEdit
+              ? t(
+                  "Not on a fence line. Open the line's page and drag this monitor onto it.",
+                )
+              : t("No fence line")}
+        </p>
         {m?.feature_id && (
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             <dt className="text-muted-foreground">{t("Line")}</dt>

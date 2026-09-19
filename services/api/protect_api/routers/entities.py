@@ -44,6 +44,8 @@ from protect_api.schemas.domain import (
     FeatureCreate,
     FeatureRead,
     FeatureUpdate,
+    FenceMonitorPlace,
+    FenceMonitorRead,
     FenceMonitorUpdate,
     FenceStatusRead,
 )
@@ -61,13 +63,15 @@ from shared.domain.fence import (
     monitor_level,
     recompute_fence,
     sections_of,
+    snap_to_line,
 )
-from shared.domain.static_place import place_entity_of
+from shared.domain.static_place import place_device, place_entity_of
 from shared.enums import FeatureType
 from shared.models import (
     Device,
     DeviceEntityAssignment,
     Entity,
+    EntityCurrentState,
     EntityType,
     Feature,
     FenceMonitor,
@@ -494,8 +498,13 @@ async def get_fence_status(
     feature = await _project_feature(session, context, feature_id)
     if feature.feature_type != FeatureType.FENCE:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not a fence line")
+    return await _fence_status_read(session, feature, utc_now())
+
+
+async def _fence_status_read(
+    session: AsyncSession, feature: Feature, now: datetime
+) -> FenceStatusRead:
     status_row = await session.get(FenceStatus, feature.id)
-    now = utc_now()
     if status_row is None:
         # never computed: a line drawn before any monitor reported, or with none on it yet
         await recompute_fence(session, feature.id, now)
@@ -510,6 +519,122 @@ async def get_fence_status(
         updated_at=status_row.updated_at if status_row else None,
         **reading,
     )
+
+
+@router.get("/fence-monitors", response_model=list[FenceMonitorRead])
+async def list_fence_monitors(
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> list[FenceMonitorRead]:
+    """Every Fence monitor entity of the project with its device today, the line it is on and
+    where it stands: what the fence line's map drags from (phase 32)."""
+    from sqlalchemy import func
+
+    now = utc_now()
+    rows = (
+        await session.execute(
+            select(
+                Entity.id,
+                Entity.name,
+                Device.id,
+                Device.name,
+                Feature.id,
+                Feature.name,
+                func.ST_X(EntityCurrentState.latest_position),
+                func.ST_Y(EntityCurrentState.latest_position),
+            )
+            .join(EntityType, EntityType.id == Entity.entity_type_id)
+            .outerjoin(
+                DeviceEntityAssignment,
+                (DeviceEntityAssignment.entity_id == Entity.id)
+                & DeviceEntityAssignment.validity.op("@>")(now),
+            )
+            .outerjoin(Device, Device.id == DeviceEntityAssignment.device_id)
+            .outerjoin(FenceMonitor, FenceMonitor.entity_id == Entity.id)
+            .outerjoin(Feature, Feature.id == FenceMonitor.feature_id)
+            .outerjoin(EntityCurrentState, EntityCurrentState.entity_id == Entity.id)
+            .where(Entity.project_id == context.project.id, EntityType.key == "fence_monitor")
+            .order_by(Entity.name)
+        )
+    ).all()
+    return [
+        FenceMonitorRead(
+            entity_id=row[0],
+            name=row[1],
+            device_id=row[2],
+            device_name=row[3],
+            feature_id=row[4],
+            feature_name=row[5],
+            longitude=float(row[6]) if row[6] is not None else None,
+            latitude=float(row[7]) if row[7] is not None else None,
+        )
+        for row in rows
+    ]
+
+
+@router.put("/features/{feature_id}/monitors/{entity_id}", response_model=FenceStatusRead)
+async def place_fence_monitor(
+    feature_id: uuid.UUID,
+    entity_id: uuid.UUID,
+    body: FenceMonitorPlace,
+    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> FenceStatusRead:
+    """A monitor dropped on the line (Tim, 2026-09-19): the point is moved onto the line, the
+    monitor's device gets that as its fixed place — over any place it had, since a drop says
+    the hardware moved — and the monitor is put on the line if it was not. A monitor without a
+    device has nothing to place and is refused."""
+    feature = await _project_feature(session, context, feature_id)
+    if feature.feature_type != FeatureType.FENCE:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not a fence line")
+    entity = await _project_entity(session, context, entity_id)
+    now = utc_now()
+    device_id = await session.scalar(
+        select(DeviceEntityAssignment.device_id).where(
+            DeviceEntityAssignment.entity_id == entity.id,
+            DeviceEntityAssignment.validity.op("@>")(now),
+        )
+    )
+    if device_id is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "This monitor has no device; give it its FenceEdge first",
+        )
+    device = await get_or_404(session, Device, device_id, "Device")
+    geometry = geom_to_geojson(feature.geom) or {}
+    if geometry.get("type") != "LineString":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The fence line has no line")
+    coordinates = [list(c[:2]) for c in geometry["coordinates"]]
+    lon, lat, metres = snap_to_line(coordinates, body.longitude, body.latitude)
+    placed = await place_device(session, device, lon, lat, now)
+    link = await session.get(FenceMonitor, entity.id)
+    previous = link.feature_id if link else None
+    if link is None:
+        session.add(FenceMonitor(entity_id=entity.id, feature_id=feature.id))
+    else:
+        link.feature_id = feature.id
+    await session.flush()
+    if previous is not None and previous != feature.id:
+        await recompute_fence(session, previous, now)
+    await recompute_fence(session, feature.id, now)
+    await record_audit(
+        session,
+        user=context.user,
+        action="entity.fence_placed",
+        object_type="entity",
+        object_id=str(entity.id),
+        project_id=context.project.id,
+        details={
+            "feature_id": str(feature.id),
+            "device_id": str(device.id),
+            "longitude": lon,
+            "latitude": lat,
+            "along_m": round(metres, 1),
+            "sightings_placed": placed,
+        },
+    )
+    await session.commit()
+    return await _fence_status_read(session, feature, utc_now())
 
 
 @router.get("/entities/{entity_id}/fence", response_model=EntityFenceRead)

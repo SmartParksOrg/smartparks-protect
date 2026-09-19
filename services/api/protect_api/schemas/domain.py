@@ -219,6 +219,27 @@ class FenceStatusRead(BaseModel):
     updated_at: datetime | None
 
 
+class FenceMonitorRead(BaseModel):
+    """A Fence monitor entity of the project as the fence line's map lists it: its device, the
+    line it is on and where it stands, or what it lacks."""
+
+    entity_id: uuid.UUID
+    name: str
+    device_id: uuid.UUID | None
+    device_name: str | None
+    feature_id: uuid.UUID | None
+    feature_name: str | None
+    longitude: float | None
+    latitude: float | None
+
+
+class FenceMonitorPlace(BaseModel):
+    """Where a monitor was dropped; the server moves it onto the line."""
+
+    longitude: float = Field(ge=-180, le=180)
+    latitude: float = Field(ge=-90, le=90)
+
+
 class EntityFenceRead(BaseModel):
     """The fence line a monitor entity stands on, or nothing."""
 

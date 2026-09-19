@@ -619,6 +619,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/fence-monitors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fence Monitors
+         * @description Every Fence monitor entity of the project with its device today, the line it is on and
+         *     where it stands: what the fence line's map drags from (phase 32).
+         */
+        get: operations["list_fence_monitors_api_v1_projects__project_id__fence_monitors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/features/{feature_id}/monitors/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Place Fence Monitor
+         * @description A monitor dropped on the line (Tim, 2026-09-19): the point is moved onto the line, the
+         *     monitor's device gets that as its fixed place — over any place it had, since a drop says
+         *     the hardware moved — and the monitor is put on the line if it was not. A monitor without a
+         *     device has nothing to place and is refused.
+         */
+        put: operations["place_fence_monitor_api_v1_projects__project_id__features__feature_id__monitors__entity_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/entities/{entity_id}/fence": {
         parameters: {
             query?: never;
@@ -8813,6 +8857,42 @@ export interface components {
             } | null;
         };
         /**
+         * FenceMonitorPlace
+         * @description Where a monitor was dropped; the server moves it onto the line.
+         */
+        FenceMonitorPlace: {
+            /** Longitude */
+            longitude: number;
+            /** Latitude */
+            latitude: number;
+        };
+        /**
+         * FenceMonitorRead
+         * @description A Fence monitor entity of the project as the fence line's map lists it: its device, the
+         *     line it is on and where it stands, or what it lacks.
+         */
+        FenceMonitorRead: {
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** Device Id */
+            device_id: string | null;
+            /** Device Name */
+            device_name: string | null;
+            /** Feature Id */
+            feature_id: string | null;
+            /** Feature Name */
+            feature_name: string | null;
+            /** Longitude */
+            longitude: number | null;
+            /** Latitude */
+            latitude: number | null;
+        };
+        /**
          * FenceMonitorUpdate
          * @description Which fence line a Fence monitor entity stands on (decision D263); null takes it off.
          */
@@ -14060,6 +14140,74 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FenceStatusRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_fence_monitors_api_v1_projects__project_id__fence_monitors_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FenceMonitorRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    place_fence_monitor_api_v1_projects__project_id__features__feature_id__monitors__entity_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feature_id: string;
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FenceMonitorPlace"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

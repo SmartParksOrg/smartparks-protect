@@ -201,6 +201,17 @@ def point_along(coordinates: list[list[float]], metres: float) -> tuple[float, f
     return (coordinates[-1][0], coordinates[-1][1])
 
 
+def snap_to_line(
+    coordinates: list[list[float]], lon: float, lat: float
+) -> tuple[float, float, float]:
+    """The point of the line nearest to (lon, lat) and how far along the line it is: where a
+    monitor dropped near the line actually goes (Tim, 2026-09-19), so that a monitor is on
+    the line and not beside it."""
+    metres = along_line(coordinates, lon, lat)
+    snapped_lon, snapped_lat = point_along(coordinates, metres)
+    return snapped_lon, snapped_lat, metres
+
+
 def sections_of(length_m: float, monitors: list[MonitorReading]) -> list[Section]:
     """The sections of a line from its monitors' places and levels (decision D264).
 
