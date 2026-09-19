@@ -243,7 +243,7 @@ server; `PROJECT_PLAN.md` phase 30 carries the full list with what each turned o
 - [x] C9 docs: an analytics guide for the module. Done with phase 30: the device guide's
       scanning section (`docs/devices/bluetooth-contacts.md`), the OpenCollar port table, the
       domain model's record types, `DEVELOPERS.md`, the changelog and ADR 0036.
-- [ ] C10 release.
+- [x] C10 release: v2.8.0, tagged 2026-09-19.
 
 ## 6. Exit criteria
 

@@ -4,6 +4,15 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+## v2.8.0, 2026-09-19
+
+Contact tracing end to end, built between 2026-09-18 and 2026-09-19 from the PWN project's own data: Bluetooth sightings as a canonical record type of their own (phase 30), then the analysis module that reads them beside position proximity (phase 31). With them the grazing analysis's Sentinel-2 vegetation layer and the day of Tim's testing that preceded it. Migrations 0039 to 0046; the schema is at revision 0046.
+
+**`v2.7.0` was never cut.** The plan gave that number to phase 29 (analytics phase 2), whose vegetation half is in this release and whose corrected home range, movement strategy and movement module are still to build. Rather than tag a half-finished phase under its own number, its delivered half rides here and the number is skipped, as phases 22 and 28 were folded into v2.6.0.
+
+What the phase learned, which is the part worth keeping: nine defects surfaced in the last day and only three were caught by the test suite. The rest came from running the module against real devices and from opening the page and looking — a subject limit no request could reach, a module key the database refused, a map that dropped any geometry kind it had not been told about, charts that drew empty boxes because the series sat under the wrong key, and a module with no page at all. One of them, `device_fix()` counting a position one device gave another as that device's own fix, was not about contact tracing and had been wrong across the platform since phase 30.
+
+
 ### Added
 
 - [Contact tracing](docs/analytics/contact-tracing.md), the guide: what a contact is and is not, the form, the three warnings and why each exists, and what comes out. It says plainly, twice, that the module infers no transmission and that a signal is never converted to metres.

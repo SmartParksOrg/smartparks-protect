@@ -2,7 +2,7 @@
 
 This file describes how the Smart Parks Protect codebase works today. The plan for where it is going lives in `PROJECT_PLAN.md`. The product and architecture rationale lives in `Smart_Parks_Protect_Concept_Architecture.md`. Conventions live in `CONVENTIONS.md`.
 
-Status: v2.6.0 released on 2026-09-16; phases 0 to 28 are done (phases 22 and 28, the analysis modules and device performance, went out in the same tag). Phase 29 is open and unreleased: its landscape half (the Sentinel-2 vegetation of the grazing analysis, P4 to P6) is built and running on the dev server, its movement half (P1 to P3) is not started. `main` is ahead of the tag by the work of 2026-09-17 and 2026-09-18 and is what the dev server runs. A few live-verification items of phases 7 to 9 and the phase 23 exit criteria still wait for accounts or for Tim's reading; `PROJECT_PLAN.md` carries the phases, the decisions and the session log.
+Status: v2.8.0 released on 2026-09-19; phases 0 to 31 are done except the movement half of phase 29 (P1 to P3: the corrected home range, the movement strategy, the movement module), which is not started — its landscape half rode in v2.8.0 and the v2.7.0 number was skipped rather than tag a half-finished phase. Phases 30 and 31 (Bluetooth contacts and the contact tracing module) closed on 2026-09-19. A few live-verification items of phases 7 to 9 and the phase 23 exit criteria still wait for accounts or for Tim's reading; `PROJECT_PLAN.md` carries the phases, the decisions and the session log.
 
 ## Project overview
 
