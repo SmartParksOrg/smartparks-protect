@@ -14,9 +14,11 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - A **fence line page** (Tim, 2026-09-19: the panel was too crowded, and a fence with more sections would be worse). The live map's panel shows the essentials only: the level and since when, the line as one bar with each section in its colour and a tick per monitor, one sentence naming what is wrong and where, and the monitors' count and newest reading. Everything else moved to a page of its own, opened from the panel, the Features list or a monitor's entity page: the bar large with the monitors named, the sections table, every monitor with its reading and voltage chart, the status history, and the thresholds, which project admins edit there. API: `GET /projects/{id}/features/{feature_id}/fence/events`.
 
-- A fence line is set up in one place (Tim, 2026-09-19): under **Setup** on the fence line page, project admins rename the line, correct it on a map by dragging its vertices (the monitors' places and the sections follow at once), set the thresholds, and manage the monitors on it — put an existing Fence monitor on, take one off, or make a new one with its name, its FenceEdge and the place the post stands. The Features page has a **New fence line** button; the drawing map is shared with the New feature dialog and can start from an existing shape.
+- A fence line is set up in one place (Tim, 2026-09-19): under **Setup** on the fence line page, project admins rename the line, correct it on a map by dragging its vertices (the monitors' places and the sections follow at once), set the thresholds, and manage the monitors on it — put an existing Fence monitor on, take one off, or make a new one with its name, its FenceEdge and the place the post stands. A new fence line starts like any other feature, from **New feature** on the Features page; once made, its own page opens for the setup. The drawing map is shared with the New feature dialog and can start from an existing shape.
 
 ### Fixed
+
+- Choosing the fence type in the New feature dialog left the page blank (Tim, 2026-09-19). The dialog's drawing map remounts on a change of type, React removes the map before the drawing session, and the session's teardown then reached for layers that were gone. The teardown tolerates a map that is already gone.
 
 - An entity's page showed no map for an entity whose device has a place set by hand: the small map draws position rows and a fixed place has none. It takes the current position instead when there is nothing else to draw. (Tim, 2026-09-19.)
 

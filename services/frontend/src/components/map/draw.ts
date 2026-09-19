@@ -231,7 +231,13 @@ export function createDrawSession(
     destroy() {
       draw.off("finish", emit);
       draw.off("change", emit);
-      draw.stop();
+      try {
+        draw.stop();
+      } catch {
+        // the map was removed before the session: React cleans the map hook's effect up
+        // first when a dialog's drawing map remounts on a change of type, and terra-draw
+        // then reaches for layers that are gone (the blank Features page, 2026-09-19)
+      }
     },
   };
 }

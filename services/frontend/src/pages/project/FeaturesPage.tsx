@@ -5,7 +5,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Plus, Trash2, Wheat, Zap } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { z } from "zod";
 
 import { api } from "@/api/client";
@@ -55,6 +55,7 @@ export function FeaturesPage() {
         query: { limit: 500 },
       }),
   });
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [geometry, setGeometry] = useState<GeoJSON.Geometry | null>(null);
   const [removing, setRemoving] = useState<Feature | null>(null);
@@ -69,10 +70,13 @@ export function FeaturesPage() {
       }),
     invalidate: [queryKeys.features(projectId)],
     success: t("Feature created"),
-    onSuccess: () => {
+    onSuccess: (created) => {
       setOpen(false);
       form.reset();
       setGeometry(null);
+      // a fence line has a setup of its own: the thresholds and the monitors on it
+      if (created.feature_type === "fence")
+        navigate(`/projects/${projectId}/features/${created.id}/fence`);
     },
     onError: (error) => form.setError("root", { message: error.message }),
   });
@@ -143,20 +147,9 @@ export function FeaturesPage() {
         title={t("Features")}
         description={t("Sites, zones, geofences and routes drawn on the map")}
         actions={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => {
-                form.setValue("feature_type", "fence");
-                setOpen(true);
-              }}
-            >
-              <Zap className="size-4" /> {t("New fence line")}
-            </Button>
-            <Button onClick={() => setOpen(true)}>
-              <Plus className="size-4" /> {t("New feature")}
-            </Button>
-          </>
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="size-4" /> {t("New feature")}
+          </Button>
         }
       />
       <Page>
