@@ -11,6 +11,7 @@ import {
   type DrawKind,
   type DrawSession,
 } from "@/components/map/draw";
+import type { Bounds } from "@/components/map/fit";
 import { useMap } from "@/components/map/useMap";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
@@ -44,10 +45,14 @@ function centreOf(
 export function DrawMap({
   kind,
   initial = null,
+  around = null,
   onChange,
 }: {
   kind: DrawKind;
   initial?: GeoJSON.Geometry | null;
+  /** Where to start looking when there is nothing to load yet: the extent of what the project
+   * already has on the map, so the drawing starts over the reserve and not over a continent. */
+  around?: Bounds | null;
   onChange: (geometry: GeoJSON.Geometry | null) => void;
 }) {
   const { t } = useTranslation();
@@ -62,6 +67,12 @@ export function DrawMap({
   );
   const session = useRef<DrawSession | null>(null);
   const initialRef = useRef(initial);
+  const aroundRef = useRef(around);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || initialRef.current || !aroundRef.current) return;
+    map.fitBounds(aroundRef.current, { padding: 40, duration: 0, maxZoom: 14 });
+  }, [mapRef, ready]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;

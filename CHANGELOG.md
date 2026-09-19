@@ -16,6 +16,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - A fence line is set up in one place (Tim, 2026-09-19): under **Setup** on the fence line page, project admins rename the line, correct it on a map by dragging its vertices (the monitors' places and the sections follow at once), set the thresholds, and manage the monitors on it — put an existing Fence monitor on, take one off, or make a new one with its name, its FenceEdge and the place the post stands. A new fence line starts like any other feature, from **New feature** on the Features page; once made, its own page opens for the setup. The drawing map is shared with the New feature dialog and can start from an existing shape.
 
+- The New feature dialog's drawing map starts over what the project already has: its features, else its entities and devices, else the map's usual start (Tim, 2026-09-19). It started over southern Africa for everyone.
+
 ### Fixed
 
 - Choosing the fence type in the New feature dialog left the page blank (Tim, 2026-09-19). The dialog's drawing map remounts on a change of type, React removes the map before the drawing session, and the session's teardown then reached for layers that were gone. The teardown tolerates a map that is already gone.

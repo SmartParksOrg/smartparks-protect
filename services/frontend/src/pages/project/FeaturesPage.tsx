@@ -10,13 +10,14 @@ import { z } from "zod";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { Feature, Page as PageType } from "@/api/types";
+import type { CurrentState, Feature, Page as PageType } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
 import { DrawMap } from "@/components/map/DrawMap";
+import { boundsOf, geometryBounds } from "@/components/map/fit";
 import { drawKindFor } from "@/components/map/featureTools";
 import { Button } from "@/components/ui/button";
 import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
@@ -56,6 +57,24 @@ export function FeaturesPage() {
       }),
   });
   const navigate = useNavigate();
+  // where a new drawing starts: over what the project already has drawn, else over its
+  // entities and devices, else the map's usual start (Tim, 2026-09-19)
+  const current = useQuery({
+    queryKey: queryKeys.currentState(projectId),
+    queryFn: () =>
+      api.get<CurrentState>(`/api/v1/projects/${projectId}/map/current`),
+  });
+  const around =
+    geometryBounds(
+      (features.data?.items ?? []) as unknown as {
+        geometry: { type: string; coordinates: unknown } | null;
+      }[],
+    ) ??
+    boundsOf(
+      (current.data?.features as unknown as
+        | { geometry: { type: string; coordinates: unknown } | null }[]
+        | undefined) ?? [],
+    );
   const [open, setOpen] = useState(false);
   const [geometry, setGeometry] = useState<GeoJSON.Geometry | null>(null);
   const [removing, setRemoving] = useState<Feature | null>(null);
@@ -216,6 +235,7 @@ export function FeaturesPage() {
               <DrawMap
                 key={form.watch("feature_type")}
                 kind={drawKindFor(form.watch("feature_type"))}
+                around={around}
                 onChange={setGeometry}
               />
             )}

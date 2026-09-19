@@ -28,3 +28,39 @@ export function boundsOf(features: Positioned[]): Bounds | null {
     [east, north],
   ];
 }
+
+/** The extent of any geometries, not only points: the features of a project, so a drawing
+ * map starts over the reserve rather than over a continent (Tim, 2026-09-19). */
+export function geometryBounds(
+  features: {
+    geometry: { type: string; coordinates: unknown } | null | undefined;
+  }[],
+): Bounds | null {
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+  const take = (value: unknown): void => {
+    if (!Array.isArray(value)) return;
+    if (
+      value.length >= 2 &&
+      typeof value[0] === "number" &&
+      typeof value[1] === "number"
+    ) {
+      const [lon, lat] = value as [number, number];
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+      west = Math.min(west, lon);
+      east = Math.max(east, lon);
+      south = Math.min(south, lat);
+      north = Math.max(north, lat);
+      return;
+    }
+    for (const inner of value) take(inner);
+  };
+  for (const f of features) if (f.geometry) take(f.geometry.coordinates);
+  if (west === Infinity) return null;
+  return [
+    [west, south],
+    [east, north],
+  ];
+}
