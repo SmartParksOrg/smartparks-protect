@@ -103,15 +103,12 @@ export function FenceLinePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="overflow-x-auto">
-                <FenceStrip
-                  lengthM={s.length_m}
-                  sections={sections}
-                  monitors={monitors}
-                  labels
-                  className="h-16 w-full min-w-[480px]"
-                />
-              </div>
+              <FenceStrip
+                lengthM={s.length_m}
+                sections={sections}
+                monitors={monitors}
+                labels
+              />
               <p className="text-sm">{fenceSummary(sections, monitors, t)}</p>
               <p className="text-xs text-muted-foreground">
                 {t("{{length}} long", { length: formatLength(s.length_m) })}
