@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import select
@@ -37,11 +38,14 @@ from protect_api.schemas.domain import (
     EntityBulkMove,
     EntityBulkMoveResult,
     EntityCreate,
+    EntityFenceRead,
     EntityRead,
     EntityUpdate,
     FeatureCreate,
     FeatureRead,
     FeatureUpdate,
+    FenceMonitorUpdate,
+    FenceStatusRead,
 )
 from protect_api.visibility import group_and_subgroups
 from shared.bus import RedisStreamsBus
@@ -49,13 +53,25 @@ from shared.curation.apply import recompute_current_state
 from shared.database import get_session
 from shared.domain.assignments import resolve_attribution
 from shared.domain.attribution import QueueResult, publish_job
+from shared.domain.fence import (
+    MonitorReading,
+    Thresholds,
+    line_length_m,
+    line_level,
+    monitor_level,
+    recompute_fence,
+    sections_of,
+)
 from shared.domain.static_place import place_entity_of
+from shared.enums import FeatureType
 from shared.models import (
     Device,
     DeviceEntityAssignment,
     Entity,
     EntityType,
     Feature,
+    FenceMonitor,
+    FenceStatus,
     Group,
 )
 from shared.permissions import Permission, permissions_for
@@ -71,10 +87,66 @@ def entity_read(entity: Entity) -> EntityRead:
     return data
 
 
-def feature_read(feature: Feature) -> FeatureRead:
+def feature_read(feature: Feature, fence: FenceStatus | None = None) -> FeatureRead:
     data = FeatureRead.model_validate(feature)
     data.geometry = geom_to_geojson(feature.geom)
+    if feature.feature_type == FeatureType.FENCE:
+        reading = _fence_now(feature, fence, utc_now())
+        data.fence_level = reading["level"]
+        data.fence_sections = reading["sections"]
     return data
+
+
+def _fence_now(feature: Feature, status: FenceStatus | None, now: datetime) -> dict[str, Any]:
+    """A fence line's reading as of now: the stored monitors re-judged against the clock, so a
+    line whose monitors fell silent reads unknown although no measurement arrived to say so
+    (decision D264). The sections are cut again from the stored places."""
+    thresholds = Thresholds.of(feature.attributes)
+    coordinates = geom_to_geojson(feature.geom) or {}
+    length = (
+        line_length_m([list(c[:2]) for c in coordinates["coordinates"]])
+        if coordinates.get("type") == "LineString"
+        else 0.0
+    )
+    monitors: list[MonitorReading] = []
+    for m in (status.monitors if status else None) or []:
+        measured_at = datetime.fromisoformat(m["measured_at"]) if m.get("measured_at") else None
+        reading = MonitorReading(
+            entity_id=uuid.UUID(m["entity_id"]),
+            name=str(m.get("name") or ""),
+            position_m=m.get("position_m"),
+            device_id=uuid.UUID(m["device_id"]) if m.get("device_id") else None,
+            voltage_v=m.get("voltage_v"),
+            pulses=m.get("pulses"),
+            measured_at=measured_at,
+            failed=bool(m.get("failed")),
+        )
+        reading.level = monitor_level(
+            reading.voltage_v, reading.pulses, reading.failed, measured_at, now, thresholds
+        )
+        monitors.append(reading)
+    sections = sections_of(length, monitors)
+    return {
+        "level": line_level(sections),
+        "length_m": round(length, 1),
+        "thresholds": {
+            "ok_v": thresholds.ok_v,
+            "down_v": thresholds.down_v,
+            "interval_s": thresholds.interval_s,
+        },
+        "sections": [s.as_dict() for s in sections],
+        "monitors": [m.as_dict() for m in monitors],
+    }
+
+
+async def _fence_statuses(
+    session: AsyncSession, features: list[Feature]
+) -> dict[uuid.UUID, FenceStatus]:
+    ids = [f.id for f in features if f.feature_type == FeatureType.FENCE]
+    if not ids:
+        return {}
+    rows = (await session.scalars(select(FenceStatus).where(FenceStatus.feature_id.in_(ids)))).all()
+    return {row.feature_id: row for row in rows}
 
 
 def assignment_read(
@@ -360,7 +432,10 @@ async def list_features(
     if feature_type is not None:
         statement = statement.where(Feature.feature_type == feature_type)
     rows, next_cursor = await paginate(session, Feature.id, statement, page)
-    return PageResponse(items=[feature_read(r) for r in rows], next_cursor=next_cursor)
+    statuses = await _fence_statuses(session, list(rows))
+    return PageResponse(
+        items=[feature_read(r, statuses.get(r.id)) for r in rows], next_cursor=next_cursor
+    )
 
 
 @router.post("/features", response_model=FeatureRead, status_code=status.HTTP_201_CREATED)
@@ -404,7 +479,103 @@ async def get_feature(
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> FeatureRead:
-    return feature_read(await _project_feature(session, context, feature_id))
+    feature = await _project_feature(session, context, feature_id)
+    return feature_read(feature, await session.get(FenceStatus, feature.id))
+
+
+@router.get("/features/{feature_id}/fence", response_model=FenceStatusRead)
+async def get_fence_status(
+    feature_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> FenceStatusRead:
+    """A fence line's reading (phase 32): the level as of now, the sections along the line
+    and what each monitor last reported. A line without monitors reads unknown and says so."""
+    feature = await _project_feature(session, context, feature_id)
+    if feature.feature_type != FeatureType.FENCE:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not a fence line")
+    status_row = await session.get(FenceStatus, feature.id)
+    now = utc_now()
+    if status_row is None:
+        # never computed: a line drawn before any monitor reported, or with none on it yet
+        await recompute_fence(session, feature.id, now)
+        await session.commit()
+        status_row = await session.get(FenceStatus, feature.id)
+    reading = _fence_now(feature, status_row, now)
+    return FenceStatusRead(
+        feature_id=feature.id,
+        project_id=feature.project_id,
+        name=feature.name,
+        changed_at=status_row.changed_at if status_row else None,
+        updated_at=status_row.updated_at if status_row else None,
+        **reading,
+    )
+
+
+@router.get("/entities/{entity_id}/fence", response_model=EntityFenceRead)
+async def get_entity_fence(
+    entity_id: uuid.UUID,
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> EntityFenceRead:
+    """The fence line a monitor entity stands on, with the monitor's own reading."""
+    entity = await _project_entity(session, context, entity_id)
+    link = await session.get(FenceMonitor, entity.id)
+    if link is None:
+        return EntityFenceRead(feature_id=None, feature_name=None, level=None, monitor=None)
+    feature = await session.get(Feature, link.feature_id)
+    status_row = await session.get(FenceStatus, link.feature_id)
+    reading = _fence_now(feature, status_row, utc_now()) if feature else None
+    mine = next(
+        (m for m in (reading["monitors"] if reading else []) if m["entity_id"] == str(entity.id)),
+        None,
+    )
+    return EntityFenceRead(
+        feature_id=link.feature_id,
+        feature_name=feature.name if feature else None,
+        level=reading["level"] if reading else None,
+        monitor=mine,
+    )
+
+
+@router.put("/entities/{entity_id}/fence", response_model=EntityFenceRead)
+async def set_entity_fence(
+    entity_id: uuid.UUID,
+    body: FenceMonitorUpdate,
+    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> EntityFenceRead:
+    """Put a Fence monitor entity on a fence line, or take it off (decision D263). Both lines
+    are recomputed, since a monitor leaving one changes what that one can say."""
+    entity = await _project_entity(session, context, entity_id)
+    link = await session.get(FenceMonitor, entity.id)
+    previous = link.feature_id if link else None
+    if body.feature_id is not None:
+        feature = await _project_feature(session, context, body.feature_id)
+        if feature.feature_type != FeatureType.FENCE:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Not a fence line")
+        if link is None:
+            session.add(FenceMonitor(entity_id=entity.id, feature_id=feature.id))
+        else:
+            link.feature_id = feature.id
+    elif link is not None:
+        await session.delete(link)
+    await session.flush()
+    now = utc_now()
+    for touched in (previous, body.feature_id):
+        if touched is not None:
+            await recompute_fence(session, touched, now)
+    await record_audit(
+        session,
+        user=context.user,
+        action="entity.fence_set",
+        object_type="entity",
+        object_id=str(entity.id),
+        project_id=context.project.id,
+        details={"feature_id": str(body.feature_id) if body.feature_id else None},
+    )
+    await session.commit()
+    return await get_entity_fence(entity_id, context, session)
 
 
 @router.patch("/features/{feature_id}", response_model=FeatureRead)
@@ -420,6 +591,11 @@ async def update_feature(
         feature.geom = geojson_to_geom(body.geometry.as_dict())
         changed["geometry"] = body.geometry.as_dict()
     await flush_or_409(session, "Feature")
+    if feature.feature_type == FeatureType.FENCE and (
+        body.geometry is not None or body.attributes is not None
+    ):
+        # a moved line or new thresholds change where the monitors stand and what they say
+        await recompute_fence(session, feature.id, utc_now())
     await record_audit(
         session,
         user=context.user,
@@ -430,7 +606,7 @@ async def update_feature(
         details=changed,
     )
     await session.commit()
-    return feature_read(feature)
+    return feature_read(feature, await session.get(FenceStatus, feature.id))
 
 
 @router.delete("/features/{feature_id}", status_code=status.HTTP_204_NO_CONTENT)

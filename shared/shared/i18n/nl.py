@@ -97,6 +97,52 @@ NL: dict[str, str] = {
     "{n} devices have records held invalid (a clock ahead, or curated out).": "{n} apparaten hebben ongeldige records (een voorlopende klok, of weggecureerd).",
     "{n} devices sent nothing in the period.": "{n} apparaten hebben in de periode niets gestuurd.",
     "{n} devices sent nothing in the comparison period.": "{n} apparaten hebben in de vergelijkingsperiode niets gestuurd.",
+    # fences and traps (phase 32)
+    "A fence monitor reads under 2 kV (phase 32). Reminds once a day while it stays down; the fence line's own status on the map follows the thresholds set on the line.": (
+        "Een hekbewaker meet minder dan 2 kV (fase 32). Herinnert eenmaal per dag zolang het zo blijft; "
+        "de status van de heklijn zelf op de kaart volgt de drempels die op de lijn zijn ingesteld."
+    ),
+    "{entity} reads {value} V on the fence": "{entity} meet {value} V op het hek",
+    "A stretch of the fence line changed what it reads, from what the fence monitors on it last measured: live, low, down, or unknown when a monitor failed or fell silent.": (
+        "Een stuk van de heklijn is anders gaan lezen, op grond van wat de hekbewakers erop het laatst "
+        "hebben gemeten: onder spanning, laag, uitgevallen, of onbekend als een bewaker faalde of stil viel."
+    ),
+    "A fence monitor measured a voltage under the rule's threshold. The wire near it carries too little to hold an animal; check the energiser and the wire between them.": (
+        "Een hekbewaker heeft een spanning onder de drempel van de regel gemeten. De draad bij hem voert te "
+        "weinig om een dier tegen te houden; controleer het schrikdraadapparaat en de draad ertussen."
+    ),
+    "A fence monitor has not reported for the time the rule sets, so the stretch of fence it watches reads unknown. Check the device and the network near it.": (
+        "Een hekbewaker heeft zo lang niets gemeld als de regel stelt, dus het stuk hek dat hij bewaakt "
+        "leest onbekend. Controleer het apparaat en het netwerk in de buurt."
+    ),
+    "The switch on the trap says the door shut. Somebody has to go and look; a trap that stays shut holds whatever it caught.": (
+        "De schakelaar op de val zegt dat de deur dicht is gegaan. Iemand moet gaan kijken; een val die "
+        "dicht blijft houdt vast wat hij heeft gevangen."
+    ),
+    "The switch on the trap says the door is open again.": "De schakelaar op de val zegt dat de deur weer open is.",
+    "The trap reads shut, from its switch, and stays so. Somebody has to go and look.": (
+        "De val leest dicht, volgens zijn schakelaar, en blijft dat. Iemand moet gaan kijken."
+    ),
+    "A fence monitor has not reported for six hours (phase 32). Checked every five minutes; scope it to the Fence monitor type.": (
+        "Een hekbewaker heeft zes uur niets gemeld (fase 32). Elke vijf minuten gecontroleerd; "
+        "beperk de regel tot het type Hekbewaker."
+    ),
+    "{entity} has not reported for 6 hours": "{entity} heeft 6 uur niets gemeld",
+    "A trap's door shut (phase 32, decision D266): somebody has to go and look. Reminds once a day while it stays shut.": (
+        "De deur van een val is dichtgegaan (fase 32, besluit D266): iemand moet gaan kijken. "
+        "Herinnert eenmaal per dag zolang hij dicht blijft."
+    ),
+    "{entity} is shut": "{entity} is dicht",
+    "Trap {entity} closed": "Val {entity} dichtgegaan",
+    "Trap {entity} opened": "Val {entity} opengegaan",
+    "Fence {name} reads live near {stretch}": "Hek {name} staat onder spanning bij {stretch}",
+    "Fence {name} reads low near {stretch}": "Hek {name} meet laag bij {stretch}",
+    "Fence {name} reads down near {stretch}": "Hek {name} is uitgevallen bij {stretch}",
+    "Fence {name} reads unknown near {stretch}": "Hek {name} is onbekend bij {stretch}",
+    "Fence {name} reads live": "Hek {name} staat onder spanning",
+    "Fence {name} reads low": "Hek {name} meet laag",
+    "Fence {name} reads down": "Hek {name} is uitgevallen",
+    "Fence {name} reads unknown": "Hek {name} is onbekend",
     # a scan for phones (decision D260)
     "Human presence": "Menselijke aanwezigheid",
     "{device} heard {n} human-worn Bluetooth device": (

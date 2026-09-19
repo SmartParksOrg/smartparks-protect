@@ -109,6 +109,70 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "fence_down": {
+        "name": "Fence down",
+        "description": (
+            "A fence monitor reads under 2 kV (phase 32). Reminds once a day while it stays down; "
+            "the fence line's own status on the map follows the thresholds set on the line."
+        ),
+        "document": {
+            "trigger": {"kind": "measurement", "metric_key": "fence_voltage"},
+            "conditions": {
+                "type": "threshold",
+                "metric": "fence_voltage",
+                "op": "<",
+                "value": 2000,
+            },
+            "cooldown_seconds": 86_400,
+            "event": {
+                "event_type": "FENCE_DOWN",
+                "severity": "critical",
+                "title": "{entity} reads {value} V on the fence",
+                "create_alert": True,
+            },
+        },
+    },
+    "fence_monitor_silent": {
+        "name": "Fence monitor silent",
+        "description": (
+            "A fence monitor has not reported for six hours (phase 32). Checked every five "
+            "minutes; scope it to the Fence monitor type."
+        ),
+        "document": {
+            "trigger": {"kind": "schedule", "every_seconds": 300},
+            "conditions": {"type": "no_data", "for_seconds": 21_600},
+            "cooldown_seconds": 86_400,
+            "event": {
+                "event_type": "FENCE_MONITOR_SILENT",
+                "severity": "warning",
+                "title": "{entity} has not reported for 6 hours",
+                "create_alert": True,
+            },
+        },
+    },
+    "trap_closed": {
+        "name": "Trap closed",
+        "description": (
+            "A trap's door shut (phase 32, decision D266): somebody has to go and look. "
+            "Reminds once a day while it stays shut."
+        ),
+        "document": {
+            "trigger": {"kind": "measurement", "metric_key": "trap_triggered"},
+            "conditions": {
+                "type": "threshold",
+                "metric": "trap_triggered",
+                "op": ">=",
+                "value": 1,
+            },
+            "cooldown_seconds": 86_400,
+            "event": {
+                "event_type": "TRAP_SHUT",
+                "severity": "critical",
+                "title": "{entity} is shut",
+                "create_alert": True,
+            },
+        },
+    },
     "possible_immobility": {
         "name": "Device not moving",
         "description": (

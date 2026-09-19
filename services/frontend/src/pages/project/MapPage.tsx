@@ -22,6 +22,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
+import { fenceSectionFeatures } from "@/lib/fence";
 import type {
   CoverageResponse,
   NetworkLocationsResponse,
@@ -1420,11 +1421,7 @@ export function MapPage() {
       map,
       features.data.items
         .filter((f) => f.geometry && isFeatureVisible(f, layers))
-        .map((f) => ({
-          type: "Feature",
-          geometry: f.geometry as unknown as GeoJSON.Geometry,
-          properties: { id: f.id, name: f.name, feature_type: f.feature_type },
-        })),
+        .flatMap((f) => fenceSectionFeatures(f)),
     );
   }, [mapRef, ready, features.data, layers]);
 

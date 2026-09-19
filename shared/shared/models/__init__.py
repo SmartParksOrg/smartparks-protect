@@ -27,6 +27,8 @@ from shared.models.domain import (
     EntityType,
     ExternalIdentity,
     Feature,
+    FenceMonitor,
+    FenceStatus,
     Group,
     Metric,
 )
@@ -99,6 +101,8 @@ __all__ = [
     "ExportJob",
     "ExternalIdentity",
     "Feature",
+    "FenceMonitor",
+    "FenceStatus",
     "Gateway",
     "GatewayReception",
     "Group",

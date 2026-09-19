@@ -60,12 +60,25 @@ from shared.domain.contacts import (
 )
 from shared.domain.contacts import normalise as normalise_address
 from shared.domain.device_settings import record_settings_frame
+from shared.domain.fence import (
+    FENCE_STATUS_EVENT,
+    SEVERITY_OF,
+    changed_level,
+    recompute_fence,
+    status_title,
+)
 from shared.domain.movement import derive_activity, movement_times, previous_sample
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.domain.outliers import EVENT_TYPE as OUTLIER_EVENT_TYPE
 from shared.domain.outliers import outlier_of
 from shared.domain.reboot import detect_reboots, previous_uptime
 from shared.domain.static_place import Sighting, place_sightings
+from shared.domain.trap import (
+    TRAP_ENTITY_TYPE,
+    closed_when_active,
+    derive_trap,
+    previous_closed,
+)
 from shared.enums import (
     AcquisitionChannel,
     ConnectivityStatus,
@@ -450,11 +463,29 @@ async def process_source_event(
                 previous_uptime(before.latest_measurements if before else None),
                 wrap(device.firmware_version) if callable(wrap) else None,
             )
+            # a switch on a trap says whether the door is shut (shared/domain/trap.py)
+            if any(m.metric_key == "switch_active" for m in records.measurements):
+                trap = await _trap_entity(
+                    session, await attribution_at(records.measurements[0].time)
+                )
+                if trap is not None:
+                    derive_trap(
+                        records,
+                        entity_name=trap,
+                        wiring_closed_when_active=closed_when_active(device.attributes),
+                        was_closed=previous_closed(before.latest_measurements if before else None),
+                    )
             await _write_positions(session, event, device, records, outcome, attribution_at)
             await _write_measurements(session, event, device, records, outcome, attribution_at)
             await _write_states(session, event, device, records, outcome, attribution_at)
             await _write_events(session, event, device, records, outcome, attribution_at)
             await _write_contacts(session, event, device, records, outcome, attribution_at)
+            # a fence reading changes what a stretch of fence line says (shared/domain/fence.py)
+            fence_records = [
+                r for r in records.measurements + records.states if r.record_type == "fence"
+            ]
+            if fence_records:
+                await _update_fence(session, event, device, fence_records[0].time, outcome)
             total = sum(outcome.created.values())
             step.metadata.update(created=total, duplicates=outcome.duplicates)
             if outcome.settings_changed:
@@ -1085,6 +1116,83 @@ async def _write_states(
                 },
             )
         )
+
+
+async def _trap_entity(session: AsyncSession, attribution: Attribution) -> str | None:
+    """The name of the Trap entity the device is on right now, or None when it is not on one."""
+    if attribution.entity_id is None:
+        return None
+    from shared.models import EntityType
+
+    name = await session.scalar(
+        select(Entity.name)
+        .join(EntityType, EntityType.id == Entity.entity_type_id)
+        .where(Entity.id == attribution.entity_id, EntityType.key == TRAP_ENTITY_TYPE)
+    )
+    return str(name) if name is not None else None
+
+
+async def _update_fence(
+    session: AsyncSession,
+    event: SourceEvent,
+    device: Device,
+    when: datetime,
+    outcome: Outcome,
+) -> None:
+    """Recompute the fence line the device's entity stands on, and raise a FENCE_STATUS event
+    on the line when a section changed level (decision D265). The event is put on the map in
+    the middle of the stretch that changed, since an event is a point; the entity is the
+    monitor that reported and the feature is named in the context."""
+    from shared.models import FenceMonitor
+
+    attribution = await resolve_attribution(session, device.id, when)
+    if attribution.entity_id is None or attribution.project_id is None:
+        return
+    feature_id = await session.scalar(
+        select(FenceMonitor.feature_id).where(FenceMonitor.entity_id == attribution.entity_id)
+    )
+    if feature_id is None:
+        return
+    now = utc_now()
+    reading = await recompute_fence(session, feature_id, now)
+    if reading is None or not reading.changed:
+        return
+    dedup = fingerprint([str(feature_id), now.isoformat(), FENCE_STATUS_EVENT])
+    row = Event(
+        time=now,
+        project_id=attribution.project_id,
+        entity_id=attribution.entity_id,
+        device_id=device.id,
+        event_type=FENCE_STATUS_EVENT,
+        severity=SEVERITY_OF[changed_level(reading.changed)],
+        title=status_title(reading.name, reading.changed, reading.monitors),
+        geom=from_shape(Point(*reading.where), srid=4326),
+        context={
+            "feature_id": str(feature_id),
+            "feature_name": reading.name,
+            "level": reading.level,
+            "section_level": changed_level(reading.changed),
+            "sections": [s.as_dict() for s in reading.changed],
+            "dedup": dedup,
+        },
+        source_event_id=event.id,
+        source_event_ingested_at=event.ingested_at,
+        trace_id=event.trace_id,
+    )
+    session.add(row)
+    await session.flush()
+    outcome.created["events"] += 1
+    outcome.messages.append(
+        (
+            Topic.EVENT_CREATED,
+            {
+                "event_id": str(row.id),
+                "project_id": str(attribution.project_id),
+                "event_type": FENCE_STATUS_EVENT,
+                "time": now.isoformat(),
+            },
+        )
+    )
 
 
 async def _write_events(

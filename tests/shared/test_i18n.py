@@ -3,6 +3,7 @@
 from shared.analysis.modules.device_performance import FOLDED_TEXTS
 from shared.domain.contacts import HUMAN_PRESENCE_MANY, HUMAN_PRESENCE_ONE, HUMAN_PRESENCE_TITLE
 from shared.domain.explanations import ERROR_FLAGS, EVENTS, RESET_REASONS, explain_event
+from shared.domain.trap import trap_titles
 from shared.i18n import resolve_language, translate
 from shared.i18n.nl import NL
 from shared.rules.templates import TEMPLATES
@@ -59,6 +60,7 @@ def test_every_fixed_server_text_has_its_dutch():
         HUMAN_PRESENCE_TITLE,
         HUMAN_PRESENCE_ONE,
         HUMAN_PRESENCE_MANY,
+        *trap_titles(),
     ]
     for template in TEMPLATES.values():
         fixed.append(template["description"])

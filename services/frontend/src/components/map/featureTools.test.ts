@@ -12,6 +12,7 @@ describe("feature tools", () => {
     ]);
     expect(featureTypesFor({ type: "LineString", coordinates: [] })).toEqual([
       "route",
+      "fence",
     ]);
     expect(featureTypesFor({ type: "Polygon", coordinates: [] })).toEqual([
       "geofence",

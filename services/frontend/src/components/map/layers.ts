@@ -12,6 +12,7 @@ import {
 import { intensityFor, radiusExpression } from "@/components/map/heat";
 import { circlePolygon } from "@/components/map/networkLocations";
 import { imprecise } from "@/lib/accuracy";
+import { FENCE_COLORS } from "@/lib/fence";
 
 export const SOURCES = {
   entities: "entities",
@@ -725,8 +726,21 @@ export function ensureFeatureLayers(map: MapLibreMap): void {
         ["==", ["geometry-type"], "LineString"],
       ],
       paint: {
-        "line-color": "#52735E",
-        "line-width": 2,
+        // a fence line in its level's colour (phase 32), every other feature as before
+        "line-color": [
+          "match",
+          ["coalesce", ["get", "fence_level"], ""],
+          "ok",
+          FENCE_COLORS.ok,
+          "low",
+          FENCE_COLORS.low,
+          "down",
+          FENCE_COLORS.down,
+          "unknown",
+          FENCE_COLORS.unknown,
+          "#52735E",
+        ],
+        "line-width": ["case", ["has", "fence_level"], 4, 2],
         "line-dasharray": [2, 1],
       },
     },

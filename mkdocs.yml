@@ -74,6 +74,7 @@ nav:
       - Device control: devices/device-control.md
       - OpenCollar over Web Bluetooth: devices/opencollar-webble.md
       - Bluetooth contacts: devices/bluetooth-contacts.md
+      - Fences and traps: devices/fences-and-traps.md
       - Raw log files: devices/raw-log-files.md
   - Integrations:
       - integrations/index.md

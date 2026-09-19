@@ -186,6 +186,58 @@ class FeatureRead(ORMModel):
     attributes: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    fence_level: str | None = Field(
+        default=None,
+        description="A fence line's current level (ok, low, down, unknown; phase 32), read "
+        "with the staleness rule applied; null for every other feature type",
+    )
+    fence_sections: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="A fence line's sections along the line with their level, for the map",
+    )
+
+
+class FenceMonitorUpdate(BaseModel):
+    """Which fence line a Fence monitor entity stands on (decision D263); null takes it off."""
+
+    feature_id: uuid.UUID | None = None
+
+
+class FenceStatusRead(BaseModel):
+    """A fence line's reading (decisions D264 and D265): its level with the staleness rule
+    applied at the time of reading, its sections, and what each monitor last said."""
+
+    feature_id: uuid.UUID
+    project_id: uuid.UUID
+    name: str
+    level: str
+    length_m: float
+    thresholds: dict[str, float]
+    sections: list[dict[str, Any]]
+    monitors: list[dict[str, Any]]
+    changed_at: datetime | None
+    updated_at: datetime | None
+
+
+class EntityFenceRead(BaseModel):
+    """The fence line a monitor entity stands on, or nothing."""
+
+    feature_id: uuid.UUID | None
+    feature_name: str | None
+    level: str | None
+    monitor: dict[str, Any] | None
+
+
+class DeviceTrapUpdate(BaseModel):
+    """How the switch of a TrapEdge is wired (decision D266): whether an active switch means
+    the trap is closed; null gives the default (yes) back."""
+
+    closed_when_active: bool | None = None
+
+
+class DeviceTrap(BaseModel):
+    closed_when_active: bool
+    set_by_hand: bool
 
 
 class DeviceTypeCreate(BaseModel):

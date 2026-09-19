@@ -151,6 +151,44 @@ class Feature(UuidPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class FenceMonitor(Base):
+    """Which fence line a Fence monitor entity stands on (phase 32, decision D263). One line per
+    entity; a line holds any number of monitors."""
+
+    __tablename__ = "fence_monitors"
+
+    entity_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True
+    )
+    feature_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("features.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+
+class FenceStatus(Base):
+    """The current reading of a fence line (decisions D264 and D265): its level, its sections
+    along the line with theirs, and what each monitor last reported. Rewritten by the decoder
+    when a fence measurement lands; `changed_at` moves when any section's level does."""
+
+    __tablename__ = "fence_status"
+
+    feature_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("features.id", ondelete="CASCADE"), primary_key=True
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    level: Mapped[str] = mapped_column(String(16), nullable=False)
+    sections: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    monitors: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class DeviceType(UuidPrimaryKeyMixin, TimestampMixin, Base):
     """Family metadata: which driver decodes it and what it can do."""
 

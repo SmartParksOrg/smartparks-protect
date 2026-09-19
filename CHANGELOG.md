@@ -4,6 +4,12 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **Fence lines** (phase 32, decisions D263 to D265; Tim, 2026-09-19). An electric fence is a feature type of its own, drawn like a route, and it reads its status from the FenceEdge devices on it: each FenceEdge is a device on a Fence monitor entity with a fixed place, the entity is put on a line from its page, and the line is cut into sections where its monitors stand. A section reads the worse of the monitors at its ends: live, low, down (under the down threshold, or no pulse counted) or unknown (failed, silent or nothing yet), with the thresholds set per line. The live map draws each section in its colour and the line's panel shows the sections, every monitor's newest voltage in kV and pulses, and a voltage chart. Every change of a section's level is a `FENCE_STATUS` event placed on the stretch that changed, so the feed and the automations see it, and two shipped rules alert: Fence down and Fence monitor silent. Migration 0047; `fence_voltage` is corrected to volts, which is what the device reports.
+
+- **Traps** (decision D266). A Trap entity with a TrapEdge on it: the switch becomes a `trap_triggered` reading, a change raises `TRAP_CLOSED` (a warning: somebody has to go) or `TRAP_OPENED`, the shipped rule Trap closed alerts and makes the trap read critical on the map. Whether an active switch means closed is set on the device page, since it depends on the wiring.
+
 ### Changed
 
 - A GPS attempt that got no fix no longer raises a device error event (Tim, 2026-09-19). The `ublox_fix` flag is a fact about the sky and the antenna, not about the device, and it comes with every status of a device under canopy; an event on each one drowned the flag that matters, `ublox`, which says the receiver itself did not answer and usually needs a person to go and look. The flag stays in the state, on the health card and in the device performance figures; it only raises no event, so no automation fires on it.

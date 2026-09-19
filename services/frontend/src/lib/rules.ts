@@ -38,7 +38,13 @@ export const CONDITION_TYPES = [
   { value: "window", label: t("Window aggregate") },
 ] as const;
 export const RELATIONS = ["enter", "exit", "inside", "outside"] as const;
-export const FEATURE_TYPES = ["geofence", "zone", "site", "route"] as const;
+export const FEATURE_TYPES = [
+  "geofence",
+  "zone",
+  "site",
+  "route",
+  "fence",
+] as const;
 export const AGGREGATES = ["avg", "min", "max", "sum", "count"] as const;
 export const DERIVED_METRICS = [
   "speed_kmh",
@@ -284,6 +290,12 @@ const EVENT_ICONS: Record<string, string> = {
   BATTERY_LOW: "event.low_battery",
   POSSIBLE_IMMOBILITY: "event.immobility",
   PROXIMITY: "event.proximity",
+  FENCE_STATUS: "event.fence_breakage",
+  FENCE_DOWN: "event.fence_breakage",
+  FENCE_MONITOR_SILENT: "event.device_offline",
+  TRAP_CLOSED: "event.trap",
+  TRAP_OPENED: "event.trap",
+  TRAP_SHUT: "event.trap",
 };
 
 export function eventIcon(eventType: string): string {

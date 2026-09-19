@@ -2841,6 +2841,191 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/features/{feature_id}/fence": {
+   "get": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Get Fence Status",
+    "description": "A fence line's reading (phase 32): the level as of now, the sections along the line\nand what each monitor last reported. A line without monitors reads unknown and says so.",
+    "operationId": "get_fence_status_api_v1_projects__project_id__features__feature_id__fence_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "feature_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Feature Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FenceStatusRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/entities/{entity_id}/fence": {
+   "get": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Get Entity Fence",
+    "description": "The fence line a monitor entity stands on, with the monitor's own reading.",
+    "operationId": "get_entity_fence_api_v1_projects__project_id__entities__entity_id__fence_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "entity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityFenceRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Set Entity Fence",
+    "description": "Put a Fence monitor entity on a fence line, or take it off (decision D263). Both lines\nare recomputed, since a monitor leaving one changes what that one can say.",
+    "operationId": "set_entity_fence_api_v1_projects__project_id__entities__entity_id__fence_put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "entity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FenceMonitorUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityFenceRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/entity-assignments": {
    "get": {
     "tags": [
@@ -4550,6 +4735,112 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/DeviceBattery"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/trap": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Trap",
+    "description": "How this device's switch is wired for a trap (decision D266).",
+    "operationId": "device_trap_api_v1_devices__device_id__trap_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceTrap"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Set Device Trap",
+    "description": "Whether an active switch means the trap is closed, which depends on how the magnet and\nthe contact were mounted (decision D266); null gives the default back. Project admins of\nthe device's current project, or a server admin.",
+    "operationId": "set_device_trap_api_v1_devices__device_id__trap_put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeviceTrapUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceTrap"
         }
        }
       }
@@ -28575,6 +28866,42 @@
     ],
     "title": "DeviceSyncResult"
    },
+   "DeviceTrap": {
+    "properties": {
+     "closed_when_active": {
+      "type": "boolean",
+      "title": "Closed When Active"
+     },
+     "set_by_hand": {
+      "type": "boolean",
+      "title": "Set By Hand"
+     }
+    },
+    "type": "object",
+    "required": [
+     "closed_when_active",
+     "set_by_hand"
+    ],
+    "title": "DeviceTrap"
+   },
+   "DeviceTrapUpdate": {
+    "properties": {
+     "closed_when_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Closed When Active"
+     }
+    },
+    "type": "object",
+    "title": "DeviceTrapUpdate",
+    "description": "How the switch of a TrapEdge is wired (decision D266): whether an active switch means\nthe trap is closed; null gives the default (yes) back."
+   },
    "DeviceTypeCreate": {
     "properties": {
      "key": {
@@ -29597,6 +29924,65 @@
      "name"
     ],
     "title": "EntityCreate"
+   },
+   "EntityFenceRead": {
+    "properties": {
+     "feature_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Feature Id"
+     },
+     "feature_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Feature Name"
+     },
+     "level": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Level"
+     },
+     "monitor": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monitor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "feature_id",
+     "feature_name",
+     "level",
+     "monitor"
+    ],
+    "title": "EntityFenceRead",
+    "description": "The fence line a monitor entity stands on, or nothing."
    },
    "EntityGroup": {
     "type": "string",
@@ -31466,6 +31852,34 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "fence_level": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fence Level",
+      "description": "A fence line's current level (ok, low, down, unknown; phase 32), read with the staleness rule applied; null for every other feature type"
+     },
+     "fence_sections": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fence Sections",
+      "description": "A fence line's sections along the line with their level, for the map"
      }
     },
     "type": "object",
@@ -31487,7 +31901,8 @@
      "site",
      "zone",
      "geofence",
-     "route"
+     "route",
+     "fence"
     ],
     "title": "FeatureType"
    },
@@ -31553,6 +31968,113 @@
     },
     "type": "object",
     "title": "FeatureUpdate"
+   },
+   "FenceMonitorUpdate": {
+    "properties": {
+     "feature_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Feature Id"
+     }
+    },
+    "type": "object",
+    "title": "FenceMonitorUpdate",
+    "description": "Which fence line a Fence monitor entity stands on (decision D263); null takes it off."
+   },
+   "FenceStatusRead": {
+    "properties": {
+     "feature_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Feature Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "level": {
+      "type": "string",
+      "title": "Level"
+     },
+     "length_m": {
+      "type": "number",
+      "title": "Length M"
+     },
+     "thresholds": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "type": "object",
+      "title": "Thresholds"
+     },
+     "sections": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Sections"
+     },
+     "monitors": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Monitors"
+     },
+     "changed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Changed At"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "feature_id",
+     "project_id",
+     "name",
+     "level",
+     "length_m",
+     "thresholds",
+     "sections",
+     "monitors",
+     "changed_at",
+     "updated_at"
+    ],
+    "title": "FenceStatusRead",
+    "description": "A fence line's reading (decisions D264 and D265): its level with the staleness rule\napplied at the time of reading, its sections, and what each monitor last said."
    },
    "GatewayDetail": {
     "properties": {

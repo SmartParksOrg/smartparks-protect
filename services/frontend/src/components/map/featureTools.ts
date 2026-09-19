@@ -1,14 +1,14 @@
 /** What a drawn geometry can become and which rule a feature starts (decisions D139, D140). */
 
-export type FeatureType = "site" | "zone" | "geofence" | "route";
+export type FeatureType = "site" | "zone" | "geofence" | "route" | "fence";
 
-/** The types a drawn geometry can become: a point a site, a line a route, a polygon a
- * geofence or a zone. */
+/** The types a drawn geometry can become: a point a site, a line a route or a fence line
+ * (phase 32), a polygon a geofence or a zone. */
 export function featureTypesFor(
   geometry: GeoJSON.Geometry | null,
 ): FeatureType[] {
   if (geometry?.type === "Point") return ["site"];
-  if (geometry?.type === "LineString") return ["route"];
+  if (geometry?.type === "LineString") return ["route", "fence"];
   return ["geofence", "zone"];
 }
 

@@ -50,6 +50,8 @@ class FeatureType(StrEnum):
     ZONE = "zone"
     GEOFENCE = "geofence"
     ROUTE = "route"
+    #: An electric fence line with a status read off the FenceEdge devices on it (D263).
+    FENCE = "fence"
 
 
 class LocationSource(StrEnum):

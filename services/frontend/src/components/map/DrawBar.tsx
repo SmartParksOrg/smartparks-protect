@@ -163,7 +163,7 @@ export function DrawBar({
 
 const schema = z.object({
   name: z.string().min(1).max(200),
-  feature_type: z.enum(["site", "zone", "geofence", "route"]),
+  feature_type: z.enum(["site", "zone", "geofence", "route", "fence"]),
 });
 export type SaveFeatureValues = z.infer<typeof schema>;
 

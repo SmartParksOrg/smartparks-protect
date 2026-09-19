@@ -598,6 +598,52 @@ export interface paths {
         patch: operations["update_feature_api_v1_projects__project_id__features__feature_id__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/features/{feature_id}/fence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fence Status
+         * @description A fence line's reading (phase 32): the level as of now, the sections along the line
+         *     and what each monitor last reported. A line without monitors reads unknown and says so.
+         */
+        get: operations["get_fence_status_api_v1_projects__project_id__features__feature_id__fence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/entities/{entity_id}/fence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Entity Fence
+         * @description The fence line a monitor entity stands on, with the monitor's own reading.
+         */
+        get: operations["get_entity_fence_api_v1_projects__project_id__entities__entity_id__fence_get"];
+        /**
+         * Set Entity Fence
+         * @description Put a Fence monitor entity on a fence line, or take it off (decision D263). Both lines
+         *     are recomputed, since a monitor leaving one changes what that one can say.
+         */
+        put: operations["set_entity_fence_api_v1_projects__project_id__entities__entity_id__fence_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/entity-assignments": {
         parameters: {
             query?: never;
@@ -1009,6 +1055,32 @@ export interface paths {
          *     admins of the device's current project, or a server admin.
          */
         put: operations["set_device_battery_api_v1_devices__device_id__battery_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/trap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Trap
+         * @description How this device's switch is wired for a trap (decision D266).
+         */
+        get: operations["device_trap_api_v1_devices__device_id__trap_get"];
+        /**
+         * Set Device Trap
+         * @description Whether an active switch means the trap is closed, which depends on how the magnet and
+         *     the contact were mounted (decision D266); null gives the default back. Project admins of
+         *     the device's current project, or a server admin.
+         */
+        put: operations["set_device_trap_api_v1_devices__device_id__trap_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -7605,6 +7677,22 @@ export interface components {
             /** Updated */
             updated: number;
         };
+        /** DeviceTrap */
+        DeviceTrap: {
+            /** Closed When Active */
+            closed_when_active: boolean;
+            /** Set By Hand */
+            set_by_hand: boolean;
+        };
+        /**
+         * DeviceTrapUpdate
+         * @description How the switch of a TrapEdge is wired (decision D266): whether an active switch means
+         *     the trap is closed; null gives the default (yes) back.
+         */
+        DeviceTrapUpdate: {
+            /** Closed When Active */
+            closed_when_active?: boolean | null;
+        };
         /** DeviceTypeCreate */
         DeviceTypeCreate: {
             /** Key */
@@ -7990,6 +8078,22 @@ export interface components {
              * @default 24
              */
             location_fallback_hours: number;
+        };
+        /**
+         * EntityFenceRead
+         * @description The fence line a monitor entity stands on, or nothing.
+         */
+        EntityFenceRead: {
+            /** Feature Id */
+            feature_id: string | null;
+            /** Feature Name */
+            feature_name: string | null;
+            /** Level */
+            level: string | null;
+            /** Monitor */
+            monitor: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * EntityGroup
@@ -8656,12 +8760,24 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Fence Level
+             * @description A fence line's current level (ok, low, down, unknown; phase 32), read with the staleness rule applied; null for every other feature type
+             */
+            fence_level?: string | null;
+            /**
+             * Fence Sections
+             * @description A fence line's sections along the line with their level, for the map
+             */
+            fence_sections?: {
+                [key: string]: unknown;
+            }[] | null;
         };
         /**
          * FeatureType
          * @enum {string}
          */
-        FeatureType: "site" | "zone" | "geofence" | "route";
+        FeatureType: "site" | "zone" | "geofence" | "route" | "fence";
         /** FeatureUpdate */
         FeatureUpdate: {
             feature_type?: components["schemas"]["FeatureType"] | null;
@@ -8674,6 +8790,53 @@ export interface components {
             attributes?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * FenceMonitorUpdate
+         * @description Which fence line a Fence monitor entity stands on (decision D263); null takes it off.
+         */
+        FenceMonitorUpdate: {
+            /** Feature Id */
+            feature_id?: string | null;
+        };
+        /**
+         * FenceStatusRead
+         * @description A fence line's reading (decisions D264 and D265): its level with the staleness rule
+         *     applied at the time of reading, its sections, and what each monitor last said.
+         */
+        FenceStatusRead: {
+            /**
+             * Feature Id
+             * Format: uuid
+             */
+            feature_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Name */
+            name: string;
+            /** Level */
+            level: string;
+            /** Length M */
+            length_m: number;
+            /** Thresholds */
+            thresholds: {
+                [key: string]: number;
+            };
+            /** Sections */
+            sections: {
+                [key: string]: unknown;
+            }[];
+            /** Monitors */
+            monitors: {
+                [key: string]: unknown;
+            }[];
+            /** Changed At */
+            changed_at: string | null;
+            /** Updated At */
+            updated_at: string | null;
         };
         /** GatewayDetail */
         GatewayDetail: {
@@ -13865,6 +14028,106 @@ export interface operations {
             };
         };
     };
+    get_fence_status_api_v1_projects__project_id__features__feature_id__fence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feature_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FenceStatusRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_entity_fence_api_v1_projects__project_id__entities__entity_id__fence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityFenceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_entity_fence_api_v1_projects__project_id__entities__entity_id__fence_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FenceMonitorUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityFenceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_entity_assignments_api_v1_projects__project_id__entity_assignments_get: {
         parameters: {
             query?: {
@@ -14772,6 +15035,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceBattery"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_trap_api_v1_devices__device_id__trap_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceTrap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_device_trap_api_v1_devices__device_id__trap_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceTrapUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceTrap"];
                 };
             };
             /** @description Validation Error */

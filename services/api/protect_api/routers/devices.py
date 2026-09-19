@@ -47,6 +47,8 @@ from protect_api.schemas.domain import (
     DeviceSettingsRead,
     DeviceSettingWrite,
     DeviceStaticPositionUpdate,
+    DeviceTrap,
+    DeviceTrapUpdate,
     DeviceUpdate,
     DeviceWithAssignments,
     ExternalIdentityCreate,
@@ -95,6 +97,7 @@ from shared.domain.static_place import (
     place_past_sightings_of,
     show_static_place,
 )
+from shared.domain.trap import TRAP_ATTRIBUTE, closed_when_active
 from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource, Role
 from shared.models import (
     AttributionJob,
@@ -1547,6 +1550,58 @@ async def set_device_battery(
     )
     await session.commit()
     return await device_battery(device_id, user, session)
+
+
+@router.get("/{device_id}/trap", response_model=DeviceTrap)
+async def device_trap(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceTrap:
+    """How this device's switch is wired for a trap (decision D266)."""
+    device = await _visible_device(session, user, device_id)
+    attributes = device.attributes or {}
+    return DeviceTrap(
+        closed_when_active=closed_when_active(attributes),
+        set_by_hand=TRAP_ATTRIBUTE in attributes,
+    )
+
+
+@router.put("/{device_id}/trap", response_model=DeviceTrap)
+async def set_device_trap(
+    device_id: uuid.UUID,
+    body: DeviceTrapUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DeviceTrap:
+    """Whether an active switch means the trap is closed, which depends on how the magnet and
+    the contact were mounted (decision D266); null gives the default back. Project admins of
+    the device's current project, or a server admin."""
+    device = await get_or_404(session, Device, device_id, "Device")
+    attribution = await resolve_attribution(session, device.id, utc_now())
+    if not user.is_superuser:
+        if attribution.project_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
+        await _require_project_admin(session, user, attribution.project_id)
+    attributes = dict(device.attributes or {})
+    if body.closed_when_active is None:
+        attributes.pop(TRAP_ATTRIBUTE, None)
+    else:
+        attributes[TRAP_ATTRIBUTE] = body.closed_when_active
+    device.attributes = attributes
+    await record_audit(
+        session,
+        user=user,
+        action="device.trap_set",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=attribution.project_id,
+        details={"closed_when_active": body.closed_when_active},
+    )
+    await session.commit()
+    return DeviceTrap(
+        closed_when_active=closed_when_active(attributes), set_by_hand=TRAP_ATTRIBUTE in attributes
+    )
 
 
 @router.get("/{device_id}/attribution-jobs", response_model=list[AttributionJobRead])

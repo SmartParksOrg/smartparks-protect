@@ -53,6 +53,12 @@ ICON_BY_TYPE = {
     "BATTERY_LOW": "event.low_battery",
     "POSSIBLE_IMMOBILITY": "event.immobility",
     "PROXIMITY": "event.proximity",
+    "FENCE_STATUS": "event.fence_breakage",
+    "FENCE_DOWN": "event.fence_breakage",
+    "FENCE_MONITOR_SILENT": "event.device_offline",
+    "TRAP_CLOSED": "event.trap",
+    "TRAP_OPENED": "event.trap",
+    "TRAP_SHUT": "event.trap",
 }
 
 

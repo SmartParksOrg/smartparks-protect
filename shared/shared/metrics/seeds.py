@@ -247,8 +247,26 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
     ),
     # infrastructure
     MetricSeed("door_open", "Door open", None, B, "infrastructure", "Gate or door is open"),
+    # volts, as the FenceEdge reports them (a u16 of volts, research 3.10); the fence panel shows
+    # kV, which is how a fence person reads a fence (corrected 2026-09-19, the seed said kV)
     MetricSeed(
-        "fence_voltage", "Fence voltage", "kV", N, "infrastructure", "Electric fence voltage"
+        "fence_voltage", "Fence voltage", "V", N, "infrastructure", "Electric fence peak voltage"
+    ),
+    MetricSeed(
+        "fence_pulse_count",
+        "Fence pulses",
+        None,
+        N,
+        "infrastructure",
+        "Pulses counted in one fence sampling window",
+    ),
+    MetricSeed(
+        "fence_energy",
+        "Fence pulse energy",
+        None,
+        N,
+        "infrastructure",
+        "Average pulse energy of a fence measurement, in the device's own units",
     ),
     MetricSeed("trap_triggered", "Trap triggered", None, B, "infrastructure", "Trap trigger state"),
     MetricSeed("tank_level", "Tank level", "%", N, "infrastructure", "Fill level of a tank"),

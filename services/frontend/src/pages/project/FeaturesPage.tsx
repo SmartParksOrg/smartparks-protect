@@ -50,7 +50,7 @@ import { useTheme } from "@/hooks/useTheme";
 
 const schema = z.object({
   name: z.string().min(1).max(200),
-  feature_type: z.enum(["site", "zone", "geofence", "route"]),
+  feature_type: z.enum(["site", "zone", "geofence", "route", "fence"]),
 });
 type Values = z.infer<typeof schema>;
 
@@ -75,7 +75,11 @@ function DrawMap({
   );
   const session = useRef<DrawSession | null>(null);
   const drawKind: DrawKind =
-    kind === "site" ? "point" : kind === "route" ? "line" : "polygon";
+    kind === "site"
+      ? "point"
+      : kind === "route" || kind === "fence"
+        ? "line"
+        : "polygon";
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
@@ -255,6 +259,7 @@ export function FeaturesPage() {
                     <SelectItem value="zone">{t("zone")}</SelectItem>
                     <SelectItem value="site">{t("site")}</SelectItem>
                     <SelectItem value="route">{t("route")}</SelectItem>
+                    <SelectItem value="fence">{t("fence")}</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>

@@ -4,6 +4,7 @@ import { Link } from "react-router";
 
 import type { Feature } from "@/api/types";
 import { ruleTemplateFor } from "@/components/map/featureTools";
+import { FenceRows } from "@/components/map/FencePanel";
 import { MapPanel, PanelRow } from "@/components/map/MapObjectPanel";
 import { Button } from "@/components/ui/button";
 import { formatArea, formatLength, measure } from "@/lib/geodesy";
@@ -98,6 +99,9 @@ export function FeaturePanel({
       )}
       {m.area_m2 != null && (
         <PanelRow label={t("Area")}>{formatArea(m.area_m2)}</PanelRow>
+      )}
+      {feature.feature_type === "fence" && (
+        <FenceRows projectId={projectId} featureId={feature.id} />
       )}
       {m.length_m != null && (
         <PanelRow

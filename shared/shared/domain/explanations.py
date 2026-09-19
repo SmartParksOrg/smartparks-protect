@@ -110,6 +110,26 @@ EVENTS: dict[str, str] = {
         "rule sets. The device may have dropped off, or the animal is not moving; check the "
         "last position and the movement line on the entity page."
     ),
+    "FENCE_STATUS": (
+        "A stretch of the fence line changed what it reads, from what the fence monitors on it "
+        "last measured: live, low, down, or unknown when a monitor failed or fell silent."
+    ),
+    "FENCE_DOWN": (
+        "A fence monitor measured a voltage under the rule's threshold. The wire near it carries "
+        "too little to hold an animal; check the energiser and the wire between them."
+    ),
+    "FENCE_MONITOR_SILENT": (
+        "A fence monitor has not reported for the time the rule sets, so the stretch of fence "
+        "it watches reads unknown. Check the device and the network near it."
+    ),
+    "TRAP_CLOSED": (
+        "The switch on the trap says the door shut. Somebody has to go and look; a trap that "
+        "stays shut holds whatever it caught."
+    ),
+    "TRAP_OPENED": "The switch on the trap says the door is open again.",
+    "TRAP_SHUT": (
+        "The trap reads shut, from its switch, and stays so. Somebody has to go and look."
+    ),
     "GEOFENCE_EXIT": "The entity's position left the geofence named in the title.",
     "GEOFENCE_ENTER": "The entity's position entered the geofence named in the title.",
     "PROXIMITY": "The entity came within the distance the rule sets of the place or entity named.",

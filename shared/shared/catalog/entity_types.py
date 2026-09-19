@@ -41,6 +41,10 @@ ENTITY_TYPE_SEEDS: tuple[EntityTypeSeed, ...] = (
     # A reader on a post, listening for the Bluetooth tags on animals or for the phones
     # people carry, with a place set by hand because it does not move (Tim, 2026-09-18).
     T("scanner", "Bluetooth scanner", "equipment", "device.scanner", "equipment"),
+    # a FenceEdge on a post, attached to a fence line (phase 32, decision D263), and a trap
+    # with a TrapEdge on its door (decision D266)
+    T("fence_monitor", "Fence monitor", "equipment", "infrastructure.fence_sensor", "equipment"),
+    T("trap", "Trap", "equipment", "event.trap", "equipment"),
     T("radio_repeater", "Radio repeater", "equipment", "device.radio_repeater", "equipment"),
     T("sensor", "Sensor station", "environmental", "device.sensor", "environmental_sensor"),
     T("video_camera", "Video camera", "equipment", "device.video_camera", "equipment"),

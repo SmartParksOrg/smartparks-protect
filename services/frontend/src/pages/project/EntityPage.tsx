@@ -17,7 +17,8 @@ import type {
   Page as PageType,
   Position,
   TrafficRow,
-  EntityAssignmentExtended,} from "@/api/types";
+  EntityAssignmentExtended,
+} from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
@@ -38,6 +39,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
+import { FenceLineCard } from "@/components/entities/FenceLineCard";
 import {
   Table,
   TableBody,
@@ -153,7 +155,13 @@ export function EntityPage() {
     queryFn: () =>
       api.get<Position[]>(`/api/v1/projects/${projectId}/positions`, {
         query: around.at
-          ? { entity_id: entityId, limit: 50, from: around.from, to: around.to, sources }
+          ? {
+              entity_id: entityId,
+              limit: 50,
+              from: around.from,
+              to: around.to,
+              sources,
+            }
           : {
               entity_id: entityId,
               limit: 10,
@@ -225,7 +233,10 @@ export function EntityPage() {
     queryKeys.entity(projectId, entityId),
     queryKeys.positions(projectId, { entityId, recent: true }),
     ...(current
-      ? [queryKeys.device(current.device_id), queryKeys.deviceSpan(current.device_id)]
+      ? [
+          queryKeys.device(current.device_id),
+          queryKeys.deviceSpan(current.device_id),
+        ]
       : []),
   ]);
   const attributing = attribution.active !== null;
@@ -315,7 +326,10 @@ export function EntityPage() {
         }
       />
       <Page>
-        <AttributionProgress active={attribution.active} failed={attribution.failed} />
+        <AttributionProgress
+          active={attribution.active}
+          failed={attribution.failed}
+        />
         {current && sp && beforeEntity > 0 && (
           <Callout kind="info">
             {t(
@@ -367,7 +381,13 @@ export function EntityPage() {
                 <CardContent>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                     <dt className="text-muted-foreground">{t("Type")}</dt>
-                    <dd className="inline-flex items-center gap-2"><Icon iconKey={e.icon_key ?? type?.icon_key} className="size-4" />{typePath(types.data?.items ?? [], e.entity_type_id)}</dd>
+                    <dd className="inline-flex items-center gap-2">
+                      <Icon
+                        iconKey={e.icon_key ?? type?.icon_key}
+                        className="size-4"
+                      />
+                      {typePath(types.data?.items ?? [], e.entity_type_id)}
+                    </dd>
                     {e.group_id && (
                       <>
                         <dt className="text-muted-foreground">{t("Group")}</dt>
@@ -426,7 +446,11 @@ export function EntityPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("Device")}</CardTitle>
                   {admin && !current && (
-                    <Button size="sm" disabled={attributing} onClick={() => setAssigning(true)}>
+                    <Button
+                      size="sm"
+                      disabled={attributing}
+                      onClick={() => setAssigning(true)}
+                    >
                       <Plus className="size-4" /> {t("Assign device")}
                     </Button>
                   )}
@@ -484,6 +508,13 @@ export function EntityPage() {
                   )}
                 </CardContent>
               </Card>
+              {type?.key === "fence_monitor" && (
+                <FenceLineCard
+                  projectId={projectId}
+                  entityId={e.id}
+                  canEdit={can("entities:write")}
+                />
+              )}
               <LocationSourceCard
                 key={`${e.location_source ?? "device"}-${e.location_fallback_hours ?? 24}`}
                 path={`/api/v1/projects/${projectId}/entities/${e.id}`}
@@ -505,7 +536,10 @@ export function EntityPage() {
                 updatedAt={e.picture_updated_at}
                 name={e.name}
                 editable={admin}
-                invalidate={[queryKeys.entity(projectId, e.id), queryKeys.entities(projectId)]}
+                invalidate={[
+                  queryKeys.entity(projectId, e.id),
+                  queryKeys.entities(projectId),
+                ]}
               />
               <MiniMap
                 positions={positions.data ?? []}

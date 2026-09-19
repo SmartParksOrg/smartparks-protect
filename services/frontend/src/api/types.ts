@@ -148,3 +148,6 @@ export type DeviceStateRead = Schemas["DeviceStateRead"];
 export type ProjectRole = Schemas["ProjectRoleRead"];
 export type MemberScope = Schemas["MemberScope"];
 export type PermissionCatalogue = Schemas["PermissionCatalogue"];
+export type FenceStatus = Schemas["FenceStatusRead"];
+export type EntityFence = Schemas["EntityFenceRead"];
+export type DeviceTrap = Schemas["DeviceTrap"];

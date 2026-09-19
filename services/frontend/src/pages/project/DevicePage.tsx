@@ -55,6 +55,7 @@ import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { BatteryCard } from "@/components/devices/BatteryCard";
+import { TrapCard } from "@/components/devices/TrapCard";
 import { BleAddress } from "@/components/devices/BleAddress";
 import { ReportingCard } from "@/components/devices/ReportingCard";
 import { StaticPositionCard } from "@/components/devices/StaticPositionCard";
@@ -70,7 +71,13 @@ import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
 import { useAuthStore } from "@/stores/auth";
 
-const TABS = ["overview", "data", "connectivity", "network", "settings"] as const;
+const TABS = [
+  "overview",
+  "data",
+  "connectivity",
+  "network",
+  "settings",
+] as const;
 
 export function DevicePage() {
   const { t } = useTranslation();
@@ -552,6 +559,14 @@ export function DevicePage() {
                 device={d}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}
               />
+              {projectId && currentEntityId && (
+                <TrapCard
+                  deviceId={d.id}
+                  projectId={projectId}
+                  entityId={currentEntityId}
+                  canEdit={Boolean(user?.is_superuser) || can("project:write")}
+                />
+              )}
               <ReportingCard
                 deviceId={d.id}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}

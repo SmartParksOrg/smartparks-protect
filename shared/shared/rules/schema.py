@@ -79,7 +79,7 @@ class SpatialCondition(BaseModel):
     type: Literal["spatial"]
     relation: Literal["enter", "exit", "inside", "outside"]
     feature_ids: list[uuid.UUID] = Field(default_factory=list)
-    feature_type: Literal["site", "zone", "geofence", "route"] | None = None
+    feature_type: Literal["site", "zone", "geofence", "route", "fence"] | None = None
 
     @model_validator(mode="after")
     def _some_features(self) -> "SpatialCondition":
@@ -99,7 +99,7 @@ class NearCondition(BaseModel):
     type: Literal["near"]
     meters: float = Field(gt=0, le=100_000)
     feature_ids: list[uuid.UUID] = Field(default_factory=list)
-    feature_type: Literal["site", "zone", "geofence", "route"] | None = None
+    feature_type: Literal["site", "zone", "geofence", "route", "fence"] | None = None
     entity_ids: list[uuid.UUID] = Field(default_factory=list)
 
     @model_validator(mode="after")
