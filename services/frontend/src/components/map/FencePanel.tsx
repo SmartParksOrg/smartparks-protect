@@ -8,6 +8,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type { FenceStatus } from "@/api/types";
 import { MetricTrend } from "@/components/map/BatteryTrend";
 import { PanelRow } from "@/components/map/MapObjectPanel";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useNow } from "@/hooks/useNow";
 import {
   type FenceMonitor,
@@ -43,6 +44,7 @@ export function FenceRows({
 }) {
   const { t } = useTranslation();
   const now = useNow();
+  const phone = useIsPhone();
   const [open, setOpen] = useState<string | null>(null);
   const status = useQuery({
     queryKey: [...queryKeys.features(projectId), featureId, "fence"],
@@ -68,7 +70,9 @@ export function FenceRows({
   return (
     <>
       <PanelRow label={t("Fence")}>
-        <FenceLevelDot level={s.level} /> {fenceLevelLabel(s.level, t)}
+        <span className="whitespace-nowrap">
+          <FenceLevelDot level={s.level} /> {fenceLevelLabel(s.level, t)}
+        </span>
         {s.changed_at && (
           <span
             className="ml-1 text-xs text-muted-foreground"
@@ -78,11 +82,19 @@ export function FenceRows({
           </span>
         )}
       </PanelRow>
-      <PanelRow label={t("Thresholds")}>
-        {t("live at {{ok}}, down under {{down}}", {
+      <PanelRow
+        label={t("Thresholds")}
+        title={t("live at {{ok}}, down under {{down}}", {
           ok: kilovolts(s.thresholds.ok_v),
           down: kilovolts(s.thresholds.down_v),
         })}
+      >
+        {phone
+          ? `${kilovolts(s.thresholds.ok_v)} / ${kilovolts(s.thresholds.down_v)}`
+          : t("live at {{ok}}, down under {{down}}", {
+              ok: kilovolts(s.thresholds.ok_v),
+              down: kilovolts(s.thresholds.down_v),
+            })}
       </PanelRow>
       {monitors.length === 0 ? (
         <PanelRow label={t("Monitors")}>
@@ -111,75 +123,81 @@ export function FenceRows({
               </div>
             ))}
           </div>
-          {monitors.map((m) => (
-            <Fragment key={m.entity_id}>
-              <PanelRow
-                label={m.name}
-                title={m.measured_at ? formatTime(m.measured_at) : undefined}
-              >
-                <FenceLevelDot level={m.level} />{" "}
-                {m.device_id ? (
-                  <button
-                    type="button"
-                    className="underline underline-offset-2 hover:text-primary"
-                    title={
-                      open === m.entity_id
-                        ? t("Hide the fence voltage")
-                        : t("Show the fence voltage")
-                    }
-                    aria-expanded={open === m.entity_id}
-                    onClick={() => toggle(m.entity_id)}
-                  >
-                    {kilovolts(m.voltage_v)}
-                  </button>
-                ) : (
-                  kilovolts(m.voltage_v)
-                )}
-                {m.pulses != null && (
-                  <span className="text-muted-foreground">
-                    {" "}
-                    · {t("{{count}} pulses", { count: m.pulses })}
-                  </span>
-                )}
-                {m.failed && (
-                  <span className="text-muted-foreground">
-                    {" "}
-                    · {t("measurement failed")}
-                  </span>
-                )}
-                {m.measured_at && (
-                  <span className="text-muted-foreground">
-                    {" "}
-                    · {formatAgo(m.measured_at, now)}
-                  </span>
-                )}{" "}
-                <Link
-                  className="underline"
-                  to={`/projects/${projectId}/entities/${m.entity_id}`}
+          {/* one line per monitor: its name, then what it reads, wrapping to a second line on
+              a phone and never into the narrow value column */}
+          <div className="col-span-2 space-y-1 text-sm">
+            {monitors.map((m) => (
+              <Fragment key={m.entity_id}>
+                <div
+                  className="flex flex-wrap items-center gap-x-2"
+                  title={m.measured_at ? formatTime(m.measured_at) : undefined}
                 >
-                  {t("entity")}
-                </Link>
-              </PanelRow>
-              {open === m.entity_id && m.device_id && (
-                <div className="col-span-2 rounded-md border bg-muted/30 p-2">
-                  <MetricTrend
-                    projectId={projectId}
-                    deviceId={m.device_id}
-                    spec={{
-                      metric: "fence_voltage",
-                      label: t("Fence voltage"),
-                      unit: "kV",
-                      scale: 0.001,
-                      decimals: 2,
-                      floor: 0,
-                      ariaLabel: t("Fence voltage"),
-                    }}
-                    until={m.measured_at ?? null}
-                  />
+                  <FenceLevelDot level={m.level} />
+                  <Link
+                    className="min-w-0 flex-1 truncate font-medium hover:underline"
+                    to={`/projects/${projectId}/entities/${m.entity_id}`}
+                  >
+                    {m.name}
+                  </Link>
+                  <span className="whitespace-nowrap">
+                    {m.device_id ? (
+                      <button
+                        type="button"
+                        className="underline underline-offset-2 hover:text-primary"
+                        title={
+                          open === m.entity_id
+                            ? t("Hide the fence voltage")
+                            : t("Show the fence voltage")
+                        }
+                        aria-expanded={open === m.entity_id}
+                        onClick={() => toggle(m.entity_id)}
+                      >
+                        {kilovolts(m.voltage_v)}
+                      </button>
+                    ) : (
+                      kilovolts(m.voltage_v)
+                    )}
+                    {m.pulses != null && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {t("{{count}} pulses", { count: m.pulses })}
+                      </span>
+                    )}
+                    {m.failed && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {t("measurement failed")}
+                      </span>
+                    )}
+                    {m.measured_at && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {formatAgo(m.measured_at, now)}
+                      </span>
+                    )}
+                  </span>
                 </div>
-              )}
-            </Fragment>
-          ))}
+                {open === m.entity_id && m.device_id && (
+                  <div className="rounded-md border bg-muted/30 p-2">
+                    <MetricTrend
+                      projectId={projectId}
+                      deviceId={m.device_id}
+                      spec={{
+                        metric: "fence_voltage",
+                        label: t("Fence voltage"),
+                        unit: "kV",
+                        scale: 0.001,
+                        decimals: 2,
+                        floor: 0,
+                        ariaLabel: t("Fence voltage"),
+                      }}
+                      until={m.measured_at ?? null}
+                    />
+                  </div>
+                )}
+              </Fragment>
+            ))}
+          </div>
         </>
       )}
     </>

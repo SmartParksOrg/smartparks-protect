@@ -1374,20 +1374,25 @@ async def _update_current_state(
         }
     connectivity.updated_at = now
 
+    # the entity the device is on is seen whenever the device reports, not only when it fixes
+    # (Tim, 2026-09-19: a fence monitor with a place set by hand reads "last seen never" on
+    # the map while its readings arrive every hour); a position moves it, a reading marks it
     candidate = newest_fix or newest_network
-    if candidate is not None:
-        attribution = attributions.get(candidate.time)
-        if (
-            attribution is not None
-            and attribution.entity_id is not None
-            and attribution.project_id is not None
-        ):
-            entity_state = await session.get(EntityCurrentState, attribution.entity_id)
-            if entity_state is None:
-                entity_state = EntityCurrentState(
-                    entity_id=attribution.entity_id, project_id=attribution.project_id
-                )
-                session.add(entity_state)
+    attribution = attributions.get(candidate.time if candidate is not None else seen_at)
+    if attribution is None and candidate is None:
+        attribution = await resolve_attribution(session, device.id, seen_at)
+    if (
+        attribution is not None
+        and attribution.entity_id is not None
+        and attribution.project_id is not None
+    ):
+        entity_state = await session.get(EntityCurrentState, attribution.entity_id)
+        if entity_state is None:
+            entity_state = EntityCurrentState(
+                entity_id=attribution.entity_id, project_id=attribution.project_id
+            )
+            session.add(entity_state)
+        if candidate is not None:
             entity = await session.get(Entity, attribution.entity_id)
             moved = _apply_position(
                 entity_state,
@@ -1398,9 +1403,9 @@ async def _update_current_state(
             )
             if moved is not None:
                 entity_state.device_id = device.id
-            if entity_state.last_seen_at is None or seen_at > entity_state.last_seen_at:
-                entity_state.last_seen_at = seen_at
-            entity_state.updated_at = now
+        if entity_state.last_seen_at is None or seen_at > entity_state.last_seen_at:
+            entity_state.last_seen_at = seen_at
+        entity_state.updated_at = now
     del latest_position
 
 

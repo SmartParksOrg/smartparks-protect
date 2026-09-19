@@ -173,6 +173,15 @@ async def test_a_fence_line_reads_its_sections_from_its_monitors(client, db, bus
     await _deliver(db, bus, source_w, id_w, 12, fence_frame(6800))
     await _deliver(db, bus, source_e, id_e, 12, fence_frame(6500))
     await db.rollback()
+    # a reading is a sign of life for the entity too, though it moves nothing
+    from shared.models import EntityCurrentState
+
+    seen = await db.scalar(
+        select(EntityCurrentState.last_seen_at)
+        .where(EntityCurrentState.entity_id == uuid.UUID(west_entity))
+        .execution_options(populate_existing=True)
+    )
+    assert seen is not None, "a monitor that reports was seen"
     status = (await client.get(f"{base}/features/{fence_id}/fence", headers=h)).json()
     assert status["level"] == "ok"
     assert [s["level"] for s in status["sections"]] == ["ok", "ok", "ok"]
