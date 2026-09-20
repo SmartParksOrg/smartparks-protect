@@ -30,6 +30,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - A **Metrics** table on the Data tab of a device and of an entity (Tim, 2026-09-20), in the project and under Server admin: every metric reported in the last thirty days with its newest reading, when, and how many readings there were; a numeric one unfolds its trend. The tab had the positions and the events and not the measurements between them. API: `GET /projects/{id}/measurements/summary`.
 
+- The Data explorer's table sorts and filters (Tim, 2026-09-20): the time first and newest first by default, a click on any header sorts the loaded rows by it (again reverses; empty cells stay last), and under every header a filter — a piece of text, or for a number column `> 3.5`, `<= 2`, `3.5-4` or a plain number — with a line saying how many loaded rows match. The column picker offers the metadata a reader asks for: the kinds of record a moment holds, the position's kind, the device type, the data source, the device and entity ids, the source event, its ingestion time and the trace; off until added, and the choice sticks per user.
+
 ### Changed
 
 - The fence line's panel on the live map reads as one line per section — the range and the monitors at its ends — with each monitor's voltage chart folded behind its reading, instead of every word wrapping in the narrow value column and three charts stacked open (Tim, 2026-09-19, after looking at it on a phone, a tablet and a desktop).

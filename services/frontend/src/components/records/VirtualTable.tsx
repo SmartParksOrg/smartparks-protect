@@ -5,9 +5,15 @@ import { useEffect, useRef } from "react";
 import type { RecordRow } from "@/api/types";
 import { formatInZone } from "@/lib/analytics";
 import { formatDuration } from "@/lib/format";
-import { cellOf, formatCell, type RecordColumn } from "@/lib/records";
+import {
+  cellOf,
+  formatCell,
+  type RecordColumn,
+  type RecordSort,
+} from "@/lib/records";
 
 const ROW_HEIGHT = 32;
+const FILTER_HEIGHT = 30;
 
 function cellWidth(c: RecordColumn): number {
   return c.key === "time"
@@ -28,10 +34,20 @@ export function VirtualTable({
   highlightTime = null,
   follow = true,
   height = 480,
+  sort,
+  onSort,
+  filters,
+  onFilter,
 }: {
   rows: RecordRow[];
   columns: RecordColumn[];
   timezone: string;
+  /** The column the rows are ordered by; a click on a header sorts by it, again reverses. */
+  sort?: RecordSort;
+  onSort?: (sort: RecordSort) => void;
+  /** A filter per column, typed under its header (Tim, 2026-09-20). */
+  filters?: Record<string, string>;
+  onFilter?: (key: string, text: string) => void;
   onRowClick?: (row: RecordRow) => void;
   /** The pointer over a row, or over none (decision D154). */
   onRowHover?: (row: RecordRow | null) => void;
@@ -68,23 +84,75 @@ export function VirtualTable({
       onMouseLeave={() => onRowHover?.(null)}
     >
       <div style={{ minWidth: width }}>
-        <div
-          className="sticky top-0 z-10 flex border-b bg-muted text-xs font-medium"
-          style={{ height: ROW_HEIGHT }}
-        >
-          {columns.map((c) => (
-            <div
-              key={c.key}
-              className="flex shrink-0 items-center truncate px-2"
-              style={{ width: cellWidth(c) }}
-              title={c.unit ? `${t(c.label)} (${c.unit})` : t(c.label)}
-            >
-              {t(c.label)}
-              {c.unit ? (
-                <span className="ml-1 text-muted-foreground">{c.unit}</span>
-              ) : null}
+        <div className="sticky top-0 z-10 border-b bg-muted text-xs">
+          <div className="flex font-medium" style={{ height: ROW_HEIGHT }}>
+            {columns.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                className="flex shrink-0 items-center truncate px-2 text-left hover:text-primary"
+                style={{ width: cellWidth(c) }}
+                title={
+                  onSort
+                    ? t("Sort by {{column}}", { column: t(c.label) })
+                    : c.unit
+                      ? `${t(c.label)} (${c.unit})`
+                      : t(c.label)
+                }
+                onClick={() =>
+                  onSort?.({
+                    key: c.key,
+                    direction:
+                      sort?.key === c.key && sort.direction === "desc"
+                        ? "asc"
+                        : "desc",
+                  })
+                }
+                aria-sort={
+                  sort?.key === c.key
+                    ? sort.direction === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : undefined
+                }
+              >
+                {t(c.label)}
+                {c.unit ? (
+                  <span className="ml-1 text-muted-foreground">{c.unit}</span>
+                ) : null}
+                {sort?.key === c.key && (
+                  <span className="ml-1 text-muted-foreground" aria-hidden>
+                    {sort.direction === "asc" ? "▲" : "▼"}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {onFilter && (
+            <div className="flex" style={{ height: FILTER_HEIGHT }}>
+              {columns.map((c) => (
+                <div
+                  key={c.key}
+                  className="shrink-0 px-1 py-0.5"
+                  style={{ width: cellWidth(c) }}
+                >
+                  <input
+                    type="text"
+                    className="h-6 w-full rounded border bg-background px-1 font-normal"
+                    value={filters?.[c.key] ?? ""}
+                    placeholder={c.numeric ? "> 3.5" : t("filter")}
+                    aria-label={t("Filter {{column}}", { column: t(c.label) })}
+                    title={
+                      c.numeric
+                        ? t("> 3.5, <= 2, 3.5-4, or a number")
+                        : t("A piece of the text")
+                    }
+                    onChange={(e) => onFilter(c.key, e.target.value)}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
         <div
           className="relative"

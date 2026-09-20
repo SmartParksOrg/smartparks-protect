@@ -60,6 +60,12 @@ class RecordRow(BaseModel):
     source_event_id: int | None
     source_event_ingested_at: datetime | None
     trace_id: uuid.UUID | None
+    #: Metadata a reader adds as columns (Tim, 2026-09-20).
+    device_type: str | None = None
+    data_source_id: uuid.UUID | None = None
+    data_source_name: str | None = None
+    kinds: list[str] = Field(default_factory=list)
+    record_type: str | None = None
 
 
 class RecordsPage(BaseModel):
@@ -224,6 +230,11 @@ async def records(
             if r.position is not None
             else None,
             measurements=r.measurements,
+            device_type=r.device_type,
+            data_source_id=r.data_source_id,
+            data_source_name=r.data_source_name,
+            kinds=r.kinds,
+            record_type=r.record_type,
             state=r.state,
             source_event_id=r.source_event_id,
             source_event_ingested_at=r.source_event_ingested_at,

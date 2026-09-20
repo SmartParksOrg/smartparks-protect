@@ -131,6 +131,8 @@ export interface RecordColumn {
   unit?: string | null;
   kind: "fixed" | "metric" | "state";
   numeric: boolean;
+  /** Off until a reader adds it: the metadata columns (Tim, 2026-09-20). */
+  extra?: boolean;
 }
 
 const FIXED: RecordColumn[] = [
@@ -160,7 +162,82 @@ const FIXED: RecordColumn[] = [
     kind: "fixed",
     numeric: true,
   },
+  // the metadata a reader adds when the question is where a record came from
+  {
+    key: "kinds",
+    label: t("Records"),
+    kind: "fixed",
+    numeric: false,
+    extra: true,
+  },
+  {
+    key: "record_type",
+    label: t("Position kind"),
+    kind: "fixed",
+    numeric: false,
+    extra: true,
+  },
+  {
+    key: "device_type",
+    label: t("Device type"),
+    kind: "fixed",
+    numeric: false,
+    extra: true,
+  },
+  {
+    key: "data_source",
+    label: t("Data source"),
+    kind: "fixed",
+    numeric: false,
+    extra: true,
+  },
+  {
+    key: "device_id",
+    label: t("Device id"),
+    kind: "fixed",
+    numeric: false,
+    extra: true,
+  },
+  {
+    key: "entity_id",
+    label: t("Entity id"),
+    kind: "fixed",
+    numeric: false,
+    extra: true,
+  },
+  {
+    key: "source_event",
+    label: t("Source event"),
+    kind: "fixed",
+    numeric: true,
+    extra: true,
+  },
+  {
+    key: "ingested_at",
+    label: t("Ingested"),
+    kind: "fixed",
+    numeric: false,
+    extra: true,
+  },
+  {
+    key: "trace_id",
+    label: t("Trace"),
+    kind: "fixed",
+    numeric: false,
+    extra: true,
+  },
 ];
+
+/** The columns shown: every column not hidden, with the extra ones only when added. */
+export function shownColumns(
+  columns: RecordColumn[],
+  hidden: string[],
+  added: string[],
+): RecordColumn[] {
+  return columns.filter(
+    (c) => !hidden.includes(c.key) && (!c.extra || added.includes(c.key)),
+  );
+}
 
 /** The columns the loaded rows carry: the fixed ones, then a column per metric key seen (in
  * the order first seen, with the registry's label and unit), then the state fields seen. */
@@ -223,6 +300,24 @@ export function cellOf(row: RecordRow, column: RecordColumn): CellValue {
         : null;
     case "altitude_m":
       return row.position?.altitude_m ?? null;
+    case "kinds":
+      return (row.kinds ?? []).join(" + ") || null;
+    case "record_type":
+      return row.record_type ?? null;
+    case "device_type":
+      return row.device_type ?? null;
+    case "data_source":
+      return row.data_source_name ?? null;
+    case "device_id":
+      return row.device_id;
+    case "entity_id":
+      return row.entity_id ?? null;
+    case "source_event":
+      return row.source_event_id ?? null;
+    case "ingested_at":
+      return row.source_event_ingested_at ?? null;
+    case "trace_id":
+      return row.trace_id ?? null;
     default: {
       const raw =
         column.kind === "metric"
@@ -262,4 +357,88 @@ export function seriesOf(
       points.push({ time: row.time, value });
   }
   return points.reverse();
+}
+
+/** How the table is ordered: a column and a direction; the server gives newest first and so
+ * does the default (Tim, 2026-09-20). Sorting reads the loaded rows. */
+export interface RecordSort {
+  key: string;
+  direction: "asc" | "desc";
+}
+export const DEFAULT_SORT: RecordSort = { key: "time", direction: "desc" };
+
+function compareCells(a: CellValue, b: CellValue): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (typeof a === "boolean" && typeof b === "boolean")
+    return Number(a) - Number(b);
+  return String(a).localeCompare(String(b));
+}
+
+export function sortRows(
+  rows: RecordRow[],
+  columns: RecordColumn[],
+  sort: RecordSort,
+): RecordRow[] {
+  const column = columns.find((c) => c.key === sort.key);
+  if (!column) return rows;
+  const sign = sort.direction === "asc" ? 1 : -1;
+  // an empty cell sorts last whichever way round, so a column with gaps still reads
+  const ordered = (x: CellValue, y: CellValue): number =>
+    x === null || y === null ? compareCells(x, y) : sign * compareCells(x, y);
+  return [...rows]
+    .map((row, index) => ({ row, index, cell: cellOf(row, column) }))
+    .sort((x, y) => ordered(x.cell, y.cell) || x.index - y.index)
+    .map((x) => x.row);
+}
+
+/** A filter per column, typed in the header (Tim, 2026-09-20). A number column takes
+ * `> 3.5`, `>= 3.5`, `< 2`, `<= 2`, `3.5-4` (a range) or a plain number (equal to two
+ * decimals); every other column takes a piece of text, matched without regard to case. */
+export function matchesFilter(
+  value: CellValue,
+  text: string,
+  numeric: boolean,
+): boolean {
+  const wanted = text.trim();
+  if (wanted === "") return true;
+  if (value === null) return false;
+  if (numeric && typeof value === "number") {
+    const range = wanted.match(/^(-?[\d.]+)\s*-\s*(-?[\d.]+)$/);
+    if (range) return value >= Number(range[1]) && value <= Number(range[2]);
+    const bound = wanted.match(/^(>=|<=|>|<|=)?\s*(-?[\d.]+)$/);
+    if (bound) {
+      const n = Number(bound[2]);
+      switch (bound[1]) {
+        case ">":
+          return value > n;
+        case ">=":
+          return value >= n;
+        case "<":
+          return value < n;
+        case "<=":
+          return value <= n;
+        default:
+          return Math.abs(value - n) < 0.005;
+      }
+    }
+    return false;
+  }
+  return formatCell(value).toLowerCase().includes(wanted.toLowerCase());
+}
+
+export function filterRows(
+  rows: RecordRow[],
+  columns: RecordColumn[],
+  filters: Record<string, string>,
+): RecordRow[] {
+  const active = columns.filter((c) => (filters[c.key] ?? "").trim() !== "");
+  if (active.length === 0) return rows;
+  return rows.filter((row) =>
+    active.every((c) =>
+      matchesFilter(cellOf(row, c), filters[c.key], c.numeric),
+    ),
+  );
 }

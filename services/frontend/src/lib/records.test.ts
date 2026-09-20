@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import type { RecordRow } from "@/api/types";
 import {
-  inputValue,
-  recordsHref,
   cellOf,
   columnsOf,
+  DEFAULT_SORT,
+  filterRows,
+  inputValue,
+  matchesFilter,
   readRecordsState,
+  recordsHref,
   seriesOf,
+  shownColumns,
+  sortRows,
   windowFor,
   writeRecordsState,
 } from "@/lib/records";
@@ -130,6 +135,15 @@ describe("records columns", () => {
       "accuracy_m",
       "speed_kmh",
       "altitude_m",
+      "kinds",
+      "record_type",
+      "device_type",
+      "data_source",
+      "device_id",
+      "entity_id",
+      "source_event",
+      "ingested_at",
+      "trace_id",
       "m:temperature",
       "m:reset_reason",
       "m:battery_voltage",
@@ -196,5 +210,115 @@ describe("records inputs", () => {
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/,
     );
     expect(inputValue("xZ")).toBe("");
+  });
+});
+
+describe("records order and filters", () => {
+  const rows = [
+    {
+      time: "2026-09-20T10:00:00Z",
+      device_id: "d",
+      device_name: "B",
+      entity_id: null,
+      entity_name: null,
+      project_id: null,
+      position: null,
+      measurements: { battery_voltage: 3.9 },
+      state: null,
+      source_event_id: 1,
+      source_event_ingested_at: null,
+      trace_id: null,
+      kinds: ["measurement"],
+    },
+    {
+      time: "2026-09-20T11:00:00Z",
+      device_id: "d",
+      device_name: "A",
+      entity_id: null,
+      entity_name: null,
+      project_id: null,
+      position: null,
+      measurements: { battery_voltage: 3.5 },
+      state: null,
+      source_event_id: 2,
+      source_event_ingested_at: null,
+      trace_id: null,
+      kinds: ["measurement", "state"],
+    },
+    {
+      time: "2026-09-20T12:00:00Z",
+      device_id: "d",
+      device_name: "C",
+      entity_id: null,
+      entity_name: null,
+      project_id: null,
+      position: null,
+      measurements: {},
+      state: null,
+      source_event_id: 3,
+      source_event_ingested_at: null,
+      trace_id: null,
+      kinds: [],
+    },
+  ] as unknown as RecordRow[];
+  const labels = new Map([
+    ["battery_voltage", { label: "Battery", unit: "V" }],
+  ]);
+  const columns = columnsOf(rows, labels);
+  it("sorts newest first by default and by any column on request", () => {
+    expect(
+      sortRows(rows, columns, DEFAULT_SORT).map((r) => r.device_name),
+    ).toEqual(["C", "A", "B"]);
+    expect(
+      sortRows(rows, columns, { key: "device", direction: "asc" }).map(
+        (r) => r.device_name,
+      ),
+    ).toEqual(["A", "B", "C"]);
+    // an empty cell sorts last whichever way
+    expect(
+      sortRows(rows, columns, {
+        key: "m:battery_voltage",
+        direction: "asc",
+      }).map((r) => r.device_name),
+    ).toEqual(["A", "B", "C"]);
+    expect(
+      sortRows(rows, columns, {
+        key: "m:battery_voltage",
+        direction: "desc",
+      }).map((r) => r.device_name),
+    ).toEqual(["B", "A", "C"]);
+  });
+  it("filters a number column by bound, range or value and a text column by a piece", () => {
+    expect(
+      filterRows(rows, columns, { "m:battery_voltage": "> 3.6" }).map(
+        (r) => r.device_name,
+      ),
+    ).toEqual(["B"]);
+    expect(
+      filterRows(rows, columns, { "m:battery_voltage": "3.4-3.6" }).map(
+        (r) => r.device_name,
+      ),
+    ).toEqual(["A"]);
+    expect(
+      filterRows(rows, columns, { "m:battery_voltage": "3.5" }).map(
+        (r) => r.device_name,
+      ),
+    ).toEqual(["A"]);
+    expect(
+      filterRows(rows, columns, { device: "a" }).map((r) => r.device_name),
+    ).toEqual(["A"]);
+    expect(filterRows(rows, columns, { device: "" })).toHaveLength(3);
+    expect(matchesFilter(null, "x", false)).toBe(false);
+  });
+  it("keeps the metadata columns off until added", () => {
+    const keys = shownColumns(columns, [], []).map((c) => c.key);
+    expect(keys[0]).toBe("time");
+    expect(keys).not.toContain("device_type");
+    expect(
+      shownColumns(columns, [], ["device_type"]).map((c) => c.key),
+    ).toContain("device_type");
+    expect(shownColumns(columns, ["lat"], []).map((c) => c.key)).not.toContain(
+      "lat",
+    );
   });
 });

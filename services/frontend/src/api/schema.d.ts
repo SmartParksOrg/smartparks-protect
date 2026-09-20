@@ -11222,6 +11222,16 @@ export interface components {
             source_event_ingested_at: string | null;
             /** Trace Id */
             trace_id: string | null;
+            /** Device Type */
+            device_type?: string | null;
+            /** Data Source Id */
+            data_source_id?: string | null;
+            /** Data Source Name */
+            data_source_name?: string | null;
+            /** Kinds */
+            kinds?: string[];
+            /** Record Type */
+            record_type?: string | null;
         };
         /** RecordsCount */
         RecordsCount: {

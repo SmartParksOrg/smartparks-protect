@@ -90,7 +90,15 @@ import {
   viewOfParams,
   writeExploreState,
 } from "@/lib/explore";
-import { columnsOf, windowFor } from "@/lib/records";
+import {
+  columnsOf,
+  DEFAULT_SORT,
+  filterRows,
+  type RecordSort,
+  shownColumns,
+  sortRows,
+  windowFor,
+} from "@/lib/records";
 import { useAuthStore } from "@/stores/auth";
 
 const CHART_LABELS: Record<ChartType, string> = {
@@ -257,7 +265,20 @@ export function ExplorerPage() {
     "records_hidden_columns",
     [],
   );
-  const shown = columns.filter((c) => !hiddenColumns.includes(c.key));
+  // the metadata columns are off until added, and the choice sticks (Tim, 2026-09-20)
+  const [addedColumns, setAddedColumns] = usePreference<string[]>(
+    "records_added_columns",
+    [],
+  );
+  const shown = shownColumns(columns, hiddenColumns, addedColumns);
+  // the order and the filters read the loaded rows: time first, newest first, by default
+  const [sort, setSort] = useState<RecordSort>(DEFAULT_SORT);
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const tableRows = useMemo(
+    () => sortRows(filterRows(records.rows, shown, filters), shown, sort),
+    [records.rows, shown, filters, sort],
+  );
+  const filtering = Object.values(filters).some((v) => v.trim() !== "");
 
   // the marked moment (decision D154): a hover is transient, a click pins it into the URL
   // the selection strip folds once a selection exists, first on a phone; a choice sticks
@@ -524,22 +545,43 @@ export function ExplorerPage() {
   );
 
   const table = (
-    <VirtualTable
-      rows={records.rows}
-      columns={shown}
-      timezone={state.timezone}
-      height="100%"
-      highlightTime={markedRowTime}
-      follow={hovered?.source !== "table"}
-      onRowHover={(row) =>
-        setHovered(row ? { ms: Date.parse(row.time), source: "table" } : null)
-      }
-      onRowClick={(row: RecordRow) => {
-        // a click pins the moment in every view and shows the record plainly
-        pick(Date.parse(row.time));
-        setPicked(row);
-      }}
-    />
+    <div className="flex h-full flex-col gap-1">
+      {filtering && (
+        <div className="shrink-0 text-xs text-muted-foreground">
+          {t("{{shown}} of {{loaded}} loaded rows match the filters.", {
+            shown: tableRows.length,
+            loaded: records.rows.length,
+          })}{" "}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => setFilters({})}
+          >
+            {t("Clear the filters")}
+          </button>
+        </div>
+      )}
+      <VirtualTable
+        rows={tableRows}
+        columns={shown}
+        timezone={state.timezone}
+        sort={sort}
+        onSort={setSort}
+        filters={filters}
+        onFilter={(key, text) => setFilters((f) => ({ ...f, [key]: text }))}
+        height="100%"
+        highlightTime={markedRowTime}
+        follow={hovered?.source !== "table"}
+        onRowHover={(row) =>
+          setHovered(row ? { ms: Date.parse(row.time), source: "table" } : null)
+        }
+        onRowClick={(row: RecordRow) => {
+          // a click pins the moment in every view and shows the record plainly
+          pick(Date.parse(row.time));
+          setPicked(row);
+        }}
+      />
+    </div>
   );
   const boundNote = !aggregated
     ? null
@@ -570,11 +612,18 @@ export function ExplorerPage() {
         <MultiSelect
           options={columns.map((c) => ({ value: c.key, label: t(c.label) }))}
           value={shown.map((c) => c.key)}
-          onChange={(visible) =>
+          onChange={(visible) => {
             setHiddenColumns(
-              columns.filter((c) => !visible.includes(c.key)).map((c) => c.key),
-            )
-          }
+              columns
+                .filter((c) => !c.extra && !visible.includes(c.key))
+                .map((c) => c.key),
+            );
+            setAddedColumns(
+              columns
+                .filter((c) => c.extra && visible.includes(c.key))
+                .map((c) => c.key),
+            );
+          }}
           placeholder={t("Columns")}
           label={t("columns")}
           className="h-8 w-36"

@@ -56,6 +56,9 @@ async def test_records_rows_pages_and_count(client, db, bus):  # noqa: F811
     body = page.json()
     assert body["next_cursor"] is None
     rows = body["items"]
+    # the metadata a reader adds as columns (Tim, 2026-09-20)
+    assert rows[0]["device_type"] and rows[0]["kinds"], rows[0]
+    assert all(set(r["kinds"]) <= {"position", "measurement", "state"} for r in rows)
     assert [r["time"][:19] for r in rows] == [
         (start + timedelta(minutes=m)).isoformat()[:19] for m in (5, 2, 1, 0)
     ]

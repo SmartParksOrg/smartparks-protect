@@ -20,7 +20,15 @@ from shared.curation.effective import (
     sources_filter,
     visible,
 )
-from shared.models import Device, DeviceStateHistory, Entity, Measurement, Position
+from shared.models import (
+    DataSource,
+    Device,
+    DeviceStateHistory,
+    DeviceType,
+    Entity,
+    Measurement,
+    Position,
+)
 
 Key = tuple[uuid.UUID, datetime]
 
@@ -57,6 +65,14 @@ class Record:
     source_event_id: int | None = None
     source_event_ingested_at: datetime | None = None
     trace_id: uuid.UUID | None = None
+    #: The metadata a reader adds as columns (Tim, 2026-09-20): the device's type, the data
+    #: source the moment's records came through, what kinds of record the moment holds, and
+    #: the position's own kind (a fix, an estimate, a fixed place).
+    device_type: str | None = None
+    data_source_id: uuid.UUID | None = None
+    data_source_name: str | None = None
+    kinds: list[str] = field(default_factory=list)
+    record_type: str | None = None
 
 
 def _owner(model: Any, selection: RecordSelection) -> Any:
@@ -212,10 +228,33 @@ async def fill(session: AsyncSession, selection: RecordSelection, keys: list[Key
         if key in wanted:
             states.setdefault(key, s.state)
 
-    device_names = {
-        d.id: d.name
-        for d in (await session.scalars(select(Device).where(Device.id.in_(devices)))).all()
+    device_rows = (await session.scalars(select(Device).where(Device.id.in_(devices)))).all()
+    device_names = {d.id: d.name for d in device_rows}
+    type_ids = {d.device_type_id for d in device_rows}
+    type_labels = (
+        {
+            dt.id: dt.label
+            for dt in (
+                await session.scalars(select(DeviceType).where(DeviceType.id.in_(type_ids)))
+            ).all()
+        }
+        if type_ids
+        else {}
+    )
+    device_types = {d.id: type_labels.get(d.device_type_id) for d in device_rows}
+    source_ids = {p.data_source_id for p, _, _ in positions.values() if p.data_source_id} | {
+        m.data_source_id for m in firsts.values() if m.data_source_id
     }
+    source_names = (
+        {
+            s.id: s.name
+            for s in (
+                await session.scalars(select(DataSource).where(DataSource.id.in_(source_ids)))
+            ).all()
+        }
+        if source_ids
+        else {}
+    )
     entity_ids = {p.entity_id for p, _, _ in positions.values() if p.entity_id is not None} | {
         m.entity_id for m in firsts.values() if m.entity_id is not None
     }
@@ -251,6 +290,21 @@ async def fill(session: AsyncSession, selection: RecordSelection, keys: list[Key
                 source_event_id=owner.source_event_id if owner else None,
                 source_event_ingested_at=owner.source_event_ingested_at if owner else None,
                 trace_id=owner.trace_id if owner else None,
+                device_type=device_types.get(device_id),
+                data_source_id=owner.data_source_id if owner else None,
+                data_source_name=source_names.get(owner.data_source_id)
+                if owner and owner.data_source_id
+                else None,
+                kinds=[
+                    kind
+                    for kind, present in (
+                        ("position", found is not None),
+                        ("measurement", key in measurements),
+                        ("state", key in states),
+                    )
+                    if present
+                ],
+                record_type=found[0].record_type if found else None,
             )
         )
     return records
