@@ -2234,6 +2234,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/measurements/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Measurement Summary
+         * @description Every metric a device or an entity reported in the last `days`, with its newest reading
+         *     and its count (Tim, 2026-09-20): the table of processed metrics on the Data tab, beside the
+         *     positions and the events. Valid rows only, the effective value, attributed to the project.
+         */
+        get: operations["measurement_summary_api_v1_projects__project_id__measurements_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/source-events/{source_event_id}": {
         parameters: {
             query?: never;
@@ -10066,6 +10088,32 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * MetricSummaryRead
+         * @description One metric a device or an entity reported in the window (Tim, 2026-09-20): the newest
+         *     reading with its time, and how many readings the window holds.
+         */
+        MetricSummaryRead: {
+            /** Metric Key */
+            metric_key: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string | null;
+            /** Value Type */
+            value_type: string;
+            /** Category */
+            category: string;
+            /** Value */
+            value: number | boolean | string | null;
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Count */
+            count: number;
+        };
         /** MetricUpdate */
         MetricUpdate: {
             /** Label */
@@ -17645,6 +17693,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PositionRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    measurement_summary_api_v1_projects__project_id__measurements_summary_get: {
+        parameters: {
+            query?: {
+                device_id?: string | null;
+                entity_id?: string | null;
+                days?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricSummaryRead"][];
                 };
             };
             /** @description Validation Error */

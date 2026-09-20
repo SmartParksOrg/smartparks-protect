@@ -28,6 +28,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - An entity whose device reports readings but no positions read "Last seen: never" on the live map — a fence monitor with a place set by hand, a scanner, a trap — while its readings arrived every hour. The decoder marked the entity as seen only when a position came in; any record of the device does now, and a position still moves it. (Tim, 2026-09-19, on the demo projects.)
 
+- A **Metrics** table on the Data tab of a device and of an entity (Tim, 2026-09-20), in the project and under Server admin: every metric reported in the last thirty days with its newest reading, when, and how many readings there were; a numeric one unfolds its trend. The tab had the positions and the events and not the measurements between them. API: `GET /projects/{id}/measurements/summary`.
+
 ### Changed
 
 - The fence line's panel on the live map reads as one line per section — the range and the monitors at its ends — with each monitor's voltage chart folded behind its reading, instead of every word wrapping in the narrow value column and three charts stacked open (Tim, 2026-09-19, after looking at it on a phone, a tablet and a desktop).

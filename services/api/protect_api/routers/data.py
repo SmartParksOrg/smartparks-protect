@@ -17,6 +17,8 @@ from shared.curation.effective import effective_time, in_window, sources_filter,
 from shared.database import get_session
 from shared.models import ApplicationError as ApplicationErrorRow
 from shared.models import (
+    Measurement,
+    Metric,
     Position,
     ProcessingStep,
     ProcessingTrace,
@@ -58,6 +60,20 @@ class PositionRead(BaseModel):
     valid: bool = True
     curated_fields: list[str] = Field(default_factory=list)
     curation_version: int = 1
+
+
+class MetricSummaryRead(BaseModel):
+    """One metric a device or an entity reported in the window (Tim, 2026-09-20): the newest
+    reading with its time, and how many readings the window holds."""
+
+    metric_key: str
+    label: str
+    unit: str | None
+    value_type: str
+    category: str
+    value: float | bool | str | None
+    time: datetime
+    count: int
 
 
 class DeliveryRead(BaseModel):
@@ -251,6 +267,88 @@ async def list_positions(
         statement = statement.where(Position.entity_id == entity_id)
     rows = await session.scalars(statement.order_by(effective_time(Position).desc()).limit(limit))
     return [position_read(r) for r in rows]
+
+
+@router.get("/projects/{project_id}/measurements/summary", response_model=list[MetricSummaryRead])
+async def measurement_summary(
+    device_id: uuid.UUID | None = None,
+    entity_id: uuid.UUID | None = None,
+    days: int = Query(30, ge=1, le=366),
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> list[MetricSummaryRead]:
+    """Every metric a device or an entity reported in the last `days`, with its newest reading
+    and its count (Tim, 2026-09-20): the table of processed metrics on the Data tab, beside the
+    positions and the events. Valid rows only, the effective value, attributed to the project."""
+    if (device_id is None) == (entity_id is None):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "give device_id or entity_id, not both"
+        )
+    since = utc_now() - timedelta(days=days)
+    owner = (
+        Measurement.device_id == device_id
+        if device_id is not None
+        else Measurement.entity_id == entity_id
+    )
+    where = [
+        Measurement.project_id == context.project.id,
+        context.visibility.rows(Measurement.entity_id, Measurement.device_id),
+        in_window(Measurement, since, None),
+        visible(Measurement),
+        owner,
+    ]
+    counts = (
+        await session.execute(
+            select(Measurement.metric_key, func.count())
+            .where(*where)
+            .group_by(Measurement.metric_key)
+        )
+    ).all()
+    if not counts:
+        return []
+    newest = (
+        await session.execute(
+            select(Measurement)
+            .distinct(Measurement.metric_key)
+            .where(*where)
+            .order_by(Measurement.metric_key, effective_time(Measurement).desc())
+        )
+    ).scalars()
+    registry = {
+        m.key: m
+        for m in (
+            await session.scalars(select(Metric).where(Metric.key.in_([key for key, _ in counts])))
+        ).all()
+    }
+    by_key: dict[str, int] = {str(key): int(n) for key, n in counts}
+    out: list[MetricSummaryRead] = []
+    for row in newest:
+        metric = registry.get(row.metric_key)
+        value: float | bool | str | None
+        if row.curated_value_num is not None:
+            value = row.curated_value_num
+        elif row.value_num is not None:
+            value = row.value_num
+        elif row.value_bool is not None:
+            value = row.value_bool
+        elif row.value_text is not None:
+            value = row.value_text
+        else:
+            value = None
+        out.append(
+            MetricSummaryRead(
+                metric_key=row.metric_key,
+                label=metric.label if metric else row.metric_key.replace("_", " "),
+                unit=metric.unit if metric else None,
+                value_type=metric.value_type if metric else "numeric",
+                category=metric.category if metric else "uncategorized",
+                value=value,
+                time=row.curated_time or row.time,
+                count=int(by_key.get(row.metric_key, 0)),
+            )
+        )
+    out.sort(key=lambda m: (m.category, m.label))
+    return out
 
 
 async def _device_visible(session: AsyncSession, user: User, device_id: uuid.UUID | None) -> bool:

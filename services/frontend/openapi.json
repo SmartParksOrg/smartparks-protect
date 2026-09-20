@@ -8994,6 +8994,105 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/measurements/summary": {
+   "get": {
+    "tags": [
+     "data"
+    ],
+    "summary": "Measurement Summary",
+    "description": "Every metric a device or an entity reported in the last `days`, with its newest reading\nand its count (Tim, 2026-09-20): the table of processed metrics on the Data tab, beside the\npositions and the events. Valid rows only, the effective value, attributed to the project.",
+    "operationId": "measurement_summary_api_v1_projects__project_id__measurements_summary_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "entity_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "days",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 366,
+       "minimum": 1,
+       "default": 30,
+       "title": "Days"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/MetricSummaryRead"
+         },
+         "title": "Response Measurement Summary Api V1 Projects  Project Id  Measurements Summary Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/source-events/{source_event_id}": {
    "get": {
     "tags": [
@@ -35665,6 +35764,76 @@
      "created_at"
     ],
     "title": "MetricRead"
+   },
+   "MetricSummaryRead": {
+    "properties": {
+     "metric_key": {
+      "type": "string",
+      "title": "Metric Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "value_type": {
+      "type": "string",
+      "title": "Value Type"
+     },
+     "category": {
+      "type": "string",
+      "title": "Category"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     },
+     "time": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Time"
+     },
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     }
+    },
+    "type": "object",
+    "required": [
+     "metric_key",
+     "label",
+     "unit",
+     "value_type",
+     "category",
+     "value",
+     "time",
+     "count"
+    ],
+    "title": "MetricSummaryRead",
+    "description": "One metric a device or an entity reported in the window (Tim, 2026-09-20): the newest\nreading with its time, and how many readings the window holds."
    },
    "MetricUpdate": {
     "properties": {

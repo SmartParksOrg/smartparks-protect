@@ -54,6 +54,7 @@ import { AssignEntityDialog } from "@/components/devices/AssignEntityDialog";
 import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
+import { MeasurementsCard } from "@/components/data/MeasurementsCard";
 import { BatteryCard } from "@/components/devices/BatteryCard";
 import { TrapCard } from "@/components/devices/TrapCard";
 import { BleAddress } from "@/components/devices/BleAddress";
@@ -796,6 +797,18 @@ export function DevicePage() {
                 <ContactsCard
                   deviceId={d.id}
                   canScan={type?.driver_key !== "ble_tag"}
+                />
+              )}
+              {projectId && (
+                <MeasurementsCard
+                  className="lg:col-span-2"
+                  projectId={projectId}
+                  deviceId={d.id}
+                  trendDeviceId={d.id}
+                  recordsTo={recordsHref(projectId, {
+                    devices: [d.id],
+                    at: around.at,
+                  })}
                 />
               )}
               {projectId && (

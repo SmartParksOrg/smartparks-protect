@@ -152,3 +152,4 @@ export type FenceStatus = Schemas["FenceStatusRead"];
 export type EntityFence = Schemas["EntityFenceRead"];
 export type DeviceTrap = Schemas["DeviceTrap"];
 export type FenceMonitorItem = Schemas["FenceMonitorRead"];
+export type MetricSummary = Schemas["MetricSummaryRead"];

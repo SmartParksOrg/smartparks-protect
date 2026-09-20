@@ -39,6 +39,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
+import { MeasurementsCard } from "@/components/data/MeasurementsCard";
 import { FenceLineCard } from "@/components/entities/FenceLineCard";
 import {
   Table,
@@ -641,6 +642,16 @@ export function EntityPage() {
               </Button>
             </div>
             <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+              <MeasurementsCard
+                className="lg:col-span-2"
+                projectId={projectId}
+                entityId={e.id}
+                trendDeviceId={current?.device_id ?? null}
+                recordsTo={recordsHref(projectId, {
+                  entities: [e.id],
+                  at: around.at,
+                })}
+              />
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("Recent events")}</CardTitle>

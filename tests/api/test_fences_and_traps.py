@@ -406,3 +406,37 @@ async def test_a_monitor_dropped_near_the_line_lands_on_it(client, db, bus):
         headers=h,
     )
     assert refused.status_code == 422
+
+
+async def test_the_data_tab_lists_every_metric_with_its_newest_reading(client, db, bus):
+    """Tim, 2026-09-20: a table of the processed metrics beside the positions and the events,
+    per device and per entity, with the newest reading and the count over the window."""
+    admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    h = admin.headers
+    device, entity_id, source, identity = await _device(
+        client,
+        db,
+        project,
+        admin,
+        entity_type_key="fence_monitor",
+        name=unique_name("M"),
+        place=(4.6, 52.5),
+    )
+    await _deliver(db, bus, source, identity, 12, fence_frame(6500, 5))
+    await _deliver(db, bus, source, identity, 12, fence_frame(6200, 4))
+    await db.rollback()
+    base = f"/api/v1/projects/{project.id}/measurements/summary"
+    by_device = (await client.get(base, params={"device_id": device["id"]}, headers=h)).json()
+    keys = {m["metric_key"]: m for m in by_device}
+    assert {"fence_voltage", "fence_pulse_count", "fence_energy"} <= set(keys)
+    assert keys["fence_voltage"]["value"] == 6200 and keys["fence_voltage"]["count"] == 2
+    assert (
+        keys["fence_voltage"]["unit"] == "V" and keys["fence_voltage"]["label"] == "Fence voltage"
+    )
+    by_entity = (await client.get(base, params={"entity_id": entity_id}, headers=h)).json()
+    assert {m["metric_key"] for m in by_entity} == set(keys)
+    both = await client.get(
+        base, params={"entity_id": entity_id, "device_id": device["id"]}, headers=h
+    )
+    assert both.status_code == 422
