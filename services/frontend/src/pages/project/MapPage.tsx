@@ -187,6 +187,9 @@ function fitGeometry(
   if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
 }
 
+/** Where a project's map was left: longitude, latitude, zoom. */
+type MapView = [number, number, number];
+
 interface CurrentFeature {
   type: "Feature";
   id: string;
@@ -264,6 +267,13 @@ export function MapPage() {
   const { maptilerKey } = useMapConfig();
   const basemaps = useMemo(() => basemapsFor(maptilerKey), [maptilerKey]);
   const [terrainOn, setTerrainOn] = usePreference<boolean>("terrain", false);
+  // where the person left the map, per project (Tim, 2026-09-20): the next visit opens there
+  // instead of fitting to everything; three numbers per project on the account
+  const [mapViews, setMapViews] = usePreference<Record<string, MapView>>(
+    "map_view",
+    {},
+  );
+  const rememberedView = projectId ? mapViews[projectId] : undefined;
   const container = useRef<HTMLDivElement | null>(null);
   const { resolved: resolvedTheme } = useTheme();
   const { mapRef, ready, stripHost, zoomHost } = useMap(
@@ -1170,6 +1180,20 @@ export function MapPage() {
             .join(","),
           zoom: Math.round(map.getZoom()),
         });
+        if (!projectId) return;
+        // the view the person sees now is the one the next visit opens with; read the
+        // document fresh so a pan never writes an older copy of the other projects' views
+        const c = map.getCenter();
+        const view: MapView = [
+          Number(c.lng.toFixed(5)),
+          Number(c.lat.toFixed(5)),
+          Number(map.getZoom().toFixed(2)),
+        ];
+        const known = (useAuthStore.getState().user?.preferences?.map_view ??
+          {}) as Record<string, MapView>;
+        const before = known[projectId];
+        if (before && before.every((v, i) => v === view[i])) return;
+        setMapViews({ ...known, [projectId]: view });
       }, 600);
     };
     update();
@@ -1178,7 +1202,7 @@ export function MapPage() {
       map.off("moveend", update);
       if (timer) clearTimeout(timer);
     };
-  }, [mapRef, ready]);
+  }, [mapRef, ready, projectId, setMapViews]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1322,6 +1346,12 @@ export function MapPage() {
       });
       return;
     }
+    // back where the person left this project's map; a first visit fits everything
+    if (rememberedView) {
+      const [lng, lat, zoom] = rememberedView;
+      map.jumpTo({ center: [lng, lat], zoom });
+      return;
+    }
     const bounds = boundsOf([
       ...(currentFeatures ?? []),
       ...(deviceFeatures ?? []),
@@ -1340,6 +1370,7 @@ export function MapPage() {
     featureParamValue,
     selectedId,
     selectedDeviceId,
+    rememberedView,
   ]);
 
   // a "show on map" link lands on a visible object (phase 19): the object and its layer are
