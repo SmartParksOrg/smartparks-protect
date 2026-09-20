@@ -139,6 +139,26 @@ const FIXED: RecordColumn[] = [
   { key: "time", label: t("Time"), kind: "fixed", numeric: false },
   { key: "entity", label: t("Entity"), kind: "fixed", numeric: false },
   { key: "device", label: t("Device"), kind: "fixed", numeric: false },
+  // where a record came from, on by default (Tim, 2026-09-20)
+  {
+    key: "device_type",
+    label: t("Device type"),
+    kind: "fixed",
+    numeric: false,
+  },
+  {
+    key: "data_source",
+    label: t("Data source"),
+    kind: "fixed",
+    numeric: false,
+  },
+  { key: "kinds", label: t("Records"), kind: "fixed", numeric: false },
+  {
+    key: "record_type",
+    label: t("Position kind"),
+    kind: "fixed",
+    numeric: false,
+  },
   { key: "lat", label: t("Latitude"), kind: "fixed", numeric: true },
   { key: "lon", label: t("Longitude"), kind: "fixed", numeric: true },
   {
@@ -162,35 +182,7 @@ const FIXED: RecordColumn[] = [
     kind: "fixed",
     numeric: true,
   },
-  // the metadata a reader adds when the question is where a record came from
-  {
-    key: "kinds",
-    label: t("Records"),
-    kind: "fixed",
-    numeric: false,
-    extra: true,
-  },
-  {
-    key: "record_type",
-    label: t("Position kind"),
-    kind: "fixed",
-    numeric: false,
-    extra: true,
-  },
-  {
-    key: "device_type",
-    label: t("Device type"),
-    kind: "fixed",
-    numeric: false,
-    extra: true,
-  },
-  {
-    key: "data_source",
-    label: t("Data source"),
-    kind: "fixed",
-    numeric: false,
-    extra: true,
-  },
+  // the identifiers, added when a question needs them
   {
     key: "device_id",
     label: t("Device id"),

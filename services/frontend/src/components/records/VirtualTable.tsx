@@ -18,9 +18,11 @@ const FILTER_HEIGHT = 30;
 function cellWidth(c: RecordColumn): number {
   return c.key === "time"
     ? 170
-    : c.key === "entity" || c.key === "device"
+    : c.key === "entity" || c.key === "device" || c.key === "data_source"
       ? 150
-      : 110;
+      : c.key === "kinds" || c.key === "device_type"
+        ? 140
+        : 110;
 }
 
 /** The records table, virtualized (decision D143): only the rows in view render, so a year of

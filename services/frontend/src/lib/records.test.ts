@@ -130,15 +130,15 @@ describe("records columns", () => {
       "time",
       "entity",
       "device",
+      "device_type",
+      "data_source",
+      "kinds",
+      "record_type",
       "lat",
       "lon",
       "accuracy_m",
       "speed_kmh",
       "altitude_m",
-      "kinds",
-      "record_type",
-      "device_type",
-      "data_source",
       "device_id",
       "entity_id",
       "source_event",
@@ -310,13 +310,15 @@ describe("records order and filters", () => {
     expect(filterRows(rows, columns, { device: "" })).toHaveLength(3);
     expect(matchesFilter(null, "x", false)).toBe(false);
   });
-  it("keeps the metadata columns off until added", () => {
+  it("shows where a record came from and keeps the identifiers off until added", () => {
     const keys = shownColumns(columns, [], []).map((c) => c.key);
     expect(keys[0]).toBe("time");
-    expect(keys).not.toContain("device_type");
-    expect(
-      shownColumns(columns, [], ["device_type"]).map((c) => c.key),
-    ).toContain("device_type");
+    expect(keys).toContain("device_type");
+    expect(keys).toContain("data_source");
+    expect(keys).not.toContain("trace_id");
+    expect(shownColumns(columns, [], ["trace_id"]).map((c) => c.key)).toContain(
+      "trace_id",
+    );
     expect(shownColumns(columns, ["lat"], []).map((c) => c.key)).not.toContain(
       "lat",
     );
