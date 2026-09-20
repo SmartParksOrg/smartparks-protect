@@ -2313,7 +2313,7 @@
   "The tenant has no application.": "The tenant has no application.",
   "The thresholds behind the levels": "The thresholds behind the levels",
   "The Trace explorer and the trace of a record.": "The Trace explorer and the trace of a record.",
-  "The trap's door over the period, 1 closed and 0 open": "The trap's door over the period, 1 closed and 0 open",
+  "The trap's door over the period, closed or open": "The trap's door over the period, closed or open",
   "The unnamed run": "The unnamed run",
   "The value before the correction comes back; the correction stays on file as reverted.": "The value before the correction comes back; the correction stays on file as reverted.",
   "The vegetation index per area from satellite imagery. It asks an outside provider and is the slowest part of the run; without it everything else is the same.": "The vegetation index per area from satellite imagery. It asks an outside provider and is the slowest part of the run; without it everything else is the same.",

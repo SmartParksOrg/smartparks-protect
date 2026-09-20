@@ -64,7 +64,9 @@ export function BatteryValue({
         percent: percent ?? 0,
         type: batteryTypeLabel(batteryType, t),
       })
-    : t("No battery type known for this device, so the voltage is judged by the driver.");
+    : t(
+        "No battery type known for this device, so the voltage is judged by the driver.",
+      );
   if (!deviceId)
     return (
       <span className={className} title={explain}>
@@ -344,7 +346,10 @@ export function MetricTrend({
       spec.step ??
         niceStep(Math.min(...values, Infinity), Math.max(...values, -Infinity)),
     );
-  const show = (v: number) => `${v.toFixed(decimals)} ${spec.unit}`;
+  const show = (v: number) =>
+    spec.words?.[Math.round(v)] !== undefined && Number.isInteger(v)
+      ? spec.words[Math.round(v)]
+      : `${v.toFixed(decimals)} ${spec.unit}`;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -470,8 +475,17 @@ function Sparkline({
     const steps = Math.max(1, Math.round((high - low) / step));
     const parts =
       steps <= 3 ? steps : ([3, 2].find((n) => steps % n === 0) ?? 3);
-    const interval = Math.ceil(steps / parts) * step;
+    let interval = Math.ceil(steps / parts) * step;
     high = low + interval * parts;
+    if (spec.ceiling !== undefined) {
+      // a fixed top: a door is 0 or 1, and an axis that runs to 2 says nothing
+      high = spec.ceiling;
+      interval = step;
+    }
+    const label = (v: number): string =>
+      spec.words?.[Math.round(v)] !== undefined && Number.isInteger(v)
+        ? spec.words[Math.round(v)]
+        : `${v.toFixed(decimals)}${spec.unit ? ` ${spec.unit}` : ""}`;
     instance.setOption(
       {
         animation: false,
@@ -483,7 +497,7 @@ function Sparkline({
           formatter: (params: unknown) => {
             const p = (params as { value: [number, number | null] }[])[0];
             if (!p) return "";
-            return `${formatInZone(new Date(p.value[0]).toISOString(), timezone)}<br/>${p.value[1] == null ? "" : p.value[1].toFixed(decimals)} ${spec.unit}`;
+            return `${formatInZone(new Date(p.value[0]).toISOString(), timezone)}<br/>${p.value[1] == null ? "" : label(p.value[1])}`;
           },
         },
         xAxis: {
@@ -506,7 +520,8 @@ function Sparkline({
           axisLabel: {
             color: th.text,
             fontSize: 10,
-            formatter: (v: number) => v.toFixed(decimals),
+            formatter: (v: number) =>
+              spec.words ? label(v) : v.toFixed(decimals),
           },
           splitLine: { lineStyle: { color: th.grid } },
         },
@@ -514,6 +529,7 @@ function Sparkline({
           {
             type: "line",
             data: points,
+            step: spec.stepped ? "end" : undefined,
             showSymbol: false,
             connectNulls: true,
             lineStyle: { width: 1.5, color: "#52735E" },

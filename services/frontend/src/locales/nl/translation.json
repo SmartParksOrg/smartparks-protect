@@ -1885,7 +1885,7 @@
   "The stretch of fence this monitor watches. The line reads its status from the monitors on it, section by section.": "Het stuk hek dat deze bewaker in de gaten houdt. De lijn leest haar status af van de bewakers erop, sectie voor sectie.",
   "The tenant has no application.": "De tenant heeft geen applicatie.",
   "The thresholds behind the levels": "De drempels achter de niveaus",
-  "The trap's door over the period, 1 closed and 0 open": "De deur van de val over de periode, 1 dicht en 0 open",
+  "The trap's door over the period, closed or open": "De deur van de val over de periode, dicht of open",
   "The unnamed run": "De naamloze analyse",
   "The value before the correction comes back; the correction stays on file as reverted.": "De waarde van voor de correctie komt terug; de correctie blijft bewaard als teruggedraaid.",
   "The vegetation index per area from satellite imagery. It asks an outside provider and is the slowest part of the run; without it everything else is the same.": "De vegetatie-index per gebied uit satellietbeelden. Die vraagt een externe provider en is het traagste deel van de analyse; zonder die laag blijft de rest gelijk.",

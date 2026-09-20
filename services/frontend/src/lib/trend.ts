@@ -13,6 +13,12 @@ export interface TrendSpec {
   floor?: number;
   /** A factor on the stored value before it is shown (seconds to days for the uptime). */
   scale?: number;
+  /** A fixed top for the axis: a trap's door is 0 or 1 and nothing above. */
+  ceiling?: number;
+  /** Words for the values instead of numbers (0 open, 1 closed), on the axis and the tooltip. */
+  words?: Record<number, string>;
+  /** Drawn as steps rather than slopes: a door is open or shut, never half way. */
+  stepped?: boolean;
   ariaLabel: string;
 }
 
@@ -93,7 +99,10 @@ SPECIAL.trap_triggered = (t) => ({
   decimals: 0,
   step: 1,
   floor: 0,
-  ariaLabel: t("The trap's door over the period, 1 closed and 0 open"),
+  ceiling: 1,
+  words: { 0: t("open"), 1: t("closed") },
+  stepped: true,
+  ariaLabel: t("The trap's door over the period, closed or open"),
 });
 SPECIAL.movement = SPECIAL.activity;
 

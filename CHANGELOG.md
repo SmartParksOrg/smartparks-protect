@@ -20,6 +20,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- The trap's trend ran its axis to 2 for a door that is 0 or 1 (Tim, 2026-09-20). It reads open and closed now, on the axis and in the tooltip, drawn as steps, with nothing above closed.
+
 - Choosing the fence type in the New feature dialog left the page blank (Tim, 2026-09-19). The dialog's drawing map remounts on a change of type, React removes the map before the drawing session, and the session's teardown then reached for layers that were gone. The teardown tolerates a map that is already gone.
 
 - An entity's page showed no map for an entity whose device has a place set by hand: the small map draws position rows and a fixed place has none. It takes the current position instead when there is nothing else to draw. (Tim, 2026-09-19.)
