@@ -71,8 +71,10 @@ async def list_projects(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> PageResponse[ProjectWithRole]:
-    """Projects the caller can open, with the caller's role. Server admins see all projects.
-    `organization_id` narrows the list to one grouping (decision D92)."""
+    """Projects the caller can open, with the caller's role. Server admins see all projects,
+    archived ones included, so the admin page can unarchive or delete them; a member's list
+    leaves archived projects out (decision D267). `organization_id` narrows the list to one
+    grouping (decision D92)."""
     if user.is_superuser:
         statement = select(Project)
         if organization_id is not None:
@@ -91,7 +93,7 @@ async def list_projects(
     statement = (
         select(Project)
         .join(ProjectMembership, ProjectMembership.project_id == Project.id)
-        .where(ProjectMembership.user_id == user.id)
+        .where(ProjectMembership.user_id == user.id, Project.archived_at.is_(None))
     )
     if organization_id is not None:
         statement = statement.where(Project.organization_id == organization_id)
@@ -163,6 +165,40 @@ async def get_project(context: ProjectContext = Depends(get_project_context)) ->
     return context.project
 
 
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_project(
+    project_id: uuid.UUID,
+    confirm: str,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Deletes a project for good (decision D267): only an archived one, and only when
+    `confirm` is the project's name, typed. Everything that is the project's goes with it:
+    entities, groups, features, rules, alerts, events, dashboards, memberships, exports,
+    analyses. Devices are server-level hardware and stay, released from the project with
+    their history; positions, measurements and traces stay too, no longer attributed to any
+    project. The audit log keeps the name."""
+    project = await get_or_404(session, Project, project_id, "Project")
+    if project.archived_at is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Archive the project before deleting it")
+    if confirm.strip() != project.name:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Type the project's name to confirm"
+        )
+    details = {"name": project.name, "slug": project.slug, "id": str(project.id)}
+    await session.delete(project)
+    await session.flush()
+    await record_audit(
+        session,
+        user=user,
+        action="project.deleted",
+        object_type="project",
+        object_id=str(project_id),
+        details=details,
+    )
+    await session.commit()
+
+
 @router.patch("/{project_id}", response_model=ProjectRead)
 async def update_project(
     body: ProjectUpdate,
@@ -173,12 +209,19 @@ async def update_project(
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "Only a server admin moves a project between organizations"
         )
+    archiving = "archived_at" in body.model_fields_set
+    if archiving and not context.is_server_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a server admin archives a project")
+    was_archived = context.project.archived_at is not None
     changed = apply_patch(context.project, body)
     await flush_or_409(session, "Project")
+    action = "project.updated"
+    if archiving and (context.project.archived_at is not None) != was_archived:
+        action = "project.archived" if context.project.archived_at else "project.unarchived"
     await record_audit(
         session,
         user=context.user,
-        action="project.updated",
+        action=action,
         object_type="project",
         object_id=str(context.project.id),
         project_id=context.project.id,

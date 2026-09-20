@@ -307,8 +307,10 @@ export interface paths {
         };
         /**
          * List Projects
-         * @description Projects the caller can open, with the caller's role. Server admins see all projects.
-         *     `organization_id` narrows the list to one grouping (decision D92).
+         * @description Projects the caller can open, with the caller's role. Server admins see all projects,
+         *     archived ones included, so the admin page can unarchive or delete them; a member's list
+         *     leaves archived projects out (decision D267). `organization_id` narrows the list to one
+         *     grouping (decision D92).
          */
         get: operations["list_projects_api_v1_projects_get"];
         put?: never;
@@ -331,7 +333,16 @@ export interface paths {
         get: operations["get_project_api_v1_projects__project_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Project
+         * @description Deletes a project for good (decision D267): only an archived one, and only when
+         *     `confirm` is the project's name, typed. Everything that is the project's goes with it:
+         *     entities, groups, features, rules, alerts, events, dashboards, memberships, exports,
+         *     analyses. Devices are server-level hardware and stay, released from the project with
+         *     their history; positions, measurements and traces stay too, no longer attributed to any
+         *     project. The audit log keeps the name.
+         */
+        delete: operations["delete_project_api_v1_projects__project_id__delete"];
         options?: never;
         head?: never;
         /** Update Project */
@@ -13260,6 +13271,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ProjectRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project_api_v1_projects__project_id__delete: {
+        parameters: {
+            query: {
+                confirm: string;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

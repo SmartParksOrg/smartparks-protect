@@ -19,7 +19,7 @@ export function ProjectsPage() {
         <div className="text-muted-foreground">{t("Loading projects…")}</div>
       </Page>
     );
-  const projects = data?.items ?? [];
+  const projects = (data?.items ?? []).filter((p) => !p.archived_at);
   const target = projects.find((p) => p.id === last) ?? projects[0];
   if (target) return <Navigate to={`/projects/${target.id}/map`} replace />;
   return (

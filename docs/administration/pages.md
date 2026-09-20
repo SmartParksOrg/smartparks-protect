@@ -50,6 +50,17 @@ and recovery, System alerts, Automations, Notifications, Projects, Users, Device
 sources, Gateways, Audit, AI policy, catalogues). The project pages are the same as a ranger's:
 to check what a ranger sees, sign in as one.
 
+Server admin, Projects lists every project with its organization, slug, timezone and when
+it was created or archived, with an organization filter, a "Show archived" switch and a New
+project button; a row opens the project's settings. Two buttons on a row (decision D267):
+Archive takes a project out of the switcher, the lists and All projects, its members can no
+longer open it and its rules stop, while everything stays and its devices keep reporting;
+Restore brings it back. An archived row also offers Delete, which asks for the project's name
+typed and then removes the project for good with everything that is its own (entities,
+groups, features, rules, alerts, events, dashboards, members, exports, analyses); devices are
+server hardware and stay, released from the project, and positions, measurements and traces
+stay without a project. The audit log keeps both acts with the name.
+
 Server admin, Users lists every account with its active and server admin switches and the
 open invitations. Its invite form takes one address, a Server admin box and a row per project
 (project, role built in or custom, what the person sees): one mail with one link, and

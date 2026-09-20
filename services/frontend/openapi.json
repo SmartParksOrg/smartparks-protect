@@ -924,7 +924,7 @@
      "projects"
     ],
     "summary": "List Projects",
-    "description": "Projects the caller can open, with the caller's role. Server admins see all projects.\n`organization_id` narrows the list to one grouping (decision D92).",
+    "description": "Projects the caller can open, with the caller's role. Server admins see all projects,\narchived ones included, so the admin page can unarchive or delete them; a member's list\nleaves archived projects out (decision D267). `organization_id` narrows the list to one\ngrouping (decision D92).",
     "operationId": "list_projects_api_v1_projects_get",
     "security": [
      {
@@ -1082,6 +1082,55 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "projects"
+    ],
+    "summary": "Delete Project",
+    "description": "Deletes a project for good (decision D267): only an archived one, and only when\n`confirm` is the project's name, typed. Everything that is the project's goes with it:\nentities, groups, features, rules, alerts, events, dashboards, memberships, exports,\nanalyses. Devices are server-level hardware and stay, released from the project with\ntheir history; positions, measurements and traces stay too, no longer attributed to any\nproject. The audit log keeps the name.",
+    "operationId": "delete_project_api_v1_projects__project_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "confirm",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Confirm"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",

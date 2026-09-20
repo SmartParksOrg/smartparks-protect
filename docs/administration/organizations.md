@@ -11,6 +11,8 @@ D21), and a server admin sees every project whatever its organization.
 - Project admin, Settings: server admins move a project between organizations there. Project
   admins see the field but cannot change it.
 - Removing an organization leaves its projects in place without a grouping.
+- Archiving and deleting a project are on the same page, per row: see
+  [the pages guide](pages.md#server-admin) for what each does.
 
 API: `GET`, `POST`, `PATCH` and `DELETE` under `/api/v1/admin/organizations`; `organization_id`
 on projects; `GET /api/v1/projects?organization_id=` filters the list, for server admins and

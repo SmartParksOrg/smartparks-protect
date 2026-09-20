@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, status
-from sqlalchemy import select, true
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.auth.users import current_active_user
@@ -70,13 +70,15 @@ class ScopeContext:
         return None if self.project is None else self.project.id
 
     def where(self, column: Any, *, unassigned: bool = False) -> Any:
-        """The project filter: one project, or any project at all (never the system scope of
-        events without a project). With `unassigned`, the all scope takes data that belongs to
-        no project as well (decision D120: a server admin sees inventory devices and their
-        positions until they are attributed, architecture 28.11)."""
+        """The project filter: one project, or any live project (never the system scope of
+        events without a project, and never an archived project, decision D267). With
+        `unassigned`, the all scope takes data that belongs to no project as well (decision
+        D120: a server admin sees inventory devices and their positions until they are
+        attributed, architecture 28.11)."""
         if self.project is not None:
             return column == self.project.id
-        return true() if unassigned else column.is_not(None)
+        live = select(Project.id).where(Project.archived_at.is_(None))
+        return or_(column.is_(None), column.in_(live)) if unassigned else column.in_(live)
 
 
 async def get_scope_context(
@@ -160,6 +162,8 @@ async def get_project_context(
     role, permissions, visibility = await membership_access(session, user, project_id)
     if role is None and not user.is_superuser:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No access to this project")
+    if project.archived_at is not None and not user.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This project is archived")
     return ProjectContext(
         user=user,
         project=project,

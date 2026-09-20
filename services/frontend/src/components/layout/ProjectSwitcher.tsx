@@ -19,7 +19,8 @@ export function ProjectSwitcher() {
   const navigate = useNavigate();
   const setLast = useProjectStore((s) => s.setLastProjectId);
   const [open, setOpen] = useState(false);
-  const projects = data?.items ?? [];
+  // an archived project is not somewhere to go; server admins find it under Projects
+  const projects = (data?.items ?? []).filter((p) => !p.archived_at);
   const user = useAuthStore((s) => s.user);
   const all = isAllProjects(projectId);
   const current = projects.find((p) => p.id === projectId);

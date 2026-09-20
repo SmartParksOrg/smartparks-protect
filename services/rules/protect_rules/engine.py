@@ -26,6 +26,7 @@ from shared.models import (
     Entity,
     Measurement,
     Position,
+    Project,
     Rule,
     RuleState,
     RuleVersion,
@@ -112,7 +113,8 @@ class RuleCache:
                     (RuleVersion.rule_id == Rule.id)
                     & (RuleVersion.version == Rule.current_version),
                 )
-                .where(Rule.enabled.is_(True))
+                .join(Project, Project.id == Rule.project_id)
+                .where(Rule.enabled.is_(True), Project.archived_at.is_(None))
             )
             loaded: dict[uuid.UUID, list[LoadedRule]] = {}
             for rule, version in rows:

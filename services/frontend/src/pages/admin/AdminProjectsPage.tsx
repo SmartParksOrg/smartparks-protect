@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Building2, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Building2, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -41,6 +43,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { cn } from "@/lib/utils";
 import { formatTime } from "@/lib/format";
 
 const schema = z.object({
@@ -75,16 +78,47 @@ export function AdminProjectsPage() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<string>(ALL);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiving, setArchiving] = useState<ProjectWithRole | null>(null);
+  const [deleting, setDeleting] = useState<ProjectWithRole | null>(null);
   const organizationById = useMemo(
     () => new Map(organizations.data?.map((o) => [o.id, o])),
     [organizations.data],
   );
+  const archivedCount = useMemo(
+    () => (projects.data?.items ?? []).filter((p) => p.archived_at).length,
+    [projects.data],
+  );
   const visible = useMemo(() => {
-    const items = projects.data?.items ?? [];
-    if (filter === ALL) return items;
+    let items = projects.data?.items ?? [];
+    if (!showArchived) items = items.filter((p) => !p.archived_at);
     if (filter === NONE) return items.filter((p) => !p.organization_id);
-    return items.filter((p) => p.organization_id === filter);
-  }, [projects.data, filter]);
+    if (filter !== ALL) return items.filter((p) => p.organization_id === filter);
+    return items;
+  }, [projects.data, filter, showArchived]);
+  const archive = useMutationToast({
+    mutationFn: (project: ProjectWithRole) =>
+      api.patch<Project>(`/api/v1/projects/${project.id}`, {
+        body: {
+          archived_at: project.archived_at ? null : new Date().toISOString(),
+        },
+      }),
+    invalidate: [queryKeys.projects],
+    success: (project) =>
+      project.archived_at
+        ? t("Project archived; its members no longer see it")
+        : t("Project restored"),
+    onSuccess: () => setArchiving(null),
+  });
+  const remove = useMutationToast({
+    mutationFn: (project: ProjectWithRole) =>
+      api.delete<void>(`/api/v1/projects/${project.id}`, {
+        query: { confirm: project.name },
+      }),
+    invalidate: [queryKeys.projects, queryKeys.organizations],
+    success: t("Project deleted"),
+    onSuccess: () => setDeleting(null),
+  });
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -131,6 +165,48 @@ export function AdminProjectsPage() {
       accessorKey: "archived_at",
       cell: ({ getValue }) => formatTime(getValue<string | null>()),
     },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={
+              row.original.archived_at ? t("Restore project") : t("Archive project")
+            }
+            title={
+              row.original.archived_at ? t("Restore project") : t("Archive project")
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              setArchiving(row.original);
+            }}
+          >
+            {row.original.archived_at ? (
+              <ArchiveRestore className="size-4" />
+            ) : (
+              <Archive className="size-4" />
+            )}
+          </Button>
+          {row.original.archived_at && (
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={t("Delete project")}
+              title={t("Delete project")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleting(row.original);
+              }}
+            >
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
   ];
   return (
     <>
@@ -161,16 +237,59 @@ export function AdminProjectsPage() {
               ))}
             </SelectContent>
           </Select>
+          <Label className="flex items-center gap-2 text-sm font-normal">
+            <Switch
+              checked={showArchived}
+              onCheckedChange={setShowArchived}
+              aria-label={t("Show archived projects")}
+            />
+            {t("Show archived ({{count}})", { count: archivedCount })}
+          </Label>
         </div>
         <DataTable
           columns={columns}
           data={visible}
           searchable
           isLoading={projects.isPending}
+          rowClassName={(p) => cn(p.archived_at && "text-muted-foreground")}
           onRowClick={(p) => navigate(`/projects/${p.id}/admin/settings`)}
         />
         <OrganizationsCard organizations={organizations.data ?? []} />
       </Page>
+      <ConfirmDialog
+        open={archiving !== null}
+        onOpenChange={(open) => {
+          if (!open) setArchiving(null);
+        }}
+        title={
+          archiving?.archived_at ? t("Restore project") : t("Archive project")
+        }
+        description={
+          archiving?.archived_at
+            ? t(
+                "{{name}} comes back for its members, in the switcher and in All projects, and its rules run again.",
+                { name: archiving.name },
+              )
+            : t(
+                "{{name}} leaves the switcher, the lists and All projects, its members can no longer open it and its rules stop; everything stays and a server admin can restore it. Its devices keep reporting.",
+                { name: archiving?.name ?? "" },
+              )
+        }
+        confirmLabel={archiving?.archived_at ? t("Restore") : t("Archive")}
+        destructive={!archiving?.archived_at}
+        pending={archive.isPending}
+        onConfirm={() => {
+          if (archiving) archive.mutate(archiving);
+        }}
+      />
+      <DeleteProjectDialog
+        project={deleting}
+        pending={remove.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (deleting) remove.mutate(deleting);
+        }}
+      />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -276,6 +395,84 @@ export function AdminProjectsPage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** A delete is for good, so the name is typed (decision D267). */
+function DeleteProjectDialog({
+  project,
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  project: ProjectWithRole | null;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useTranslation();
+  const [typed, setTyped] = useState("");
+  const matches = project !== null && typed.trim() === project.name;
+  return (
+    <Dialog
+      open={project !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setTyped("");
+          onClose();
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("Delete project")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p>
+            {t(
+              "Everything that is the project's goes with it: entities, groups, features, rules, alerts, events, dashboards, members, exports and analyses. This cannot be undone.",
+            )}
+          </p>
+          <p className="text-muted-foreground">
+            {t(
+              "Devices are kept and released from the project with their history; positions, measurements and traces stay, no longer attributed to a project.",
+            )}
+          </p>
+          <Field
+            label={t("Type the project's name to confirm")}
+            htmlFor="delete-project-name"
+            hint={project?.name ?? ""}
+          >
+            <Input
+              id="delete-project-name"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setTyped("");
+              onClose();
+            }}
+          >
+            {t("Cancel")}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={!matches || pending}
+            onClick={onConfirm}
+          >
+            {t("Delete for good")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
