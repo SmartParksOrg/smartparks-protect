@@ -7,9 +7,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import update
 
 from shared.enums import Role
-from shared.models import Measurement
+from shared.models import Measurement, Position
 from tests.api.conftest import actor, create_project, project_actor
 from tests.api.test_network_and_map import _feed, _setup, bus  # noqa: F401
 
@@ -128,3 +129,31 @@ async def test_records_rows_pages_and_count(client, db, bus):  # noqa: F811
         headers=superuser.headers,
     )
     assert everywhere.status_code == 200 and len(everywhere.json()["items"]) == 4
+
+
+async def test_a_positions_route_fills_the_via_column(client, db, bus):  # noqa: F811
+    """A status message stores the route it came by on its state and a position on its
+    attributes; the row shows both under `via`, so the column is not empty on every position
+    row (Tim, 2026-09-20). The moment does not count as a state record for it."""
+    admin, project, entity, source, device, external_id = await _setup(client, db)
+    when = datetime(2026, 4, 1, 12, 0, tzinfo=UTC)
+    await _feed(db, bus, source["id"], external_id, when, -24.9, 31.5)
+    await db.execute(
+        update(Position)
+        .where(Position.device_id == uuid.UUID(device["id"]))
+        .values(attributes={"via": "flash_log", "port": 5})
+    )
+    await db.commit()
+    page = await client.get(
+        f"/api/v1/projects/{project.id}/records",
+        params={
+            "from": (when - timedelta(hours=1)).isoformat(),
+            "to": (when + timedelta(hours=1)).isoformat(),
+            "entity_id": entity["id"],
+        },
+        headers=admin.headers,
+    )
+    assert page.status_code == 200, page.text
+    (row,) = page.json()["items"]
+    assert row["state"] == {"via": "flash_log"}
+    assert row["kinds"] == ["position", "measurement"]

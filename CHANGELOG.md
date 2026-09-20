@@ -34,6 +34,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- The Data explorer's `via` column shows the route a position came by as well as a status message's (Tim, 2026-09-20): it read as empty on every position row, which looked like missing data. Only status messages store the route on the state; a position stores it on its attributes, and the row now shows either. The moment does not count as a state record for it, and a records export gets the column whenever a position in the window carries a route.
+
 - The fence line's panel on the live map reads as one line per section — the range and the monitors at its ends — with each monitor's voltage chart folded behind its reading, instead of every word wrapping in the narrow value column and three charts stacked open (Tim, 2026-09-19, after looking at it on a phone, a tablet and a desktop).
 
 - A GPS attempt that got no fix no longer raises a device error event (Tim, 2026-09-19). The `ublox_fix` flag is a fact about the sky and the antenna, not about the device, and it comes with every status of a device under canopy; an event on each one drowned the flag that matters, `ublox`, which says the receiver itself did not answer and usually needs a person to go and look. The flag stays in the state, on the health card and in the device performance figures; it only raises no event, so no automation fires on it.

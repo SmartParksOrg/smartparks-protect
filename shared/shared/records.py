@@ -127,8 +127,15 @@ async def metric_keys(session: AsyncSession, selection: RecordSelection) -> list
     return [row[0] for row in rows.all()]
 
 
+#: The route a record came by (`lorawan`, `webble`, `flash_log`): a status message stores it
+#: on its state, a position on its attributes. The row shows both under the one state column,
+#: because a `via` that is empty on every position row read as missing data (Tim, 2026-09-20).
+ROUTE_KEY = "via"
+
+
 async def state_keys(session: AsyncSession, selection: RecordSelection) -> list[str]:
-    """The state fields the selection's devices reported in the window."""
+    """The state fields the selection's devices reported in the window, and the route when
+    a position carries one."""
     devices: Any = select(Measurement.device_id).where(*conditions(Measurement, selection))
     if selection.device_ids:
         devices = devices.union(select(Device.id).where(Device.id.in_(selection.device_ids)))
@@ -142,7 +149,25 @@ async def state_keys(session: AsyncSession, selection: RecordSelection) -> list[
         .group_by("k")
         .order_by("k")
     )
-    return [row[0] for row in rows.all()]
+    keys = [row[0] for row in rows.all()]
+    if ROUTE_KEY not in keys:
+        routed = await session.scalar(
+            select(Position.id)
+            .where(*conditions(Position, selection), Position.attributes.has_key(ROUTE_KEY))
+            .limit(1)
+        )
+        if routed is not None:
+            keys = sorted([*keys, ROUTE_KEY])
+    return keys
+
+
+def state_of(state: dict[str, Any] | None, position: Position | None) -> dict[str, Any] | None:
+    """The state fields a row shows: the state reported at that moment, with the position's
+    route filled in under `via` when the moment has no state saying otherwise."""
+    route = position.attributes.get(ROUTE_KEY) if position is not None else None
+    if route is None or (state is not None and state.get(ROUTE_KEY) is not None):
+        return state
+    return {**(state or {}), ROUTE_KEY: route}
 
 
 def value_of(m: Measurement) -> Any:
@@ -286,7 +311,7 @@ async def fill(session: AsyncSession, selection: RecordSelection, keys: list[Key
                 lat=found[1] if found else None,
                 lon=found[2] if found else None,
                 measurements=measurements.get(key, {}),
-                state=states.get(key),
+                state=state_of(states.get(key), found[0] if found else None),
                 source_event_id=owner.source_event_id if owner else None,
                 source_event_ingested_at=owner.source_event_ingested_at if owner else None,
                 trace_id=owner.trace_id if owner else None,
