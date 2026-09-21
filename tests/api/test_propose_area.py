@@ -58,6 +58,43 @@ async def test_a_click_answers_candidates(client, db, monkeypatch):
     assert refused.status_code == 403
 
 
+async def test_a_dragged_box_is_read_and_a_big_one_is_refused(client, db, monkeypatch):
+    """Decision D277: a drag says exactly what to read, and a box past the limit never
+    reaches OpenStreetMap, since a read that big comes back as a refusal anyway."""
+    project = await create_project(db)
+    admin = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    asked: list[str] = []
+
+    async def fake_fetch(url: str, query: str) -> dict:
+        asked.append(query)
+        return json.loads(FIXTURE.read_text())
+
+    monkeypatch.setattr("protect_api.routers.entities.fetch_overpass", fake_fetch)
+    dragged = await client.post(
+        f"/api/v1/projects/{project.id}/features/propose",
+        json={"west": 4.6060, "south": 52.5280, "east": 4.6150, "north": 52.5330},
+        headers=admin.headers,
+    )
+    assert dragged.status_code == 200, dragged.text
+    assert dragged.json()["candidates"]
+    assert "(52.528000,4.606000,52.533000,4.615000)" in asked[0]
+
+    too_big = await client.post(
+        f"/api/v1/projects/{project.id}/features/propose",
+        json={"west": 4.40, "south": 52.30, "east": 4.75, "north": 52.55},
+        headers=admin.headers,
+    )
+    assert too_big.status_code == 422 and "km²" in too_big.text
+    assert len(asked) == 1, "a box too large is refused without asking OpenStreetMap"
+
+    neither = await client.post(
+        f"/api/v1/projects/{project.id}/features/propose",
+        json={"radius_m": 800},
+        headers=admin.headers,
+    )
+    assert neither.status_code == 422
+
+
 async def test_an_unanswering_overpass_is_a_502_with_the_reason(client, db, monkeypatch):
     project = await create_project(db)
     admin = await project_actor(client, db, project, Role.PROJECT_ADMIN)

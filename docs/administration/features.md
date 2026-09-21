@@ -31,11 +31,24 @@ WGS 84 is reprojected when its `.prj` file is in the zip.
 
 Most areas are already marked on the ground: a block between two roads and a river, a fenced
 camp, a forest or a lake the map knows. Under "New feature" for a zone or a geofence, and in
-the live map's draw tool, "Propose" turns a click into candidates instead of a vertex: the
-server reads OpenStreetMap's roads, tracks, rivers, fences and railways in a box of 1.5 km
-around the click, joins them into the faces they enclose, and answers the face that contains
-the point together with every OpenStreetMap area that contains it (a protected area, a forest,
-a lake, a landuse), smallest first, with its size. The ways people walk on — footpaths, paths,
+the live map's draw tool, "Propose" turns a gesture into candidates instead of a vertex.
+
+**A click** reads a box of 1.5 km around the point; **dragging** reads the box you draw. Either
+way the box is on the map before it is read and its size is named in square kilometres, so
+what is being asked for is never a guess. The server joins OpenStreetMap's roads, tracks,
+rivers, fences and railways inside it into the faces they enclose, and answers the face that
+contains the middle of the box together with every OpenStreetMap area that contains it (a
+protected area, a forest, a lake, a landuse), smallest first, with its size.
+
+A read takes seconds, so while one is running the bar shows a spinner with **Cancel**, and
+another click or drag is ignored rather than starting a second read — a second read is what
+makes the public server refuse the first. The map keeps panning and zooming throughout.
+
+A box larger than **25 km²** is refused before anything is sent, and one over 9 km² says it may
+take a while. Those are not arbitrary: a box of 9 km² over the Kennemer dunes answers in about
+3 seconds with a megabyte, one of 100 km² takes 11 seconds and 14 megabytes, and the same box
+over a Namibian reserve comes back as a refusal. For a whole reserve, find it by name instead —
+that reads only the named areas and stays fast whatever the size. The ways people walk on — footpaths, paths,
 steps, cycleways and bridleways — do not cut the face: a dune reserve is threaded with them,
 and a block cut by every one of them is a fragment of a few hectares rather than a zone. The
 candidates show as faint outlines; "Use" puts one in the editor and brings it into view, where

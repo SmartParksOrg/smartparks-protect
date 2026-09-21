@@ -42,10 +42,18 @@ from shapely.geometry import (
 )
 from shapely.ops import linemerge, polygonize, unary_union
 
-#: The box around the click that is read, in metres: half its side. Clamped by the API.
+#: The box around a click that is read, in metres: half its side. Clamped by the API.
 DEFAULT_RADIUS_M = 1500
 MIN_RADIUS_M = 200
-MAX_RADIUS_M = 5000
+MAX_RADIUS_M = 2500
+#: How much ground one read may cover, in square kilometres (decision D277). Measured on the
+#: public Overpass over the Kennemer dunes: a box of 9 km² answers in 3 seconds with 392
+#: elements and about a megabyte, one of 100 km² takes 11 seconds and 14 megabytes, and the
+#: same box over Okonjima is refused with a 504. A box past `WARN_READ_KM2` is worth a word of
+#: warning; one past `MAX_READ_KM2` is refused, here and in the interface, so nobody waits for
+#: an answer that is not coming.
+WARN_READ_KM2 = 9.0
+MAX_READ_KM2 = 25.0
 #: Line features that bound an area on the ground.
 LINE_KEYS = ("highway", "waterway", "barrier", "railway")
 #: Ways people walk or cycle on (decision D272). They cross a landscape without dividing it,
@@ -123,6 +131,56 @@ class Frame:
         return metres / max(self.m_per_deg_lon, self.m_per_deg_lat)
 
 
+@dataclass(slots=True)
+class ReadBox:
+    """The ground one read covers (decision D277): a click makes a box around the point, a drag
+    makes the box itself, and both say how much ground they ask OpenStreetMap to hand over."""
+
+    west: float
+    south: float
+    east: float
+    north: float
+
+    @property
+    def centre(self) -> tuple[float, float]:
+        return ((self.west + self.east) / 2, (self.south + self.north) / 2)
+
+    @property
+    def polygon(self) -> Polygon:
+        return box(self.west, self.south, self.east, self.north)
+
+    @property
+    def area_km2(self) -> float:
+        frame = Frame((self.south + self.north) / 2)
+        return (
+            abs(self.east - self.west)
+            * frame.m_per_deg_lon
+            * abs(self.north - self.south)
+            * frame.m_per_deg_lat
+            / 1_000_000
+        )
+
+    @property
+    def too_large(self) -> bool:
+        return self.area_km2 > MAX_READ_KM2
+
+
+def box_around(lon: float, lat: float, radius_m: float) -> ReadBox:
+    """The box a click reads: `radius_m` to each side of the point."""
+    b = Frame(lat).box_around(lon, lat, radius_m).bounds
+    return ReadBox(west=b[0], south=b[1], east=b[2], north=b[3])
+
+
+def box_of(west: float, south: float, east: float, north: float) -> ReadBox:
+    """The box a drag reads, whichever corner it started from."""
+    return ReadBox(
+        west=min(west, east),
+        south=min(south, north),
+        east=max(west, east),
+        north=max(south, north),
+    )
+
+
 def _line_part(key: str, bbox: str) -> str:
     """The query statement for one kind of line. The ways people walk on are left out here as
     well as in the reading, so the answer stays small on a landscape full of footpaths."""
@@ -132,12 +190,10 @@ def _line_part(key: str, bbox: str) -> str:
     return f'way["highway"]["highway"!~"^({walking})$"]{bbox};'
 
 
-def overpass_query(lon: float, lat: float, radius_m: float) -> str:
-    """The Overpass QL for the lines and areas in the box around a point. `out geom` puts the
+def overpass_query(read: ReadBox) -> str:
+    """The Overpass QL for the lines and areas in the box that is read. `out geom` puts the
     coordinates on every way and on every relation member, so no second read is needed."""
-    frame = Frame(lat)
-    b = frame.box_around(lon, lat, radius_m).bounds
-    bbox = f"({b[1]:.6f},{b[0]:.6f},{b[3]:.6f},{b[2]:.6f})"
+    bbox = f"({read.south:.6f},{read.west:.6f},{read.north:.6f},{read.east:.6f})"
     parts = [_line_part(key, bbox) for key in LINE_KEYS]
     parts += [f'way["{key}"]{bbox};' for key in AREA_KEYS]
     parts += [f'relation["{key}"]{bbox};' for key in AREA_KEYS]
@@ -330,11 +386,13 @@ def _same_shape(a: Polygon, b: Polygon | MultiPolygon) -> bool:
     return bool(a.symmetric_difference(b).area < max(a.area, b.area) * 0.01)
 
 
-def propose(document: dict[str, Any], lon: float, lat: float, radius_m: float) -> list[Candidate]:
-    """The candidates for a click: the enclosed face first, then the areas that contain the
-    point, smallest first, at most `MAX_CANDIDATES`."""
+def propose(document: dict[str, Any], read: ReadBox) -> list[Candidate]:
+    """The candidates for one read: the enclosed face first, then the areas that contain the
+    point, smallest first, at most `MAX_CANDIDATES`. The point is the middle of the box, which
+    is the click for a click and the middle of the drag for a drag."""
+    lon, lat = read.centre
     frame = Frame(lat)
-    area = frame.box_around(lon, lat, radius_m)
+    area = read.polygon
     point = Point(lon, lat)
     parsed = parse_overpass(document)
     out: list[Candidate] = []

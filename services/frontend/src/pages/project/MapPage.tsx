@@ -121,10 +121,18 @@ import {
   shapeParts,
   type ProposedArea,
 } from "@/components/map/propose";
+import {
+  bindBoxGestures,
+  ensureBoxLayer,
+  readVerdict,
+  setBox,
+  type ReadBox,
+} from "@/components/map/proposeBox";
 import { useUnionAreas } from "@/hooks/useCombineAreas";
 import { useProposeArea } from "@/hooks/useProposeArea";
 import { FeaturePanel } from "@/components/map/FeaturePanel";
-import { boundsOf } from "@/components/map/fit";
+import { geometryBounds } from "@/components/map/fit";
+import { isProjectSwitch, rememberProject } from "@/components/map/mapSession";
 import {
   DEFAULT_HEAT,
   type HeatSettings,
@@ -284,6 +292,9 @@ export function MapPage() {
     {},
   );
   const rememberedView = projectId ? mapViews[projectId] : undefined;
+  // which project's map has been placed, by the fit or by the remembered view; until then
+  // nothing about the view is worth remembering
+  const placed = useRef<string | null>(null);
   const container = useRef<HTMLDivElement | null>(null);
   const { resolved: resolvedTheme } = useTheme();
   const { mapRef, ready, stripHost, zoomHost } = useMap(
@@ -495,6 +506,16 @@ export function MapPage() {
       ),
     [currentFeatures, layers, groups.data, allProjects],
   );
+  const visibleDevices = useMemo(
+    () =>
+      (deviceFeatures ?? []).filter(
+        (f) =>
+          f.geometry &&
+          (isDeviceShown(f.properties.device_id, layers) ||
+            f.properties.device_id === selectedDeviceId),
+      ),
+    [deviceFeatures, layers, selectedDeviceId],
+  );
   const features = useQuery({
     queryKey: queryKeys.features(projectId),
     queryFn: () =>
@@ -521,6 +542,23 @@ export function MapPage() {
         (gateways.data ?? []).map((g) => g.id),
       ),
     [layers, gateways.data],
+  );
+  // what the enabled layers actually put on the map (Tim, 2026-09-21): the entities and the
+  // devices that are shown, the gateways of the gateway layer and the project's features.
+  // The fit uses this, so choosing a project brings into view what the person can see there
+  // rather than everything the project happens to hold.
+  const shownOnMap = useMemo(
+    () => [
+      ...(visibleFeatures ?? []),
+      ...visibleDevices,
+      ...(gateways.data ?? []).filter(
+        (g) => g.geometry && isGatewayVisible(g.id, layers, g.status),
+      ),
+      ...(features.data?.items ?? []).filter(
+        (f) => f.geometry && isFeatureVisible(f, layers),
+      ),
+    ],
+    [visibleFeatures, visibleDevices, gateways.data, features.data, layers],
   );
   const coverageParams = useMemo(
     () => ({
@@ -802,7 +840,7 @@ export function MapPage() {
   const drawSession = useRef<DrawSession | null>(null);
   // propose mode (phase 33): a click asks what encloses it, a candidate goes into the editor
   const [proposing, setProposing] = useState(false);
-  const [askedBy, setAskedBy] = useState<"click" | "name">("click");
+  const [askedBy, setAskedBy] = useState<"box" | "name">("box");
   // a shape the drawing editor cannot hold, kept as it came (decision D274)
   const [kept, setKept] = useState<{
     geometry: GeoJSON.Geometry;
@@ -1144,7 +1182,8 @@ export function MapPage() {
   const toggleProposing = () => {
     const next = !proposing;
     setProposing(next);
-    proposal.reset();
+    setReading(null);
+    proposal.cancel();
     if (next) drawSession.current?.idle();
     else drawSession.current?.begin(drawKind);
   };
@@ -1179,8 +1218,9 @@ export function MapPage() {
     const map = mapRef.current;
     if (!map) return;
     const view = map.getBounds();
+    setReading(null);
     setAskedBy("name");
-    proposal.mutate({
+    proposal.ask({
       kind: "name",
       name,
       bounds: [
@@ -1189,23 +1229,49 @@ export function MapPage() {
       ],
     });
   };
-  // while proposing, the map's own click asks the API; the candidates show as faint outlines
+  // while proposing, a click reads the default box around the point and a drag reads the box
+  // it draws (decision D277); the box is on the map before it is read, and a box past the
+  // limit is refused here rather than sent
+  const [reading, setReading] = useState<ReadBox | null>(null);
+  const [preview, setPreview] = useState<ReadBox | null>(null);
+  const readBox = useCallback(
+    (box: ReadBox) => {
+      if (proposal.isPending) return; // one read at a time (decision D277)
+      setReading(box);
+      setAskedBy("box");
+      if (readVerdict(box).tooLarge) return;
+      proposal.ask({ kind: "box", box });
+    },
+    // the mutation object is stable enough for a gesture
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !proposing) return;
     map.getCanvas().style.cursor = "crosshair";
-    const onClick = (e: { lngLat: { lng: number; lat: number } }) => {
-      setAskedBy("click");
-      proposal.mutate({ kind: "click", at: [e.lngLat.lng, e.lngLat.lat] });
-    };
-    map.on("click", onClick);
+    ensureBoxLayer(map);
+    const stop = bindBoxGestures(map, {
+      onPreview: setPreview,
+      onGesture: ({ box }) => readBox(box),
+    });
     return () => {
-      map.off("click", onClick);
+      stop();
+      setPreview(null);
       map.getCanvas().style.cursor = "";
     };
-    // the mutation object is stable enough for a click; re-binding per render is not needed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapRef, ready, proposing]);
+  }, [mapRef, ready, proposing, readBox]);
+  const proposalPending = proposal.isPending;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (!proposing) {
+      if (map.getLayer("propose-box-fill")) setBox(map, null);
+      return;
+    }
+    ensureBoxLayer(map);
+    setBox(map, preview ?? (proposalPending ? reading : null));
+  }, [mapRef, ready, proposing, preview, reading, proposalPending]);
   const candidates = proposal.data?.candidates;
   const ghosts = useMemo(
     () =>
@@ -1298,6 +1364,11 @@ export function MapPage() {
           zoom: Math.round(map.getZoom()),
         });
         if (!projectId) return;
+        // nothing is remembered until this project's map has been placed (Tim, 2026-09-21):
+        // the map starts over southern Africa and the fit waits for the reads, so a view
+        // written before then is the starting point, not the person's, and every later visit
+        // would open there — which is how a Dutch project ended up opening over Kruger
+        if (placed.current !== projectId) return;
         // the view the person sees now is the one the next visit opens with; read the
         // document fresh so a pan never writes an older copy of the other projects' views
         const c = map.getCenter();
@@ -1425,15 +1496,27 @@ export function MapPage() {
     );
   }, [mapRef, ready, visibleFeatures, selectedId]);
 
-  // fit to the project once per visit, to its entities and devices together (phase 19): a park
-  // whose devices have no animal yet, or hardware in the workshop, fits to the devices; without
-  // any position the view stays where it was. Waits for both reads so the fit is not to half.
+  // fit to the project once per visit, to everything its enabled layers show (phase 19, and
+  // Tim, 2026-09-21): a park whose devices have no animal yet, or hardware in the workshop,
+  // fits to the devices; a project with only gateways or only zones fits to those. Without a
+  // single geometry the view stays where it was. Waits for the reads the layers need, so the
+  // fit is not to half of them.
   const fittedProject = useRef<string | null>(null);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || current.isPending || devices.isPending) return;
+    const waiting =
+      current.isPending ||
+      devices.isPending ||
+      (layers.features && features.isPending) ||
+      (layers.gateways && gateways.isPending);
+    if (!map || !ready || waiting) return;
     if (fittedProject.current === projectId) return;
     fittedProject.current = projectId;
+    // choosing another project fits to it; coming back to this one, or reloading the page,
+    // opens where the person left it (decision D275)
+    const switched = isProjectSwitch(projectId);
+    rememberProject(projectId);
+    placed.current = projectId;
     // a link to a gateway or a feature fits to that object instead; a link to an entity or a
     // device with an imprecise position fits its accuracy disc (the selection effect below)
     if (gatewayParam || featureParamValue) return;
@@ -1463,16 +1546,17 @@ export function MapPage() {
       });
       return;
     }
-    // back where the person left this project's map; a first visit fits everything
-    if (rememberedView) {
+    // back where the person left this project's map; a switch and a first visit fit instead
+    if (rememberedView && !switched) {
       const [lng, lat, zoom] = rememberedView;
       map.jumpTo({ center: [lng, lat], zoom });
       return;
     }
-    const bounds = boundsOf([
-      ...(currentFeatures ?? []),
-      ...(deviceFeatures ?? []),
-    ]);
+    const bounds = geometryBounds(
+      shownOnMap as unknown as {
+        geometry: { type: string; coordinates: unknown } | null;
+      }[],
+    );
     if (bounds)
       map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 0 });
   }, [
@@ -1481,6 +1565,11 @@ export function MapPage() {
     projectId,
     current.isPending,
     devices.isPending,
+    features.isPending,
+    gateways.isPending,
+    layers.features,
+    layers.gateways,
+    shownOnMap,
     currentFeatures,
     deviceFeatures,
     gatewayParam,
@@ -1573,16 +1662,6 @@ export function MapPage() {
     );
   }, [mapRef, ready, features.data, layers]);
 
-  const visibleDevices = useMemo(
-    () =>
-      (deviceFeatures ?? []).filter(
-        (f) =>
-          f.geometry &&
-          (isDeviceShown(f.properties.device_id, layers) ||
-            f.properties.device_id === selectedDeviceId),
-      ),
-    [deviceFeatures, layers, selectedDeviceId],
-  );
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
@@ -1760,18 +1839,25 @@ export function MapPage() {
           } satisfies StripItem,
         ]
       : []),
-    {
-      key: "draw",
-      icon: PenLine,
-      label: canEdit
-        ? tool === "draw"
-          ? t("Stop drawing")
-          : t("Draw a feature")
-        : t("Drawing features needs the project admin role"),
-      active: tool === "draw",
-      disabled: !canEdit,
-      onClick: () => (tool === "draw" ? endTool() : setTool("draw")),
-    },
+    // no drawing in the all scope (decision D278): a feature belongs to one project, and that
+    // scope reads across every one of them, so there is nothing to save it into. It used to be
+    // offered and the save came back as a UUID parse error nobody could act on (Tim, 2026-09-21)
+    ...(allProjects
+      ? []
+      : [
+          {
+            key: "draw",
+            icon: PenLine,
+            label: canEdit
+              ? tool === "draw"
+                ? t("Stop drawing")
+                : t("Draw a feature")
+              : t("Drawing features needs the project admin role"),
+            active: tool === "draw",
+            disabled: !canEdit,
+            onClick: () => (tool === "draw" ? endTool() : setTool("draw")),
+          } satisfies StripItem,
+        ]),
     {
       key: "measure",
       icon: Ruler,
@@ -1928,10 +2014,12 @@ export function MapPage() {
               proposal: proposal.data ?? null,
               error: proposal.error?.message ?? null,
               asked: askedBy,
+              reading: preview ?? reading,
               onToggle: toggleProposing,
               onPick: pickCandidate,
               onSearch: searchByName,
               onCombine: combineCandidates,
+              onCancel: proposal.cancel,
               kept: kept ? { parts: kept.parts, holes: kept.holes } : null,
             }}
           />

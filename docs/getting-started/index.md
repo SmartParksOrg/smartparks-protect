@@ -54,7 +54,7 @@ MinIO console <http://localhost:9001>.
 
 ## Finding things
 
-Ctrl+K (Cmd+K on a Mac) or the Search button in the sidebar opens one search box over everything you may see: entities, devices by name, serial or DevEUI, features, gateways, projects and the pages of the current project. Server admins also find data sources. Recent picks are listed when the box is empty. Every list keeps its own search box for narrowing what is on the page.
+Ctrl+K (Cmd+K on a Mac) or the Search button in the top bar — its magnifier alone on a phone — opens one search box over everything you may see: entities, devices by name, serial or DevEUI, features, gateways, projects and the pages of the current project. Server admins also find data sources. Recent picks are listed when the box is empty. Every list keeps its own search box for narrowing what is on the page.
 
 ## Interface language
 

@@ -601,11 +601,13 @@ export interface paths {
         put?: never;
         /**
          * Propose Area
-         * @description The areas a click could mean (phase 33, decision D270): the face of OpenStreetMap's
-         *     roads, water, fences and railways that encloses the point (the ways people walk on do not
-         *     cut it, decision D272), and every OpenStreetMap area that contains it, smallest first. Read
-         *     from the Overpass API named by `OVERPASS_URL` over a box of `radius_m` around the click;
-         *     nothing is stored. A 502 says OpenStreetMap did not answer.
+         * @description The areas one read could mean (phase 33, decisions D270 and D277): the face of
+         *     OpenStreetMap's roads, water, fences and railways that encloses the middle of the box (the
+         *     ways people walk on do not cut it, decision D272), and every OpenStreetMap area that
+         *     contains it, smallest first. The ground read is a box around a click or the box a person
+         *     dragged, at most `MAX_READ_KM2`; a larger one is a 422 naming its size, since the public
+         *     Overpass answers a read that big with a refusal. Read from the Overpass API named by
+         *     `OVERPASS_URL`; nothing is stored. A 502 says OpenStreetMap did not answer.
          */
         post: operations["propose_area_api_v1_projects__project_id__features_propose_post"];
         delete?: never;
@@ -11181,18 +11183,28 @@ export interface components {
         };
         /**
          * ProposeAreaRequest
-         * @description Where a person clicked and how far around it to read (phase 33, decision D270).
+         * @description What ground to read (phase 33, decisions D270 and D277): a click with a reach around it,
+         *     or the box a person dragged. A box larger than the reader takes is refused rather than
+         *     asked for, since a public Overpass answers 14 megabytes with a refusal.
          */
         ProposeAreaRequest: {
             /** Lon */
-            lon: number;
+            lon?: number | null;
             /** Lat */
-            lat: number;
+            lat?: number | null;
             /**
              * Radius M
              * @default 1500
              */
             radius_m: number;
+            /** West */
+            west?: number | null;
+            /** South */
+            south?: number | null;
+            /** East */
+            east?: number | null;
+            /** North */
+            north?: number | null;
         };
         /**
          * ProposedArea

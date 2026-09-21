@@ -4,15 +4,29 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useProjects } from "@/hooks/useProjects";
 import { cn } from "@/lib/utils";
 import { ALL_PROJECTS, isAllProjects } from "@/lib/scope";
 import { useAuthStore } from "@/stores/auth";
 import { useProjectStore } from "@/stores/project";
 
-export function ProjectSwitcher() {
+/** The project a page is about. It lives in the top bar (Tim, 2026-09-21), where the host
+ * decides how wide it may be: the full width of a drawer, or a truncating button beside the
+ * brand on a phone. */
+export function ProjectSwitcher({ className }: { className?: string } = {}) {
   const { t } = useTranslation();
   const { projectId } = useParams();
   const { data } = useProjects();
@@ -24,12 +38,19 @@ export function ProjectSwitcher() {
   const user = useAuthStore((s) => s.user);
   const all = isAllProjects(projectId);
   const current = projects.find((p) => p.id === projectId);
-  const label = all ? t("All projects") : (current?.name ?? t("Select a project"));
+  const label = all
+    ? t("All projects")
+    : (current?.name ?? t("Select a project"));
 
   return (
     <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between", className)}
+        >
           <span className="truncate">{label}</span>
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
@@ -49,9 +70,16 @@ export function ProjectSwitcher() {
                     void navigate(`/projects/${ALL_PROJECTS}/map`);
                   }}
                 >
-                  <Check className={cn("mr-2 size-4", all ? "opacity-100" : "opacity-0")} />
+                  <Check
+                    className={cn(
+                      "mr-2 size-4",
+                      all ? "opacity-100" : "opacity-0",
+                    )}
+                  />
                   <span className="truncate">{t("All projects")}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{t("server admin")}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {t("server admin")}
+                  </span>
                 </CommandItem>
               )}
               {projects.map((project) => (
@@ -64,9 +92,16 @@ export function ProjectSwitcher() {
                     void navigate(`/projects/${project.id}/map`);
                   }}
                 >
-                  <Check className={cn("mr-2 size-4", project.id === projectId ? "opacity-100" : "opacity-0")} />
+                  <Check
+                    className={cn(
+                      "mr-2 size-4",
+                      project.id === projectId ? "opacity-100" : "opacity-0",
+                    )}
+                  />
                   <span className="truncate">{project.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{project.role.replace("project-", "")}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {project.role.replace("project-", "")}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>

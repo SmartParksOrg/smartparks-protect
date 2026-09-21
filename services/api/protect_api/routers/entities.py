@@ -64,6 +64,9 @@ from shared.curation.apply import recompute_current_state
 from shared.database import get_session
 from shared.domain.areas import (
     ATTRIBUTION,
+    MAX_READ_KM2,
+    box_around,
+    box_of,
     combine_areas,
     name_query,
     overpass_query,
@@ -493,17 +496,32 @@ async def propose_area(
     body: ProposeAreaRequest,
     context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
 ) -> ProposedAreas:
-    """The areas a click could mean (phase 33, decision D270): the face of OpenStreetMap's
-    roads, water, fences and railways that encloses the point (the ways people walk on do not
-    cut it, decision D272), and every OpenStreetMap area that contains it, smallest first. Read
-    from the Overpass API named by `OVERPASS_URL` over a box of `radius_m` around the click;
-    nothing is stored. A 502 says OpenStreetMap did not answer."""
-    query = overpass_query(body.lon, body.lat, body.radius_m)
+    """The areas one read could mean (phase 33, decisions D270 and D277): the face of
+    OpenStreetMap's roads, water, fences and railways that encloses the middle of the box (the
+    ways people walk on do not cut it, decision D272), and every OpenStreetMap area that
+    contains it, smallest first. The ground read is a box around a click or the box a person
+    dragged, at most `MAX_READ_KM2`; a larger one is a 422 naming its size, since the public
+    Overpass answers a read that big with a refusal. Read from the Overpass API named by
+    `OVERPASS_URL`; nothing is stored. A 502 says OpenStreetMap did not answer."""
+    read = (
+        box_of(body.west, body.south, body.east, body.north)
+        if body.west is not None
+        and body.south is not None
+        and body.east is not None
+        and body.north is not None
+        else box_around(body.lon or 0.0, body.lat or 0.0, body.radius_m)
+    )
+    if read.too_large:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"That box is {read.area_km2:.0f} km²; a read takes at most {MAX_READ_KM2:.0f} km²",
+        )
+    query = overpass_query(read)
     try:
         document = await fetch_overpass(get_settings().overpass_url, query)
     except ApplicationError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, error.message) from error
-    candidates = propose(document, body.lon, body.lat, body.radius_m)
+    candidates = propose(document, read)
     return ProposedAreas(
         candidates=[ProposedArea(**asdict(candidate)) for candidate in candidates],
         attribution=ATTRIBUTION,

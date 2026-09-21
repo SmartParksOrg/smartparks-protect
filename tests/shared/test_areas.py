@@ -7,6 +7,7 @@ within the vertex bound, and a name finds the areas that carry it."""
 import json
 from pathlib import Path
 
+import pytest
 from shapely.geometry import Point, shape
 
 from shared.domain import areas
@@ -19,7 +20,7 @@ def _document() -> dict:
 
 
 def test_the_query_names_a_box_around_the_click_south_west_north_east():
-    query = areas.overpass_query(4.61, 52.53, 500)
+    query = areas.overpass_query(areas.box_around(4.61, 52.53, 500))
     assert query.startswith("[out:json][timeout:25];(")
     assert query.endswith(");out geom;")
     # 500 m is about 0.0045 degrees of latitude and 0.0074 of longitude at 52.5 north
@@ -42,7 +43,7 @@ def test_the_recorded_answer_parses_into_lines_and_areas():
 
 
 def test_a_click_in_the_dunes_proposes_the_scrub_it_is_in_smallest_first():
-    candidates = areas.propose(_document(), 4.6105, 52.5305, 500)
+    candidates = areas.propose(_document(), areas.box_around(4.6105, 52.5305, 500))
     assert candidates, "nothing proposed"
     assert candidates[0].kind == "osm" and candidates[0].tags == {"kind": "natural=scrub"}
     # no name on OpenStreetMap: the kind in words, and not marked as named
@@ -55,15 +56,15 @@ def test_a_click_in_the_dunes_proposes_the_scrub_it_is_in_smallest_first():
 
 
 def test_a_face_cut_by_the_box_is_marked_clipped():
-    candidates = areas.propose(_document(), 4.6070, 52.5290, 500)
+    candidates = areas.propose(_document(), areas.box_around(4.6070, 52.5290, 500))
     enclosed = [c for c in candidates if c.kind == "enclosed"]
     assert enclosed and enclosed[0].clipped is True
     assert enclosed[0].name == "Enclosed by roads and water"
 
 
 def test_nothing_around_the_click_proposes_nothing():
-    assert areas.propose({"elements": []}, 4.61, 52.53, 500) == []
-    far = areas.propose(_document(), 4.70, 52.60, 500)
+    assert areas.propose({"elements": []}, areas.box_around(4.61, 52.53, 500)) == []
+    far = areas.propose(_document(), areas.box_around(4.70, 52.60, 500))
     assert far == []
 
 
@@ -86,7 +87,7 @@ def test_a_big_shape_is_simplified_under_the_vertex_bound():
             }
         ]
     }
-    (candidate,) = areas.propose(document, 4.61, 52.53, 500)
+    (candidate,) = areas.propose(document, areas.box_around(4.61, 52.53, 500))
     assert candidate.name == "Round wood" and candidate.named is True
     assert len(candidate.geometry["coordinates"][0]) <= areas.MAX_VERTICES
     assert 22_000 < candidate.area_m2 < 25_000
@@ -118,7 +119,7 @@ def test_a_footpath_does_not_cut_a_face_but_a_fence_along_one_does():
     click = (4.6045, 52.530)
 
     def face_area(divider: dict) -> int:
-        candidates = areas.propose({"elements": [ring, divider]}, *click, 2000)
+        candidates = areas.propose({"elements": [ring, divider]}, areas.box_around(*click, 2000))
         enclosed = [c for c in candidates if c.kind == "enclosed"]
         assert enclosed, "no face"
         return enclosed[0].area_m2
@@ -269,3 +270,36 @@ def test_a_combined_area_stays_under_the_vertex_bound():
     assert combined is not None and combined.parts == 2
     points = sum(len(part[0]) for part in combined.geometry["coordinates"])
     assert points <= areas.MAX_VERTICES
+
+
+def test_a_read_says_how_much_ground_it_covers_and_when_it_is_too_much():
+    """Decision D277: the box is what a read costs, so it is the thing that is bounded. The
+    measurements behind the numbers are in the module's comment."""
+    click = areas.box_around(4.61, 52.53, 1500)
+    assert 8.5 < click.area_km2 < 9.5  # three kilometres by three
+    assert click.too_large is False
+    assert click.centre == pytest.approx((4.61, 52.53), abs=1e-9)
+
+    dragged = areas.box_of(4.65, 52.56, 4.60, 52.52)
+    assert (dragged.west, dragged.south) == (4.60, 52.52)
+    assert (dragged.east, dragged.north) == (4.65, 52.56)
+    assert dragged.area_km2 == pytest.approx(areas.box_of(4.60, 52.52, 4.65, 52.56).area_km2)
+
+    big = areas.box_around(4.61, 52.53, 2500)
+    assert big.area_km2 == pytest.approx(25.0, abs=0.5) and big.too_large is False
+    too_big = areas.box_of(4.40, 52.30, 4.75, 52.55)
+    assert too_big.area_km2 > areas.MAX_READ_KM2 and too_big.too_large is True
+    assert areas.WARN_READ_KM2 < areas.MAX_READ_KM2
+
+
+def test_a_dragged_box_proposes_the_face_around_its_middle():
+    # the same dunes as the recorded answer, read as a box instead of a click
+    click = areas.propose(_document(), areas.box_around(4.6105, 52.5305, 500))
+    around = areas.Frame(52.5305)
+    dlon = 500 / around.m_per_deg_lon
+    dlat = 500 / around.m_per_deg_lat
+    dragged = areas.propose(
+        _document(),
+        areas.box_of(4.6105 - dlon, 52.5305 - dlat, 4.6105 + dlon, 52.5305 + dlat),
+    )
+    assert [c.name for c in dragged] == [c.name for c in click]

@@ -1,8 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Languages, LogOut, PanelLeftClose, Plug, Search } from "lucide-react";
+import { Languages, LogOut, PanelLeftClose, Plug } from "lucide-react";
 import { Link, NavLink, useParams } from "react-router";
 
-import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
 import {
   sectionsFor,
   serverSections,
@@ -82,9 +81,9 @@ export function Sidebar({
 
   return (
     <div className="flex h-full flex-col">
-      {/* the brand lives in the top bar (decision D182); the column keeps only its collapse
-          button, and the row keeps its height in the drawer so the sheet's close button has
-          room above the project switcher */}
+      {/* the brand, the project switcher and the search live in the top bar (decision D182 and
+          Tim, 2026-09-21); the column keeps only its collapse button, and the row keeps its
+          height in the drawer so the sheet's close button has room above the navigation */}
       <div className="flex h-12 shrink-0 items-center justify-end px-2">
         {collapsible && (
           <Button
@@ -98,22 +97,6 @@ export function Sidebar({
             <PanelLeftClose className="size-5" />
           </Button>
         )}
-      </div>
-      <div className="px-3 pb-3">
-        <ProjectSwitcher />
-      </div>
-      <div className="px-3 pb-3">
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2 text-muted-foreground"
-          onClick={() => window.dispatchEvent(new Event("protect:open-search"))}
-        >
-          <Search className="size-4" />
-          <span className="flex-1 text-left">{t("Search…")}</span>
-          <kbd className="hidden rounded border bg-muted px-1.5 text-[10px] font-medium sm:inline">
-            {t("Ctrl K")}
-          </kbd>
-        </Button>
       </div>
       <nav className="flex-1 space-y-4 overflow-y-auto px-2 pb-4">
         {projectId &&

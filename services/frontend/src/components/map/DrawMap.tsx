@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   basemapsFor,
@@ -17,6 +17,12 @@ import {
   setGhosts,
   type ProposedArea,
 } from "@/components/map/propose";
+import {
+  bindBoxGestures,
+  ensureBoxLayer,
+  setBox,
+  type ReadBox,
+} from "@/components/map/proposeBox";
 import { useMap } from "@/components/map/useMap";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
@@ -53,7 +59,9 @@ export function DrawMap({
   around = null,
   onChange,
   proposing = false,
-  onProposeAt,
+  onProposeBox,
+  onProposePreview,
+  reading = null,
   ghosts = [],
   load = null,
   onView,
@@ -64,10 +72,14 @@ export function DrawMap({
    * already has on the map, so the drawing starts over the reserve and not over a continent. */
   around?: Bounds | null;
   onChange: (geometry: GeoJSON.Geometry | null) => void;
-  /** Propose mode (phase 33): the drawing rests, the pointer is a crosshair and a click on
-   * the map reports its place instead of adding a vertex. */
+  /** Propose mode (phase 33): the drawing rests, the pointer is a crosshair, and a click or a
+   * drag on the map says what ground to read instead of adding a vertex (decision D277). */
   proposing?: boolean;
-  onProposeAt?: (lonLat: [number, number]) => void;
+  onProposeBox?: (box: ReadBox) => void;
+  /** The box under the pointer while it is dragged, so its size can be shown as it grows. */
+  onProposePreview?: (box: ReadBox | null) => void;
+  /** The box being read now, drawn while the answer is awaited. */
+  reading?: ReadBox | null;
   /** The candidates drawn as faint outlines while the person chooses. */
   ghosts?: ProposedArea[];
   /** A shape to put in the editor, selected: the candidate chosen. A new object loads again. */
@@ -105,20 +117,35 @@ export function DrawMap({
       session.current = null;
     };
   }, [mapRef, ready, kind, onChange]);
-  // propose mode: the session rests and the map's own click reports where
+  // propose mode: the session rests, and a click or a drag on the map says what to read
+  const [preview, setPreview] = useState<ReadBox | null>(null);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !proposing) return;
     session.current?.idle();
     map.getCanvas().style.cursor = "crosshair";
-    const onClick = (e: { lngLat: { lng: number; lat: number } }) =>
-      onProposeAt?.([e.lngLat.lng, e.lngLat.lat]);
-    map.on("click", onClick);
+    ensureBoxLayer(map);
+    const stop = bindBoxGestures(map, {
+      onPreview: (box) => {
+        setPreview(box);
+        onProposePreview?.(box);
+      },
+      onGesture: ({ box }) => onProposeBox?.(box),
+    });
     return () => {
-      map.off("click", onClick);
+      stop();
+      setPreview(null);
+      onProposePreview?.(null);
       map.getCanvas().style.cursor = "";
     };
-  }, [mapRef, ready, proposing, onProposeAt]);
+  }, [mapRef, ready, proposing, onProposeBox, onProposePreview]);
+  // the box being dragged, else the one being read, else nothing
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    ensureBoxLayer(map);
+    setBox(map, proposing ? (preview ?? reading) : null);
+  }, [mapRef, ready, proposing, preview, reading]);
   const onViewRef = useRef(onView);
   useEffect(() => {
     onViewRef.current = onView;
@@ -161,7 +188,7 @@ export function DrawMap({
         <span>
           {proposing
             ? t(
-                "Click inside the area you want; the roads, rivers and areas around it decide the shape",
+                "Click inside the area you want, or drag a box over the ground to read",
               )
             : kind === "point"
               ? t("Click to place the site")

@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Pencil, RadioTower } from "lucide-react";
+import { RadioTower } from "lucide-react";
 import { Link } from "react-router";
 
 import { api } from "@/api/client";
@@ -14,7 +14,6 @@ import {
 } from "@/components/map/layerChoices";
 import { MapPanel, PanelRow } from "@/components/map/MapObjectPanel";
 import { GatewayLocationDialog } from "@/components/network/GatewayLocationDialog";
-import { GatewayNameDialog } from "@/components/network/GatewayNameDialog";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/useProjects";
@@ -54,7 +53,6 @@ export function GatewayPanel({
   const { t } = useTranslation();
   const { can } = usePermissions(projectId);
   const [placing, setPlacing] = useState(false);
-  const [renaming, setRenaming] = useState(false);
   const detail = useQuery({
     queryKey: queryKeys.gateway(projectId, gatewayId, HOURS),
     queryFn: () =>
@@ -112,26 +110,14 @@ export function GatewayPanel({
             {only ? t("All heard positions") : t("Show heard positions")}
           </Button>
           {g && can("project:write") && !allProjects && (
-            <>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                aria-label={t("Rename")}
-                title={t("Rename this gateway")}
-                onClick={() => setRenaming(true)}
-              >
-                <Pencil className="size-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={() => setPlacing(true)}
-              >
-                {coordinates ? t("Change location") : t("Set location")}
-              </Button>
-            </>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setPlacing(true)}
+            >
+              {coordinates ? t("Change location") : t("Set location")}
+            </Button>
           )}
           {only && (
             <span className="text-xs text-muted-foreground">
@@ -174,9 +160,7 @@ export function GatewayPanel({
           >
             {coordinates ? (
               <>
-                <span className="font-mono text-xs">
-                  {gatewayCoords(g, 5)}
-                </span>
+                <span className="font-mono text-xs">{gatewayCoords(g, 5)}</span>
                 {g.location_source === "admin" && (
                   <span className="text-muted-foreground">
                     {" "}
@@ -237,13 +221,6 @@ export function GatewayPanel({
               projectId={projectId}
               gateway={g}
               onClose={() => setPlacing(false)}
-            />
-          )}
-          {renaming && (
-            <GatewayNameDialog
-              projectId={projectId}
-              gateway={g}
-              onClose={() => setRenaming(false)}
             />
           )}
           <PanelRow label={t("More")}>

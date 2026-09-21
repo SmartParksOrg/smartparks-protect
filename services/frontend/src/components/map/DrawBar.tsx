@@ -12,6 +12,7 @@ import type {
   ProposedAreas as Proposal,
 } from "@/components/map/propose";
 import { ProposedAreas } from "@/components/map/ProposedAreas";
+import type { ReadBox } from "@/components/map/proposeBox";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,12 +46,16 @@ export interface ProposeControls {
   proposal: Proposal | null;
   error: string | null;
   /** What the answer on show came from (decision D273). */
-  asked: "click" | "name";
+  asked: "box" | "name";
+  /** The ground the last gesture chose (decision D277). */
+  reading?: ReadBox | null;
   onToggle: () => void;
   onPick: (candidate: ProposedArea) => void;
   onSearch: (name: string) => void;
   /** Several ticked areas kept as one zone (decision D274). */
   onCombine: (candidates: ProposedArea[]) => void;
+  /** Give up on the read in flight. */
+  onCancel: () => void;
   /** Set when the shape is one the drawing editor cannot correct: a zone in several pieces,
    * or one with enclaves inside it. It is saved as it came. */
   kept?: { parts: number; holes: number } | null;
@@ -134,7 +139,7 @@ export function DrawBar({
         <div className="mt-2 space-y-2">
           <p className="text-xs text-muted-foreground">
             {t(
-              "Click inside the area you want; the roads, rivers and areas around it decide the shape.",
+              "Click inside the area you want, or drag a box over the ground to read.",
             )}
           </p>
           <ProposedAreas
@@ -142,9 +147,11 @@ export function DrawBar({
             busy={propose.busy}
             error={propose.error}
             asked={propose.asked}
+            reading={propose.reading ?? null}
             onPick={propose.onPick}
             onSearch={propose.onSearch}
             onCombine={propose.onCombine}
+            onCancel={propose.onCancel}
           />
           {propose.kept ? (
             <p className="mt-1 text-xs text-muted-foreground">

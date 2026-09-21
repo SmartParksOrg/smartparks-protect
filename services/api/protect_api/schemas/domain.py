@@ -204,11 +204,26 @@ class FenceMonitorUpdate(BaseModel):
 
 
 class ProposeAreaRequest(BaseModel):
-    """Where a person clicked and how far around it to read (phase 33, decision D270)."""
+    """What ground to read (phase 33, decisions D270 and D277): a click with a reach around it,
+    or the box a person dragged. A box larger than the reader takes is refused rather than
+    asked for, since a public Overpass answers 14 megabytes with a refusal."""
 
-    lon: float = Field(ge=-180, le=180)
-    lat: float = Field(ge=-90, le=90)
-    radius_m: int = Field(default=1500, ge=200, le=5000)
+    lon: float | None = Field(default=None, ge=-180, le=180)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    radius_m: int = Field(default=1500, ge=200, le=2500)
+    west: float | None = Field(default=None, ge=-180, le=180)
+    south: float | None = Field(default=None, ge=-90, le=90)
+    east: float | None = Field(default=None, ge=-180, le=180)
+    north: float | None = Field(default=None, ge=-90, le=90)
+
+    @model_validator(mode="after")
+    def _a_point_or_a_box(self) -> "ProposeAreaRequest":
+        corners = (self.west, self.south, self.east, self.north)
+        if all(c is not None for c in corners):
+            return self
+        if self.lon is not None and self.lat is not None:
+            return self
+        raise ValueError("Give a point to read around, or the four corners of a box")
 
 
 class SearchAreasRequest(BaseModel):

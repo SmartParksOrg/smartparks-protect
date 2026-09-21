@@ -26,6 +26,7 @@ import {
   shapeParts,
   type ProposedArea,
 } from "@/components/map/propose";
+import { readVerdict, type ReadBox } from "@/components/map/proposeBox";
 import { ProposedAreas } from "@/components/map/ProposedAreas";
 import { useUnionAreas } from "@/hooks/useCombineAreas";
 import { useProposeArea } from "@/hooks/useProposeArea";
@@ -108,20 +109,28 @@ export function FeaturesPage() {
     null,
   );
   const proposal = useProposeArea(projectId);
-  const [asked, setAsked] = useState<"click" | "name">("click");
+  const [asked, setAsked] = useState<"box" | "name">("box");
   const view = useRef<Bounds | null>(null);
-  const proposeAt = useCallback(
-    (lonLat: [number, number]) => {
-      setAsked("click");
-      proposal.mutate({ kind: "click", at: lonLat });
+  // the ground being read now, so the map can draw it and the list can say how much it is
+  const [reading, setReading] = useState<ReadBox | null>(null);
+  // the box under the pointer while it is dragged: its size shows as it grows
+  const [preview, setPreview] = useState<ReadBox | null>(null);
+  const proposeBox = useCallback(
+    (box: ReadBox) => {
+      if (proposal.isPending) return; // one read at a time (decision D277)
+      setReading(box);
+      setAsked("box");
+      if (readVerdict(box).tooLarge) return;
+      proposal.ask({ kind: "box", box });
     },
     [proposal],
   );
   const searchByName = (name: string) => {
     const bounds = view.current ?? around;
     if (!bounds) return;
+    setReading(null);
     setAsked("name");
-    proposal.mutate({ kind: "name", name, bounds });
+    proposal.ask({ kind: "name", name, bounds });
   };
   // a shape the editor cannot hold — a zone in several pieces, or one with an enclave inside
   // it — is kept as it came and saved that way (decision D274)
@@ -356,7 +365,9 @@ export function FeaturesPage() {
                 around={around}
                 onChange={setGeometry}
                 proposing={proposing}
-                onProposeAt={proposeAt}
+                onProposeBox={proposeBox}
+                onProposePreview={setPreview}
+                reading={proposal.isPending ? reading : null}
                 ghosts={
                   kept
                     ? [
@@ -385,7 +396,8 @@ export function FeaturesPage() {
                   aria-pressed={proposing}
                   onClick={() => {
                     setProposing((p) => !p);
-                    proposal.reset();
+                    setReading(null);
+                    proposal.cancel();
                   }}
                 >
                   <Wand2 className="size-4" /> {t("Propose from the map")}
@@ -396,9 +408,11 @@ export function FeaturesPage() {
                     busy={proposal.isPending}
                     error={proposal.error?.message ?? null}
                     asked={asked}
+                    reading={preview ?? reading}
                     onPick={pickCandidate}
                     onSearch={searchByName}
                     onCombine={combineCandidates}
+                    onCancel={proposal.cancel}
                   />
                 )}
                 {kept && (
