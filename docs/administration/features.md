@@ -51,6 +51,21 @@ edge runs — and it does not depend on clicking the right spot. Only areas answ
 street or a building of the same name. Move the map over the reserve first; if the view is
 wider than about 150 km, its middle is searched and the list says so.
 
+What to expect:
+
+- Where OpenStreetMap has the tracks and streams of the reserve, the enclosed face is the
+  block you meant. Where it has one road through the whole park, the face is large and marked
+  "cut by the edge of the search box", which means the box and not the landscape closed it;
+  draw that one, or start from a smaller area OpenStreetMap already holds.
+- The data is OpenStreetMap's, under the ODbL, and the attribution is shown under the list. A
+  feature made from it is yours to edit; nothing links back.
+- The server asks the public Overpass API by default (`OVERPASS_URL`); a server that clicks a
+  lot can point that at its own instance. The public service refuses bursts: a refused call is
+  made once more after a couple of seconds, and if that is refused too the interface says so.
+  Click again, or try a smaller radius.
+- Nothing is proposed from satellite imagery. Where OpenStreetMap has nothing, the shape is
+  drawn by hand.
+
 ## Several areas as one zone
 
 A zone a reserve works with is often several areas on the map: Zuid-Kennemerland, Duin en
@@ -72,18 +87,3 @@ combined zone, the grazing analysis reports both, and the same ground appears in
 A zone whose parts do not touch is kept as one feature in several pieces, and a zone with an
 enclave inside it keeps its hole; both work everywhere, but the drawing editor holds one ring
 at a time, so it cannot correct them vertex by vertex. The interface says so when it happens.
-
-What to expect:
-
-- Where OpenStreetMap has the tracks and streams of the reserve, the enclosed face is the
-  block you meant. Where it has one road through the whole park, the face is large and marked
-  "cut by the edge of the search box", which means the box and not the landscape closed it;
-  draw that one, or start from a smaller area OpenStreetMap already holds.
-- The data is OpenStreetMap's, under the ODbL, and the attribution is shown under the list. A
-  feature made from it is yours to edit; nothing links back.
-- The server asks the public Overpass API by default (`OVERPASS_URL`); a server that clicks a
-  lot can point that at its own instance. The public service refuses bursts: a refused call is
-  made once more after a couple of seconds, and if that is refused too the interface says so.
-  Click again, or try a smaller radius.
-- Nothing is proposed from satellite imagery. Where OpenStreetMap has nothing, the shape is
-  drawn by hand.
