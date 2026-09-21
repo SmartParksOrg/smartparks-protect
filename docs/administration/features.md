@@ -38,7 +38,14 @@ way the box is on the map before it is read and its size is named in square kilo
 what is being asked for is never a guess. The server joins OpenStreetMap's roads, tracks,
 rivers, fences and railways inside it into the faces they enclose, and answers the face that
 contains the middle of the box together with every OpenStreetMap area that contains it (a
-protected area, a forest, a lake, a landuse), smallest first, with its size.
+protected area, a forest, a lake, a landuse), smallest first, with its size. The ways people
+walk on — footpaths, paths, steps, cycleways and bridleways — do not cut the face: a dune
+reserve is threaded with them, and a block cut by every one of them is a fragment of a few
+hectares rather than a zone.
+
+The candidates show as faint outlines; "Use" puts one in the editor and brings it into view,
+where it is adjusted like any drawn shape, named and saved; an area OpenStreetMap names fills
+the name in.
 
 A read takes seconds, so while one is running the bar shows a spinner with **Cancel**, and
 another click or drag is ignored rather than starting a second read — a second read is what
@@ -48,12 +55,7 @@ A box larger than **25 km²** is refused before anything is sent, and one over 9
 take a while. Those are not arbitrary: a box of 9 km² over the Kennemer dunes answers in about
 3 seconds with a megabyte, one of 100 km² takes 11 seconds and 14 megabytes, and the same box
 over a Namibian reserve comes back as a refusal. For a whole reserve, find it by name instead —
-that reads only the named areas and stays fast whatever the size. The ways people walk on — footpaths, paths,
-steps, cycleways and bridleways — do not cut the face: a dune reserve is threaded with them,
-and a block cut by every one of them is a fragment of a few hectares rather than a zone. The
-candidates show as faint outlines; "Use" puts one in the editor and brings it into view, where
-it is adjusted like any drawn shape, named and saved; an area OpenStreetMap names fills the
-name in.
+that reads only the named areas and stays fast whatever the size.
 
 ### Or find it by name
 
