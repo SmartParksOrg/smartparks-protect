@@ -55,7 +55,12 @@ export function ProjectSwitcher({ className }: { className?: string } = {}) {
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start">
+      {/* wide enough for a name and its role on one line where there is room, and never
+          wider than the screen (Tim, 2026-09-21) */}
+      <PopoverContent
+        className="w-[min(24rem,calc(100vw-1.5rem))] p-0 sm:w-80 lg:w-96"
+        align="start"
+      >
         <Command>
           <CommandInput placeholder={t("Search projects")} />
           <CommandList>
@@ -77,7 +82,7 @@ export function ProjectSwitcher({ className }: { className?: string } = {}) {
                     )}
                   />
                   <span className="truncate">{t("All projects")}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
+                  <span className="ml-auto shrink-0 pl-2 text-xs whitespace-nowrap text-muted-foreground">
                     {t("server admin")}
                   </span>
                 </CommandItem>
@@ -99,7 +104,7 @@ export function ProjectSwitcher({ className }: { className?: string } = {}) {
                     )}
                   />
                   <span className="truncate">{project.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
+                  <span className="ml-auto shrink-0 pl-2 text-xs whitespace-nowrap text-muted-foreground">
                     {project.role.replace("project-", "")}
                   </span>
                 </CommandItem>

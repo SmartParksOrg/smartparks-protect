@@ -106,7 +106,7 @@ export function AppLayout() {
           <span className="hidden min-w-0 truncate text-sm font-medium whitespace-nowrap sm:inline sm:text-base">
             {t("Smart Parks Protect")}
           </span>
-          <ProjectSwitcher className="h-8 w-auto min-w-0 flex-1 sm:ml-2 sm:h-9 sm:max-w-56 sm:flex-none lg:max-w-64" />
+          <ProjectSwitcher className="h-8 w-auto min-w-0 flex-1 sm:ml-2 sm:h-9 sm:max-w-56 sm:flex-none lg:max-w-80" />
           <Button
             variant="outline"
             className="size-8 shrink-0 justify-center p-0 text-muted-foreground sm:h-9 sm:w-56 sm:justify-start sm:gap-2 sm:px-3"
