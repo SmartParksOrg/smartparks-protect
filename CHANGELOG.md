@@ -24,6 +24,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- A group's settings could not be reached on a touch screen (Tim, 2026-09-21): the Edit, New subgroup and Delete buttons of a row showed on hover only. They now stay visible on the group that is open and on every row where there is no hover, and the entity list is headed by the open group's colour, name and description with Edit group and New subgroup beside it.
+
 - Tracks shown together on the live map, the Data explorer and an analysis result are always in colours of their own (Tim, 2026-09-21): the colour was a hash of the entity's id into eight, so two of four tracks were the same colour more often than not. The tracks on the map now share out the palette, a track keeps its colour while others come and go, and past eight tracks the colours continue with spread hues.
 
 - The trap's trend ran its axis to 2 for a door that is 0 or 1 (Tim, 2026-09-20). It reads open and closed now, on the axis and in the tooltip, drawn as steps, with nothing above closed.

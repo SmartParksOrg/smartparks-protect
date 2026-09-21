@@ -287,6 +287,9 @@ export function GroupsPage() {
   } | null>(null);
   const [removing, setRemoving] = useState<EntityGroup | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  // the group the tree has open: its name and settings head the entity list, with the edit
+  // there as well as on the row, since the row's buttons show on hover only (Tim, 2026-09-21)
+  const currentGroup = groups.data?.find((g) => g.id === node) ?? null;
   const filters = {
     q: q || undefined,
     entity_type_id: typeId || undefined,
@@ -419,7 +422,9 @@ export function GroupsPage() {
         </span>
       </button>
       {actions && (
-        <span className="hidden shrink-0 gap-0.5 group-hover:flex">
+        <span
+          className={`shrink-0 gap-0.5 [@media(hover:none)]:flex ${node === key ? "flex" : "hidden group-hover:flex"}`}
+        >
           {actions}
         </span>
       )}
@@ -537,6 +542,40 @@ export function GroupsPage() {
           </Card>
           <Card>
             <CardContent className="space-y-3 p-3">
+              {currentGroup && (
+                <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+                  <span
+                    className="inline-block size-3 shrink-0 rounded-full border"
+                    style={{ background: currentGroup.color ?? "transparent" }}
+                  />
+                  <span className="font-medium">{currentGroup.name}</span>
+                  {currentGroup.description && (
+                    <span className="truncate text-sm text-muted-foreground">
+                      {currentGroup.description}
+                    </span>
+                  )}
+                  <span className="ml-auto flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setEditing({ group: currentGroup, parentId: null })
+                      }
+                    >
+                      <Pencil className="size-3.5" /> {t("Edit group")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setEditing({ group: null, parentId: currentGroup.id })
+                      }
+                    >
+                      <Plus className="size-3.5" /> {t("New subgroup")}
+                    </Button>
+                  </span>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <Input
                   value={q}
