@@ -12,6 +12,11 @@ import {
   type DrawSession,
 } from "@/components/map/draw";
 import type { Bounds } from "@/components/map/fit";
+import {
+  ensureGhostLayers,
+  setGhosts,
+  type ProposedArea,
+} from "@/components/map/propose";
 import { useMap } from "@/components/map/useMap";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
@@ -47,6 +52,10 @@ export function DrawMap({
   initial = null,
   around = null,
   onChange,
+  proposing = false,
+  onProposeAt,
+  ghosts = [],
+  load = null,
 }: {
   kind: DrawKind;
   initial?: GeoJSON.Geometry | null;
@@ -54,6 +63,14 @@ export function DrawMap({
    * already has on the map, so the drawing starts over the reserve and not over a continent. */
   around?: Bounds | null;
   onChange: (geometry: GeoJSON.Geometry | null) => void;
+  /** Propose mode (phase 33): the drawing rests, the pointer is a crosshair and a click on
+   * the map reports its place instead of adding a vertex. */
+  proposing?: boolean;
+  onProposeAt?: (lonLat: [number, number]) => void;
+  /** The candidates drawn as faint outlines while the person chooses. */
+  ghosts?: ProposedArea[];
+  /** A shape to put in the editor, selected: the candidate chosen. A new object loads again. */
+  load?: { geometry: GeoJSON.Geometry } | null;
 }) {
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
@@ -85,20 +102,48 @@ export function DrawMap({
       session.current = null;
     };
   }, [mapRef, ready, kind, onChange]);
+  // propose mode: the session rests and the map's own click reports where
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !proposing) return;
+    session.current?.idle();
+    map.getCanvas().style.cursor = "crosshair";
+    const onClick = (e: { lngLat: { lng: number; lat: number } }) =>
+      onProposeAt?.([e.lngLat.lng, e.lngLat.lat]);
+    map.on("click", onClick);
+    return () => {
+      map.off("click", onClick);
+      map.getCanvas().style.cursor = "";
+    };
+  }, [mapRef, ready, proposing, onProposeAt]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    ensureGhostLayers(map);
+    setGhosts(map, ghosts);
+  }, [mapRef, ready, ghosts]);
+  useEffect(() => {
+    if (!load || !session.current) return;
+    session.current.load(kind, load.geometry);
+  }, [load, kind]);
   return (
     <div className="space-y-2">
       <div ref={container} className="z-0 h-72 w-full rounded-md border" />
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          {kind === "point"
-            ? t("Click to place the site")
-            : initial
-              ? t(
-                  "Drag a vertex to move it, a midpoint to add one; Delete removes a vertex",
-                )
-              : t(
-                  "Click to add vertices, click the last one again or press Enter to finish",
-                )}
+          {proposing
+            ? t(
+                "Click inside the area you want; the roads, rivers and areas around it decide the shape",
+              )
+            : kind === "point"
+              ? t("Click to place the site")
+              : initial || load
+                ? t(
+                    "Drag a vertex to move it, a midpoint to add one; Delete removes a vertex",
+                  )
+                : t(
+                    "Click to add vertices, click the last one again or press Enter to finish",
+                  )}
         </span>
         <Button
           type="button"

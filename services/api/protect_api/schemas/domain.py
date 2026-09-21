@@ -203,6 +203,32 @@ class FenceMonitorUpdate(BaseModel):
     feature_id: uuid.UUID | None = None
 
 
+class ProposeAreaRequest(BaseModel):
+    """Where a person clicked and how far around it to read (phase 33, decision D270)."""
+
+    lon: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-90, le=90)
+    radius_m: int = Field(default=1500, ge=200, le=5000)
+
+
+class ProposedArea(BaseModel):
+    """One candidate: the face enclosed by roads and water (`enclosed`), or an OpenStreetMap
+    area containing the click (`osm`), with its size and whether the read box cut it."""
+
+    kind: str
+    name: str
+    geometry: dict[str, Any]
+    area_m2: int
+    clipped: bool
+    osm_id: int | None = None
+    tags: dict[str, str] = Field(default_factory=dict)
+
+
+class ProposedAreas(BaseModel):
+    candidates: list[ProposedArea]
+    attribution: str
+
+
 class FenceStatusRead(BaseModel):
     """A fence line's reading (decisions D264 and D265): its level with the staleness rule
     applied at the time of reading, its sections, and what each monitor last said."""

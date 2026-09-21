@@ -120,6 +120,7 @@ nav:
       - Notifications: administration/notifications.md
       - Icons: administration/icons.md
       - Organizations: administration/organizations.md
+      - Features: administration/features.md
       - Pages per role: administration/pages.md
   - Operations:
       - operations/index.md

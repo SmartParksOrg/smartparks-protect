@@ -113,6 +113,13 @@ import {
   SaveFeatureDialog,
   type SaveFeatureValues,
 } from "@/components/map/DrawBar";
+import {
+  ensureGhostLayers,
+  removeGhostLayers,
+  setGhosts,
+  type ProposedArea,
+} from "@/components/map/propose";
+import { useProposeArea } from "@/hooks/useProposeArea";
 import { FeaturePanel } from "@/components/map/FeaturePanel";
 import { boundsOf } from "@/components/map/fit";
 import {
@@ -790,9 +797,13 @@ export function MapPage() {
   const [drawn, setDrawn] = useState<DrawState>(EMPTY_DRAW);
   const [saveOpen, setSaveOpen] = useState(false);
   const drawSession = useRef<DrawSession | null>(null);
+  // propose mode (phase 33): a click asks what encloses it, a candidate goes into the editor
+  const [proposing, setProposing] = useState(false);
+  const proposal = useProposeArea(projectId);
   const endTool = useCallback(() => {
     setTool(null);
     setSaveOpen(false);
+    setProposing(false);
   }, []);
   const createFeature = useMutationToast({
     // a circle is kept as its polygon with the centre and radius in the attributes (D172)
@@ -1115,8 +1126,53 @@ export function MapPage() {
   }, [mapRef, ready, tool]);
   const changeDrawKind = (kind: DrawKind) => {
     setDrawKind(kind);
+    setProposing(false);
+    proposal.reset();
     drawSession.current?.begin(kind);
   };
+  const toggleProposing = () => {
+    const next = !proposing;
+    setProposing(next);
+    proposal.reset();
+    if (next) drawSession.current?.idle();
+    else drawSession.current?.begin(drawKind);
+  };
+  const pickCandidate = (candidate: ProposedArea) => {
+    setDrawKind("polygon");
+    setProposing(false);
+    proposal.reset();
+    drawSession.current?.load("polygon", candidate.geometry);
+  };
+  // while proposing, the map's own click asks the API; the candidates show as faint outlines
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !proposing) return;
+    map.getCanvas().style.cursor = "crosshair";
+    const onClick = (e: { lngLat: { lng: number; lat: number } }) =>
+      proposal.mutate([e.lngLat.lng, e.lngLat.lat]);
+    map.on("click", onClick);
+    return () => {
+      map.off("click", onClick);
+      map.getCanvas().style.cursor = "";
+    };
+    // the mutation object is stable enough for a click; re-binding per render is not needed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapRef, ready, proposing]);
+  const candidates = proposal.data?.candidates;
+  const ghosts = useMemo(
+    () => (proposing ? (candidates ?? []) : []),
+    [proposing, candidates],
+  );
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (!tool) {
+      removeGhostLayers(map);
+      return;
+    }
+    ensureGhostLayers(map);
+    setGhosts(map, ghosts);
+  }, [mapRef, ready, tool, ghosts]);
 
   // Locate (decision D173): a toggle that watches the browser's position and follows it
   const [locate, setLocate] = useState<LocateStatus>("off");
@@ -1805,6 +1861,14 @@ export function MapPage() {
             onKind={changeDrawKind}
             onSave={() => setSaveOpen(true)}
             onCancel={endTool}
+            propose={{
+              active: proposing,
+              busy: proposal.isPending,
+              proposal: proposal.data ?? null,
+              error: proposal.error?.message ?? null,
+              onToggle: toggleProposing,
+              onPick: pickCandidate,
+            }}
           />
         )}
         {tracksOn && !tracksCardHidden && (

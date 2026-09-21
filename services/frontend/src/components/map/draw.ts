@@ -51,6 +51,9 @@ export interface DrawSession {
   /** Start from an existing shape instead, selected so its vertices can be dragged, added
    * on a midpoint or deleted (a fence line being corrected, phase 32). */
   load(kind: DrawKind, geometry: GeoJSON.Geometry): void;
+  /** Stop drawing and editing without removing what is drawn: the map's own clicks reach
+   * the page again (a click that proposes an area, phase 33). */
+  idle(): void;
   /** The current state. */
   state(): DrawState;
   /** Remove everything drawn. */
@@ -222,6 +225,9 @@ export function createDrawSession(
       draw.setMode("select");
       if (added?.valid && added.id != null) draw.selectFeature(added.id);
       emit();
+    },
+    idle() {
+      draw.setMode("static");
     },
     state: current,
     clear() {

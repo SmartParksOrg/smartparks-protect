@@ -1,6 +1,7 @@
 """Entities, features and device-to-entity assignments inside a project."""
 
 import uuid
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
@@ -48,11 +49,16 @@ from protect_api.schemas.domain import (
     FenceMonitorRead,
     FenceMonitorUpdate,
     FenceStatusRead,
+    ProposeAreaRequest,
+    ProposedArea,
+    ProposedAreas,
 )
 from protect_api.visibility import group_and_subgroups
 from shared.bus import RedisStreamsBus
+from shared.config import get_settings
 from shared.curation.apply import recompute_current_state
 from shared.database import get_session
+from shared.domain.areas import ATTRIBUTION, overpass_query, propose
 from shared.domain.assignments import resolve_attribution
 from shared.domain.attribution import QueueResult, publish_job
 from shared.domain.fence import (
@@ -78,9 +84,11 @@ from shared.models import (
     FenceStatus,
     Group,
 )
+from shared.overpass import fetch_overpass
 from shared.permissions import Permission, permissions_for
 from shared.pictures import PICTURE_LANDSCAPE
 from shared.timeutil import utc_now
+from shared.trace import ApplicationError
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["entities"])
 
@@ -466,6 +474,27 @@ async def create_feature(
     )
     await session.commit()
     return feature_read(feature)
+
+
+@router.post("/features/propose", response_model=ProposedAreas)
+async def propose_area(
+    body: ProposeAreaRequest,
+    context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
+) -> ProposedAreas:
+    """The areas a click could mean (phase 33, decision D270): the face of OpenStreetMap's
+    roads, paths, rivers and fences that encloses the point, and every OpenStreetMap area that
+    contains it, smallest first. Read from the Overpass API named by `OVERPASS_URL` over a box
+    of `radius_m` around the click; nothing is stored. A 502 says OpenStreetMap did not answer."""
+    query = overpass_query(body.lon, body.lat, body.radius_m)
+    try:
+        document = await fetch_overpass(get_settings().overpass_url, query)
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, error.message) from error
+    candidates = propose(document, body.lon, body.lat, body.radius_m)
+    return ProposedAreas(
+        candidates=[ProposedArea(**asdict(candidate)) for candidate in candidates],
+        attribution=ATTRIBUTION,
+    )
 
 
 async def _project_feature(

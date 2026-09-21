@@ -590,6 +590,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/features/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Area
+         * @description The areas a click could mean (phase 33, decision D270): the face of OpenStreetMap's
+         *     roads, paths, rivers and fences that encloses the point, and every OpenStreetMap area that
+         *     contains it, smallest first. Read from the Overpass API named by `OVERPASS_URL` over a box
+         *     of `radius_m` around the click; nothing is stored. A 502 says OpenStreetMap did not answer.
+         */
+        post: operations["propose_area_api_v1_projects__project_id__features_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/features/{feature_id}": {
         parameters: {
             query?: never;
@@ -11053,6 +11076,53 @@ export interface components {
             /** Analysis Modules */
             analysis_modules?: string[];
         };
+        /**
+         * ProposeAreaRequest
+         * @description Where a person clicked and how far around it to read (phase 33, decision D270).
+         */
+        ProposeAreaRequest: {
+            /** Lon */
+            lon: number;
+            /** Lat */
+            lat: number;
+            /**
+             * Radius M
+             * @default 1500
+             */
+            radius_m: number;
+        };
+        /**
+         * ProposedArea
+         * @description One candidate: the face enclosed by roads and water (`enclosed`), or an OpenStreetMap
+         *     area containing the click (`osm`), with its size and whether the read box cut it.
+         */
+        ProposedArea: {
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Geometry */
+            geometry: {
+                [key: string]: unknown;
+            };
+            /** Area M2 */
+            area_m2: number;
+            /** Clipped */
+            clipped: boolean;
+            /** Osm Id */
+            osm_id?: number | null;
+            /** Tags */
+            tags?: {
+                [key: string]: string;
+            };
+        };
+        /** ProposedAreas */
+        ProposedAreas: {
+            /** Candidates */
+            candidates: components["schemas"]["ProposedArea"][];
+            /** Attribution */
+            attribution: string;
+        };
         /** QueueItem */
         QueueItem: {
             /** Id */
@@ -14118,6 +14188,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeatureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_area_api_v1_projects__project_id__features_propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeAreaRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposedAreas"];
                 };
             };
             /** @description Validation Error */

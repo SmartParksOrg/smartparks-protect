@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     public_url: str = Field(
         default="http://localhost:3000", description="Where links in emails point to"
     )
+    overpass_url: str = Field(
+        default="https://overpass-api.de/api/interpreter",
+        description="The Overpass API that answers 'propose an area' with OpenStreetMap's "
+        "roads, rivers, fences and areas around a click (decision D270); a server may point "
+        "it at its own instance",
+    )
     credentials_key: str = Field(
         min_length=16, description="Key for encrypting data source credentials at rest"
     )

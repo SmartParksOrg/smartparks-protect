@@ -40,7 +40,7 @@ A viewer sees the pages below. The Operator and Analyst roles see the same pages
 ## Project admin
 
 Everything a viewer sees, plus the Network section (Traffic, Gateways, Trace explorer), Rules,
-Automations, Integrations, Curation and the Project admin section (Members with its Roles and Invitations tabs, the scope picker and the role editor; Features, Groups,
+Automations, Integrations, Curation and the Project admin section (Members with its Roles and Invitations tabs, the scope picker and the role editor; Features, with New feature, Import and Propose, see [features](features.md); Groups,
 Notifications, Settings).
 
 ## Server admin

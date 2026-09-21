@@ -1,12 +1,17 @@
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Circle, MapPin, Minus, Pentagon, X } from "lucide-react";
+import { Circle, MapPin, Minus, Pentagon, Wand2, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import type { DrawKind, DrawState } from "@/components/map/draw";
+import type {
+  ProposedArea,
+  ProposedAreas as Proposal,
+} from "@/components/map/propose";
+import { ProposedAreas } from "@/components/map/ProposedAreas";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,6 +37,17 @@ import { formatArea, formatLength, measure } from "@/lib/geodesy";
  * area or radius of the shape while it is drawn and after, and the way out: Save as feature for
  * a drawing, Done for a measurement, which is kept nowhere.
  */
+/** Propose mode on the live map (phase 33): on or off, what the last click answered, and
+ * the way to take a candidate into the editor. */
+export interface ProposeControls {
+  active: boolean;
+  busy: boolean;
+  proposal: Proposal | null;
+  error: string | null;
+  onToggle: () => void;
+  onPick: (candidate: ProposedArea) => void;
+}
+
 export function DrawBar({
   purpose,
   kind,
@@ -39,6 +55,7 @@ export function DrawBar({
   onKind,
   onSave,
   onCancel,
+  propose,
 }: {
   purpose: "draw" | "measure";
   kind: DrawKind;
@@ -46,6 +63,7 @@ export function DrawBar({
   onKind: (kind: DrawKind) => void;
   onSave: () => void;
   onCancel: () => void;
+  propose?: ProposeControls;
 }) {
   const { t } = useTranslation();
   const { geometry, live, circle } = state;
@@ -80,32 +98,63 @@ export function DrawBar({
           .map(({ kind: k, label, icon: Icon }) => (
             <Button
               key={k}
-              variant={kind === k ? "default" : "outline"}
+              variant={kind === k && !propose?.active ? "default" : "outline"}
               size="sm"
               className="h-8"
-              aria-pressed={kind === k}
+              aria-pressed={kind === k && !propose?.active}
               onClick={() => onKind(k)}
             >
               <Icon className="size-4" /> {label}
             </Button>
           ))}
+        {purpose === "draw" && propose && (
+          <Button
+            variant={propose.active ? "default" : "outline"}
+            size="sm"
+            className="h-8"
+            aria-pressed={propose.active}
+            title={t(
+              "Propose an area from the roads, rivers and areas on the map",
+            )}
+            onClick={propose.onToggle}
+          >
+            <Wand2 className="size-4" /> {t("Propose")}
+          </Button>
+        )}
       </div>
+      {propose?.active && (
+        <div className="mt-2 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            {t(
+              "Click inside the area you want; the roads, rivers and areas around it decide the shape.",
+            )}
+          </p>
+          <ProposedAreas
+            proposal={propose.proposal}
+            busy={propose.busy}
+            error={propose.error}
+            onPick={propose.onPick}
+          />
+        </div>
+      )}
       <div className="mt-2 text-xs text-muted-foreground">
-        {geometry === null
-          ? kind === "point"
-            ? t("Tap the map to place the point.")
+        {propose?.active
+          ? null
+          : geometry === null
+            ? kind === "point"
+              ? t("Tap the map to place the point.")
+              : kind === "circle"
+                ? t(
+                    "Drag from the centre to the radius, or click the centre, move and click again; Escape cancels.",
+                  )
+                : t(
+                    "Tap the map to add vertices, tap the last one again or press Enter to finish, Escape to cancel.",
+                  )
             : kind === "circle"
-              ? t(
-                  "Drag from the centre to the radius, or click the centre, move and click again; Escape cancels.",
-                )
+              ? t("Drag the circle to move it; Escape clears.")
               : t(
-                  "Tap the map to add vertices, tap the last one again or press Enter to finish, Escape to cancel.",
-                )
-          : kind === "circle"
-            ? t("Drag the circle to move it; Escape clears.")
-            : t(
-                "Drag a vertex to move it, a midpoint to add one; Escape clears.",
-              )}
+                  "Drag a vertex to move it, a midpoint to add one; Escape clears.",
+                )}
       </div>
       {measured && (
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
