@@ -143,6 +143,15 @@ export interface DeviceFeatureProperties {
 
 const OFFLINE_AFTER_MS = 24 * 3600_000;
 
+/** The icon size of a layer: the selected marker, whose image carries a halo, a fifth larger
+ * than the rest so it is the one the eye finds (Tim, 2026-09-21). */
+const SELECTED_SIZE = (size: number): ExpressionSpecification => [
+  "case",
+  ["in", ":selected", ["get", "marker"]],
+  Math.round(size * 1.2 * 100) / 100,
+  size,
+];
+
 export function stateFor(
   props: EntityFeatureProperties,
   selectedId: string | null,
@@ -203,7 +212,7 @@ export function ensureEntityLayers(map: MapLibreMap): void {
     filter: ["!", ["has", "point_count"]],
     layout: {
       "icon-image": ["get", "marker"],
-      "icon-size": 0.9,
+      "icon-size": SELECTED_SIZE(0.9),
       "icon-allow-overlap": true,
       "text-field": ["get", "name"],
       "text-size": 11,
@@ -356,7 +365,7 @@ export function ensureDeviceLayers(map: MapLibreMap): void {
       filter: ["!", ["has", "point_count"]],
       layout: {
         "icon-image": ["get", "marker"],
-        "icon-size": 0.75,
+        "icon-size": SELECTED_SIZE(0.75),
         // on its position like an entity (Tim, 2026-09-15); the entity layers sit above the
         // device layers, so an animal and its device at one place show the animal
         "icon-allow-overlap": true,
@@ -559,7 +568,8 @@ export function assignTrackColors(
     rememberedColors.set(id, color);
   };
   for (const track of tracks)
-    if (track.color && !out.has(track.entityId)) claim(track.entityId, track.color);
+    if (track.color && !out.has(track.entityId))
+      claim(track.entityId, track.color);
   // first the colours already on the map, then each track's own colour, so a track that was
   // shown alone does not change when a second one arrives
   for (const track of tracks) {

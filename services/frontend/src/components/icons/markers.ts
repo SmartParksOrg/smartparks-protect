@@ -8,21 +8,30 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 
 import { markerFamily, resolveIcon } from "@/components/icons/registry";
 
-export type MarkerState = "normal" | "warning" | "critical" | "offline" | "selected";
+export type MarkerState =
+  "normal" | "warning" | "critical" | "offline" | "selected";
 
 const STATE_COLOURS: Record<MarkerState, string> = {
   normal: "#52735E",
   warning: "#C6B187",
   critical: "#A13D2D",
   offline: "#8A9590",
-  selected: "#2F4A3A",
+  // a blue no state uses, with a halo behind the marker, so the selected one stands out
+  // from every other at a glance (Tim, 2026-09-21: the darker green was not enough)
+  selected: "#2563EB",
 };
+
+const SELECTED_HALO = "rgba(37, 99, 235, 0.28)";
 
 export function markerImageId(iconKey: string, state: MarkerState): string {
   return `marker:${iconKey}:${state}`;
 }
 
-async function svgToImage(svg: string, colour: string, size: number): Promise<HTMLImageElement> {
+async function svgToImage(
+  svg: string,
+  colour: string,
+  size: number,
+): Promise<HTMLImageElement> {
   const coloured = svg.replace(/currentColor/g, colour);
   const image = new Image(size, size);
   image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(coloured)}`;
@@ -30,7 +39,11 @@ async function svgToImage(svg: string, colour: string, size: number): Promise<HT
   return image;
 }
 
-export async function ensureMarkerImage(map: MapLibreMap, iconKey: string, state: MarkerState): Promise<string> {
+export async function ensureMarkerImage(
+  map: MapLibreMap,
+  iconKey: string,
+  state: MarkerState,
+): Promise<string> {
   const id = markerImageId(iconKey, state);
   if (map.hasImage(id)) return id;
   const { svg, entry } = resolveIcon(iconKey);
@@ -42,9 +55,19 @@ export async function ensureMarkerImage(map: MapLibreMap, iconKey: string, state
   const ctx = canvas.getContext("2d");
   if (!ctx) return id;
   const colour = STATE_COLOURS[state];
+  if (state === "selected") {
+    // the halo fills the image; the marker itself is drawn smaller inside it
+    ctx.fillStyle = SELECTED_HALO;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.translate(size / 2, size / 2);
+    ctx.scale(0.8, 0.8);
+    ctx.translate(-size / 2, -size / 2);
+  }
   ctx.fillStyle = "#ffffff";
   ctx.strokeStyle = colour;
-  ctx.lineWidth = 5;
+  ctx.lineWidth = state === "selected" ? 7 : 5;
   ctx.beginPath();
   if (family === "entity") {
     ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
@@ -62,6 +85,7 @@ export async function ensureMarkerImage(map: MapLibreMap, iconKey: string, state
   const icon = await svgToImage(svg, colour, size);
   const inset = family === "event" ? 18 : 14;
   ctx.drawImage(icon, inset, inset, size - inset * 2, size - inset * 2);
-  if (!map.hasImage(id)) map.addImage(id, ctx.getImageData(0, 0, size, size), { pixelRatio: 2 });
+  if (!map.hasImage(id))
+    map.addImage(id, ctx.getImageData(0, 0, size, size), { pixelRatio: 2 });
   return id;
 }

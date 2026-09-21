@@ -42,6 +42,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- The selected entity or device on the live map stands out (Tim, 2026-09-21: a slightly darker green was not enough): its marker takes a blue ring no state uses, a translucent blue halo behind it, and a fifth more size than the others.
+
 - The Data explorer's `via` column shows the route a position came by as well as a status message's (Tim, 2026-09-20): it read as empty on every position row, which looked like missing data. Only status messages store the route on the state; a position stores it on its attributes, and the row now shows either. The moment does not count as a state record for it, and a records export gets the column whenever a position in the window carries a route.
 
 - The fence line's panel on the live map reads as one line per section — the range and the monitors at its ends — with each monitor's voltage chart folded behind its reading, instead of every word wrapping in the narrow value column and three charts stacked open (Tim, 2026-09-19, after looking at it on a phone, a tablet and a desktop).
