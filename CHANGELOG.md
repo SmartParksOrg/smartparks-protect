@@ -24,7 +24,17 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - The New feature dialog's drawing map starts over what the project already has: its features, else its entities and devices, else the map's usual start (Tim, 2026-09-19). It started over southern Africa for everyone.
 
+- **Several areas kept as one zone** (phase 33, decision D274; Tim, 2026-09-21: Zuid-Kennemerland, Duin en Kruidberg, Midden-Herenduin and Heerenduinen are one dune area to the people who patrol them). In the Propose list, on the Features page and in the live map's draw tool, candidates are ticked and "Use N areas as one zone" puts their union in the editor; on the Features page, rows are ticked and "Combine N into one zone" shows the union over its parts with its size, takes a name and a type, and saves it, with the parts kept unless they are asked to go with it. Rules, the grazing analysis and the map read the result as one zone, and ground two parts share is counted once. Outlines that share an edge are snapped together first, so a zone does not come back in pieces over a sliver of a gap. API: `POST /projects/{id}/features/union` and `/features/combine`.
+
+- **An area is found by its name** (phase 33, decision D273; Tim, 2026-09-21: he knew the area was called Kraansvlak and looked for it on openstreetmap.org rather than hunting for the spot to click). Under Propose, on the Features page and in the live map's draw tool, a box takes a name: the OpenStreetMap areas whose name holds that text, inside the part of the map on screen, come back as the same candidates a click gives, best match first and the larger of two equal matches before the smaller. Only areas answer, never a street of the same name; a view wider than about 150 km is searched in the middle and the list says so. API: `POST /projects/{id}/features/search-areas`.
+
 ### Fixed
+
+- A proposed area with an enclave inside it was lost between the list and the editor: the drawing editor holds one polygon of one ring, and a shape with a hole was handed to it, silently dropped, and the dialog then asked for the geometry to be drawn first. A shape the editor cannot hold is now kept as it came, drawn as an outline and saved that way, and the interface says why it cannot be corrected by hand.
+
+- The ways people walk on no longer cut a proposed area (decision D272; Tim, 2026-09-21: the proposals were too rough to use). Footpaths, paths, steps, cycleways and bridleways cross a landscape without dividing it, and a box of three kilometres over the Kennemer dunes holds 281 footways and 125 paths, so the face a click proposed was a fragment: the same click gives 47.5 ha instead of 6.1 ha now that roads, tracks, water, fences and railways alone cut it. A path that is also a fence still cuts.
+
+- A proposed area failed about one click in three (Tim's testing on dev, 2026-09-21). The public Overpass server refuses a burst rather than queueing it, with a 429, 502, 503 or 504 within seconds, and the call was made once. A refused call is now made once more after a short pause, and only the second refusal reaches the person; a server's final word, such as a 400 on a bad query, is still passed straight on.
 
 - A group's settings could not be reached on a touch screen (Tim, 2026-09-21): the Edit, New subgroup and Delete buttons of a row showed on hover only. They now stay visible on the group that is open and on every row where there is no hover, and the entity list is headed by the open group's colour, name and description with Edit group and New subgroup beside it.
 

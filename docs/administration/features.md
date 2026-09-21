@@ -32,11 +32,46 @@ WGS 84 is reprojected when its `.prj` file is in the zip.
 Most areas are already marked on the ground: a block between two roads and a river, a fenced
 camp, a forest or a lake the map knows. Under "New feature" for a zone or a geofence, and in
 the live map's draw tool, "Propose" turns a click into candidates instead of a vertex: the
-server reads OpenStreetMap's roads, paths, rivers, fences and railways in a box of 1.5 km
+server reads OpenStreetMap's roads, tracks, rivers, fences and railways in a box of 1.5 km
 around the click, joins them into the faces they enclose, and answers the face that contains
 the point together with every OpenStreetMap area that contains it (a protected area, a forest,
-a lake, a landuse), smallest first, with its size. The candidates show as faint outlines;
-"Use" puts one in the editor and brings it into view, where it is adjusted like any drawn shape, named and saved; an area OpenStreetMap names fills the name in.
+a lake, a landuse), smallest first, with its size. The ways people walk on — footpaths, paths,
+steps, cycleways and bridleways — do not cut the face: a dune reserve is threaded with them,
+and a block cut by every one of them is a fragment of a few hectares rather than a zone. The
+candidates show as faint outlines; "Use" puts one in the editor and brings it into view, where
+it is adjusted like any drawn shape, named and saved; an area OpenStreetMap names fills the
+name in.
+
+### Or find it by name
+
+Under the same Propose, a box takes a name: type "Kraansvlak" and the OpenStreetMap areas whose
+name holds that text, in the part of the map on screen, come back as the same candidates, best
+match first. It is the way in when you know what the area is called and not exactly where its
+edge runs — and it does not depend on clicking the right spot. Only areas answer, never a
+street or a building of the same name. Move the map over the reserve first; if the view is
+wider than about 150 km, its middle is searched and the list says so.
+
+## Several areas as one zone
+
+A zone a reserve works with is often several areas on the map: Zuid-Kennemerland, Duin en
+Kruidberg, Midden-Herenduin and Heerenduinen are one dune area to the people who patrol them.
+They are combined into one feature, which rules, the grazing analysis and the map then read as
+a single zone.
+
+- **While proposing.** Tick as many candidates as you want in the Propose list — after a name
+  search or a click — and "Use N areas as one zone" puts their union in the editor, ready to be
+  named and saved.
+- **From the features you already have.** Tick the rows on the Features page and "Combine N
+  into one zone" shows the union over its parts with its size, takes a name and a type, and
+  saves it. The parts stay unless you ask for them to be removed with it.
+
+Ground that two parts share is counted once, so the combined zone's hectares are the ground it
+covers, not the sum of its parts. If you keep the parts as zones of their own **and** the
+combined zone, the grazing analysis reports both, and the same ground appears in both rows.
+
+A zone whose parts do not touch is kept as one feature in several pieces, and a zone with an
+enclave inside it keeps its hole; both work everywhere, but the drawing editor holds one ring
+at a time, so it cannot correct them vertex by vertex. The interface says so when it happens.
 
 What to expect:
 
@@ -47,7 +82,8 @@ What to expect:
 - The data is OpenStreetMap's, under the ODbL, and the attribution is shown under the list. A
   feature made from it is yours to edit; nothing links back.
 - The server asks the public Overpass API by default (`OVERPASS_URL`); a server that clicks a
-  lot can point that at its own instance. The public service refuses bursts, and the interface
-  says so when it does.
+  lot can point that at its own instance. The public service refuses bursts: a refused call is
+  made once more after a couple of seconds, and if that is refused too the interface says so.
+  Click again, or try a smaller radius.
 - Nothing is proposed from satellite imagery. Where OpenStreetMap has nothing, the shape is
   drawn by hand.

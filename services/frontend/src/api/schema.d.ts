@@ -602,11 +602,82 @@ export interface paths {
         /**
          * Propose Area
          * @description The areas a click could mean (phase 33, decision D270): the face of OpenStreetMap's
-         *     roads, paths, rivers and fences that encloses the point, and every OpenStreetMap area that
-         *     contains it, smallest first. Read from the Overpass API named by `OVERPASS_URL` over a box
-         *     of `radius_m` around the click; nothing is stored. A 502 says OpenStreetMap did not answer.
+         *     roads, water, fences and railways that encloses the point (the ways people walk on do not
+         *     cut it, decision D272), and every OpenStreetMap area that contains it, smallest first. Read
+         *     from the Overpass API named by `OVERPASS_URL` over a box of `radius_m` around the click;
+         *     nothing is stored. A 502 says OpenStreetMap did not answer.
          */
         post: operations["propose_area_api_v1_projects__project_id__features_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/features/union": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Union Areas
+         * @description Several areas as one shape (phase 33, decision D274): four reserves beside each other
+         *     are one zone to the people who patrol them. Takes the project's features, shapes that are
+         *     not saved yet, or both, and answers their union without storing anything, so the shape can
+         *     be seen and named before it is kept. Pieces that touch become one.
+         */
+        post: operations["union_areas_api_v1_projects__project_id__features_union_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/features/combine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Combine Features
+         * @description One feature out of several of the project's own (decision D274), in one go: the union is
+         *     saved under a new name and the parts are kept unless `remove_parts` says otherwise. Both
+         *     acts are in the audit log; a part that is still referred to keeps the whole thing from
+         *     being saved rather than half of it.
+         */
+        post: operations["combine_features_api_v1_projects__project_id__features_combine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/features/search-areas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Areas By Name
+         * @description The areas of a name (phase 33, decision D273): somebody who knows what the area is
+         *     called types it instead of finding the spot to click, and the OpenStreetMap areas whose
+         *     name holds the text, inside the part of the map they are looking at, come back as the same
+         *     candidates a click gives. A view wider than the widest search reads its middle and says so.
+         *     Nothing is stored; a 502 says OpenStreetMap did not answer.
+         */
+        post: operations["search_areas_by_name_api_v1_projects__project_id__features_search_areas_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6298,6 +6369,38 @@ export interface components {
              */
             until: string;
         };
+        /**
+         * CombineFeaturesRequest
+         * @description Several of the project's features as one new feature (decision D274). The parts are
+         *     kept unless `remove_parts` says otherwise, since combining is not a way to lose work.
+         */
+        CombineFeaturesRequest: {
+            /** Name */
+            name: string;
+            feature_type: components["schemas"]["FeatureType"];
+            /** Feature Ids */
+            feature_ids: string[];
+            /**
+             * Remove Parts
+             * @default false
+             */
+            remove_parts: boolean;
+        };
+        /**
+         * CombinedArea
+         * @description One shape out of several: what it looks like, how large it is, and in how many pieces
+         *     it lies. More than one piece cannot be corrected vertex by vertex in the editor.
+         */
+        CombinedArea: {
+            /** Geometry */
+            geometry: {
+                [key: string]: unknown;
+            };
+            /** Area M2 */
+            area_m2: number;
+            /** Parts */
+            parts: number;
+        };
         /** CommandCreate */
         CommandCreate: {
             /** Action Key */
@@ -11127,6 +11230,11 @@ export interface components {
             candidates: components["schemas"]["ProposedArea"][];
             /** Attribution */
             attribution: string;
+            /**
+             * Narrowed
+             * @default false
+             */
+            narrowed: boolean;
         };
         /** QueueItem */
         QueueItem: {
@@ -11693,6 +11801,23 @@ export interface components {
             key: string;
             /** Description */
             description: string;
+        };
+        /**
+         * SearchAreasRequest
+         * @description A name and the part of the map to look in (phase 33, decision D273): the view's corners,
+         *     narrowed by the domain when they span more than the widest search.
+         */
+        SearchAreasRequest: {
+            /** Name */
+            name: string;
+            /** West */
+            west: number;
+            /** South */
+            south: number;
+            /** East */
+            east: number;
+            /** North */
+            north: number;
         };
         /** SearchHit */
         SearchHit: {
@@ -12318,6 +12443,17 @@ export interface components {
              * @default 1
              */
             factor: number;
+        };
+        /**
+         * UnionAreasRequest
+         * @description The areas to join into one (phase 33, decision D274): features of the project, shapes
+         *     that are not saved yet (a proposal's candidates), or both. At least two in all.
+         */
+        UnionAreasRequest: {
+            /** Feature Ids */
+            feature_ids?: string[];
+            /** Geometries */
+            geometries?: components["schemas"]["GeoJSONGeometry"][];
         };
         /** UnknownIdentity */
         UnknownIdentity: {
@@ -14218,6 +14354,111 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProposeAreaRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposedAreas"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    union_areas_api_v1_projects__project_id__features_union_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnionAreasRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CombinedArea"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    combine_features_api_v1_projects__project_id__features_combine_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CombineFeaturesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_areas_by_name_api_v1_projects__project_id__features_search_areas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchAreasRequest"];
             };
         };
         responses: {

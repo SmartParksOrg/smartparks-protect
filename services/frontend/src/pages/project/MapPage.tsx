@@ -115,10 +115,13 @@ import {
 } from "@/components/map/DrawBar";
 import {
   ensureGhostLayers,
+  heldByEditor,
   removeGhostLayers,
   setGhosts,
+  shapeParts,
   type ProposedArea,
 } from "@/components/map/propose";
+import { useUnionAreas } from "@/hooks/useCombineAreas";
 import { useProposeArea } from "@/hooks/useProposeArea";
 import { FeaturePanel } from "@/components/map/FeaturePanel";
 import { boundsOf } from "@/components/map/fit";
@@ -799,11 +802,19 @@ export function MapPage() {
   const drawSession = useRef<DrawSession | null>(null);
   // propose mode (phase 33): a click asks what encloses it, a candidate goes into the editor
   const [proposing, setProposing] = useState(false);
+  const [askedBy, setAskedBy] = useState<"click" | "name">("click");
+  // a shape the drawing editor cannot hold, kept as it came (decision D274)
+  const [kept, setKept] = useState<{
+    geometry: GeoJSON.Geometry;
+    parts: number;
+    holes: number;
+  } | null>(null);
   const proposal = useProposeArea(projectId);
   const endTool = useCallback(() => {
     setTool(null);
     setSaveOpen(false);
     setProposing(false);
+    setKept(null);
   }, []);
   const createFeature = useMutationToast({
     // a circle is kept as its polygon with the centre and radius in the attributes (D172)
@@ -1137,19 +1148,56 @@ export function MapPage() {
     if (next) drawSession.current?.idle();
     else drawSession.current?.begin(drawKind);
   };
-  const pickCandidate = (candidate: ProposedArea) => {
+  // a shape terra-draw can hold goes into the drawing session and is corrected like any
+  // polygon; a zone in several pieces, or one with an enclave inside it, is kept as it came,
+  // drawn as an outline and saved from there (decision D274)
+  const takeShape = (geometry: GeoJSON.Geometry) => {
     setDrawKind("polygon");
     setProposing(false);
     proposal.reset();
-    drawSession.current?.load("polygon", candidate.geometry);
+    if (heldByEditor(geometry)) {
+      setKept(null);
+      drawSession.current?.load("polygon", geometry);
+      return;
+    }
+    drawSession.current?.clear();
+    setKept({ geometry, ...shapeParts(geometry) });
+    setDrawn({ geometry, live: geometry, circle: null });
+  };
+  const pickCandidate = (candidate: ProposedArea) =>
+    takeShape(candidate.geometry);
+  // several ticked areas as one zone (decision D274): the union is worked out by the API
+  const union = useUnionAreas(projectId);
+  const combineCandidates = (chosen: ProposedArea[]) => {
+    union.mutate(
+      { geometries: chosen.map((c) => c.geometry) },
+      { onSuccess: (combined) => takeShape(combined.geometry) },
+    );
+  };
+  // a name is looked for in what the map shows, so panning to the reserve is enough (D273)
+  const searchByName = (name: string) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const view = map.getBounds();
+    setAskedBy("name");
+    proposal.mutate({
+      kind: "name",
+      name,
+      bounds: [
+        [view.getWest(), view.getSouth()],
+        [view.getEast(), view.getNorth()],
+      ],
+    });
   };
   // while proposing, the map's own click asks the API; the candidates show as faint outlines
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !proposing) return;
     map.getCanvas().style.cursor = "crosshair";
-    const onClick = (e: { lngLat: { lng: number; lat: number } }) =>
-      proposal.mutate([e.lngLat.lng, e.lngLat.lat]);
+    const onClick = (e: { lngLat: { lng: number; lat: number } }) => {
+      setAskedBy("click");
+      proposal.mutate({ kind: "click", at: [e.lngLat.lng, e.lngLat.lat] });
+    };
     map.on("click", onClick);
     return () => {
       map.off("click", onClick);
@@ -1160,8 +1208,21 @@ export function MapPage() {
   }, [mapRef, ready, proposing]);
   const candidates = proposal.data?.candidates;
   const ghosts = useMemo(
-    () => (proposing ? (candidates ?? []) : []),
-    [proposing, candidates],
+    () =>
+      kept
+        ? [
+            {
+              kind: "osm",
+              name: "",
+              geometry: kept.geometry,
+              area_m2: 0,
+              clipped: false,
+            },
+          ]
+        : proposing
+          ? (candidates ?? [])
+          : [],
+    [proposing, candidates, kept],
   );
   useEffect(() => {
     const map = mapRef.current;
@@ -1866,8 +1927,12 @@ export function MapPage() {
               busy: proposal.isPending,
               proposal: proposal.data ?? null,
               error: proposal.error?.message ?? null,
+              asked: askedBy,
               onToggle: toggleProposing,
               onPick: pickCandidate,
+              onSearch: searchByName,
+              onCombine: combineCandidates,
+              kept: kept ? { parts: kept.parts, holes: kept.holes } : null,
             }}
           />
         )}

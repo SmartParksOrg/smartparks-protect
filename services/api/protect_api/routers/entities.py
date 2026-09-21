@@ -33,6 +33,8 @@ from protect_api.schemas.domain import (
     AssignmentChange,
     AssignmentEnd,
     AssignmentStart,
+    CombinedArea,
+    CombineFeaturesRequest,
     EntityAssignmentCreate,
     EntityAssignmentExtended,
     EntityAssignmentRead,
@@ -52,13 +54,23 @@ from protect_api.schemas.domain import (
     ProposeAreaRequest,
     ProposedArea,
     ProposedAreas,
+    SearchAreasRequest,
+    UnionAreasRequest,
 )
 from protect_api.visibility import group_and_subgroups
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
 from shared.curation.apply import recompute_current_state
 from shared.database import get_session
-from shared.domain.areas import ATTRIBUTION, overpass_query, propose
+from shared.domain.areas import (
+    ATTRIBUTION,
+    combine_areas,
+    name_query,
+    overpass_query,
+    propose,
+    search_areas,
+    search_box,
+)
 from shared.domain.assignments import resolve_attribution
 from shared.domain.attribution import QueueResult, publish_job
 from shared.domain.fence import (
@@ -482,9 +494,10 @@ async def propose_area(
     context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
 ) -> ProposedAreas:
     """The areas a click could mean (phase 33, decision D270): the face of OpenStreetMap's
-    roads, paths, rivers and fences that encloses the point, and every OpenStreetMap area that
-    contains it, smallest first. Read from the Overpass API named by `OVERPASS_URL` over a box
-    of `radius_m` around the click; nothing is stored. A 502 says OpenStreetMap did not answer."""
+    roads, water, fences and railways that encloses the point (the ways people walk on do not
+    cut it, decision D272), and every OpenStreetMap area that contains it, smallest first. Read
+    from the Overpass API named by `OVERPASS_URL` over a box of `radius_m` around the click;
+    nothing is stored. A 502 says OpenStreetMap did not answer."""
     query = overpass_query(body.lon, body.lat, body.radius_m)
     try:
         document = await fetch_overpass(get_settings().overpass_url, query)
@@ -497,6 +510,102 @@ async def propose_area(
     )
 
 
+@router.post("/features/union", response_model=CombinedArea)
+async def union_areas(
+    body: UnionAreasRequest,
+    context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> CombinedArea:
+    """Several areas as one shape (phase 33, decision D274): four reserves beside each other
+    are one zone to the people who patrol them. Takes the project's features, shapes that are
+    not saved yet, or both, and answers their union without storing anything, so the shape can
+    be seen and named before it is kept. Pieces that touch become one."""
+    shapes = [geometry.as_dict() for geometry in body.geometries]
+    if body.feature_ids:
+        features = await _features_of(session, context, body.feature_ids)
+        shapes += [g for g in (geom_to_geojson(f.geom) for f in features) if g]
+    if len(shapes) < 2:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Two areas or more make a combined one"
+        )
+    combined = combine_areas(shapes)
+    if combined is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "None of those is an area")
+    return CombinedArea(geometry=combined.geometry, area_m2=combined.area_m2, parts=combined.parts)
+
+
+@router.post("/features/combine", response_model=FeatureRead, status_code=status.HTTP_201_CREATED)
+async def combine_features(
+    body: CombineFeaturesRequest,
+    context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> FeatureRead:
+    """One feature out of several of the project's own (decision D274), in one go: the union is
+    saved under a new name and the parts are kept unless `remove_parts` says otherwise. Both
+    acts are in the audit log; a part that is still referred to keeps the whole thing from
+    being saved rather than half of it."""
+    features = await _features_of(session, context, body.feature_ids)
+    combined = combine_areas([g for g in (geom_to_geojson(f.geom) for f in features) if g])
+    if combined is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "None of those is an area")
+    feature = Feature(
+        project_id=context.project.id,
+        feature_type=body.feature_type,
+        name=body.name,
+        geom=geojson_to_geom(combined.geometry),
+        attributes={"combined_from": [str(part.id) for part in features]},
+    )
+    session.add(feature)
+    await flush_or_409(session, "Feature")
+    await record_audit(
+        session,
+        user=context.user,
+        action="feature.created",
+        object_type="feature",
+        object_id=str(feature.id),
+        project_id=context.project.id,
+        details={"name": feature.name, "combined_from": [part.name for part in features]},
+    )
+    if body.remove_parts:
+        for part in features:
+            await record_audit(
+                session,
+                user=context.user,
+                action="feature.deleted",
+                object_type="feature",
+                object_id=str(part.id),
+                project_id=context.project.id,
+                details={"name": part.name, "combined_into": feature.name},
+            )
+            await session.delete(part)
+    await session.commit()
+    return feature_read(feature)
+
+
+@router.post("/features/search-areas", response_model=ProposedAreas)
+async def search_areas_by_name(
+    body: SearchAreasRequest,
+    context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
+) -> ProposedAreas:
+    """The areas of a name (phase 33, decision D273): somebody who knows what the area is
+    called types it instead of finding the spot to click, and the OpenStreetMap areas whose
+    name holds the text, inside the part of the map they are looking at, come back as the same
+    candidates a click gives. A view wider than the widest search reads its middle and says so.
+    Nothing is stored; a 502 says OpenStreetMap did not answer."""
+    box = search_box(body.west, body.south, body.east, body.north)
+    query = name_query(box, body.name.strip())
+    try:
+        document = await fetch_overpass(get_settings().overpass_url, query)
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, error.message) from error
+    candidates = search_areas(document, body.name.strip(), box)
+    return ProposedAreas(
+        candidates=[ProposedArea(**asdict(candidate)) for candidate in candidates],
+        attribution=ATTRIBUTION,
+        narrowed=box.narrowed,
+    )
+
+
 async def _project_feature(
     session: AsyncSession, context: ProjectContext, feature_id: uuid.UUID
 ) -> Feature:
@@ -504,6 +613,25 @@ async def _project_feature(
     if feature.project_id != context.project.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Feature not found")
     return feature
+
+
+async def _features_of(
+    session: AsyncSession, context: ProjectContext, feature_ids: list[uuid.UUID]
+) -> list[Feature]:
+    """The project's features named by the ids, in the order they were asked for. An id that
+    is not the project's is a 404, as it is for one feature (decision D274)."""
+    rows = (
+        await session.execute(
+            select(Feature).where(
+                Feature.project_id == context.project.id, Feature.id.in_(set(feature_ids))
+            )
+        )
+    ).scalars()
+    found = {feature.id: feature for feature in rows}
+    missing = [str(i) for i in feature_ids if i not in found]
+    if missing:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Feature not found")
+    return [found[i] for i in dict.fromkeys(feature_ids)]
 
 
 @router.get("/features/{feature_id}", response_model=FeatureRead)

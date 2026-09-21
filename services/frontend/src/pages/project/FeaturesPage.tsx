@@ -2,8 +2,8 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Plus, Trash2, Upload, Wand2, Wheat, Zap } from "lucide-react";
-import { useCallback, useState } from "react";
+import { Combine, Plus, Trash2, Upload, Wand2, Wheat, Zap } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router";
 import { z } from "zod";
@@ -16,12 +16,18 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { CombineFeaturesDialog } from "@/components/features/CombineFeaturesDialog";
 import { ImportFeaturesDialog } from "@/components/features/ImportFeaturesDialog";
 import { DrawMap } from "@/components/map/DrawMap";
-import { boundsOf, geometryBounds } from "@/components/map/fit";
+import { boundsOf, geometryBounds, type Bounds } from "@/components/map/fit";
 import { drawKindFor } from "@/components/map/featureTools";
-import type { ProposedArea } from "@/components/map/propose";
+import {
+  heldByEditor,
+  shapeParts,
+  type ProposedArea,
+} from "@/components/map/propose";
 import { ProposedAreas } from "@/components/map/ProposedAreas";
+import { useUnionAreas } from "@/hooks/useCombineAreas";
 import { useProposeArea } from "@/hooks/useProposeArea";
 import { Button } from "@/components/ui/button";
 import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
@@ -85,7 +91,16 @@ export function FeaturesPage() {
   });
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // rows ticked for combining (decision D274): only areas can make a zone between them
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [combineOpen, setCombineOpen] = useState(false);
   const [geometry, setGeometry] = useState<GeoJSON.Geometry | null>(null);
+  // only areas make a zone between them; a route or a site among the ticked rows is left out
+  const pickedAreas = ((features.data?.items ?? []) as Feature[]).filter(
+    (f) =>
+      picked.has(f.id) &&
+      (f.geometry?.type === "Polygon" || f.geometry?.type === "MultiPolygon"),
+  );
   const [removing, setRemoving] = useState<Feature | null>(null);
   // propose mode (phase 33): a click asks what encloses it, a candidate goes into the editor
   const [proposing, setProposing] = useState(false);
@@ -93,27 +108,63 @@ export function FeaturesPage() {
     null,
   );
   const proposal = useProposeArea(projectId);
+  const [asked, setAsked] = useState<"click" | "name">("click");
+  const view = useRef<Bounds | null>(null);
   const proposeAt = useCallback(
-    (lonLat: [number, number]) => proposal.mutate(lonLat),
+    (lonLat: [number, number]) => {
+      setAsked("click");
+      proposal.mutate({ kind: "click", at: lonLat });
+    },
     [proposal],
   );
-  const pickCandidate = (candidate: ProposedArea) => {
-    setLoaded({ geometry: candidate.geometry });
+  const searchByName = (name: string) => {
+    const bounds = view.current ?? around;
+    if (!bounds) return;
+    setAsked("name");
+    proposal.mutate({ kind: "name", name, bounds });
+  };
+  // a shape the editor cannot hold — a zone in several pieces, or one with an enclave inside
+  // it — is kept as it came and saved that way (decision D274)
+  const [kept, setKept] = useState<{
+    geometry: GeoJSON.Geometry;
+    parts: number;
+    holes: number;
+  } | null>(null);
+  const takeShape = (geometry: GeoJSON.Geometry) => {
     setProposing(false);
     proposal.reset();
+    if (heldByEditor(geometry)) {
+      setKept(null);
+      setLoaded({ geometry });
+    } else {
+      setLoaded(null);
+      setKept({ geometry, ...shapeParts(geometry) });
+    }
+  };
+  const pickCandidate = (candidate: ProposedArea) => {
+    takeShape(candidate.geometry);
     if (!form.getValues("name") && candidate.named)
       form.setValue("name", candidate.name);
+  };
+  // several ticked areas as one zone (decision D274): the union is worked out by the API
+  const union = useUnionAreas(projectId);
+  const combineCandidates = (chosen: ProposedArea[]) => {
+    union.mutate(
+      { geometries: chosen.map((c) => c.geometry) },
+      { onSuccess: (combined) => takeShape(combined.geometry) },
+    );
   };
   const closeDialog = () => {
     setOpen(false);
     setProposing(false);
     setLoaded(null);
+    setKept(null);
     proposal.reset();
   };
   const create = useMutationToast({
     mutationFn: (values: Values) =>
       api.post<Feature>(`/api/v1/projects/${projectId}/features`, {
-        body: { ...values, geometry },
+        body: { ...values, geometry: kept?.geometry ?? geometry },
       }),
     invalidate: [queryKeys.features(projectId)],
     success: t("Feature created"),
@@ -195,6 +246,14 @@ export function FeaturesPage() {
         description={t("Sites, zones, geofences and routes drawn on the map")}
         actions={
           <>
+            {can("features:write") && pickedAreas.length > 1 && (
+              <Button variant="outline" onClick={() => setCombineOpen(true)}>
+                <Combine className="size-4" />{" "}
+                {t("Combine {{count}} into one zone", {
+                  count: pickedAreas.length,
+                })}
+              </Button>
+            )}
             {can("features:write") && (
               <Button variant="outline" onClick={() => setImportOpen(true)}>
                 <Upload className="size-4" /> {t("Import")}
@@ -215,12 +274,28 @@ export function FeaturesPage() {
           emptyMessage={t(
             "No features yet. Draw a site, zone, geofence or route with New feature.",
           )}
+          selection={
+            can("features:write")
+              ? {
+                  selected: picked,
+                  onChange: setPicked,
+                  rowId: (f: Feature) => f.id,
+                }
+              : undefined
+          }
         />
       </Page>
       <ImportFeaturesDialog
         projectId={projectId}
         open={importOpen}
         onOpenChange={setImportOpen}
+      />
+      <CombineFeaturesDialog
+        projectId={projectId}
+        parts={pickedAreas}
+        open={combineOpen}
+        onClose={() => setCombineOpen(false)}
+        onCombined={() => setPicked(new Set())}
       />
       <Dialog
         open={open}
@@ -236,7 +311,7 @@ export function FeaturesPage() {
           <form
             className="space-y-4"
             onSubmit={form.handleSubmit((v) => {
-              if (!geometry) {
+              if (!kept && !geometry) {
                 form.setError("root", {
                   message: t("Draw the geometry first"),
                 });
@@ -282,8 +357,23 @@ export function FeaturesPage() {
                 onChange={setGeometry}
                 proposing={proposing}
                 onProposeAt={proposeAt}
-                ghosts={proposal.data?.candidates ?? []}
+                ghosts={
+                  kept
+                    ? [
+                        {
+                          kind: "osm",
+                          name: "",
+                          geometry: kept.geometry,
+                          area_m2: 0,
+                          clipped: false,
+                        },
+                      ]
+                    : (proposal.data?.candidates ?? [])
+                }
                 load={loaded}
+                onView={(bounds) => {
+                  view.current = bounds;
+                }}
               />
             )}
             {drawKindFor(form.watch("feature_type")) === "polygon" && (
@@ -305,8 +395,24 @@ export function FeaturesPage() {
                     proposal={proposal.data ?? null}
                     busy={proposal.isPending}
                     error={proposal.error?.message ?? null}
+                    asked={asked}
                     onPick={pickCandidate}
+                    onSearch={searchByName}
+                    onCombine={combineCandidates}
                   />
+                )}
+                {kept && (
+                  <p className="text-xs text-muted-foreground">
+                    {kept.parts > 1
+                      ? t(
+                          "The areas do not touch: this zone is kept in {{count}} pieces, which the editor cannot correct by hand.",
+                          { count: kept.parts },
+                        )
+                      : t(
+                          "This zone has {{count}} enclaves inside it, which the editor cannot correct by hand. It is saved as it is.",
+                          { count: kept.holes },
+                        )}
+                  </p>
                 )}
               </div>
             )}

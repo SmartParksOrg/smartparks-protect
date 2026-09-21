@@ -1,9 +1,9 @@
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 
 /**
- * Areas proposed from a click (phase 33, decision D270): the candidates the API answers and
- * the faint outlines a map draws for them while a person chooses. The chosen one goes into
- * the drawing session, where it is edited like any drawn polygon.
+ * Areas proposed from a click (phase 33, decision D270) or from a name (D273): the candidates
+ * the API answers and the faint outlines a map draws for them while a person chooses. The
+ * chosen one goes into the drawing session, where it is edited like any drawn polygon.
  */
 export interface ProposedArea {
   kind: "enclosed" | "osm" | string;
@@ -20,6 +20,8 @@ export interface ProposedArea {
 export interface ProposedAreas {
   candidates: ProposedArea[];
   attribution: string;
+  /** A search whose view was too wide read only its middle (decision D273). */
+  narrowed?: boolean;
 }
 
 const SOURCE = "propose-ghosts";
@@ -75,4 +77,31 @@ export function candidateKind(candidate: ProposedArea): string {
   if (!kind) return candidate.kind;
   const [key, value] = kind.split("=");
   return value ? `${value.replace(/_/g, " ")} (${key})` : kind;
+}
+
+/** What the drawing editor would have to hold: how many pieces the shape is in and how many
+ * enclaves it has inside it. terra-draw keeps one polygon of one ring at a time (phase 33,
+ * decision D274), so a zone made of several reserves, or one with an enclave, is kept as it
+ * came instead of being loaded into the editor and silently dropped. */
+export function shapeParts(geometry: GeoJSON.Geometry): {
+  parts: number;
+  holes: number;
+} {
+  if (geometry.type === "Polygon")
+    return { parts: 1, holes: Math.max(geometry.coordinates.length - 1, 0) };
+  if (geometry.type === "MultiPolygon")
+    return {
+      parts: geometry.coordinates.length,
+      holes: geometry.coordinates.reduce(
+        (n, part) => n + Math.max(part.length - 1, 0),
+        0,
+      ),
+    };
+  return { parts: 1, holes: 0 };
+}
+
+/** Whether the drawing editor can take the shape and give it back unchanged. */
+export function heldByEditor(geometry: GeoJSON.Geometry): boolean {
+  const { parts, holes } = shapeParts(geometry);
+  return geometry.type === "Polygon" && parts === 1 && holes === 0;
 }

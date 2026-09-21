@@ -37,15 +37,23 @@ import { formatArea, formatLength, measure } from "@/lib/geodesy";
  * area or radius of the shape while it is drawn and after, and the way out: Save as feature for
  * a drawing, Done for a measurement, which is kept nowhere.
  */
-/** Propose mode on the live map (phase 33): on or off, what the last click answered, and
- * the way to take a candidate into the editor. */
+/** Propose mode on the live map (phase 33): on or off, what the last click or name answered,
+ * and the way to take a candidate into the editor. */
 export interface ProposeControls {
   active: boolean;
   busy: boolean;
   proposal: Proposal | null;
   error: string | null;
+  /** What the answer on show came from (decision D273). */
+  asked: "click" | "name";
   onToggle: () => void;
   onPick: (candidate: ProposedArea) => void;
+  onSearch: (name: string) => void;
+  /** Several ticked areas kept as one zone (decision D274). */
+  onCombine: (candidates: ProposedArea[]) => void;
+  /** Set when the shape is one the drawing editor cannot correct: a zone in several pieces,
+   * or one with enclaves inside it. It is saved as it came. */
+  kept?: { parts: number; holes: number } | null;
 }
 
 export function DrawBar({
@@ -133,8 +141,24 @@ export function DrawBar({
             proposal={propose.proposal}
             busy={propose.busy}
             error={propose.error}
+            asked={propose.asked}
             onPick={propose.onPick}
+            onSearch={propose.onSearch}
+            onCombine={propose.onCombine}
           />
+          {propose.kept ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {propose.kept.parts > 1
+                ? t(
+                    "The areas do not touch: this zone is kept in {{count}} pieces, which the editor cannot correct by hand.",
+                    { count: propose.kept.parts },
+                  )
+                : t(
+                    "This zone has {{count}} enclaves inside it, which the editor cannot correct by hand. It is saved as it is.",
+                    { count: propose.kept.holes },
+                  )}
+            </p>
+          ) : null}
         </div>
       )}
       <div className="mt-2 text-xs text-muted-foreground">

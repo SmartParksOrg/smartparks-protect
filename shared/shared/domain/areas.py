@@ -11,6 +11,10 @@ clicks inside one and gets it proposed. Two kinds of candidate come back for a c
 * every OpenStreetMap area that contains the point (a protected area, a forest, a lake, a
   landuse), smallest first.
 
+A name is the other way in (decision D273): somebody who knows the area is called Kraansvlak
+types that instead of hunting for the spot to click, and the areas of that name in the part of
+the map they are looking at come back as the same kind of candidate.
+
 Pure: the query text and the reading of the answer live here, the HTTP call does not, so the
 tests run on a recorded answer. Coordinates are GeoJSON `[lon, lat]`; the flat frame for
 metres is a plain equirectangular scaling around the click, good enough for a box of a few km.
@@ -19,10 +23,23 @@ metres is a plain equirectangular scaling around the click, good enough for a bo
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box, mapping
+from shapely import set_precision
+from shapely.geometry import (
+    GeometryCollection,
+    LineString,
+    MultiPolygon,
+    Point,
+    Polygon,
+    box,
+    mapping,
+)
+from shapely.geometry import (
+    shape as shapely_shape,
+)
 from shapely.ops import linemerge, polygonize, unary_union
 
 #: The box around the click that is read, in metres: half its side. Clamped by the API.
@@ -31,12 +48,29 @@ MIN_RADIUS_M = 200
 MAX_RADIUS_M = 5000
 #: Line features that bound an area on the ground.
 LINE_KEYS = ("highway", "waterway", "barrier", "railway")
+#: Ways people walk or cycle on (decision D272). They cross a landscape without dividing it,
+#: and a dune reserve is threaded with them — a box of three kilometres over the Kennemer dunes
+#: holds 281 footways and 125 paths — so a face cut by all of them is a fragment of a few
+#: hectares instead of a zone. They do not cut the face; a way that is also a fence still does.
+WALKING_HIGHWAYS = ("footway", "path", "steps", "cycleway", "bridleway", "pedestrian", "corridor")
 #: Area features worth proposing as they are. `boundary` is narrowed to the kinds that mean a
 #: managed area; an administrative boundary is not a zone anybody patrols.
 AREA_KEYS = ("landuse", "natural", "leisure", "amenity")
 BOUNDARY_VALUES = ("protected_area", "national_park", "aboriginal_lands", "forest")
 #: The most candidates a click answers and the most vertices a candidate keeps.
 MAX_CANDIDATES = 8
+#: The widest box a search by name reads, in degrees (decision D273). A view wider than this is
+#: narrowed to this around its middle, since a name asked over a continent is a query no public
+#: Overpass server will answer.
+MAX_SEARCH_SPAN_DEG = 1.5
+#: The shortest name worth searching for.
+MIN_SEARCH_LENGTH = 2
+#: The grid two areas' corners are snapped to before they are joined, in degrees: about a
+#: centimetre. Two shapes that share an edge rarely share its numbers to the last digit — an
+#: outline read from OpenStreetMap, reprojected from a shapefile or dragged by hand carries
+#: noise far below a centimetre — and without snapping that leaves a sliver of a gap, so a
+#: zone somebody sees as one comes back in pieces (decision D274).
+JOIN_GRID_DEG = 1e-7
 MAX_VERTICES = 2000
 #: Where the simplification starts, in metres, doubled until a shape fits `MAX_VERTICES`.
 SIMPLIFY_START_M = 1.0
@@ -89,13 +123,22 @@ class Frame:
         return metres / max(self.m_per_deg_lon, self.m_per_deg_lat)
 
 
+def _line_part(key: str, bbox: str) -> str:
+    """The query statement for one kind of line. The ways people walk on are left out here as
+    well as in the reading, so the answer stays small on a landscape full of footpaths."""
+    if key != "highway":
+        return f'way["{key}"]{bbox};'
+    walking = "|".join(WALKING_HIGHWAYS)
+    return f'way["highway"]["highway"!~"^({walking})$"]{bbox};'
+
+
 def overpass_query(lon: float, lat: float, radius_m: float) -> str:
     """The Overpass QL for the lines and areas in the box around a point. `out geom` puts the
     coordinates on every way and on every relation member, so no second read is needed."""
     frame = Frame(lat)
     b = frame.box_around(lon, lat, radius_m).bounds
     bbox = f"({b[1]:.6f},{b[0]:.6f},{b[3]:.6f},{b[2]:.6f})"
-    parts = [f'way["{key}"]{bbox};' for key in LINE_KEYS]
+    parts = [_line_part(key, bbox) for key in LINE_KEYS]
     parts += [f'way["{key}"]{bbox};' for key in AREA_KEYS]
     parts += [f'relation["{key}"]{bbox};' for key in AREA_KEYS]
     parts += [f'way["boundary"="{value}"]{bbox};' for value in BOUNDARY_VALUES]
@@ -118,7 +161,15 @@ def _area_kind(tags: dict[str, str]) -> str | None:
 
 
 def _is_line(tags: dict[str, str]) -> bool:
-    return any(key in tags for key in LINE_KEYS)
+    """Whether the way divides the ground. A way people walk on does not (decision D272),
+    unless it is something else as well: a footpath along a fence still cuts."""
+    for key in LINE_KEYS:
+        if key not in tags:
+            continue
+        if key == "highway" and tags[key] in WALKING_HIGHWAYS:
+            continue
+        return True
+    return False
 
 
 def _name_of(tags: dict[str, str], kind: str) -> str:
@@ -315,3 +366,143 @@ def propose(document: dict[str, Any], lon: float, lat: float, radius_m: float) -
             )
         )
     return out
+
+
+@dataclass(slots=True)
+class SearchBox:
+    """The part of the map a search by name reads: the view, narrowed when it is too wide."""
+
+    west: float
+    south: float
+    east: float
+    north: float
+    narrowed: bool = False
+
+
+def search_box(west: float, south: float, east: float, north: float) -> SearchBox:
+    """The view as it will be searched. A view wider than `MAX_SEARCH_SPAN_DEG` is kept to that
+    span around its middle, and says so, rather than being refused or asked for in full."""
+    lon_span, lat_span = abs(east - west), abs(north - south)
+    if lon_span <= MAX_SEARCH_SPAN_DEG and lat_span <= MAX_SEARCH_SPAN_DEG:
+        return SearchBox(min(west, east), min(south, north), max(west, east), max(south, north))
+    mid_lon, mid_lat = (west + east) / 2, (south + north) / 2
+    half = MAX_SEARCH_SPAN_DEG / 2
+    return SearchBox(
+        max(mid_lon - half, -180.0),
+        max(mid_lat - half, -90.0),
+        min(mid_lon + half, 180.0),
+        min(mid_lat + half, 90.0),
+        narrowed=True,
+    )
+
+
+def _quoted(text: str) -> str:
+    """The text as a literal inside an Overpass regex string: the regex's own characters lose
+    their meaning, and the quotes and backslashes the query language reads are escaped."""
+    return re.escape(text).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def name_query(box_: SearchBox, name: str) -> str:
+    """The Overpass QL for the areas whose name holds `name`, inside the searched box. Only the
+    elements that carry an area tag are asked for, so a street of the same name stays out."""
+    bbox = f"({box_.south:.6f},{box_.west:.6f},{box_.north:.6f},{box_.east:.6f})"
+    wanted = _quoted(name)
+    parts = []
+    for element in ("way", "relation"):
+        for key in AREA_KEYS:
+            parts.append(f'{element}["name"~"{wanted}",i]["{key}"]{bbox};')
+        for value in BOUNDARY_VALUES:
+            parts.append(f'{element}["name"~"{wanted}",i]["boundary"="{value}"]{bbox};')
+    return "[out:json][timeout:25];(" + "".join(parts) + ");out geom;"
+
+
+def _match_rank(area_name: str, wanted: str) -> int:
+    """How well a name answers what was typed: the same name, then one that starts with it,
+    then one that merely holds it. "Kraansvlak" finds "Het Kraansvlak" without beating it."""
+    found, asked = area_name.casefold(), wanted.casefold()
+    if found == asked:
+        return 0
+    if found.startswith(asked):
+        return 1
+    return 2
+
+
+def search_areas(document: dict[str, Any], name: str, box_: SearchBox) -> list[Candidate]:
+    """The named areas an Overpass answer holds for a search, best match first and the larger
+    of two equal matches before the smaller, since the reserve is what a name usually means."""
+    frame = Frame((box_.south + box_.north) / 2)
+    parsed = parse_overpass(document)
+    found = [a for a in parsed.areas if a.named and name.casefold() in a.name.casefold()]
+    found.sort(key=lambda a: (_match_rank(a.name, name), -a.shape.area))
+    seen: set[int] = set()
+    out: list[Candidate] = []
+    for osm in found:
+        if osm.osm_id in seen:
+            continue
+        seen.add(osm.osm_id)
+        out.append(
+            _candidate(
+                "osm",
+                osm.name,
+                osm.shape,
+                frame,
+                osm_id=osm.osm_id,
+                tags={"kind": osm.kind},
+                named=True,
+            )
+        )
+        if len(out) >= MAX_CANDIDATES:
+            break
+    return out
+
+
+@dataclass(slots=True)
+class Combined:
+    """Several areas as one (decision D274): the union, its size, and how many pieces it is
+    in. Pieces that touch become one; pieces that do not stay separate in one shape."""
+
+    geometry: dict[str, Any]
+    area_m2: int
+    parts: int
+
+    @property
+    def separate(self) -> bool:
+        """Whether the shape is in pieces, which is what a drawing editor cannot correct."""
+        return self.parts > 1
+
+
+def combine_areas(geometries: list[dict[str, Any]]) -> Combined | None:
+    """One area out of several (decision D274): four dune reserves beside each other are one
+    zone to the people who patrol them. The shapes are cleaned of the self-touching rings
+    OpenStreetMap and hand-drawing leave (`buffer(0)`), joined, and simplified under the same
+    vertex bound as a proposal. Anything that is not an area is ignored; None when nothing of
+    the sort is left."""
+    shapes: list[Polygon | MultiPolygon] = []
+    for geometry in geometries:
+        try:
+            piece = shapely_shape(geometry)
+        except (AttributeError, KeyError, TypeError, ValueError):
+            continue
+        if not isinstance(piece, Polygon | MultiPolygon):
+            continue
+        if not piece.is_valid:
+            piece = piece.buffer(0)
+        if isinstance(piece, Polygon | MultiPolygon) and not piece.is_empty:
+            shapes.append(piece)
+    if not shapes:
+        return None
+    joined = unary_union([set_precision(piece, JOIN_GRID_DEG) for piece in shapes])
+    if isinstance(joined, GeometryCollection):
+        polygons = [g for g in joined.geoms if isinstance(g, Polygon | MultiPolygon)]
+        if not polygons:
+            return None
+        joined = unary_union(polygons)
+    if not isinstance(joined, Polygon | MultiPolygon) or joined.is_empty:
+        return None
+    frame = Frame(joined.centroid.y)
+    simplified = _simplified(joined, frame)
+    return Combined(
+        geometry=mapping(simplified),
+        area_m2=round(frame.area_m2(simplified)),
+        parts=len(simplified.geoms) if isinstance(simplified, MultiPolygon) else 1,
+    )

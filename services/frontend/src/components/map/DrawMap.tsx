@@ -56,6 +56,7 @@ export function DrawMap({
   onProposeAt,
   ghosts = [],
   load = null,
+  onView,
 }: {
   kind: DrawKind;
   initial?: GeoJSON.Geometry | null;
@@ -71,6 +72,8 @@ export function DrawMap({
   ghosts?: ProposedArea[];
   /** A shape to put in the editor, selected: the candidate chosen. A new object loads again. */
   load?: { geometry: GeoJSON.Geometry } | null;
+  /** What the map shows, at the start and after every move: the box a search by name reads. */
+  onView?: (bounds: Bounds) => void;
 }) {
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
@@ -116,6 +119,26 @@ export function DrawMap({
       map.getCanvas().style.cursor = "";
     };
   }, [mapRef, ready, proposing, onProposeAt]);
+  const onViewRef = useRef(onView);
+  useEffect(() => {
+    onViewRef.current = onView;
+  }, [onView]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const report = () => {
+      const view = map.getBounds();
+      onViewRef.current?.([
+        [view.getWest(), view.getSouth()],
+        [view.getEast(), view.getNorth()],
+      ]);
+    };
+    report();
+    map.on("moveend", report);
+    return () => {
+      map.off("moveend", report);
+    };
+  }, [mapRef, ready]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;

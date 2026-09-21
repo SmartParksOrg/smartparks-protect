@@ -211,6 +211,44 @@ class ProposeAreaRequest(BaseModel):
     radius_m: int = Field(default=1500, ge=200, le=5000)
 
 
+class SearchAreasRequest(BaseModel):
+    """A name and the part of the map to look in (phase 33, decision D273): the view's corners,
+    narrowed by the domain when they span more than the widest search."""
+
+    name: str = Field(min_length=2, max_length=100)
+    west: float = Field(ge=-180, le=180)
+    south: float = Field(ge=-90, le=90)
+    east: float = Field(ge=-180, le=180)
+    north: float = Field(ge=-90, le=90)
+
+
+class UnionAreasRequest(BaseModel):
+    """The areas to join into one (phase 33, decision D274): features of the project, shapes
+    that are not saved yet (a proposal's candidates), or both. At least two in all."""
+
+    feature_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
+    geometries: list[GeoJSONGeometry] = Field(default_factory=list, max_length=50)
+
+
+class CombineFeaturesRequest(BaseModel):
+    """Several of the project's features as one new feature (decision D274). The parts are
+    kept unless `remove_parts` says otherwise, since combining is not a way to lose work."""
+
+    name: str = Field(min_length=1, max_length=200)
+    feature_type: FeatureType
+    feature_ids: list[uuid.UUID] = Field(min_length=2, max_length=50)
+    remove_parts: bool = False
+
+
+class CombinedArea(BaseModel):
+    """One shape out of several: what it looks like, how large it is, and in how many pieces
+    it lies. More than one piece cannot be corrected vertex by vertex in the editor."""
+
+    geometry: dict[str, Any]
+    area_m2: int
+    parts: int
+
+
 class ProposedArea(BaseModel):
     """One candidate: the face enclosed by roads and water (`enclosed`), or an OpenStreetMap
     area containing the click (`osm`), with its size and whether the read box cut it."""
@@ -228,6 +266,8 @@ class ProposedArea(BaseModel):
 class ProposedAreas(BaseModel):
     candidates: list[ProposedArea]
     attribution: str
+    #: A search whose view was wider than the widest search read only its middle, and says so.
+    narrowed: bool = False
 
 
 class FenceStatusRead(BaseModel):

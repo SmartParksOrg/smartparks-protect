@@ -2723,7 +2723,7 @@
      "entities"
     ],
     "summary": "Propose Area",
-    "description": "The areas a click could mean (phase 33, decision D270): the face of OpenStreetMap's\nroads, paths, rivers and fences that encloses the point, and every OpenStreetMap area that\ncontains it, smallest first. Read from the Overpass API named by `OVERPASS_URL` over a box\nof `radius_m` around the click; nothing is stored. A 502 says OpenStreetMap did not answer.",
+    "description": "The areas a click could mean (phase 33, decision D270): the face of OpenStreetMap's\nroads, water, fences and railways that encloses the point (the ways people walk on do not\ncut it, decision D272), and every OpenStreetMap area that contains it, smallest first. Read\nfrom the Overpass API named by `OVERPASS_URL` over a box of `radius_m` around the click;\nnothing is stored. A 502 says OpenStreetMap did not answer.",
     "operationId": "propose_area_api_v1_projects__project_id__features_propose_post",
     "security": [
      {
@@ -2748,6 +2748,183 @@
       "application/json": {
        "schema": {
         "$ref": "#/components/schemas/ProposeAreaRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProposedAreas"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/features/union": {
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Union Areas",
+    "description": "Several areas as one shape (phase 33, decision D274): four reserves beside each other\nare one zone to the people who patrol them. Takes the project's features, shapes that are\nnot saved yet, or both, and answers their union without storing anything, so the shape can\nbe seen and named before it is kept. Pieces that touch become one.",
+    "operationId": "union_areas_api_v1_projects__project_id__features_union_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UnionAreasRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CombinedArea"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/features/combine": {
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Combine Features",
+    "description": "One feature out of several of the project's own (decision D274), in one go: the union is\nsaved under a new name and the parts are kept unless `remove_parts` says otherwise. Both\nacts are in the audit log; a part that is still referred to keeps the whole thing from\nbeing saved rather than half of it.",
+    "operationId": "combine_features_api_v1_projects__project_id__features_combine_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CombineFeaturesRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FeatureRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/features/search-areas": {
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Search Areas By Name",
+    "description": "The areas of a name (phase 33, decision D273): somebody who knows what the area is\ncalled types it instead of finding the spot to click, and the OpenStreetMap areas whose\nname holds the text, inside the part of the map they are looking at, come back as the same\ncandidates a click gives. A view wider than the widest search reads its middle and says so.\nNothing is stored; a 502 says OpenStreetMap did not answer.",
+    "operationId": "search_areas_by_name_api_v1_projects__project_id__features_search_areas_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SearchAreasRequest"
        }
       }
      }
@@ -25151,6 +25328,67 @@
     "title": "ClockAheadDevice",
     "description": "A device with records whose device time runs ahead of the delivery (decision D119):\nkept, invalid, waiting for a curation job with a time offset."
    },
+   "CombineFeaturesRequest": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "feature_type": {
+      "$ref": "#/components/schemas/FeatureType"
+     },
+     "feature_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "minItems": 2,
+      "title": "Feature Ids"
+     },
+     "remove_parts": {
+      "type": "boolean",
+      "title": "Remove Parts",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "feature_type",
+     "feature_ids"
+    ],
+    "title": "CombineFeaturesRequest",
+    "description": "Several of the project's features as one new feature (decision D274). The parts are\nkept unless `remove_parts` says otherwise, since combining is not a way to lose work."
+   },
+   "CombinedArea": {
+    "properties": {
+     "geometry": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Geometry"
+     },
+     "area_m2": {
+      "type": "integer",
+      "title": "Area M2"
+     },
+     "parts": {
+      "type": "integer",
+      "title": "Parts"
+     }
+    },
+    "type": "object",
+    "required": [
+     "geometry",
+     "area_m2",
+     "parts"
+    ],
+    "title": "CombinedArea",
+    "description": "One shape out of several: what it looks like, how large it is, and in how many pieces\nit lies. More than one piece cannot be corrected vertex by vertex in the editor."
+   },
    "CommandCreate": {
     "properties": {
      "action_key": {
@@ -38816,6 +39054,11 @@
      "attribution": {
       "type": "string",
       "title": "Attribution"
+     },
+     "narrowed": {
+      "type": "boolean",
+      "title": "Narrowed",
+      "default": false
      }
     },
     "type": "object",
@@ -40383,6 +40626,50 @@
      "description"
     ],
     "title": "ScopeInfo"
+   },
+   "SearchAreasRequest": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 2,
+      "title": "Name"
+     },
+     "west": {
+      "type": "number",
+      "maximum": 180.0,
+      "minimum": -180.0,
+      "title": "West"
+     },
+     "south": {
+      "type": "number",
+      "maximum": 90.0,
+      "minimum": -90.0,
+      "title": "South"
+     },
+     "east": {
+      "type": "number",
+      "maximum": 180.0,
+      "minimum": -180.0,
+      "title": "East"
+     },
+     "north": {
+      "type": "number",
+      "maximum": 90.0,
+      "minimum": -90.0,
+      "title": "North"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "west",
+     "south",
+     "east",
+     "north"
+    ],
+    "title": "SearchAreasRequest",
+    "description": "A name and the part of the map to look in (phase 33, decision D273): the view's corners,\nnarrowed by the domain when they span more than the widest search."
    },
    "SearchHit": {
     "properties": {
@@ -42215,6 +42502,30 @@
      "kind"
     ],
     "title": "TransformationIn"
+   },
+   "UnionAreasRequest": {
+    "properties": {
+     "feature_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "title": "Feature Ids"
+     },
+     "geometries": {
+      "items": {
+       "$ref": "#/components/schemas/GeoJSONGeometry"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "title": "Geometries"
+     }
+    },
+    "type": "object",
+    "title": "UnionAreasRequest",
+    "description": "The areas to join into one (phase 33, decision D274): features of the project, shapes\nthat are not saved yet (a proposal's candidates), or both. At least two in all."
    },
    "UnknownIdentity": {
     "properties": {
