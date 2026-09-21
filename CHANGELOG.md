@@ -24,6 +24,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- Tracks shown together on the live map, the Data explorer and an analysis result are always in colours of their own (Tim, 2026-09-21): the colour was a hash of the entity's id into eight, so two of four tracks were the same colour more often than not. The tracks on the map now share out the palette, a track keeps its colour while others come and go, and past eight tracks the colours continue with spread hues.
+
 - The trap's trend ran its axis to 2 for a door that is 0 or 1 (Tim, 2026-09-20). It reads open and closed now, on the axis and in the tooltip, drawn as steps, with nothing above closed.
 
 - Choosing the fence type in the New feature dialog left the page blank (Tim, 2026-09-19). The dialog's drawing map remounts on a change of type, React removes the map before the drawing session, and the session's teardown then reached for layers that were gone. The teardown tolerates a map that is already gone.

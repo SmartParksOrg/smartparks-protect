@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   BASEMAP_SOURCE_IDS,
   SOURCES,
+  assignTrackColors,
   bindEntityClicks,
   bindEventClicks,
   bindFeatureClicks,
   bindGatewayClicks,
   bindTrackPointClicks,
+  trackColor,
   trackPointKey,
 } from "@/components/map/layers";
 
@@ -200,5 +202,43 @@ describe("map click binding", () => {
 describe("source ids", () => {
   it("never collide with a base map style's sources", () => {
     for (const id of Object.values(SOURCES)) expect(BASEMAP_SOURCE_IDS, id).not.toContain(id);
+  });
+});
+
+describe("assignTrackColors", () => {
+  // ids whose hashed colours collide, found by trying: the palette has eight entries
+  const ids = Array.from({ length: 40 }, (_, i) => `entity-${i}`);
+  const colliding = ids.filter((id) => trackColor(id) === trackColor(ids[0]));
+
+  it("gives tracks shown together colours of their own even when their hashes collide", () => {
+    expect(colliding.length).toBeGreaterThan(1);
+    const colors = assignTrackColors(colliding.map((entityId) => ({ entityId })));
+    expect(new Set(colors.values()).size).toBe(colliding.length);
+    expect(colors.get(colliding[0])).toBe(trackColor(colliding[0]));
+  });
+
+  it("keeps a track's colour while others come and go", () => {
+    const first = assignTrackColors([{ entityId: "keep-me" }]).get("keep-me");
+    const withOthers = assignTrackColors(
+      ["a", "b", "c", "keep-me", "d"].map((entityId) => ({ entityId })),
+    );
+    expect(withOthers.get("keep-me")).toBe(first);
+    expect(new Set(withOthers.values()).size).toBe(5);
+  });
+
+  it("goes past the palette with colours that still differ", () => {
+    const colors = assignTrackColors(
+      Array.from({ length: 12 }, (_, i) => ({ entityId: `many-${i}` })),
+    );
+    expect(new Set(colors.values()).size).toBe(12);
+  });
+
+  it("leaves a colour the caller chose alone", () => {
+    const colors = assignTrackColors([
+      { entityId: "x", color: "#123456" },
+      { entityId: "y" },
+    ]);
+    expect(colors.get("x")).toBe("#123456");
+    expect(colors.get("y")).not.toBe("#123456");
   });
 });

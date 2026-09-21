@@ -527,11 +527,63 @@ const TRACK_COLORS = [
   "#374151",
 ];
 
-/** A steady colour per entity, so two tracks on the map stay apart. */
+/** The colour an entity would take on its own: a steady pick from the palette by its id. */
 export function trackColor(entityId: string): string {
   let hash = 0;
   for (const c of entityId) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
   return TRACK_COLORS[hash % TRACK_COLORS.length];
+}
+
+/** A colour past the palette: hues spread by the golden angle so the ninth track and every
+ * one after it still differs from its neighbours. */
+function extraTrackColor(index: number): string {
+  const hue = Math.round((index * 137.508) % 360);
+  return `hsl(${hue} 60% 38%)`;
+}
+
+/** What each track showed last time, so a track keeps its colour while others come and go. */
+const rememberedColors = new Map<string, string>();
+
+/** Distinct colours for the tracks shown together (Tim, 2026-09-21: two of four tracks in
+ * the same colour cannot be told apart). A track keeps the colour it had, its own hashed
+ * colour when that is free, and the first free colour of the palette otherwise; beyond
+ * eight tracks the palette is extended. Tracks whose colour the caller chose keep it. */
+export function assignTrackColors(
+  tracks: readonly { entityId: string; color?: string }[],
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const taken = new Set<string>();
+  const claim = (id: string, color: string) => {
+    out.set(id, color);
+    taken.add(color);
+    rememberedColors.set(id, color);
+  };
+  for (const track of tracks)
+    if (track.color && !out.has(track.entityId)) claim(track.entityId, track.color);
+  // first the colours already on the map, then each track's own colour, so a track that was
+  // shown alone does not change when a second one arrives
+  for (const track of tracks) {
+    if (out.has(track.entityId)) continue;
+    const kept = rememberedColors.get(track.entityId);
+    if (kept && !taken.has(kept)) claim(track.entityId, kept);
+  }
+  for (const track of tracks) {
+    if (out.has(track.entityId)) continue;
+    const own = trackColor(track.entityId);
+    if (!taken.has(own)) claim(track.entityId, own);
+  }
+  for (const track of tracks) {
+    if (out.has(track.entityId)) continue;
+    const free = TRACK_COLORS.find((c) => !taken.has(c));
+    if (free) {
+      claim(track.entityId, free);
+      continue;
+    }
+    let index = 0;
+    while (taken.has(extraTrackColor(index))) index++;
+    claim(track.entityId, extraTrackColor(index));
+  }
+  return out;
 }
 
 export function ensureTrackLayers(map: MapLibreMap): void {
@@ -670,13 +722,14 @@ export interface TrackLayer {
   accuracies?: (number | null)[];
 }
 
-/** Every track shown at once, each in its entity's colour. */
+/** Every track shown at once, each in a colour of its own. */
 export function setTracks(map: MapLibreMap, tracks: TrackLayer[]): void {
   const source = map.getSource(SOURCES.track) as GeoJSONSource | undefined;
   if (!source) return;
   const features: GeoJSON.Feature[] = [];
+  const colors = assignTrackColors(tracks);
   for (const track of tracks) {
-    const color = track.color ?? trackColor(track.entityId);
+    const color = colors.get(track.entityId) ?? trackColor(track.entityId);
     features.push({
       type: "Feature",
       geometry: track.geometry,
