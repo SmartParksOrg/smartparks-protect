@@ -57,6 +57,9 @@ class Candidate:
     clipped: bool = False
     osm_id: int | None = None
     tags: dict[str, str] = field(default_factory=dict)
+    #: Whether the name is the area's own (OpenStreetMap's `name`) rather than its kind in
+    #: words, so the interface prefills a name only when there is one to prefill.
+    named: bool = False
 
 
 @dataclass(slots=True)
@@ -119,7 +122,11 @@ def _is_line(tags: dict[str, str]) -> bool:
 
 
 def _name_of(tags: dict[str, str], kind: str) -> str:
-    return tags.get("name") or kind
+    """The area's own name, else its kind in words: `natural=scrub` reads "Scrub"."""
+    if tags.get("name"):
+        return tags["name"]
+    value = kind.split("=", 1)[1] if "=" in kind else kind
+    return value.replace("_", " ").capitalize()
 
 
 def _merged(pieces: list[LineString]) -> Any:
@@ -167,6 +174,10 @@ class OsmArea:
     shape: Polygon | MultiPolygon
     osm_id: int
     tags: dict[str, str]
+
+    @property
+    def named(self) -> bool:
+        return bool(self.tags.get("name"))
 
 
 @dataclass(slots=True)
@@ -249,6 +260,7 @@ def _candidate(
     clipped: bool = False,
     osm_id: int | None = None,
     tags: dict[str, str] | None = None,
+    named: bool = False,
 ) -> Candidate:
     simplified = _simplified(shape, frame)
     return Candidate(
@@ -259,6 +271,7 @@ def _candidate(
         clipped=clipped,
         osm_id=osm_id,
         tags=tags or {},
+        named=named,
     )
 
 
@@ -292,7 +305,13 @@ def propose(document: dict[str, Any], lon: float, lat: float, radius_m: float) -
             break
         out.append(
             _candidate(
-                "osm", osm.name, osm.shape, frame, osm_id=osm.osm_id, tags={"kind": osm.kind}
+                "osm",
+                osm.name,
+                osm.shape,
+                frame,
+                osm_id=osm.osm_id,
+                tags={"kind": osm.kind},
+                named=osm.named,
             )
         )
     return out

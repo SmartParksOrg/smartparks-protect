@@ -13,6 +13,8 @@ export interface ProposedArea {
   clipped: boolean;
   osm_id?: number | null;
   tags?: Record<string, string>;
+  /** The name is the area's own, not its kind in words. */
+  named?: boolean;
 }
 
 export interface ProposedAreas {

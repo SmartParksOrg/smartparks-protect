@@ -11,7 +11,7 @@ import {
   type DrawKind,
   type DrawSession,
 } from "@/components/map/draw";
-import type { Bounds } from "@/components/map/fit";
+import { geometryBounds, type Bounds } from "@/components/map/fit";
 import {
   ensureGhostLayers,
   setGhosts,
@@ -122,10 +122,15 @@ export function DrawMap({
     ensureGhostLayers(map);
     setGhosts(map, ghosts);
   }, [mapRef, ready, ghosts]);
+  // the chosen candidate goes into the editor and the map goes to it
   useEffect(() => {
-    if (!load || !session.current) return;
+    const map = mapRef.current;
+    if (!load || !session.current || !map) return;
     session.current.load(kind, load.geometry);
-  }, [load, kind]);
+    const bounds = geometryBounds([{ geometry: load.geometry as never }]);
+    if (bounds)
+      map.fitBounds(bounds, { padding: 40, duration: 300, maxZoom: 16 });
+  }, [mapRef, load, kind]);
   return (
     <div className="space-y-2">
       <div ref={container} className="z-0 h-72 w-full rounded-md border" />

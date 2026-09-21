@@ -11115,6 +11115,11 @@ export interface components {
             tags?: {
                 [key: string]: string;
             };
+            /**
+             * Named
+             * @default false
+             */
+            named: boolean;
         };
         /** ProposedAreas */
         ProposedAreas: {

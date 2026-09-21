@@ -40,6 +40,8 @@ def test_a_click_in_the_dunes_proposes_the_scrub_it_is_in_smallest_first():
     candidates = areas.propose(_document(), 4.6105, 52.5305, 500)
     assert candidates, "nothing proposed"
     assert candidates[0].kind == "osm" and candidates[0].tags == {"kind": "natural=scrub"}
+    # no name on OpenStreetMap: the kind in words, and not marked as named
+    assert candidates[0].name == "Scrub" and candidates[0].named is False
     assert 250_000 < candidates[0].area_m2 < 300_000
     assert shape(candidates[0].geometry).contains(Point(4.6105, 52.5305))
     # the enclosed face was the scrub itself, so it is not listed twice
@@ -80,6 +82,6 @@ def test_a_big_shape_is_simplified_under_the_vertex_bound():
         ]
     }
     (candidate,) = areas.propose(document, 4.61, 52.53, 500)
-    assert candidate.name == "Round wood"
+    assert candidate.name == "Round wood" and candidate.named is True
     assert len(candidate.geometry["coordinates"][0]) <= areas.MAX_VERTICES
     assert 22_000 < candidate.area_m2 < 25_000

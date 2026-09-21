@@ -222,6 +222,7 @@ class ProposedArea(BaseModel):
     clipped: bool
     osm_id: int | None = None
     tags: dict[str, str] = Field(default_factory=dict)
+    named: bool = False
 
 
 class ProposedAreas(BaseModel):

@@ -36,7 +36,7 @@ server reads OpenStreetMap's roads, paths, rivers, fences and railways in a box 
 around the click, joins them into the faces they enclose, and answers the face that contains
 the point together with every OpenStreetMap area that contains it (a protected area, a forest,
 a lake, a landuse), smallest first, with its size. The candidates show as faint outlines;
-"Use" puts one in the editor, where it is adjusted like any drawn shape, named and saved.
+"Use" puts one in the editor and brings it into view, where it is adjusted like any drawn shape, named and saved; an area OpenStreetMap names fills the name in.
 
 What to expect:
 

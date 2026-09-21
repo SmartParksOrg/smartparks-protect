@@ -101,7 +101,7 @@ export function FeaturesPage() {
     setLoaded({ geometry: candidate.geometry });
     setProposing(false);
     proposal.reset();
-    if (!form.getValues("name") && candidate.kind !== "enclosed")
+    if (!form.getValues("name") && candidate.named)
       form.setValue("name", candidate.name);
   };
   const closeDialog = () => {

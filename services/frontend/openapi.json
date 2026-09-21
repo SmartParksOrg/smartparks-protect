@@ -38786,6 +38786,11 @@
       },
       "type": "object",
       "title": "Tags"
+     },
+     "named": {
+      "type": "boolean",
+      "title": "Named",
+      "default": false
      }
     },
     "type": "object",
