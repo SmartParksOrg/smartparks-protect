@@ -50,10 +50,15 @@ class Settings(BaseSettings):
         default="http://localhost:3000", description="Where links in emails point to"
     )
     overpass_url: str = Field(
-        default="https://overpass-api.de/api/interpreter",
-        description="The Overpass API that answers 'propose an area' with OpenStreetMap's "
-        "roads, rivers, fences and areas around a click (decision D270); a server may point "
-        "it at its own instance",
+        default=(
+            "https://overpass-api.de/api/interpreter,"
+            "https://overpass.openstreetmap.fr/api/interpreter"
+        ),
+        description="The Overpass APIs that answer 'propose an area' with OpenStreetMap's "
+        "roads, rivers, fences and areas in a box (decisions D270 and D279), separated by "
+        "commas and asked in order: a public instance refuses a read now and then, and a host "
+        "that lands on a tired backend is refused nearly every time, so the second address is "
+        "what makes the tool usable. A server may point this at its own instance",
     )
     credentials_key: str = Field(
         min_length=16, description="Key for encrypting data source credentials at rest"

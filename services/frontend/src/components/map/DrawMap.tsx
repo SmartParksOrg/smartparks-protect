@@ -61,6 +61,7 @@ export function DrawMap({
   proposing = false,
   onProposeBox,
   onProposePreview,
+  onRefused,
   reading = null,
   ghosts = [],
   load = null,
@@ -78,6 +79,8 @@ export function DrawMap({
   onProposeBox?: (box: ReadBox) => void;
   /** The box under the pointer while it is dragged, so its size can be shown as it grows. */
   onProposePreview?: (box: ReadBox | null) => void;
+  /** A shape the editor would not take, handed back so the page can keep and save it. */
+  onRefused?: (geometry: GeoJSON.Geometry) => void;
   /** The box being read now, drawn while the answer is awaited. */
   reading?: ReadBox | null;
   /** The candidates drawn as faint outlines while the person chooses. */
@@ -172,15 +175,17 @@ export function DrawMap({
     ensureGhostLayers(map);
     setGhosts(map, ghosts);
   }, [mapRef, ready, ghosts]);
-  // the chosen candidate goes into the editor and the map goes to it
+  // the chosen candidate goes into the editor and the map goes to it; when terra-draw will
+  // not have it the page is told, so the shape is kept rather than quietly lost (D280)
   useEffect(() => {
     const map = mapRef.current;
     if (!load || !session.current || !map) return;
-    session.current.load(kind, load.geometry);
+    const taken = session.current.load(kind, load.geometry);
+    if (!taken) onRefused?.(load.geometry);
     const bounds = geometryBounds([{ geometry: load.geometry as never }]);
     if (bounds)
       map.fitBounds(bounds, { padding: 40, duration: 300, maxZoom: 16 });
-  }, [mapRef, load, kind]);
+  }, [mapRef, load, kind, onRefused]);
   return (
     <div className="space-y-2">
       <div ref={container} className="z-0 h-72 w-full rounded-md border" />

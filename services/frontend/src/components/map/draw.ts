@@ -50,7 +50,9 @@ export interface DrawSession {
   begin(kind: DrawKind): void;
   /** Start from an existing shape instead, selected so its vertices can be dragged, added
    * on a midpoint or deleted (a fence line being corrected, phase 32). */
-  load(kind: DrawKind, geometry: GeoJSON.Geometry): void;
+  /** Put a shape in the editor, selected. False when terra-draw would not have it:
+   * it holds one polygon of one ring and refuses the rest, silently (Tim, 2026-09-21). */
+  load(kind: DrawKind, geometry: GeoJSON.Geometry): boolean;
   /** Stop drawing and editing without removing what is drawn: the map's own clicks reach
    * the page again (a click that proposes an area, phase 33). */
   idle(): void;
@@ -223,8 +225,12 @@ export function createDrawSession(
         },
       ]);
       draw.setMode("select");
-      if (added?.valid && added.id != null) draw.selectFeature(added.id);
+      const taken = !!added?.valid && added.id != null;
+      if (taken) draw.selectFeature(added.id as string | number);
       emit();
+      // terra-draw keeps one polygon of one ring; anything else is refused here, and the
+      // caller keeps it beside the session rather than losing it (Tim, 2026-09-21)
+      return taken && current().geometry !== null;
     },
     idle() {
       draw.setMode("static");

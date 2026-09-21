@@ -111,3 +111,56 @@ def test_an_answer_that_is_not_json_is_refused(monkeypatch):
         _fetch()
     assert "not JSON" in failure.value.message
     assert asked == 1
+
+
+def test_several_servers_are_asked_in_turn(monkeypatch):
+    """Decision D279: a host pinned to a tired backend is refused nearly every time, so the
+    next attempt goes to another server rather than to the same one again."""
+    asked: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(str(request.url))
+        return (
+            httpx.Response(504, text="gateway timeout")
+            if "first" in str(request.url)
+            else httpx.Response(200, json={"elements": []})
+        )
+
+    _mock_client(monkeypatch, handler)
+    answer = asyncio.run(
+        overpass.fetch_overpass(
+            "https://first.example/api , https://second.example/api", "[out:json];"
+        )
+    )
+    assert answer == {"elements": []}
+    assert asked == ["https://first.example/api", "https://second.example/api"]
+
+
+def test_every_server_refusing_is_the_answer_with_the_reason(monkeypatch):
+    asked: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(str(request.url))
+        return httpx.Response(504, text="gateway timeout")
+
+    _mock_client(monkeypatch, handler)
+    with pytest.raises(ApplicationError) as failure:
+        asyncio.run(
+            overpass.fetch_overpass(
+                ["https://first.example/api", "https://second.example/api"], "[out:json];"
+            )
+        )
+    assert "504" in failure.value.message
+    assert failure.value.context["url"] == "https://second.example/api"
+    # both servers, twice each, and no more
+    assert len(asked) == overpass.ATTEMPTS
+    assert asked.count("https://first.example/api") == 2
+
+
+def test_a_list_of_one_behaves_as_one_server(monkeypatch):
+    assert overpass.servers("  https://one.example/api  ") == ["https://one.example/api"]
+    assert overpass.servers("a,,b , c") == ["a", "b", "c"]
+    assert overpass.servers([" a ", ""]) == ["a"]
+    with pytest.raises(ApplicationError) as failure:
+        asyncio.run(overpass.fetch_overpass("  ,  ", "[out:json];"))
+    assert "No OpenStreetMap server" in failure.value.message

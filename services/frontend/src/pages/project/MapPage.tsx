@@ -873,7 +873,7 @@ export function MapPage() {
                 radius_m: Math.round(drawn.circle.radius_m),
               },
             }
-          : { ...values, geometry: drawn.geometry },
+          : { ...values, geometry: kept?.geometry ?? drawn.geometry },
       }),
     invalidate: [queryKeys.features(projectId)],
     success: t("Feature created"),
@@ -1194,14 +1194,20 @@ export function MapPage() {
     setDrawKind("polygon");
     setProposing(false);
     proposal.reset();
-    if (heldByEditor(geometry)) {
+    // into the editor when it can hold the shape and says it took it; a refusal there is
+    // silent, and used to leave Save as feature grey with nothing to save (Tim, 2026-09-21)
+    if (
+      heldByEditor(geometry) &&
+      drawSession.current?.load("polygon", geometry) === true
+    ) {
       setKept(null);
-      drawSession.current?.load("polygon", geometry);
       return;
     }
+    // the session holds one polygon of one ring and clears itself as it goes, so a shape it
+    // cannot hold is kept here and saved from here (Tim, 2026-09-21: after Use on an area with
+    // enclaves, Save as feature stayed grey and nothing could be saved at all)
     drawSession.current?.clear();
     setKept({ geometry, ...shapeParts(geometry) });
-    setDrawn({ geometry, live: geometry, circle: null });
   };
   const pickCandidate = (candidate: ProposedArea) =>
     takeShape(candidate.geometry);
@@ -2005,6 +2011,7 @@ export function MapPage() {
             purpose={tool}
             kind={drawKind}
             state={drawn}
+            savable={!!kept?.geometry}
             onKind={changeDrawKind}
             onSave={() => setSaveOpen(true)}
             onCancel={endTool}

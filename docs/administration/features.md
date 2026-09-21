@@ -74,10 +74,11 @@ What to expect:
   draw that one, or start from a smaller area OpenStreetMap already holds.
 - The data is OpenStreetMap's, under the ODbL, and the attribution is shown under the list. A
   feature made from it is yours to edit; nothing links back.
-- The server asks the public Overpass API by default (`OVERPASS_URL`); a server that clicks a
-  lot can point that at its own instance. The public service refuses bursts: a refused call is
-  made once more after a couple of seconds, and if that is refused too the interface says so.
-  Click again, or try a smaller radius.
+- The server asks public Overpass instances (`OVERPASS_URL`, several addresses separated by
+  commas, tried in turn); a server that reads a lot can point that at its own instance. A
+  public instance refuses a read now and then, and a refusal moves on to the next address
+  rather than waiting on the same one. When every address refuses, the interface says so;
+  click again, or drag a smaller box.
 - Nothing is proposed from satellite imagery. Where OpenStreetMap has nothing, the shape is
   drawn by hand.
 

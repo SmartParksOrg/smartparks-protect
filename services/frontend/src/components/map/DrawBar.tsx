@@ -65,6 +65,7 @@ export function DrawBar({
   purpose,
   kind,
   state,
+  savable = false,
   onKind,
   onSave,
   onCancel,
@@ -73,6 +74,8 @@ export function DrawBar({
   purpose: "draw" | "measure";
   kind: DrawKind;
   state: DrawState;
+  /** A shape the drawing session cannot hold, kept beside it and saved all the same. */
+  savable?: boolean;
   onKind: (kind: DrawKind) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -222,7 +225,7 @@ export function DrawBar({
           <Button
             size="sm"
             className="h-8"
-            disabled={geometry === null}
+            disabled={geometry === null && !savable}
             onClick={onSave}
           >
             {t("Save as feature")}

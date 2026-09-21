@@ -34,6 +34,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- **Proposing an area failed with "OpenStreetMap answered 504"** (decision D279; Tim, 2026-09-21). The public `overpass-api.de` spreads its clients over its backends and keeps each one where it put it, so a host that lands on a tired backend is refused nearly every read: from the dev server the same query gave 504, 200, 504 at `overpass-api.de` and 200, 200, 200 at `overpass.openstreetmap.fr` within a minute. `OVERPASS_URL` now takes several addresses separated by commas, asked in turn, so a refusal moves to the next server instead of waiting on the same one; the dev server asks the French instance first.
+
+- **A proposed area could not be saved at all** (Tim, 2026-09-21: "I searched Kraansvlak and saved it, and it does not show up in the Features"). On the live map a shape the drawing editor cannot hold — one in several pieces, or one with an enclave — was handed to the drawing session, which clears itself as it loads, so Save as feature stayed grey and nothing was ever created. The shape is now kept beside the session and saved from there. The editor's refusal is no longer silent either: it reports whether it took the shape, and a shape it would not have is kept instead of vanishing.
+
 - The live map's Draw tool is gone from the All projects scope (decision D278; Tim, 2026-09-21: a feature saved there could not be found afterwards). A feature belongs to one project and that scope reads across every one of them, so the save came back as a UUID parse error and nothing was ever created. Measure stays, since it keeps nothing.
 
 - A project's map could open on the other side of the world. The view a project opens with is saved shortly after the map settles, and that happened before the first fit, so the starting point over southern Africa was stored as "where you left this project" and every later visit went there. Nothing is remembered now until the map has been placed for that project.

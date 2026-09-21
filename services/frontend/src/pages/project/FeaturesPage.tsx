@@ -367,6 +367,10 @@ export function FeaturesPage() {
                 proposing={proposing}
                 onProposeBox={proposeBox}
                 onProposePreview={setPreview}
+                onRefused={(geometry) => {
+                  setLoaded(null);
+                  setKept({ geometry, ...shapeParts(geometry) });
+                }}
                 reading={proposal.isPending ? reading : null}
                 ghosts={
                   kept
