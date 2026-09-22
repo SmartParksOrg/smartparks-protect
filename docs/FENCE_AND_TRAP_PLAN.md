@@ -66,6 +66,8 @@ The API also applies the staleness rule when it reads the status, so a line whos
 - [x] F6 the interface: the feature form, the map layer and the fence panel, the monitor's card on the entity page, the trap card on the device page, Dutch.
 - [x] F7 docs: `docs/devices/fences-and-traps.md`, the OpenCollar driver row, the pages guide, `DEVELOPERS.md`, the changelog, this document's state.
 - [ ] F8 the dev server: the simulated half done on 2026-09-19 (the Fence demo and Trap demo projects, a day of frames through the real decoder); Tim's field devices when they report.
+- [ ] F9 a trap's alert does not clear when the door opens again (seen on the Trap demo project, 2026-09-19): `TRAP_OPENED` raises its event and the open `TRAP_CLOSED` alert stays, so the second exit criterion of section 6 does not hold yet.
+- [ ] F10 six metric keys this phase's messages registered stand in the registry as `uncategorized` (`switch_active`, `switch_count`, `lr_satellites`, `gnss_pdop`, `flash_used_percent`, `flash_messages`); seed them with their label, unit and category.
 
 ## 6. Exit criteria
 

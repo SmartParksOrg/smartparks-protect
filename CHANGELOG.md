@@ -34,6 +34,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - **The project switcher and the search moved to the top bar** (decision D276; Tim, 2026-09-21). They say and change what every page is about, so they sit beside the brand instead of at the top of a navigation column that is hidden on a phone and collapsible on a desktop. On a phone the product name gives its room to the project and the search shrinks to its magnifier, which opens the same palette as Ctrl+K. The list of projects is as wide as the screen allows, so a name and its role share one line (Tim, 2026-09-21: "Island Conservation" was cut in half and its role wrapped underneath).
 
+- A **Metrics** table on the Data tab of a device and of an entity (Tim, 2026-09-20), in the project and under Server admin: every metric reported in the last thirty days with its newest reading, when, and how many readings there were; a numeric one unfolds its trend. The tab had the positions and the events and not the measurements between them. API: `GET /projects/{id}/measurements/summary`.
+
+- The Data explorer's table sorts and filters (Tim, 2026-09-20): the time first and newest first by default, a click on any header sorts the loaded rows by it (again reverses; empty cells stay last), and under every header a filter — a piece of text, or for a number column `> 3.5`, `<= 2`, `3.5-4` or a plain number — with a line saying how many loaded rows match. The device type, the data source, the kinds of record a moment holds and the position's kind are columns on by default; the identifiers — the device and entity ids, the source event, its ingestion time and the trace — are in the column picker, off until added, and the choice sticks per user.
+
 ### Fixed
 
 - **Proposing an area failed with "OpenStreetMap answered 504"** (decision D279; Tim, 2026-09-21). The public `overpass-api.de` spreads its clients over its backends and keeps each one where it put it, so a host that lands on a tired backend is refused nearly every read: from the dev server the same query gave 504, 200, 504 at `overpass-api.de` and 200, 200, 200 at `overpass.openstreetmap.fr` within a minute. `OVERPASS_URL` now takes several addresses separated by commas, asked in turn, so a refusal moves to the next server instead of waiting on the same one; the dev server asks the French instance first.
@@ -65,10 +69,6 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 - An entity's page showed no map for an entity whose device has a place set by hand: the small map draws position rows and a fixed place has none. It takes the current position instead when there is nothing else to draw. (Tim, 2026-09-19.)
 
 - An entity whose device reports readings but no positions read "Last seen: never" on the live map — a fence monitor with a place set by hand, a scanner, a trap — while its readings arrived every hour. The decoder marked the entity as seen only when a position came in; any record of the device does now, and a position still moves it. (Tim, 2026-09-19, on the demo projects.)
-
-- A **Metrics** table on the Data tab of a device and of an entity (Tim, 2026-09-20), in the project and under Server admin: every metric reported in the last thirty days with its newest reading, when, and how many readings there were; a numeric one unfolds its trend. The tab had the positions and the events and not the measurements between them. API: `GET /projects/{id}/measurements/summary`.
-
-- The Data explorer's table sorts and filters (Tim, 2026-09-20): the time first and newest first by default, a click on any header sorts the loaded rows by it (again reverses; empty cells stay last), and under every header a filter — a piece of text, or for a number column `> 3.5`, `<= 2`, `3.5-4` or a plain number — with a line saying how many loaded rows match. The device type, the data source, the kinds of record a moment holds and the position's kind are columns on by default; the identifiers — the device and entity ids, the source event, its ingestion time and the trace — are in the column picker, off until added, and the choice sticks per user.
 
 ### Changed
 
