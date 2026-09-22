@@ -123,3 +123,6 @@ def test_fifteen_byte_records_carry_hrv_and_a_heart_rate() -> None:
     last = readings[1789041960]
     assert last["cmdq_success"] is False
     assert "heart_rate" not in last and "cmdq_temperature" not in last
+    # nor a variability of zero, which would be a heart beating perfectly evenly
+    assert "heart_rate_variability" not in last
+    assert last["cmdq_hrv_raw"] == 0

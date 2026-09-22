@@ -165,6 +165,8 @@ def test_driver_matches_the_reference_decoder(entry, version, expected):
                 assert "cmdq_temperature" not in ours
             if reading["cmdq_hrv_raw"]:
                 assert close(ours["heart_rate_variability"], reading["cmdq_hrv"], 0.01)
+            else:
+                assert "heart_rate_variability" not in ours
             if reading["cmdq_rr_median"]:
                 # our own derivation, from the published tens of milliseconds
                 assert close(ours["heart_rate"], 6000 / reading["cmdq_rr_median"], 0.05)

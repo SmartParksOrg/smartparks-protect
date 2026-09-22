@@ -591,9 +591,12 @@ class OpenCollarDriver:
         if length >= CMDQ_DATA_OFFSET + 11:
             hrv_raw = struct.unpack_from(">H", data, base + 9)[0]
             values["cmdq_hrv_raw"] = float(hrv_raw)
-            # sqrt of the mean squared successive difference is RMSSD, which is what the
-            # reference decoder reports as `cmdq_hrv`.
-            values["heart_rate_variability"] = round(math.sqrt(hrv_raw), 2)
+            if hrv_raw > 0:
+                # sqrt of the mean squared successive difference is RMSSD, which is what the
+                # reference decoder reports as `cmdq_hrv`. A raw of zero is the tag saying it
+                # measured none, not a heart whose beats were perfectly even, so no variability
+                # is written for it; the reference decoder reports 0 there and we do not.
+                values["heart_rate_variability"] = round(math.sqrt(hrv_raw), 2)
         for key, value in values.items():
             records.measurements.append(
                 DecodedMeasurement(

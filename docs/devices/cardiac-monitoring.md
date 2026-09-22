@@ -38,8 +38,9 @@ skin.
 
 This matters more than it sounds, because **a quiet tag and a calm animal look the same in a
 heart rate chart**. Every figure Protect shows is accompanied by how many sightings there were
-and how many of them carried a reading. When no reading came through, no heart rate is written at
-all, rather than a zero that would drag an average down.
+and how many of them carried a reading. When no reading came through, no heart rate, no
+temperature and no variability are written at all, rather than zeros that would drag an average
+down. The raw fields are still stored, so the record is complete.
 
 ## How often it reports
 

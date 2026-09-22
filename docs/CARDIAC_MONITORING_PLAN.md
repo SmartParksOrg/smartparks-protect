@@ -74,9 +74,11 @@ guess (decision D283).
   `cmdq_active_min_in_last_hour`, `cmdq_raw_temperature`, `cmdq_impedance`, `cmdq_hrv_raw`,
   `cmdq_temperature`, `cmdq_success`, and where the firmware sent HRV, `cmdq_hrv`.
 - Two derived on top, and only where they mean something: `heart_rate` is `6000 / rr_median`
-  when `rr_median` is above zero, `heart_rate_variability` is `sqrt(hrv_raw)`. A record with
-  `rr_median` zero is a sighting without a cardiac reading: the tag was heard, the heart was
-  not, and `cmdq_success` says which.
+  when `rr_median` is above zero, `heart_rate_variability` is `sqrt(hrv_raw)` when the raw is
+  above zero. A record with `rr_median` zero is a sighting without a cardiac reading: the tag
+  was heard, the heart was not, and `cmdq_success` says which. The reference decoder reports a
+  zero for each of these and we write nothing, which is the one place we differ from it on
+  purpose: a variability of zero would be a heart beating perfectly evenly.
 - The reference decoders are the oracle: `scripts/opencollar_golden.py` runs the recorded port 15
   frames through them, so our arithmetic cannot drift from the firmware's own.
 
