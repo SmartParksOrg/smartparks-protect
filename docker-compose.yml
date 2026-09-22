@@ -164,7 +164,8 @@ services:
       MAIL_FROM: ${MAIL_FROM:-}
       DEV_NOTIFY_EMAILS: ${DEV_NOTIFY_EMAILS:-}
       MAIL_DELIVER_TO_ALL: ${MAIL_DELIVER_TO_ALL:-false}
-      ANALYSIS_MODULES: ${ANALYSIS_MODULES:-movement,grazing}
+      # keep in step with `analysis_modules` in shared/config.py; a test holds them equal
+      ANALYSIS_MODULES: ${ANALYSIS_MODULES:-movement,grazing,device_performance,contact_tracing,cardiac}
       ANALYSIS_CONCURRENCY: ${ANALYSIS_CONCURRENCY:-1}
       ANALYSIS_TIMEOUT_SECONDS: ${ANALYSIS_TIMEOUT_SECONDS:-900}
       ANALYSIS_RETENTION_DAYS: ${ANALYSIS_RETENTION_DAYS:-7}
