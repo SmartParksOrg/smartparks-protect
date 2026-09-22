@@ -364,6 +364,7 @@ function HealthRows({
   fenceVoltage,
   fencePulses,
   trapClosed,
+  heartRate,
   now,
   onOpenPosition,
   onOpenState,
@@ -401,6 +402,9 @@ function HealthRows({
   fenceVoltage?: number | null;
   fencePulses?: number | null;
   trapClosed?: number | null;
+  /** The newest heart rate from the animal's cardiac tag (phase 34), when a collar relays one;
+   * it unfolds its trend the way the battery and the fence rows do. */
+  heartRate?: number | null;
   now: number;
   /** Opens the fix of that moment, the panel a track point opens (Tim, 2026-09-13). */
   onOpenPosition?: () => void;
@@ -415,6 +419,7 @@ function HealthRows({
   const [uptimeOpen, setUptimeOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
   const [fenceOpen, setFenceOpen] = useState(false);
+  const [heartOpen, setHeartOpen] = useState(false);
   const [trapOpen, setTrapOpen] = useState(false);
   const hasMovement = activity !== undefined && activity !== null;
   const rebooted =
@@ -562,6 +567,33 @@ function HealthRows({
           <UptimeTrend
             projectId={batteryProject}
             deviceId={batteryDevice}
+            until={lastSeenAt}
+          />
+        </div>
+      )}
+      {heartRate != null && (
+        <PanelRow label={t("Heart rate")}>
+          {batteryProject && batteryDevice ? (
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-primary"
+              title={t("Show the heart rate over the period")}
+              onClick={() => setHeartOpen((open) => !open)}
+              aria-expanded={heartOpen}
+            >
+              {t("{{count}} bpm", { count: Math.round(heartRate) })}
+            </button>
+          ) : (
+            t("{{count}} bpm", { count: Math.round(heartRate) })
+          )}
+        </PanelRow>
+      )}
+      {heartRate != null && heartOpen && batteryProject && batteryDevice && (
+        <div className="col-span-2 rounded-md border bg-muted/30 p-2">
+          <MetricTrend
+            projectId={batteryProject}
+            deviceId={batteryDevice}
+            spec={trendSpecFor("heart_rate", undefined, t)!}
             until={lastSeenAt}
           />
         </div>
@@ -982,6 +1014,7 @@ export function EntityPanel({
         lastContactAt={props.last_contact_at}
         contactsTo={contactsHref}
         fenceVoltage={props.fence_voltage}
+        heartRate={props.heart_rate}
         fencePulses={props.fence_pulses}
         trapClosed={props.trap_closed}
         now={now}
@@ -1165,6 +1198,7 @@ export function DevicePanel({
         lastContactAt={props.last_contact_at}
         contactsTo={contactsHref}
         fenceVoltage={props.fence_voltage}
+        heartRate={props.heart_rate}
         fencePulses={props.fence_pulses}
         trapClosed={props.trap_closed}
         now={now}

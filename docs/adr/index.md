@@ -42,3 +42,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0034 Devices as analysis subjects, with levels](0034-devices-as-analysis-subjects-with-levels.md)
 - [0035 Device settings known per device, from the type's catalogue](0035-device-settings-known-per-device.md)
 - [0036 Contacts as a canonical record type, and a place a device does not report](0036-contacts-as-a-canonical-record-type.md)
+- [0037 Cardiac readings on the scanning device, with only what is published derived](0037-cardiac-readings-on-the-scanning-device.md)

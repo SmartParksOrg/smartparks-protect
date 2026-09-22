@@ -73,6 +73,15 @@ const SPECIAL: Record<string, (t: Translate) => TrendSpec> = {
     ariaLabel: t("Uptime over the period"),
   }),
 };
+SPECIAL.heart_rate = (t) => ({
+  metric: "heart_rate",
+  label: t("Heart rate"),
+  unit: "bpm",
+  decimals: 0,
+  step: 10,
+  floor: 0,
+  ariaLabel: t("Heart rate over the period"),
+});
 SPECIAL.fence_voltage = (t) => ({
   metric: "fence_voltage",
   label: t("Fence voltage"),

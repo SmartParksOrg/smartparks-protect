@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  cardiacParameters,
   comparisonOf,
   documentOf,
   fixesPreset,
@@ -113,6 +114,37 @@ describe("analysis form state", () => {
       strategy: true,
     });
     expect(parameters).not.toHaveProperty("kde_bandwidth_m");
+  });
+  it("carries the cardiac method only when it differs from the defaults", () => {
+    const plain = readFormState(new URLSearchParams("entity=a"));
+    expect(writeFormState(plain).toString()).toBe("entity=a");
+    const changed = readFormState(
+      new URLSearchParams("entity=a&quiet_from=22&quiet_to=4&quantile=0.05"),
+    );
+    expect(changed.cardiac).toEqual({
+      quietFrom: 22,
+      quietTo: 4,
+      quantile: 0.05,
+    });
+    // midnight is hour 0, which must survive the round trip as a real answer
+    const midnight = readFormState(new URLSearchParams("entity=a&quiet_to=0"));
+    expect(midnight.cardiac.quietTo).toBe(0);
+  });
+  it("builds the cardiac parameters from the form", () => {
+    const now = new Date("2026-09-22T10:00:00Z");
+    const state = readFormState(
+      new URLSearchParams("entity=a&entity=b&range=7d&quiet_from=22&quiet_to=4"),
+    );
+    expect(cardiacParameters(state, now)).toMatchObject({
+      entity_ids: ["a", "b"],
+      quiet_from_hour: 22,
+      quiet_to_hour: 4,
+      resting_quantile: 0.1,
+    });
+    // no subject, no run
+    expect(
+      cardiacParameters(readFormState(new URLSearchParams("range=7d")), now),
+    ).toBeNull();
   });
   it("reads a subject's figures out of a nested summary", () => {
     const document = {

@@ -6,6 +6,9 @@ MAX_SUBJECTS_MOVEMENT = 25
 #: is 780 pairs, which is the honest limit rather than a number that quietly melts the
 #: worker (design section 4.2).
 MAX_SUBJECTS_CONTACT = 40
+#: A cardiac run reads one series per subject and compares nothing between them, so the
+#: bound is about how many curves a person can read on one page, not about the work.
+MAX_SUBJECTS_CARDIAC = 25
 MAX_DEVICES = 100
 MAX_ROWS_PER_DEVICE = 500_000
 MAX_ANIMALS_GRAZING = 100

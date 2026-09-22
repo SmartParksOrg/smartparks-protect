@@ -648,6 +648,145 @@
   "source": "wiki uplinks.jsonl"
  },
  {
+  "data_hex": "fc2dc09ba26a4b0c03091108ea0ff007e9749ca26a3c0e15402609020fe00384289da26a0000000000000000000000",
+  "decoders": {
+   "6.11.2": {
+    "0": {
+     "cmdq_active_min_in_last_hour": 17,
+     "cmdq_activity_average": 3,
+     "cmdq_activity_max": 9,
+     "cmdq_h_impedance": 4080,
+     "cmdq_hrv": 45,
+     "cmdq_hrv_raw": 2025,
+     "cmdq_raw_temp": 2282,
+     "cmdq_rr_median": 75,
+     "cmdq_rr_median_modesum": 12,
+     "cmdq_success": 1,
+     "cmdq_temp": 38.50359999999999,
+     "cmdq_timestamp": 1789041600
+    },
+    "1": {
+     "cmdq_active_min_in_last_hour": 38,
+     "cmdq_activity_average": 21,
+     "cmdq_activity_max": 64,
+     "cmdq_h_impedance": 4064,
+     "cmdq_hrv": 30,
+     "cmdq_hrv_raw": 900,
+     "cmdq_raw_temp": 2306,
+     "cmdq_rr_median": 60,
+     "cmdq_rr_median_modesum": 14,
+     "cmdq_success": 1,
+     "cmdq_temp": 39.0988,
+     "cmdq_timestamp": 1789041780
+    },
+    "2": {
+     "cmdq_active_min_in_last_hour": 0,
+     "cmdq_activity_average": 0,
+     "cmdq_activity_max": 0,
+     "cmdq_h_impedance": 0,
+     "cmdq_hrv": 0,
+     "cmdq_hrv_raw": 0,
+     "cmdq_raw_temp": 0,
+     "cmdq_rr_median": 0,
+     "cmdq_rr_median_modesum": 0,
+     "cmdq_success": 0,
+     "cmdq_temp": 0,
+     "cmdq_timestamp": 1789041960
+    }
+   },
+   "6.15.1": {
+    "0": {
+     "cmdq_active_min_in_last_hour": 17,
+     "cmdq_activity_average": 3,
+     "cmdq_activity_max": 9,
+     "cmdq_h_impedance": 4080,
+     "cmdq_hrv": 45,
+     "cmdq_hrv_raw": 2025,
+     "cmdq_raw_temp": 2282,
+     "cmdq_rr_median": 75,
+     "cmdq_rr_median_modesum": 12,
+     "cmdq_success": 1,
+     "cmdq_temp": 38.50359999999999,
+     "cmdq_timestamp": 1789041600
+    },
+    "1": {
+     "cmdq_active_min_in_last_hour": 38,
+     "cmdq_activity_average": 21,
+     "cmdq_activity_max": 64,
+     "cmdq_h_impedance": 4064,
+     "cmdq_hrv": 30,
+     "cmdq_hrv_raw": 900,
+     "cmdq_raw_temp": 2306,
+     "cmdq_rr_median": 60,
+     "cmdq_rr_median_modesum": 14,
+     "cmdq_success": 1,
+     "cmdq_temp": 39.0988,
+     "cmdq_timestamp": 1789041780
+    },
+    "2": {
+     "cmdq_active_min_in_last_hour": 0,
+     "cmdq_activity_average": 0,
+     "cmdq_activity_max": 0,
+     "cmdq_h_impedance": 0,
+     "cmdq_hrv": 0,
+     "cmdq_hrv_raw": 0,
+     "cmdq_raw_temp": 0,
+     "cmdq_rr_median": 0,
+     "cmdq_rr_median_modesum": 0,
+     "cmdq_success": 0,
+     "cmdq_temp": 0,
+     "cmdq_timestamp": 1789041960
+    }
+   },
+   "7.2.0": {
+    "0": {
+     "cmdq_active_min_in_last_hour": 17,
+     "cmdq_activity_average": 3,
+     "cmdq_activity_max": 9,
+     "cmdq_h_impedance": 4080,
+     "cmdq_hrv": 45,
+     "cmdq_hrv_raw": 2025,
+     "cmdq_raw_temp": 2282,
+     "cmdq_rr_median": 75,
+     "cmdq_rr_median_modesum": 12,
+     "cmdq_success": 1,
+     "cmdq_temp": 38.50359999999999,
+     "cmdq_timestamp": 1789041600
+    },
+    "1": {
+     "cmdq_active_min_in_last_hour": 38,
+     "cmdq_activity_average": 21,
+     "cmdq_activity_max": 64,
+     "cmdq_h_impedance": 4064,
+     "cmdq_hrv": 30,
+     "cmdq_hrv_raw": 900,
+     "cmdq_raw_temp": 2306,
+     "cmdq_rr_median": 60,
+     "cmdq_rr_median_modesum": 14,
+     "cmdq_success": 1,
+     "cmdq_temp": 39.0988,
+     "cmdq_timestamp": 1789041780
+    },
+    "2": {
+     "cmdq_active_min_in_last_hour": 0,
+     "cmdq_activity_average": 0,
+     "cmdq_activity_max": 0,
+     "cmdq_h_impedance": 0,
+     "cmdq_hrv": 0,
+     "cmdq_hrv_raw": 0,
+     "cmdq_raw_temp": 0,
+     "cmdq_rr_median": 0,
+     "cmdq_rr_median_modesum": 0,
+     "cmdq_success": 0,
+     "cmdq_temp": 0,
+     "cmdq_timestamp": 1789041960
+    }
+   }
+  },
+  "port": 15,
+  "source": "wiki uplinks.jsonl"
+ },
+ {
   "data_hex": "930e8a255b75623d081f1d346f031f00",
   "decoders": {
    "6.11.2": {

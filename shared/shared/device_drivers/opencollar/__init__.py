@@ -15,6 +15,7 @@ receive time; inside a flash log it is the store timestamp of the record.
 """
 
 import json
+import math
 import re
 import struct
 from dataclasses import dataclass
@@ -97,7 +98,7 @@ KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
     27: (0x91, None),
     28: (0x90, None),
 }
-NOT_CANONICAL_PORTS = {1, 5, 6, 9, 10, 15, 27, 28}
+NOT_CANONICAL_PORTS = {1, 5, 6, 9, 10, 27, 28}
 PORT_BLE_SCAN_AGGREGATED = 7  # msg 0xF9, the buffer the device summarised (research 3.7)
 #: How many octets of an address a scan reports, and so how much of a MAC can ever be matched.
 #: The devices a scan saw, one sample per scan window, zero when it looked and saw none.
@@ -121,6 +122,16 @@ def scan_suffix(mac: str) -> str:
     """The part of a device's address a neighbour's scan can report: its last three octets."""
     return ":".join(mac.lower().split(":")[-SCAN_ADDRESS_OCTETS:])
 
+
+PORT_CMDQ = 15  # msg 0xFC, what the collar heard from a LINQII cardiac tag (research 3.13)
+#: Where a record's own fields start, after its four byte timestamp.
+CMDQ_DATA_OFFSET = 4
+#: The R-R median is published in tens of milliseconds, so a heart rate is 60_000 / (median * 10).
+CMDQ_BPM_NUMERATOR = 6000.0
+#: raw_temperature to degrees Celsius, and the rule that says a reading happened at all
+#: (`bt_cmdq` README and every reference decoder since 6.5.0).
+CMDQ_TEMPERATURE_SCALE = 0.0248
+CMDQ_TEMPERATURE_OFFSET = -18.09
 
 PORT_BLE_SCAN = 11  # msg 0xFA, one scan as it happened (research 3.9)
 PORT_RF_SCAN = 8  # firmware 4.x to 6.16, removed in 7.1.0 (research 3.23)
@@ -479,7 +490,6 @@ class OpenCollarDriver:
         }
 
     @staticmethod
-    @staticmethod
     def _address(data: bytes, offset: int) -> str:
         """The three octets of a neighbour's Bluetooth address as the firmware sends them.
 
@@ -519,6 +529,81 @@ class OpenCollarDriver:
             index += 1
             offset += 4
         self._note_scan(records, scan_at, seen, len(records.contacts) - before, "single")
+
+    def _decode_cmdq(
+        self, data: bytes, time: datetime, records: DecodedRecords, layout: Layout
+    ) -> None:
+        """Port 15 (`decodeBluetoothCMDQMessage`): what the collar heard from the LINQII cardiac
+        tag it is configured to follow (decision D282, research 3.13).
+
+        One record per sighting: a four byte timestamp written by the *collar*
+        (`get_global_unix_time()`, little-endian) and then the tag's advertisement copied
+        verbatim, which is why those fields are big-endian. The record is 13 bytes up to firmware
+        6.8 and 15 bytes from 6.9.0, when HRV was added; the length comes from the firmware
+        layout and never from the frame, so a device that sends an unexpected number of bytes is
+        a note rather than eleven fields read at the wrong offsets.
+
+        A sighting without a cardiac reading is normal and is not a fault: the tag was heard, the
+        heart was not, `rr_median` is zero and `cmdq_success` says so. `FC 00` is the empty report
+        of `cmdq_report_zero_messages_to_be_sent` and carries no record at all."""
+        length = layout.cmdq_record_length
+        if length is None:
+            records.notes.append(f"the {layout.key} catalogue has no CMDQ record length")
+            return
+        if not data:
+            records.notes.append("no cardiac detection in the reporting interval")
+            return
+        count, spare = divmod(len(data), length)
+        if spare:
+            # Whole records are still data; only the tail is unreadable.
+            records.notes.append(
+                f"cardiac message holds {len(data)} bytes, not a whole number of "
+                f"{length} byte records; {spare} trailing bytes left unread"
+            )
+        for index in range(count):
+            self._cmdq_record(data, index * length, length, time, records)
+
+    def _cmdq_record(
+        self, data: bytes, offset: int, length: int, time: datetime, records: DecodedRecords
+    ) -> None:
+        stamp = struct.unpack_from("<I", data, offset)[0]
+        at = _unix(stamp) or time
+        base = offset + CMDQ_DATA_OFFSET
+        rr_median = data[base]
+        raw_temperature = struct.unpack_from(">H", data, base + 5)[0]
+        values: dict[str, float | bool] = {
+            "cmdq_rr_median": float(rr_median),
+            "cmdq_rr_median_modesum": float(data[base + 1]),
+            "cmdq_activity_average": float(data[base + 2]),
+            "cmdq_activity_max": float(data[base + 3]),
+            "cmdq_active_min_in_last_hour": float(data[base + 4]),
+            "cmdq_raw_temperature": float(raw_temperature),
+            "cmdq_impedance": float(struct.unpack_from(">H", data, base + 7)[0]),
+            # The reference decoder calls a reading successful when the temperature came through.
+            "cmdq_success": raw_temperature > 0,
+        }
+        if raw_temperature > 0:
+            values["cmdq_temperature"] = round(
+                raw_temperature * CMDQ_TEMPERATURE_SCALE + CMDQ_TEMPERATURE_OFFSET, 3
+            )
+        if rr_median > 0:
+            values["heart_rate"] = round(CMDQ_BPM_NUMERATOR / rr_median, 1)
+        if length >= CMDQ_DATA_OFFSET + 11:
+            hrv_raw = struct.unpack_from(">H", data, base + 9)[0]
+            values["cmdq_hrv_raw"] = float(hrv_raw)
+            # sqrt of the mean squared successive difference is RMSSD, which is what the
+            # reference decoder reports as `cmdq_hrv`.
+            values["heart_rate_variability"] = round(math.sqrt(hrv_raw), 2)
+        for key, value in values.items():
+            records.measurements.append(
+                DecodedMeasurement(
+                    time=at,
+                    metric_key=key,
+                    value=value,
+                    record_type="cmdq",
+                    device_clock=True,
+                )
+            )
 
     def _decode_ble_scan_aggregated(
         self, data: bytes, time: datetime, records: DecodedRecords
@@ -750,6 +835,8 @@ class OpenCollarDriver:
             self._decode_open_sky(frame[1:], time, records)
         elif port == PORT_FENCE:
             self._decode_fence(data, time, records)
+        elif port == PORT_CMDQ:
+            self._decode_cmdq(data, time, records, layout)
         elif port == PORT_FLASH_STATUS:
             used, count = struct.unpack_from("<BI", data)
             records.measurements += [

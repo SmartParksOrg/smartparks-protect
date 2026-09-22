@@ -25,7 +25,8 @@ The protocol catalogue (settings, commands and readable values of firmware 7.3.0
 | 31 | Command confirmation, BLE MAC, requested last position | State `last_command`, state `ble_mac`, Position (firmware byte order: longitude first) | Fix timestamp for the position |
 | 3, 30 | Settings and values readback | State with the raw `id: hex` list | Network receive time |
 | 7, 11 | BLE scan, aggregated over a window and one at a time | One contact per sighting, with the three octets the scan carries, the signal strength and how the address resolved; under the phone filter also a `human_presence` event and measurement, and from a device with a place set, a `proximity` position for what it heard. See [Bluetooth contacts](bluetooth-contacts.md) | The scan's own timestamp, unless it is implausibly far behind its delivery (decision D259) |
-| 1, 5, 6, 9, 10, 15, 21, 27, 28 | LR11xx NAV, satellite lists, Wi-Fi scans, cardiac monitor, air quality, Memfault, messaging | Accepted, no canonical rows yet (the LR11xx NAV needs an external solver) | |
+| 15 | Cardiac monitor (CMDQ) | One reading per sighting of the LINQII tag the device follows: `heart_rate` (bpm), `heart_rate_variability` (ms), `cmdq_temperature` (°C), `cmdq_success` and the raw fields. See [Cardiac monitoring](cardiac-monitoring.md) | The sighting's own timestamp, from the device's clock |
+| 1, 5, 6, 9, 10, 21, 27, 28 | LR11xx NAV, satellite lists, Wi-Fi scans, air quality, Memfault, messaging | Accepted, no canonical rows yet (the LR11xx NAV needs an external solver) | |
 
 Unknown ports, wrong message ids and length mismatches raise `PAYLOAD_DECODE_FAILED` and land in Needs Attention.
 

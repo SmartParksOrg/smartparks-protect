@@ -73,6 +73,11 @@ const GrazingPage = lazy(() =>
     default: m.GrazingPage,
   })),
 );
+const CardiacPage = lazy(() =>
+  import("@/pages/project/CardiacPage").then((m) => ({
+    default: m.CardiacPage,
+  })),
+);
 const ContactTracingPage = lazy(() =>
   import("@/pages/project/ContactTracingPage").then((m) => ({
     default: m.ContactTracingPage,
@@ -288,6 +293,9 @@ export default function App() {
                   path="analyze/contact-tracing"
                   element={<ContactTracingPage />}
                 />
+              </Route>
+              <Route element={<RequireAnalysisModule module="cardiac" />}>
+                <Route path="analyze/cardiac" element={<CardiacPage />} />
               </Route>
               <Route
                 element={<RequireAnalysisModule module="device_performance" />}

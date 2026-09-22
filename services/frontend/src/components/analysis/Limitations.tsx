@@ -148,6 +148,39 @@ export function DevicePerformanceLimitations() {
 /** What a contact study can and cannot say. The module writes its own limitations into the
  * result (design 4.4); these are the ones that hold whatever the run found, and the first is
  * the one somebody will otherwise assume the opposite of. */
+export function CardiacLimitations() {
+  const { t } = useTranslation();
+  return (
+    <details className="rounded-md border px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {t("What these figures can and cannot say")}
+      </summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+        <li>
+          {t(
+            "There is no normal range here. What a healthy heart rate is depends on the species, the age, the season and what the animal was doing a minute ago, and none of those are in this data.",
+          )}
+        </li>
+        <li>
+          {t(
+            "The tag is heard on the collar's schedule, not the heart's. Every figure is a sample of a fast signal by a slow observer, and nothing is interpolated between readings.",
+          )}
+        </li>
+        <li>
+          {t(
+            "A sighting without a cardiac reading is normal: the tag was heard and the heart was not. Read the share with a reading before reading the heart rate.",
+          )}
+        </li>
+        <li>
+          {t(
+            "The tag's activity, impedance and mode sum are stored as the numbers the tag sent. Their meaning is not published by the manufacturer, so nothing here interprets them.",
+          )}
+        </li>
+      </ul>
+    </details>
+  );
+}
+
 export function ContactTracingLimitations() {
   const { t } = useTranslation();
   return (

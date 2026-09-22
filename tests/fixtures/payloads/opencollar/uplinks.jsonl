@@ -7,3 +7,4 @@
 {"f_port": 5, "data_hex": "f50100", "expected": {"not_canonical": true}}
 {"f_port": 11, "data_hex": "fa0db820ad6a020c410a36e1029f25", "expected": {"N_BT_res": 2, "t": 1789731000, "built": true}}
 {"f_port": 7, "data_hex": "f913020c410a49061401ad6ae1029f280104f3ac6a", "expected": {"N_BT_res": 2, "built": true}}
+{"f_port": 15, "data_hex": "fc2dc09ba26a4b0c03091108ea0ff007e9749ca26a3c0e15402609020fe00384289da26a0000000000000000000000", "expected": {"0": {"cmdq_timestamp": 1789041600, "cmdq_rr_median": 75, "cmdq_temp": 38.5036, "cmdq_hrv": 45, "cmdq_success": 1}, "1": {"cmdq_timestamp": 1789041780, "cmdq_rr_median": 60, "cmdq_temp": 39.0988, "cmdq_hrv": 30, "cmdq_success": 1}, "2": {"cmdq_timestamp": 1789041960, "cmdq_rr_median": 0, "cmdq_temp": 0, "cmdq_hrv": 0, "cmdq_success": 0}}}

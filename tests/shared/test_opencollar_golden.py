@@ -139,6 +139,37 @@ def test_driver_matches_the_reference_decoder(entry, version, expected):
     elif port == 14:
         assert measurements["flash_used_percent"] == expected["percentage"]
         assert measurements["flash_messages"] == expected["n_msg"]
+    elif port == 15:
+        # one sighting per record, each at its own time, so the values are grouped by moment
+        # rather than by key: a frame carries several records of the same metric.
+        by_time: dict[int, dict[str, float]] = {}
+        for m in records.measurements:
+            by_time.setdefault(int(m.time.timestamp()), {})[m.metric_key] = m.value
+        wanted = [expected[str(i)] for i in range(len(expected))]
+        assert [t for t in by_time] == [r["cmdq_timestamp"] for r in wanted]
+        for reading, ours in zip(wanted, by_time.values(), strict=True):
+            assert ours["cmdq_rr_median"] == reading["cmdq_rr_median"]
+            assert ours["cmdq_rr_median_modesum"] == reading["cmdq_rr_median_modesum"]
+            assert ours["cmdq_activity_average"] == reading["cmdq_activity_average"]
+            assert ours["cmdq_activity_max"] == reading["cmdq_activity_max"]
+            assert ours["cmdq_active_min_in_last_hour"] == reading["cmdq_active_min_in_last_hour"]
+            assert ours["cmdq_raw_temperature"] == reading["cmdq_raw_temp"]
+            assert ours["cmdq_impedance"] == reading["cmdq_h_impedance"]
+            assert ours["cmdq_success"] == bool(reading["cmdq_success"])
+            assert ours["cmdq_hrv_raw"] == reading["cmdq_hrv_raw"]
+            # the reference decoder reports a temperature of 0 and an HRV of 0 for a record
+            # that carries neither; we leave the value out instead of writing a false reading
+            if reading["cmdq_success"]:
+                assert close(ours["cmdq_temperature"], reading["cmdq_temp"], 0.01)
+            else:
+                assert "cmdq_temperature" not in ours
+            if reading["cmdq_hrv_raw"]:
+                assert close(ours["heart_rate_variability"], reading["cmdq_hrv"], 0.01)
+            if reading["cmdq_rr_median"]:
+                # our own derivation, from the published tens of milliseconds
+                assert close(ours["heart_rate"], 6000 / reading["cmdq_rr_median"], 0.05)
+            else:
+                assert "heart_rate" not in ours
     else:
         # ports the mapping does not cover: the driver must at least accept the frame
         assert records is not None

@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 32 (fence lines and traps) and phase 33 (areas from files and from the map) are built and running on the dev server, each with items open. Migrations at 0047, decisions to D281. Nothing is tagged since v2.9.0 |
+| Active phase | Phase 34 (cardiac monitoring from a LINQII tag), built on 2026-09-22 except the dev-server demo, which waits for a deploy. Phases 32 and 33 are built and running on the dev server, each with items open. Migrations at 0048, decisions to D285. Nothing is tagged since v2.9.0 |
 | Latest release | v2.9.0 (2026-09-19) at 3cafb78. Everything after it is on `main` and untagged: phases 32 and 33, the Data explorer sweep, the Metrics table on the Data tabs, archive and delete a project (D267), the live map's saved view (D275), the top bar (D276) and the notice that a page is older than the server (D281). The dev server runs the newest commit, d135d93 of 2026-09-21, and CI is green on it |
-| Last session | 2026-09-22 (the plan and the documents brought up to date, no code changed). The last session that changed code was 2026-09-21 |
-| Next item | Tim's choice. Waiting on him: read the fence and trap work and the feature tools on the dev server, then tag v2.10.0. Open in the phases: F8 (a real FenceEdge or TrapEdge reporting to dev), F9 (a trap's alert stays open when the door opens again), F10 (six metric keys still uncategorized), A6 to A8. Older threads: the proximity half of contact tracing is **not** field-proven (one bison pair, both reporting every 61 min, no ground truth, so two devices together with a known answer would settle it); the strategy classes rest on one resident animal and synthetic curves until a migrant or a disperser is tracked; a grazing run over months; contact chains over time (A met B, B later met C), which phase 31 deliberately left out; the phase 23 exit criteria still wait for Tim's reading; the hardening items noted in the review of 2026-09-19 |
+| Last session | 2026-09-22: the plan and the documents brought up to date, then phase 34 built |
+| Next item | Deploy phase 34 and seed the Cardiac demo (C8), then Tim reads it. Also waiting on him: the fence and trap work and the feature tools on the dev server, then tag v2.10.0. Open in the phases: C8, F8 (a real FenceEdge or TrapEdge reporting to dev), F9 (a trap's alert stays open when the door opens again), F10 (six metric keys still uncategorized), A6 to A8. Older threads: the proximity half of contact tracing is **not** field-proven (one bison pair, both reporting every 61 min, no ground truth, so two devices together with a known answer would settle it); the strategy classes rest on one resident animal and synthetic curves until a migrant or a disperser is tracked; a grazing run over months; contact chains over time (A met B, B later met C), which phase 31 deliberately left out; the phase 23 exit criteria still wait for Tim's reading; the hardening items noted in the review of 2026-09-19 |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); Cloudloop and Rock7 are connected to the dev server (2026-09-10) but no Iridium device has spoken since 2026-07-10, so a field message and a command wait; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -323,6 +323,10 @@ Answers to the 24 setup questions from 2026-09-03. Each decision gets an ADR in 
 | D255 | Bluetooth sightings and position proximity are one module | Two kinds of evidence for one question, so a pair seen by both can be read against itself; the Bluetooth half needs OpenCollar, the proximity half works for anything that reports a fix | Tim (2026-09-18) |
 | D256 | The core half of contact tracing ships before the module | The driver, the address per device, the store and the Data tab go live first, so the decoding is read against real collars before an analysis is built on it; there is not one recorded scan payload in the repository | Tim (2026-09-18) |
 | D48 | Firing semantics | Edge-triggered: a rule fires when its condition becomes true and, while it stays true, again only after the cooldown; FOR makes the condition count once it has held that long | A battery rule sends one event per drop and one reminder per cooldown, never one per measurement. Recorded by Claude on 2026-09-04. |
+| D282 | A cardiac reading belongs to the device that heard it | The CMDQ records of port 15 become measurements of the scanning collar, so they land on the animal wearing it. One collar follows one configured tag (`cmdq_searched_mac_address`), and that address is already known per device from the settings table, so the tag needs no device, no resolver and no migration. If a tag is ever read by two collars the history can be re-attributed later without decoding anything again | Tim (2026-09-22), the recommended option. The LINQII is a sensor on the same animal, not a neighbour: the contact tracing machinery answers a different question |
+| D283 | Every field is stored; heart rate and HRV are derived, nothing is guessed | The ten decoder fields go in under their own names in a new `physiology` category, and two derived on top: `heart_rate` in bpm from `6000 / rr_median` (the median R-R interval is published as tens of milliseconds) and `heart_rate_variability` in ms as the square root of `hrv_raw`. The five fields whose meaning sits in the private IRNAS issue 389 are stored as numbers and described as not published | Tim (2026-09-22), the recommended option. A reader wants a heart rate, not tens of milliseconds, and the arithmetic for it is published; the rest is kept because the device spent the airtime, but it is not dressed up as something we understand |
+| D284 | The cardiac study is an analysis module of its own | Key `cardiac`, entities as subjects: what the collar managed to hear first, then heart rate over the period, the daily rhythm on the project's clock, a resting heart rate as a named quantile of named quiet hours, HRV where the firmware sends it, and the tag's temperature beside the collar's own | Tim (2026-09-22), the recommended option. Phase 31 set CMDQ aside as a different question; it is a physiological time series, not a spatial one, so it earns its own module rather than a corner of movement |
+| D285 | Simulated frames prove it until a LINQII reports | A Cardiac demo project on the dev server, seeded through the real decoder with a day of port 15 frames carrying a plausible curve, clearly marked and removable, the way the Fence demo and Trap demo projects were made in phase 32 | Tim (2026-09-22), the recommended option. No port 15 uplink has ever reached the dev server and no device carries a `cmdq_*` setting, so the alternative is shipping a module neither of us has seen with data in it |
 
 ### Open decisions from architecture section 32
 
@@ -1279,6 +1283,44 @@ produced them; a flash log upload of the same period yields the scans the air tr
 - [x] A9 the follow-ups of Tim's testing on dev (2026-09-21): a proposal reads a box that is drawn before it is read, one read at a time (D277); the draw tool is gone from the All projects scope, where a saved feature could not be found again (D278); `OVERPASS_URL` names several servers, asked in turn, so a tired backend is left behind (D279); a shape the drawing editor refuses is kept beside it instead of lost (D280).
 
 **Exit criteria.** A shapefile of a reserve's zones imports with its names in one go; a click inside a block between roads proposes that block; a click inside a mapped forest proposes the forest under its name; the access matrix holds for the new route.
+
+### Phase 34: cardiac monitoring from a LINQII tag (CMDQ)
+
+**Goal.** Read what an OpenCollar Edge hears from a LINQII cardiac tag (port 15, the CMDQ
+module of the firmware), store it as ordinary measurements, and give it an analysis module.
+Asked for by Tim on 2026-09-22. Design: `docs/CARDIAC_MONITORING_PLAN.md`; decisions D282 to
+D285.
+
+**Why here.** The driver has known port 15 and its record length per firmware since phase 15
+(D100) and has thrown the data away ever since, because there was nothing for it to be about.
+Phase 31 set CMDQ aside as "a different question" when it built the contact store, and this is
+that question: not who an animal met, but how its heart was doing while it did.
+
+**Deliverables:**
+
+- [x] C1 the driver: `_decode_cmdq`, port 15 out of `NOT_CANONICAL_PORTS`, the 13 and 15 byte
+      record layouts from the firmware layout rather than from the frame, the empty report as a
+      note, each record at its own time with `device_clock=True`; the documented frames as
+      fixtures with their sources and the golden test over them (2026-09-22).
+- [x] C2 the metrics: the `physiology` category and the new keys in `shared/metrics/seeds.py`
+      with the migration that seeds them (migration 0048, 2026-09-22).
+- [x] C3 the settings catalogue: units and descriptions for 0x49 to 0x50 from the firmware's own
+      README, which were empty or mis-scraped (2026-09-22).
+- [x] C4 the interface of the device: a Cardiac row with its trend on the live map's entity and
+      device panels, as the fence and trap rows do (2026-09-22; the health card reads the
+      driver's own fields and the tag is not one of them, so the row is the panel's).
+- [x] C5 the module: `primitives/cardiac.py`, `modules/cardiac.py`, the enum value, the
+      migration that widens the run row's check, registration (2026-09-22).
+- [x] C6 the frontend: the page, the form, the presentation, the navigation entry, Dutch
+      (2026-09-22).
+- [x] C7 docs: `docs/devices/cardiac-monitoring.md`, `docs/analytics/cardiac.md`, the driver row,
+      `DEVELOPERS.md`, the changelog, ADR 0037 (2026-09-22).
+- [ ] C8 the dev server: a Cardiac demo project seeded through the real decoder (D285). The
+      script is written and waits for a deploy, since no server runs the phase 34 decoder
+      yet; then Tim's own device when a LINQII reports.
+
+**Exit criteria.** Those of the design document's section 6.
+
 
 ### Phase 31: contact tracing as an analysis module (v2.8.0)
 
@@ -2465,3 +2507,16 @@ Listed by the phase where they are first needed.
 - Done elsewhere: the status lines of `DEVELOPERS.md` and `README.md` say v2.9.0 is the last tag with phases 32 and 33 on `main`, the README names the two new capabilities, and the two changelog entries that describe additions moved out of Fixed into Added.
 - Checked: the dev server answers `d135d93` at `/api/version`, which is the newest commit; CI is green on it; the working tree was clean before this.
 - Noted and left: the root documents hold 67 em dashes against convention 12 (43 in the changelog, 13 in this plan, 11 in `DEVELOPERS.md`). Replacing them is a sweep of its own, and it would bury a real change in a diff of punctuation.
+
+### 2026-09-22, phase 34: cardiac monitoring from a LINQII tag (Claude and Tim)
+
+- Tim: add a module for the CMDQ heart rate data the OpenCollar Edge reads from LINQII tags; look at the firmware repository and the raw logs decoder first, and have the decoder and the metrics understand it.
+- Read first, built after. `docs/devices/opencollar-protocol-research.md` section 3.13 already held the record layout from the firmware source; the three vendored reference decoders hold `decodeBluetoothCMDQMessage` and are byte identical to the clone in `~/apps/raw_logs_decoder`; `field-meta.json` there gives the published units. Fetched `bt_cmdq/README.md` and `bt_cmdq_messaging.c` from the public firmware mirror, which settled two things the decoder alone could not: the four byte timestamp is written by the *collar* (`get_global_unix_time()`, little-endian, while the tag's own bytes stay big-endian), and the important data is 11 bytes at offset 17 of the advertisement, which is what makes the record 15 bytes since firmware 6.9.0 and 13 before it.
+- Checked the dev server before deciding anything: not one port 15 uplink in 400 days and no device with a `cmdq_*` setting. So the decoding is provable against the reference decoders and the module is not provable against real data, which is what D285 is about.
+- Four decisions asked, the recommended answer taken each time (D282 to D285): the readings are measurements of the scanning device, every field is stored with only published arithmetic derived, the study is a module of its own, and simulated frames prove it until a tag reports.
+- Built C1 to C7: `_decode_cmdq` with port 15 out of `NOT_CANONICAL_PORTS`; the `physiology` metrics and migration 0048; the seven `cmdq_*` settings given the firmware's own units and words, which were empty or mis-scraped; the Heart rate row with its trend on the live map's panels; `primitives/cardiac.py` and `modules/cardiac.py` with the coverage block before the physiology; the page, form, presentation, navigation and Dutch; the two guides, the port table row, ADR 0037, `DEVELOPERS.md` and the changelog.
+- Decisions inside the build worth keeping: the record length comes from the firmware layout and never from the frame, so an odd length leaves whole records and a note rather than eleven fields at wrong offsets; a sighting that carried no reading writes no heart rate at all rather than a zero; readings outside 15 to 300 bpm are dropped and counted, since one byte of R-R median reaches from 23 to 6000; the module's `check` refuses an estimate over a period with no reading, because the generic estimate counts fixes and a cardiac tag has nothing to do with fixes; and `MAX_SUBJECTS_CARDIAC` is declared rather than inherited, which a test in `test_analyses.py` insists on.
+- Fixtures: the firmware README's two 13 byte examples drive `tests/shared/test_opencollar_cmdq.py`, since no vendored decoder reads 13 byte records (they all assume 15). A 15 byte frame with three sightings is built to the documented layout, checked against the reference decoder with node before it was kept, and added to `uplinks.jsonl`, where the golden test now runs it through all three decoders. The wiki's own port 15 example cannot be used as it stands: its length byte counts the two header bytes, so it declares 28 and carries 26. The fixtures README says all of this.
+- Found on the way: `_address` in the OpenCollar driver carried `@staticmethod` twice. It works, and it was a slip; removed.
+- Checked: ruff, ruff format, mypy, the whole Python suite (887 with the database up locally, which needed only `docker compose up -d postgres`), eslint, tsc, vitest (215), the English and Dutch catalogues, `mkdocs build --strict` and `docs_check.py`.
+- Left: C8, the Cardiac demo project on dev. The script is written and waits for a deploy, since no server runs this decoder yet. Then Tim reads it, and a real LINQII is the only thing that can prove the whole path.

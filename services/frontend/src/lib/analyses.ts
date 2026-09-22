@@ -161,6 +161,22 @@ export interface ContactOptions {
   shortest: number;
 }
 
+export interface CardiacOptions {
+  /** The hours of the local day a resting heart rate is read from, inclusive, and they may
+   * wrap past midnight, which is what they usually do. */
+  quietFrom: number;
+  quietTo: number;
+  /** The low quantile of those hours that is called resting. Not the minimum: one bad
+   * reading would then be the answer. */
+  quantile: number;
+}
+
+export const DEFAULT_CARDIAC: CardiacOptions = {
+  quietFrom: 0,
+  quietTo: 5,
+  quantile: 0.1,
+};
+
 export const DEFAULT_CONTACT: ContactOptions = {
   bluetooth: true,
   proximity: true,
@@ -192,6 +208,7 @@ export interface FormState {
   method: MethodOptions;
   grazing: GrazingOptions;
   contact: ContactOptions;
+  cardiac: CardiacOptions;
 }
 
 export const DEFAULT_RANGE = "30d";
@@ -199,6 +216,12 @@ export const DEFAULT_RANGE = "30d";
 function numberOr(value: string | null, fallback: number): number {
   const n = value === null ? NaN : Number(value);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/** The same, for a value where zero is a real answer: midnight is hour 0. */
+function numberOrZero(value: string | null, fallback: number): number {
+  const n = value === null ? NaN : Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
 export function readFormState(params: URLSearchParams): FormState {
@@ -216,6 +239,11 @@ export function readFormState(params: URLSearchParams): FormState {
     to: params.get("to"),
     compare: params.get("compare"),
     run: params.get("run"),
+    cardiac: {
+      quietFrom: numberOrZero(params.get("quiet_from"), DEFAULT_CARDIAC.quietFrom),
+      quietTo: numberOrZero(params.get("quiet_to"), DEFAULT_CARDIAC.quietTo),
+      quantile: numberOr(params.get("quantile"), DEFAULT_CARDIAC.quantile),
+    },
     contact: {
       bluetooth: params.get("bluetooth") !== "0",
       proximity: params.get("proximity") !== "0",
@@ -287,6 +315,13 @@ export function writeFormState(state: FormState): URLSearchParams {
     params.set("window", String(c.window));
   if (c.rssi !== null) params.set("rssi", String(c.rssi));
   if (c.shortest) params.set("shortest", String(c.shortest));
+  const cd = state.cardiac;
+  if (cd.quietFrom !== DEFAULT_CARDIAC.quietFrom)
+    params.set("quiet_from", String(cd.quietFrom));
+  if (cd.quietTo !== DEFAULT_CARDIAC.quietTo)
+    params.set("quiet_to", String(cd.quietTo));
+  if (cd.quantile !== DEFAULT_CARDIAC.quantile)
+    params.set("quantile", String(cd.quantile));
   const g = state.grazing;
   for (const id of g.areas) params.append("area", id);
   if (g.weighting !== "equal") params.set("weighting", g.weighting);
@@ -381,6 +416,27 @@ export function contactTracingParameters(
     max_time_s: c.window,
     ...(c.rssi !== null ? { min_rssi_dbm: c.rssi } : {}),
     min_contact_s: c.shortest,
+  };
+}
+
+/** The parameters the cardiac module takes (decision D284): the subjects, the period, and
+ * how a resting heart rate is read; null while no subject is chosen or a custom range lacks
+ * a date. */
+export function cardiacParameters(
+  state: FormState,
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  const window = windowOf(state, now);
+  if (!window || state.entities.length === 0) return null;
+  const comparison = comparisonOf(state, window);
+  const c = state.cardiac;
+  return {
+    entity_ids: state.entities,
+    ...window,
+    ...(comparison ? { comparison } : {}),
+    quiet_from_hour: c.quietFrom,
+    quiet_to_hour: c.quietTo,
+    resting_quantile: c.quantile,
   };
 }
 
@@ -834,6 +890,11 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
       landscape: p.landscape !== false,
       absence: num("min_absence_hours", DEFAULT_GRAZING.absence),
       rest: num("rest_threshold_hours", 0),
+    },
+    cardiac: {
+      quietFrom: num("quiet_from_hour", DEFAULT_CARDIAC.quietFrom),
+      quietTo: num("quiet_to_hour", DEFAULT_CARDIAC.quietTo),
+      quantile: num("resting_quantile", DEFAULT_CARDIAC.quantile),
     },
     contact: {
       bluetooth: p.bluetooth !== false,

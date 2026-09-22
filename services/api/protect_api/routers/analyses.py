@@ -39,6 +39,7 @@ from shared.analysis.limits import (
     MAX_DAYS,
     MAX_DEVICES,
     MAX_QUEUED_PER_PROJECT,
+    MAX_SUBJECTS_CARDIAC,
     MAX_SUBJECTS_CONTACT,
     MAX_SUBJECTS_MOVEMENT,
 )
@@ -74,6 +75,7 @@ SUBJECT_LIMITS = {
     "grazing": MAX_ANIMALS_GRAZING,
     "device_performance": MAX_DEVICES,
     "contact_tracing": MAX_SUBJECTS_CONTACT,
+    "cardiac": MAX_SUBJECTS_CARDIAC,
 }
 
 

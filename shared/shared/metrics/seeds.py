@@ -271,6 +271,116 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
     MetricSeed("trap_triggered", "Trap triggered", None, B, "infrastructure", "Trap trigger state"),
     MetricSeed("tank_level", "Tank level", "%", N, "infrastructure", "Fill level of a tank"),
     MetricSeed("flow_rate", "Flow rate", "L/min", N, "infrastructure", "Water flow"),
+    # the cardiac tag an OpenCollar Edge follows (port 15, phase 34, decisions D282 and D283).
+    # The first two are ours, derived from the published arithmetic; the rest are what the tag
+    # sent, under the reference decoder's own names. Five of them have no published meaning.
+    MetricSeed(
+        "heart_rate",
+        "Heart rate",
+        "bpm",
+        N,
+        "physiology",
+        "Beats per minute from the cardiac tag's median R-R interval (6000 / rr_median, which is "
+        "published in tens of milliseconds). Absent when the tag was heard but reported no "
+        "cardiac reading",
+    ),
+    MetricSeed(
+        "heart_rate_variability",
+        "Heart rate variability",
+        "ms",
+        N,
+        "physiology",
+        "RMSSD in milliseconds: the square root of the tag's mean squared successive R-R "
+        "difference. Firmware 6.9.0 and later; older firmware sends no HRV",
+    ),
+    MetricSeed(
+        "cmdq_temperature",
+        "Body temperature (cardiac tag)",
+        "°C",
+        N,
+        "physiology",
+        "Temperature from the cardiac tag, raw * 0.0248 - 18.09. Absent when the raw value is "
+        "zero, which is the tag saying it has no reading",
+    ),
+    MetricSeed(
+        "cmdq_success",
+        "Cardiac reading succeeded",
+        None,
+        B,
+        "physiology",
+        "True when the tag's advertisement carried a temperature above zero, which is how the "
+        "firmware's own decoder judges a reading. A sighting without one means the tag was "
+        "heard and the heart was not",
+    ),
+    MetricSeed(
+        "cmdq_rr_median",
+        "R-R median",
+        "10 ms",
+        N,
+        "physiology",
+        "Median time between cardiac R peaks in tens of milliseconds, as the tag sends it. The "
+        "source of the heart rate, kept because it is the measured value",
+    ),
+    MetricSeed(
+        "cmdq_raw_temperature",
+        "Raw temperature (cardiac tag)",
+        None,
+        N,
+        "physiology",
+        "The tag's raw temperature value, from which the temperature is derived",
+    ),
+    MetricSeed(
+        "cmdq_hrv_raw",
+        "Raw HRV (cardiac tag)",
+        None,
+        N,
+        "physiology",
+        "The tag's raw HRV value, the mean of squared successive R-R differences",
+    ),
+    MetricSeed(
+        "cmdq_rr_median_modesum",
+        "R-R median mode sum",
+        None,
+        N,
+        "physiology",
+        "Sent by the cardiac tag; its meaning is not published (IRNAS issue 389). Stored as the "
+        "number it is",
+    ),
+    MetricSeed(
+        "cmdq_activity_average",
+        "Tag activity, average",
+        None,
+        N,
+        "physiology",
+        "Sent by the cardiac tag; its meaning and unit are not published (IRNAS issue 389). Not "
+        "the collar's own accelerometer activity",
+    ),
+    MetricSeed(
+        "cmdq_activity_max",
+        "Tag activity, highest",
+        None,
+        N,
+        "physiology",
+        "Sent by the cardiac tag; its meaning and unit are not published (IRNAS issue 389)",
+    ),
+    MetricSeed(
+        "cmdq_active_min_in_last_hour",
+        "Tag active minutes in the last hour",
+        None,
+        N,
+        "physiology",
+        "Sent by the cardiac tag; read as minutes, though the unit is not published (IRNAS "
+        "issue 389)",
+    ),
+    MetricSeed(
+        "cmdq_impedance",
+        "Tag impedance",
+        None,
+        N,
+        "physiology",
+        "Sent by the cardiac tag; its meaning and unit are not published (IRNAS issue 389). It "
+        "reads as a contact quality, which is a guess and not documented",
+    ),
 )
 
 

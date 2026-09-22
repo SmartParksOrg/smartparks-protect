@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { AnalysisRun } from "@/api/types";
 import { AreaCards } from "@/components/analysis/AreaCards";
+import { CardiacSummary } from "@/components/analysis/CardiacSummary";
 import { ContactSummary } from "@/components/analysis/ContactSummary";
 import {
   DeviceSections,
@@ -9,6 +10,7 @@ import {
   LevelDefaults,
 } from "@/components/analysis/FleetTable";
 import {
+  CardiacLimitations,
   ContactTracingLimitations,
   DevicePerformanceLimitations,
   GrazingLimitations,
@@ -149,6 +151,19 @@ export function contactTracingPresentation(
         />
       ),
       after: () => <ContactTracingLimitations />,
+    },
+  };
+}
+
+/** The cardiac study (docs/analytics/cardiac.md): a card per subject, the daily rhythm as the
+ * one chart, the two tables, and no map at all, because a heart rate has no place on one. */
+export function cardiacPresentation(t: Translate): Presentation {
+  return {
+    labels: cardiacLabels(t),
+    render: {
+      summary: (document) => <CardiacSummary document={document} />,
+      map: () => null,
+      after: () => <CardiacLimitations />,
     },
   };
 }
@@ -384,6 +399,16 @@ export const movementLabels = (t: Translate): Record<string, string> => ({
 });
 
 /** The human names of the grazing result's keys; every header says use, not grazing. */
+export const cardiacLabels = (t: Translate): Record<string, string> => ({
+  cardiac: t("Heart"),
+  coverage: t("What the collar heard"),
+  rhythm: t("Heart rate by hour of the day"),
+  heart_rate: t("Heart rate"),
+  resting_heart_rate: t("Resting heart rate"),
+  hrv: t("Heart rate variability"),
+  tag_temperature: t("Tag temperature"),
+});
+
 export const contactTracingLabels = (t: Translate): Record<string, string> => ({
   pairs: t("Pairs"),
   subjects: t("Subjects"),

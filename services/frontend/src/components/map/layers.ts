@@ -88,6 +88,8 @@ export interface EntityFeatureProperties {
   fence_voltage?: number | null;
   fence_pulses?: number | null;
   trap_closed?: number | null;
+  /** The cardiac tag (phase 34): the newest heart rate in bpm a collar relayed. */
+  heart_rate?: number | null;
   last_reset_at?: string | null;
   last_status_at?: string | null;
   device_last_seen_at?: string | null;
@@ -136,6 +138,8 @@ export interface DeviceFeatureProperties {
   fence_voltage?: number | null;
   fence_pulses?: number | null;
   trap_closed?: number | null;
+  /** The cardiac tag (phase 34): the newest heart rate in bpm a collar relayed. */
+  heart_rate?: number | null;
   last_reset_at?: string | null;
   last_status_at?: string | null;
   picture_updated_at?: string | null;

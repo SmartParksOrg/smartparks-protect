@@ -75,6 +75,7 @@ nav:
       - OpenCollar over Web Bluetooth: devices/opencollar-webble.md
       - Bluetooth contacts: devices/bluetooth-contacts.md
       - Fences and traps: devices/fences-and-traps.md
+      - Cardiac monitoring: devices/cardiac-monitoring.md
       - Raw log files: devices/raw-log-files.md
   - Integrations:
       - integrations/index.md
@@ -107,6 +108,7 @@ nav:
       - Grazing: analytics/grazing.md
       - Device performance: analytics/device-performance.md
       - Contact tracing: analytics/contact-tracing.md
+      - Cardiac monitoring: analytics/cardiac.md
       - Analysis design (phase 1): ANALYTICS_PHASE1_PLAN.md
       - Analysis design (device performance): ANALYTICS_DEVICE_PERFORMANCE_PLAN.md
       - Analysis design (phase 2): ANALYTICS_PHASE2_PLAN.md
@@ -174,3 +176,4 @@ nav:
       - adr/0034-devices-as-analysis-subjects-with-levels.md
       - adr/0035-device-settings-known-per-device.md
       - adr/0036-contacts-as-a-canonical-record-type.md
+      - adr/0037-cardiac-readings-on-the-scanning-device.md

@@ -890,7 +890,8 @@
    "max": true,
    "group": "Command queue",
    "unit": null,
-   "since_firmware": "5.0.1"
+   "since_firmware": "5.0.1",
+   "description": "Switches the cardiac tag scanner on. Switching it off while a scan runs stops the scan."
   },
   {
    "id": 74,
@@ -901,8 +902,9 @@
    "min": 1,
    "max": 10000,
    "group": "Command queue",
-   "unit": null,
-   "since_firmware": "5.0.1"
+   "unit": "ms",
+   "since_firmware": "5.0.1",
+   "description": "How long the module scans for the tag during a short scan. Long enough that small differences in timekeeping do not make it miss the advertisement."
   },
   {
    "id": 75,
@@ -913,8 +915,9 @@
    "min": 1,
    "max": 10000,
    "group": "Command queue",
-   "unit": null,
-   "since_firmware": "5.0.1"
+   "unit": "s",
+   "since_firmware": "5.0.1",
+   "description": "How long the module waits between scans. During an immediate or a long scan it scans for this duration instead, because it has no idea yet when the tag speaks. Set it to the tag's advertising interval."
   },
   {
    "id": 76,
@@ -925,8 +928,9 @@
    "min": 1,
    "max": 10000,
    "group": "Command queue",
-   "unit": null,
-   "since_firmware": "5.0.1"
+   "unit": "s",
+   "since_firmware": "5.0.1",
+   "description": "How long to wait after a long scan found nothing before trying again."
   },
   {
    "id": 77,
@@ -939,7 +943,7 @@
    "group": "Command queue",
    "unit": null,
    "since_firmware": "5.0.1",
-   "description": "One record per received BLE advertisement of the configured CMDQ MAC (cmdq_searched_mac_address 0x4D);"
+   "description": "The Bluetooth address of the cardiac tag this device follows. One device follows one tag; its readings are stored as measurements of this device (decision D282)."
   },
   {
    "id": 78,
@@ -950,9 +954,9 @@
    "min": 1,
    "max": 10000,
    "group": "Command queue",
-   "unit": null,
+   "unit": "s",
    "since_firmware": "5.0.1",
-   "description": "reporting interval cmdq_reporting_interval (0x4E)."
+   "description": "How often the detections held in the buffer are composed into a port 15 message and sent over LoRaWAN, satellite or Bluetooth."
   },
   {
    "id": 79,
@@ -977,7 +981,7 @@
    "group": "Command queue",
    "unit": null,
    "since_firmware": "5.0.1",
-   "description": "Empty report FC 00 when cmdq_report_zero_messages_to_be_sent (0x50) is on."
+   "description": "Report an empty port 15 message when no detection was made between two reporting intervals. A debugging aid: it proves the scanner is running."
   },
   {
    "id": 82,
