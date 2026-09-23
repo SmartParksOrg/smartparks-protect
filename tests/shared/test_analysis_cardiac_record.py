@@ -222,3 +222,26 @@ def test_the_report_has_a_cardiac_section_of_its_own() -> None:
     assert CARDIAC_LIMITATIONS[0][:40] in html
     assert MOVEMENT_LIMITATIONS[0][:40] not in html
     assert "no fixes" not in html
+
+
+def test_a_tag_reading_the_same_air_as_the_device_is_off_the_animal() -> None:
+    """An implant reads the body and the device the air on the neck, ten degrees apart on a
+    living animal (the baboons, 2026-09-23); the warning is for the two agreeing."""
+    subject = Subject(id=uuid.uuid4(), name="SP060573", type="Baboon")
+    chosen = params()
+    period = Period(key="main", time_from=chosen.time_from, time_to=chosen.time_to)
+    alive = readings_over(2)
+    for step in range(12):
+        alive.add(cardiac.COLLAR_TEMPERATURE, START + timedelta(hours=step), 28.0)
+    figures = cardiac.subject_figures(alive, period, UTC, chosen, FIVE_MIN, None)
+    assert figures["temperature_difference"] == 9.0
+    assert "tag_reads_like_the_device" not in {
+        w.code for w in cardiac.subject_warnings(subject, figures, period)
+    }
+    fallen = readings_over(2)
+    for step in range(12):
+        fallen.add(cardiac.COLLAR_TEMPERATURE, START + timedelta(hours=step), 37.4)
+    figures = cardiac.subject_figures(fallen, period, UTC, chosen, FIVE_MIN, None)
+    assert "tag_reads_like_the_device" in {
+        w.code for w in cardiac.subject_warnings(subject, figures, period)
+    }

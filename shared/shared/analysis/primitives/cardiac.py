@@ -374,15 +374,12 @@ def _moment(times_s: NDArray[np.float64], index: int) -> datetime | None:
     return datetime.fromtimestamp(float(times_s[index]), tz=UTC)
 
 
-def temperature_disagreement(
-    tag: NDArray[np.float64], collar: NDArray[np.float64], limit_c: float
-) -> float | None:
-    """How far the tag's temperature sits from the collar's own, as the median difference, or
-    None when one of them has nothing. A tag that has fallen off the animal reads the air while
-    the collar still reads the animal, so a large steady difference is the sign worth showing.
-
-    `limit_c` is not applied here: the caller decides what counts as far, because the answer
-    depends on where on the animal both sit."""
-    if tag.size == 0 or collar.size == 0:
+def temperature_disagreement(tag: NDArray[np.float64], device: NDArray[np.float64]) -> float | None:
+    """How far the tag's temperature sits from the device's own, as the median difference, or
+    None when one of them has nothing. An implant reads the body and the device the air on the
+    animal's neck, so a living animal keeps them about ten degrees apart; the sign worth showing
+    is the two agreeing, which is a tag reading the same air as the device, off the animal. The
+    caller decides what counts as agreeing."""
+    if tag.size == 0 or device.size == 0:
         return None
-    return float(np.median(tag) - np.median(collar))
+    return float(np.median(tag) - np.median(device))

@@ -157,6 +157,6 @@ def test_coverage_reads_times_in_any_order() -> None:
 def test_the_two_temperatures_are_compared_by_their_medians() -> None:
     tag = np.array([38.0, 38.2, 38.4])
     collar = np.array([25.0, 25.5, 26.0])
-    assert temperature_disagreement(tag, collar, 3.0) == pytest.approx(12.7)
-    assert temperature_disagreement(np.array([]), collar, 3.0) is None
-    assert temperature_disagreement(tag, np.array([]), 3.0) is None
+    assert temperature_disagreement(tag, collar) == pytest.approx(12.7)
+    assert temperature_disagreement(np.array([]), collar) is None
+    assert temperature_disagreement(tag, np.array([])) is None

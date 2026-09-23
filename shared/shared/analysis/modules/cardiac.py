@@ -100,8 +100,11 @@ LOADED_KEYS = (*CARDIAC_KEYS, COLLAR_TEMPERATURE)
 #: How often the collar composes a port 15 message. The coverage block reads it per device to
 #: say how much of what was promised actually arrived.
 REPORTING_INTERVAL_SETTING = "cmdq_reporting_interval"
-#: A tag reading this much colder than the collar has probably left the animal.
-TEMPERATURE_GAP_C = 3.0
+#: An implant reads the body and the device reads the air on the animal's neck, so the two
+#: normally sit ten degrees apart; a tag reading within this of the device is reading the air
+#: beside it, which is a tag that has left the animal (seen the other way round on the baboons,
+#: 2026-09-23, where the old rule warned about the difference a living animal makes).
+TEMPERATURE_ALIKE_C = 1.5
 
 #: The four metrics read in every part of the day (decision D290), by the name the document
 #: uses, with the measurement behind each and its unit.
@@ -381,7 +384,7 @@ def subject_figures(
             figures[key] = block["spread"]
     tag_temperature = metric_readings(readings, "temperature")[1]
     collar = readings.array(COLLAR_TEMPERATURE)[1]
-    difference = temperature_disagreement(tag_temperature, collar, TEMPERATURE_GAP_C)
+    difference = temperature_disagreement(tag_temperature, collar)
     if difference is not None:
         figures["temperature_difference"] = round(difference, 2)
     return figures
@@ -522,15 +525,16 @@ def subject_warnings(subject: Subject, figures: dict[str, Any], period: Period) 
             )
         )
     difference = figures.get("temperature_difference")
-    if difference is not None and abs(difference) >= TEMPERATURE_GAP_C:
+    if difference is not None and abs(difference) < TEMPERATURE_ALIKE_C:
         out.append(
             Warning(
-                code="temperature_disagrees",
+                code="tag_reads_like_the_device",
                 subject_id=subject.id,
                 text=(
-                    f"The tag on {subject.name} reads {difference:+.1f} C against the collar's "
-                    "own temperature. A tag that has come off the animal reads the air while "
-                    "the collar still reads the animal."
+                    f"The tag on {subject.name} reads {difference:+.1f} C against the device's "
+                    "own temperature, so both read the same air. An implant reads the body, "
+                    "about ten degrees above the device on the animal's neck; a tag reading "
+                    "the air has left the animal."
                 ),
             )
         )

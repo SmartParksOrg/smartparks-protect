@@ -64,7 +64,7 @@ export function CardiacPage() {
       <PageHeader
         title={t("Cardiac monitoring")}
         description={t(
-          "Heart rate, variability and body temperature from a cardiac tag the animal wears, heard over Bluetooth by its collar",
+          "Heart rate, variability and body temperature from a cardiac tag the animal wears, heard over Bluetooth by its device",
         )}
         actions={
           can("analysis:run") ? (

@@ -46,9 +46,10 @@ The metrics:
   animal is awake and moving and low in its sleep. It is not the device's own activity. The implant
   writes a 0 once an hour by a fault of its own and a real score never falls that low, so every 0
   is set aside and counted rather than pulling the night down.
-- **Body temperature** from the tag, with the difference against the collar's own temperature
-  where both exist. A tag that has come off the animal reads the air while the collar still reads
-  the animal, so a large steady difference is worth seeing.
+- **Body temperature** from the tag, with the difference against the device's own temperature
+  where both exist. An implant reads the body and the device reads the air on the animal's neck,
+  so the two sit about ten degrees apart on a living animal; a tag that reads within 1.5 °C of the
+  device is reading the same air, which is a tag that has left the animal, and the run says so.
 
 And the views, a metric to a row on the page and the same in the PDF report:
 
@@ -113,7 +114,7 @@ Each one names the subject it is about:
 | `long_silence` | The longest gap is over a day |
 | `few_readings` | Too few usable readings to describe a distribution |
 | `implausible_dropped` | Readings outside what a heart can do were set aside |
-| `temperature_disagrees` | The tag's temperature sits far from the collar's own |
+| `tag_reads_like_the_device` | The tag's temperature sits within 1.5 °C of the device's own: both read the air, so the tag is off the animal |
 | `no_hrv` | The firmware predates 6.9.0 and sends no HRV |
 | `day_night_by_the_clock` | The animal has no position to read the sun at, so day is 06:00 to 18:00 on the local clock |
 
