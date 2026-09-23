@@ -48,6 +48,9 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- **Cardiac readings read out of a device's flash over LoRaWAN kept only one reading per download, dated the download** (found on the Baboon project, 2026-09-23). A port 29 download carries days of stored records on purpose, but the clock rule for live deliveries (D259) took every record more than a day behind its delivery for a broken clock and filed it at the delivery time, where the canonical key folded a frame's sightings into one. A stored stream now keeps the times its records were stored at, whatever channel carried it. Readings already filed that way are wrong and few; the frames are kept and can be decoded again.
+- The entity page offers "Analyse heart" beside "Analyse movement" when the animal's metrics of the last thirty days hold a heart rate.
+
 - The progress of a log file being decoded looked stalled: the decoder wrote it once per batch of 200 frames, which at the dev server's pace was once every minute or two. A batch now also ends after three seconds, so the count moves every few seconds and always counts frames whose records are saved.
 
 - The cardiac run's heart rate by hour of the day drew an empty chart on the page and in the PDF: its series were written under a key neither reads. And the PDF of a cardiac run used the movement module's labels, key figures ("no fixes") and limitations; it has its own now (phase 35).

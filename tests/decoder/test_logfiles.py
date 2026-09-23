@@ -4,7 +4,7 @@ malformed frames and re-decoding."""
 
 import base64
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -14,7 +14,7 @@ from sqlalchemy import select
 from protect_decoder.logfiles import process_log_file
 from protect_decoder.pipeline import process_source_event, publish_outcome
 from shared.bus import RedisStreamsBus
-from shared.enums import AcquisitionChannel, ErrorCode, LogFileStatus
+from shared.enums import AcquisitionChannel, ErrorCode, LogFileStatus, ProcessingStatus
 from shared.ingest import commit_and_publish, store_inbound
 from shared.logfiles import DuplicateLogFile, frames_to_text, store_log_file
 from shared.models import DeviceLogFile, DeviceType, Position, SourceDelivery, SourceEvent
@@ -233,3 +233,35 @@ async def test_batches_cut_by_time_count_every_frame_once(db, bus, world, monkey
     )
     assert row.status == LogFileStatus.COMPLETE
     assert row.frames_total == 2 and row.frames_done == 2 and row.frames_failed == 1
+
+
+async def test_a_flash_stream_over_lorawan_keeps_the_times_of_its_records(db, bus, world):
+    """A port 29 download carries the past on purpose (architecture 25.8): its cardiac records
+    keep the times they were stored at, however many days before the download, and each is its
+    own reading. The clock rule (D259) folded a whole frame into one reading at the download
+    time before this, which is how the Baboon project lost most of its heart rates."""
+    import struct
+
+    from shared.models import Measurement
+
+    await _opencollar(db, world)
+    old = int((datetime.now(UTC) - timedelta(days=5)).timestamp())
+    records = b""
+    for offset in (0, 300):
+        stamp = struct.pack("<I", old + offset)
+        # a 15 byte CMDQ record: the stamp, then R-R 60, mode sum, activity, max, minutes,
+        # raw temperature, impedance and raw HRV, big-endian as the tag sends them
+        data = stamp + struct.pack(">BBBBBHHH", 60, 5, 120, 200, 10, 2250, 1500, 49)
+        records += bytes([15, 0xFC, len(data)]) + data + stamp
+    outcome = await _lorawan(db, bus, world, 29, records.hex())
+    assert outcome.status == ProcessingStatus.PROCESSED
+    await db.rollback()
+    rows = (
+        await db.execute(
+            select(Measurement).where(
+                Measurement.device_id == world.device.id, Measurement.metric_key == "heart_rate"
+            )
+        )
+    ).scalars()
+    times = sorted(int(r.time.timestamp()) for r in rows)
+    assert times == [old, old + 300]

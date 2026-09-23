@@ -126,3 +126,32 @@ def test_fifteen_byte_records_carry_hrv_and_a_heart_rate() -> None:
     # nor a variability of zero, which would be a heart beating perfectly evenly
     assert "heart_rate_variability" not in last
     assert last["cmdq_hrv_raw"] == 0
+
+
+def test_a_flash_stream_keeps_its_records_times_as_history() -> None:
+    """A port 29 read-out of the flash holds records days old on purpose, so the driver marks
+    the delivery `stored` and the pipeline's clock rule (D259) leaves the times alone. The
+    baboons' cardiac readings arrive this way: every port 29 download of 2026-09-23 was filed
+    at the download time and folded into one reading before this."""
+    stamp = "58f3cd65"
+    record = "0d" + stamp + "000000000006bc0ff0"  # a 13 byte record of firmware 6.5
+    later = "0d" + "70f4cd65" + "000000000006bc0ff0"
+    stream = "0ffc" + record + stamp + "0ffc" + later + "70f4cd65"
+    records = driver.decode(
+        SourceEventData(
+            id=1,
+            event_type="uplink",
+            payload={"fPort": 29},
+            provider_metadata={"f_port": 29},
+            network_received_at=RECEIVED,
+            ingested_at=RECEIVED,
+            device_attributes={},
+            device_type_settings={},
+            frame=bytes.fromhex(stream),
+            f_port=29,
+            firmware_version="6.5",
+        )
+    )
+    assert records.stored is True
+    assert list(by_time(records)) == [1707995992, 1707996272]
+    assert all(m.device_clock for m in records.measurements)

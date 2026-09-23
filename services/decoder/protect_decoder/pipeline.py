@@ -198,7 +198,9 @@ def _behind_delivery(event: SourceEvent, record_time: datetime) -> float:
     )
 
 
-def _believed_time(event: SourceEvent, record_time: datetime) -> tuple[datetime, float]:
+def _believed_time(
+    event: SourceEvent, record_time: datetime, stored: bool = False
+) -> tuple[datetime, float]:
     """When a record is filed, and by how far its device disagreed (decision D259).
 
     Every record of one scan has to be filed the same way, or the scan lands twice under two
@@ -210,7 +212,14 @@ def _believed_time(event: SourceEvent, record_time: datetime) -> tuple[datetime,
     reading the contacts carry. Not every old record in a delivery: a genuine backfill over a
     live channel carries the past on purpose and moving it would be a lie of its own. And not
     positions, since rewriting when an animal was somewhere moves tracks and attribution, which
-    is a heavier thing than moving a reading and is Tim's to decide."""
+    is a heavier thing than moving a reading and is Tim's to decide.
+
+    A stored stream (`DecodedRecords.stored`, a flash log read out over LoRaWAN) is such a
+    backfill: the baboons' port 29 downloads carried five days of cardiac readings, every one
+    was filed at the download time, and the canonical key then folded a frame's six sightings
+    into one (2026-09-23)."""
+    if stored:
+        return record_time, 0.0
     behind = _behind_delivery(event, record_time)
     return (event.ingested_at if behind else record_time), behind
 
@@ -768,7 +777,7 @@ async def _write_contacts(
         # D259): only on a path that arrives as it happens, since a log file carries the past
         # on purpose. The device's own claim stays on the row, so nothing is lost.
         claimed = record.time
-        when, behind = _believed_time(event, record.time)
+        when, behind = _believed_time(event, record.time, records.stored)
         ahead = _ahead_of_delivery(event, record.time)
         if ahead:
             when = event.ingested_at
@@ -994,7 +1003,11 @@ async def _write_measurements(
     created_ids: list[int] = []
     for record in records.measurements:
         extra = record.metric_key + (f":{record.fingerprint}" if record.fingerprint else "")
-        filed = _believed_time(event, record.time)[0] if record.device_clock else record.time
+        filed = (
+            _believed_time(event, record.time, records.stored)[0]
+            if record.device_clock
+            else record.time
+        )
         key = canonical_key(device.id, filed, record.record_type, extra)
         existing = await session.scalar(
             select(Measurement).where(Measurement.canonical_key == key, Measurement.time == filed)
@@ -1061,7 +1074,9 @@ async def _write_states(
     for record in records.states:
         # the same correction its sightings get, or one scan lands twice under two times (D259)
         when, behind = (
-            _believed_time(event, record.time) if record.device_clock else (record.time, 0.0)
+            _believed_time(event, record.time, records.stored)
+            if record.device_clock
+            else (record.time, 0.0)
         )
         state = (
             {

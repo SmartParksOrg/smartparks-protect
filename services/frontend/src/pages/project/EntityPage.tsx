@@ -1,6 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Footprints, MapPin, Pencil, Plus, Table2 } from "lucide-react";
+import {
+  Footprints,
+  HeartPulse,
+  MapPin,
+  Pencil,
+  Plus,
+  Table2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -18,6 +25,7 @@ import type {
   Position,
   TrafficRow,
   EntityAssignmentExtended,
+  MetricSummary,
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -73,6 +81,20 @@ export function EntityPage() {
   const { projectId = "", entityId = "" } = useParams();
   const { can } = usePermissions(projectId);
   const modules = useAnalysisModules(projectId);
+  // the metrics of the last thirty days, the Data tab's table (one query, shared with it):
+  // an entity with a heart rate among them wears a cardiac tag and is offered the study
+  const metricsSeen = useQuery({
+    queryKey: ["projects", projectId, "measurements-summary", "", entityId],
+    queryFn: () =>
+      api.get<MetricSummary[]>(
+        `/api/v1/projects/${projectId}/measurements/summary`,
+        { query: { entity_id: entityId, days: 30 } },
+      ),
+    enabled: Boolean(entityId),
+  });
+  const hasHeart = (metricsSeen.data ?? []).some(
+    (m) => m.metric_key === "heart_rate",
+  );
   const now = useNow();
   const [editing, setEditing] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -330,6 +352,15 @@ export function EntityPage() {
                   to={`/projects/${projectId}/analyze/movement?entity=${e.id}`}
                 >
                   <Footprints className="size-4" /> {t("Analyse movement")}
+                </Link>
+              </Button>
+            )}
+            {hasHeart && modules.includes("cardiac") && can("analysis:run") && (
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to={`/projects/${projectId}/analyze/cardiac?entity=${e.id}`}
+                >
+                  <HeartPulse className="size-4" /> {t("Analyse heart")}
                 </Link>
               </Button>
             )}

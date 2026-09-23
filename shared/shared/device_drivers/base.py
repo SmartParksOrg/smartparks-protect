@@ -109,6 +109,10 @@ class DecodedRecords:
     events: list[DecodedEvent] = field(default_factory=list)
     contacts: list[DecodedContact] = field(default_factory=list)
     decoder_version: str = "1"
+    #: The delivery is a stream of records the device stored and offloaded later, a flash log
+    #: read out over the air: the past on purpose, whatever channel carried it, so the clock
+    #: rule for live deliveries (D259) leaves its times alone. Set by the driver.
+    stored: bool = False
     notes: list[str] = field(
         default_factory=list,
         metadata={

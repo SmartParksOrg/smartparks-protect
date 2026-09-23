@@ -739,7 +739,10 @@ class OpenCollarDriver:
 
     def _decode_flash_log(self, frame: bytes, records: DecodedRecords, layout: Layout) -> None:
         """Concatenated stored records: port, msg_id, len, data, store timestamp (u32). A status
-        record inside the stream names the firmware; the records after it use its layout."""
+        record inside the stream names the firmware; the records after it use its layout. The
+        stream is history read out of the device's flash, so the records keep the times they
+        were stored at, however long after them the stream arrives (`records.stored`)."""
+        records.stored = True
         i = 0
         count = 0
         while i + 7 <= len(frame):
