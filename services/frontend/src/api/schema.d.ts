@@ -8464,12 +8464,50 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** @description What its devices say about it today; filled by the entities list (D286) */
+            tracking?: components["schemas"]["EntityTracking"] | null;
         };
         /**
          * EntityStatus
          * @enum {string}
          */
         EntityStatus: "active" | "inactive" | "archived";
+        /**
+         * EntityTracking
+         * @description An entity as its devices report it: the devices tracking it today with their health, the
+         *     worst of those levels, and what the entity's current state holds (decision D286). Read from
+         *     the assignments and the current states, so an entity whose devices send no position still
+         *     has its devices and its last seen.
+         */
+        EntityTracking: {
+            /**
+             * Devices
+             * @default []
+             */
+            devices: components["schemas"]["TrackingDevice"][];
+            /**
+             * Level
+             * @description The worst health level of the devices: ok, warn or critical
+             */
+            level?: string | null;
+            /**
+             * Last Seen At
+             * @description The newest record of any kind from its devices
+             */
+            last_seen_at?: string | null;
+            /** Position Time */
+            position_time?: string | null;
+            /**
+             * Position Kind
+             * @description device, network, proximity or static (decisions D164, D258)
+             */
+            position_kind?: string | null;
+            /**
+             * Active Alert Count
+             * @default 0
+             */
+            active_alert_count: number;
+        };
         /** EntityTypeCreate */
         EntityTypeCreate: {
             /** Key */
@@ -12314,6 +12352,19 @@ export interface components {
             first_position_id: number | null;
             /** Last Position Id */
             last_position_id: number | null;
+        };
+        /** TrackingDevice */
+        TrackingDevice: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Last Seen At */
+            last_seen_at?: string | null;
+            health?: components["schemas"]["DeviceHealth"] | null;
         };
         /** TrafficRow */
         TrafficRow: {

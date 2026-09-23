@@ -20,8 +20,9 @@ from protect_api.attribution import hold_while_attributing, job_read, queue_job
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
-from protect_api.crud import apply_patch, flush_or_409, geom_to_geojson, get_or_404, range_bounds
+from protect_api.crud import apply_patch, flush_or_409, get_or_404, range_bounds
 from protect_api.deps import accessible_project_ids, require_server_admin
+from protect_api.device_reads import with_state
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
 from protect_api.routers.entities import assignment_read
@@ -79,7 +80,6 @@ from shared.domain.battery import PROFILES as BATTERY_PROFILES
 from shared.domain.battery import resolve as resolve_battery
 from shared.domain.contacts import resolve_waiting, scanning_of, watches_for_people
 from shared.domain.device_settings import known_settings, record_setting
-from shared.domain.health import device_health
 from shared.domain.links import resolve_links
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.domain.reporting import (
@@ -189,94 +189,6 @@ async def _visible_device(session: AsyncSession, user: User, device_id: uuid.UUI
         if not visibility.device_visible(device_id):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found")
     return device
-
-
-async def with_state(session: AsyncSession, devices: list[Device]) -> list[DeviceRead]:
-    """Device reads with last seen and health from the current state, one query for all."""
-    reads = [DeviceRead.model_validate(d) for d in devices]
-    for device, read in zip(devices, reads, strict=True):
-        read.static_position = geom_to_geojson(device.static_geom)
-    if not devices:
-        return reads
-    ids = [d.id for d in devices]
-    states = {
-        s.device_id: s
-        for s in (
-            await session.scalars(
-                select(DeviceCurrentState).where(DeviceCurrentState.device_id.in_(ids))
-            )
-        ).all()
-    }
-    types = {
-        t.id: t
-        for t in (
-            await session.scalars(
-                select(DeviceType).where(DeviceType.id.in_({d.device_type_id for d in devices}))
-            )
-        ).all()
-    }
-    now = utc_now()
-    tracking = {
-        device_id: (entity_id, name, group_id)
-        for device_id, entity_id, name, group_id in (
-            await session.execute(
-                select(DeviceEntityAssignment.device_id, Entity.id, Entity.name, Entity.group_id)
-                .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
-                .where(
-                    DeviceEntityAssignment.device_id.in_(ids),
-                    DeviceEntityAssignment.validity.op("@>")(now),
-                )
-            )
-        ).all()
-    }
-    current_projects = {
-        device_id: project_id
-        for device_id, project_id in (
-            await session.execute(
-                select(DeviceProjectAssignment.device_id, DeviceProjectAssignment.project_id).where(
-                    DeviceProjectAssignment.device_id.in_(ids),
-                    DeviceProjectAssignment.validity.op("@>")(now),
-                )
-            )
-        ).all()
-    }
-    source_names: dict[uuid.UUID, list[str]] = {}
-    for device_id, name in (
-        await session.execute(
-            select(ExternalIdentity.device_id, DataSource.name)
-            .join(DataSource, DataSource.id == ExternalIdentity.data_source_id)
-            .where(ExternalIdentity.device_id.in_(ids), ExternalIdentity.ignored.is_(False))
-            .distinct()
-            .order_by(DataSource.name)
-        )
-    ).all():
-        source_names.setdefault(device_id, []).append(name)
-    for device, read in zip(devices, reads, strict=True):
-        read.project_id = current_projects.get(device.id)
-        read.data_source_names = source_names.get(device.id, [])
-        if device.id in tracking:
-            read.entity_id, read.entity_name, read.group_id = tracking[device.id]
-        state = states.get(device.id)
-        if state is None:
-            continue
-        device_type = types.get(device.device_type_id)
-        driver = DRIVERS.get(device_type.driver_key) if device_type else None
-        read.last_seen_at = state.last_seen_at
-        read.health = device_health(
-            getattr(driver, "health", None),
-            latest_measurements=state.latest_measurements,
-            latest_state=state.latest_state,
-            latest_state_time=state.latest_state_time,
-            last_seen_at=state.last_seen_at,
-            last_movement_at=state.last_movement_at,
-            last_reset_at=state.last_reset_at,
-            battery=resolve_battery(
-                device.attributes,
-                device_type.default_settings if device_type else None,
-                driver,
-            ).profile,
-        )
-    return reads
 
 
 @router.get("", response_model=PageResponse[DeviceRead])

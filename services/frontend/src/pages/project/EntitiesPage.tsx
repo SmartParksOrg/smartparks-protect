@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Link2, MapPin, Plus, Wheat } from "lucide-react";
+import { BellRing, Link2, MapPin, Plus, Wheat } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router";
 
@@ -9,18 +9,11 @@ import { api } from "@/api/client";
 import { useProjects } from "@/hooks/useProjects";
 import { isAllProjects, projectFor } from "@/lib/scope";
 import { queryKeys } from "@/api/queryKeys";
-import type {
-  EntityAssignment,
-  CurrentState,
-  Entity,
-  EntityType,
-  Page as PageType,
-  Device,
-} from "@/api/types";
-import type { EntityFeatureProperties } from "@/components/map/layers";
+import type { Entity, EntityType, Page as PageType } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
+import { HealthLine } from "@/components/devices/HealthCard";
 import { LoadMore } from "@/components/data/LoadMore";
 import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { EntityDialog } from "@/components/entities/EntityDialog";
@@ -33,6 +26,12 @@ import { useNow } from "@/hooks/useNow";
 import { usePages } from "@/hooks/usePages";
 import { UNGROUPED, useGroups } from "@/hooks/useGroups";
 import { formatAgo } from "@/lib/format";
+import { positionKindExplanation, positionKindLabel } from "@/lib/positionKind";
+
+// the order of the health levels, worst last, as the API judges them (decision D286)
+const LEVEL_RANK: Record<string, number> = { ok: 0, warn: 1, critical: 2 };
+const levelRank = (level: string | null | undefined) =>
+  LEVEL_RANK[level ?? ""] ?? -1;
 
 export function EntitiesPage() {
   const { t } = useTranslation();
@@ -60,6 +59,8 @@ export function EntitiesPage() {
         },
       }),
     keepPrevious: true,
+    // health and last seen are live, so an open list keeps up with its devices
+    refetchInterval: 60_000,
   });
   const groups = useGroups(projectId);
   const groupName = (id: string | null | undefined) =>
@@ -71,58 +72,11 @@ export function EntitiesPage() {
         query: { limit: 500 },
       }),
   });
-  const state = useQuery({
-    queryKey: queryKeys.currentState(projectId),
-    queryFn: () =>
-      api.get<CurrentState>(`/api/v1/projects/${projectId}/map/current`),
-  });
   const typeById = useMemo(
     () => new Map(types.data?.items.map((t) => [t.id, t])),
     [types.data],
   );
   const now = useNow();
-  const projectDevices = useQuery({
-    queryKey: queryKeys.devices({ projectId }),
-    queryFn: () =>
-      api.get<PageType<Device>>("/api/v1/devices", {
-        query: { project_id: allProjects ? undefined : projectId, limit: 500 },
-      }),
-    enabled: Boolean(projectId),
-  });
-  const deviceNames = useMemo(
-    () =>
-      new Map((projectDevices.data?.items ?? []).map((d) => [d.id, d.name])),
-    [projectDevices.data],
-  );
-  const assignments = useQuery({
-    queryKey: queryKeys.entityAssignments(projectId),
-    queryFn: () =>
-      api.get<PageType<EntityAssignment>>(
-        `/api/v1/projects/${projectId}/entity-assignments`,
-        { query: { limit: 500 } },
-      ),
-    enabled: Boolean(projectId) && !isAllProjects(projectId),
-  });
-  const tracked = useMemo(
-    () =>
-      new Set(
-        (assignments.data?.items ?? [])
-          .filter((a) => !a.valid_to)
-          .map((a) => a.entity_id),
-      ),
-    [assignments.data],
-  );
-  const lastSeen = useMemo(
-    () =>
-      new Map(
-        (
-          state.data?.features as unknown as
-            { properties: EntityFeatureProperties }[] | undefined
-        )?.map((f) => [f.properties.entity_id, f.properties]),
-      ),
-    [state.data],
-  );
-
   const allProjects = isAllProjects(projectId);
   const projectList = useProjects();
   const projectName = (id: string | null | undefined) =>
@@ -156,11 +110,6 @@ export function EntitiesPage() {
       header: t("Type"),
       accessorFn: (e) => typeById.get(e.entity_type_id)?.label ?? "",
     },
-    {
-      header: t("Status"),
-      accessorKey: "status",
-      cell: ({ getValue }) => <StatusBadge value={getValue<string>()} />,
-    },
     ...(groups.data && groups.data.length > 0
       ? [
           {
@@ -170,28 +119,51 @@ export function EntitiesPage() {
         ]
       : []),
     {
-      header: t("Last seen"),
-      accessorFn: (e) => lastSeen.get(e.id)?.last_seen_at ?? undefined,
-      cell: ({ getValue }) => formatAgo(getValue<string | undefined>(), now),
+      id: "health",
+      header: t("Health"),
+      accessorFn: (e) => e.tracking?.level ?? "",
+      cell: ({ row }) => {
+        const devices = row.original.tracking?.devices ?? [];
+        // the device that drives the entity's level speaks for it (decision D286)
+        const worst = [...devices].sort(
+          (a, b) => levelRank(b.health?.level) - levelRank(a.health?.level),
+        )[0];
+        if (!worst?.health) return null;
+        return (
+          <span className="inline-flex flex-wrap items-center gap-x-2">
+            <HealthLine health={worst.health} />
+            {devices.length > 1 && (
+              <span className="text-xs text-muted-foreground">
+                {worst.name}
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
-      header: t("Device"),
+      id: "devices",
+      header: t("Devices"),
       accessorFn: (e) =>
-        deviceNames.get(lastSeen.get(e.id)?.device_id ?? "") ?? "",
+        (e.tracking?.devices ?? []).map((d) => d.name).join(", "),
       cell: ({ row }) => {
-        const id = lastSeen.get(row.original.id)?.device_id;
-        return id ? (
-          <Link
-            className="underline"
-            to={`/projects/${projectFor(projectId, row.original.project_id)}/devices/${id}`}
-            onClick={(ev) => ev.stopPropagation()}
-          >
-            {deviceNames.get(id) ?? t("open device")}
-          </Link>
-        ) : can("devices:write") &&
-          !allProjects &&
-          assignments.data &&
-          !tracked.has(row.original.id) ? (
+        const devices = row.original.tracking?.devices ?? [];
+        if (devices.length > 0)
+          return (
+            <span className="inline-flex flex-wrap gap-x-2">
+              {devices.map((d) => (
+                <Link
+                  key={d.id}
+                  className="underline"
+                  to={`/projects/${projectFor(projectId, row.original.project_id)}/devices/${d.id}`}
+                  onClick={(ev) => ev.stopPropagation()}
+                >
+                  {d.name}
+                </Link>
+              ))}
+            </span>
+          );
+        return can("devices:write") && !allProjects ? (
           <Button
             size="sm"
             variant="outline"
@@ -209,13 +181,71 @@ export function EntitiesPage() {
       },
     },
     {
+      id: "last_seen",
+      header: t("Last seen"),
+      meta: { filter: false },
+      accessorFn: (e) => e.tracking?.last_seen_at ?? undefined,
+      cell: ({ getValue }) => formatAgo(getValue<string | undefined>(), now),
+    },
+    {
+      id: "last_position",
+      header: t("Last position"),
+      meta: { filter: false },
+      accessorFn: (e) => e.tracking?.position_time ?? undefined,
+      cell: ({ row }) => {
+        const tracking = row.original.tracking;
+        if (!tracking?.position_time)
+          return <span className="text-muted-foreground">{t("none")}</span>;
+        const kind = positionKindLabel(tracking.position_kind, t);
+        return (
+          <span>
+            {formatAgo(tracking.position_time, now)}
+            {kind && (
+              <span
+                className="ml-1 text-xs text-muted-foreground"
+                title={positionKindExplanation(tracking.position_kind, t)}
+              >
+                {kind}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      id: "alerts",
+      header: t("Open alerts"),
+      meta: { filter: false },
+      accessorFn: (e) => e.tracking?.active_alert_count ?? 0,
+      cell: ({ getValue, row }) => {
+        const count = getValue<number>();
+        return count > 0 ? (
+          <Link
+            className="inline-flex items-center gap-1 text-destructive underline"
+            to={`/projects/${projectFor(projectId, row.original.project_id)}/alerts`}
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <BellRing className="size-3.5" /> {count}
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">0</span>
+        );
+      },
+    },
+    {
+      id: "status",
+      header: t("Status"),
+      accessorKey: "status",
+      cell: ({ getValue }) => <StatusBadge value={getValue<string>()} />,
+    },
+    {
       id: "map",
       header: "",
       cell: ({ row }) =>
-        lastSeen.get(row.original.id)?.position_time ? (
+        row.original.tracking?.position_time ? (
           <Link
             className="inline-flex items-center gap-1 text-xs underline"
-            to={`/projects/${projectId}/map?entity=${row.original.id}`}
+            to={`/projects/${projectFor(projectId, row.original.project_id)}/map?entity=${row.original.id}`}
             onClick={(ev) => ev.stopPropagation()}
           >
             <MapPin className="size-3" /> {t("Map")}
@@ -245,7 +275,9 @@ export function EntitiesPage() {
               analysisModules.includes("grazing") &&
               can("analysis:run") && (
                 <Button asChild variant="outline">
-                  <Link to={`/projects/${projectId}/analyze/grazing?group=${group}`}>
+                  <Link
+                    to={`/projects/${projectId}/analyze/grazing?group=${group}`}
+                  >
                     <Wheat className="size-4" /> {t("Analyse grazing")}
                   </Link>
                 </Button>
@@ -297,6 +329,8 @@ export function EntitiesPage() {
             "No entities yet. Add one with New entity, or onboard devices with their animals from Needs attention.",
           )}
           columnsKey="entities"
+          defaultHidden={["status"]}
+          defaultHiddenSmall={["type", "last_position", "alerts"]}
           onRowClick={(e) =>
             void navigate(
               `/projects/${projectFor(projectId, e.project_id)}/entities/${e.id}`,

@@ -17,11 +17,14 @@ export function usePages<T>({
   fetchPage,
   enabled = true,
   keepPrevious = false,
+  refetchInterval,
 }: {
   queryKey: QueryKey;
   fetchPage: (cursor: string | undefined) => Promise<Page<T>>;
   enabled?: boolean;
   keepPrevious?: boolean;
+  /** Read the loaded pages again this often, for a list whose rows are live. */
+  refetchInterval?: number;
 }) {
   const query = useInfiniteQuery({
     queryKey,
@@ -30,6 +33,7 @@ export function usePages<T>({
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     enabled,
     placeholderData: keepPrevious ? keepPreviousData : undefined,
+    refetchInterval,
   });
   const items = useMemo(
     () => query.data?.pages.flatMap((p) => p.items) ?? [],

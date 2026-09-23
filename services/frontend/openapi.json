@@ -31013,6 +31013,17 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "tracking": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/EntityTracking"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "What its devices say about it today; filled by the entities list (D286)"
      }
     },
     "type": "object",
@@ -31038,6 +31049,75 @@
      "archived"
     ],
     "title": "EntityStatus"
+   },
+   "EntityTracking": {
+    "properties": {
+     "devices": {
+      "items": {
+       "$ref": "#/components/schemas/TrackingDevice"
+      },
+      "type": "array",
+      "title": "Devices",
+      "default": []
+     },
+     "level": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Level",
+      "description": "The worst health level of the devices: ok, warn or critical"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At",
+      "description": "The newest record of any kind from its devices"
+     },
+     "position_time": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Position Time"
+     },
+     "position_kind": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Position Kind",
+      "description": "device, network, proximity or static (decisions D164, D258)"
+     },
+     "active_alert_count": {
+      "type": "integer",
+      "title": "Active Alert Count",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "title": "EntityTracking",
+    "description": "An entity as its devices report it: the devices tracking it today with their health, the\nworst of those levels, and what the entity's current state holds (decision D286). Read from\nthe assignments and the current states, so an entity whose devices send no position still\nhas its devices and its last seen."
    },
    "EntityTypeCreate": {
     "properties": {
@@ -42216,6 +42296,47 @@
      "last_position_id"
     ],
     "title": "TrackResponse"
+   },
+   "TrackingDevice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At"
+     },
+     "health": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeviceHealth"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name"
+    ],
+    "title": "TrackingDevice"
    },
    "TrafficRow": {
     "properties": {

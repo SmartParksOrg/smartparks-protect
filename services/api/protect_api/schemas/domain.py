@@ -140,6 +140,33 @@ class EntityUpdate(BaseModel):
     )
 
 
+class TrackingDevice(BaseModel):
+    id: uuid.UUID
+    name: str
+    last_seen_at: datetime | None = None
+    health: DeviceHealth | None = None
+
+
+class EntityTracking(BaseModel):
+    """An entity as its devices report it: the devices tracking it today with their health, the
+    worst of those levels, and what the entity's current state holds (decision D286). Read from
+    the assignments and the current states, so an entity whose devices send no position still
+    has its devices and its last seen."""
+
+    devices: list[TrackingDevice] = []
+    level: str | None = Field(
+        default=None, description="The worst health level of the devices: ok, warn or critical"
+    )
+    last_seen_at: datetime | None = Field(
+        default=None, description="The newest record of any kind from its devices"
+    )
+    position_time: datetime | None = None
+    position_kind: str | None = Field(
+        default=None, description="device, network, proximity or static (decisions D164, D258)"
+    )
+    active_alert_count: int = 0
+
+
 class EntityRead(ORMModel):
     location_source: str = "device"
     location_fallback_hours: int = 24
@@ -158,6 +185,10 @@ class EntityRead(ORMModel):
     )
     created_at: datetime
     updated_at: datetime
+    tracking: EntityTracking | None = Field(
+        default=None,
+        description="What its devices say about it today; filled by the entities list (D286)",
+    )
 
 
 class FeatureCreate(BaseModel):

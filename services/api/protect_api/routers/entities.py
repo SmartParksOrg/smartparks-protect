@@ -1,6 +1,7 @@
 """Entities, features and device-to-entity assignments inside a project."""
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime
 from typing import Any
@@ -27,6 +28,7 @@ from protect_api.deps import (
     require_permission,
     require_scope_permission,
 )
+from protect_api.device_reads import with_state
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
 from protect_api.schemas.domain import (
@@ -43,6 +45,7 @@ from protect_api.schemas.domain import (
     EntityCreate,
     EntityFenceRead,
     EntityRead,
+    EntityTracking,
     EntityUpdate,
     FeatureCreate,
     FeatureRead,
@@ -55,6 +58,7 @@ from protect_api.schemas.domain import (
     ProposedArea,
     ProposedAreas,
     SearchAreasRequest,
+    TrackingDevice,
     UnionAreasRequest,
 )
 from protect_api.visibility import group_and_subgroups
@@ -86,6 +90,7 @@ from shared.domain.fence import (
     sections_of,
     snap_to_line,
 )
+from shared.domain.health import LEVELS
 from shared.domain.static_place import place_device, place_entity_of
 from shared.enums import FeatureType
 from shared.models import (
@@ -112,6 +117,75 @@ def entity_read(entity: Entity) -> EntityRead:
     data = EntityRead.model_validate(entity)
     data.geometry = geom_to_geojson(entity.geom)
     return data
+
+
+async def with_tracking(session: AsyncSession, entities: Sequence[Entity]) -> list[EntityRead]:
+    """Entity reads with what their devices say today (decision D286): the devices assigned now
+    with their health, judged as the devices list judges it, the worst of those levels, the
+    newest record and the position the current state holds, and the open alerts. Read from the
+    assignments rather than from the positions, so a device that sends no fix still counts."""
+    reads = [entity_read(e) for e in entities]
+    if not reads:
+        return reads
+    ids = [e.id for e in entities]
+    entity_of = {
+        device_id: entity_id
+        for entity_id, device_id in (
+            await session.execute(
+                select(DeviceEntityAssignment.entity_id, DeviceEntityAssignment.device_id).where(
+                    DeviceEntityAssignment.entity_id.in_(ids),
+                    DeviceEntityAssignment.validity.op("@>")(utc_now()),
+                )
+            )
+        ).all()
+    }
+    devices = (
+        list(
+            (
+                await session.scalars(
+                    select(Device).where(Device.id.in_(entity_of)).order_by(Device.name)
+                )
+            ).all()
+        )
+        if entity_of
+        else []
+    )
+    tracking: dict[uuid.UUID, list[TrackingDevice]] = {}
+    for device in await with_state(session, devices):
+        tracking.setdefault(entity_of[device.id], []).append(
+            TrackingDevice(
+                id=device.id,
+                name=device.name,
+                last_seen_at=device.last_seen_at,
+                health=device.health,
+            )
+        )
+    states = {
+        s.entity_id: s
+        for s in (
+            await session.scalars(
+                select(EntityCurrentState).where(EntityCurrentState.entity_id.in_(ids))
+            )
+        ).all()
+    }
+    for read in reads:
+        tracked = tracking.get(read.id, [])
+        state = states.get(read.id)
+        levels = [
+            LEVELS.index(d.health.level) for d in tracked if d.health and d.health.level in LEVELS
+        ]
+        seen = [d.last_seen_at for d in tracked if d.last_seen_at]
+        if state is not None and state.last_seen_at:
+            seen.append(state.last_seen_at)
+        read.tracking = EntityTracking(
+            devices=tracked,
+            level=LEVELS[max(levels)] if levels else None,
+            last_seen_at=max(seen) if seen else None,
+            position_time=state.latest_position_time if state else None,
+            position_kind=state.latest_position_kind if state else None,
+            active_alert_count=state.active_alert_count if state else 0,
+        )
+    return reads
 
 
 def feature_read(feature: Feature, fence: FenceStatus | None = None) -> FeatureRead:
@@ -236,7 +310,7 @@ async def list_entities(
     if q:
         statement = statement.where(Entity.name.ilike(f"%{q}%"))
     rows, next_cursor = await paginate(session, Entity.id, statement, page)
-    return PageResponse(items=[entity_read(r) for r in rows], next_cursor=next_cursor)
+    return PageResponse(items=await with_tracking(session, rows), next_cursor=next_cursor)
 
 
 @router.post("/entities", response_model=EntityRead, status_code=status.HTTP_201_CREATED)
