@@ -450,9 +450,18 @@ export function EntityPage() {
                       </>
                     )}
                     <dt className="text-muted-foreground">{t("Last seen")}</dt>
-                    <dd title={formatTime(live?.last_seen_at)}>
-                      {live?.last_seen_at
-                        ? formatAgo(live.last_seen_at, now)
+                    {/* an animal without a position has no live feature; its device still
+                        says when it last reported (the baboons, 2026-09-23) */}
+                    <dd
+                      title={formatTime(
+                        live?.last_seen_at ?? device.data?.last_seen_at,
+                      )}
+                    >
+                      {(live?.last_seen_at ?? device.data?.last_seen_at)
+                        ? formatAgo(
+                            live?.last_seen_at ?? device.data?.last_seen_at,
+                            now,
+                          )
                         : t("never")}
                     </dd>
                     <dt className="text-muted-foreground">
