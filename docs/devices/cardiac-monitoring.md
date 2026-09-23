@@ -19,7 +19,8 @@ One record per sighting. Four of the values can be read directly, and five canno
 | Body temperature | `cmdq_temperature` | Degrees Celsius from the tag's raw value |
 | A reading happened | `cmdq_success` | True when the tag's temperature came through, which is how the firmware's own decoder judges a reading |
 | R-R median | `cmdq_rr_median` | The measured value the heart rate is derived from, in tens of milliseconds |
-| Activity, average and highest | `cmdq_activity_average`, `cmdq_activity_max` | Numbers the tag sends. **The manufacturer does not publish what they mean or in what unit.** They are not the collar's own accelerometer activity |
+| Activity | `cmdq_activity_average` | The implant's own accelerometer score, unitless from 0 to 255: high while the animal is awake and moving, low in its sleep. A 0 is the implant's hourly fault, not a reading, and the analysis sets it aside (D287). Not the device's own accelerometer activity |
+| Activity, highest | `cmdq_activity_max` | A number the tag sends; not interpreted |
 | Active minutes in the last hour | `cmdq_active_min_in_last_hour` | Reads as minutes, though the unit is not published |
 | Impedance | `cmdq_impedance` | A number the tag sends. Its meaning is not published; it reads like a contact quality, but that is a guess |
 | Mode sum | `cmdq_rr_median_modesum` | A number the tag sends. Its meaning is not published |

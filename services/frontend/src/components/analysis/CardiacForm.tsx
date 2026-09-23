@@ -31,6 +31,7 @@ import { usePermissions } from "@/hooks/useProjects";
 import {
   type CardiacOptions,
   cardiacParameters,
+  eventInside,
   type FormState,
   withGroupMembers,
 } from "@/lib/analyses";
@@ -96,7 +97,11 @@ export function CardiacForm({
   const typeOptions = (types.data?.items ?? []).filter((x) =>
     usedTypes.has(x.id),
   );
-  const parameters = cardiacParameters({ ...state, entities: subjects });
+  // an event outside the period is refused by the module (decision D289), so it is not asked
+  const outside = !eventInside(state);
+  const parameters = outside
+    ? null
+    : cardiacParameters({ ...state, entities: subjects });
   const estimate = useQuery({
     queryKey: queryKeys.analysisEstimate(projectId, parameters ?? {}),
     queryFn: () =>
@@ -253,6 +258,18 @@ export function CardiacForm({
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1">
+          <Label className="text-xs">
+            {t("Event, to compare before and after")}
+          </Label>
+          <Input
+            type="datetime-local"
+            aria-label={t("Event, to compare before and after")}
+            className="h-8 w-48"
+            value={inputValue(c.event)}
+            onChange={(ev) => cardiac({ event: ev.target.value || null })}
+          />
+        </div>
         {mayRun && !editing && (
           <Button
             type="button"
@@ -362,27 +379,48 @@ export function CardiacForm({
               }}
             />
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("Restless above (activity)")}</Label>
+            <Input
+              type="number"
+              className="h-8 w-28"
+              min={1}
+              max={254}
+              step={1}
+              value={c.restless}
+              onChange={(ev) => {
+                const n = Number(ev.target.value);
+                if (Number.isInteger(n) && n >= 1 && n <= 254)
+                  cardiac({ restless: n });
+              }}
+            />
+          </div>
           <p className="w-full text-xs text-muted-foreground">
             {t(
               "The resting heart rate is this quantile of the readings taken in the quiet hours, on the project's clock. The quiet hours may wrap past midnight.",
+            )}{" "}
+            {t(
+              "A night's restless minutes count the readings whose activity, on the implant's scale of 0 to 255, is above this value.",
             )}
           </p>
         </div>
       )}
 
       <p className="text-xs text-muted-foreground" aria-live="polite">
-        {!parameters
-          ? t("Choose at least one subject and a period.")
-          : !mayRun
-            ? t("Your role can read results but not start a run.")
-            : e
-              ? e.ok
-                ? t("{{subjects}} subjects, {{days}} days.", {
-                    subjects: e.subjects,
-                    days: e.days,
-                  })
-                : e.reasons?.join(" ") || t("The run is too large.")
-              : t("Estimating…")}
+        {outside
+          ? t("The event must fall inside the period.")
+          : !parameters
+            ? t("Choose at least one subject and a period.")
+            : !mayRun
+              ? t("Your role can read results but not start a run.")
+              : e
+                ? e.ok
+                  ? t("{{subjects}} subjects, {{days}} days.", {
+                      subjects: e.subjects,
+                      days: e.days,
+                    })
+                  : e.reasons?.join(" ") || t("The run is too large.")
+                : t("Estimating…")}
       </p>
     </div>
   );

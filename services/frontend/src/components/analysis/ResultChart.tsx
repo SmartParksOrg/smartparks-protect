@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { BarChart, GraphChart, LineChart } from "echarts/charts";
+import { BarChart, BoxplotChart, GraphChart, LineChart } from "echarts/charts";
 import {
   GridComponent,
   LegendComponent,
+  MarkLineComponent,
   PolarComponent,
   TooltipComponent,
 } from "echarts/components";
@@ -11,17 +12,20 @@ import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useRef } from "react";
 
 import { useTheme } from "@/hooks/useTheme";
-import type {
-  ResultChart as ResultChartData,
-  ResultChartSeries,
+import {
+  farFromZero,
+  type ResultChart as ResultChartData,
+  type ResultChartSeries,
 } from "@/lib/analyses";
 import { PALETTE, chartTheme } from "@/lib/chartStyle";
 
 echarts.use([
   LineChart,
   BarChart,
+  BoxplotChart,
   GraphChart,
   GridComponent,
+  MarkLineComponent,
   TooltipComponent,
   LegendComponent,
   PolarComponent,
@@ -29,7 +33,8 @@ echarts.use([
 ]);
 
 /** A chart of a result document: a line or bar over time, a stacked bar, a rose of directions,
- * or the contact network; the data comes from the document, the look from the brand palette. */
+ * a box plot per category, or the contact network; the data comes from the document, the look
+ * from the brand palette. */
 export function ResultChart({
   chart,
   labels,
@@ -71,6 +76,7 @@ export function ResultChart({
           ? (labels?.[s.name] ?? s.name)
           : ([
               labels?.[s.subject ?? ""] ?? s.subject,
+              s.part ? (labels?.[s.part] ?? s.part) : null,
               s.period === "comparison" ? t("before") : null,
               s.fit ? t("fitted") : null,
             ]
@@ -88,6 +94,26 @@ export function ResultChart({
       instance.current?.setOption(networkOption(chart, th, dark, t), true);
       return;
     }
+    if (chart.kind === "box") {
+      instance.current?.setOption(
+        boxOption(chart, th, names, colors, labels),
+        true,
+      );
+      return;
+    }
+    // a moment the chart is read around, on the first series (the event of a cardiac run)
+    const markLine = chart.marks?.length
+      ? {
+          symbol: "none",
+          silent: true,
+          lineStyle: { type: "dotted" as const, color: th.text, width: 1 },
+          label: { color: th.text, fontSize: 10, position: "insideEndTop" },
+          data: chart.marks.map((m) => ({
+            xAxis: m.at,
+            label: { formatter: labels?.[m.label] ?? m.label },
+          })),
+        }
+      : undefined;
     const option: echarts.EChartsCoreOption = {
       animation: false,
       color: colors,
@@ -143,6 +169,8 @@ export function ResultChart({
             },
             yAxis: {
               type: "value",
+              // a line far above zero reads its own range, as on paper
+              scale: farFromZero(chart),
               name: chart.unit ?? undefined,
               nameTextStyle: { color: th.text, fontSize: 10 },
               axisLabel: { color: th.text, fontSize: 10 },
@@ -157,11 +185,12 @@ export function ResultChart({
         data: rose ? (s.data ?? []).map((d) => d[1]) : (s.data ?? []),
         showSymbol: false,
         connectNulls: true,
+        markLine: i === 0 ? markLine : undefined,
         lineStyle: {
           width: s.fit ? 1.2 : 1.5,
           type: s.fit
             ? "dotted"
-            : s.period === "comparison"
+            : s.period === "comparison" || s.part === "night"
               ? "dashed"
               : "solid",
         },
@@ -184,6 +213,64 @@ export function ResultChart({
       aria-label={labels?.[chart.key] ?? chart.key}
     />
   );
+}
+
+/** A box per category and subject, side by side (the cardiac study's day, night and resting,
+ * decision D290): each point carries the five numbers low, q1, median, q3 and high, and the
+ * far readings are not drawn because the document does not list them. */
+function boxOption(
+  chart: ResultChartData,
+  th: ReturnType<typeof chartTheme>,
+  names: string[],
+  colors: string[],
+  labels: Record<string, string> | undefined,
+): echarts.EChartsCoreOption {
+  const categories = (chart.series[0]?.data ?? []).map((d) => String(d[0]));
+  return {
+    animation: false,
+    tooltip: {
+      trigger: "item",
+      backgroundColor: th.tooltipBg,
+      textStyle: { color: th.tooltipText, fontSize: 11 },
+    },
+    legend:
+      chart.series.length > 1
+        ? {
+            type: "scroll",
+            top: 0,
+            left: 44,
+            right: 12,
+            textStyle: { color: th.text, fontSize: 11 },
+            pageTextStyle: { color: th.text },
+          }
+        : undefined,
+    grid: {
+      left: 44,
+      right: 12,
+      top: chart.series.length > 1 ? 44 : 24,
+      bottom: 24,
+    },
+    xAxis: {
+      type: "category",
+      data: categories.map((c) => labels?.[c] ?? c),
+      axisLabel: { color: th.text, fontSize: 10 },
+      axisLine: { lineStyle: { color: th.grid } },
+    },
+    yAxis: {
+      type: "value",
+      scale: true,
+      name: chart.unit ?? undefined,
+      nameTextStyle: { color: th.text, fontSize: 10 },
+      axisLabel: { color: th.text, fontSize: 10 },
+      splitLine: { lineStyle: { color: th.grid } },
+    },
+    series: chart.series.map((s, i) => ({
+      name: names[i],
+      type: "boxplot",
+      itemStyle: { color: `${colors[i]}66`, borderColor: colors[i] },
+      data: (s.data ?? []).map((d) => (Array.isArray(d[1]) ? d[1] : [])),
+    })),
+  };
 }
 
 /** The contact network: subjects as nodes, pairs that met as edges (design section 4.3).

@@ -167,15 +167,24 @@ section.map {
   break-inside: avoid;
 }
 
+/* inline blocks rather than a flex box: WeasyPrint does not break a flex container across
+   pages, so a run with many charts pushed the whole grid past its heading and left the heading
+   alone on an empty page; lines of inline blocks break between rows */
 .grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4mm;
+  display: block;
+  /* no gap from the whitespace between the inline blocks; the captions set their own size */
+  font-size: 0;
 }
 figure {
+  display: inline-block;
+  vertical-align: top;
   width: 84mm;
-  margin: 0;
+  margin: 0 4mm 4mm 0;
   break-inside: avoid;
+}
+/* the second of a row ends at the margin, or two do not fit the 175 mm of text width */
+.grid figure:nth-child(2n) {
+  margin-right: 0;
 }
 figcaption {
   font-size: 9pt;

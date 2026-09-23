@@ -4,6 +4,10 @@ Pure numpy over the arrays a module loads, so every figure here is testable with
 The arithmetic that turns a tag's bytes into a heart rate lives in the OpenCollar driver, not
 here: by the time these functions see a value it is already beats per minute.
 
+Phase 35 (decisions D287 to D290) reads every metric of the record the same way: in the day, the
+night and the resting hours, as a rhythm over the hours of the day, as a course over the dates, and
+before and after an event.
+
 Two things shape the module and are worth stating once. A sighting without a cardiac reading is
 normal, so every figure counts what it used and says what it set aside; and a tag is heard on
 the collar's schedule, not the heart's, so a heart rate series is a sample of a fast signal by a
@@ -18,6 +22,8 @@ from datetime import datetime
 import numpy as np
 from numpy.typing import NDArray
 
+from shared.analysis.primitives.timeagg import sun_elevation_deg
+
 #: Hours of the local day a resting heart rate is read from, when nobody says otherwise. The
 #: quiet half of the night for most animals; it is a parameter because it is not true for all.
 DEFAULT_QUIET_HOURS: tuple[int, int] = (0, 5)
@@ -30,6 +36,19 @@ MIN_READINGS = 12
 #: 6000 / 255 is about 23 bpm at the low end and 6000 / 1 is 6000 at the high end; both ends of
 #: that range are arithmetic, not physiology.
 PLAUSIBLE_BPM: tuple[float, float] = (15.0, 300.0)
+#: The implant's activity score is 0 to 255, and a real score never falls to 0: the implant writes
+#: a 0 once an hour by a fault of its own (decision D287), so a 0 is set aside, never averaged in.
+ACTIVITY_FAULT = 0.0
+#: Activity above this counts as a restless moment at night; the implant's scale is unitless, so
+#: it is a parameter of the run with this default.
+DEFAULT_RESTLESS_ACTIVITY = 100
+#: Day and night on the local clock when a subject has no position at all to read the sun at
+#: (decision D288): the day from the first hour up to the second.
+FALLBACK_DAY_HOURS: tuple[int, int] = (6, 18)
+#: The three parts of a day every metric is read in.
+PARTS = ("day", "night", "resting")
+#: A night belongs to the evening it started on: its local date is read this many seconds back.
+NIGHT_SHIFT_S = 12 * 3600
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +91,53 @@ def spread(values: NDArray[np.float64]) -> Spread | None:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class Box:
+    """A box plot's five numbers: the middle half between `q1` and `q3`, the median, and the
+    whiskers at the furthest readings within one and a half middle halves of the box (Tukey).
+    Readings beyond the whiskers are not listed; `n` says how many readings are behind it."""
+
+    n: int
+    low: float
+    q1: float
+    median: float
+    q3: float
+    high: float
+
+    def as_dict(self) -> dict[str, float | int]:
+        return {
+            "n": self.n,
+            "low": round(self.low, 2),
+            "q1": round(self.q1, 2),
+            "median": round(self.median, 2),
+            "q3": round(self.q3, 2),
+            "high": round(self.high, 2),
+        }
+
+
+def box(values: NDArray[np.float64]) -> Box | None:
+    """The box of a set of readings, or None when there is nothing to draw."""
+    clean = values[np.isfinite(values)]
+    if clean.size == 0:
+        return None
+    q1, median, q3 = (float(q) for q in np.quantile(clean, [0.25, 0.5, 0.75]))
+    reach = 1.5 * (q3 - q1)
+    return Box(
+        n=int(clean.size),
+        low=float(np.min(clean[clean >= q1 - reach])),
+        q1=q1,
+        median=median,
+        q3=q3,
+        high=float(np.max(clean[clean <= q3 + reach])),
+    )
+
+
+def real_activity(values: NDArray[np.float64]) -> NDArray[np.bool_]:
+    """Which activity scores are readings: finite and not the implant's hourly 0 (D287)."""
+    keep: NDArray[np.bool_] = np.isfinite(values) & (values != ACTIVITY_FAULT)
+    return keep
+
+
 def plausible(values: NDArray[np.float64]) -> NDArray[np.bool_]:
     """Which heart rates are within the range a heart can beat at. A value outside it is the
     arithmetic of a byte, not a measurement, and is left out of every figure and counted."""
@@ -101,6 +167,116 @@ def hour_profile(
     return out
 
 
+def in_hours(hours: NDArray[np.int_], span: tuple[int, int]) -> NDArray[np.bool_]:
+    """Which readings fall in the hours from the first to the second inclusive; the span may
+    wrap past midnight, which quiet hours usually do."""
+    start, end = span
+    if start <= end:
+        return (hours >= start) & (hours <= end)
+    return (hours >= start) | (hours <= end)
+
+
+def daylight(times_s: NDArray[np.float64], lat: float, lon: float) -> NDArray[np.bool_]:
+    """Which moments had the sun above the horizon at one place (decision D288). One place for
+    the whole period, the subject's mean position: sunrise moves by minutes over the tens of
+    kilometres an animal ranges, and by hours over the seasons, which this follows."""
+    if times_s.size == 0:
+        return np.zeros(0, dtype=bool)
+    elevation = sun_elevation_deg(
+        times_s, np.full(times_s.shape, lat, dtype=float), np.full(times_s.shape, lon, dtype=float)
+    )
+    return np.asarray(elevation > 0, dtype=bool)
+
+
+def fixed_daylight(hours: NDArray[np.int_]) -> NDArray[np.bool_]:
+    """Day by the clock, for a subject with no position to read the sun at."""
+    start, end = FALLBACK_DAY_HOURS
+    return (hours >= start) & (hours < end)
+
+
+def part_masks(
+    is_day: NDArray[np.bool_], hours: NDArray[np.int_], quiet: tuple[int, int]
+) -> dict[str, NDArray[np.bool_]]:
+    """The readings of each part of the day. Resting is the quiet hours and overlaps the night;
+    it is its own question (how low the animal goes), not a third of the day."""
+    return {"day": is_day, "night": ~is_day, "resting": in_hours(hours, quiet)}
+
+
+def local_days(times_s: NDArray[np.float64], offsets_s: NDArray[np.float64]) -> NDArray[np.int_]:
+    """The local calendar day of each reading, as days since 1970-01-01."""
+    return ((times_s + offsets_s) // 86_400).astype(int)
+
+
+def night_days(times_s: NDArray[np.float64], offsets_s: NDArray[np.float64]) -> NDArray[np.int_]:
+    """The night each reading belongs to, named by the local date of the evening it started on,
+    so a reading at 02:00 counts to the night before and not to a night of its own."""
+    return local_days(times_s - NIGHT_SHIFT_S, offsets_s)
+
+
+def daily_medians(
+    days: NDArray[np.int_], values: NDArray[np.float64]
+) -> list[tuple[int, float, int]]:
+    """`(day, median, count)` per day that has a reading, in date order."""
+    out: list[tuple[int, float, int]] = []
+    for day in np.unique(days):
+        chosen = values[(days == day) & np.isfinite(values)]
+        if chosen.size:
+            out.append((int(day), float(np.median(chosen)), int(chosen.size)))
+    return out
+
+
+def report_step_s(times_s: NDArray[np.float64]) -> float | None:
+    """How far apart the reports are, as the median step between consecutive readings; what one
+    reading stands for when minutes are counted. None with fewer than two readings."""
+    if times_s.size < 2:
+        return None
+    steps = np.diff(np.sort(times_s))
+    steps = steps[steps > 0]
+    return float(np.median(steps)) if steps.size else None
+
+
+def restless_nights(
+    nights: NDArray[np.int_],
+    activity: NDArray[np.float64],
+    threshold: float,
+    step_s: float,
+) -> list[tuple[int, float, int]]:
+    """`(night, minutes, readings)`: per night, the minutes with activity above the threshold,
+    each reading standing for one report step. A night with fewer than `MIN_READINGS` readings
+    is left out rather than counted as a quiet one: too little of it was heard."""
+    out: list[tuple[int, float, int]] = []
+    for night in np.unique(nights):
+        chosen = activity[(nights == night) & np.isfinite(activity)]
+        if chosen.size < MIN_READINGS:
+            continue
+        minutes = float(np.count_nonzero(chosen > threshold)) * step_s / 60
+        out.append((int(night), round(minutes, 1), int(chosen.size)))
+    return out
+
+
+def before_after(
+    times_s: NDArray[np.float64], values: NDArray[np.float64], event_s: float
+) -> dict[str, object] | None:
+    """The readings before and after a moment (decision D289): each side's box and the change in
+    the median. A side with fewer than `MIN_READINGS` readings has no box, and then there is no
+    change either: a median of three readings is not a baseline."""
+    finite = np.isfinite(values)
+    sides = {
+        "before": box(values[finite & (times_s < event_s)]),
+        "after": box(values[finite & (times_s >= event_s)]),
+    }
+    if all(side is None for side in sides.values()):
+        return None
+    usable = {k: v for k, v in sides.items() if v is not None and v.n >= MIN_READINGS}
+    return {
+        "before": usable["before"].as_dict() if "before" in usable else None,
+        "after": usable["after"].as_dict() if "after" in usable else None,
+        "difference": (
+            round(usable["after"].median - usable["before"].median, 2) if len(usable) == 2 else None
+        ),
+    }
+
+
 def resting_rate(
     hours: NDArray[np.int_],
     values: NDArray[np.float64],
@@ -113,11 +289,7 @@ def resting_rate(
 
     The quiet hours run from the first to the second inclusive and may wrap past midnight, which
     is what they usually do."""
-    start, end = quiet
-    inside = (
-        (hours >= start) & (hours <= end) if start <= end else (hours >= start) | (hours <= end)
-    )
-    chosen = values[inside & np.isfinite(values)]
+    chosen = values[in_hours(hours, quiet) & np.isfinite(values)]
     if chosen.size < MIN_READINGS:
         return None
     return float(np.quantile(chosen, quantile)), int(chosen.size)

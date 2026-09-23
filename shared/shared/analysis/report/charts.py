@@ -1,6 +1,6 @@
 """The charts of a result document drawn for paper: the same kinds the interface draws (a
-line or bar over time or categories, a stacked bar, a rose of directions), in the brand
-palette, as SVG so they stay crisp at any size."""
+line or bar over time or categories, a stacked bar, a rose of directions, a box plot per
+category), in the brand palette, as SVG so they stay crisp at any size."""
 
 from __future__ import annotations
 
@@ -73,6 +73,8 @@ def series_name(series: dict[str, Any], labels: dict[str, str]) -> str:
     parts = [labels.get(series.get("subject", ""), series.get("subject"))]
     if series.get("herd"):
         parts.append(f"herd {series['herd']}")
+    if series.get("part"):
+        parts.append(labels.get(series["part"], series["part"]))
     if series.get("period") == "comparison":
         parts.append("before")
     if series.get("fit"):
@@ -97,8 +99,11 @@ def chart_svg(
         _rose(fig, series, labels, colors)
     elif kind == "network":
         _network(fig, series, labels)
+    elif kind == "box":
+        _box(fig, series, chart.get("unit"), labels, colors)
     else:
-        _cartesian(fig, kind, series, chart.get("unit"), labels, colors)
+        marks = chart.get("marks") or []
+        _cartesian(fig, kind, series, chart.get("unit"), labels, colors, marks)
     buffer = io.StringIO()
     fig.savefig(buffer, format="svg", bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
@@ -119,6 +124,7 @@ def _cartesian(
     unit: str | None,
     labels: dict[str, str],
     colors: dict[str, str],
+    marks: list[dict[str, Any]] | None = None,
 ) -> None:
     ax = fig.add_subplot(111)
     ax.grid(axis="x", visible=False)
@@ -136,12 +142,14 @@ def _cartesian(
             y = np.array([np.nan if d[1] is None else float(d[1]) for d in data])
             comparison = s.get("period") == "comparison"
             fit = bool(s.get("fit"))
+            # a night series beside its day is dashed, as a comparison is
+            dashed = comparison or s.get("part") == "night"
             ax.plot(
                 x,
                 y,
                 color=_color(s, i, colors),
                 linewidth=1.0 if fit else 1.2,
-                linestyle=":" if fit else "--" if comparison else "-",
+                linestyle=":" if fit else "--" if dashed else "-",
                 alpha=0.55 if comparison else 1.0,
                 label=series_name(s, labels),
             )
@@ -195,9 +203,24 @@ def _cartesian(
         locator = mdates.AutoDateLocator(minticks=3, maxticks=7)  # type: ignore[no-untyped-call]
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))  # type: ignore[no-untyped-call]
+        for mark in marks or []:
+            at = mdates.date2num(datetime.fromtimestamp(float(mark["at"]) / 1000, tz=UTC))  # type: ignore[no-untyped-call]
+            ax.axvline(at, color=TEXT, linestyle=":", linewidth=0.8)
+            ax.annotate(
+                labels.get(str(mark.get("label")), str(mark.get("label", ""))),
+                (at, 1.0),
+                xycoords=("data", "axes fraction"),
+                fontsize=6.5,
+                ha="left",
+                va="top",
+            )
+    if kind == "line" and axis == "category" and len(xs) > 12:
+        for i, tick in enumerate(ax.get_xticklabels()):
+            tick.set_visible(i % 3 == 0)
     if unit:
         ax.set_ylabel(unit)
-    ax.set_ylim(bottom=min(0.0, ax.get_ylim()[0]))
+    if not (kind == "line" and far_from_zero(series)):
+        ax.set_ylim(bottom=min(0.0, ax.get_ylim()[0]))
     if legend:
         # below the plot, so the lines stay clear
         ax.legend(
@@ -206,6 +229,75 @@ def _cartesian(
             fontsize=6.5,
             frameon=False,
             ncol=2,
+        )
+
+
+def far_from_zero(series: list[dict[str, Any]]) -> bool:
+    """Whether every value of a line sits so far above zero that an axis from zero would flatten
+    it: a body temperature, a heart rate that barely moves. The interface's `farFromZero` in
+    `lib/analyses.ts` is the same rule, so a chart reads the same on paper and on the page."""
+    values = [
+        float(d[1]) for s in series for d in s.get("data", []) if isinstance(d[1], int | float)
+    ]
+    if not values:
+        return False
+    low, high = min(values), max(values)
+    return low > 0 and (high - low) < 0.25 * high
+
+
+def _box(
+    fig: Figure,
+    series: list[dict[str, Any]],
+    unit: str | None,
+    labels: dict[str, str],
+    colors: dict[str, str],
+) -> None:
+    """A box per category and subject, side by side: the five numbers each point carries (low,
+    q1, median, q3, high), without the far readings, which the document does not list."""
+    ax = fig.add_subplot(111)
+    ax.grid(axis="x", visible=False)
+    categories = [str(d[0]) for d in (series[0].get("data", []) if series else [])]
+    if not categories:
+        ax.text(0.5, 0.5, "no data", ha="center", va="center", transform=ax.transAxes)
+        ax.set_axis_off()
+        return
+    width = 0.8 / len(series)
+    for i, s in enumerate(series):
+        stats = []
+        positions = []
+        for index, point in enumerate(s.get("data", [])):
+            if not point[1]:
+                continue
+            low, q1, median, q3, high = (float(v) for v in point[1])
+            stats.append(
+                {"whislo": low, "q1": q1, "med": median, "q3": q3, "whishi": high, "fliers": []}
+            )
+            positions.append(index - 0.4 + width * (i + 0.5))
+        if not stats:
+            continue
+        color = _color(s, i, colors)
+        drawn = ax.bxp(
+            stats,
+            positions=positions,
+            widths=width * 0.8,
+            patch_artist=True,
+            showfliers=False,
+            medianprops={"color": TEXT, "linewidth": 1.0},
+            whiskerprops={"color": color},
+            capprops={"color": color},
+        )
+        for patch in drawn["boxes"]:
+            patch.set_facecolor(color)
+            patch.set_alpha(0.7)
+            patch.set_edgecolor(color)
+        drawn["boxes"][0].set_label(series_name(s, labels))
+    ax.set_xticks(range(len(categories)))
+    ax.set_xticklabels([labels.get(c, c) for c in categories])
+    if unit:
+        ax.set_ylabel(unit)
+    if len(series) > 1:
+        ax.legend(
+            loc="upper center", bbox_to_anchor=(0.5, -0.14), fontsize=6.5, frameon=False, ncol=2
         )
 
 

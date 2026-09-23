@@ -352,8 +352,9 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
         None,
         N,
         "physiology",
-        "Sent by the cardiac tag; its meaning and unit are not published (IRNAS issue 389). Not "
-        "the collar's own accelerometer activity",
+        "The implant's own accelerometer score, unitless from 0 to 255: high while the animal is "
+        "awake and moving, low in its sleep. A 0 is the implant's hourly fault, not a reading "
+        "(D287). Not the device's own accelerometer activity",
     ),
     MetricSeed(
         "cmdq_activity_max",

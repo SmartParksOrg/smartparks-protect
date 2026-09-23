@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { AnalysisRun } from "@/api/types";
 import { AreaCards } from "@/components/analysis/AreaCards";
+import { CardiacCharts } from "@/components/analysis/CardiacCharts";
 import { CardiacSummary } from "@/components/analysis/CardiacSummary";
 import { ContactSummary } from "@/components/analysis/ContactSummary";
 import {
@@ -155,14 +156,19 @@ export function contactTracingPresentation(
   };
 }
 
-/** The cardiac study (docs/analytics/cardiac.md): a card per subject, the daily rhythm as the
- * one chart, the two tables, and no map at all, because a heart rate has no place on one. */
+/** The cardiac study (docs/analytics/cardiac.md): a card per subject, the charts a metric to
+ * a row (decision D290), the tables, and no map at all, because a heart rate has no place on
+ * one. */
 export function cardiacPresentation(t: Translate): Presentation {
+  const labels = cardiacLabels(t);
   return {
-    labels: cardiacLabels(t),
+    labels,
     render: {
       summary: (document) => <CardiacSummary document={document} />,
       map: () => null,
+      charts: (document, _run, colors) => (
+        <CardiacCharts document={document} labels={labels} colors={colors} />
+      ),
       after: () => <CardiacLimitations />,
     },
   };
@@ -401,12 +407,43 @@ export const movementLabels = (t: Translate): Record<string, string> => ({
 /** The human names of the grazing result's keys; every header says use, not grazing. */
 export const cardiacLabels = (t: Translate): Record<string, string> => ({
   cardiac: t("Heart"),
-  coverage: t("What the collar heard"),
+  coverage: t("What the device heard"),
+  parts: t("Day, night and resting"),
+  event: t("Before and after the event"),
+  event_at: t("Event"),
+  subject: t("Subject"),
+  metric: t("Metric"),
+  part: t("Part of the day"),
+  readings: t("Readings"),
+  median: t("Median"),
+  q1: t("Lower quartile"),
+  q3: t("Upper quartile"),
+  before: t("Before"),
+  after: t("After"),
+  change: t("Difference"),
   rhythm: t("Heart rate by hour of the day"),
   heart_rate: t("Heart rate"),
   resting_heart_rate: t("Resting heart rate"),
   hrv: t("Heart rate variability"),
+  activity: t("Activity"),
+  temperature: t("Tag temperature"),
   tag_temperature: t("Tag temperature"),
+  restless: t("Restless minutes per night"),
+  day: t("Day"),
+  night: t("Night"),
+  resting: t("Resting"),
+  rhythm_heart_rate: t("Heart rate by hour of the day"),
+  rhythm_hrv: t("Heart rate variability by hour of the day"),
+  rhythm_activity: t("Activity by hour of the day"),
+  rhythm_temperature: t("Tag temperature by hour of the day"),
+  parts_heart_rate: t("Heart rate by day, night and resting"),
+  parts_hrv: t("Heart rate variability by day, night and resting"),
+  parts_activity: t("Activity by day, night and resting"),
+  parts_temperature: t("Tag temperature by day, night and resting"),
+  daily_heart_rate: t("Heart rate per day, by day and by night"),
+  daily_hrv: t("Heart rate variability per day, by day and by night"),
+  daily_activity: t("Activity per day, by day and by night"),
+  daily_temperature: t("Tag temperature per day, by day and by night"),
 });
 
 export const contactTracingLabels = (t: Translate): Record<string, string> => ({

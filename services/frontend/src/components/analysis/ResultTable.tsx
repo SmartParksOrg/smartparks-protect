@@ -21,7 +21,7 @@ export function ResultTable({
         const v = getValue<unknown>();
         // a period or a herd key reads by its label
         if (
-          (c === "period" || c === "herd" || c === "metric") &&
+          (c === "period" || c === "herd" || c === "metric" || c === "part") &&
           typeof v === "string"
         )
           return labels?.[v] ?? v;

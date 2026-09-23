@@ -1,5 +1,6 @@
-"""The cardiac module over real rows (phase 34): the API refuses a period with no readings,
-creates the run over a day of them, and the runner computes what the document promises.
+"""The cardiac module over real rows (phases 34 and 35): the API refuses a period with no
+readings and an event outside the period, creates the run over a day of them, and the runner
+computes what the document promises, every metric in the day, the night and the resting hours.
 """
 
 import json
@@ -70,6 +71,21 @@ async def _a_day_of_readings(db, project, entity, device, source):
                 )
             )
             index += 1
+            # the implant's activity score, with its 0 at the top of every hour (decision D287)
+            activity = 0.0 if at.minute == 0 else 210.0 if 6 <= at.hour < 18 else 25.0
+            rows.append(
+                _measurement(
+                    project,
+                    entity,
+                    device,
+                    source,
+                    at,
+                    "cmdq_activity_average",
+                    index,
+                    num=activity,
+                )
+            )
+            index += 1
     # 6000 / 1, the arithmetic of a single byte and not a heartbeat
     rows.append(
         _measurement(
@@ -124,7 +140,18 @@ async def test_a_cardiac_run_over_a_day_of_readings(client, db):
     admin, project, entity, source, device, _ = await _setup(client, db)
     await _a_day_of_readings(db, project, entity, device, source)
     base = f"/api/v1/projects/{project.id}/analyses"
-    params = _params(entity_ids=[entity["id"]])
+    params = _params(entity_ids=[entity["id"]], event_at=(T0 + timedelta(hours=12)).isoformat())
+
+    outside = await client.post(
+        base,
+        json={
+            "module": "cardiac",
+            "parameters": {**params, "event_at": (T0 - timedelta(days=2)).isoformat()},
+        },
+        headers=admin.headers,
+    )
+    assert outside.status_code == 422, outside.text
+    assert "inside the period" in outside.text
 
     estimate = await client.get(
         f"{base}/estimate",
@@ -170,11 +197,25 @@ async def test_a_cardiac_run_over_a_day_of_readings(client, db):
     assert document["summary"]["settings"]["quiet_hours"] == [0, 5]
     assert document["summary"]["settings"]["resting_quantile"] == 0.1
 
-    assert [t["key"] for t in document["tables"]] == ["cardiac", "coverage"]
-    assert [c["key"] for c in document["charts"]] == ["rhythm"]
+    # phase 35: the activity with its hourly 0s set aside, the parts of the day by the clock
+    # (the entity has no position to read the sun at), the restless nights and the event
+    assert figures["activity_faults"] == 24
+    activity = figures["metrics"]["activity"]["parts"]
+    assert activity["day"]["median"] == 210.0 and activity["night"]["median"] == 25.0
+    assert figures["day_night_from"] == "fixed hours"
+    assert figures["restless"]["median_minutes"] == 0.0
+    assert figures["metrics"]["heart_rate"]["event"]["day"]["difference"] == 0.0
+    assert "rhythm" not in figures["metrics"]["heart_rate"]  # the charts hold the hours
+
+    assert [t["key"] for t in document["tables"]] == ["cardiac", "parts", "event", "coverage"]
+    charts = {c["key"]: c for c in document["charts"]}
+    assert {"rhythm_heart_rate", "parts_activity", "daily_activity", "restless"} <= set(charts)
+    assert len(charts["rhythm_heart_rate"]["series"][0]["data"]) == 24
+    assert charts["daily_heart_rate"]["marks"][0]["label"] == "event_at"
     assert document["subjects"][0]["name"] == "Rhino 14"
     codes = {w["code"] for w in document["warnings"]}
     assert "implausible_dropped" in codes
+    assert "day_night_by_the_clock" in codes
     assert "nothing_heard" not in codes
 
 

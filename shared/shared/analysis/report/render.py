@@ -27,6 +27,7 @@ MODULE_LABELS = {
     "movement": "Movement",
     "grazing": "Grazing",
     "device_performance": "Device performance",
+    "cardiac": "Cardiac monitoring",
 }
 
 #: The human names of the result keys, the frontend's `presentations.tsx` in English.
@@ -368,6 +369,75 @@ GRAZING_KEY_FIGURES: list[tuple[str, str]] = [
     ("rest_days", "days"),
     ("longest_rest_days", "days"),
 ]
+#: The cardiac study's keys (decisions D284 and D287 to D290), the frontend's `cardiacLabels`.
+CARDIAC_LABELS: dict[str, str] = {
+    "subject": "Subject",
+    "cardiac": "Heart",
+    "coverage": "What the device heard",
+    "parts": "Day, night and resting",
+    "event": "Before and after the event",
+    "heart_rate": "Heart rate",
+    "hrv": "Heart rate variability",
+    "activity": "Activity",
+    "temperature": "Tag temperature",
+    "resting_heart_rate": "Resting heart rate",
+    "restless": "Restless minutes per night",
+    "day": "Day",
+    "night": "Night",
+    "resting": "Resting",
+    "event_at": "Event",
+    "metric": "Metric",
+    "part": "Part of the day",
+    "readings": "Readings",
+    "median": "Median",
+    "q1": "Lower quartile",
+    "q3": "Upper quartile",
+    "before": "Before",
+    "after": "After",
+    "change": "Difference",
+    "rhythm_heart_rate": "Heart rate by hour of the day",
+    "rhythm_hrv": "Heart rate variability by hour of the day",
+    "rhythm_activity": "Activity by hour of the day",
+    "rhythm_temperature": "Tag temperature by hour of the day",
+    "parts_heart_rate": "Heart rate by day, night and resting",
+    "parts_hrv": "Heart rate variability by day, night and resting",
+    "parts_activity": "Activity by day, night and resting",
+    "parts_temperature": "Tag temperature by day, night and resting",
+    "daily_heart_rate": "Heart rate per day, by day and by night",
+    "daily_hrv": "Heart rate variability per day, by day and by night",
+    "daily_activity": "Activity per day, by day and by night",
+    "daily_temperature": "Tag temperature per day, by day and by night",
+}
+CARDIAC_KEY_FIGURES: list[tuple[str, str]] = [
+    ("heart_rate", "bpm"),
+    ("resting_heart_rate", "bpm"),
+    ("hrv", "ms"),
+    ("activity", ""),
+    ("temperature", "C"),
+    ("restless", "min"),
+]
+CARDIAC_LIMITATIONS = [
+    "What the device heard comes first: a quiet tag and a calm animal look the same in a heart "
+    "rate chart, and only the coverage table tells them apart.",
+    "There is no normal range. What a healthy heart rate is depends on the species, the age, "
+    "the season and what the animal was doing, and none of that is in this data.",
+    "The tag is sampled on the device's schedule, not the heart's; nothing is interpolated.",
+    "Heart rates outside 15 to 300 bpm are the arithmetic of a byte, not a heartbeat, and are "
+    "set aside and counted.",
+    "Activity is the implant's own accelerometer score on a unitless scale of 0 to 255. It "
+    "writes a 0 once an hour by a fault of its own; every 0 is set aside and counted.",
+    "Day and night split at the horizon, by the sun at the animal's mean position in the "
+    "period; without a position they fall back to 06:00 and 18:00 on the local clock, and the "
+    "warnings say so. Resting is the run's quiet hours and overlaps the night.",
+    "Restless minutes count the readings above the threshold at night, each standing for one "
+    "report step; a night heard fewer than twelve times is left out.",
+    "Before and after an event is descriptive: the medians and their middle half on each side, "
+    "with no model and no p-value. One animal's record is not a sample.",
+    "The tag's activity maximum, active minutes, impedance and mode sum are not interpreted.",
+]
+#: Options every run carries that a module does not read, left off its settings block: the
+#: cardiac study has no fixes, so no gap between them.
+UNUSED_OPTIONS: dict[str, tuple[str, ...]] = {"cardiac": ("gap_hours",)}
 OPTION_LABELS: list[tuple[str, str]] = [
     ("gap_hours", "Gap threshold (hours)"),
     ("max_speed_mps", "Maximum plausible speed (m/s)"),
@@ -380,6 +450,10 @@ OPTION_LABELS: list[tuple[str, str]] = [
     ("weight_key", "Attribute key"),
     ("min_absence_hours", "New visit after (hours away)"),
     ("rest_threshold_hours", "Rest day at or below (animal-hours)"),
+    ("quiet_from_hour", "Quiet hours from"),
+    ("quiet_to_hour", "Quiet hours to"),
+    ("resting_quantile", "Resting quantile"),
+    ("restless_activity", "Restless above (activity)"),
 ]
 MOVEMENT_LIMITATIONS = [
     "Distance from fixes underestimates the path between them; a coarser sampling means a "
@@ -438,7 +512,11 @@ class ReportInput:
 
 
 def labels_for(module: str, document: dict[str, Any]) -> dict[str, str]:
-    by_module = {"grazing": GRAZING_LABELS, "device_performance": DEVICE_PERFORMANCE_LABELS}
+    by_module = {
+        "grazing": GRAZING_LABELS,
+        "device_performance": DEVICE_PERFORMANCE_LABELS,
+        "cardiac": CARDIAC_LABELS,
+    }
     labels = dict(by_module.get(module, MOVEMENT_LABELS))
     for subject in document.get("subjects", []):
         labels[str(subject["id"])] = subject["name"]
@@ -534,9 +612,13 @@ def settings_rows(inp: ReportInput, labels: dict[str, str]) -> list[tuple[str, s
                 span(comparison.get("time_from"), comparison.get("time_to"), inp.timezone),
             )
         )
+    if p.get("event_at"):
+        rows.append(("Event", fmt_time(p["event_at"], inp.timezone)))
     if p.get("seasons") is True:
         rows.append(("Seasons", "rows per season"))
     for key, label in OPTION_LABELS:
+        if key in UNUSED_OPTIONS.get(inp.module, ()):
+            continue
         value = p.get(key)
         if value is None or value == "" or value == []:
             continue
@@ -736,6 +818,8 @@ def key_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
     before = summary.get("comparison") or {}
     if inp.module == "device_performance":
         return _device_figures(inp, labels)
+    if inp.module == "cardiac":
+        return _cardiac_figures(inp, labels)
     if inp.module == "grazing":
         metrics = GRAZING_KEY_FIGURES
         rows_source = [
@@ -772,6 +856,45 @@ def key_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def _cardiac_figure(figures: dict[str, Any], key: str) -> Any:
+    """One key figure of a subject: a median where the figure is a spread."""
+    if key == "resting_heart_rate":
+        return figures.get(key)
+    if key == "restless":
+        return (figures.get("restless") or {}).get("median_minutes")
+    spread = figures.get("tag_temperature" if key == "temperature" else key)
+    return spread.get("median") if isinstance(spread, dict) else None
+
+
+def _cardiac_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
+    """The cardiac cards as one table: a row per subject, the median of each metric, the
+    comparison period's in brackets."""
+    summary = inp.document.get("summary", {})
+    main = summary.get("subjects") or {}
+    before = summary.get("comparison") or {}
+    rows = []
+    for subject in inp.document.get("subjects", []):
+        key = str(subject["id"])
+        figures = main.get(key)
+        cells = []
+        for metric, unit in CARDIAC_KEY_FIGURES:
+            if not isinstance(figures, dict):
+                cells.append("nothing heard")
+                continue
+            text = fmt_figure(_cardiac_figure(figures, metric), unit)
+            if isinstance(before.get(key), dict):
+                text += f" ({fmt_figure(_cardiac_figure(before[key], metric), unit)})"
+            cells.append(text)
+        rows.append({"name": subject["name"], "note": subject.get("type") or "", "cells": cells})
+    return {
+        "first": "Subject",
+        "columns": [labels.get(m, m) for m, _ in CARDIAC_KEY_FIGURES],
+        "rows": rows,
+        "note": "The figure in brackets is the period before." if before else "",
+        "herd": None,
+    }
+
+
 #: A table wider than this is turned on its side when it has few rows: a column per row.
 WIDE_COLUMNS = 8
 TRANSPOSE_MAX_ROWS = 6
@@ -787,11 +910,14 @@ def table_block(table: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]
     ]
     title = labels.get(table["key"], table["key"])
     if len(columns) > WIDE_COLUMNS and 0 < len(rows) <= TRANSPOSE_MAX_ROWS:
-        # the first two cells name the row (subject and period, area and period)
-        heads = [" · ".join(c for c in r[:2] if c) for r in rows]
+        # the first cell names the row, and the second too when it is words (subject and
+        # period, area and period); a figure in the second column stays a figure
+        raw = table.get("rows", [])
+        named = 2 if all(len(r) > 1 and isinstance(r[1], str) for r in raw) else 1
+        heads = [" · ".join(c for c in r[:named] if c) for r in rows]
         body = [
             [columns[i], *[r[i] if i < len(r) else "" for r in rows]]
-            for i in range(2, len(columns))
+            for i in range(named, len(columns))
         ]
         return {"title": title, "columns": ["", *heads], "rows": body, "wide": True}
     return {"title": title, "columns": columns, "rows": rows, "wide": len(columns) > WIDE_COLUMNS}
@@ -930,6 +1056,8 @@ def render_html(inp: ReportInput) -> str:
             if devices
             else GRAZING_LIMITATIONS
             if inp.module == "grazing"
+            else CARDIAC_LIMITATIONS
+            if inp.module == "cardiac"
             else MOVEMENT_LIMITATIONS
         ),
         version=inp.version,

@@ -145,3 +145,69 @@ No geometries. The module is a time series study, not a spatial one.
 - The LINQII as a device of its own, if a tag is ever read by more than one collar (D282 keeps
   the address on the device's settings, so the history can be re-attributed without decoding
   anything again).
+
+## 8. Phase 35: the whole record
+
+Asked for by Tim on 2026-09-23: the module showed the heart rate by hour of the day and little
+else, while a port 15 record carries the heart rate, the variability, the tag's own activity and
+its temperature. How the people who study these animals read such a record was shared by Tim
+from their unpublished work and is not cited here; what it taught is written into the decisions.
+Decisions D287 to D290.
+
+### 8.1 What the record gives, read as a researcher reads it
+
+- **Activity** (`cmdq_activity_average`) is the implant's accelerometer score on a unitless scale
+  of 0 to 255, one value per report. It is not the device's own activity. Awake and moving scores
+  sit high, sleep sits low. The implant writes a 0 once an hour by a fault of its own, and a real
+  score never falls that low, so a 0 is set aside and counted (D287).
+- **Day, night and resting** are the three parts of a day every figure is read in. Day and night
+  follow the sun at the animal's position, so they hold at any latitude and in any season; the
+  resting part is the run's quiet hours, as before, now for every metric (D288).
+- **The daily rhythm** of each metric: heart rate peaks in the afternoon and bottoms out before
+  dawn, the variability peaks as the animals wake, activity follows daylight.
+- **Restless nights**: the minutes per night with activity above a threshold (100 by default),
+  a measure of disturbed rest.
+- **A change around an event**: an animal leaving its group, a capture, a drought. The period is
+  split at a date and every part of the day compared before and after (D289). Descriptive only,
+  no model and no p-value: one animal's record is not a sample.
+
+### 8.2 The views (D290)
+
+- The hour-of-day median of all four metrics, one chart each.
+- Day, night and resting as a box plot per subject for each metric: a new chart kind, `box`, on
+  the page and in the report.
+- The daily course over the period: day and night medians per date, the event date marked.
+- Restless minutes per night per subject.
+
+The page and the PDF report show the same things. The report gains its own cardiac section; it
+fell back to the movement module's labels, key figures and limitations until now.
+
+### 8.3 Tasks
+
+- [x] P1 primitives: `box`, `daylight` (the sun's elevation at a place), `part_masks`,
+      `daily_medians`, `restless_nights`, `before_after`; activity zeros set aside.
+- [x] P2 the module: activity loaded, the position for the sun, the parts, rhythms, daily course,
+      nights and the event split per subject; the tables and charts; the parameters `event_at`
+      and `restless_activity`; the rhythm chart's series as `data` (it wrote `points`, which
+      neither the page nor the report reads, so the chart drew empty).
+- [x] P3 the chart kind `box` and the chart's `marks` in `base.Chart`, `ResultChart.tsx` and
+      `report/charts.py`; a night series drawn dashed.
+- [x] P4 the frontend: the form (event date, restless threshold), the summary cards, the labels,
+      Dutch.
+- [x] P5 the report: the cardiac labels, key figures and limitations.
+- [x] P6 tests: the primitives, the module over synthetic days, the report, the run through the
+      API.
+- [x] P7 docs: `docs/analytics/cardiac.md`, `docs/devices/cardiac-monitoring.md` (activity is a
+      score now), `DEVELOPERS.md`, the changelog, the plan.
+- [ ] P8 the dev server: the Cardiac demo reseeded with activity, then Tim reads a run.
+
+### 8.4 Exit criteria
+
+- A run over a subject with several days of readings answers all four metrics in the day, the
+  night and the resting hours, draws their rhythms, the daily course and the restless nights,
+  and says where day and night came from.
+- An event date inside the period gives before and after figures for every metric and part; one
+  outside it is refused with a warning, not ignored.
+- A subject without any position still gets day and night, from fixed hours, and is told so.
+- The PDF of a cardiac run carries the cardiac figures, charts and limitations and none of the
+  movement module's.

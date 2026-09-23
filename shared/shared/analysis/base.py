@@ -63,9 +63,14 @@ class Chart(BaseModel):
     key: str
     #: `network` is the contact study's picture: nodes and edges rather than points, so
     #: its series carry `nodes` and `edges` instead of `points` (design section 4.3).
-    kind: Literal["line", "bar", "rose", "stacked", "network"]
+    #: `box` draws a box plot per category: its points carry the five numbers low, q1, median,
+    #: q3 and high rather than one value (the cardiac study, decision D290).
+    kind: Literal["line", "bar", "rose", "stacked", "network", "box"]
     unit: str | None = None
     series: list[dict[str, Any]]
+    #: Moments to mark on a time axis, each `{at: epoch ms, label}`: an event the chart is read
+    #: around (decision D289).
+    marks: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class Table(BaseModel):

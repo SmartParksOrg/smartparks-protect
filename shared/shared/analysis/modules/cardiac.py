@@ -6,6 +6,11 @@ right: the tag had something to say, and the collar was listening when it said i
 the run answers what was heard before it answers what the heart was doing. A quiet tag and a calm
 animal look the same in a heart rate chart, and only the coverage block tells them apart.
 
+Phase 35 reads the whole record the same way (decisions D287 to D290): the heart rate, its
+variability, the implant's activity and its temperature, each in the day, the night and the
+resting hours, as a rhythm over the hours of the day, as a course over the dates, and before and
+after an event; with the minutes of restless activity per night beside them.
+
 What this module does not do is judge. There is no normal range for a heart rate here, because it
 depends on the species, the age, the season and what the animal was doing a minute ago, and
 nobody has given us those numbers. It reports what was measured, at what times of day, and how
@@ -22,7 +27,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,22 +47,42 @@ from shared.analysis.parameters import CommonParameters
 from shared.analysis.primitives.cardiac import (
     DEFAULT_QUIET_HOURS,
     DEFAULT_RESTING_QUANTILE,
+    DEFAULT_RESTLESS_ACTIVITY,
+    FALLBACK_DAY_HOURS,
     MIN_READINGS,
+    PARTS,
     Coverage,
     Spread,
+    before_after,
+    box,
     coverage,
+    daily_medians,
+    daylight,
+    fixed_daylight,
     hour_profile,
+    local_days,
     local_hours,
+    night_days,
+    part_masks,
     plausible,
+    real_activity,
+    report_step_s,
     resting_rate,
+    restless_nights,
     spread,
     temperature_disagreement,
 )
-from shared.curation.effective import effective_number, effective_time, in_window, visible
-from shared.models import Entity, EntityType, Measurement, Project
+from shared.curation.effective import (
+    effective_geom,
+    effective_number,
+    effective_time,
+    in_window,
+    visible,
+)
+from shared.models import Entity, EntityCurrentState, EntityType, Measurement, Position, Project
 from shared.models.settings import DeviceSetting
 
-METHOD_VERSION = "cardiac-1.0.0"
+METHOD_VERSION = "cardiac-2.0.0"
 YIELD_PER = 5_000
 
 #: The heart rate and what stands beside it. `cmdq_success` says a sighting carried a reading at
@@ -66,8 +91,10 @@ HEART_RATE = "heart_rate"
 HRV = "heart_rate_variability"
 TAG_TEMPERATURE = "cmdq_temperature"
 SUCCESS = "cmdq_success"
+#: The implant's own accelerometer score, 0 to 255 without a unit (decision D287).
+ACTIVITY = "cmdq_activity_average"
 COLLAR_TEMPERATURE = "device_temperature"
-CARDIAC_KEYS = (HEART_RATE, HRV, TAG_TEMPERATURE, SUCCESS)
+CARDIAC_KEYS = (HEART_RATE, HRV, TAG_TEMPERATURE, SUCCESS, ACTIVITY)
 LOADED_KEYS = (*CARDIAC_KEYS, COLLAR_TEMPERATURE)
 
 #: How often the collar composes a port 15 message. The coverage block reads it per device to
@@ -75,6 +102,18 @@ LOADED_KEYS = (*CARDIAC_KEYS, COLLAR_TEMPERATURE)
 REPORTING_INTERVAL_SETTING = "cmdq_reporting_interval"
 #: A tag reading this much colder than the collar has probably left the animal.
 TEMPERATURE_GAP_C = 3.0
+
+#: The four metrics read in every part of the day (decision D290), by the name the document
+#: uses, with the measurement behind each and its unit.
+METRICS: dict[str, tuple[str, str]] = {
+    "heart_rate": (HEART_RATE, "bpm"),
+    "hrv": (HRV, "ms"),
+    "activity": (ACTIVITY, "score"),
+    "temperature": (TAG_TEMPERATURE, "°C"),
+}
+#: The figures the charts are drawn from; the stored summary keeps the charts rather than a
+#: second copy of every day and hour.
+CHART_ONLY = ("rhythm", "daily")
 
 
 class CardiacParameters(CommonParameters):
@@ -85,6 +124,20 @@ class CardiacParameters(CommonParameters):
     quiet_from_hour: int = Field(default=DEFAULT_QUIET_HOURS[0], ge=0, le=23)
     quiet_to_hour: int = Field(default=DEFAULT_QUIET_HOURS[1], ge=0, le=23)
     resting_quantile: float = Field(default=DEFAULT_RESTING_QUANTILE, ge=0.01, le=0.5)
+    #: A moment inside the period to compare before and after (decision D289).
+    event_at: datetime | None = None
+    #: Activity above this is a restless moment at night, on the implant's 0 to 255 scale.
+    restless_activity: int = Field(default=DEFAULT_RESTLESS_ACTIVITY, ge=1, le=254)
+
+    @model_validator(mode="after")
+    def _event_inside(self) -> CardiacParameters:
+        if self.event_at is None:
+            return self
+        if self.event_at.tzinfo is None:
+            raise ValueError("the event date needs a timezone")
+        if not self.time_from < self.event_at < self.time_to:
+            raise ValueError("the event date must fall inside the period")
+        return self
 
 
 class Readings:
@@ -175,6 +228,41 @@ async def reporting_intervals(
     return out
 
 
+async def subject_place(
+    session: AsyncSession, entity_id: uuid.UUID, period: Period
+) -> tuple[float, float, str] | None:
+    """Where to read the sun for one subject (decision D288): its mean position in the period,
+    else where it stands now, as `(lat, lon, source)`; None when it has neither and day and night
+    fall back to the clock. Any position counts, a place set by hand included: the question is
+    where the animal is under the sky, not what made the fix."""
+    geom = effective_geom()
+    lat, lon = (
+        await session.execute(
+            select(func.avg(func.ST_Y(geom)), func.avg(func.ST_X(geom))).where(
+                Position.entity_id == entity_id,
+                in_window(Position, period.time_from, period.time_to),
+                visible(Position),
+            )
+        )
+    ).one()
+    if lat is not None and lon is not None:
+        return float(lat), float(lon), "sun"
+    now = (
+        await session.execute(
+            select(
+                func.ST_Y(EntityCurrentState.latest_position),
+                func.ST_X(EntityCurrentState.latest_position),
+            ).where(
+                EntityCurrentState.entity_id == entity_id,
+                EntityCurrentState.latest_position.is_not(None),
+            )
+        )
+    ).first()
+    if now is None:
+        return None
+    return float(now[0]), float(now[1]), "sun at the current position"
+
+
 def zone_offsets(times_s: NDArray[np.float64], zone: tzinfo) -> NDArray[np.float64]:
     """The zone's offset in seconds at each moment, so the rhythm is read on the local clock and
     a period that crosses a daylight saving change is read on both sides of it."""
@@ -187,22 +275,76 @@ def zone_offsets(times_s: NDArray[np.float64], zone: tzinfo) -> NDArray[np.float
     )
 
 
+def metric_readings(
+    readings: Readings, metric: str
+) -> tuple[NDArray[np.float64], NDArray[np.float64], int]:
+    """One metric's usable readings and how many were set aside: heart rates outside what a heart
+    can do, and the implant's hourly 0 for activity (decision D287)."""
+    times, values = readings.array(METRICS[metric][0])
+    if metric == "heart_rate":
+        keep = plausible(values)
+    elif metric == "activity":
+        keep = real_activity(values)
+    else:
+        keep = np.isfinite(values)
+    return times[keep], values[keep], int(values.size - np.count_nonzero(keep))
+
+
+def _rows(profile: list[tuple[int, float, int]]) -> list[list[float | int]]:
+    return [[key, round(value, 2), n] for key, value, n in profile]
+
+
+def metric_block(
+    times: NDArray[np.float64],
+    values: NDArray[np.float64],
+    zone: tzinfo,
+    params: CardiacParameters,
+    place: tuple[float, float, str] | None,
+    event_s: float | None,
+) -> dict[str, Any]:
+    """One metric of one subject read every way the module reads it (decision D290): its spread,
+    a box per part of the day, the rhythm over the hours, the day and night medians per date,
+    and, with an event, each part before and after it."""
+    offsets = zone_offsets(times, zone)
+    hours = local_hours(times, offsets)
+    is_day = daylight(times, place[0], place[1]) if place else fixed_daylight(hours)
+    masks = part_masks(is_day, hours, (params.quiet_from_hour, params.quiet_to_hour))
+    days = local_days(times, offsets)
+    whole = spread(values)
+    block: dict[str, Any] = {
+        "spread": whole.as_dict() if whole else None,
+        "parts": {
+            part: shape.as_dict()
+            for part, mask in masks.items()
+            if (shape := box(values[mask])) is not None
+        },
+        "rhythm": _rows(hour_profile(hours, values)),
+        "daily": {
+            part: _rows(daily_medians(days[masks[part]], values[masks[part]]))
+            for part in ("day", "night")
+        },
+    }
+    if event_s is not None:
+        block["event"] = {
+            part: change
+            for part, mask in masks.items()
+            if (change := before_after(times[mask], values[mask], event_s)) is not None
+        }
+    return block
+
+
 def subject_figures(
     readings: Readings,
     period: Period,
-    offsets_s: NDArray[np.float64],
+    zone: tzinfo,
     params: CardiacParameters,
     reporting_interval_s: float | None,
+    place: tuple[float, float, str] | None,
+    event_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Every figure of one subject in one period. Times are in UTC seconds; `offsets_s` gives
-    the project's offset at each heart rate reading, so the rhythm is read on the local clock
-    the way the movement and grazing modules read theirs."""
-    times, bpm = readings.array(HEART_RATE)
-    keep = plausible(bpm)
-    dropped = int(bpm.size - np.count_nonzero(keep))
-    times, bpm = times[keep], bpm[keep]
-    offsets_s = offsets_s[keep] if offsets_s.size == keep.size else offsets_s
-
+    """Every figure of one subject in one period. Times are in UTC seconds and read on the
+    project's clock through `zone`, the way the movement and grazing modules read theirs; day
+    and night come from the sun at `place`, or from the clock when there is none."""
     success_times, success = readings.array(SUCCESS)
     seen = coverage(
         success_times,
@@ -210,41 +352,93 @@ def subject_figures(
         (period.time_to - period.time_from).total_seconds(),
         reporting_interval_s,
     )
-
     figures: dict[str, Any] = {
         "coverage": seen.as_dict(),
-        "dropped_implausible": dropped,
+        "dropped_implausible": 0,
+        "activity_faults": 0,
+        "day_night_from": place[2] if place else "fixed hours",
+        "metrics": {},
     }
-    rate = spread(bpm)
-    if rate:
-        figures["heart_rate"] = rate.as_dict()
-    hours = local_hours(times, offsets_s) if times.size else np.array([], dtype=int)
-    if times.size:
-        figures["by_hour"] = [
-            {"hour": hour, "median": round(median, 1), "n": n}
-            for hour, median, n in hour_profile(hours, bpm)
-        ]
-        rest = resting_rate(
-            hours,
-            bpm,
-            (params.quiet_from_hour, params.quiet_to_hour),
-            params.resting_quantile,
-        )
-        if rest:
-            figures["resting_heart_rate"] = round(rest[0], 1)
-            figures["resting_readings"] = rest[1]
-    hrv = spread(readings.array(HRV)[1])
-    if hrv:
-        figures["hrv"] = hrv.as_dict()
-    tag_temperature = readings.array(TAG_TEMPERATURE)[1]
-    tag = spread(tag_temperature)
-    if tag:
-        figures["tag_temperature"] = tag.as_dict()
+    event_s = event_at.timestamp() if event_at else None
+    for metric in METRICS:
+        times, values, set_aside = metric_readings(readings, metric)
+        if metric == "heart_rate":
+            figures["dropped_implausible"] = set_aside
+        elif metric == "activity":
+            figures["activity_faults"] = set_aside
+        if not times.size:
+            continue
+        figures["metrics"][metric] = metric_block(times, values, zone, params, place, event_s)
+        if metric == "heart_rate":
+            _heart_rate_figures(figures, times, values, zone, params)
+        elif metric == "activity":
+            _restless(figures, times, values, zone, params, place, reporting_interval_s)
+    # the spreads under the names the cards and the older runs read
+    legacy = (("hrv", "hrv"), ("temperature", "tag_temperature"), ("activity", "activity"))
+    for metric, key in legacy:
+        block = figures["metrics"].get(metric)
+        if block and block["spread"]:
+            figures[key] = block["spread"]
+    tag_temperature = metric_readings(readings, "temperature")[1]
     collar = readings.array(COLLAR_TEMPERATURE)[1]
     difference = temperature_disagreement(tag_temperature, collar, TEMPERATURE_GAP_C)
     if difference is not None:
         figures["temperature_difference"] = round(difference, 2)
     return figures
+
+
+def _heart_rate_figures(
+    figures: dict[str, Any],
+    times: NDArray[np.float64],
+    bpm: NDArray[np.float64],
+    zone: tzinfo,
+    params: CardiacParameters,
+) -> None:
+    """The heart rate figures phase 34 wrote, which the cards and the older runs read."""
+    rate = spread(bpm)
+    if rate:
+        figures["heart_rate"] = rate.as_dict()
+    hours = local_hours(times, zone_offsets(times, zone))
+    figures["by_hour"] = [
+        {"hour": hour, "median": round(median, 1), "n": n}
+        for hour, median, n in hour_profile(hours, bpm)
+    ]
+    rest = resting_rate(
+        hours, bpm, (params.quiet_from_hour, params.quiet_to_hour), params.resting_quantile
+    )
+    if rest:
+        figures["resting_heart_rate"] = round(rest[0], 1)
+        figures["resting_readings"] = rest[1]
+
+
+def _restless(
+    figures: dict[str, Any],
+    times: NDArray[np.float64],
+    activity: NDArray[np.float64],
+    zone: tzinfo,
+    params: CardiacParameters,
+    place: tuple[float, float, str] | None,
+    reporting_interval_s: float | None,
+) -> None:
+    """Minutes of restless activity per night (decision D290): each reading above the threshold
+    stands for one report step, measured from the readings themselves before the settings."""
+    step = report_step_s(times) or reporting_interval_s
+    if not step:
+        return
+    offsets = zone_offsets(times, zone)
+    hours = local_hours(times, offsets)
+    night = ~(daylight(times, place[0], place[1]) if place else fixed_daylight(hours))
+    nights = restless_nights(
+        night_days(times, offsets)[night], activity[night], params.restless_activity, step
+    )
+    figures["restless"] = {
+        "nights": [[day, minutes, n] for day, minutes, n in nights],
+        "median_minutes": (
+            round(float(np.median([m for _, m, _ in nights])), 1) if nights else None
+        ),
+        "threshold": params.restless_activity,
+        "step_minutes": round(step / 60, 2),
+    }
 
 
 def subject_warnings(subject: Subject, figures: dict[str, Any], period: Period) -> list[Warning]:
@@ -340,6 +534,19 @@ def subject_warnings(subject: Subject, figures: dict[str, Any], period: Period) 
                 ),
             )
         )
+    if figures.get("day_night_from") == "fixed hours" and figures.get("metrics"):
+        start, end = FALLBACK_DAY_HOURS
+        out.append(
+            Warning(
+                code="day_night_by_the_clock",
+                subject_id=subject.id,
+                level="notice",
+                text=(
+                    f"{subject.name} has no position to read the sun at, so its day runs from "
+                    f"{start:02d}:00 to {end:02d}:00 on the local clock and its night the rest."
+                ),
+            )
+        )
     if "hrv" not in figures and figures.get("heart_rate"):
         out.append(
             Warning(
@@ -353,6 +560,78 @@ def subject_warnings(subject: Subject, figures: dict[str, Any], period: Period) 
             )
         )
     return out
+
+
+HOURS = [f"{hour:02d}" for hour in range(24)]
+
+
+def _day_ms(day: int) -> int:
+    """A local date (days since 1970) as the epoch milliseconds of its noon, where a daily
+    point sits on a time axis."""
+    return (day * 86_400 + 43_200) * 1000
+
+
+def metric_charts(
+    subjects: list[Subject], figures_of: dict[uuid.UUID, dict[str, Any]], event_at: datetime | None
+) -> list[Chart]:
+    """The views of decision D290 for every metric that has readings: the rhythm over the hours,
+    a box per part of the day, and the day and night course over the dates."""
+    charts: list[Chart] = []
+    marks = [{"at": int(event_at.timestamp() * 1000), "label": "event_at"}] if event_at else []
+    for metric, (_, unit) in METRICS.items():
+        blocks = {
+            subject.id: block
+            for subject in subjects
+            if (block := (figures_of.get(subject.id) or {}).get("metrics", {}).get(metric))
+        }
+        if not blocks:
+            continue
+        rhythm = []
+        parts = []
+        daily = []
+        for subject_id, block in blocks.items():
+            by_hour = {int(hour): value for hour, value, _ in block["rhythm"]}
+            rhythm.append(
+                {
+                    "subject": str(subject_id),
+                    "data": [[label, by_hour.get(hour)] for hour, label in enumerate(HOURS)],
+                }
+            )
+            parts.append(
+                {
+                    "subject": str(subject_id),
+                    "data": [
+                        [
+                            part,
+                            [shape[k] for k in ("low", "q1", "median", "q3", "high")]
+                            if (shape := block["parts"].get(part))
+                            else None,
+                        ]
+                        for part in PARTS
+                    ],
+                }
+            )
+            for part in ("day", "night"):
+                points = [[_day_ms(day), value] for day, value, _ in block["daily"][part]]
+                if points:
+                    daily.append({"subject": str(subject_id), "part": part, "data": points})
+        charts.append(Chart(key=f"rhythm_{metric}", kind="line", unit=unit, series=rhythm))
+        charts.append(Chart(key=f"parts_{metric}", kind="box", unit=unit, series=parts))
+        if daily:
+            charts.append(
+                Chart(key=f"daily_{metric}", kind="line", unit=unit, series=daily, marks=marks)
+            )
+    restless = [
+        {
+            "subject": str(subject.id),
+            "data": [[_day_ms(day), minutes] for day, minutes, _ in nights],
+        }
+        for subject in subjects
+        if (nights := ((figures_of.get(subject.id) or {}).get("restless") or {}).get("nights"))
+    ]
+    if restless:
+        charts.append(Chart(key="restless", kind="line", unit="min", series=restless, marks=marks))
+    return charts
 
 
 def build_document(
@@ -371,13 +650,18 @@ def build_document(
     }
     rows: list[list[Any]] = []
     quality: list[list[Any]] = []
-    charts: list[Chart] = []
-    rhythm: list[dict[str, Any]] = []
+    part_rows: list[list[Any]] = []
+    event_rows: list[list[Any]] = []
+    main = {
+        subject.id: per_subject[(subject.id, "main")]
+        for subject in subjects
+        if (subject.id, "main") in per_subject
+    }
     for subject in subjects:
-        figures = per_subject.get((subject.id, "main"))
+        figures = main.get(subject.id)
         if figures is None:
             continue
-        summary["subjects"][str(subject.id)] = figures
+        summary["subjects"][str(subject.id)] = _stored(figures)
         rate = figures.get("heart_rate") or {}
         seen = figures.get("coverage") or {}
         rows.append(
@@ -388,7 +672,9 @@ def build_document(
                 rate.get("p10"),
                 rate.get("p90"),
                 (figures.get("hrv") or {}).get("median"),
+                (figures.get("activity") or {}).get("median"),
                 (figures.get("tag_temperature") or {}).get("median"),
+                (figures.get("restless") or {}).get("median_minutes"),
                 rate.get("n", 0),
             ]
         )
@@ -403,31 +689,34 @@ def build_document(
                 seen.get("longest_gap_hours"),
             ]
         )
-        for point in figures.get("by_hour", []):
-            rhythm.append(
-                {"subject": str(subject.id), "hour": point["hour"], "value": point["median"]}
-            )
-    if rhythm:
-        charts.append(
-            Chart(
-                key="rhythm",
-                kind="line",
-                unit="bpm",
-                series=[
-                    {
-                        "key": str(subject.id),
-                        "name": subject.name,
-                        "points": [
-                            [point["hour"], point["value"]]
-                            for point in rhythm
-                            if point["subject"] == str(subject.id)
-                        ],
-                    }
-                    for subject in subjects
-                    if any(p["subject"] == str(subject.id) for p in rhythm)
-                ],
-            )
-        )
+        for metric, block in figures.get("metrics", {}).items():
+            for part in PARTS:
+                shape = block["parts"].get(part)
+                if shape:
+                    part_rows.append(
+                        [
+                            subject.name,
+                            metric,
+                            part,
+                            shape["n"],
+                            shape["median"],
+                            shape["q1"],
+                            shape["q3"],
+                        ]
+                    )
+                change = (block.get("event") or {}).get(part)
+                if change:
+                    event_rows.append(
+                        [
+                            subject.name,
+                            metric,
+                            part,
+                            (change["before"] or {}).get("median"),
+                            (change["after"] or {}).get("median"),
+                            change["difference"],
+                        ]
+                    )
+    charts = metric_charts(subjects, main, params.event_at)
     tables = [
         Table(
             key="cardiac",
@@ -438,10 +727,18 @@ def build_document(
                 "Low (p10)",
                 "High (p90)",
                 "Median HRV (ms)",
+                "Median activity (score)",
                 "Median tag temperature (C)",
+                "Restless minutes per night",
                 "Readings",
             ],
             rows=rows,
+        ),
+        Table(
+            key="parts",
+            # keys rather than words: the page and the report name them from their labels
+            columns=["subject", "metric", "part", "readings", "median", "q1", "q3"],
+            rows=part_rows,
         ),
         Table(
             key="coverage",
@@ -457,8 +754,17 @@ def build_document(
             rows=quality,
         ),
     ]
+    if event_rows:
+        tables.insert(
+            2,
+            Table(
+                key="event",
+                columns=["subject", "metric", "part", "before", "after", "change"],
+                rows=event_rows,
+            ),
+        )
     comparison = {
-        str(subject.id): per_subject[(subject.id, "comparison")]
+        str(subject.id): _stored(per_subject[(subject.id, "comparison")])
         for subject in subjects
         if (subject.id, "comparison") in per_subject
     }
@@ -482,9 +788,26 @@ def build_document(
             input_count=input_count,
             excluded_count=excluded_count,
             computed_at=datetime.now(UTC),
-            sources=["measurements (cardiac tag, port 15)", "device_settings"],
+            sources=[
+                "measurements (cardiac tag, port 15)",
+                "device_settings",
+                "positions (where the sun is read)",
+            ],
         ),
     )
+
+
+def _stored(figures: dict[str, Any]) -> dict[str, Any]:
+    """A subject's figures as the summary keeps them: the charts already hold every hour and
+    date, so the summary keeps the boxes, the changes and the spreads rather than a second copy."""
+    out = dict(figures)
+    out["metrics"] = {
+        metric: {k: v for k, v in block.items() if k not in CHART_ONLY}
+        for metric, block in figures.get("metrics", {}).items()
+    }
+    if "restless" in out:
+        out["restless"] = {k: v for k, v in out["restless"].items() if k != "nights"}
+    return out
 
 
 def _settings(params: CardiacParameters) -> dict[str, Any]:
@@ -493,6 +816,10 @@ def _settings(params: CardiacParameters) -> dict[str, Any]:
         "quiet_hours": [params.quiet_from_hour, params.quiet_to_hour],
         "resting_quantile": params.resting_quantile,
         "minimum_readings": MIN_READINGS,
+        "day_and_night": "the sun at the subject's mean position; fixed hours "
+        f"{FALLBACK_DAY_HOURS[0]:02d}:00 to {FALLBACK_DAY_HOURS[1]:02d}:00 without one",
+        "restless_activity": params.restless_activity,
+        "event_at": params.event_at.isoformat() if params.event_at else None,
     }
 
 
@@ -597,10 +924,14 @@ class CardiacModule:
                 await ctx.progress(int(done * 90 / steps), f"{subject.name} ({period.key})")
                 readings, count = await load_readings(session, subject.id, period)
                 input_count += count
-                times = readings.array(HEART_RATE)[0]
-                offsets = zone_offsets(times, zone)
                 figures = subject_figures(
-                    readings, period, offsets, params, intervals.get(subject.id)
+                    readings,
+                    period,
+                    zone,
+                    params,
+                    intervals.get(subject.id),
+                    await subject_place(session, subject.id, period),
+                    params.event_at if period.key == "main" else None,
                 )
                 per_subject[(subject.id, period.key)] = figures
                 if period.key == "main":
@@ -608,7 +939,10 @@ class CardiacModule:
                 done += 1
 
         await ctx.progress(95, "writing the result")
-        excluded = sum(int(f.get("dropped_implausible", 0)) for f in per_subject.values())
+        excluded = sum(
+            int(f.get("dropped_implausible", 0)) + int(f.get("activity_faults", 0))
+            for f in per_subject.values()
+        )
         document = build_document(
             subjects, periods, per_subject, params, warnings, input_count, excluded
         )
@@ -622,6 +956,8 @@ __all__ = [
     "Spread",
     "build_document",
     "load_readings",
+    "metric_charts",
     "subject_figures",
+    "subject_place",
     "subject_warnings",
 ]

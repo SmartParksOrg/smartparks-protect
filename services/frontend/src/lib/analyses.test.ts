@@ -11,6 +11,8 @@ import {
   withGroupMembers,
   deviceSelection,
   devicePerformanceParameters,
+  eventInside,
+  farFromZero,
   intensityFeatures,
   isActive,
   isManagementUnit,
@@ -125,6 +127,8 @@ describe("analysis form state", () => {
       quietFrom: 22,
       quietTo: 4,
       quantile: 0.05,
+      event: null,
+      restless: 100,
     });
     // midnight is hour 0, which must survive the round trip as a real answer
     const midnight = readFormState(new URLSearchParams("entity=a&quiet_to=0"));
@@ -133,7 +137,9 @@ describe("analysis form state", () => {
   it("builds the cardiac parameters from the form", () => {
     const now = new Date("2026-09-22T10:00:00Z");
     const state = readFormState(
-      new URLSearchParams("entity=a&entity=b&range=7d&quiet_from=22&quiet_to=4"),
+      new URLSearchParams(
+        "entity=a&entity=b&range=7d&quiet_from=22&quiet_to=4",
+      ),
     );
     expect(cardiacParameters(state, now)).toMatchObject({
       entity_ids: ["a", "b"],
@@ -145,6 +151,38 @@ describe("analysis form state", () => {
     expect(
       cardiacParameters(readFormState(new URLSearchParams("range=7d")), now),
     ).toBeNull();
+  });
+  it("carries the event and the restless threshold, and knows an event outside the period", () => {
+    const now = new Date("2026-09-22T10:00:00Z");
+    const inside = readFormState(
+      new URLSearchParams(
+        "entity=a&range=7d&event=2026-09-20T08:00:00Z&restless=120",
+      ),
+    );
+    expect(cardiacParameters(inside, now)).toMatchObject({
+      event_at: "2026-09-20T08:00:00.000Z",
+      restless_activity: 120,
+    });
+    expect(eventInside(inside, now)).toBe(true);
+    expect(writeFormState(inside).get("restless")).toBe("120");
+    const before = readFormState(
+      new URLSearchParams("entity=a&range=7d&event=2026-08-01T08:00:00Z"),
+    );
+    expect(eventInside(before, now)).toBe(false);
+    // no event: nothing to be outside of, and no event in the parameters
+    const none = readFormState(new URLSearchParams("entity=a&range=7d"));
+    expect(eventInside(none, now)).toBe(true);
+    expect(cardiacParameters(none, now)).not.toHaveProperty("event_at");
+  });
+  it("lets a line far above zero read its own range", () => {
+    const line = (values: number[]) => ({
+      key: "rhythm_temperature",
+      kind: "line" as const,
+      series: [{ data: values.map((v, i) => [i, v] as [number, number]) }],
+    });
+    expect(farFromZero(line([36.5, 37.2, 38.1]))).toBe(true);
+    expect(farFromZero(line([2, 8, 30]))).toBe(false);
+    expect(farFromZero({ ...line([36, 37]), kind: "bar" })).toBe(false);
   });
   it("reads a subject's figures out of a nested summary", () => {
     const document = {

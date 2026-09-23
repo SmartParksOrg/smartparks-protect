@@ -56,16 +56,42 @@ export interface ResultChartSeries {
   /** Grazing: the area the series belongs to, and the herd when two are compared. */
   area?: string;
   herd?: string;
-  data?: [number | string, number | null][];
+  /** Cardiac: the part of the day a daily series is (day or night); a night is dashed. */
+  part?: string;
+  /** A value per x, or for a box plot the five numbers low, q1, median, q3 and high. */
+  data?: [number | string, number | number[] | null][];
   /** Contact tracing: a network has nodes and edges where every other chart has points. */
   nodes?: ResultNetworkNode[];
   edges?: ResultNetworkEdge[];
 }
+export interface ResultChartMark {
+  /** Epoch milliseconds on the time axis. */
+  at: number;
+  label: string;
+}
 export interface ResultChart {
   key: string;
-  kind: "line" | "bar" | "rose" | "stacked" | "network";
+  kind: "line" | "bar" | "rose" | "stacked" | "network" | "box";
   unit?: string | null;
   series: ResultChartSeries[];
+  /** Moments marked on a time axis, such as the event a cardiac run is read around. */
+  marks?: ResultChartMark[];
+}
+
+/** Whether every value of a line sits so far above zero that an axis from zero would flatten
+ * it, a body temperature for one; the report's `far_from_zero` in `report/charts.py` is the
+ * same rule, so a chart reads the same on the page and on paper. */
+export function farFromZero(chart: ResultChart): boolean {
+  if (chart.kind !== "line") return false;
+  const values = chart.series.flatMap((s) =>
+    (s.data ?? [])
+      .map((d) => d[1])
+      .filter((v): v is number => typeof v === "number"),
+  );
+  if (values.length === 0) return false;
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  return low > 0 && high - low < 0.25 * high;
 }
 export interface ResultDocument {
   version: number;
@@ -169,12 +195,19 @@ export interface CardiacOptions {
   /** The low quantile of those hours that is called resting. Not the minimum: one bad
    * reading would then be the answer. */
   quantile: number;
+  /** A moment inside the period to read every metric before and after (decision D289), as
+   * the datetime-local text of the form; null for none. */
+  event: string | null;
+  /** Activity above this is a restless moment at night, on the implant's 0 to 255 scale. */
+  restless: number;
 }
 
 export const DEFAULT_CARDIAC: CardiacOptions = {
   quietFrom: 0,
   quietTo: 5,
   quantile: 0.1,
+  event: null,
+  restless: 100,
 };
 
 export const DEFAULT_CONTACT: ContactOptions = {
@@ -240,9 +273,14 @@ export function readFormState(params: URLSearchParams): FormState {
     compare: params.get("compare"),
     run: params.get("run"),
     cardiac: {
-      quietFrom: numberOrZero(params.get("quiet_from"), DEFAULT_CARDIAC.quietFrom),
+      quietFrom: numberOrZero(
+        params.get("quiet_from"),
+        DEFAULT_CARDIAC.quietFrom,
+      ),
       quietTo: numberOrZero(params.get("quiet_to"), DEFAULT_CARDIAC.quietTo),
       quantile: numberOr(params.get("quantile"), DEFAULT_CARDIAC.quantile),
+      event: params.get("event"),
+      restless: numberOr(params.get("restless"), DEFAULT_CARDIAC.restless),
     },
     contact: {
       bluetooth: params.get("bluetooth") !== "0",
@@ -322,6 +360,9 @@ export function writeFormState(state: FormState): URLSearchParams {
     params.set("quiet_to", String(cd.quietTo));
   if (cd.quantile !== DEFAULT_CARDIAC.quantile)
     params.set("quantile", String(cd.quantile));
+  if (cd.event) params.set("event", cd.event);
+  if (cd.restless !== DEFAULT_CARDIAC.restless)
+    params.set("restless", String(cd.restless));
   const g = state.grazing;
   for (const id of g.areas) params.append("area", id);
   if (g.weighting !== "equal") params.set("weighting", g.weighting);
@@ -419,9 +460,22 @@ export function contactTracingParameters(
   };
 }
 
-/** The parameters the cardiac module takes (decision D284): the subjects, the period, and
- * how a resting heart rate is read; null while no subject is chosen or a custom range lacks
- * a date. */
+/** Whether the cardiac form's event date falls inside the period, which the module requires
+ * (decision D289); true when there is no event. */
+export function eventInside(state: FormState, now: Date = new Date()): boolean {
+  const event = state.cardiac.event;
+  const window = windowOf(state, now);
+  if (!event || !window) return true;
+  const at = new Date(event).getTime();
+  return (
+    at > new Date(window.time_from).getTime() &&
+    at < new Date(window.time_to).getTime()
+  );
+}
+
+/** The parameters the cardiac module takes (decisions D284 and D289): the subjects, the
+ * period, how a resting heart rate is read, the event to compare around and what counts as a
+ * restless night; null while no subject is chosen or a custom range lacks a date. */
 export function cardiacParameters(
   state: FormState,
   now: Date = new Date(),
@@ -437,6 +491,8 @@ export function cardiacParameters(
     quiet_from_hour: c.quietFrom,
     quiet_to_hour: c.quietTo,
     resting_quantile: c.quantile,
+    ...(c.event ? { event_at: new Date(c.event).toISOString() } : {}),
+    restless_activity: c.restless,
   };
 }
 
@@ -895,6 +951,8 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
       quietFrom: num("quiet_from_hour", DEFAULT_CARDIAC.quietFrom),
       quietTo: num("quiet_to_hour", DEFAULT_CARDIAC.quietTo),
       quantile: num("resting_quantile", DEFAULT_CARDIAC.quantile),
+      event: typeof p.event_at === "string" ? p.event_at : null,
+      restless: num("restless_activity", DEFAULT_CARDIAC.restless),
     },
     contact: {
       bluetooth: p.bluetooth !== false,
