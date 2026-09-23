@@ -10,7 +10,7 @@ import { LineChart } from "echarts/charts";
 import { GridComponent, TooltipComponent } from "echarts/components";
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useNow } from "@/hooks/useNow";
 import { useTheme } from "@/hooks/useTheme";
@@ -333,13 +333,21 @@ export function MetricTrend({
     staleTime: 60_000,
   });
   const scale = spec.scale ?? 1;
-  const points = (series.data?.series?.[0]?.points ?? []).map((p) => ({
-    time: p.time,
-    value: p.values.mean == null ? null : p.values.mean * scale,
-  }));
-  const values = points
-    .map((p) => p.value)
-    .filter((v): v is number => v != null);
+  // one array per answer, not per render: the chart is redrawn from it, and a redraw on every
+  // tick of the clock wiped the tooltip under a still mouse (Tim, 2026-09-23)
+  const points = useMemo(
+    () =>
+      (series.data?.series?.[0]?.points ?? []).map(
+        (p) =>
+          [
+            Date.parse(p.time),
+            p.values.mean == null ? null : p.values.mean * scale,
+          ] as [number, number | null],
+      ),
+    [series.data, scale],
+  );
+  const values = points.map((p) => p[1]).filter((v): v is number => v != null);
+  const bucketSeconds = series.data?.bucket_seconds;
   const decimals =
     spec.decimals ??
     decimalsFor(
@@ -390,13 +398,13 @@ export function MetricTrend({
       ) : (
         <>
           <Sparkline
-            points={points.map(
-              (p) => [Date.parse(p.time), p.value] as [number, number | null],
-            )}
+            points={points}
             timezone={timezone}
             spec={spec}
+            from={Date.parse(window.from)}
+            to={Date.parse(window.to)}
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex flex-wrap justify-between gap-x-3 text-xs text-muted-foreground">
             <span>
               {t("Low {{value}}", { value: show(Math.min(...values)) })}
             </span>
@@ -406,6 +414,15 @@ export function MetricTrend({
             <span>
               {t("Now {{value}}", { value: show(values[values.length - 1]) })}
             </span>
+            {bucketSeconds != null && bucketSeconds > 0 && (
+              // a longer period is read in coarser means, which is why its line is calmer
+              // and its extremes closer together than the week's (Tim, 2026-09-23)
+              <span>
+                {t("means per {{bucket}}", {
+                  bucket: formatDuration(bucketSeconds),
+                })}
+              </span>
+            )}
           </div>
         </>
       )}
@@ -427,15 +444,28 @@ function Sparkline({
   points,
   timezone,
   spec,
+  from,
+  to,
 }: {
   points: [number, number | null][];
   timezone: string;
   spec: TrendSpec;
+  /** The period asked for: the axis spans it whole, so a month with a week of readings
+   * shows the week at its end rather than stretched over the width (Tim, 2026-09-23). */
+  from: number;
+  to: number;
 }) {
   const { resolved } = useTheme();
   const dark = resolved === "dark";
   const container = useRef<HTMLDivElement | null>(null);
   const chart = useRef<echarts.ECharts | null>(null);
+  // the spec is built afresh by every caller's render; the chart follows its content, not its
+  // identity, or a redraw on every tick wipes the tooltip under a still mouse
+  const specKey = JSON.stringify(spec);
+  const specRef = useRef(spec);
+  useEffect(() => {
+    specRef.current = spec;
+  }, [spec]);
   useEffect(() => {
     if (!container.current) return;
     const instance = echarts.init(container.current, undefined, {
@@ -453,6 +483,7 @@ function Sparkline({
   useEffect(() => {
     const instance = chart.current;
     if (!instance) return;
+    const spec = specRef.current;
     const th = chartTheme(dark);
     const values = points
       .map((p) => p[1])
@@ -502,6 +533,8 @@ function Sparkline({
         },
         xAxis: {
           type: "time",
+          min: from,
+          max: to,
           axisLine: { lineStyle: { color: th.grid } },
           axisTick: { show: false },
           axisLabel: {
@@ -540,7 +573,7 @@ function Sparkline({
       },
       true,
     );
-  }, [points, timezone, dark, spec]);
+  }, [points, timezone, dark, specKey, from, to]);
   return (
     <div
       ref={container}

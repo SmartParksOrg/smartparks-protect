@@ -48,6 +48,9 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- A metric's trend on the Data tab lost its tooltip under a still mouse (Tim, 2026-09-23): the chart was redrawn on every tick of the page's clock. It is redrawn only when its data changes now. The 7 d and 30 d views also looked alike for a device with a week of readings, since the axis fitted the readings and the y axis tightened to the coarser means; the axis now spans the whole period asked for and the footer names the bucket ("means per 15 min").
+- The metrics table on the Data tab groups its rows by category, the animal's physiology first and the hardware last, sorted by name within a group.
+
 - A result table on a phone hid every column after the third, so the cardiac run's day, night and resting table showed three columns of names and nothing to scroll to (Tim, 2026-09-23). Result tables keep every column on a phone and scroll sideways.
 
 - The cardiac run's temperature warning was the wrong way round for an implant (seen on the first real run, 2026-09-23): it warned that the tag read ten degrees above the device, which is a living animal (the tag reads the body, the device the air on the neck). It now warns when the two read alike, which is a tag reading the same air as the device, off the animal.

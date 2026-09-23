@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMetricsByKey } from "@/hooks/useMetrics";
 import { useNow } from "@/hooks/useNow";
 import { formatAgo, formatTime } from "@/lib/format";
+import { CATEGORY_LABELS, groupMetrics } from "@/lib/metricGroups";
 import { trendSpecFor } from "@/lib/trend";
 
 const DAYS = 30;
@@ -110,69 +111,85 @@ export function MeasurementsCard({
               </tr>
             </thead>
             <tbody>
-              {summary.data.map((m) => {
-                const spec =
-                  m.value_type === "numeric" && trendDeviceId
-                    ? trendSpecFor(m.metric_key, metrics.get(m.metric_key), t)
-                    : null;
-                const unfolded = open === m.metric_key;
-                return (
-                  <FragmentRow key={m.metric_key}>
-                    <tr className="border-t">
-                      <td className="py-1">
-                        {spec ? (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
-                            aria-expanded={unfolded}
-                            title={
-                              unfolded
-                                ? t("Hide the trend")
-                                : t("Show the trend of {{metric}}", {
-                                    metric: m.label,
-                                  })
-                            }
-                            onClick={() =>
-                              setOpen(unfolded ? null : m.metric_key)
-                            }
-                          >
-                            {unfolded ? (
-                              <ChevronDown className="size-3.5" />
-                            ) : (
-                              <ChevronRight className="size-3.5" />
-                            )}
-                            {m.label}
-                          </button>
-                        ) : (
-                          m.label
-                        )}
-                      </td>
-                      <td className="tabular-nums">{show(m)}</td>
-                      <td
-                        className="hidden text-muted-foreground sm:table-cell"
-                        title={formatTime(m.time)}
-                      >
-                        {formatAgo(m.time, now)}
-                      </td>
-                      <td className="text-right tabular-nums">{m.count}</td>
-                    </tr>
-                    {unfolded && spec && trendDeviceId && (
-                      <tr>
-                        <td colSpan={4} className="pb-2">
-                          <div className="rounded-md border bg-muted/30 p-2">
-                            <MetricTrend
-                              projectId={projectId}
-                              deviceId={trendDeviceId}
-                              spec={spec}
-                              until={m.time}
-                            />
-                          </div>
+              {groupMetrics(
+                summary.data,
+                (key) => metrics.get(key)?.category,
+              ).flatMap(([category, rows]) => [
+                <tr key={`group-${category}`} className="border-t">
+                  <th
+                    colSpan={4}
+                    scope="rowgroup"
+                    className="pt-3 pb-1 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                  >
+                    {CATEGORY_LABELS[category]
+                      ? t(CATEGORY_LABELS[category])
+                      : category}
+                  </th>
+                </tr>,
+                ...rows.map((m) => {
+                  const spec =
+                    m.value_type === "numeric" && trendDeviceId
+                      ? trendSpecFor(m.metric_key, metrics.get(m.metric_key), t)
+                      : null;
+                  const unfolded = open === m.metric_key;
+                  return (
+                    <FragmentRow key={m.metric_key}>
+                      <tr className="border-t">
+                        <td className="py-1">
+                          {spec ? (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                              aria-expanded={unfolded}
+                              title={
+                                unfolded
+                                  ? t("Hide the trend")
+                                  : t("Show the trend of {{metric}}", {
+                                      metric: m.label,
+                                    })
+                              }
+                              onClick={() =>
+                                setOpen(unfolded ? null : m.metric_key)
+                              }
+                            >
+                              {unfolded ? (
+                                <ChevronDown className="size-3.5" />
+                              ) : (
+                                <ChevronRight className="size-3.5" />
+                              )}
+                              {m.label}
+                            </button>
+                          ) : (
+                            m.label
+                          )}
                         </td>
+                        <td className="tabular-nums">{show(m)}</td>
+                        <td
+                          className="hidden text-muted-foreground sm:table-cell"
+                          title={formatTime(m.time)}
+                        >
+                          {formatAgo(m.time, now)}
+                        </td>
+                        <td className="text-right tabular-nums">{m.count}</td>
                       </tr>
-                    )}
-                  </FragmentRow>
-                );
-              })}
+                      {unfolded && spec && trendDeviceId && (
+                        <tr>
+                          <td colSpan={4} className="pb-2">
+                            <div className="rounded-md border bg-muted/30 p-2">
+                              <MetricTrend
+                                projectId={projectId}
+                                deviceId={trendDeviceId}
+                                spec={spec}
+                                until={m.time}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </FragmentRow>
+                  );
+                }),
+              ])}
             </tbody>
           </table>
         )}
