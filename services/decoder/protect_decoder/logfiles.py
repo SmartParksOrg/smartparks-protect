@@ -5,15 +5,20 @@ splits it into frames, stores every frame as a source event on the channel's bui
 source (with the device known up front) and decodes it through the normal pipeline, in
 batches of one transaction each so a large flash dump shows progress and survives a restart.
 The row keeps the counts: frames in the file (`frames_total`, known from the split), frames
-done so far (`frames_done`, written after every batch, the progress the card shows), malformed
+done so far (`frames_done`, written after every batch, the progress the pages show), malformed
 frames, records found, new and known through another path, the log period and the firmware
-version seen. A re-decode reprocesses the frames that exist instead of storing them again.
+version seen. A batch ends at `LOG_FILE_BATCH_SIZE` frames or after `BATCH_SECONDS`, whichever
+comes first, so the progress moves every few seconds on a slow file and always counts frames whose
+records are committed. A re-decode reprocesses the frames that exist instead of storing them
+again.
 
 The file has its own trace (root `log_file`); every frame has the compact trace the ingest
 starts, as any other delivery.
 """
 
+import time
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -81,6 +86,27 @@ async def _existing_frames(session: AsyncSession, row: DeviceLogFile) -> list[So
         .order_by(SourceEvent.id)
     )
     return list(rows.all())
+
+
+#: A batch also ends after this many seconds. At the dev server's two frames a second a batch of
+#: 200 frames held the progress still for over a minute, which read as a stalled decode (Tim,
+#: 2026-09-23); a commit every few seconds costs nothing beside the decoding itself.
+BATCH_SECONDS = 3.0
+
+
+@dataclass
+class Pacer:
+    """When a batch is full: at `size` frames, or once `BATCH_SECONDS` have passed with at least
+    one frame done, so a batch always makes progress."""
+
+    size: int
+    count: int = 0
+    started: float = field(default_factory=time.monotonic)
+
+    def full(self) -> bool:
+        if self.count >= self.size:
+            return True
+        return self.count > 0 and time.monotonic() - self.started >= BATCH_SECONDS
 
 
 class Counters:
@@ -275,17 +301,20 @@ async def _process_new(
         frames = [f for f in frames if f.line not in done]
         counters.frames += len(done)
 
-    for start in range(0, len(frames), batch_size):
-        batch = frames[start : start + batch_size]
+    position = 0
+    while position < len(frames):
+        pacer = Pacer(batch_size)
         async with session_scope() as session:
             row = await session.get(DeviceLogFile, log_file_id)
             assert row is not None
-            stored: list[StoredEvent] = []
-            for frame in batch:
-                stored.append(await store_inbound(session, source, frame_message(row, frame)))
-            await session.flush()
             outcomes: list[Outcome] = []
-            for item in stored:
+            while position < len(frames) and not pacer.full():
+                item: StoredEvent = await store_inbound(
+                    session, source, frame_message(row, frames[position])
+                )
+                await session.flush()
+                position += 1
+                pacer.count += 1
                 event = item.source_event
                 if event.processing_status != ProcessingStatus.RECEIVED:
                     counters.add(None)
@@ -325,13 +354,17 @@ async def _reprocess(
             component="logfiles",
             user_actionable=True,
         )
-    for start in range(0, len(keys), batch_size):
-        batch = keys[start : start + batch_size]
+    position = 0
+    while position < len(keys):
+        pacer = Pacer(batch_size)
         async with session_scope() as session:
             row = await session.get(DeviceLogFile, log_file_id)
             assert row is not None
             outcomes: list[Outcome] = []
-            for event_id, ingested_at in batch:
+            while position < len(keys) and not pacer.full():
+                event_id, ingested_at = keys[position]
+                position += 1
+                pacer.count += 1
                 event = await session.get(SourceEvent, (event_id, ingested_at))
                 if event is None:
                     counters.add(None)

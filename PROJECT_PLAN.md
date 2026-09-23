@@ -1551,7 +1551,7 @@ Part b, network locations (D162 to D164):
 
 ---
 
-### Follow-ups after v2.9.0 (2026-09-20 and 2026-09-21)
+### Follow-ups after v2.9.0 (2026-09-20 to 2026-09-23)
 
 Work that came out of Tim's testing and belongs to no phase. All of it is on `main` and untagged.
 
@@ -1562,6 +1562,9 @@ Work that came out of Tim's testing and belongs to no phase. All of it is on `ma
 - [x] The project switcher and the search in the top bar (D276), with the project list wide enough for a name and its role (2026-09-21).
 - [x] A page older than the server says so, with a Reload beside it (D281) (2026-09-21).
 - [x] Tracks shown together are always in colours of their own, a group's settings are reachable without a hover, and the selected marker on the live map stands out (2026-09-21).
+- [x] The Entities page shows what the devices report (D286) (2026-09-23).
+- [x] The switch ports read by the port, so a trap's change sent with the status message's id decodes with a note (2026-09-23).
+- [x] Data coming in shows on the device and entity pages, and a log file's progress moves every few seconds (2026-09-23).
 
 ## Continuous work in every phase
 
@@ -2563,4 +2566,5 @@ Listed by the phase where they are first needed.
 - Checked: ruff, mypy, the shared and analysis suites (590), eslint, tsc, vitest (217), both catalogues, and a synthetic two-animal PDF rendered to pages and read. The API run test was extended (activity, the event, the 422) and runs in CI only, since Docker is off on this machine.
 - Left: P8, the Cardiac demo on dev reseeded with activity (the phase 34 seed carries none), then Tim reads a run.
 - Deployed at ca74e54 after one CI round (the API test counted 24 hourly activity zeros in a day whose 10:00 sighting carried no reading; 23 is right). The failed trap uplink of 2026-09-21 (source event 180781) was reprocessed at Tim's word and decoded. P8 seeded on dev: a week for Bison 7 through a raw log file, because a live channel files a record more than a day behind its delivery at the delivery time (D259), which would have collapsed the week onto today; hourly fixes in the same file give the sun a place. The run reads the seeded changes back (heart rate +6 bpm, variability +2.4 ms, daytime activity down, the nights restless after the event). The browser check found the daily charts' legend naming the animal by its id, since the cardiac chart layout had the fixed labels but not the subjects' names; fixed.
+- Tim: show on the device and entity pages that data is still being decoded, as the Data tab does, and the progress bar updates too rarely and looks stalled. The page polled every 3 s; the worker wrote `frames_done` once per batch of 200 frames, which at about two frames a second on dev is once every 100 s. Built: a batch also ends after `BATCH_SECONDS` (3 s, `Pacer` in `protect_decoder/logfiles.py`), so the count moves every few seconds and is committed with the records it counts; `useDecoding` and `DecodingNotice` put the file, its frames and a bar above the tabs of both pages (the entity page for every device tracking it today), with a way to the Data tab, poll every 3 s while decoding and every 30 s otherwise, and refresh the page when the last file finishes. Checked in a browser against dev with the log files read stubbed to a moving file.
 

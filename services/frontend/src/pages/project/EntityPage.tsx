@@ -50,6 +50,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
+import { useDecoding } from "@/hooks/useDecoding";
+import { DecodingNotice } from "@/components/devices/DecodingNotice";
 import { lastPositionsWindow } from "@/lib/positionsWindow";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
@@ -114,6 +116,12 @@ export function EntityPage() {
     [assignments.data],
   );
   const current = history.find((a) => !a.valid_to) ?? null;
+  // every device tracking the entity today, since each may be decoding a file of its own
+  const decoding = useDecoding(
+    history
+      .filter((a) => !a.valid_to)
+      .map((a) => ({ id: a.device_id, name: a.device_name })),
+  );
   const device = useQuery({
     queryKey: queryKeys.device(current?.device_id ?? ""),
     queryFn: () => api.get<Device>(`/api/v1/devices/${current?.device_id}`),
@@ -341,6 +349,10 @@ export function EntityPage() {
         <AttributionProgress
           active={attribution.active}
           failed={attribution.failed}
+        />
+        <DecodingNotice
+          decoding={decoding}
+          onOpen={tab === "data" ? undefined : () => setTab("data")}
         />
         {current && sp && beforeEntity > 0 && (
           <Callout kind="info">

@@ -62,6 +62,8 @@ import { ReportingCard } from "@/components/devices/ReportingCard";
 import { StaticPositionCard } from "@/components/devices/StaticPositionCard";
 import { DeviceSettingsTab } from "@/components/devices/DeviceSettingsTab";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
+import { useDecoding } from "@/hooks/useDecoding";
+import { DecodingNotice } from "@/components/devices/DecodingNotice";
 import { lastPositionsWindow } from "@/lib/positionsWindow";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
@@ -212,6 +214,7 @@ export function DevicePage() {
         : t("Nothing to recompute: the device has no records in that window"),
   });
   const d = device.data;
+  const decoding = useDecoding(deviceId ? [{ id: deviceId }] : []);
   const type = types.data?.items.find((t) => t.id === d?.device_type_id);
   const sp = span.data;
   const beforeProject = sp
@@ -377,6 +380,10 @@ export function DevicePage() {
         <AttributionProgress
           active={attribution.active}
           failed={attribution.failed}
+        />
+        <DecodingNotice
+          decoding={decoding}
+          onOpen={tab === "data" ? undefined : () => setTab("data")}
         />
         {sp &&
           (sp.clock_ahead?.positions ?? 0) +

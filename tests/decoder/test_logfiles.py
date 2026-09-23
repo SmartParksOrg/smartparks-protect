@@ -197,3 +197,39 @@ async def test_malformed_frames_are_counted_and_an_empty_file_fails(db, bus, wor
     await process_log_file(bus, empty.id)
     await db.refresh(empty)
     assert empty.status == LogFileStatus.FAILED and empty.error_code == ErrorCode.FILE_PARSE_FAILED
+
+
+def test_a_batch_ends_at_its_size_or_after_a_few_seconds(monkeypatch):
+    """The progress moves every few seconds on a slow file (Tim, 2026-09-23), and a batch
+    always takes at least one frame, so a short time bound never stalls the loop."""
+    import protect_decoder.logfiles as logfiles
+
+    pacer = logfiles.Pacer(size=3)
+    assert not pacer.full()
+    pacer.count = 3
+    assert pacer.full()
+    monkeypatch.setattr(logfiles, "BATCH_SECONDS", 0.0)
+    quick = logfiles.Pacer(size=200)
+    assert not quick.full()  # nothing done yet: the batch takes its first frame
+    quick.count = 1
+    assert quick.full()
+
+
+async def test_batches_cut_by_time_count_every_frame_once(db, bus, world, monkeypatch):
+    """With the time bound at zero every frame is a batch of its own, committed with its count;
+    the totals are the same as one batch would give."""
+    import protect_decoder.logfiles as logfiles
+
+    monkeypatch.setattr(logfiles, "BATCH_SECONDS", 0.0)
+    await _opencollar(db, world)
+    status = bytes.fromhex("04f40e0400a00095007f7f721444550000")
+    row = await _file(
+        db,
+        bus,
+        world,
+        [status, bytes.fromhex("04f40e0400")],
+        AcquisitionChannel.LOG_FILE,
+        "slow.txt",
+    )
+    assert row.status == LogFileStatus.COMPLETE
+    assert row.frames_total == 2 and row.frames_done == 2 and row.frames_failed == 1
