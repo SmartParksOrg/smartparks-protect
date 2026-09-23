@@ -48,6 +48,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- A result table on a phone hid every column after the third, so the cardiac run's day, night and resting table showed three columns of names and nothing to scroll to (Tim, 2026-09-23). Result tables keep every column on a phone and scroll sideways.
+
 - The cardiac run's temperature warning was the wrong way round for an implant (seen on the first real run, 2026-09-23): it warned that the tag read ten degrees above the device, which is a living animal (the tag reads the body, the device the air on the neck). It now warns when the two read alike, which is a tag reading the same air as the device, off the animal.
 
 - **Cardiac readings read out of a device's flash over LoRaWAN kept only one reading per download, dated the download** (found on the Baboon project, 2026-09-23). A port 29 download carries days of stored records on purpose, but the clock rule for live deliveries (D259) took every record more than a day behind its delivery for a broken clock and filed it at the delivery time, where the canonical key folded a frame's sightings into one. A stored stream now keeps the times its records were stored at, whatever channel carried it. Readings already filed that way are wrong and few; the frames are kept and can be decoded again.
