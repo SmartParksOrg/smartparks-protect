@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMetricsByKey } from "@/hooks/useMetrics";
 import { useNow } from "@/hooks/useNow";
-import { formatAgo, formatTime, scaledUnit } from "@/lib/format";
+import { formatAgo, formatMeasurement, formatTime } from "@/lib/format";
 import { CATEGORY_LABELS, groupMetrics } from "@/lib/metricGroups";
 import { trendSpecFor } from "@/lib/trend";
 
@@ -60,21 +60,12 @@ export function MeasurementsCard({
     enabled: Boolean(deviceId || entityId),
     refetchInterval: 60_000,
   });
+  // the measurement formatter: a duration in seconds as days and hours, a numbered unit
+  // multiplied out, a boolean as a word (Tim, 2026-09-23: the uptime read as seconds here)
   const show = (m: MetricSummary): string => {
     if (m.value === null || m.value === undefined) return "–";
     if (typeof m.value === "boolean") return m.value ? t("yes") : t("no");
-    if (typeof m.value === "number") {
-      const { factor, unit } = scaledUnit(m.unit);
-      const value = m.value * factor;
-      const text =
-        Math.abs(value) >= 100
-          ? value.toFixed(0)
-          : Number.isInteger(value)
-            ? String(value)
-            : value.toFixed(2);
-      return unit ? `${text} ${unit}` : text;
-    }
-    return String(m.value);
+    return formatMeasurement(m.value, m.unit);
   };
   return (
     <Card className={className}>
