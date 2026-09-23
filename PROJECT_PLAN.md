@@ -16,10 +16,10 @@ Living plan for building Smart Parks Protect from the concept architecture (`Sma
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 35 (the whole cardiac record, D287 to D290), built on 2026-09-23 except P8, the demo reseeded on dev after a deploy. Phase 34 (cardiac monitoring from a LINQII tag) was built and deployed on 2026-09-22; C8 waits for Tim's reading. Phases 32 and 33 are built and running on the dev server, each with items open. Migrations at 0049, decisions to D290. Nothing is tagged since v2.9.0 |
-| Latest release | v2.9.0 (2026-09-19) at 3cafb78. Everything after it is on `main` and untagged: phases 32 and 33, the Data explorer sweep, the Metrics table on the Data tabs, archive and delete a project (D267), the live map's saved view (D275), the top bar (D276) and the notice that a page is older than the server (D281). The dev server runs the newest commit, d135d93 of 2026-09-21, and CI is green on it |
-| Last session | 2026-09-23: the Entities page shows what the devices report (D286), the switch ports read by the port, then phase 35 (the whole cardiac record, D287 to D290) built; P8 on the dev server waits for a deploy |
-| Next item | Deploy phase 34 and seed the Cardiac demo (C8), then Tim reads it. Also waiting on him: the fence and trap work and the feature tools on the dev server, then tag v2.10.0. Open in the phases: C8, F8 (a real FenceEdge or TrapEdge reporting to dev), F9 (a trap's alert stays open when the door opens again), F10 (six metric keys still uncategorized), A6 to A8. Older threads: the proximity half of contact tracing is **not** field-proven (one bison pair, both reporting every 61 min, no ground truth, so two devices together with a known answer would settle it); the strategy classes rest on one resident animal and synthetic curves until a migrant or a disperser is tracked; a grazing run over months; contact chains over time (A met B, B later met C), which phase 31 deliberately left out; the phase 23 exit criteria still wait for Tim's reading; the hardening items noted in the review of 2026-09-19 |
+| Active phase | None planned. Phase 35 (the whole cardiac record, D287 to D290) is built, deployed and read on real data; phase 34's demo and phase 35's are read. Phases 32 and 33 keep open items (F8 to F10, A6 to A8). Migrations at 0049, decisions to D290. Nothing is tagged since v2.9.0 |
+| Latest release | v2.9.0 (2026-09-19) at 3cafb78. Everything after it is on `main` and untagged: phases 32 to 35 and the follow-ups of 2026-09-20 to 2026-09-23 (listed under "Follow-ups after v2.9.0"). The dev server runs the newest commit and CI is green on it |
+| Last session | 2026-09-23: the Entities page shows what the devices report (D286), the switch ports read by the port, phase 35 built and deployed, data coming in shown on the device and entity pages, the Baboon project's cardiac readings repaired (a flash stream keeps its times) and analysed on real data, the entity page offering the cardiac study, the temperature rule turned around, result tables and metric trends fixed on the phone and the Data tab |
+| Next item | Ask Tim. Candidates: tag v2.10.0 (a large Unreleased since v2.9.0); F8 (a real FenceEdge or TrapEdge reporting to dev), F9 (a trap's alert stays open when the door opens again), F10 (six metric keys still uncategorized); A6 (WDPA, SAM); the baboons' day and night by the sun need a position (a project-level place, or fixes from the devices); cardiac warnings in Dutch (`nl.py` has none). Older threads: the proximity half of contact tracing is **not** field-proven; the strategy classes rest on one resident animal; a grazing run over months; contact chains over time; the phase 23 exit criteria still wait for Tim's reading; the hardening notes of the 2026-09-19 review |
 | Blockers | Live verification: KPN LoRa, chirpstack-dev4 and LoRaNAM (grpc-web) are live; no uplink has come through chirpstack-dev4 since 2026-09-06 (SP051307 sends over KPN now); Cloudloop and Rock7 are connected to the dev server (2026-09-10) but no Iridium device has spoken since 2026-07-10, so a field message and a command wait; no LORIOT, Netmore, akenza, Gundi, AddaxAI Connect or Traccar account in use yet, and no OpenCollar with BLE at hand; deep link paths for Netmore, akenza, Traccar, AddaxAI Connect and Cloudloop are guesses until seen live |
 
 ## What we are building
@@ -1320,9 +1320,9 @@ that question: not who an animal met, but how its heart was doing while it did.
       (2026-09-22).
 - [x] C7 docs: `docs/devices/cardiac-monitoring.md`, `docs/analytics/cardiac.md`, the driver row,
       `DEVELOPERS.md`, the changelog, ADR 0037 (2026-09-22).
-- [ ] C8 the dev server: a Cardiac demo project seeded through the real decoder (D285). The
-      script is written and waits for a deploy, since no server runs the phase 34 decoder
-      yet; then Tim's own device when a LINQII reports.
+- [x] C8 the dev server: a Cardiac demo project seeded through the real decoder (D285) on
+      2026-09-22, a week for Bison 7 added on 2026-09-23 and read by Tim ("looks good for
+      now"); real LINQII data followed the same day in the Baboon project (see phase 35).
 
 **Exit criteria.** Those of the design document's section 6.
 
@@ -1342,7 +1342,7 @@ that question: not who an animal met, but how its heart was doing while it did.
 - [x] P5 the report's cardiac section (2026-09-23)
 - [x] P6 tests (2026-09-23)
 - [x] P7 docs (2026-09-23)
-- [ ] P8 the dev server: the demo reseeded with activity (the phase 34 seed carries none), then Tim reads a run (seeded on 2026-09-23: a simulated week for Bison 7 in Cardiac demo, 14 to 21 September, uploaded as a log file with hourly fixes around the Kraansvlak, the assignments moved back to 13 September; the shared run "Bison 7, a week around an event (simulated)" eebcf9ce; left: Tim reads it)
+- [x] P8 the dev server: the demo reseeded with activity (the phase 34 seed carries none), then Tim reads a run (seeded on 2026-09-23: a simulated week for Bison 7 in Cardiac demo, 14 to 21 September, uploaded as a log file with hourly fixes around the Kraansvlak, the assignments moved back to 13 September; the shared run "Bison 7, a week around an event (simulated)" eebcf9ce; read by Tim the same day, and the module then ran on real LINQII data in the Baboon project: \"SP060573, 8 to 23 September\")
 
 **Exit criteria.** Those of the design document's section 8.4.
 
@@ -1565,6 +1565,10 @@ Work that came out of Tim's testing and belongs to no phase. All of it is on `ma
 - [x] The Entities page shows what the devices report (D286) (2026-09-23).
 - [x] The switch ports read by the port, so a trap's change sent with the status message's id decodes with a note (2026-09-23).
 - [x] Data coming in shows on the device and entity pages, and a log file's progress moves every few seconds (2026-09-23).
+- [x] A flash stream read out over the air keeps its records' times (the clock rule D259 folded the baboons' port 29 downloads onto the download time); the Baboon project's cardiac readings repaired and re-attributed on dev (2026-09-23).
+- [x] The entity page offers "Analyse heart" when the animal's metrics of the last thirty days hold a heart rate, and its card's last seen falls back to the device (2026-09-23).
+- [x] The cardiac temperature warning is for a tag reading the air (the two alike), not for the body against the air (2026-09-23).
+- [x] Result tables keep every column on a phone and scroll; a metric's trend keeps its tooltip, spans the period asked for and names its bucket; the metrics table is grouped by category; a numbered unit ("10 ms") is multiplied out at display (2026-09-23).
 
 ## Continuous work in every phase
 

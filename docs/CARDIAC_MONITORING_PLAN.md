@@ -199,7 +199,7 @@ fell back to the movement module's labels, key figures and limitations until now
       API.
 - [x] P7 docs: `docs/analytics/cardiac.md`, `docs/devices/cardiac-monitoring.md` (activity is a
       score now), `DEVELOPERS.md`, the changelog, the plan.
-- [ ] P8 the dev server: the Cardiac demo reseeded with activity, then Tim reads a run.
+- [x] P8 the dev server: the Cardiac demo reseeded with activity on 2026-09-23 and read by Tim; real LINQII data in the Baboon project followed the same day (the flash-stream repair in the plan's session log).
 
 ### 8.4 Exit criteria
 
