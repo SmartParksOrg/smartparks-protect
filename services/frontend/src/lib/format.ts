@@ -114,17 +114,33 @@ export function formatDuration(seconds: number): string {
   return `${total} s`;
 }
 
+/** A unit with a number in front is a scale the device counts in ("10 ms": the cardiac tag
+ * sends its R-R median in tens of milliseconds). A reader wants the plain unit, so the value
+ * is multiplied out at display and the unit loses its number (Tim, 2026-09-23). Any other
+ * unit passes through with a factor of one. */
+export function scaledUnit(unit: string | null | undefined): {
+  factor: number;
+  unit: string | null;
+} {
+  const match = unit?.match(/^(\d+(?:\.\d+)?)\s+(\S.*)$/);
+  if (!match) return { factor: 1, unit: unit ?? null };
+  return { factor: Number(match[1]), unit: match[2] };
+}
+
 /** A measurement with its unit, durations spelled out; the unit is part of the text. */
 export function formatMeasurement(
   value: unknown,
-  unit: string | null | undefined,
+  rawUnit: string | null | undefined,
 ): string {
+  const scaled = scaledUnit(rawUnit);
+  const unit = scaled.unit;
   if (typeof value === "number" && unit === "s") return formatDuration(value);
   if (typeof value !== "number") return String(value ?? "");
-  const text = Number.isInteger(value)
-    ? String(value)
-    : Math.abs(value) >= 100
-      ? value.toFixed(1)
-      : value.toFixed(2);
+  const number = value * scaled.factor;
+  const text = Number.isInteger(number)
+    ? String(number)
+    : Math.abs(number) >= 100
+      ? number.toFixed(1)
+      : number.toFixed(2);
   return unit ? `${text} ${unit}` : text;
 }

@@ -1,4 +1,5 @@
 import type { Metric } from "@/api/types";
+import { scaledUnit } from "@/lib/format";
 
 /** What one trend shows: the metric, its words and how its axis is stepped. */
 export interface TrendSpec {
@@ -126,10 +127,13 @@ export function trendSpecFor(
   const special = SPECIAL[key];
   if (special) return special(t);
   if (!metric || metric.value_type !== "numeric") return null;
+  // a unit with a number in front ("10 ms") is read out in the plain unit
+  const { factor, unit } = scaledUnit(metric.unit);
   return {
     metric: metric.key,
     label: metric.label,
-    unit: metric.unit ?? "",
+    unit: unit ?? "",
+    ...(factor !== 1 ? { scale: factor } : {}),
     ariaLabel: t("{{metric}} over the period", { metric: metric.label }),
   };
 }

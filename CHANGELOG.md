@@ -49,6 +49,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 ### Fixed
 
 - A metric's trend on the Data tab lost its tooltip under a still mouse (Tim, 2026-09-23): the chart was redrawn on every tick of the page's clock. It is redrawn only when its data changes now. The 7 d and 30 d views also looked alike for a device with a week of readings, since the axis fitted the readings and the y axis tightened to the coarser means; the axis now spans the whole period asked for and the footer names the bucket ("means per 15 min").
+- A unit with a number in front, the cardiac tag's R-R median in "10 ms", is multiplied out at display and reads in the plain unit ("520 ms" rather than "52 10 ms") in the metrics table, its trend and the measurement formatter (Tim, 2026-09-23).
 - The metrics table on the Data tab groups its rows by category, the animal's physiology first and the hardware last, sorted by name within a group.
 
 - A result table on a phone hid every column after the third, so the cardiac run's day, night and resting table showed three columns of names and nothing to scroll to (Tim, 2026-09-23). Result tables keep every column on a phone and scroll sideways.

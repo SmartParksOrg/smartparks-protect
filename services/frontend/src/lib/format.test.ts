@@ -24,7 +24,7 @@ describe("formatTimeShort", () => {
   });
 });
 
-import { formatDuration, formatMeasurement } from "./format";
+import { formatDuration, formatMeasurement, scaledUnit } from "./format";
 
 describe("durations", () => {
   it("spells seconds out as days, hours, minutes", () => {
@@ -47,13 +47,24 @@ describe("the 24 hour clock", () => {
   const evening = "2026-09-18T19:05:00Z";
   it("never writes AM or PM, whatever the browser's locale", () => {
     expect(formatTime(evening)).not.toMatch(/[AP]M/i);
-    expect(formatTimeShort(evening, new Date("2026-09-20T12:00:00Z"))).not.toMatch(
-      /[AP]M/i,
-    );
+    expect(
+      formatTimeShort(evening, new Date("2026-09-20T12:00:00Z")),
+    ).not.toMatch(/[AP]M/i);
   });
 
   it("writes the evening hour as 19 or later, not as 7", () => {
     // whatever zone the test machine is in, an evening in UTC is never hour 7 on a 24 hour clock
     expect(formatTime(evening)).toMatch(/\b(1[0-9]|2[0-3]|0[0-9]):05:00\b/);
+  });
+});
+
+describe("scaledUnit", () => {
+  it("multiplies a numbered unit out and keeps the plain one", () => {
+    expect(scaledUnit("10 ms")).toEqual({ factor: 10, unit: "ms" });
+    expect(scaledUnit("0.5 °C")).toEqual({ factor: 0.5, unit: "°C" });
+    expect(scaledUnit("bpm")).toEqual({ factor: 1, unit: "bpm" });
+    expect(scaledUnit(null)).toEqual({ factor: 1, unit: null });
+    // the cardiac tag's R-R median arrives in tens of milliseconds and reads as milliseconds
+    expect(formatMeasurement(52, "10 ms")).toBe("520 ms");
   });
 });

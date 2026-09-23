@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMetricsByKey } from "@/hooks/useMetrics";
 import { useNow } from "@/hooks/useNow";
-import { formatAgo, formatTime } from "@/lib/format";
+import { formatAgo, formatTime, scaledUnit } from "@/lib/format";
 import { CATEGORY_LABELS, groupMetrics } from "@/lib/metricGroups";
 import { trendSpecFor } from "@/lib/trend";
 
@@ -64,13 +64,15 @@ export function MeasurementsCard({
     if (m.value === null || m.value === undefined) return "–";
     if (typeof m.value === "boolean") return m.value ? t("yes") : t("no");
     if (typeof m.value === "number") {
+      const { factor, unit } = scaledUnit(m.unit);
+      const value = m.value * factor;
       const text =
-        Math.abs(m.value) >= 100
-          ? m.value.toFixed(0)
-          : Number.isInteger(m.value)
-            ? String(m.value)
-            : m.value.toFixed(2);
-      return m.unit ? `${text} ${m.unit}` : text;
+        Math.abs(value) >= 100
+          ? value.toFixed(0)
+          : Number.isInteger(value)
+            ? String(value)
+            : value.toFixed(2);
+      return unit ? `${text} ${unit}` : text;
     }
     return String(m.value);
   };
