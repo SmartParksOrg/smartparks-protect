@@ -1342,7 +1342,7 @@ that question: not who an animal met, but how its heart was doing while it did.
 - [x] P5 the report's cardiac section (2026-09-23)
 - [x] P6 tests (2026-09-23)
 - [x] P7 docs (2026-09-23)
-- [ ] P8 the dev server: the demo reseeded with activity (the phase 34 seed carries none), then Tim reads a run
+- [ ] P8 the dev server: the demo reseeded with activity (the phase 34 seed carries none), then Tim reads a run (seeded on 2026-09-23: a simulated week for Bison 7 in Cardiac demo, 14 to 21 September, uploaded as a log file with hourly fixes around the Kraansvlak, the assignments moved back to 13 September; the shared run "Bison 7, a week around an event (simulated)" eebcf9ce; left: Tim reads it)
 
 **Exit criteria.** Those of the design document's section 8.4.
 
@@ -2562,4 +2562,5 @@ Listed by the phase where they are first needed.
 - Built P1 to P7: the primitives (`box`, `daylight`, `part_masks`, `daily_medians`, `restless_nights`, `before_after` and helpers), the module (`metric_block`, `subject_place`, `metric_charts`, `event_at` refused outside the period at validation, `restless_activity`), the `box` chart kind and chart `marks` on the page and in the report, the page's own chart layout (`CardiacCharts.tsx`, a metric to a row), the form's event and threshold, the cards, labels and Dutch, the report's cardiac section, migration 0049 for the activity metric's description, the docs.
 - Checked: ruff, mypy, the shared and analysis suites (590), eslint, tsc, vitest (217), both catalogues, and a synthetic two-animal PDF rendered to pages and read. The API run test was extended (activity, the event, the 422) and runs in CI only, since Docker is off on this machine.
 - Left: P8, the Cardiac demo on dev reseeded with activity (the phase 34 seed carries none), then Tim reads a run.
+- Deployed at ca74e54 after one CI round (the API test counted 24 hourly activity zeros in a day whose 10:00 sighting carried no reading; 23 is right). The failed trap uplink of 2026-09-21 (source event 180781) was reprocessed at Tim's word and decoded. P8 seeded on dev: a week for Bison 7 through a raw log file, because a live channel files a record more than a day behind its delivery at the delivery time (D259), which would have collapsed the week onto today; hourly fixes in the same file give the sun a place. The run reads the seeded changes back (heart rate +6 bpm, variability +2.4 ms, daytime activity down, the nights restless after the event). The browser check found the daily charts' legend naming the animal by its id, since the cardiac chart layout had the fixed labels but not the subjects' names; fixed.
 

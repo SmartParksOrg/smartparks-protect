@@ -25,6 +25,11 @@ export function CardiacCharts({
   colors: Record<string, string>;
 }) {
   const { t } = useTranslation();
+  // a series names its subject by id; the legend says the animal's name
+  const named: Record<string, string> = {
+    ...labels,
+    ...Object.fromEntries(document.subjects.map((s) => [s.id, s.name])),
+  };
   const byKey = new Map(document.charts.map((c) => [c.key, c]));
   const card = (chart: ResultChartData) => (
     <Card key={chart.key} className="min-w-0">
@@ -36,7 +41,7 @@ export function CardiacCharts({
       <CardContent>
         <ResultChart
           chart={chart}
-          labels={labels}
+          labels={named}
           colorOf={(s) => (s.subject ? (colors[s.subject] ?? null) : null)}
         />
       </CardContent>
