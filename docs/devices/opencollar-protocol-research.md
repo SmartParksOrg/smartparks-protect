@@ -349,6 +349,8 @@ Port 19, state change (immediate): `98 05 [activity u8: 1 became active, 0 becam
 
 Port 20, periodic status every `external_switch_detection_reporting_interval` (0x81): `99 05 [state u8] [count u32 LE]`. When state is 0 or 1 the count is the number of inactive to active transitions in the interval (`num_of_active_detections`). When state is 2 the device is in impulse counter mode (`external_switch_counter_enabled` 0x85) and the count is `impulse_count`.
 
+The port decides which of the two a frame is, as the reference decoder does, which never reads the id byte. A TrapEdge on 6.15 (SP052048, 2026-09-21) sent `99 05 00 65 f1 30 29` on port 19: as a status its count is 691 million transitions, as a change it is eight days of inactivity. The driver reads it as the port says and notes the id on the trace; any other id on these ports still fails.
+
 ### 3.16 FPort 21, msg 0x9A: air quality (RangerEdge AirQ special firmware)
 
 Source: `ttn_decoder.js decodeAirQualityMessage`, `app/src/sensors/air_quality/README.md`. Data are IEEE 754 float32 little-endian.

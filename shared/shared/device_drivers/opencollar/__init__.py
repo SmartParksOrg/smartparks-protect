@@ -98,6 +98,10 @@ KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
     27: (0x91, None),
     28: (0x90, None),
 }
+
+# The two external switch messages (research 3.15): the port says which one a frame is.
+SWITCH_PORTS = {PORT_SWITCH_CHANGE: 0x98, PORT_SWITCH_STATUS: 0x99}
+
 NOT_CANONICAL_PORTS = {1, 5, 6, 9, 10, 27, 28}
 PORT_BLE_SCAN_AGGREGATED = 7  # msg 0xF9, the buffer the device summarised (research 3.7)
 #: How many octets of an address a scan reports, and so how much of a MAC can ever be matched.
@@ -803,7 +807,15 @@ class OpenCollarDriver:
         if len(frame) < 2:
             raise _fail("frame shorter than the two byte header", port=port)
         msg_id, length = frame[0], frame[1]
-        if expected_id is not None and msg_id != expected_id:
+        if port in SWITCH_PORTS and msg_id in SWITCH_PORTS.values() and msg_id != expected_id:
+            # The port decides between the two switch messages, as the reference decoder does:
+            # a TrapEdge on 6.15 sent a state change on port 19 with the status message's id
+            # (SP052048, 2026-09-21), whose count would have read 691 million transitions and
+            # whose duration reads eight days. Both share the header and the length.
+            records.notes.append(
+                f"message id 0x{msg_id:02X} on port {port}, read as port {port} (0x{expected_id:02X})"
+            )
+        elif expected_id is not None and msg_id != expected_id:
             raise _fail(
                 f"message id 0x{msg_id:02X} does not belong on port {port} (expected 0x{expected_id:02X})",
                 port=port,

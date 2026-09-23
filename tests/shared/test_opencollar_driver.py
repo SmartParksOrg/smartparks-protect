@@ -178,6 +178,18 @@ def test_switch_timestamp_and_command_confirmation():
     assert confirm.states[0].state["last_command"] == {"id": 0xA4, "executed": True}
 
 
+def test_the_port_decides_between_the_switch_messages():
+    """A TrapEdge on 6.15 sent a state change on port 19 with the status message's id
+    (SP052048, 2026-09-21); read as the port says, it is eight days of inactivity, as the
+    reference decoder reads it. Any other id on the switch ports still fails."""
+    records = driver.decode(event(19, "99050065f13029"))
+    assert records.events[0].event_type == "switch_deactivated"
+    assert records.events[0].context["previous_period_seconds"] == 691073.381
+    assert records.notes == ["message id 0x99 on port 19, read as port 19 (0x98)"]
+    with pytest.raises(ApplicationError):
+        driver.decode(event(19, "92050065f13029"))
+
+
 def test_unknown_and_legacy_ports_are_notes_not_failures():
     """A port the catalogue does not know (research 3.23) keeps the source event and says so
     on the trace; a KPN device on firmware 6.x still sends the Modem-E message on port 199."""
