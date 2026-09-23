@@ -199,7 +199,8 @@ async def test_a_cardiac_run_over_a_day_of_readings(client, db):
 
     # phase 35: the activity with its hourly 0s set aside, the parts of the day by the clock
     # (the entity has no position to read the sun at), the restless nights and the event
-    assert figures["activity_faults"] == 24
+    # a 0 at the top of every hour but 10:00, the sighting that carried no reading at all
+    assert figures["activity_faults"] == 23
     activity = figures["metrics"]["activity"]["parts"]
     assert activity["day"]["median"] == 210.0 and activity["night"]["median"] == 25.0
     assert figures["day_night_from"] == "fixed hours"
