@@ -8,16 +8,18 @@ sees a message whose row is not committed yet.
 
 import json
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, cast
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from sqlalchemy import CursorResult, select, update
+from sqlalchemy import CursorResult, Select, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared import reprocessing
 from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
 from shared.connectivity.base import (
@@ -543,22 +545,86 @@ async def commit_and_publish(
 
 RETAINED = (ProcessingStatus.UNASSIGNED, ProcessingStatus.FAILED, ProcessingStatus.IGNORED)
 
+#: A reception's time is the network's clock, the event's `ingested_at` ours; on dev the two
+#: sit up to 71 minutes apart (KPN, 2026-09-24). A day on either side keeps every reception of
+#: an event inside the window that prunes the chunks and the compressed batches.
+RECEPTION_WINDOW = timedelta(days=1)
 
-async def link_receptions(session: AsyncSession, identity: ExternalIdentity) -> int:
-    """Receptions stored while the identity was unknown carry no device; give them the device
-    their source event has now, so the gateway layer and the coverage see those uplinks."""
+#: One reception without a device: its id, its time and the gateway that made it.
+ReceptionRef = tuple[int, datetime, str]
+
+
+def retained_events(identity: ExternalIdentity) -> Select[tuple[int, datetime]]:
+    """The source events of a linked identity that wait for the decoder's walk (decision D121):
+    unassigned, failed or ignored, oldest first. Named by the source and the external id, which
+    the events' index leads with, so a busy source is not scanned for one identity."""
+    return (
+        select(SourceEvent.id, SourceEvent.ingested_at)
+        .where(
+            SourceEvent.data_source_id == identity.data_source_id,
+            SourceEvent.external_id == identity.external_id,
+            SourceEvent.external_identity_id == identity.id,
+            SourceEvent.processing_status.in_(RETAINED),
+        )
+        .order_by(SourceEvent.ingested_at, SourceEvent.id)
+    )
+
+
+async def unlinked_receptions(
+    session: AsyncSession, events: Sequence[tuple[int, datetime]]
+) -> dict[tuple[int, datetime], list[ReceptionRef]]:
+    """The receptions without a device of these source events, keyed by the event. Receptions
+    stored while the identity was unknown carry no device; the walk gives them the device their
+    event gets, so the gateway layer and the coverage see those uplinks. Read over the events'
+    time window, so the chunks and the compressed batches outside it are never opened."""
+    if not events:
+        return {}
+    lo = min(ingested_at for _, ingested_at in events) - RECEPTION_WINDOW
+    hi = max(ingested_at for _, ingested_at in events) + RECEPTION_WINDOW
+    rows = await session.execute(
+        select(
+            GatewayReception.id,
+            GatewayReception.time,
+            GatewayReception.gateway_id,
+            GatewayReception.source_event_id,
+            GatewayReception.source_event_ingested_at,
+        ).where(
+            GatewayReception.device_id.is_(None),
+            GatewayReception.source_event_id.in_([event_id for event_id, _ in events]),
+            GatewayReception.time >= lo,
+            GatewayReception.time <= hi,
+        )
+    )
+    found: dict[tuple[int, datetime], list[ReceptionRef]] = {}
+    for reception_id, time, gateway_id, event_id, ingested_at in rows:
+        found.setdefault((int(event_id), ingested_at), []).append(
+            (int(reception_id), time, str(gateway_id))
+        )
+    return found
+
+
+async def link_event_receptions(
+    session: AsyncSession, device_id: uuid.UUID, receptions: Sequence[ReceptionRef]
+) -> int:
+    """Give these receptions the device. Each is named by its gateway, its time and its id, so
+    in a compressed chunk only the batch that holds it is decompressed. A statement that joined
+    the receptions to an identity's source events had no such bound: TimescaleDB decompressed
+    the whole table to run it and stopped at its limit of 100,000 tuples per transaction, which
+    is the 500 of 2026-09-24."""
+    if not receptions:
+        return 0
     result = cast(
         "CursorResult[Any]",
         await session.execute(
             update(GatewayReception)
             .where(
                 GatewayReception.device_id.is_(None),
-                GatewayReception.source_event_id == SourceEvent.id,
-                GatewayReception.source_event_ingested_at == SourceEvent.ingested_at,
-                SourceEvent.external_identity_id == identity.id,
-                SourceEvent.device_id.is_not(None),
+                GatewayReception.gateway_id.in_({gateway for _, _, gateway in receptions}),
+                GatewayReception.time >= min(time for _, time, _ in receptions),
+                GatewayReception.time <= max(time for _, time, _ in receptions),
+                GatewayReception.id.in_([reception_id for reception_id, _, _ in receptions]),
             )
-            .values(device_id=SourceEvent.device_id)
+            .values(device_id=device_id)
         ),
     )
     return int(result.rowcount or 0)
@@ -568,31 +634,20 @@ async def queue_identity_reprocess(
     session: AsyncSession, bus: RedisStreamsBus, identity: ExternalIdentity
 ) -> int:
     """Hand the retained source events of a linked identity to the decoder (decision D121):
-    every unassigned, failed or ignored event gets the device and the received status in one
-    statement, the receptions of the same uplinks get the device too, and one message asks the
-    decoder to walk them in order. Returns how many events wait; the caller has committed the
-    link, this commits the queue before the message goes out."""
+    count them, start the walk's progress entry for the summary, and publish one message. The
+    decoder walks the events oldest first and gives each one and its receptions the device as
+    it decodes it, one commit per event. Nothing here writes to a hypertable: one statement
+    over an identity's whole history decompresses every compressed batch of its source (64,564
+    tuples for one KPN identity on dev on 2026-09-24) and TimescaleDB stops a transaction at
+    100,000. Returns how many events wait."""
     if identity.device_id is None:
         raise ValueError("The identity has no device")
-    result = cast(
-        "CursorResult[Any]",
-        await session.execute(
-            update(SourceEvent)
-            .where(
-                SourceEvent.external_identity_id == identity.id,
-                SourceEvent.processing_status.in_(RETAINED),
-            )
-            .values(
-                device_id=identity.device_id,
-                processing_status=ProcessingStatus.RECEIVED,
-                error_code=None,
-            )
-        ),
+    queued = int(
+        await session.scalar(select(func.count()).select_from(retained_events(identity).subquery()))
+        or 0
     )
-    queued = int(result.rowcount or 0)
-    await link_receptions(session, identity)
-    await session.commit()
     if queued:
+        await reprocessing.start_walk(bus.redis, identity.id, identity.device_id, queued)
         await bus.publish(
             Topic.IDENTITY_REPROCESS_REQUESTED,
             {

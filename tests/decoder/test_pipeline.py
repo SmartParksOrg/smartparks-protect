@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 
 from protect_decoder.main import build_worker
 from protect_decoder.pipeline import process_source_event, publish_outcome
+from shared import reprocessing
 from shared.bus import Message, RedisStreamsBus, Topic
 from shared.enums import AcquisitionChannel, ErrorCode, ProcessingStatus, TraceStatus
 from shared.ingest import commit_and_publish, store_inbound
@@ -250,14 +251,18 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
     await db.commit()
     identity_id = identity.id
     assert await queue_identity_reprocess(db, bus, identity) == 3
-    statuses = (
-        await db.scalars(
-            select(SourceEvent.processing_status).where(
+    # nothing is marked up front: the rows are written once, by the walk, with their outcome
+    rows = (
+        await db.execute(
+            select(SourceEvent.processing_status, SourceEvent.device_id).where(
                 SourceEvent.external_identity_id == identity_id
             )
         )
     ).all()
-    assert set(statuses) == {ProcessingStatus.RECEIVED}
+    assert {s for s, _ in rows} == {ProcessingStatus.UNASSIGNED}
+    assert all(d is None for _, d in rows)
+    walk = next(w for w in await reprocessing.walks(bus.redis) if w.identity_id == identity_id)
+    assert (walk.total, walk.done, walk.device_id) == (3, 0, world.device.id)
 
     worker = build_worker()
     worker.bus = bus
@@ -270,14 +275,15 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
     )
     device_id = world.device.id
     db.expire_all()
-    statuses = (
-        await db.scalars(
-            select(SourceEvent.processing_status).where(
-                SourceEvent.external_identity_id == identity_id
-            )
+    rows = (
+        await db.execute(
+            select(SourceEvent.processing_status, SourceEvent.device_id)
+            .where(SourceEvent.external_identity_id == identity_id)
+            .order_by(SourceEvent.ingested_at)
         )
     ).all()
-    assert statuses == [ProcessingStatus.PROCESSED] * 3
+    assert rows == [(ProcessingStatus.PROCESSED, device_id)] * 3
+    assert all(w.identity_id != identity_id for w in await reprocessing.walks(bus.redis))
     positions = (
         await db.scalars(
             select(Position.time)
@@ -289,6 +295,91 @@ async def test_identity_walker_processes_the_retained_events_in_order(db, bus, w
         )
     ).all()
     assert [p.day for p in positions] == [13, 14, 15]
+
+
+async def test_identity_walker_links_receptions_and_passes_a_failing_event(db, bus, world):
+    """The receptions stored while the identity was unknown get the device with their event,
+    named one by one rather than through a join over the table (the 500 of 2026-09-24), and a
+    failing event in the middle is marked failed while the rest are decoded and the walk ends."""
+    from shared.connectivity.base import GatewayReceptionData
+    from shared.ingest import queue_identity_reprocess
+    from shared.models import GatewayReception
+
+    unknown_id = uuid.uuid4().hex[:16].upper()
+    payloads = [
+        {"time": "2026-04-01T00:00:00+00:00", "lat": -24.6, "lon": 31.2},
+        {"time": "not a time", "lat": -24.6, "lon": 31.2},
+        {"time": "2026-04-03T00:00:00+00:00", "lat": -24.6, "lon": 31.2},
+    ]
+    events = []
+    for payload in payloads:
+        one = await store_inbound(
+            db,
+            world.source,
+            inbound(
+                unknown_id,
+                payload,
+                gateway_receptions=[
+                    GatewayReceptionData(gateway_id="gw-walk-1", rssi=-90.0),
+                    GatewayReceptionData(gateway_id="gw-walk-2", rssi=-105.0),
+                ],
+            ),
+        )
+        await commit_and_publish(db, bus, [one])
+        events.append(one.source_event)
+    identity = events[0].external_identity_id
+    assert identity is not None
+    from shared.models import ExternalIdentity
+
+    row = await db.get(ExternalIdentity, identity)
+    assert row is not None
+    row.device_id = world.device.id
+    await db.commit()
+    assert await queue_identity_reprocess(db, bus, row) == 3
+    event_ids = [e.id for e in events]
+    unlinked = await db.scalar(
+        select(func.count())
+        .select_from(GatewayReception)
+        .where(
+            GatewayReception.source_event_id.in_(event_ids), GatewayReception.device_id.is_(None)
+        )
+    )
+    assert unlinked == 6
+
+    worker = build_worker()
+    worker.bus = bus
+    handler = next(h for t, h in worker._subscriptions if t == Topic.IDENTITY_REPROCESS_REQUESTED)
+    await handler(
+        Message(
+            topic=Topic.IDENTITY_REPROCESS_REQUESTED,
+            payload={"external_identity_id": str(identity), "device_id": str(world.device.id)},
+        )
+    )
+    device_id = world.device.id
+    db.expire_all()
+    rows = (
+        await db.execute(
+            select(SourceEvent.processing_status, SourceEvent.device_id, SourceEvent.error_code)
+            .where(SourceEvent.id.in_(event_ids))
+            .order_by(SourceEvent.ingested_at)
+        )
+    ).all()
+    assert [s for s, _, _ in rows] == [
+        ProcessingStatus.PROCESSED,
+        ProcessingStatus.FAILED,
+        ProcessingStatus.PROCESSED,
+    ]
+    assert all(d == device_id for _, d, _ in rows)
+    assert rows[1][2] == ErrorCode.TIMESTAMP_INVALID
+    linked = (
+        await db.scalars(
+            select(GatewayReception.device_id).where(
+                GatewayReception.source_event_id.in_(event_ids)
+            )
+        )
+    ).all()
+    assert linked == [device_id] * 6
+    assert all(w.identity_id != identity for w in await reprocessing.walks(bus.redis))
 
 
 async def test_decode_failure_lands_in_dead_letter(db, bus, world):

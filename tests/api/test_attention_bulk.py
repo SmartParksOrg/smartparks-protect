@@ -40,8 +40,14 @@ async def _unknown_identities(client, headers, count: int):
 
 
 async def test_linking_gives_the_receptions_the_device(client, db):
-    """A reception stored while the identity was unknown gets the device when the identity is
-    linked, so the gateway layer sees the uplink (decision D121)."""
+    """A reception stored while the identity was unknown gets the device when the decoder walks
+    the identity's retained events after the link (decision D121): the request itself writes
+    nothing to the hypertables, since one statement over an identity's history decompressed
+    the whole receptions table and TimescaleDB stopped it (the 500 of 2026-09-24)."""
+    from protect_decoder.main import build_worker
+    from shared import reprocessing
+    from shared.bus import Message, RedisStreamsBus, Topic
+
     admin = await actor(client, db, superuser=True)
     h = admin.headers
     device_type = (
@@ -81,12 +87,52 @@ async def test_linking_gives_the_receptions_the_device(client, db):
     )
     assert result.status_code == 201, result.text
     assert result.json()["queued"] == 1
+    device_id = result.json()["device_ids"][0]
+    bus = RedisStreamsBus()
+    try:
+        # the request counted the event and started the walk's progress; nothing was written
+        db.expire_all()
+        reception = await db.scalar(
+            select(GatewayReception).where(GatewayReception.source_event_id == event_id)
+        )
+        assert reception is not None and reception.device_id is None
+        walk = next(
+            w for w in await reprocessing.walks(bus.redis) if str(w.identity_id) == identity["id"]
+        )
+        assert (walk.total, walk.done, str(walk.device_id)) == (1, 0, device_id)
+        summary = (await client.get("/api/v1/attention/summary", headers=h)).json()
+        assert summary["queued_source_events"] >= 1
+
+        worker = build_worker()
+        worker.bus = bus
+        walk_handler = next(
+            handler
+            for topic, handler in worker._subscriptions
+            if topic == Topic.IDENTITY_REPROCESS_REQUESTED
+        )
+        await walk_handler(
+            Message(
+                topic=Topic.IDENTITY_REPROCESS_REQUESTED,
+                payload={"external_identity_id": identity["id"], "device_id": device_id},
+            )
+        )
+        assert all(
+            str(w.identity_id) != identity["id"] for w in await reprocessing.walks(bus.redis)
+        )
+    finally:
+        await bus.close()
     db.expire_all()
     reception = await db.scalar(
         select(GatewayReception).where(GatewayReception.source_event_id == event_id)
     )
     assert reception is not None
-    assert str(reception.device_id) == result.json()["device_ids"][0]
+    assert str(reception.device_id) == device_id
+    event = await db.get(SourceEvent, (event_id, ingested_at))
+    assert event is not None
+    assert (event.processing_status, str(event.device_id)) == (
+        ProcessingStatus.PROCESSED,
+        device_id,
+    )
 
 
 async def test_bulk_create_devices_with_entities_names_and_skips(client, db):
@@ -151,7 +197,8 @@ async def test_bulk_create_devices_with_entities_names_and_skips(client, db):
     body = result.json()
     assert body["created"] == 3 and body["entities"] == 3 and body["skipped"] == []
     assert body["queued"] == 3
-    # the retained events wait for the decoder with their device (decision D121)
+    # the retained events wait for the decoder's walk as they are; it gives them the device
+    # one by one (decision D121), and the summary counts them from the walk's progress
     events = (
         await db.scalars(
             select(SourceEvent).where(
@@ -160,8 +207,8 @@ async def test_bulk_create_devices_with_entities_names_and_skips(client, db):
         )
     ).all()
     assert len(events) == 3
-    assert {e.processing_status for e in events} == {ProcessingStatus.RECEIVED}
-    assert all(e.device_id is not None for e in events)
+    assert {e.processing_status for e in events} == {ProcessingStatus.UNASSIGNED}
+    assert all(e.device_id is None for e in events)
     summary = (await client.get("/api/v1/attention/summary", headers=h)).json()
     assert summary["queued_source_events"] >= 3
     devices = {

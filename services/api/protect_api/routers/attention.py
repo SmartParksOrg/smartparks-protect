@@ -18,6 +18,7 @@ from protect_api.deps import require_server_admin
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.domain import DeviceRead, ExternalIdentityRead
 from protect_api.serial import fill_serial_from_identity
+from shared import reprocessing
 from shared.bus import RedisStreamsBus, Topic, is_stale
 from shared.config import get_settings
 from shared.curation.effective import effective_time
@@ -220,14 +221,18 @@ async def summary(
         .select_from(SourceEvent)
         .where(SourceEvent.processing_status == ProcessingStatus.UNASSIGNED)
     )
-    queued = await session.scalar(
-        select(func.count())
-        .select_from(SourceEvent)
-        .where(
-            SourceEvent.processing_status == ProcessingStatus.RECEIVED,
-            SourceEvent.device_id.is_not(None),
+    # the events in flight plus what the decoder's walks over retained events have not reached
+    queued = int(
+        await session.scalar(
+            select(func.count())
+            .select_from(SourceEvent)
+            .where(
+                SourceEvent.processing_status == ProcessingStatus.RECEIVED,
+                SourceEvent.device_id.is_not(None),
+            )
         )
-    )
+        or 0
+    ) + await reprocessing.waiting(bus.redis)
     dead = {topic: await bus.dead_count(topic) for topic in DEAD_TOPICS}
     workers = await bus.heartbeats()
     uncategorized = await session.scalar(
@@ -243,7 +248,7 @@ async def summary(
         workers=workers,
         uncategorized_metrics=int(uncategorized or 0),
         clock_ahead_devices=clock_ahead,
-        queued_source_events=int(queued or 0),
+        queued_source_events=queued,
     )
 
 

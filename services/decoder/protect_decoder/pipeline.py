@@ -336,10 +336,17 @@ async def payload_of(event: SourceEvent) -> dict[str, Any]:
 
 
 async def process_source_event(
-    session: AsyncSession, source_event_id: int, ingested_at: datetime, *, reprocess: bool = False
+    session: AsyncSession,
+    source_event_id: int,
+    ingested_at: datetime,
+    *,
+    reprocess: bool = False,
+    device_id: uuid.UUID | None = None,
 ) -> Outcome:
     """Decode one source event inside the caller's session. Commits nothing; the caller commits
-    and publishes `outcome.messages`."""
+    and publishes `outcome.messages`. `device_id` is the device an event without one gets: the
+    identity was linked after the event arrived and the walk names the device (decision D121),
+    so the row is written once, here, with its outcome."""
     event = await load_source_event(session, source_event_id, ingested_at)
     outcome = Outcome(
         source_event_id=event.id, status=ProcessingStatus.PROCESSED, trace_id=event.trace_id
@@ -347,6 +354,8 @@ async def process_source_event(
     if event.processing_status == ProcessingStatus.PROCESSED and not reprocess:
         outcome.status = ProcessingStatus.PROCESSED
         return outcome
+    if event.device_id is None and device_id is not None:
+        event.device_id = device_id
     if event.device_id is None:
         event.processing_status = ProcessingStatus.UNASSIGNED
         outcome.status = ProcessingStatus.UNASSIGNED
