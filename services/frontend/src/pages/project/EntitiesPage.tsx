@@ -188,6 +188,16 @@ export function EntitiesPage() {
       cell: ({ getValue }) => formatAgo(getValue<string | undefined>(), now),
     },
     {
+      // when data last arrived, apart from the records' own time: an animal without a
+      // position whose readings come out of a flash log shows here that data came in
+      // (Tim, 2026-09-24)
+      id: "data_received",
+      header: t("Data received"),
+      meta: { filter: false },
+      accessorFn: (e) => e.tracking?.data_received_at ?? undefined,
+      cell: ({ getValue }) => formatAgo(getValue<string | undefined>(), now),
+    },
+    {
       id: "last_position",
       header: t("Last position"),
       meta: { filter: false },

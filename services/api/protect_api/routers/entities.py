@@ -95,6 +95,7 @@ from shared.domain.static_place import place_device, place_entity_of
 from shared.enums import FeatureType
 from shared.models import (
     Device,
+    DeviceCurrentState,
     DeviceEntityAssignment,
     Entity,
     EntityCurrentState,
@@ -150,6 +151,20 @@ async def with_tracking(session: AsyncSession, entities: Sequence[Entity]) -> li
         if entity_of
         else []
     )
+    received = (
+        {
+            device_id: updated_at
+            for device_id, updated_at in (
+                await session.execute(
+                    select(DeviceCurrentState.device_id, DeviceCurrentState.updated_at).where(
+                        DeviceCurrentState.device_id.in_(list(entity_of))
+                    )
+                )
+            ).all()
+        }
+        if entity_of
+        else {}
+    )
     tracking: dict[uuid.UUID, list[TrackingDevice]] = {}
     for device in await with_state(session, devices):
         tracking.setdefault(entity_of[device.id], []).append(
@@ -157,6 +172,7 @@ async def with_tracking(session: AsyncSession, entities: Sequence[Entity]) -> li
                 id=device.id,
                 name=device.name,
                 last_seen_at=device.last_seen_at,
+                data_received_at=received.get(device.id),
                 health=device.health,
             )
         )
@@ -177,10 +193,14 @@ async def with_tracking(session: AsyncSession, entities: Sequence[Entity]) -> li
         seen = [d.last_seen_at for d in tracked if d.last_seen_at]
         if state is not None and state.last_seen_at:
             seen.append(state.last_seen_at)
+        arrived = [d.data_received_at for d in tracked if d.data_received_at]
+        if state is not None:
+            arrived.append(state.updated_at)
         read.tracking = EntityTracking(
             devices=tracked,
             level=LEVELS[max(levels)] if levels else None,
             last_seen_at=max(seen) if seen else None,
+            data_received_at=max(arrived) if arrived else None,
             position_time=state.latest_position_time if state else None,
             position_kind=state.latest_position_kind if state else None,
             active_alert_count=state.active_alert_count if state else 0,

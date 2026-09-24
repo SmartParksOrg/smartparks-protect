@@ -9,6 +9,19 @@ from pydantic import BaseModel, Field
 from protect_api.schemas.common import ORMModel
 
 
+class WalkRead(BaseModel):
+    """The decoder's walk over the retained events of an identity that got a device (decision
+    D121), as far as it is: the progress card on Needs attention and the data coming in notice
+    of the device and entity pages read it."""
+
+    identity_id: uuid.UUID
+    external_id: str | None = None
+    device_id: uuid.UUID
+    device_name: str | None = None
+    total: int
+    done: int
+
+
 class DeviceLogFileRead(ORMModel):
     id: uuid.UUID
     device_id: uuid.UUID

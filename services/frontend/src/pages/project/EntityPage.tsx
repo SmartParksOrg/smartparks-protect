@@ -464,6 +464,16 @@ export function EntityPage() {
                           )
                         : t("never")}
                     </dd>
+                    {/* when data last arrived, apart from the records' own time (Tim,
+                        2026-09-24: readings out of a flash log carry their own time) */}
+                    <dt className="text-muted-foreground">
+                      {t("Data received")}
+                    </dt>
+                    <dd title={formatTime(device.data?.data_received_at)}>
+                      {device.data?.data_received_at
+                        ? formatAgo(device.data.data_received_at, now)
+                        : t("never")}
+                    </dd>
                     <dt className="text-muted-foreground">
                       {t("Last position")}
                     </dt>

@@ -22,7 +22,7 @@ from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.crud import apply_patch, flush_or_409, get_or_404, range_bounds
 from protect_api.deps import accessible_project_ids, require_server_admin
-from protect_api.device_reads import with_state
+from protect_api.device_reads import walk_reads, with_state
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
 from protect_api.routers.entities import assignment_read
@@ -63,8 +63,10 @@ from protect_api.schemas.domain import (
     ReattributeResult,
     RecordCounts,
 )
+from protect_api.schemas.log_files import WalkRead
 from protect_api.serial import fill_serial_from_identity
 from protect_api.visibility import group_and_subgroups, visibility_for
+from shared import reprocessing
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
 from shared.connectivity.registry import ADAPTERS
@@ -1982,6 +1984,20 @@ class DeviceConnectivityRead(BaseModel):
     device_id: uuid.UUID
     hours: int
     sources: list[SourceConnectivity]
+
+
+@router.get("/{device_id}/walks", response_model=list[WalkRead])
+async def device_walks(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> list[WalkRead]:
+    """The decoder's walks over this device's retained events in progress (decision D121),
+    for the data coming in notice at the top of the device and entity pages."""
+    device = await _visible_device(session, user, device_id)
+    walks = [w for w in await reprocessing.walks(bus.redis) if w.device_id == device.id]
+    return await walk_reads(session, walks)
 
 
 @router.get("/{device_id}/connectivity", response_model=DeviceConnectivityRead)

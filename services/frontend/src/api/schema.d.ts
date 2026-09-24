@@ -1382,6 +1382,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/walks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Walks
+         * @description The decoder's walks over this device's retained events in progress (decision D121),
+         *     for the data coming in notice at the top of the device and entity pages.
+         */
+        get: operations["device_walks_api_v1_devices__device_id__walks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/connectivity": {
         parameters: {
             query?: never;
@@ -5758,6 +5779,11 @@ export interface components {
              * @default 0
              */
             queued_source_events: number;
+            /**
+             * Walks
+             * @description The decoder's walks over retained events in progress, one per identity
+             */
+            walks?: components["schemas"]["WalkRead"][];
         };
         /**
          * AttributionJobRead
@@ -7689,6 +7715,11 @@ export interface components {
              * @description Newest record of any kind (decision D104)
              */
             last_seen_at?: string | null;
+            /**
+             * Data Received At
+             * @description When the decoder last wrote for the device: the arrival of its newest data
+             */
+            data_received_at?: string | null;
             /** @description What the driver declares as health, from the current state */
             health?: components["schemas"]["DeviceHealth"] | null;
             /**
@@ -8087,6 +8118,11 @@ export interface components {
              * @description Newest record of any kind (decision D104)
              */
             last_seen_at?: string | null;
+            /**
+             * Data Received At
+             * @description When the decoder last wrote for the device: the arrival of its newest data
+             */
+            data_received_at?: string | null;
             /** @description What the driver declares as health, from the current state */
             health?: components["schemas"]["DeviceHealth"] | null;
             /**
@@ -8495,6 +8531,11 @@ export interface components {
              * @description The newest record of any kind from its devices
              */
             last_seen_at?: string | null;
+            /**
+             * Data Received At
+             * @description When the decoder last wrote for the entity or its devices (Tim, 2026-09-24): an animal without a position whose readings come out of a flash log shows here that data arrived, where last seen holds the readings' own time
+             */
+            data_received_at?: string | null;
             /** Position Time */
             position_time?: string | null;
             /**
@@ -12364,6 +12405,11 @@ export interface components {
             name: string;
             /** Last Seen At */
             last_seen_at?: string | null;
+            /**
+             * Data Received At
+             * @description When the decoder last wrote for the device: the arrival of its newest data, which for readings read out of a flash log lies days after their time
+             */
+            data_received_at?: string | null;
             health?: components["schemas"]["DeviceHealth"] | null;
         };
         /** TrafficRow */
@@ -12751,6 +12797,32 @@ export interface components {
             version: string;
             /** Commit */
             commit: string;
+        };
+        /**
+         * WalkRead
+         * @description The decoder's walk over the retained events of an identity that got a device (decision
+         *     D121), as far as it is: the progress card on Needs attention and the data coming in notice
+         *     of the device and entity pages read it.
+         */
+        WalkRead: {
+            /**
+             * Identity Id
+             * Format: uuid
+             */
+            identity_id: string;
+            /** External Id */
+            external_id?: string | null;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name?: string | null;
+            /** Total */
+            total: number;
+            /** Done */
+            done: number;
         };
         /** WorkerHealth */
         WorkerHealth: {
@@ -16025,6 +16097,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_walks_api_v1_devices__device_id__walks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalkRead"][];
                 };
             };
             /** @description Validation Error */

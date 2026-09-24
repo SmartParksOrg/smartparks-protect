@@ -6,9 +6,9 @@ import { ProgressBar } from "@/components/common/ProgressBar";
 import { Button } from "@/components/ui/button";
 import type { Decoding } from "@/hooks/useDecoding";
 
-/** Data coming in: the files the decoder is working on for this device, or for the devices of
- * this entity, with the frames done and a bar, at the top of the page on every tab (Tim,
- * 2026-09-23: the Data tab showed it, but nobody looked there). */
+/** Data coming in: the files and the walks over retained events the decoder is working on for
+ * this device, or for the devices of this entity, with what is done and a bar, at the top of
+ * the page on every tab (Tim, 2026-09-23: the Data tab showed it, but nobody looked there). */
 export function DecodingNotice({
   decoding,
   onOpen,
@@ -22,7 +22,38 @@ export function DecodingNotice({
   return (
     <Callout kind="info">
       <div className="space-y-2">
-        {decoding.map(({ deviceId, deviceName, file }) => {
+        {decoding.map((item) => {
+          if (item.kind === "walk") {
+            const { deviceId, deviceName, walk } = item;
+            const percent =
+              walk.total > 0
+                ? Math.min(100, (walk.done / walk.total) * 100)
+                : 0;
+            const what = deviceName ?? walk.device_name ?? walk.external_id;
+            return (
+              <div
+                key={`${deviceId}-${walk.identity_id}`}
+                className="space-y-1"
+              >
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Loader2 className="size-4 shrink-0 animate-spin" />
+                  <span className="font-medium">
+                    {t(
+                      "Decoding the retained uplinks of {{what}}: {{done}} of {{total}}, {{percent}}%.",
+                      {
+                        what,
+                        done: walk.done,
+                        total: walk.total,
+                        percent: Math.floor(percent),
+                      },
+                    )}
+                  </span>
+                </div>
+                <ProgressBar className="max-w-md" percent={percent} />
+              </div>
+            );
+          }
+          const { deviceId, deviceName, file } = item;
           const percent =
             file.frames_total > 0
               ? Math.min(100, (file.frames_done / file.frames_total) * 100)

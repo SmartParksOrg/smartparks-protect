@@ -15,8 +15,10 @@ from protect_api.audit import record_audit
 from protect_api.bus import get_bus
 from protect_api.crud import flush_or_409, get_or_404
 from protect_api.deps import require_server_admin
+from protect_api.device_reads import walk_reads
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.schemas.domain import DeviceRead, ExternalIdentityRead
+from protect_api.schemas.log_files import WalkRead
 from protect_api.serial import fill_serial_from_identity
 from shared import reprocessing
 from shared.bus import RedisStreamsBus, Topic, is_stale
@@ -71,6 +73,10 @@ class AttentionSummary(BaseModel):
     clock_ahead_devices: int = 0
     queued_source_events: int = Field(
         0, description="Events with a device that wait for the decoder, retained ones mostly"
+    )
+    walks: list[WalkRead] = Field(
+        default_factory=list,
+        description="The decoder's walks over retained events in progress, one per identity",
     )
 
 
@@ -233,6 +239,7 @@ async def summary(
         )
         or 0
     ) + await reprocessing.waiting(bus.redis)
+    walks = await walk_reads(session, await reprocessing.walks(bus.redis))
     dead = {topic: await bus.dead_count(topic) for topic in DEAD_TOPICS}
     workers = await bus.heartbeats()
     uncategorized = await session.scalar(
@@ -249,6 +256,7 @@ async def summary(
         uncategorized_metrics=int(uncategorized or 0),
         clock_ahead_devices=clock_ahead,
         queued_source_events=queued,
+        walks=walks,
     )
 
 

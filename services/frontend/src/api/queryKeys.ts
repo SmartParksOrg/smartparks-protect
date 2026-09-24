@@ -137,6 +137,7 @@ export const queryKeys = {
     ["devices", deviceId, "downlink-queue"] as const,
   deviceRoutes: (deviceId: string) => ["devices", deviceId, "routes"] as const,
   logFiles: (deviceId: string) => ["devices", deviceId, "log-files"] as const,
+  deviceWalks: (deviceId: string) => ["devices", deviceId, "walks"] as const,
   driverCatalog: (deviceId: string) =>
     ["devices", deviceId, "driver-catalog"] as const,
   recordDeliveries: (canonicalType: string, canonicalId: number) =>

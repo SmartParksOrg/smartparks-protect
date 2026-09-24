@@ -13,7 +13,9 @@ import type {
   BulkIgnoreResult,
   ClockAheadDevice,
   DeadLetter,
+  Device,
   DeviceType,
+  DeviceWalk,
   NewMetric,
   NewMetricsResponse,
   Page as PageType,
@@ -90,9 +92,12 @@ function Stat({
  * from the most events seen waiting since it was last empty. */
 function QueueProgress({
   queued,
+  walks,
   onDrained,
 }: {
   queued: number;
+  /** The walks in progress, one per identity, each with its device (Tim, 2026-09-24). */
+  walks: DeviceWalk[];
   onDrained: () => void;
 }) {
   const { t } = useTranslation();
@@ -119,7 +124,7 @@ function QueueProgress({
   const total = Math.max(peak, queued);
   const done = total - queued;
   return (
-    <Card>
+    <Card id={QUEUE_PROGRESS_ID}>
       <CardContent className="space-y-2 pt-4">
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">{t("Processing retained events")}</span>
@@ -146,6 +151,55 @@ function QueueProgress({
             }}
           />
         </div>
+        {walks.length > 0 && (
+          <ul className="space-y-1 text-sm">
+            {walks.map((w) => {
+              const percent =
+                w.total > 0 ? Math.min(100, (w.done / w.total) * 100) : 0;
+              return (
+                <li
+                  key={w.identity_id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]"
+                >
+                  <span className="truncate">
+                    <Link
+                      className="underline"
+                      to={`/admin/devices/${w.device_id}`}
+                    >
+                      {w.device_name ?? w.external_id ?? w.device_id}
+                    </Link>
+                    {w.external_id && w.device_name && (
+                      <span className="ml-1 font-mono text-xs text-muted-foreground">
+                        {w.external_id}
+                      </span>
+                    )}
+                  </span>
+                  <div className="col-span-2 sm:col-span-1">
+                    <div
+                      className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={w.total}
+                      aria-valuenow={w.done}
+                      aria-label={w.device_name ?? w.external_id ?? ""}
+                    >
+                      <div
+                        className="h-full rounded-full bg-primary transition-[width] duration-500"
+                        style={{ width: `${Math.round(percent)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {t("{{done}} of {{total}}", {
+                      done: w.done,
+                      total: w.total,
+                    })}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
         <p className="text-xs text-muted-foreground">
           {t(
             "The decoder works through them in the background; the counts, the devices and the map fill in as it goes. You can leave this page.",
@@ -155,6 +209,14 @@ function QueueProgress({
     </Card>
   );
 }
+
+/** The progress card's id: the toast's "Show progress" scrolls to it (Tim, 2026-09-24). */
+const QUEUE_PROGRESS_ID = "queue-progress";
+
+const showProgress = () =>
+  document
+    .getElementById(QUEUE_PROGRESS_ID)
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 function CreateDeviceDialog({
   identity,
@@ -191,23 +253,30 @@ function CreateDeviceDialog({
   const [startDate, setStartDate] = useState("");
   const create = useMutationToast({
     mutationFn: () =>
-      api.post(`/api/v1/attention/identities/${identity?.id}/create-device`, {
-        body: {
-          name,
-          device_type_id: typeId,
-          project_id: projectId || null,
-          valid_from:
-            assignmentStartValue(start, startDate) ??
-            identity?.first_seen_at ??
-            null,
+      api.post<Device>(
+        `/api/v1/attention/identities/${identity?.id}/create-device`,
+        {
+          body: {
+            name,
+            device_type_id: typeId,
+            project_id: projectId || null,
+            valid_from:
+              assignmentStartValue(start, startDate) ??
+              identity?.first_seen_at ??
+              null,
+          },
         },
-      }),
+      ),
     invalidate: [
       queryKeys.unknownIdentities,
       queryKeys.attentionSummary,
       queryKeys.devices({}),
     ],
-    success: t("Device created; retained events are being processed"),
+    success: (device: Device) =>
+      t("{{name}} created; its retained uplinks are being decoded", {
+        name: device.name,
+      }),
+    action: { label: t("Show progress"), onClick: showProgress },
     onSuccess: onClose,
   });
   return (
@@ -353,9 +422,12 @@ function BulkCreateDialog({
       queryKeys.attentionSummary,
       queryKeys.devices({}),
     ],
-    success: t(
-      "Devices created; the retained events are processed in the background",
-    ),
+    success: (data: BulkCreateResult) =>
+      t(
+        "{{created}} devices created; {{queued}} retained uplinks are being decoded",
+        { created: data.created, queued: data.queued },
+      ),
+    action: { label: t("Show progress"), onClick: showProgress },
     onSuccess: (data: BulkCreateResult) => {
       setResult(data);
       onDone();
@@ -936,6 +1008,7 @@ export function AttentionPage() {
         </div>
         <QueueProgress
           queued={s?.queued_source_events ?? 0}
+          walks={s?.walks ?? []}
           onDrained={() => {
             for (const key of invalidateAll)
               void queryClient.invalidateQueries({ queryKey: key });

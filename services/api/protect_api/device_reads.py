@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.crud import geom_to_geojson
 from protect_api.schemas.domain import DeviceRead
+from protect_api.schemas.log_files import WalkRead
+from shared import reprocessing
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.battery import resolve as resolve_battery
 from shared.domain.health import device_health
@@ -96,6 +98,7 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
         device_type = types.get(device.device_type_id)
         driver = DRIVERS.get(device_type.driver_key) if device_type else None
         read.last_seen_at = state.last_seen_at
+        read.data_received_at = state.updated_at
         read.health = device_health(
             getattr(driver, "health", None),
             latest_measurements=state.latest_measurements,
@@ -111,3 +114,38 @@ async def with_state(session: AsyncSession, devices: list[Device]) -> list[Devic
             ).profile,
         )
     return reads
+
+
+async def walk_reads(session: AsyncSession, walks: list[reprocessing.Walk]) -> list[WalkRead]:
+    """The walks with the names a person reads: the identity's external id and the device."""
+    if not walks:
+        return []
+    external_ids: dict[uuid.UUID, str] = {
+        identity_id: external_id
+        for identity_id, external_id in (
+            await session.execute(
+                select(ExternalIdentity.id, ExternalIdentity.external_id).where(
+                    ExternalIdentity.id.in_([w.identity_id for w in walks])
+                )
+            )
+        ).all()
+    }
+    names: dict[uuid.UUID, str] = {
+        device_id: name
+        for device_id, name in (
+            await session.execute(
+                select(Device.id, Device.name).where(Device.id.in_([w.device_id for w in walks]))
+            )
+        ).all()
+    }
+    return [
+        WalkRead(
+            identity_id=w.identity_id,
+            external_id=external_ids.get(w.identity_id),
+            device_id=w.device_id,
+            device_name=names.get(w.device_id),
+            total=w.total,
+            done=w.done,
+        )
+        for w in sorted(walks, key=lambda w: (names.get(w.device_id) or "", str(w.identity_id)))
+    ]

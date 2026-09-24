@@ -144,6 +144,11 @@ class TrackingDevice(BaseModel):
     id: uuid.UUID
     name: str
     last_seen_at: datetime | None = None
+    data_received_at: datetime | None = Field(
+        default=None,
+        description="When the decoder last wrote for the device: the arrival of its newest "
+        "data, which for readings read out of a flash log lies days after their time",
+    )
     health: DeviceHealth | None = None
 
 
@@ -159,6 +164,12 @@ class EntityTracking(BaseModel):
     )
     last_seen_at: datetime | None = Field(
         default=None, description="The newest record of any kind from its devices"
+    )
+    data_received_at: datetime | None = Field(
+        default=None,
+        description="When the decoder last wrote for the entity or its devices (Tim, "
+        "2026-09-24): an animal without a position whose readings come out of a flash log "
+        "shows here that data arrived, where last seen holds the readings' own time",
     )
     position_time: datetime | None = None
     position_kind: str | None = Field(
@@ -468,6 +479,10 @@ class DeviceRead(ORMModel):
     updated_at: datetime
     last_seen_at: datetime | None = Field(
         default=None, description="Newest record of any kind (decision D104)"
+    )
+    data_received_at: datetime | None = Field(
+        default=None,
+        description="When the decoder last wrote for the device: the arrival of its newest data",
     )
     health: DeviceHealth | None = Field(
         default=None, description="What the driver declares as health, from the current state"

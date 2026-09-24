@@ -5688,6 +5688,59 @@
     ]
    }
   },
+  "/api/v1/devices/{device_id}/walks": {
+   "get": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Device Walks",
+    "description": "The decoder's walks over this device's retained events in progress (decision D121),\nfor the data coming in notice at the top of the device and entity pages.",
+    "operationId": "device_walks_api_v1_devices__device_id__walks_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/WalkRead"
+         },
+         "title": "Response Device Walks Api V1 Devices  Device Id  Walks Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/connectivity": {
    "get": {
     "tags": [
@@ -23730,6 +23783,14 @@
       "title": "Queued Source Events",
       "description": "Events with a device that wait for the decoder, retained ones mostly",
       "default": 0
+     },
+     "walks": {
+      "items": {
+       "$ref": "#/components/schemas/WalkRead"
+      },
+      "type": "array",
+      "title": "Walks",
+      "description": "The decoder's walks over retained events in progress, one per identity"
      }
     },
     "type": "object",
@@ -28883,6 +28944,19 @@
       "title": "Last Seen At",
       "description": "Newest record of any kind (decision D104)"
      },
+     "data_received_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Received At",
+      "description": "When the decoder last wrote for the device: the arrival of its newest data"
+     },
      "health": {
       "anyOf": [
        {
@@ -30018,6 +30092,19 @@
       "title": "Last Seen At",
       "description": "Newest record of any kind (decision D104)"
      },
+     "data_received_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Received At",
+      "description": "When the decoder last wrote for the device: the arrival of its newest data"
+     },
      "health": {
       "anyOf": [
        {
@@ -31084,6 +31171,19 @@
       ],
       "title": "Last Seen At",
       "description": "The newest record of any kind from its devices"
+     },
+     "data_received_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Received At",
+      "description": "When the decoder last wrote for the entity or its devices (Tim, 2026-09-24): an animal without a position whose readings come out of a flash log shows here that data arrived, where last seen holds the readings' own time"
      },
      "position_time": {
       "anyOf": [
@@ -42320,6 +42420,19 @@
       ],
       "title": "Last Seen At"
      },
+     "data_received_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data Received At",
+      "description": "When the decoder last wrote for the device: the arrival of its newest data, which for readings read out of a flash log lies days after their time"
+     },
      "health": {
       "anyOf": [
        {
@@ -43335,6 +43448,59 @@
      "commit"
     ],
     "title": "VersionResponse"
+   },
+   "WalkRead": {
+    "properties": {
+     "identity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Identity Id"
+     },
+     "external_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "External Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "done": {
+      "type": "integer",
+      "title": "Done"
+     }
+    },
+    "type": "object",
+    "required": [
+     "identity_id",
+     "device_id",
+     "total",
+     "done"
+    ],
+    "title": "WalkRead",
+    "description": "The decoder's walk over the retained events of an identity that got a device (decision\nD121), as far as it is: the progress card on Needs attention and the data coming in notice\nof the device and entity pages read it."
    },
    "WorkerHealth": {
     "properties": {

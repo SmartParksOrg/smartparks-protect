@@ -116,6 +116,7 @@ export type Connection = Schemas["ConnectionRead"];
 export type BackupStatus = Schemas["BackupStatusRead"];
 export type BackupRun = Schemas["BackupRunRead"];
 export type DeviceLogFile = Schemas["DeviceLogFileRead"];
+export type DeviceWalk = Schemas["WalkRead"];
 export type BleSyncRequest = Schemas["BleSyncRequest"];
 export type DriverCatalog = Schemas["DriverCatalog"];
 export type RouteOption = Schemas["RouteOptionRead"];
