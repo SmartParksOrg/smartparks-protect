@@ -53,7 +53,7 @@ export function FeedPanel({
   });
   return (
     <aside
-      className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card text-sm shadow-lg"
+      className="flex min-h-32 flex-1 flex-col overflow-hidden rounded-lg border bg-card text-sm shadow-lg"
       aria-label={t("Feed")}
     >
       <div className="flex items-center justify-between gap-2 border-b px-3 py-2">

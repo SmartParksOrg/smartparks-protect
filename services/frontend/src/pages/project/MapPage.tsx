@@ -1973,7 +1973,7 @@ export function MapPage() {
   ];
 
   return (
-    <div className="relative min-h-0 flex-1">
+    <div className="relative min-h-0 flex-1 overflow-hidden">
       <div ref={container} className="absolute! inset-0 z-0" />
       {/* the layers and feed buttons and the events count in the top left (decisions D137, D174, D177); the entity and device count went on 2026-09-12 at Tim's word, the layers panel carries the numbers */}
       <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-5rem)] items-start gap-2 [&>*]:pointer-events-auto">
@@ -2005,7 +2005,7 @@ export function MapPage() {
         )}
       {/* the right column: cards, the layers panel and the object panel open from the right edge
           under the strip on desktop and from the bottom on a phone */}
-      <div className="pointer-events-none absolute right-14 bottom-2 left-2 z-10 flex max-h-[70%] flex-col gap-2 sm:top-3 sm:bottom-3 sm:left-auto sm:max-h-none sm:w-[22rem] [&>*]:pointer-events-auto">
+      <div className="pointer-events-none absolute right-14 bottom-2 left-2 z-10 flex max-h-[70%] flex-col gap-2 overflow-hidden sm:top-3 sm:bottom-3 sm:left-auto sm:max-h-none sm:w-[22rem] [&>*]:pointer-events-auto">
         {tool && (
           <DrawBar
             purpose={tool}
@@ -2051,7 +2051,7 @@ export function MapPage() {
             }}
           />
         )}
-        {trackSettingsOpen && tracksOn && (
+        {trackSettingsOpen && tracksOn && !tracksCardHidden && (
           <TrackSettingsPanel
             length={trackLength}
             onChange={setTrackLength}
@@ -2075,7 +2075,7 @@ export function MapPage() {
             }}
           />
         )}
-        {heatOn && heatSettingsOpen && (
+        {heatOn && heatSettingsOpen && !heatCardHidden && (
           <HeatSettingsPanel
             settings={heat}
             onChange={setHeat}

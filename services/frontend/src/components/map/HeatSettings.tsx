@@ -160,7 +160,7 @@ export function HeatSettingsPanel({
     })[sensitivityLabel(value)] ?? sensitivityLabel(value);
 
   return (
-    <div className="w-full rounded-md border bg-card p-3 text-sm shadow-md">
+    <div className="min-h-0 w-full shrink overflow-y-auto rounded-md border bg-card p-3 text-sm shadow-md">
       <div className="mb-2 flex items-center justify-between">
         <span className="font-medium">{t("Heatmap settings")}</span>
         <Button

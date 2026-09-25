@@ -106,7 +106,7 @@ export function TrackSettingsPanel({
   const days = Math.min(TRACK_MAX_DAYS, Math.max(1, Math.round(customHours / 24)));
 
   return (
-    <div className="w-full max-w-80 rounded-md border bg-card p-3 text-sm shadow-md">
+    <div className="min-h-0 w-full shrink overflow-y-auto rounded-md border bg-card p-3 text-sm shadow-md">
       <div className="mb-2 flex items-center justify-between">
         <span className="font-medium">{t("Track settings")}</span>
         <Button

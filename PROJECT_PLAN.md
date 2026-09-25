@@ -1371,7 +1371,7 @@ that question: not who an animal met, but how its heart was doing while it did.
 - [x] 36c The move of devices (2026-09-25): `shared/domain/moves.py`, `POST /devices/move` with `preview`, the handover endpoint replaced, the device page's "Move to project" and the admin page's form, tests (from first data with the entity along, from a date with the entity staying, a split project assignment, the old project's visibility).
 - [x] 36d The move of entities (2026-09-25): `POST /projects/{id}/entities/move` with `preview`, the entity page's "Move to project", tests (a device reused on another animal keeps that history behind).
 - [x] 36e Bulk (2026-09-25): `entity-assignments/bulk`, `bulk-assign` with names and a date and open to the target's admins, the Devices page's "Create entities" and "Move to project" in both scopes, the Entities page's "Move to project", the preview table, tests.
-- [ ] 36f The live map's right column at every size, a Vitest for the settings bar closing with its card, the screenshot sweep at 390, 768 and 1440 px.
+- [x] 36f The live map's right column at every size (2026-09-25: the column clips, the object panel and the settings bars shrink and scroll inside themselves, the layers panel and the feed keep a floor, a settings bar closes with its card; measured with Playwright at 1440 and 390 px with an entity selected, the layers panel open and both settings bars unfolded: no overlap, no page scroll).
 - [ ] 36g Docs (`domain-model.md`'s handover section rewritten as moves, `permissions.md`, `pages.md`, ADR 0038, `DEVELOPERS.md`), the changelog, Dutch for the new strings, the OpenAPI schema, CI green, deployed to dev, Tim reads it.
 
 **Exit criteria.**
