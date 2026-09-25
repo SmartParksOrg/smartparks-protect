@@ -7,6 +7,22 @@ text the code composes has its entry."""
 # ruff: noqa: E501
 
 NL: dict[str, str] = {
+    # the reasons of a move or a bulk action (shared/domain/moves.py, decisions D292 to D294)
+    "already in this project": "zit al in dit project",
+    "not found": "niet gevonden",
+    "not in a project; assign it instead": "zit in geen project; wijs het toe in plaats van te verplaatsen",
+    "not in a project at that moment; assign it instead": "zat op dat moment in geen project; wijs het toe in plaats van te verplaatsen",
+    "another device, {device}, tracked it": "een ander apparaat, {device}, volgde het",
+    "{device} is not moving": "{device} verhuist niet mee",
+    "{device} tracked it before {moment} UTC": "{device} volgde het al vóór {moment} UTC",
+    "the target project has an entity of that name": "het doelproject heeft al een entiteit met die naam",
+    "the entity {name} cannot move: the target project has an entity of that name": "de entiteit {name} kan niet mee: het doelproject heeft al een entiteit met die naam",
+    "already in the target project": "zit al in het doelproject",
+    "not found in this project": "niet gevonden in dit project",
+    "device not found": "apparaat niet gevonden",
+    "an entity of that name exists": "er bestaat al een entiteit met die naam",
+    "not in this project at the start": "zat bij het begin niet in dit project",
+    "tracks an entity from the start on; release it first": "volgt vanaf het begin al een entiteit; maak het eerst los",
     # the explanations (shared/domain/explanations.py)
     "The device's status message carries one or more error flags. Each flag is explained below; a flag that clears on the next status was a passing fault.": "Het statusbericht van het apparaat bevat een of meer foutvlaggen. Elke vlag wordt hieronder uitgelegd; een vlag die bij de volgende status weer weg is, was een voorbijgaande storing.",
     "The device started again: its uptime dropped back to zero. A single restart is harmless; repeated restarts point at a firmware or a power problem.": "Het apparaat is opnieuw gestart: zijn uptime viel terug naar nul. Eén herstart is onschuldig; herhaalde herstarts wijzen op een firmware- of voedingsprobleem.",

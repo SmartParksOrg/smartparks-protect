@@ -43,6 +43,10 @@ export type DeviceHealth = Schemas["DeviceHealth"];
 export type HealthValue = Schemas["HealthValue"];
 export type BulkCreateResult = Schemas["BulkCreateResult"];
 export type BulkAssignResult = Schemas["BulkAssignResult"];
+export type MoveResult = Schemas["MoveResult"];
+export type MoveDevice = Schemas["MoveDeviceRead"];
+export type MoveEntity = Schemas["MoveEntityRead"];
+export type EntityAssignmentsBulkResult = Schemas["EntityAssignmentsBulkResult"];
 export type ConnectApplicationsResult = Schemas["ConnectApplicationsResult"];
 export type DisconnectApplicationsResult =
   Schemas["DisconnectApplicationsResult"];

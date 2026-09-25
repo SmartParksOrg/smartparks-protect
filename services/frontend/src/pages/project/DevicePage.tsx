@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowRightLeft,
   ExternalLink,
   Footprints,
   Gauge,
@@ -9,7 +10,7 @@ import {
   Table2,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -51,6 +52,7 @@ import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AssignEntityDialog } from "@/components/devices/AssignEntityDialog";
+import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
@@ -95,6 +97,8 @@ export function DevicePage() {
   const [curating, setCurating] = useState<CurationTarget | null>(null);
   const [history, setHistory] = useState<CurationTarget | null>(null);
   const [assigning, setAssigning] = useState<"entity" | "project" | null>(null);
+  const [moving, setMoving] = useState(false);
+  const navigate = useNavigate();
   const device = useQuery({
     queryKey: queryKeys.device(deviceId),
     queryFn: () => api.get<DeviceDetail>(`/api/v1/devices/${deviceId}`),
@@ -594,6 +598,17 @@ export function DevicePage() {
                       {t("Assign to project")}
                     </Button>
                   )}
+                  {deviceProjectId &&
+                    (user?.is_superuser || can("project:write")) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setMoving(true)}
+                      >
+                        <ArrowRightLeft className="size-4" />{" "}
+                        {t("Move to project…")}
+                      </Button>
+                    )}
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
                   {d.project_assignments.length === 0 && (
@@ -935,6 +950,20 @@ export function DevicePage() {
         entity={assigning !== "project"}
         open={assigning !== null}
         onOpenChange={(open) => !open && setAssigning(null)}
+      />
+      <MoveToProjectDialog
+        subject={{
+          kind: "devices",
+          items: [{ id: d.id, name: d.name }],
+          currentProjectId: deviceProjectId,
+        }}
+        open={moving}
+        onOpenChange={setMoving}
+        onMoved={(r) => {
+          const outcome = r.devices[0];
+          if (outcome && !outcome.skipped)
+            void navigate(`/projects/${r.project_id}/devices/${d.id}`);
+        }}
       />
       <SourceEventDialog
         id={event?.id ?? null}

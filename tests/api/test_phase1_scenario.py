@@ -182,23 +182,21 @@ async def test_full_onboarding_and_handover(client, db):
     assert len(detail.json()["project_assignments"]) == 1
     assert detail.json()["external_identities"][0]["external_id"] == "70B3D57ED0001234"
 
-    # Handover to B: the project admin of A alone may not (not admin of B); the server admin may.
-    handover_body = {
+    # Move to B from a date: the project admin of A alone may not (not admin of B); the server
+    # admin may. The entity's history starts before the date, so it stays in A (D293).
+    move_body = {
+        "device_ids": [device["id"]],
         "project_id": project_b["id"],
-        "effective_at": T_HANDOVER.isoformat(),
+        "start": T_HANDOVER.isoformat(),
         "reason": "moved to Park B",
     }
     assert (
-        await client.post(
-            f"/api/v1/devices/{device['id']}/handover", json=handover_body, headers=pa_headers
-        )
+        await client.post("/api/v1/devices/move", json=move_body, headers=pa_headers)
     ).status_code == 403
-    handover = await client.post(
-        f"/api/v1/devices/{device['id']}/handover", json=handover_body, headers=h
-    )
-    assert handover.status_code == 201, handover.text
-    assert handover.json()["project_id"] == project_b["id"]
-    assert handover.json()["valid_from"].startswith("2026-08-10")
+    moved = await client.post("/api/v1/devices/move", json=move_body, headers=h)
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["moved_devices"] == 1 and moved.json()["moved_entities"] == 0
+    assert moved.json()["devices"][0]["spans"][0]["start"].startswith("2026-08-10")
 
     detail = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()
     pa = sorted(detail["project_assignments"], key=lambda a: a["valid_from"])
@@ -227,7 +225,7 @@ async def test_full_onboarding_and_handover(client, db):
         "external_identity.created",
         "project_assignment.created",
         "entity_assignment.created",
-        "device.handover",
+        "device.moved",
         "data_source.created",
     } <= actions
     project_audit = (

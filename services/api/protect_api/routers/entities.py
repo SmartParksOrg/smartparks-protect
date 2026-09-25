@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,10 +25,12 @@ from protect_api.crud import (
 from protect_api.deps import (
     ProjectContext,
     ScopeContext,
+    language,
     require_permission,
     require_scope_permission,
 )
 from protect_api.device_reads import with_state
+from protect_api.moves import audit_plan, move_result, require_admin_of_every_project
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
 from protect_api.schemas.domain import (
@@ -37,9 +39,13 @@ from protect_api.schemas.domain import (
     AssignmentStart,
     CombinedArea,
     CombineFeaturesRequest,
+    EntitiesMove,
     EntityAssignmentCreate,
     EntityAssignmentExtended,
     EntityAssignmentRead,
+    EntityAssignmentsBulk,
+    EntityAssignmentsBulkResult,
+    EntityAssignmentsBulkSkipped,
     EntityBulkMove,
     EntityBulkMoveResult,
     EntityCreate,
@@ -54,6 +60,7 @@ from protect_api.schemas.domain import (
     FenceMonitorRead,
     FenceMonitorUpdate,
     FenceStatusRead,
+    MoveResult,
     ProposeAreaRequest,
     ProposedArea,
     ProposedAreas,
@@ -91,8 +98,10 @@ from shared.domain.fence import (
     snap_to_line,
 )
 from shared.domain.health import LEVELS
+from shared.domain.moves import apply_plan, plan_entity_moves, start_moment
 from shared.domain.static_place import place_device, place_entity_of
 from shared.enums import FeatureType
+from shared.i18n import translate
 from shared.models import (
     Device,
     DeviceCurrentState,
@@ -104,6 +113,7 @@ from shared.models import (
     FenceMonitor,
     FenceStatus,
     Group,
+    Project,
 )
 from shared.overpass import fetch_overpass
 from shared.permissions import Permission, permissions_for
@@ -366,6 +376,44 @@ async def _new_entity(session: AsyncSession, context: ProjectContext, body: Enti
         details={"name": entity.name},
     )
     return entity
+
+
+@router.post("/entities/move", response_model=MoveResult)
+async def move_entities(
+    body: EntitiesMove,
+    context: ProjectContext = Depends(require_permission(Permission.ENTITIES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+    lang: str = Depends(language),
+) -> MoveResult:
+    """Move entities of this project to another one, whole, with their history and with their
+    devices over the spans they tracked them (decision D293); a device reused on another
+    entity of this project keeps that part here. With `preview` nothing is written. Server
+    admins, or admins of both projects."""
+    project = await get_or_404(session, Project, body.project_id, "Project")
+    if project.id == context.project.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The entities are in this project already")
+    if body.group_id is not None:
+        group = await get_or_404(session, Group, body.group_id, "Group")
+        if group.project_id != project.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found in the target project")
+    plan = await plan_entity_moves(
+        session,
+        source_project_id=context.project.id,
+        entity_ids=body.entity_ids,
+        project_id=project.id,
+        group_id=body.group_id,
+    )
+    await require_admin_of_every_project(session, context.user, plan)
+    if body.preview:
+        return await move_result(session, plan, preview=True, language=lang)
+    jobs = await apply_plan(session, plan, user_id=context.user.id, reason=body.reason)
+    await audit_plan(session, context.user, plan, "entity")
+    result = await move_result(session, plan, preview=False, language=lang)
+    await session.commit()
+    for job in jobs:
+        await publish_job(bus, job)
+    return result
 
 
 @router.post("/entities/bulk-move", response_model=EntityBulkMoveResult)
@@ -1063,6 +1111,131 @@ async def list_entity_assignments(
         items=[assignment_read(r, device_name=names.get(r.device_id)) for r in rows],
         next_cursor=next_cursor,
     )
+
+
+@router.post(
+    "/entity-assignments/bulk",
+    response_model=EntityAssignmentsBulkResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_entity_assignments_bulk(
+    body: EntityAssignmentsBulk,
+    context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+    lang: str = Depends(language),
+) -> EntityAssignmentsBulkResult:
+    """An entity per device, named per row, of one type and group, tracked by its device from
+    the chosen start (decision D294): the device's first data, since it joined the project,
+    now, or a moment. A device not in the project at that start, one tracking an entity from
+    then on, and a name the project has already are skipped with the reason; the rest are
+    made in one transaction and the records inside each range get the entity through a job."""
+    allowed = permissions_for(context.role, server_admin=context.user.is_superuser)
+    if Permission.ENTITIES_WRITE not in allowed:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Creating entities needs entities:write")
+    await get_or_404(session, EntityType, body.entity_type_id, "Entity type")
+    await check_group(session, context, body.group_id)
+    now = utc_now()
+    taken = set(
+        (
+            await session.scalars(
+                select(Entity.name).where(
+                    Entity.project_id == context.project.id,
+                    Entity.name.in_([i.name.strip() for i in body.items]),
+                )
+            )
+        ).all()
+    )
+    created = 0
+    jobs = []
+    skipped: list[EntityAssignmentsBulkSkipped] = []
+    seen: set[uuid.UUID] = set()
+    for item in body.items:
+        name = item.name.strip()
+        if item.device_id in seen:
+            continue
+        seen.add(item.device_id)
+
+        def skip(reason: str, device_id: uuid.UUID = item.device_id, name: str = name) -> None:
+            skipped.append(
+                EntityAssignmentsBulkSkipped(
+                    device_id=device_id, name=name, reason=translate(reason, lang) or reason
+                )
+            )
+
+        if await session.get(Device, item.device_id) is None:
+            skip("device not found")
+            continue
+        if name in taken:
+            skip("an entity of that name exists")
+            continue
+        start, why = await start_moment(session, item.device_id, body.start, now)
+        if start is None:
+            skip(why or "no start")
+            continue
+        attribution = await resolve_attribution(session, item.device_id, start)
+        if attribution.project_id != context.project.id:
+            skip("not in this project at the start")
+            continue
+        tracking = await session.scalar(
+            select(func.count())
+            .select_from(DeviceEntityAssignment)
+            .where(
+                DeviceEntityAssignment.device_id == item.device_id,
+                DeviceEntityAssignment.validity.op("&&")(Range(start, None, bounds="[)")),
+            )
+        )
+        if tracking:
+            skip("tracks an entity from the start on; release it first")
+            continue
+        entity = await _new_entity(
+            session,
+            context,
+            EntityCreate(name=name, entity_type_id=body.entity_type_id, group_id=body.group_id),
+        )
+        taken.add(name)
+        session.add(
+            DeviceEntityAssignment(
+                device_id=item.device_id,
+                entity_id=entity.id,
+                validity=Range(start, None, bounds="[)"),
+                reason="bulk creation",
+                created_by_user_id=context.user.id,
+            )
+        )
+        await flush_or_409(session, "Entity assignment")
+        await place_entity_of(session, item.device_id, start)
+        queued = await queue_job(
+            session,
+            device_id=item.device_id,
+            start=start,
+            end=now,
+            reason="entity_assignment.created",
+            user=context.user,
+            project_id=context.project.id,
+        )
+        if queued.created and queued.job is not None:
+            jobs.append(queued.job)
+        await record_audit(
+            session,
+            user=context.user,
+            action="entity_assignment.created",
+            object_type="device_entity_assignment",
+            object_id=str(entity.id),
+            project_id=context.project.id,
+            details={
+                "device_id": str(item.device_id),
+                "entity_id": str(entity.id),
+                "valid_from": start.isoformat(),
+                "attribution_job_id": str(queued.job.id) if queued.job else None,
+                "bulk": True,
+            },
+        )
+        created += 1
+    await session.commit()
+    for job in jobs:
+        await publish_job(bus, job)
+    return EntityAssignmentsBulkResult(created=created, attribution_jobs=len(jobs), skipped=skipped)
 
 
 @router.post(

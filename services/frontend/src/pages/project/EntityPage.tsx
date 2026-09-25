@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowRightLeft,
   Footprints,
   HeartPulse,
   MapPin,
@@ -9,7 +10,7 @@ import {
   Table2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -37,6 +38,7 @@ import { AttributionProgress } from "@/components/devices/AttributionProgress";
 import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { ChangeAssignmentDialog } from "@/components/entities/ChangeAssignmentDialog";
 import { EntityDialog } from "@/components/entities/EntityDialog";
+import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { Icon } from "@/components/icons/Icon";
 import { PictureCard } from "@/components/entities/PictureCard";
 import type { EntityFeatureProperties } from "@/components/map/layers";
@@ -97,6 +99,8 @@ export function EntityPage() {
   );
   const now = useNow();
   const [editing, setEditing] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const navigate = useNavigate();
   const [assigning, setAssigning] = useState(false);
   const [changing, setChanging] = useState<EntityAssignment | null>(null);
   const [since7d] = useState(() =>
@@ -372,8 +376,26 @@ export function EntityPage() {
                 <Pencil className="size-4" /> {t("Edit")}
               </Button>
             )}
+            {admin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMoving(true)}
+              >
+                <ArrowRightLeft className="size-4" /> {t("Move to project…")}
+              </Button>
+            )}
           </>
         }
+      />
+      <MoveToProjectDialog
+        subject={{ kind: "entities", projectId, items: [{ id: e.id, name: e.name }] }}
+        open={moving}
+        onOpenChange={setMoving}
+        onMoved={(r) => {
+          if (r.entities[0]?.moves)
+            void navigate(`/projects/${r.project_id}/entities/${e.id}`);
+        }}
       />
       <Page>
         <AttributionProgress

@@ -504,6 +504,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/entities/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Entities
+         * @description Move entities of this project to another one, whole, with their history and with their
+         *     devices over the spans they tracked them (decision D293); a device reused on another
+         *     entity of this project keeps that part here. With `preview` nothing is written. Server
+         *     admins, or admins of both projects.
+         */
+        post: operations["move_entities_api_v1_projects__project_id__entities_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/entities/bulk-move": {
         parameters: {
             query?: never;
@@ -823,6 +846,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/entity-assignments/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Entity Assignments Bulk
+         * @description An entity per device, named per row, of one type and group, tracked by its device from
+         *     the chosen start (decision D294): the device's first data, since it joined the project,
+         *     now, or a moment. A device not in the project at that start, one tracking an entity from
+         *     then on, and a name the project has already are skipped with the reason; the rest are
+         *     made in one transaction and the records inside each range get the entity through a job.
+         */
+        post: operations["create_entity_assignments_bulk_api_v1_projects__project_id__entity_assignments_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/entity-assignments/{assignment_id}/extend-start": {
         parameters: {
             query?: never;
@@ -979,6 +1026,31 @@ export interface paths {
         patch: operations["update_device_api_v1_devices__device_id__patch"];
         trace?: never;
     };
+    "/api/v1/devices/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Devices
+         * @description Move devices to another project from a moment each, with the history from that moment
+         *     (decision D292): the old assignments are cut there, a new one opens, an attribution job
+         *     rewrites the records. An entity whose whole history lies in the move goes along; one that
+         *     keeps history behind stays and loses the device from the moment on (decision D293). With
+         *     `preview` nothing is written and the answer says what would happen. Server admins, or
+         *     admins of the target and of every project a device leaves.
+         */
+        post: operations["move_devices_api_v1_devices_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/bulk-assign": {
         parameters: {
             query?: never;
@@ -992,9 +1064,10 @@ export interface paths {
          * Bulk Assign
          * @description Devices in no project, onboarded in bulk, join a project in one go (decision D122): each
          *     gets an assignment from its first data unless a start is given, optionally an entity of one
-         *     type with the device's name, and the records inside the range get the project (D103). A
-         *     device assigned anywhere in that range is skipped; an entity name already taken in the
-         *     project leaves that device without one.
+         *     type with the device's name (or the name given per device, decision D294), and the records
+         *     inside the range get the project (D103). A device assigned anywhere in that range is
+         *     skipped; an entity name already taken in the project leaves that device without one.
+         *     Server admins, or admins of the target project.
          */
         post: operations["bulk_assign_api_v1_devices_bulk_assign_post"];
         delete?: never;
@@ -1320,28 +1393,6 @@ export interface paths {
         head?: never;
         /** End Project Assignment */
         patch: operations["end_project_assignment_api_v1_devices__device_id__project_assignments__assignment_id__patch"];
-        trace?: never;
-    };
-    "/api/v1/devices/{device_id}/handover": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Handover
-         * @description Move the device to another project from `effective_at`: the current project assignment and
-         *     entity assignment close at that moment, a new project assignment opens. History is untouched.
-         *     Allowed for server admins and for admins of both the current and the target project.
-         */
-        post: operations["handover_api_v1_devices__device_id__handover_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/v1/devices/{device_id}/identities": {
@@ -6228,6 +6279,13 @@ export interface components {
             entity_type_id?: string | null;
             /** Group Id */
             group_id?: string | null;
+            /**
+             * Names
+             * @description The entity's name per device id where it should not be the device's
+             */
+            names?: {
+                [key: string]: string;
+            } | null;
         };
         /** BulkAssignResult */
         BulkAssignResult: {
@@ -8156,6 +8214,38 @@ export interface components {
             /** Links */
             links?: components["schemas"]["ExternalLink"][];
         };
+        /**
+         * DevicesMove
+         * @description Move devices to another project from a moment each (decision D292): the device's
+         *     first data, since it joined its current project, now, or a given moment. `preview`
+         *     answers what the move would do without doing it.
+         */
+        DevicesMove: {
+            /** Device Ids */
+            device_ids: string[];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Start
+             * @default first_data
+             */
+            start: string | ("first_data" | "joined" | "now");
+            /**
+             * Group Id
+             * @description The target project's group the entities that come along join
+             */
+            group_id?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Preview
+             * @default false
+             */
+            preview: boolean;
+        };
         /** DisconnectApplicationsResult */
         DisconnectApplicationsResult: {
             /** Disconnected */
@@ -8175,6 +8265,29 @@ export interface components {
             catalog: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * EntitiesMove
+         * @description Move entities of this project to another one, whole, with their devices over the spans
+         *     they tracked them (decision D293).
+         */
+        EntitiesMove: {
+            /** Entity Ids */
+            entity_ids: string[];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Group Id */
+            group_id?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Preview
+             * @default false
+             */
+            preview: boolean;
         };
         /**
          * EntityAssignmentCreate
@@ -8291,6 +8404,58 @@ export interface components {
              * @description Filled by the device read (decision D106)
              */
             entity_name?: string | null;
+        };
+        /**
+         * EntityAssignmentsBulk
+         * @description One new entity per device, named per row, of one type and group, each tracked by its
+         *     device from a start of choice (decision D294).
+         */
+        EntityAssignmentsBulk: {
+            /** Items */
+            items: components["schemas"]["EntityAssignmentsBulkItem"][];
+            /**
+             * Entity Type Id
+             * Format: uuid
+             */
+            entity_type_id: string;
+            /** Group Id */
+            group_id?: string | null;
+            /**
+             * Start
+             * @default first_data
+             */
+            start: string | ("first_data" | "joined" | "now");
+        };
+        /** EntityAssignmentsBulkItem */
+        EntityAssignmentsBulkItem: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Name */
+            name: string;
+        };
+        /** EntityAssignmentsBulkResult */
+        EntityAssignmentsBulkResult: {
+            /** Created */
+            created: number;
+            /** Attribution Jobs */
+            attribution_jobs: number;
+            /** Skipped */
+            skipped: components["schemas"]["EntityAssignmentsBulkSkipped"][];
+        };
+        /** EntityAssignmentsBulkSkipped */
+        EntityAssignmentsBulkSkipped: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
         };
         /**
          * EntityBulkMove
@@ -9340,24 +9505,6 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /**
-         * HandoverRequest
-         * @description Move a device to another project from `effective_at` (architecture 28.10).
-         */
-        HandoverRequest: {
-            /**
-             * Project Id
-             * Format: uuid
-             */
-            project_id: string;
-            /**
-             * Effective At
-             * Format: date-time
-             */
-            effective_at: string;
-            /** Reason */
-            reason?: string | null;
-        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -10367,6 +10514,92 @@ export interface components {
              * Format: date-time
              */
             last_time: string;
+        };
+        /** MoveDeviceRead */
+        MoveDeviceRead: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Project Id
+             * @description The project it leaves
+             */
+            project_id: string | null;
+            /** Project Name */
+            project_name?: string | null;
+            /** Spans */
+            spans: components["schemas"]["MoveSpanRead"][];
+            /** Entities Along */
+            entities_along: components["schemas"]["MoveEntityRead"][];
+            /** Entities Staying */
+            entities_staying: components["schemas"]["MoveEntityRead"][];
+            /** Skipped */
+            skipped?: string | null;
+            /** Attribution Job Id */
+            attribution_job_id?: string | null;
+        };
+        /** MoveEntityRead */
+        MoveEntityRead: {
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name?: string | null;
+            /** Moves */
+            moves: boolean;
+            /**
+             * Reason
+             * @description Why it stays, or why it is skipped
+             */
+            reason?: string | null;
+        };
+        /**
+         * MoveResult
+         * @description What a move does, or would do with `preview`: per device and per entity.
+         */
+        MoveResult: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
+            /** Preview */
+            preview: boolean;
+            /** Devices */
+            devices: components["schemas"]["MoveDeviceRead"][];
+            /** Entities */
+            entities: components["schemas"]["MoveEntityRead"][];
+            /** Moved Devices */
+            moved_devices: number;
+            /** Moved Entities */
+            moved_entities: number;
+            /** Attribution Jobs */
+            attribution_jobs: number;
+        };
+        /** MoveSpanRead */
+        MoveSpanRead: {
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /** End */
+            end: string | null;
         };
         /** NetworkLocationsResponse */
         NetworkLocationsResponse: {
@@ -14175,6 +14408,41 @@ export interface operations {
             };
         };
     };
+    move_entities_api_v1_projects__project_id__entities_move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntitiesMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     bulk_move_entities_api_v1_projects__project_id__entities_bulk_move_post: {
         parameters: {
             query?: never;
@@ -14955,6 +15223,41 @@ export interface operations {
             };
         };
     };
+    create_entity_assignments_bulk_api_v1_projects__project_id__entity_assignments_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityAssignmentsBulk"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityAssignmentsBulkResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     extend_entity_assignment_start_api_v1_projects__project_id__entity_assignments__assignment_id__extend_start_post: {
         parameters: {
             query?: never;
@@ -15388,6 +15691,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_devices_api_v1_devices_move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevicesMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveResult"];
                 };
             };
             /** @description Validation Error */
@@ -15989,41 +16325,6 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProjectAssignmentRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    handover_api_v1_devices__device_id__handover_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                device_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["HandoverRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
                 headers: {
                     [name: string]: unknown;
                 };

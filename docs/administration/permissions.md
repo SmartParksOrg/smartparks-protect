@@ -48,9 +48,9 @@ An admin sets the scope under Members in the Sees column, and an invitation can 
 
 ## Devices and history
 
-A device is visible to server admins and to members of every project the device was ever assigned to, within their scope. Members see the assignments that concern their projects, not those of other projects. After a handover, the old project keeps its history and does not see new data (architecture 28.12).
+A device is visible to server admins and to members of every project the device was ever assigned to, within their scope. Members see the assignments that concern their projects, not those of other projects. After a move, the old project keeps what lies before the chosen moment and does not see the rest; a device moved with its whole history leaves the old project.
 
-Assigning a device to a project needs server admin or `devices:write` in that project. A handover between projects needs server admin or that permission in both projects.
+Assigning a device to a project needs server admin or project admin in that project, one device or many at once. A move between projects, of a device or of an entity with its devices, needs server admin or project admin in every project involved. Creating an entity per device from a selection needs `devices:write` and `entities:write`.
 
 ## Registration
 

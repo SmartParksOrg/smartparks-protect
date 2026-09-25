@@ -2160,6 +2160,65 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/entities/move": {
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Move Entities",
+    "description": "Move entities of this project to another one, whole, with their history and with their\ndevices over the spans they tracked them (decision D293); a device reused on another\nentity of this project keeps that part here. With `preview` nothing is written. Server\nadmins, or admins of both projects.",
+    "operationId": "move_entities_api_v1_projects__project_id__entities_move_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EntitiesMove"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MoveResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/entities/bulk-move": {
    "post": {
     "tags": [
@@ -3612,6 +3671,65 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/entity-assignments/bulk": {
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Create Entity Assignments Bulk",
+    "description": "An entity per device, named per row, of one type and group, tracked by its device from\nthe chosen start (decision D294): the device's first data, since it joined the project,\nnow, or a moment. A device not in the project at that start, one tracking an entity from\nthen on, and a name the project has already are skipped with the reason; the rest are\nmade in one transaction and the records inside each range get the entity through a job.",
+    "operationId": "create_entity_assignments_bulk_api_v1_projects__project_id__entity_assignments_bulk_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EntityAssignmentsBulk"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntityAssignmentsBulkResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/entity-assignments/{assignment_id}/extend-start": {
    "post": {
     "tags": [
@@ -4494,13 +4612,60 @@
     }
    }
   },
+  "/api/v1/devices/move": {
+   "post": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Move Devices",
+    "description": "Move devices to another project from a moment each, with the history from that moment\n(decision D292): the old assignments are cut there, a new one opens, an attribution job\nrewrites the records. An entity whose whole history lies in the move goes along; one that\nkeeps history behind stays and loses the device from the moment on (decision D293). With\n`preview` nothing is written and the answer says what would happen. Server admins, or\nadmins of the target and of every project a device leaves.",
+    "operationId": "move_devices_api_v1_devices_move_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DevicesMove"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MoveResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
   "/api/v1/devices/bulk-assign": {
    "post": {
     "tags": [
      "devices"
     ],
     "summary": "Bulk Assign",
-    "description": "Devices in no project, onboarded in bulk, join a project in one go (decision D122): each\ngets an assignment from its first data unless a start is given, optionally an entity of one\ntype with the device's name, and the records inside the range get the project (D103). A\ndevice assigned anywhere in that range is skipped; an entity name already taken in the\nproject leaves that device without one.",
+    "description": "Devices in no project, onboarded in bulk, join a project in one go (decision D122): each\ngets an assignment from its first data unless a start is given, optionally an entity of one\ntype with the device's name (or the name given per device, decision D294), and the records\ninside the range get the project (D103). A device assigned anywhere in that range is\nskipped; an entity name already taken in the project leaves that device without one.\nServer admins, or admins of the target project.",
     "operationId": "bulk_assign_api_v1_devices_bulk_assign_post",
     "requestBody": {
      "content": {
@@ -5502,65 +5667,6 @@
     },
     "responses": {
      "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ProjectAssignmentRead"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/v1/devices/{device_id}/handover": {
-   "post": {
-    "tags": [
-     "devices"
-    ],
-    "summary": "Handover",
-    "description": "Move the device to another project from `effective_at`: the current project assignment and\nentity assignment close at that moment, a new project assignment opens. History is untouched.\nAllowed for server admins and for admins of both the current and the target project.",
-    "operationId": "handover_api_v1_devices__device_id__handover_post",
-    "security": [
-     {
-      "OAuth2PasswordBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "device_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "string",
-       "format": "uuid",
-       "title": "Device Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/HandoverRequest"
-       }
-      }
-     }
-    },
-    "responses": {
-     "201": {
       "description": "Successful Response",
       "content": {
        "application/json": {
@@ -24967,6 +25073,24 @@
        }
       ],
       "title": "Group Id"
+     },
+     "names": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "string"
+        },
+        "propertyNames": {
+         "format": "uuid"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Names",
+      "description": "The entity's name per device id where it should not be the device's"
      }
     },
     "type": "object",
@@ -30221,6 +30345,79 @@
     ],
     "title": "DeviceWithAssignments"
    },
+   "DevicesMove": {
+    "properties": {
+     "device_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Device Ids"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "start": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "string",
+        "enum": [
+         "first_data",
+         "joined",
+         "now"
+        ]
+       }
+      ],
+      "title": "Start",
+      "default": "first_data"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id",
+      "description": "The target project's group the entities that come along join"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "preview": {
+      "type": "boolean",
+      "title": "Preview",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_ids",
+     "project_id"
+    ],
+    "title": "DevicesMove",
+    "description": "Move devices to another project from a moment each (decision D292): the device's\nfirst data, since it joined its current project, now, or a given moment. `preview`\nanswers what the move would do without doing it."
+   },
    "DisconnectApplicationsResult": {
     "properties": {
      "disconnected": {
@@ -30270,6 +30467,60 @@
      "catalog"
     ],
     "title": "DriverCatalog"
+   },
+   "EntitiesMove": {
+    "properties": {
+     "entity_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Entity Ids"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "preview": {
+      "type": "boolean",
+      "title": "Preview",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "entity_ids",
+     "project_id"
+    ],
+    "title": "EntitiesMove",
+    "description": "Move entities of this project to another one, whole, with their devices over the spans\nthey tracked them (decision D293)."
    },
    "EntityAssignmentCreate": {
     "properties": {
@@ -30534,6 +30785,132 @@
      "entity_id"
     ],
     "title": "EntityAssignmentRead"
+   },
+   "EntityAssignmentsBulk": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/EntityAssignmentsBulkItem"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Items"
+     },
+     "entity_type_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Entity Type Id"
+     },
+     "group_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group Id"
+     },
+     "start": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "string",
+        "enum": [
+         "first_data",
+         "joined",
+         "now"
+        ]
+       }
+      ],
+      "title": "Start",
+      "default": "first_data"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "entity_type_id"
+    ],
+    "title": "EntityAssignmentsBulk",
+    "description": "One new entity per device, named per row, of one type and group, each tracked by its\ndevice from a start of choice (decision D294)."
+   },
+   "EntityAssignmentsBulkItem": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "name"
+    ],
+    "title": "EntityAssignmentsBulkItem"
+   },
+   "EntityAssignmentsBulkResult": {
+    "properties": {
+     "created": {
+      "type": "integer",
+      "title": "Created"
+     },
+     "attribution_jobs": {
+      "type": "integer",
+      "title": "Attribution Jobs"
+     },
+     "skipped": {
+      "items": {
+       "$ref": "#/components/schemas/EntityAssignmentsBulkSkipped"
+      },
+      "type": "array",
+      "title": "Skipped"
+     }
+    },
+    "type": "object",
+    "required": [
+     "created",
+     "attribution_jobs",
+     "skipped"
+    ],
+    "title": "EntityAssignmentsBulkResult"
+   },
+   "EntityAssignmentsBulkSkipped": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "name",
+     "reason"
+    ],
+    "title": "EntityAssignmentsBulkSkipped"
    },
    "EntityBulkMove": {
     "properties": {
@@ -33565,38 +33942,6 @@
     "type": "object",
     "title": "HTTPValidationError"
    },
-   "HandoverRequest": {
-    "properties": {
-     "project_id": {
-      "type": "string",
-      "format": "uuid",
-      "title": "Project Id"
-     },
-     "effective_at": {
-      "type": "string",
-      "format": "date-time",
-      "title": "Effective At"
-     },
-     "reason": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Reason"
-     }
-    },
-    "type": "object",
-    "required": [
-     "project_id",
-     "effective_at"
-    ],
-    "title": "HandoverRequest",
-    "description": "Move a device to another project from `effective_at` (architecture 28.10)."
-   },
    "HealthResponse": {
     "properties": {
      "status": {
@@ -36471,6 +36816,233 @@
      "last_time"
     ],
     "title": "MetricWithData"
+   },
+   "MoveDeviceRead": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id",
+      "description": "The project it leaves"
+     },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name"
+     },
+     "spans": {
+      "items": {
+       "$ref": "#/components/schemas/MoveSpanRead"
+      },
+      "type": "array",
+      "title": "Spans"
+     },
+     "entities_along": {
+      "items": {
+       "$ref": "#/components/schemas/MoveEntityRead"
+      },
+      "type": "array",
+      "title": "Entities Along"
+     },
+     "entities_staying": {
+      "items": {
+       "$ref": "#/components/schemas/MoveEntityRead"
+      },
+      "type": "array",
+      "title": "Entities Staying"
+     },
+     "skipped": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Skipped"
+     },
+     "attribution_job_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Attribution Job Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "name",
+     "project_id",
+     "spans",
+     "entities_along",
+     "entities_staying"
+    ],
+    "title": "MoveDeviceRead"
+   },
+   "MoveEntityRead": {
+    "properties": {
+     "entity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Entity Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name"
+     },
+     "moves": {
+      "type": "boolean",
+      "title": "Moves"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason",
+      "description": "Why it stays, or why it is skipped"
+     }
+    },
+    "type": "object",
+    "required": [
+     "entity_id",
+     "name",
+     "project_id",
+     "moves"
+    ],
+    "title": "MoveEntityRead"
+   },
+   "MoveResult": {
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "project_name": {
+      "type": "string",
+      "title": "Project Name"
+     },
+     "preview": {
+      "type": "boolean",
+      "title": "Preview"
+     },
+     "devices": {
+      "items": {
+       "$ref": "#/components/schemas/MoveDeviceRead"
+      },
+      "type": "array",
+      "title": "Devices"
+     },
+     "entities": {
+      "items": {
+       "$ref": "#/components/schemas/MoveEntityRead"
+      },
+      "type": "array",
+      "title": "Entities"
+     },
+     "moved_devices": {
+      "type": "integer",
+      "title": "Moved Devices"
+     },
+     "moved_entities": {
+      "type": "integer",
+      "title": "Moved Entities"
+     },
+     "attribution_jobs": {
+      "type": "integer",
+      "title": "Attribution Jobs"
+     }
+    },
+    "type": "object",
+    "required": [
+     "project_id",
+     "project_name",
+     "preview",
+     "devices",
+     "entities",
+     "moved_devices",
+     "moved_entities",
+     "attribution_jobs"
+    ],
+    "title": "MoveResult",
+    "description": "What a move does, or would do with `preview`: per device and per entity."
+   },
+   "MoveSpanRead": {
+    "properties": {
+     "start": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Start"
+     },
+     "end": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "End"
+     }
+    },
+    "type": "object",
+    "required": [
+     "start",
+     "end"
+    ],
+    "title": "MoveSpanRead"
    },
    "NetworkLocationsResponse": {
     "properties": {

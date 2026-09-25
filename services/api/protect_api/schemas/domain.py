@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -587,6 +587,38 @@ class EntityAssignmentCreate(_Validity):
         return self
 
 
+class EntityAssignmentsBulkItem(BaseModel):
+    device_id: uuid.UUID
+    name: str = Field(min_length=1, max_length=200)
+
+
+class EntityAssignmentsBulk(BaseModel):
+    """One new entity per device, named per row, of one type and group, each tracked by its
+    device from a start of choice (decision D294)."""
+
+    items: list[EntityAssignmentsBulkItem] = Field(min_length=1, max_length=500)
+    entity_type_id: uuid.UUID
+    group_id: uuid.UUID | None = None
+    start: datetime | Literal["first_data", "joined", "now"] = "first_data"
+
+    @field_validator("start")
+    @classmethod
+    def _aware(cls, value: datetime | str) -> datetime | str:
+        return require_aware(value) if isinstance(value, datetime) else value
+
+
+class EntityAssignmentsBulkSkipped(BaseModel):
+    device_id: uuid.UUID
+    name: str
+    reason: str
+
+
+class EntityAssignmentsBulkResult(BaseModel):
+    created: int
+    attribution_jobs: int
+    skipped: list[EntityAssignmentsBulkSkipped]
+
+
 class AssignmentEnd(BaseModel):
     valid_to: datetime
 
@@ -884,17 +916,74 @@ class DeviceReportingUpdate(BaseModel):
     )
 
 
-class HandoverRequest(BaseModel):
-    """Move a device to another project from `effective_at` (architecture 28.10)."""
+class DevicesMove(BaseModel):
+    """Move devices to another project from a moment each (decision D292): the device's
+    first data, since it joined its current project, now, or a given moment. `preview`
+    answers what the move would do without doing it."""
+
+    device_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    project_id: uuid.UUID
+    start: datetime | Literal["first_data", "joined", "now"] = "first_data"
+    group_id: uuid.UUID | None = Field(
+        default=None, description="The target project's group the entities that come along join"
+    )
+    reason: str | None = None
+    preview: bool = False
+
+    @field_validator("start")
+    @classmethod
+    def _aware(cls, value: datetime | str) -> datetime | str:
+        return require_aware(value) if isinstance(value, datetime) else value
+
+
+class EntitiesMove(BaseModel):
+    """Move entities of this project to another one, whole, with their devices over the spans
+    they tracked them (decision D293)."""
+
+    entity_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    project_id: uuid.UUID
+    group_id: uuid.UUID | None = None
+    reason: str | None = None
+    preview: bool = False
+
+
+class MoveSpanRead(BaseModel):
+    start: datetime
+    end: datetime | None
+
+
+class MoveEntityRead(BaseModel):
+    entity_id: uuid.UUID
+    name: str
+    project_id: uuid.UUID
+    project_name: str | None = None
+    moves: bool
+    reason: str | None = Field(default=None, description="Why it stays, or why it is skipped")
+
+
+class MoveDeviceRead(BaseModel):
+    device_id: uuid.UUID
+    name: str
+    project_id: uuid.UUID | None = Field(description="The project it leaves")
+    project_name: str | None = None
+    spans: list[MoveSpanRead]
+    entities_along: list[MoveEntityRead]
+    entities_staying: list[MoveEntityRead]
+    skipped: str | None = None
+    attribution_job_id: uuid.UUID | None = None
+
+
+class MoveResult(BaseModel):
+    """What a move does, or would do with `preview`: per device and per entity."""
 
     project_id: uuid.UUID
-    effective_at: datetime
-    reason: str | None = None
-
-    @field_validator("effective_at")
-    @classmethod
-    def _aware(cls, value: datetime) -> datetime:
-        return require_aware(value)
+    project_name: str
+    preview: bool
+    devices: list[MoveDeviceRead]
+    entities: list[MoveEntityRead]
+    moved_devices: int
+    moved_entities: int
+    attribution_jobs: int
 
 
 class ExternalLink(BaseModel):

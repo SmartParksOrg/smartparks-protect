@@ -1368,9 +1368,9 @@ that question: not who an animal met, but how its heart was doing while it did.
 
 - [x] 36a Jobs never block (2026-09-25): the follow-up job, the worker's wait, the lane by device, the hold removed from every endpoint and the bulk assignment, the pages' buttons enabled, the callout's text, the tests of the fold and the follow-up.
 - [x] 36b The rewrite covers every table (2026-09-25): contacts, state history, events and alerts, log files, commands; `count_records` and the job's counts follow; a test per table.
-- [ ] 36c The move of devices: `shared/domain/moves.py`, `POST /devices/move` with `preview`, the handover endpoint replaced, the device page's "Move to project" and the admin page's form, tests (from first data with the entity along, from a date with the entity staying, a split project assignment, the old project's visibility).
-- [ ] 36d The move of entities: `POST /projects/{id}/entities/move` with `preview`, the entity page's "Move to project", tests (a device reused on another animal keeps that history behind).
-- [ ] 36e Bulk: `entity-assignments/bulk`, `bulk-assign` with names and a date and open to the target's admins, the Devices page's "Create entities" and "Move to project" in both scopes, the Entities page's "Move to project", the preview table, tests.
+- [x] 36c The move of devices (2026-09-25): `shared/domain/moves.py`, `POST /devices/move` with `preview`, the handover endpoint replaced, the device page's "Move to project" and the admin page's form, tests (from first data with the entity along, from a date with the entity staying, a split project assignment, the old project's visibility).
+- [x] 36d The move of entities (2026-09-25): `POST /projects/{id}/entities/move` with `preview`, the entity page's "Move to project", tests (a device reused on another animal keeps that history behind).
+- [x] 36e Bulk (2026-09-25): `entity-assignments/bulk`, `bulk-assign` with names and a date and open to the target's admins, the Devices page's "Create entities" and "Move to project" in both scopes, the Entities page's "Move to project", the preview table, tests.
 - [ ] 36f The live map's right column at every size, a Vitest for the settings bar closing with its card, the screenshot sweep at 390, 768 and 1440 px.
 - [ ] 36g Docs (`domain-model.md`'s handover section rewritten as moves, `permissions.md`, `pages.md`, ADR 0038, `DEVELOPERS.md`), the changelog, Dutch for the new strings, the OpenAPI schema, CI green, deployed to dev, Tim reads it.
 

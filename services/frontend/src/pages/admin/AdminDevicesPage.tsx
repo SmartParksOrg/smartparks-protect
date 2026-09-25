@@ -35,6 +35,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AssignmentStartField } from "@/components/devices/AssignmentStartField";
+import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import {
   Dialog,
   DialogContent,
@@ -66,11 +67,8 @@ const deviceSchema = z.object({
 });
 type DeviceValues = z.infer<typeof deviceSchema>;
 
-function nowIso(): string {
-  return new Date().toISOString().slice(0, 16);
-}
 
-/** Device management: create, identities, project assignment, handover, entity assignment. */
+/** Device management: create, identities, project assignment, a move to another project, entity assignment. */
 function ManageDevice({
   deviceId,
   onClose,
@@ -110,11 +108,7 @@ function ManageDevice({
     queryFn: () =>
       api.get<DeviceDataSpan>(`/api/v1/devices/${deviceId}/data-span`),
   });
-  const [handover, setHandover] = useState({
-    project_id: "",
-    effective_at: nowIso(),
-    reason: "",
-  });
+  const [moving, setMoving] = useState(false);
   const [entityAssignment, setEntityAssignment] = useState({
     project_id: "",
     entity_id: "",
@@ -147,18 +141,6 @@ function ManageDevice({
       }),
     invalidate,
     success: t("Assigned to project"),
-  });
-  const doHandover = useMutationToast({
-    mutationFn: () =>
-      api.post(`/api/v1/devices/${deviceId}/handover`, {
-        body: {
-          project_id: handover.project_id,
-          effective_at: new Date(handover.effective_at).toISOString(),
-          reason: handover.reason || null,
-        },
-      }),
-    invalidate,
-    success: t("Device handed over"),
   });
   const assignEntity = useMutationToast({
     mutationFn: () =>
@@ -275,63 +257,25 @@ function ManageDevice({
                 )}
               </ul>
               {currentProject ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">
-                      {t("Hand over to another project")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-2 sm:grid-cols-2">
-                    <Select
-                      value={handover.project_id}
-                      onValueChange={(v) =>
-                        setHandover({ ...handover, project_id: v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("Destination project")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {projects.data?.items
-                          .filter((p) => p.id !== currentProject.project_id)
-                          .map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      type="datetime-local"
-                      value={handover.effective_at}
-                      onChange={(e) =>
-                        setHandover({
-                          ...handover,
-                          effective_at: e.target.value,
-                        })
-                      }
-                      aria-label={t("Effective at")}
-                    />
-                    <Input
-                      placeholder={t("Reason")}
-                      value={handover.reason}
-                      onChange={(e) =>
-                        setHandover({ ...handover, reason: e.target.value })
-                      }
-                    />
-                    <Button
-                      disabled={!handover.project_id || doHandover.isPending}
-                      onClick={() => doHandover.mutate()}
-                    >
-                      {t("Hand over")}
-                    </Button>
-                    <p className="text-xs text-muted-foreground sm:col-span-2">
-                      {t(
-                        "Closes the current project and entity assignment at the effective time and opens the new one. History is untouched.",
-                      )}
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="space-y-2">
+                  <Button variant="outline" onClick={() => setMoving(true)}>
+                    {t("Move to project…")}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      "Moves the device with its history from a moment of choice; from now is a handover.",
+                    )}
+                  </p>
+                  <MoveToProjectDialog
+                    subject={{
+                      kind: "devices",
+                      items: [{ id: d.id, name: d.name }],
+                      currentProjectId: currentProject.project_id,
+                    }}
+                    open={moving}
+                    onOpenChange={setMoving}
+                  />
+                </div>
               ) : (
                 <Card>
                   <CardHeader>

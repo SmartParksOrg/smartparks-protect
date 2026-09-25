@@ -21,8 +21,14 @@ from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.crud import apply_patch, flush_or_409, get_or_404, range_bounds
-from protect_api.deps import accessible_project_ids, require_server_admin
+from protect_api.deps import (
+    accessible_project_ids,
+    is_project_admin,
+    language,
+    require_server_admin,
+)
 from protect_api.device_reads import walk_reads, with_state
+from protect_api.moves import audit_plan, move_result, require_admin_of_every_project
 from protect_api.pagination import Page, PageResponse, page, paginate
 from protect_api.pictures import drop_picture, picture_response, store_picture
 from protect_api.routers.entities import assignment_read
@@ -45,6 +51,7 @@ from protect_api.schemas.domain import (
     DeviceSettingRead,
     DeviceSettingsRead,
     DeviceSettingWrite,
+    DevicesMove,
     DeviceStaticPositionUpdate,
     DeviceTrap,
     DeviceTrapUpdate,
@@ -52,10 +59,10 @@ from protect_api.schemas.domain import (
     DeviceWithAssignments,
     ExternalIdentityCreate,
     ExternalIdentityRead,
-    HandoverRequest,
     ImportResult,
     ImportRowResult,
     LearnedInterval,
+    MoveResult,
     ProjectAssignmentCreate,
     ProjectAssignmentExtended,
     ProjectAssignmentRead,
@@ -83,6 +90,7 @@ from shared.domain.battery import resolve as resolve_battery
 from shared.domain.contacts import resolve_waiting, scanning_of, watches_for_people
 from shared.domain.device_settings import known_settings, record_setting
 from shared.domain.links import resolve_links
+from shared.domain.moves import apply_plan, first_data_at, plan_device_moves
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.domain.reporting import (
     LEARN_DAYS,
@@ -97,7 +105,7 @@ from shared.domain.static_place import (
     place_past_sightings_of,
 )
 from shared.domain.trap import TRAP_ATTRIBUTE, closed_when_active
-from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource, Role
+from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource
 from shared.models import (
     AttributionJob,
     ConnectivityState,
@@ -119,7 +127,6 @@ from shared.models import (
     Measurement,
     Position,
     Project,
-    ProjectMembership,
     SourceEvent,
     User,
 )
@@ -144,19 +151,8 @@ def project_assignment_read(
     )
 
 
-async def _is_project_admin(session: AsyncSession, user: User, project_id: uuid.UUID) -> bool:
-    if user.is_superuser:
-        return True
-    role = await session.scalar(
-        select(ProjectMembership.role).where(
-            ProjectMembership.user_id == user.id, ProjectMembership.project_id == project_id
-        )
-    )
-    return role == Role.PROJECT_ADMIN
-
-
 async def _require_project_admin(session: AsyncSession, user: User, project_id: uuid.UUID) -> None:
-    if not await _is_project_admin(session, user, project_id):
+    if not await is_project_admin(session, user, project_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Project admin access required")
 
 
@@ -525,6 +521,9 @@ class BulkAssign(BaseModel):
         None, description="Also create an entity of this type per device, named as the device"
     )
     group_id: uuid.UUID | None = None
+    names: dict[uuid.UUID, str] | None = Field(
+        None, description="The entity's name per device id where it should not be the device's"
+    )
 
 
 class BulkAssignSkipped(BaseModel):
@@ -544,42 +543,59 @@ class BulkAssignResult(BaseModel):
     skipped: list[BulkAssignSkipped]
 
 
-async def _first_data_at(session: AsyncSession, device_id: uuid.UUID) -> datetime | None:
-    """The earliest the device produced anything: a record, an identity seen, a log file."""
-    candidates: list[datetime] = []
-    for model in (Position, Measurement):
-        first = await session.scalar(
-            select(func.min(effective_time(model))).where(model.device_id == device_id)
-        )
-        if first is not None:
-            candidates.append(first)
-    for value in (
-        await session.scalar(
-            select(func.min(ExternalIdentity.first_seen_at)).where(
-                ExternalIdentity.device_id == device_id
-            )
-        ),
-        await session.scalar(
-            select(func.min(DeviceLogFile.period_start)).where(DeviceLogFile.device_id == device_id)
-        ),
-    ):
-        if value is not None:
-            candidates.append(value)
-    return min(candidates, default=None)
+@router.post("/move", response_model=MoveResult)
+async def move_devices(
+    body: DevicesMove,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+    lang: str = Depends(language),
+) -> MoveResult:
+    """Move devices to another project from a moment each, with the history from that moment
+    (decision D292): the old assignments are cut there, a new one opens, an attribution job
+    rewrites the records. An entity whose whole history lies in the move goes along; one that
+    keeps history behind stays and loses the device from the moment on (decision D293). With
+    `preview` nothing is written and the answer says what would happen. Server admins, or
+    admins of the target and of every project a device leaves."""
+    project = await get_or_404(session, Project, body.project_id, "Project")
+    if body.group_id is not None:
+        group = await get_or_404(session, Group, body.group_id, "Group")
+        if group.project_id != project.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found in the target project")
+    plan = await plan_device_moves(
+        session,
+        device_ids=body.device_ids,
+        project_id=project.id,
+        start=body.start,
+        group_id=body.group_id,
+    )
+    await require_admin_of_every_project(session, user, plan)
+    if body.preview:
+        return await move_result(session, plan, preview=True, language=lang)
+    jobs = await apply_plan(session, plan, user_id=user.id, reason=body.reason)
+    start = body.start.isoformat() if isinstance(body.start, datetime) else body.start
+    await audit_plan(session, user, plan, start)
+    result = await move_result(session, plan, preview=False, language=lang)
+    await session.commit()
+    for job in jobs:
+        await publish_job(bus, job)
+    return result
 
 
 @router.post("/bulk-assign", response_model=BulkAssignResult, status_code=status.HTTP_201_CREATED)
 async def bulk_assign(
     body: BulkAssign,
-    user: User = Depends(require_server_admin),
+    user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
     bus: RedisStreamsBus = Depends(get_bus),
 ) -> BulkAssignResult:
     """Devices in no project, onboarded in bulk, join a project in one go (decision D122): each
     gets an assignment from its first data unless a start is given, optionally an entity of one
-    type with the device's name, and the records inside the range get the project (D103). A
-    device assigned anywhere in that range is skipped; an entity name already taken in the
-    project leaves that device without one."""
+    type with the device's name (or the name given per device, decision D294), and the records
+    inside the range get the project (D103). A device assigned anywhere in that range is
+    skipped; an entity name already taken in the project leaves that device without one.
+    Server admins, or admins of the target project."""
+    await _require_project_admin(session, user, body.project_id)
     project = await get_or_404(session, Project, body.project_id, "Project")
     if body.valid_from is not None:
         body.valid_from = require_aware(body.valid_from)
@@ -599,6 +615,11 @@ async def bulk_assign(
             await session.scalars(select(Device).where(Device.id.in_(set(body.device_ids))))
         ).all()
     }
+    names = body.names or {}
+
+    def entity_name(device: Device) -> str:
+        return (names.get(device.id) or device.name).strip() or device.name
+
     taken_entities: set[str] = set()
     if body.entity_type_id is not None:
         taken_entities = set(
@@ -606,7 +627,7 @@ async def bulk_assign(
                 await session.scalars(
                     select(Entity.name).where(
                         Entity.project_id == project.id,
-                        Entity.name.in_([d.name for d in devices.values()]),
+                        Entity.name.in_([entity_name(d) for d in devices.values()]),
                     )
                 )
             ).all()
@@ -634,7 +655,7 @@ async def bulk_assign(
         if device is None:
             skipped.append(BulkAssignSkipped(device_id=device_id, reason="not found"))
             continue
-        start = body.valid_from or await _first_data_at(session, device.id) or now
+        start = body.valid_from or await first_data_at(session, device.id) or now
         overlapping = await session.scalar(
             select(DeviceProjectAssignment)
             .where(
@@ -663,12 +684,12 @@ async def bulk_assign(
             )
         )
         details: dict[str, Any] = {"device_id": str(device.id), "valid_from": start.isoformat()}
-        if body.entity_type_id is not None and device.name not in taken_entities:
+        if body.entity_type_id is not None and entity_name(device) not in taken_entities:
             entity = Entity(
                 project_id=project.id,
                 entity_type_id=body.entity_type_id,
                 group_id=body.group_id,
-                name=device.name,
+                name=entity_name(device),
             )
             session.add(entity)
             await session.flush()
@@ -681,7 +702,7 @@ async def bulk_assign(
                     created_by_user_id=user.id,
                 )
             )
-            taken_entities.add(device.name)
+            taken_entities.add(entity_name(device))
             entities += 1
             details["entity_id"] = str(entity.id)
         await flush_or_409(session, "Bulk assignment")
@@ -1533,7 +1554,7 @@ async def reattribute_device(
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Server admin access required")
         await _require_project_admin(session, user, attribution.project_id)
     now = utc_now()
-    start = body.valid_from or await _first_data_at(session, device.id)
+    start = body.valid_from or await first_data_at(session, device.id)
     if start is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The device has no data yet")
     end = body.valid_to or now
@@ -1656,97 +1677,6 @@ async def end_project_assignment(
     )
     await session.commit()
     return project_assignment_read(assignment)
-
-
-@router.post(
-    "/{device_id}/handover",
-    response_model=ProjectAssignmentRead,
-    status_code=status.HTTP_201_CREATED,
-)
-async def handover(
-    device_id: uuid.UUID,
-    body: HandoverRequest,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_session),
-    bus: RedisStreamsBus = Depends(get_bus),
-) -> ProjectAssignmentRead:
-    """Move the device to another project from `effective_at`: the current project assignment and
-    entity assignment close at that moment, a new project assignment opens. History is untouched.
-    Allowed for server admins and for admins of both the current and the target project."""
-    device = await get_or_404(session, Device, device_id, "Device")
-    await get_or_404(session, Project, body.project_id, "Project")
-    current = await session.scalar(
-        select(DeviceProjectAssignment).where(
-            DeviceProjectAssignment.device_id == device.id,
-            DeviceProjectAssignment.validity.op("@>")(body.effective_at),
-        )
-    )
-    if current is None:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "Device has no project assignment at effective_at; assign it instead",
-        )
-    if current.project_id == body.project_id:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Device is already in that project")
-    await _require_project_admin(session, user, current.project_id)
-    await _require_project_admin(session, user, body.project_id)
-    current_from, _ = range_bounds(current.validity)
-    if body.effective_at <= current_from:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "effective_at must be after the current assignment started",
-        )
-    # A later assignment that overlaps the new open range is caught by the exclusion constraint.
-    current.validity = Range(current_from, body.effective_at, bounds="[)")
-    entity_assignment = await session.scalar(
-        select(DeviceEntityAssignment).where(
-            DeviceEntityAssignment.device_id == device.id,
-            DeviceEntityAssignment.validity.op("@>")(body.effective_at),
-        )
-    )
-    if entity_assignment is not None:
-        ea_from, _ = range_bounds(entity_assignment.validity)
-        entity_assignment.validity = Range(ea_from, body.effective_at, bounds="[)")
-    new = DeviceProjectAssignment(
-        device_id=device.id,
-        project_id=body.project_id,
-        validity=Range(body.effective_at, None, bounds="[)"),
-        reason=body.reason,
-        created_by_user_id=user.id,
-    )
-    session.add(new)
-    await flush_or_409(session, "Handover")
-    # Records already decoded after the handover moment move with the device (D103, D206).
-    queued = await queue_job(
-        session,
-        device_id=device.id,
-        start=body.effective_at,
-        end=utc_now(),
-        reason="device.handover",
-        user=user,
-        project_id=body.project_id,
-    )
-    await record_audit(
-        session,
-        user=user,
-        action="device.handover",
-        object_type="device",
-        object_id=str(device.id),
-        project_id=body.project_id,
-        details={
-            "from_project_id": str(current.project_id),
-            "to_project_id": str(body.project_id),
-            "effective_at": body.effective_at.isoformat(),
-            "entity_assignment_closed": str(entity_assignment.id) if entity_assignment else None,
-            "attribution_job_id": str(queued.job.id) if queued.job else None,
-        },
-    )
-    await session.commit()
-    if queued.created and queued.job is not None:
-        await publish_job(bus, queued.job)
-    read = project_assignment_read(new)
-    read.attribution_job = job_read(queued.job)
-    return read
 
 
 # External identities

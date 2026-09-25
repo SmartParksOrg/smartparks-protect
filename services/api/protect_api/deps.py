@@ -199,3 +199,15 @@ def language(accept_language: Annotated[str | None, Header(alias="Accept-Languag
     `Accept-Language` header, English otherwise. The server's own texts are translated on
     the way out with it."""
     return resolve_language(accept_language)
+
+
+async def is_project_admin(session: AsyncSession, user: User, project_id: uuid.UUID) -> bool:
+    """A server admin, or a member with the built-in project admin role."""
+    if user.is_superuser:
+        return True
+    role = await session.scalar(
+        select(ProjectMembership.role).where(
+            ProjectMembership.user_id == user.id, ProjectMembership.project_id == project_id
+        )
+    )
+    return role == Role.PROJECT_ADMIN

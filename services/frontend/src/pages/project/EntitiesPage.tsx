@@ -19,6 +19,7 @@ import { AssignDeviceDialog } from "@/components/entities/AssignDeviceDialog";
 import { EntityDialog } from "@/components/entities/EntityDialog";
 import { GroupSelect } from "@/components/entities/GroupSelect";
 import { MoveToGroupDialog } from "@/components/entities/MoveToGroupDialog";
+import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { Icon } from "@/components/icons/Icon";
 import { Button } from "@/components/ui/button";
 import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
@@ -45,6 +46,7 @@ export function EntitiesPage() {
   const [group, setGroup] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState<string[] | null>(null);
+  const [movingProject, setMovingProject] = useState<Entity[]>([]);
   const [assigning, setAssigning] = useState<Entity | null>(null);
   const entities = usePages<Entity>({
     queryKey: [...queryKeys.entities(projectId), q, group],
@@ -314,6 +316,17 @@ export function EntitiesPage() {
             </Button>
             <Button
               size="sm"
+              variant="outline"
+              onClick={() =>
+                setMovingProject(
+                  entities.items.filter((e) => selected.has(e.id)),
+                )
+              }
+            >
+              {t("Move to project…")}
+            </Button>
+            <Button
+              size="sm"
               variant="ghost"
               onClick={() => setSelected(new Set())}
             >
@@ -373,6 +386,16 @@ export function EntitiesPage() {
         entityIds={moving ?? []}
         open={moving != null}
         onOpenChange={(o) => !o && setMoving(null)}
+        onMoved={() => setSelected(new Set())}
+      />
+      <MoveToProjectDialog
+        subject={{
+          kind: "entities",
+          projectId,
+          items: movingProject.map((e) => ({ id: e.id, name: e.name })),
+        }}
+        open={movingProject.length > 0}
+        onOpenChange={(o) => !o && setMovingProject([])}
         onMoved={() => setSelected(new Set())}
       />
     </>
