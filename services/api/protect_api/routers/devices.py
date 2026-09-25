@@ -16,7 +16,7 @@ from sqlalchemy import Integer, Text, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from protect_api.attribution import hold_while_attributing, job_read, queue_job
+from protect_api.attribution import job_read, queue_job
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
@@ -76,7 +76,7 @@ from shared.curation.effective import effective_time
 from shared.database import get_session
 from shared.device_drivers.registry import DRIVERS
 from shared.domain.assignments import resolve_attribution
-from shared.domain.attribution import active_job, publish_job, recent_jobs
+from shared.domain.attribution import publish_job, recent_jobs
 from shared.domain.battery import BATTERY_ATTRIBUTE
 from shared.domain.battery import PROFILES as BATTERY_PROFILES
 from shared.domain.battery import resolve as resolve_battery
@@ -653,15 +653,6 @@ async def bulk_assign(
             )
             skipped.append(BulkAssignSkipped(device_id=device.id, name=device.name, reason=reason))
             continue
-        if await active_job(session, device.id) is not None:
-            skipped.append(
-                BulkAssignSkipped(
-                    device_id=device.id,
-                    name=device.name,
-                    reason="its records are being attributed, try again later",
-                )
-            )
-            continue
         session.add(
             DeviceProjectAssignment(
                 device_id=device.id,
@@ -742,7 +733,6 @@ async def assign_to_project(
     await _require_project_admin(session, user, body.project_id)
     device = await get_or_404(session, Device, device_id, "Device")
     await get_or_404(session, Project, body.project_id, "Project")
-    await hold_while_attributing(session, device.id)
     if body.valid_to is not None and body.valid_to <= body.valid_from:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "valid_to must be after valid_from"
@@ -1537,7 +1527,6 @@ async def reattribute_device(
     an assignment existed and so carry none, found on the dev server on 2026-09-09. Project
     admins of the device's current project, or a server admin."""
     device = await get_or_404(session, Device, device_id, "Device")
-    await hold_while_attributing(session, device.id)
     attribution = await resolve_attribution(session, device.id, utc_now())
     if not user.is_superuser:
         if attribution.project_id is None:
@@ -1598,7 +1587,6 @@ async def extend_project_assignment_start(
     if assignment.device_id != device_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
     await _require_project_admin(session, user, assignment.project_id)
-    await hold_while_attributing(session, device_id)
     old_from, valid_to = range_bounds(assignment.validity)
     if body.valid_from >= old_from:
         raise HTTPException(
@@ -1650,7 +1638,6 @@ async def end_project_assignment(
     if assignment.device_id != device_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
     await _require_project_admin(session, user, assignment.project_id)
-    await hold_while_attributing(session, device_id)
     valid_from, _ = range_bounds(assignment.validity)
     if body.valid_to <= valid_from:
         raise HTTPException(
@@ -1688,7 +1675,6 @@ async def handover(
     Allowed for server admins and for admins of both the current and the target project."""
     device = await get_or_404(session, Device, device_id, "Device")
     await get_or_404(session, Project, body.project_id, "Project")
-    await hold_while_attributing(session, device.id)
     current = await session.scalar(
         select(DeviceProjectAssignment).where(
             DeviceProjectAssignment.device_id == device.id,

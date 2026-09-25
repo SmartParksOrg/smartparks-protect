@@ -275,7 +275,6 @@ export function EntityPage() {
         ]
       : []),
   ]);
-  const attributing = attribution.active !== null;
   const sp = span.data;
   const beforeEntity =
     sp && current && sp.earliest_entity_assignment_id === current.id
@@ -400,7 +399,7 @@ export function EntityPage() {
                 size="sm"
                 variant="outline"
                 className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
-                disabled={extend.isPending || attributing}
+                disabled={extend.isPending}
                 onClick={() => extend.mutate(sp)}
               >
                 {t("Extend the assignment back to {{date}}", {
@@ -522,7 +521,6 @@ export function EntityPage() {
                   {admin && !current && (
                     <Button
                       size="sm"
-                      disabled={attributing}
                       onClick={() => setAssigning(true)}
                     >
                       <Plus className="size-4" /> {t("Assign device")}
@@ -562,7 +560,6 @@ export function EntityPage() {
                           variant="outline"
                           size="sm"
                           className="ml-auto"
-                          disabled={attributing}
                           onClick={() => setChanging(current)}
                         >
                           {t("Change…")}
@@ -572,7 +569,7 @@ export function EntityPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={release.isPending || attributing}
+                          disabled={release.isPending}
                           onClick={() => release.mutate(current.id)}
                         >
                           {t("Release device")}

@@ -53,18 +53,44 @@ async def rewrite_attribution(
     """Rewrite the project and entity of the device's records whose effective time lies in
     `[start, end)` from the assignments as they stand now (decision D103): after an assignment
     start moved back, records that had no project or the wrong one get the right attribution.
-    Records in a gap get none. Returns the rows touched per table and the entities involved
-    (None stands for the gaps), for the current-state recompute the caller runs; the
+    Records in a gap get none. Every table stamped with a project or an entity is covered
+    (decision D292): positions, measurements, contacts, state history, events with their
+    alerts, commands and log files, each by device and time so a hypertable decompresses the
+    device's segment of the window alone. Returns the rows touched per table and the entities
+    involved (None stands for the gaps), for the current-state recompute the caller runs; the
     attribution job (decision D206) runs this per window and recomputes once at the end."""
-    from sqlalchemy import and_, text, update
+    from sqlalchemy import and_, func, text, update
 
     from shared.curation.effective import effective_time
-    from shared.models import Measurement, Position
+    from shared.models import (
+        Alert,
+        Command,
+        DeviceContact,
+        DeviceLogFile,
+        DeviceStateHistory,
+        Event,
+        Measurement,
+        Position,
+    )
 
     require_aware(start)
     require_aware(end)
+    tables: list[tuple[Any, str, Any, bool]] = [
+        (Position, "positions", effective_time(Position), True),
+        (Measurement, "measurements", effective_time(Measurement), True),
+        (DeviceContact, "contacts", DeviceContact.time, True),
+        (DeviceStateHistory, "states", DeviceStateHistory.time, False),
+        (Event, "events", Event.time, True),
+        (Command, "commands", Command.created_at, True),
+        (
+            DeviceLogFile,
+            "log_files",
+            func.coalesce(DeviceLogFile.period_start, DeviceLogFile.uploaded_at),
+            False,
+        ),
+    ]
     if end <= start:
-        return {"positions": 0, "measurements": 0}, {None}
+        return {name: 0 for _, name, _, _ in tables}, {None}
     # Records older than the compression horizon live in compressed chunks; the update must
     # be allowed to decompress them.
     await session.execute(
@@ -88,11 +114,13 @@ async def rewrite_attribution(
 
     counts: dict[str, int] = {}
     entity_ids: set[uuid.UUID | None] = {None}
-    for model, name in ((Position, "positions"), (Measurement, "measurements")):
-        when = effective_time(model)
+    for model, name, when, has_entity in tables:
         window = and_(model.device_id == device_id, when >= start, when < end)
+        cleared_values: dict[str, Any] = {"project_id": None}
+        if has_entity:
+            cleared_values["entity_id"] = None
         cleared = await session.execute(
-            update(model).where(window).values(project_id=None, entity_id=None),
+            update(model).where(window).values(**cleared_values),
             execution_options={"synchronize_session": False},
         )
         counts[name] = int(getattr(cleared, "rowcount", 0) or 0)
@@ -105,6 +133,8 @@ async def rewrite_attribution(
                     .values(project_id=project_assignment.project_id),
                     execution_options={"synchronize_session": False},
                 )
+        if not has_entity:
+            continue
         for entity_assignment in entities:
             span = overlap(entity_assignment.validity)
             if span:
@@ -115,6 +145,15 @@ async def rewrite_attribution(
                     .values(entity_id=entity_assignment.entity_id),
                     execution_options={"synchronize_session": False},
                 )
+    # an alert belongs where its event does
+    alerts = await session.execute(
+        update(Alert)
+        .where(Alert.event_id == Event.id, Event.device_id == device_id)
+        .where(Event.time >= start, Event.time < end)
+        .values(project_id=Event.project_id),
+        execution_options={"synchronize_session": False},
+    )
+    counts["alerts"] = int(getattr(alerts, "rowcount", 0) or 0)
     return counts, entity_ids
 
 

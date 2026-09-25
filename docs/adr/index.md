@@ -43,3 +43,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0035 Device settings known per device, from the type's catalogue](0035-device-settings-known-per-device.md)
 - [0036 Contacts as a canonical record type, and a place a device does not report](0036-contacts-as-a-canonical-record-type.md)
 - [0037 Cardiac readings on the scanning device, with only what is published derived](0037-cardiac-readings-on-the-scanning-device.md)
+- [0038 Moves take the history along, and assignment changes never wait for a job](0038-moves-take-history-and-jobs-never-block.md)

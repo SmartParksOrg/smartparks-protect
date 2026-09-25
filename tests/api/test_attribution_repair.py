@@ -146,7 +146,8 @@ async def test_records_before_the_assignment_are_repaired_by_moving_the_start(cl
     folded = again.json()["attribution_job"]
     assert folded["id"] == job["id"] and folded["time_from"].startswith("2026-05-01")
     assert folded["records_total"] == 6
-    # ...and a change while it runs waits
+    # ...and a change while it runs queues a follow-up job of its own (decision D291), which
+    # the worker runs after the running one; nothing waits and nothing is refused
     from sqlalchemy import update
 
     from shared.models import AttributionJob
@@ -156,20 +157,27 @@ async def test_records_before_the_assignment_are_repaired_by_moving_the_start(cl
         update(AttributionJob).where(AttributionJob.id == job_id).values(status="running")
     )
     await db.commit()
-    busy = await client.post(
-        f"/api/v1/devices/{device['id']}/project-assignments/{assigned.json()['id']}/extend-start",
-        json={"valid_from": "2026-04-01T00:00:00+00:00"},
+    meanwhile = await client.post(
+        f"/api/v1/devices/{device['id']}/reattribute",
+        json={"valid_from": "2026-05-01T00:00:00+00:00"},
         headers=h,
     )
-    assert busy.status_code == 409, busy.text
+    assert meanwhile.status_code == 200, meanwhile.text
+    follow_up = meanwhile.json()["attribution_job"]
+    assert follow_up is not None and follow_up["id"] != job["id"]
+    assert follow_up["status"] == "queued" and follow_up["records_total"] == 6
     await db.execute(
         update(AttributionJob).where(AttributionJob.id == job_id).values(status="queued")
     )
     await db.commit()
     jobs = await _finish_jobs(client, device["id"], h)
-    assert jobs[0]["id"] == job["id"] and jobs[0]["status"] == "complete"
+    assert {j["status"] for j in jobs} == {"complete"}
+    assert {j["id"] for j in jobs} == {job["id"], follow_up["id"]}
     assert jobs[0]["records_done"] == 6 and jobs[0]["records_total"] == 6
-    assert jobs[0]["counts"] == {"positions": 3, "measurements": 3}
+    assert {k: jobs[0]["counts"][k] for k in ("positions", "measurements")} == {
+        "positions": 3,
+        "measurements": 3,
+    }
     assert jobs[0]["trace_id"] and jobs[0]["finished_at"]
     listed = (
         await client.get(f"/api/v1/projects/{project.id}/positions", params=window, headers=h)
@@ -243,7 +251,8 @@ async def test_records_before_the_assignment_are_repaired_by_moving_the_start(cl
     assert extended.status_code == 200, extended.text
     assert extended.json()["attribution_job"]["records_total"] == 4
     jobs = await _finish_jobs(client, device["id"], h)
-    assert jobs[0]["status"] == "complete" and jobs[0]["counts"] == {
+    assert jobs[0]["status"] == "complete"
+    assert {k: jobs[0]["counts"][k] for k in ("positions", "measurements")} == {
         "positions": 2,
         "measurements": 2,
     }
@@ -329,7 +338,10 @@ async def test_records_inside_an_assignment_without_an_entity_are_repaired(clien
     assert body["attribution_job"]["records_total"] == 6
     assert body["valid_from"].startswith("2026-05-03T10:00:00")
     jobs = await _finish_jobs(client, device["id"], h)
-    assert jobs[0]["counts"] == {"positions": 3, "measurements": 3}
+    assert {k: jobs[0]["counts"][k] for k in ("positions", "measurements")} == {
+        "positions": 3,
+        "measurements": 3,
+    }
     db.expire_all()
     left = (
         await db.scalars(
@@ -347,3 +359,77 @@ async def test_records_inside_an_assignment_without_an_entity_are_repaired(clien
         f"/api/v1/devices/{device['id']}/reattribute", json={}, headers=viewer.headers
     )
     assert refused.status_code == 403
+
+
+async def test_the_rewrite_covers_every_stamped_table(client, db, bus):
+    """Every table stamped with a project or an entity follows an assignment change (decision
+    D292): events with their alerts, contacts, state history, commands and log files beside the
+    positions and measurements."""
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from shared.models import (
+        Alert,
+        Command,
+        DeviceContact,
+        DeviceLogFile,
+        DeviceStateHistory,
+        Event,
+    )
+
+    admin, project, _device_type, device = await _device_with_early_records(client, db, bus)
+    h = admin.headers
+    device_id = uuid.UUID(device["id"])
+    detail = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()
+    source_id = uuid.UUID(detail["external_identities"][0]["data_source_id"])
+    may = datetime(2026, 5, 4, 12, tzinfo=UTC)
+    event = Event(time=may, device_id=device_id, event_type="device_rebooted", title="Rebooted")
+    db.add(event)
+    await db.flush()
+    db.add(Alert(event_id=event.id, severity="warning"))
+    db.add(
+        DeviceContact(
+            time=may, device_id=device_id, address="a3:41:0c", canonical_key=f"{device_id}:c"
+        )
+    )
+    db.add(DeviceStateHistory(time=may, device_id=device_id, state={"mode": "tracking"}))
+    db.add(Command(device_id=device_id, action_key="ping", driver_key="generic_json"))
+    db.add(
+        DeviceLogFile(
+            device_id=device_id,
+            data_source_id=source_id,
+            acquisition_channel="log_file",
+            original_filename="may.bin",
+            sha256="0" * 64,
+            size_bytes=1,
+            object_key=f"logs/{device_id}/may.bin",
+            period_start=may,
+        )
+    )
+    await db.commit()
+
+    assigned = await client.post(
+        f"/api/v1/devices/{device['id']}/project-assignments",
+        json={"project_id": str(project.id), "valid_from": "2026-05-01T00:00:00+00:00"},
+        headers=h,
+    )
+    assert assigned.status_code == 201, assigned.text
+    jobs = await _finish_jobs(client, device["id"], h)
+    assert jobs[0]["status"] == "complete", jobs[0]
+    assert jobs[0]["counts"] == {
+        "positions": 3,
+        "measurements": 3,
+        "contacts": 1,
+        "states": 1,
+        "events": 1,
+        "commands": 1,
+        "log_files": 1,
+        "alerts": 1,
+    }
+    await db.rollback()
+    for model in (Event, DeviceContact, DeviceStateHistory, Command, DeviceLogFile):
+        rows = (await db.scalars(select(model).where(model.device_id == device_id))).all()
+        assert [r.project_id for r in rows] == [project.id], model.__name__
+    alert = await db.scalar(select(Alert).where(Alert.event_id == event.id))
+    assert alert is not None and alert.project_id == project.id

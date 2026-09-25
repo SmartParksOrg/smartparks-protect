@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from protect_api.attribution import hold_while_attributing, job_read, queue_job
+from protect_api.attribution import job_read, queue_job
 from protect_api.audit import record_audit
 from protect_api.bus import get_bus
 from protect_api.crud import (
@@ -1088,7 +1088,6 @@ async def create_entity_assignment(
     else:
         entity = await _project_entity(session, context, body.entity_id)  # type: ignore[arg-type]
     await get_or_404(session, Device, body.device_id, "Device")
-    await hold_while_attributing(session, body.device_id)
     attribution = await resolve_attribution(session, body.device_id, body.valid_from)
     if attribution.project_id != context.project.id:
         raise HTTPException(
@@ -1158,7 +1157,6 @@ async def extend_entity_assignment_start(
     project assignment first."""
     assignment = await get_or_404(session, DeviceEntityAssignment, assignment_id, "Assignment")
     await _project_entity(session, context, assignment.entity_id)
-    await hold_while_attributing(session, assignment.device_id)
     old_from, valid_to = range_bounds(assignment.validity)
     if body.valid_from >= old_from:
         raise HTTPException(
@@ -1216,7 +1214,6 @@ async def change_entity_assignment(
     and the new bounds are attributed again, so history follows the change."""
     assignment = await get_or_404(session, DeviceEntityAssignment, assignment_id, "Assignment")
     await _project_entity(session, context, assignment.entity_id)
-    await hold_while_attributing(session, assignment.device_id)
     old_from, old_to = range_bounds(assignment.validity)
     change = (
         body if isinstance(body, AssignmentChange) else AssignmentChange(valid_to=body.valid_to)

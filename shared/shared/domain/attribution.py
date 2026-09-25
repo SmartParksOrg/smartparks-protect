@@ -7,13 +7,15 @@ service runs the rewrite in windows of `WINDOW_DAYS`, one transaction each, with
 done so far on the row. The pages poll the device's jobs and draw the progress. A change made
 while the device's job is still queued folds into it (the job reads the assignments when it
 runs; its window widens if needed), so the assign dialog's two steps and a quick correction
-need no second job; a change while the job is running is refused with `AttributionBusy` (409
-at the API), so two rewrites never race over the same rows.
+need no second job; a change while the job is running queues a follow-up job for its own
+window (decision D291), and the worker runs one job per device at a time, so two rewrites
+never race over the same rows and nothing ever waits for a job to finish.
 
 The rewrite itself is `shared.domain.assignments.rewrite_attribution`; the current state of the
 device and the entities involved is recomputed once at the end.
 """
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -39,17 +41,10 @@ log = get_logger("attribution")
 # minutes has about 20,000 rows in it, a few seconds on compressed chunks.
 WINDOW_DAYS = 30
 ACTIVE = (AttributionJobStatus.QUEUED, AttributionJobStatus.RUNNING)
-
-
-class AttributionBusy(Exception):
-    """A job is running for the device; assignment changes wait for it."""
-
-    def __init__(self, job: AttributionJob) -> None:
-        super().__init__(
-            "The records of this device are being given their project and entity; "
-            "wait until that has finished"
-        )
-        self.job = job
+# A follow-up job waits for the device's running job, looking this often; a running job that
+# has not moved for this long was left behind by a crashed worker and no longer holds the line.
+WAIT_SECONDS = 5
+STALE_AFTER = timedelta(minutes=10)
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,13 +70,6 @@ async def active_job(
         statement = statement.with_for_update()
     job: AttributionJob | None = await session.scalar(statement)
     return job
-
-
-async def ensure_not_attributing(session: AsyncSession, device_id: uuid.UUID) -> None:
-    """Refuse while a job runs; a queued one reads the assignments when it starts."""
-    job = await active_job(session, device_id)
-    if job is not None and job.status == AttributionJobStatus.RUNNING:
-        raise AttributionBusy(job)
 
 
 async def recent_jobs(
@@ -123,16 +111,16 @@ async def queue_reattribution(
     project_id: uuid.UUID | None,
 ) -> QueueResult:
     """Queue the rewrite of the device's records in `[start, end)`. A job still queued for the
-    device takes the change along (its window widened to cover this one); a running one raises
-    `AttributionBusy`; otherwise a new row, or none when the window holds no record (nothing
-    to rewrite, so the current state cannot change either). The caller commits and then calls
-    `publish_job` for a created job, so the worker never reads an uncommitted row."""
+    device takes the change along (its window widened to cover this one); a running one gets
+    a follow-up row that the worker runs after it (decision D291: the windows it has done
+    already read the assignments as they were); otherwise a new row, or none when the window
+    holds no record (nothing to rewrite, so the current state cannot change either). The
+    caller commits and then calls `publish_job` for a created job, so the worker never reads
+    an uncommitted row."""
     require_aware(start)
     require_aware(end)
     active = await active_job(session, device_id, for_update=True)
-    if active is not None:
-        if active.status == AttributionJobStatus.RUNNING:
-            raise AttributionBusy(active)
+    if active is not None and active.status == AttributionJobStatus.QUEUED:
         if end > start:
             active.time_from = min(active.time_from, start)
             active.time_to = max(active.time_to, end)
@@ -161,7 +149,36 @@ async def queue_reattribution(
 
 
 def job_message(job: AttributionJob) -> tuple[str, dict[str, Any]]:
-    return Topic.ATTRIBUTION_REQUESTED, {"job_id": str(job.id)}
+    # the device id keeps the device's jobs in one lane of the bus, in order (decision D291)
+    return Topic.ATTRIBUTION_REQUESTED, {"job_id": str(job.id), "device_id": str(job.device_id)}
+
+
+async def wait_for_running_job(job_id: uuid.UUID, device_id: uuid.UUID) -> None:
+    """Hold a follow-up job until the device's running job is done (decision D291), so two
+    rewrites never touch the same rows at once. A running job that has not moved for
+    `STALE_AFTER` was left behind by a crashed worker: its redelivery starts it over, and
+    this one need not wait for a row that nobody updates."""
+    while True:
+        async with session_scope() as session:
+            other = await session.scalar(
+                select(AttributionJob)
+                .where(
+                    AttributionJob.device_id == device_id,
+                    AttributionJob.status == AttributionJobStatus.RUNNING,
+                    AttributionJob.id != job_id,
+                )
+                .order_by(AttributionJob.updated_at.desc())
+                .limit(1)
+            )
+            if other is None or other.updated_at < utc_now() - STALE_AFTER:
+                return
+            waiting_for = other.id
+        log.info(
+            "attribution job waits for the device's running job",
+            job_id=str(job_id),
+            running=str(waiting_for),
+        )
+        await asyncio.sleep(WAIT_SECONDS)
 
 
 async def publish_job(bus: RedisStreamsBus, job: AttributionJob) -> None:
@@ -188,8 +205,16 @@ async def run_attribution_job(payload: dict[str, Any]) -> None:
     """The handler of `attribution.requested`: rewrite the job's window per `WINDOW_DAYS`, the
     records done on the row after every window, the current state recomputed once at the end.
     A redelivery after a crash starts the job over (the row still says running); the rewrite is
-    idempotent. The topic's loop runs one job at a time, so a job is never handled twice at once."""
+    idempotent. The bus keeps a device's jobs in one lane and a follow-up waits for the running
+    one (decision D291), so two jobs of one device never rewrite the same rows at once."""
     job_id = uuid.UUID(str(payload["job_id"]))
+    async with session_scope() as session:
+        job = await session.get(AttributionJob, job_id)
+        if job is None:
+            log.warning("attribution job not found", job_id=str(job_id))
+            return
+        device_id = job.device_id
+    await wait_for_running_job(job_id, device_id)
     async with session_scope() as session:
         # the lock keeps a change that folds into this job from committing a wider window after
         # the window was read here (see queue_reattribution)
@@ -231,7 +256,9 @@ async def run_attribution_job(payload: dict[str, Any]) -> None:
                 entity_ids |= ids
                 for key, value in part.items():
                     counts[key] = counts.get(key, 0) + value
-                done += sum(part.values())
+                # the bar counts the positions and measurements the row was queued with; the
+                # other tables are small beside them and ride along in `counts`
+                done += part["positions"] + part["measurements"]
                 job = await session.get(AttributionJob, job_id)
                 assert job is not None
                 job.records_done = done

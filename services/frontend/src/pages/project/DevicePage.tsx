@@ -248,8 +248,6 @@ export function DevicePage() {
         ]
       : []),
   ]);
-  // while the records are being rewritten, the assignments hold still (decision D206)
-  const attributing = attribution.active !== null;
   // in a project, the project's own permission; without one, a server admin picks the project in the dialog (D192)
   const mayAssign = deviceProjectId
     ? can("devices:write")
@@ -437,7 +435,7 @@ export function DevicePage() {
                 size="sm"
                 variant="outline"
                 className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
-                disabled={extendProject.isPending || attributing}
+                disabled={extendProject.isPending}
                 onClick={() => extendProject.mutate(sp)}
               >
                 {t("Extend the assignment back to {{date}}", {
@@ -465,7 +463,7 @@ export function DevicePage() {
                   size="sm"
                   variant="outline"
                   className="mt-2 h-auto max-w-full whitespace-normal text-left sm:ml-2 sm:mt-0"
-                  disabled={extendEntity.isPending || attributing}
+                  disabled={extendEntity.isPending}
                   onClick={() => extendEntity.mutate(sp)}
                 >
                   {t("Extend the entity assignment back to {{date}}", {
@@ -591,7 +589,6 @@ export function DevicePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={attributing}
                       onClick={() => setAssigning("project")}
                     >
                       {t("Assign to project")}
@@ -630,7 +627,7 @@ export function DevicePage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={release.isPending || attributing}
+                        disabled={release.isPending}
                         onClick={() =>
                           release.mutate(currentEntityAssignment.id)
                         }
@@ -640,7 +637,6 @@ export function DevicePage() {
                     ) : (
                       <Button
                         size="sm"
-                        disabled={attributing}
                         onClick={() => setAssigning("entity")}
                       >
                         {t("Assign to entity")}
@@ -773,7 +769,7 @@ export function DevicePage() {
                       "Give every record its project and entity again from the assignments as they stand, for records decoded before an assignment existed",
                     )}
                     onClick={() => recompute.mutate()}
-                    disabled={recompute.isPending || attributing}
+                    disabled={recompute.isPending}
                   >
                     <RefreshCw className="size-4" />{" "}
                     {t("Recompute attribution")}

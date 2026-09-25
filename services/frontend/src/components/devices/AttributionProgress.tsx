@@ -23,7 +23,7 @@ export function AttributionProgress({ active, failed }: { active: AttributionJob
           </span>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          {t("This runs in the background and can take a few minutes for a long history. The lists, the map and Explore show the records as they are done; other assignment changes of this device wait until it has finished.")}
+          {t("This runs in the background and can take a few minutes for a long history. The lists, the map and Explore show the records as they are done; an assignment made meanwhile follows in a job of its own.")}
         </p>
         <ProgressBar className="mt-2 max-w-md" percent={percent} />
       </Callout>
