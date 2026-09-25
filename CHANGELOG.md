@@ -56,6 +56,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - The Data explorer's table sorts and filters (Tim, 2026-09-20): the time first and newest first by default, a click on any header sorts the loaded rows by it (again reverses; empty cells stay last), and under every header a filter — a piece of text, or for a number column `> 3.5`, `<= 2`, `3.5-4` or a plain number — with a line saying how many loaded rows match. The device type, the data source, the kinds of record a moment holds and the position's kind are columns on by default; the identifiers — the device and entity ids, the source event, its ingestion time and the trace — are in the column picker, off until added, and the choice sticks per user.
 
+### Changed
+
+- CI starts MinIO from Chainguard's build of the MinIO fork, pinned by digest (2026-09-25): MinIO's own images are no longer served anonymously by quay.io or Docker Hub. Servers keep the image they already hold; `docker-compose.yml` still names `quay.io/minio/minio`, so a fresh install needs a decision on the object store first.
+
 ### Fixed
 
 - **The live map's right column no longer overflows** (Tim, 2026-09-25: with an entity selected, the layers panel open and the tracks or heatmap settings unfolded, buttons and panels landed over each other and the page scrolled). The column clips, the object panel and the settings bars shrink and scroll inside themselves, the layers panel and the feed keep a floor, a settings bar closes with its card, and the track settings bar takes the column's width.
