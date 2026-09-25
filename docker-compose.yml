@@ -82,7 +82,13 @@ services:
 
   minio:
     container_name: protect-minio
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # Chainguard's build of the MinIO fork (decision D295): MinIO's own images left Docker Hub on
+    # 2026-09-11 and quay.io on 2026-09-25. Pinned by digest, since Chainguard publishes `latest`
+    # alone; the client image is the `-dev` variant, which carries the shell the entrypoints use.
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
+    # Chainguard's image runs as a non-root user; the data volumes were written by MinIO's own
+    # image as root, so the server keeps running as root and every existing volume stays as it is.
+    user: "0:0"
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
@@ -101,7 +107,7 @@ services:
 
   minio-init:
     container_name: protect-minio-init
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: cgr.dev/chainguard/minio-client@sha256:f0dd93b48af1f8a641edcd3c64661c8dbe05189bd2ef2f8cea216eb18af10bf8
     depends_on:
       minio:
         condition: service_healthy
@@ -328,7 +334,7 @@ services:
   # One-shot, started by scripts/backup.sh: docker compose --profile backup run --rm object-mirror
   object-mirror:
     container_name: protect-object-mirror
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: cgr.dev/chainguard/minio-client@sha256:f0dd93b48af1f8a641edcd3c64661c8dbe05189bd2ef2f8cea216eb18af10bf8
     profiles: [backup]
     depends_on:
       minio:

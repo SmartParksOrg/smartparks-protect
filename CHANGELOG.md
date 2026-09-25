@@ -58,7 +58,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
-- CI starts MinIO from Chainguard's build of the MinIO fork, pinned by digest (2026-09-25): MinIO's own images are no longer served anonymously by quay.io or Docker Hub. Servers keep the image they already hold; `docker-compose.yml` still names `quay.io/minio/minio`, so a fresh install needs a decision on the object store first.
+- **The MinIO server and client images come from Chainguard** (decision D295, 2026-09-25): MinIO's own images are no longer served by quay.io (nor by Docker Hub since 2026-09-11), so a fresh install could not pull them and every CI job died starting MinIO. `docker-compose.yml` and CI name `cgr.dev/chainguard/minio` and `cgr.dev/chainguard/minio-client` pinned by digest (Chainguard publishes `latest` alone; the client is the `-dev` variant for its shell). The same commands, environment and data: a server pulls the two images once on its next update and keeps its buckets. The digests are bumped by hand like the other pins.
 
 ### Fixed
 

@@ -29,7 +29,7 @@ Status: v2.9.0 (2026-09-19) is the last tag, closing phase 29 with the corrected
 | --- | --- | --- |
 | Database | PostgreSQL 17 + PostGIS + TimescaleDB (`timescale/timescaledb-ha:pg17.10-ts2.29.2`) | Hypertables for positions, measurements, source events, gateway receptions. Decision gate in phase 4 |
 | Event bus and cache | Redis 7.4, Redis Streams with consumer groups | One broker; `RedisStreamsBus` in `shared/bus.py`, `Worker` base in `shared/worker.py` |
-| Object storage | MinIO | Raw log files, uploads, exports. Not for telemetry |
+| Object storage | MinIO (`cgr.dev/chainguard/minio` and `minio-client`, pinned by digest, decision D295) | Raw log files, uploads, exports. Not for telemetry. MinIO's own images left Docker Hub and quay.io in September 2026 |
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2 async, Alembic, Pydantic 2, FastAPI-Users | `uv` workspace, one `uv.lock`, exact `==` pins in every `pyproject.toml` |
 | Frontend | React 19, Vite, TypeScript strict, Tailwind 4, shadcn/ui (Radix), TanStack Query, Zustand, React Hook Form + Zod, React Router 8 | MapLibre GL JS 6 for maps, Apache ECharts 6 for charts, terra-draw for drawing. Rules in `services/frontend/FRONTEND_CONVENTIONS.md` |
 | Tests | pytest, Vitest, Playwright (phase 3) | API tests run against real Postgres, Redis and MinIO |
