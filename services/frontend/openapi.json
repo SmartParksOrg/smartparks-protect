@@ -2183,6 +2183,22 @@
        "format": "uuid",
        "title": "Project Id"
       }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
      }
     ],
     "requestBody": {
@@ -3694,6 +3710,22 @@
        "format": "uuid",
        "title": "Project Id"
       }
+     },
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
      }
     ],
     "requestBody": {
@@ -4620,15 +4652,38 @@
     "summary": "Move Devices",
     "description": "Move devices to another project from a moment each, with the history from that moment\n(decision D292): the old assignments are cut there, a new one opens, an attribution job\nrewrites the records. An entity whose whole history lies in the move goes along; one that\nkeeps history behind stays and loses the device from the moment on (decision D293). With\n`preview` nothing is written and the answer says what would happen. Server admins, or\nadmins of the target and of every project a device leaves.",
     "operationId": "move_devices_api_v1_devices_move_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "Accept-Language",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Accept-Language"
+      }
+     }
+    ],
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
         "$ref": "#/components/schemas/DevicesMove"
        }
       }
-     },
-     "required": true
+     }
     },
     "responses": {
      "200": {
@@ -4651,12 +4706,7 @@
        }
       }
      }
-    },
-    "security": [
-     {
-      "OAuth2PasswordBearer": []
-     }
-    ]
+    }
    }
   },
   "/api/v1/devices/bulk-assign": {

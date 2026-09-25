@@ -14411,7 +14411,9 @@ export interface operations {
     move_entities_api_v1_projects__project_id__entities_move_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 project_id: string;
             };
@@ -15226,7 +15228,9 @@ export interface operations {
     create_entity_assignments_bulk_api_v1_projects__project_id__entity_assignments_bulk_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path: {
                 project_id: string;
             };
@@ -15707,7 +15711,9 @@ export interface operations {
     move_devices_api_v1_devices_move_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Accept-Language"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
