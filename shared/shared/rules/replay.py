@@ -276,7 +276,7 @@ async def schedule_subjects(
     session: AsyncSession,
     project_id: uuid.UUID,
     scope: Scope,
-    types: dict[uuid.UUID, uuid.UUID],
+    types: dict[uuid.UUID, frozenset[uuid.UUID]],
 ) -> list[Subject]:
     """Subjects a schedule rule evaluates: the project's entities (with their current device),
     plus devices named in the scope."""
