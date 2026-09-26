@@ -1,4 +1,5 @@
 import type { RecordRow, SeriesResponse } from "@/api/types";
+import { scaledUnit } from "@/lib/format";
 import type { TrackLayer } from "@/components/map/layers";
 import {
   type Aggregate,
@@ -256,12 +257,15 @@ export function groupsFromSeries(
   const groups = new Map<string, ChartGroup>();
   for (const s of response.series ?? []) {
     const ownerId = s.entity_id ?? s.device_id ?? "";
+    // the unit people read (a speed in km/h, a numbered unit multiplied out), as the
+    // loaded rows' columns give it
+    const read = scaledUnit(s.unit);
     let group = groups.get(s.metric_key);
     if (!group) {
       group = {
         metric: s.metric_key,
         label: metricLabels.get(s.metric_key) ?? s.metric_key,
-        unit: s.unit ?? null,
+        unit: read.unit,
         series: [],
       };
       groups.set(s.metric_key, group);
@@ -270,7 +274,10 @@ export function groupsFromSeries(
       ownerId,
       name: names.get(ownerId) ?? ownerId.slice(0, 8),
       data: s.points
-        .map((p) => [Date.parse(p.time), p.values[aggregate] ?? null])
+        .map((p) => {
+          const value = p.values[aggregate];
+          return [Date.parse(p.time), value == null ? null : value * read.factor];
+        })
         .filter((d): d is number[] => d[1] !== null),
     });
   }

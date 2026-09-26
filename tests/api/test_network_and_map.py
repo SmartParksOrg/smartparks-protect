@@ -104,20 +104,34 @@ async def _setup(client, db):
 
 
 async def _feed(
-    db, bus, source_id, external_id, when: datetime, lat: float, lon: float, rssi=-60.0
+    db,
+    bus,
+    source_id,
+    external_id,
+    when: datetime,
+    lat: float,
+    lon: float,
+    rssi=-60.0,
+    speed: float | None = None,
+    heading: float | None = None,
 ):
     from shared.models import DataSource
 
     source = await db.get(DataSource, uuid.UUID(source_id))
+    payload: dict[str, object] = {
+        "time": when.isoformat(),
+        "lat": lat,
+        "lon": lon,
+        "measurements": {"battery_voltage": 3.8},
+    }
+    if speed is not None:
+        payload["speed"] = speed  # m/s, the way a Traccar-like platform reports it
+    if heading is not None:
+        payload["heading"] = heading
     message = InboundMessage(
         external_id=external_id,
         event_type="uplink",
-        payload={
-            "time": when.isoformat(),
-            "lat": lat,
-            "lon": lon,
-            "measurements": {"battery_voltage": 3.8},
-        },
+        payload=payload,
         acquisition_channel=AcquisitionChannel.LORAWAN,
         ingestion_method=IngestionMethod.MQTT,
         provider_metadata={

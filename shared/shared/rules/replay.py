@@ -20,7 +20,7 @@ from shared.curation.effective import (
     in_window,
     visible,
 )
-from shared.models import Device, Entity, EntityCurrentState, Measurement, Position
+from shared.models import Device, Entity, EntityCurrentState, EntityType, Measurement, Position
 from shared.rules.data import SqlDataAccess
 from shared.rules.evaluator import Sample, Subject, SubjectState, evaluate, format_title
 from shared.rules.schema import RuleDocument, Scope, TriggerKind
@@ -56,14 +56,18 @@ class ReplayResult:
 def in_scope(
     scope: Scope,
     entity_id: uuid.UUID | None,
-    entity_type_id: uuid.UUID | None,
+    entity_type: uuid.UUID | frozenset[uuid.UUID] | None,
     device_id: uuid.UUID | None,
 ) -> bool:
+    """Whether the rule applies to the subject. `entity_type` is the entity's type, or its
+    lineage (the type and its parent), so a rule scoped to Vehicles takes every car and
+    4x4 of the project (phase 37): a sub-type is one of its type."""
     if not (scope.entity_ids or scope.entity_type_ids or scope.device_ids):
         return True
+    types = frozenset({entity_type}) if isinstance(entity_type, uuid.UUID) else (entity_type or ())
     return (
         (entity_id is not None and entity_id in scope.entity_ids)
-        or (entity_type_id is not None and entity_type_id in scope.entity_type_ids)
+        or any(t in scope.entity_type_ids for t in types)
         or (device_id is not None and device_id in scope.device_ids)
     )
 
@@ -80,11 +84,36 @@ def position_values(
     return values
 
 
-async def entity_types(session: AsyncSession, project_id: uuid.UUID) -> dict[uuid.UUID, uuid.UUID]:
+def _lineage(type_id: uuid.UUID, parent_id: uuid.UUID | None) -> frozenset[uuid.UUID]:
+    return frozenset({type_id, parent_id}) if parent_id else frozenset({type_id})
+
+
+async def entity_types(
+    session: AsyncSession, project_id: uuid.UUID
+) -> dict[uuid.UUID, frozenset[uuid.UUID]]:
+    """Every entity of the project to its type and the type's parent, for `in_scope`."""
     rows = await session.execute(
-        select(Entity.id, Entity.entity_type_id).where(Entity.project_id == project_id)
+        select(Entity.id, Entity.entity_type_id, EntityType.parent_id)
+        .join(EntityType, EntityType.id == Entity.entity_type_id)
+        .where(Entity.project_id == project_id)
     )
-    return {row[0]: row[1] for row in rows}
+    return {row[0]: _lineage(row[1], row[2]) for row in rows}
+
+
+async def type_lineage(
+    session: AsyncSession, entity_id: uuid.UUID | None
+) -> frozenset[uuid.UUID] | None:
+    """One entity's type and the type's parent, for `in_scope`; None without an entity."""
+    if entity_id is None:
+        return None
+    row = (
+        await session.execute(
+            select(Entity.entity_type_id, EntityType.parent_id)
+            .join(EntityType, EntityType.id == Entity.entity_type_id)
+            .where(Entity.id == entity_id)
+        )
+    ).first()
+    return _lineage(row[0], row[1]) if row else None
 
 
 async def _names(
@@ -276,5 +305,6 @@ __all__ = [
     "position_values",
     "replay",
     "schedule_subjects",
+    "type_lineage",
     "union_all",
 ]

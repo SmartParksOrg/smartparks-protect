@@ -13,13 +13,13 @@ A rule turns observations into events (architecture 15). Rules are versioned doc
 | Cooldown | While the condition stays true, fire again as a reminder after this long; 0 never |
 | Event | The event type, severity, title template and whether an alert is created |
 
-The subject of a rule is the entity the data belongs to, or the device when no entity is assigned. State is kept per rule and subject: whether the condition is active, since when it holds, when it last fired and which geofences the subject was inside of.
+The subject of a rule is the entity the data belongs to, or the device when no entity is assigned. A rule's scope names entities, entity types or devices; a type in the scope takes its sub-types, so a rule for Vehicles judges every car and 4x4 of the project. State is kept per rule and subject: whether the condition is active, since when it holds, when it last fired and which geofences the subject was inside of.
 
 ## Conditions
 
 | Type | Fields | Meaning |
 | --- | --- | --- |
-| Threshold | metric, operator, value | The triggering measurement, a derived position metric (`speed_kmh`, `speed_mps`, `altitude_m`) or the latest value of another metric of the subject (within seven days) compared with the value |
+| Threshold | metric, operator, value | The triggering measurement, a derived position metric (`speed_kmh`, `speed_mps`, `altitude_m`) or the latest value of another metric of the subject (within seven days) compared with the value. `speed_kmh` is the speed the device reported with its fix (an OpenCollar with active tracking on, a Traccar tracker); a fix without a speed carries none and a speed rule stays quiet on it |
 | Geofence or area | relation (enter, exit, inside, outside), features by type or by selection | Enter and exit fire on the crossing and need a position trigger; inside and outside are checked on every sample |
 | No data | duration | The subject has not been seen for this long; needs a schedule trigger. A subject that never reported does not count |
 | Window aggregate | metric, aggregate (avg, min, max, sum, count), window, operator, value | The aggregate over the last window of the metric compared with the value |
@@ -39,6 +39,7 @@ The title is a template: `{entity}`, `{device}`, `{feature}`, `{metric}`, `{valu
 | Geofence exit | position | exit any geofence | `GEOFENCE_EXIT`, warning, alert |
 | Geofence enter | position | enter any geofence | `GEOFENCE_ENTER`, info |
 | Speed limit inside an area | position | `speed_kmh > 40` and inside any zone, for 30 s, cooldown 10 min | `SPEED_LIMIT_VIOLATION`, warning, alert |
+| Speeding | position | `speed_kmh > 60` anywhere, cooldown 10 min; scope it to the Vehicles type so a collar is never judged (a type in the scope takes its sub-types) | `SPEED_LIMIT_VIOLATION`, warning, alert |
 | No data for 12 hours | schedule, every 5 min | no data for 12 h, cooldown 24 h | `NO_DATA`, warning, alert |
 | Battery low | measurement `battery_voltage` | `battery_voltage < 3.2`, cooldown 24 h | `BATTERY_LOW`, warning, alert |
 | Collar not moving | schedule, hourly | `max(activity, 12 h) < 1.0` with at least three status messages in the window and `battery_voltage > 3.2`, cooldown 12 h; `activity` is the change of the accelerometer vector between status messages (m/s²) | `POSSIBLE_IMMOBILITY`, critical, alert |

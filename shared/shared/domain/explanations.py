@@ -134,8 +134,9 @@ EVENTS: dict[str, str] = {
     "GEOFENCE_ENTER": "The entity's position entered the geofence named in the title.",
     "PROXIMITY": "The entity came within the distance the rule sets of the place or entity named.",
     "SPEED_LIMIT_VIOLATION": (
-        "The speed between two positions was above the rule's limit. Speed is the average "
-        "over the interval between the two fixes, not an instantaneous reading."
+        "The speed the device reported with its fix was above the rule's limit: the "
+        "receiver's speed over ground at that moment, not an average between two fixes. "
+        "A device that reports no speed never raises this."
     ),
     "SYSTEM_WORKER_STALE": (
         "A background worker of the server has not reported for longer than allowed; the "

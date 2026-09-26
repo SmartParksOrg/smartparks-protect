@@ -137,6 +137,22 @@ def test_flash_status_fence_and_not_canonical_ports():
     assert driver.decode(event(5, rows[5]["data_hex"])).empty
 
 
+def test_active_tracking_carries_course_and_speed():
+    """The wiki's worked example with active tracking on (phase 37): the course is hundredths
+    of a degree plus 18000 written little-endian by the firmware, the speed whole metres per
+    second. A standstill keeps its speed of zero and the course the receiver happened to hold."""
+    head = "f21e0100001000e6a40d1f97100e03a0cb000003082f00048c616865"
+    moving = driver.decode(event(2, head + "01" + "d25a" + "0c"))  # 18000 + 5250, 12 m/s
+    position = moving.positions[0]
+    assert position.speed_mps == 12.0 and position.heading_deg == pytest.approx(52.5)
+    assert position.attributes["active_tracking"] is True
+    still = driver.decode(event(2, head + "01" + "5046" + "00")).positions[0]
+    assert still.speed_mps == 0.0 and still.heading_deg == 0.0
+    off = driver.decode(event(2, head + "00" + "000000")).positions[0]
+    assert off.speed_mps is None and off.heading_deg is None
+    assert "active_tracking" not in off.attributes
+
+
 def test_no_fix_yields_no_position_but_a_false_gnss_fix():
     no_fix = (
         "f21e"

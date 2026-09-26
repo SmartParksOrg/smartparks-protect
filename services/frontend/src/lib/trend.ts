@@ -114,6 +114,16 @@ SPECIAL.trap_triggered = (t) => ({
   stepped: true,
   ariaLabel: t("The trap's door over the period, closed or open"),
 });
+SPECIAL.speed = (t) => ({
+  metric: "speed",
+  label: t("Speed"),
+  unit: "km/h",
+  decimals: 0,
+  step: 10,
+  floor: 0,
+  scale: 3.6,
+  ariaLabel: t("Speed over the period"),
+});
 SPECIAL.movement = SPECIAL.activity;
 
 /** The trend a status value can unfold (Tim, 2026-09-15): one of the shaped ones, else any

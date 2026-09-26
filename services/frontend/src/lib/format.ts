@@ -116,12 +116,14 @@ export function formatDuration(seconds: number): string {
 
 /** A unit with a number in front is a scale the device counts in ("10 ms": the cardiac tag
  * sends its R-R median in tens of milliseconds). A reader wants the plain unit, so the value
- * is multiplied out at display and the unit loses its number (Tim, 2026-09-23). Any other
- * unit passes through with a factor of one. */
+ * is multiplied out at display and the unit loses its number (Tim, 2026-09-23). A speed is
+ * stored in m/s, what a receiver reports, and read in km/h everywhere (phase 37, decision
+ * D297). Any other unit passes through with a factor of one. */
 export function scaledUnit(unit: string | null | undefined): {
   factor: number;
   unit: string | null;
 } {
+  if (unit === "m/s") return { factor: 3.6, unit: "km/h" };
   const match = unit?.match(/^(\d+(?:\.\d+)?)\s+(\S.*)$/);
   if (!match) return { factor: 1, unit: unit ?? null };
   return { factor: Number(match[1]), unit: match[2] };

@@ -22,6 +22,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { kilovolts } from "@/lib/fence";
+import { courseText, speedText } from "@/lib/speed";
 import { trendSpecFor } from "@/lib/trend";
 import {
   BatteryTrend,
@@ -365,6 +366,8 @@ function HealthRows({
   fencePulses,
   trapClosed,
   heartRate,
+  speed,
+  heading,
   now,
   onOpenPosition,
   onOpenState,
@@ -405,6 +408,10 @@ function HealthRows({
   /** The newest heart rate from the animal's cardiac tag (phase 34), when a collar relays one;
    * it unfolds its trend the way the battery and the fence rows do. */
   heartRate?: number | null;
+  /** The speed in m/s and the course the newest fix carried (phase 37), when the device
+   * reports them; the speed unfolds its trend the way the battery does. */
+  speed?: number | null;
+  heading?: number | null;
   now: number;
   /** Opens the fix of that moment, the panel a track point opens (Tim, 2026-09-13). */
   onOpenPosition?: () => void;
@@ -421,6 +428,7 @@ function HealthRows({
   const [fenceOpen, setFenceOpen] = useState(false);
   const [heartOpen, setHeartOpen] = useState(false);
   const [trapOpen, setTrapOpen] = useState(false);
+  const [speedOpen, setSpeedOpen] = useState(false);
   const hasMovement = activity !== undefined && activity !== null;
   const rebooted =
     lastResetAt != null && now - Date.parse(lastResetAt) < 24 * 3_600_000;
@@ -476,6 +484,39 @@ function HealthRows({
           <AccuracyWarning accuracyM={accuracy as number} />
         )}
       </PanelRow>
+      {speed != null && (
+        <PanelRow label={t("Speed")}>
+          {batteryProject && batteryDevice ? (
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-primary"
+              title={t("Show the speed over the period")}
+              onClick={() => setSpeedOpen((open) => !open)}
+              aria-expanded={speedOpen}
+            >
+              {speedText(speed)}
+            </button>
+          ) : (
+            speedText(speed)
+          )}
+          {courseText(heading, speed) && (
+            <span className="text-muted-foreground">
+              {" "}
+              · {courseText(heading, speed)}
+            </span>
+          )}
+        </PanelRow>
+      )}
+      {speed != null && speedOpen && batteryProject && batteryDevice && (
+        <div className="col-span-2 rounded-md border bg-muted/30 p-2">
+          <MetricTrend
+            projectId={batteryProject}
+            deviceId={batteryDevice}
+            spec={trendSpecFor("speed", undefined, t)!}
+            until={lastSeenAt}
+          />
+        </div>
+      )}
       {heardByName && (
         // the reader is the point of a proximity position: a tag is where it is because a
         // named device heard it, and a person reading that wants to go to that device
@@ -1015,6 +1056,8 @@ export function EntityPanel({
         contactsTo={contactsHref}
         fenceVoltage={props.fence_voltage}
         heartRate={props.heart_rate}
+        speed={props.speed}
+        heading={props.heading}
         fencePulses={props.fence_pulses}
         trapClosed={props.trap_closed}
         now={now}
@@ -1199,6 +1242,8 @@ export function DevicePanel({
         contactsTo={contactsHref}
         fenceVoltage={props.fence_voltage}
         heartRate={props.heart_rate}
+        speed={props.speed}
+        heading={props.heading}
         fencePulses={props.fence_pulses}
         trapClosed={props.trap_closed}
         now={now}

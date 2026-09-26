@@ -73,6 +73,8 @@ export interface RuleFormValues {
   metric_key: string;
   every_seconds: number;
   entity_ids: string[];
+  /** The scope by entity type (phase 37): a type takes its sub-types on the server. */
+  entity_type_ids: string[];
   conditions: FormCondition[];
   for_seconds: number;
   cooldown_seconds: number;
@@ -103,6 +105,7 @@ export const defaultForm = (): RuleFormValues => ({
   metric_key: "battery_voltage",
   every_seconds: 300,
   entity_ids: [],
+  entity_type_ids: [],
   conditions: [emptyCondition()],
   for_seconds: 0,
   cooldown_seconds: 0,
@@ -173,16 +176,15 @@ export function documentToForm(doc: Doc): RuleFormValues | null {
     if (!converted) return null;
     formConditions.push(converted);
   }
-  if (
-    (scope.entity_type_ids as unknown[] | undefined)?.length ||
-    (scope.device_ids as unknown[] | undefined)?.length
-  )
-    return null;
+  if ((scope.device_ids as unknown[] | undefined)?.length) return null;
   return {
     trigger_kind: String(trigger.kind ?? "measurement"),
     metric_key: String(trigger.metric_key ?? ""),
     every_seconds: Number(trigger.every_seconds ?? 300),
     entity_ids: ((scope.entity_ids as string[] | undefined) ?? []).map(String),
+    entity_type_ids: (
+      (scope.entity_type_ids as string[] | undefined) ?? []
+    ).map(String),
     conditions: formConditions,
     for_seconds: Number(doc.for_seconds ?? 0),
     cooldown_seconds: Number(doc.cooldown_seconds ?? 0),
@@ -247,7 +249,10 @@ export function formToDocument(v: RuleFormValues): Doc {
     conditions: leaves.length === 1 ? leaves[0] : { all: leaves },
     event,
   };
-  if (v.entity_ids.length > 0) doc.scope = { entity_ids: v.entity_ids };
+  const scope: Doc = {};
+  if (v.entity_ids.length > 0) scope.entity_ids = v.entity_ids;
+  if (v.entity_type_ids.length > 0) scope.entity_type_ids = v.entity_type_ids;
+  if (Object.keys(scope).length > 0) doc.scope = scope;
   if (v.for_seconds > 0) doc.for_seconds = v.for_seconds;
   if (v.cooldown_seconds > 0) doc.cooldown_seconds = v.cooldown_seconds;
   return doc;

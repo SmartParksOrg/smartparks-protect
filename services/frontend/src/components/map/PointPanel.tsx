@@ -17,6 +17,7 @@ import { AccuracyWarning } from "@/components/map/MapObjectPanel";
 import { imprecise } from "@/lib/accuracy";
 import { formatTime } from "@/lib/format";
 import { recordsHref } from "@/lib/records";
+import { courseText, speedText } from "@/lib/speed";
 import { projectFor } from "@/lib/scope";
 
 /**
@@ -147,7 +148,14 @@ export function PointPanel({
           )}
           {p.speed_mps != null && (
             <PanelRow label={t("Speed")}>
-              {t("{{value}} km/h", { value: (p.speed_mps * 3.6).toFixed(1) })}
+              {speedText(p.speed_mps)}
+              {/* the course at a standstill is the receiver's noise (phase 37) */}
+              {courseText(p.heading_deg, p.speed_mps) && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {courseText(p.heading_deg, p.speed_mps)}
+                </span>
+              )}
             </PanelRow>
           )}
           {p.satellites != null && (

@@ -56,6 +56,25 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "speeding": {
+        "name": "Speeding",
+        "description": (
+            "Faster than 60 km/h anywhere, from the speed the device reports with its fix "
+            "(phase 37). Reminds every ten minutes while it stays. Scope the rule to the "
+            "vehicle type so an animal's collar is never judged by it."
+        ),
+        "document": {
+            "trigger": {"kind": "position"},
+            "conditions": {"type": "threshold", "metric": "speed_kmh", "op": ">", "value": 60},
+            "cooldown_seconds": 600,
+            "event": {
+                "event_type": "SPEED_LIMIT_VIOLATION",
+                "severity": "warning",
+                "title": "{entity} at {value} km/h",
+                "create_alert": True,
+            },
+        },
+    },
     "no_data": {
         "name": "No data for 12 hours",
         "description": "An entity has not reported for twelve hours. Checked every five minutes.",

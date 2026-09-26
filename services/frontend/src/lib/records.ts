@@ -1,5 +1,6 @@
 import { t } from "@/lib/i18nMark";
 import type { RecordRow } from "@/api/types";
+import { scaledUnit } from "@/lib/format";
 import {
   RANGE_PRESETS,
   type RangePreset,
@@ -133,6 +134,9 @@ export interface RecordColumn {
   numeric: boolean;
   /** Off until a reader adds it: the metadata columns (Tim, 2026-09-20). */
   extra?: boolean;
+  /** A factor on the stored value before it is shown, with the unit people read ("10 ms"
+   * multiplied out, m/s as km/h); absent when the stored value is the one shown. */
+  factor?: number;
 }
 
 const FIXED: RecordColumn[] = [
@@ -172,6 +176,13 @@ const FIXED: RecordColumn[] = [
     key: "speed_kmh",
     label: t("Speed"),
     unit: "km/h",
+    kind: "fixed",
+    numeric: true,
+  },
+  {
+    key: "heading_deg",
+    label: t("Course"),
+    unit: "°",
     kind: "fixed",
     numeric: true,
   },
@@ -255,13 +266,19 @@ export function columnsOf(
   }
   return [
     ...FIXED,
-    ...[...metricKeys].map(([key, numeric]) => ({
-      key: `m:${key}`,
-      label: metricLabels.get(key)?.label ?? key,
-      unit: metricLabels.get(key)?.unit ?? null,
-      kind: "metric" as const,
-      numeric,
-    })),
+    // the unit people read: a numbered unit multiplied out, a speed in km/h (the factor is
+    // applied in `cellOf`, so the table, the chart and the filters agree)
+    ...[...metricKeys].map(([key, numeric]) => {
+      const read = scaledUnit(metricLabels.get(key)?.unit);
+      return {
+        key: `m:${key}`,
+        label: metricLabels.get(key)?.label ?? key,
+        unit: read.unit,
+        kind: "metric" as const,
+        numeric,
+        ...(read.factor !== 1 ? { factor: read.factor } : {}),
+      };
+    }),
     ...[...stateKeys].map(([key, numeric]) => ({
       key: `s:${key}`,
       label: key,
@@ -290,6 +307,12 @@ export function cellOf(row: RecordRow, column: RecordColumn): CellValue {
       return row.position?.speed_mps != null
         ? row.position.speed_mps * 3.6
         : null;
+    case "heading_deg":
+      // a course at a standstill is the receiver's noise (phase 37)
+      return row.position?.heading_deg != null &&
+        (row.position.speed_mps ?? 0) > 0
+        ? row.position.heading_deg
+        : null;
     case "altitude_m":
       return row.position?.altitude_m ?? null;
     case "kinds":
@@ -316,6 +339,8 @@ export function cellOf(row: RecordRow, column: RecordColumn): CellValue {
           ? row.measurements?.[column.key.slice(2)]
           : row.state?.[column.key.slice(2)];
       if (raw === undefined || raw === null) return null;
+      if (typeof raw === "number" && column.kind === "metric")
+        return raw * (column.factor ?? 1);
       if (
         typeof raw === "number" ||
         typeof raw === "string" ||

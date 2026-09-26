@@ -72,6 +72,7 @@ from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.domain.outliers import EVENT_TYPE as OUTLIER_EVENT_TYPE
 from shared.domain.outliers import outlier_of
 from shared.domain.reboot import detect_reboots, previous_uptime
+from shared.domain.speed import speed_measurements
 from shared.domain.static_place import Sighting, place_sightings
 from shared.domain.trap import (
     TRAP_ENTITY_TYPE,
@@ -473,6 +474,8 @@ async def process_source_event(
                 records.measurements,
                 previous_sample(before.latest_measurements if before else None),
             )
+            # the speed and course a fix carries, as measurements too (shared/domain/speed.py)
+            records.measurements += speed_measurements(records.positions)
             # a reboot from an uptime lower than the one before it (shared/domain/reboot.py)
             wrap = getattr(driver, "uptime_wrap_seconds", None)
             records.events += detect_reboots(

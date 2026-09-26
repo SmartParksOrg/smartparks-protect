@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -11,6 +11,7 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
   Entity,
+  EntityType,
   Feature,
   Metric,
   Page as PageType,
@@ -83,6 +84,7 @@ const schema = z.object({
   metric_key: z.string(),
   every_seconds: z.number().int().min(60).max(86400),
   entity_ids: z.array(z.string()),
+  entity_type_ids: z.array(z.string()),
   conditions: z.array(conditionSchema).min(1, t("Add at least one condition")),
   for_seconds: z.number().int().min(0),
   cooldown_seconds: z.number().int().min(0),
@@ -132,6 +134,7 @@ function unflatten(v: Values): RuleFormValues {
     metric_key: v.metric_key,
     every_seconds: v.every_seconds,
     entity_ids: v.entity_ids,
+    entity_type_ids: v.entity_type_ids,
     conditions: v.conditions,
     for_seconds: v.for_seconds,
     cooldown_seconds: v.cooldown_seconds,
@@ -182,6 +185,31 @@ export function RuleEditor({
       }),
     enabled: open,
   });
+  // the scope by type (phase 37): the catalogue's types, the top level first, a sub-type
+  // named after its type; a type takes its sub-types on the server
+  const entityTypes = useQuery({
+    queryKey: queryKeys.entityTypes,
+    queryFn: () =>
+      api.get<PageType<EntityType>>("/api/v1/entity-types", {
+        query: { limit: 500 },
+      }),
+    enabled: open,
+  });
+  const typeChoices = useMemo(() => {
+    const items = entityTypes.data?.items ?? [];
+    const byId = new Map(items.map((type) => [type.id, type]));
+    return [...items]
+      .map((type) => ({
+        id: type.id,
+        label: type.parent_id
+          ? `${byId.get(type.parent_id)?.label ?? ""} › ${type.label}`
+          : type.label,
+        top: !type.parent_id,
+      }))
+      .sort((a, b) =>
+        a.top === b.top ? a.label.localeCompare(b.label) : a.top ? -1 : 1,
+      );
+  }, [entityTypes.data]);
   const features = useQuery({
     queryKey: queryKeys.features(projectId),
     queryFn: () =>
@@ -482,6 +510,48 @@ export function RuleEditor({
                               }
                             >
                               {e.name}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </Field>
+                    <Field
+                      label={t("Entity types")}
+                      htmlFor="rule-scope-types"
+                      hint={t(
+                        "Empty means every type; a type takes its sub-types. A speeding rule scoped to Vehicles never judges a collar.",
+                      )}
+                    >
+                      <div
+                        id="rule-scope-types"
+                        className="flex max-h-24 flex-wrap gap-1 overflow-y-auto"
+                      >
+                        {typeChoices.map((type) => {
+                          const on = form
+                            .watch("entity_type_ids")
+                            .includes(type.id);
+                          return (
+                            <Button
+                              key={type.id}
+                              type="button"
+                              size="sm"
+                              variant={on ? "default" : "outline"}
+                              className="h-7"
+                              onClick={() =>
+                                form.setValue(
+                                  "entity_type_ids",
+                                  on
+                                    ? form
+                                        .getValues("entity_type_ids")
+                                        .filter((x) => x !== type.id)
+                                    : [
+                                        ...form.getValues("entity_type_ids"),
+                                        type.id,
+                                      ],
+                                )
+                              }
+                            >
+                              {type.label}
                             </Button>
                           );
                         })}

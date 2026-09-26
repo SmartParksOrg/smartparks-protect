@@ -138,6 +138,7 @@ describe("records columns", () => {
       "lon",
       "accuracy_m",
       "speed_kmh",
+      "heading_deg",
       "altitude_m",
       "device_id",
       "entity_id",

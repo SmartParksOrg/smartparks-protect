@@ -333,6 +333,9 @@ async def current_state(
                     "trap_closed": _latest_value(device_state, "trap_triggered"),
                     # the cardiac tag (phase 34): the newest heart rate the collar relayed
                     "heart_rate": _latest_value(device_state, "heart_rate"),
+                    # the speed and course the newest fix carried (phase 37)
+                    "speed": _value_at_fix(device_state, "speed"),
+                    "heading": _value_at_fix(device_state, "heading"),
                     "last_reset_at": device_state.last_reset_at.isoformat()
                     if device_state and device_state.last_reset_at
                     else None,
@@ -495,6 +498,8 @@ async def devices_state(
                     "uptime": _latest_value(state, "uptime"),
                     "fence_voltage": _latest_value(state, "fence_voltage"),
                     "heart_rate": _latest_value(state, "heart_rate"),
+                    "speed": _value_at_fix(state, "speed"),
+                    "heading": _value_at_fix(state, "heading"),
                     "fence_pulses": _latest_value(state, "fence_pulse_count"),
                     "trap_closed": _latest_value(state, "trap_triggered"),
                     "last_reset_at": state.last_reset_at.isoformat()
@@ -634,6 +639,22 @@ def _latest_value(state: DeviceCurrentState | None, key: str) -> float | None:
     entry = (state.latest_measurements or {}).get(key) if state else None
     value = entry.get("value") if isinstance(entry, dict) else None
     return float(value) if isinstance(value, int | float) else None
+
+
+def _value_at_fix(state: DeviceCurrentState | None, key: str) -> float | None:
+    """The newest value of a metric only when it is of the newest fix's own moment (phase 37):
+    the speed and the course belong to one fix, so a device whose active tracking was switched
+    off must not keep reading last week's speed beside a fix of today."""
+    if state is None or state.latest_fix_time is None:
+        return None
+    if state.latest_position_time != state.latest_fix_time:
+        return None  # the position shown is an estimate newer than the fix the speed is of
+    entry = (state.latest_measurements or {}).get(key)
+    if not isinstance(entry, dict) or not entry.get("time"):
+        return None
+    if datetime.fromisoformat(str(entry["time"])) != state.latest_fix_time:
+        return None
+    return _latest_value(state, key)
 
 
 @router.get("/tracks", response_model=TrackResponse)

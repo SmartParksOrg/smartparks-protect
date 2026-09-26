@@ -119,6 +119,7 @@ def build_server(api: ProtectApi) -> MCPServer[None]:
             "longitude": coordinates[0],
             "altitude_m": row.get("altitude_m"),
             "speed_mps": row.get("speed_mps"),
+            "heading_deg": row.get("heading_deg"),
             "accuracy_m": row.get("accuracy_m"),
             "record_type": row["record_type"],
             "device_id": row["device_id"],

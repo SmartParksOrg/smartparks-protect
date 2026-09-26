@@ -90,6 +90,10 @@ export interface EntityFeatureProperties {
   trap_closed?: number | null;
   /** The cardiac tag (phase 34): the newest heart rate in bpm a collar relayed. */
   heart_rate?: number | null;
+  /** The speed in m/s and the course in degrees the newest fix carried (phase 37); absent
+   * when the fix reports none, and the course absent at a standstill. */
+  speed?: number | null;
+  heading?: number | null;
   last_reset_at?: string | null;
   last_status_at?: string | null;
   device_last_seen_at?: string | null;
@@ -140,6 +144,9 @@ export interface DeviceFeatureProperties {
   trap_closed?: number | null;
   /** The cardiac tag (phase 34): the newest heart rate in bpm a collar relayed. */
   heart_rate?: number | null;
+  /** The speed in m/s and the course in degrees the newest fix carried (phase 37). */
+  speed?: number | null;
+  heading?: number | null;
   last_reset_at?: string | null;
   last_status_at?: string | null;
   picture_updated_at?: string | null;

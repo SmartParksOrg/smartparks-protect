@@ -68,3 +68,13 @@ describe("scaledUnit", () => {
     expect(formatMeasurement(52, "10 ms")).toBe("520 ms");
   });
 });
+
+describe("scaledUnit", () => {
+  it("reads a speed in km/h and a numbered unit multiplied out", () => {
+    expect(scaledUnit("m/s")).toEqual({ factor: 3.6, unit: "km/h" });
+    expect(scaledUnit("10 ms")).toEqual({ factor: 10, unit: "ms" });
+    expect(scaledUnit("V")).toEqual({ factor: 1, unit: "V" });
+    expect(formatMeasurement(12, "m/s")).toBe("43.20 km/h");
+    expect(formatMeasurement(52, "10 ms")).toBe("520 ms");
+  });
+});

@@ -46,6 +46,7 @@ from shared.rules.replay import (
     in_scope,
     position_values,
     schedule_subjects,
+    type_lineage,
 )
 from shared.rules.schema import RuleDocument, TriggerKind
 from shared.timeutil import utc_now
@@ -249,7 +250,7 @@ async def run_rules(
     rules: list[LoadedRule],
     subject: Subject,
     sample: Sample,
-    entity_type_id: uuid.UUID | None,
+    entity_type_id: uuid.UUID | frozenset[uuid.UUID] | None,
 ) -> int:
     """Evaluate every rule in scope, each in its own transaction. Returns how many fired."""
     fired = 0
@@ -326,11 +327,7 @@ async def handle_position(bus: RedisStreamsBus, cache: RuleCache, payload: dict[
         )
         if position is None:
             return
-        entity_type_id = None
-        if position.entity_id is not None:
-            entity_type_id = await session.scalar(
-                select(Entity.entity_type_id).where(Entity.id == position.entity_id)
-            )
+        entity_type_id = await type_lineage(session, position.entity_id)
         if position.record_type in ESTIMATE_RECORD_TYPES:
             # an estimate of any kind drives rules only for an entity that opted in (D163, D164):
             # a geofence must not fire because a reader heard a tag near its own post
@@ -382,7 +379,7 @@ async def handle_measurements(
                 .order_by(Measurement.time)
             )
         ).all()
-        types: dict[uuid.UUID, uuid.UUID] = {}
+        types: dict[uuid.UUID, frozenset[uuid.UUID]] = {}
         for row in rows:
             if row[1] is not None and row[2] is not None and row[1] not in types:
                 types.update(await entity_types(session, row[1]))
@@ -438,13 +435,7 @@ async def handle_state(bus: RedisStreamsBus, cache: RuleCache, payload: dict[str
         attribution = await resolve_attribution(session, uuid.UUID(device_id), time)
         if attribution.project_id is None:
             return
-        entity_type_id = (
-            await session.scalar(
-                select(Entity.entity_type_id).where(Entity.id == attribution.entity_id)
-            )
-            if attribution.entity_id
-            else None
-        )
+        entity_type_id = await type_lineage(session, attribution.entity_id)
     rules = await cache.rules(attribution.project_id, TriggerKind.STATE)
     if not rules:
         return

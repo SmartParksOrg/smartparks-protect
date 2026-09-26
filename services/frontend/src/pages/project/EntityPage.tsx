@@ -70,6 +70,7 @@ import { useTab } from "@/hooks/useTab";
 import { groupPath, useGroups } from "@/hooks/useGroups";
 import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
+import { courseText, speedText } from "@/lib/speed";
 import { typePath } from "@/lib/entityTypes";
 
 /** One entity: what it is, the device tracking it now with its health, and the history of the
@@ -502,6 +503,15 @@ export function EntityPage() {
                       {live?.position_time
                         ? formatTime(live.position_time)
                         : t("none")}
+                      {/* the speed and course the fix carried (phase 37) */}
+                      {live?.speed != null && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {speedText(live.speed)}
+                          {courseText(live.heading, live.speed) &&
+                            ` · ${courseText(live.heading, live.speed)}`}
+                        </span>
+                      )}
                     </dd>
                     {point && (
                       <>
@@ -841,6 +851,13 @@ export function EntityPage() {
                         {p.accuracy_m != null && (
                           <span className="text-muted-foreground">
                             {t("±{{value}} m", { value: p.accuracy_m })}
+                          </span>
+                        )}
+                        {p.speed_mps != null && (
+                          <span className="text-muted-foreground">
+                            {speedText(p.speed_mps)}
+                            {courseText(p.heading_deg, p.speed_mps) &&
+                              ` · ${courseText(p.heading_deg, p.speed_mps)}`}
                           </span>
                         )}
                       </li>

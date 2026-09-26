@@ -972,8 +972,11 @@ class OpenCollarDriver:
         }
         speed = heading = None
         if active and len(data) >= 30:
+            # the firmware writes the course as hundredths of a degree plus 18000, little-endian
+            # (the reference decoder reads it big-endian, a bug the research document records),
+            # and the speed in whole metres per second
             cog_raw, sog = struct.unpack_from("<HB", data, 27)
-            heading = (cog_raw - 18000) / 100
+            heading = ((cog_raw - 18000) / 100) % 360
             speed = float(sog)
             attributes["active_tracking"] = True
         records.positions.append(

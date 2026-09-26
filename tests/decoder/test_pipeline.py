@@ -61,7 +61,7 @@ async def test_json_payload_becomes_position_measurements_and_state(db, bus, wor
     assert outcome.status == ProcessingStatus.PROCESSED
     assert outcome.created == {
         "positions": 1,
-        "measurements": 3,
+        "measurements": 4,  # the three sent, and the fix's speed (phase 37)
         "states": 1,
         "events": 1,
         "contacts": 0,

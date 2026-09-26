@@ -74,6 +74,7 @@ import { useTab } from "@/hooks/useTab";
 import { useAnalysisModules, usePermissions } from "@/hooks/useProjects";
 import { type CurationTarget } from "@/lib/curation";
 import { formatAgo, formatTime } from "@/lib/format";
+import { courseText, speedText } from "@/lib/speed";
 import { useAuthStore } from "@/stores/auth";
 
 const TABS = [
@@ -522,6 +523,31 @@ export function DevicePage() {
                         t("nothing")
                       )}
                     </dd>
+                    <dt className="text-muted-foreground">
+                      {t("Last position")}
+                    </dt>
+                    <dd>
+                      {/* the newest fix of the recent list, with the speed and course it
+                          carried (phase 37) */}
+                      {positions.data?.[0] ? (
+                        <>
+                          {formatTime(positions.data[0].time)}
+                          {positions.data[0].speed_mps != null && (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {speedText(positions.data[0].speed_mps)}
+                              {courseText(
+                                positions.data[0].heading_deg,
+                                positions.data[0].speed_mps,
+                              ) &&
+                                ` · ${courseText(positions.data[0].heading_deg, positions.data[0].speed_mps)}`}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        t("none")
+                      )}
+                    </dd>
                     <dt className="text-muted-foreground">{t("Serial")}</dt>
                     <dd>{d.serial_number ?? "none"}</dd>
                     <dt className="text-muted-foreground">{t("Firmware")}</dt>
@@ -880,6 +906,13 @@ export function DevicePage() {
                           {p.accuracy_m != null && (
                             <span className="text-muted-foreground">
                               {t("±{{value}} m", { value: p.accuracy_m })}
+                            </span>
+                          )}
+                          {p.speed_mps != null && (
+                            <span className="text-muted-foreground">
+                              {speedText(p.speed_mps)}
+                              {courseText(p.heading_deg, p.speed_mps) &&
+                                ` · ${courseText(p.heading_deg, p.speed_mps)}`}
                             </span>
                           )}
                           <CuratedBadge
