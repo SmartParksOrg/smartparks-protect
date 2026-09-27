@@ -303,3 +303,30 @@ def test_a_dragged_box_proposes_the_face_around_its_middle():
         areas.box_of(4.6105 - dlon, 52.5305 - dlat, 4.6105 + dlon, 52.5305 + dlat),
     )
     assert [c.name for c in dragged] == [c.name for c in click]
+
+
+def test_the_roads_of_a_box_come_longest_first_with_a_name_each():
+    """Phase 38 (decision D300): the roads read asks for highways alone, leaves the ways people
+    walk on out, and names a way by its name, its reference or its kind."""
+    read = areas.box_of(4.62, 52.538, 4.65, 52.552)
+    query = areas.roads_query(read)
+    assert 'way["highway"]' in query and "footway" in query and "landuse" not in query
+    document = json.loads((FIXTURE.parent / "castricum_roads.json").read_text())
+    roads = areas.parse_roads(document)
+    assert len(roads) == 12
+    assert roads[0].geometry.length >= roads[-1].geometry.length
+    assert {r.name for r in roads} >= {"Geversweg", "Oude Schulpweg", "Bredeweg", "Scoutingpad"}
+    assert {r.name for r in roads if r.highway == "track"} == {"Track"}
+    # a footpath in the answer would be dropped, and a way of one point too
+    document["elements"].append(
+        {
+            "type": "way",
+            "id": 1,
+            "tags": {"highway": "footway"},
+            "geometry": [{"lat": 52.54, "lon": 4.62}, {"lat": 52.541, "lon": 4.621}],
+        }
+    )
+    document["elements"].append(
+        {"type": "way", "id": 2, "tags": {"highway": "track"}, "geometry": [{"lat": 1, "lon": 1}]}
+    )
+    assert len(areas.parse_roads(document)) == 12

@@ -53,6 +53,7 @@ from shared.analysis.primitives.trajectory import (
     Steps,
     Trajectory,
     exclude_impossible,
+    fold_stops,
     haversine_array,
     load_trajectory,
     steps,
@@ -119,6 +120,7 @@ METRICS: list[str] = [
     "cluster_count",
     "missing_share",
     "excluded_fixes",
+    "folded_fixes",
 ]
 
 
@@ -126,6 +128,10 @@ class MovementParameters(CommonParameters):
     """The options of section 8.1 with their defaults."""
 
     max_speed_mps: float = Field(default=15, gt=0, le=100)
+    #: The stop rule (decision D303): fixes within this radius of where a run of them started
+    #: take that place, so a still animal's GNSS drift adds no distance; widened to a fix's
+    #: own accuracy when that is worse. Zero folds nothing.
+    stop_radius_m: float = Field(default=15, ge=0, le=500)
     stationary_speed_mps: float = Field(default=0.05, ge=0, le=5)
     stationary_min_minutes: float = Field(default=30, ge=1, le=1440)
     cell_m: float = Field(default=100, ge=10, le=5000)
@@ -185,8 +191,10 @@ def analyse_trajectory(
     tz: str,
     *,
     excluded: int = 0,
+    folded: int = 0,
 ) -> SubjectMetrics:
-    """The metrics of one subject in one period from a trajectory already filtered."""
+    """The metrics of one subject in one period from a trajectory already filtered and, when
+    the stop radius is on, already folded (`fold_stops`); `folded` says how many fixes it moved."""
     gap_s = params.gap_hours * 3600
     s = steps(track, gap_s)
     window_s = (period.time_to - period.time_from).total_seconds()
@@ -194,6 +202,7 @@ def analyse_trajectory(
     summary: dict[str, float | str | None] = dict.fromkeys(METRICS)
     summary["fixes"] = float(n)
     summary["excluded_fixes"] = float(excluded)
+    summary["folded_fixes"] = float(folded)
     warnings, figures = quality_report(
         track, s, subject_id=track.entity_id, window_seconds=window_s, excluded=excluded
     )
@@ -680,7 +689,10 @@ class MovementModule:
                 input_count += len(track) + track.duplicates
                 track, dropped = exclude_impossible(track, params.max_speed_mps)
                 excluded_count += dropped + track.duplicates
-                m = analyse_trajectory(track, params, period, tz or "UTC", excluded=dropped)
+                track, folded = fold_stops(track, params.stop_radius_m)
+                m = analyse_trajectory(
+                    track, params, period, tz or "UTC", excluded=dropped, folded=folded
+                )
                 results[(period.key, subject.id)] = m
                 geometries.extend(hotspot_geometries(subject, period, m))
                 geometries.extend(await spatial_layers(session, subject, period, track, params, m))

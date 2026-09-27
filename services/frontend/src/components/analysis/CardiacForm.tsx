@@ -39,6 +39,7 @@ import { inputValue } from "@/lib/records";
 
 const MAX_SUBJECTS = 25;
 const RANGES: [string, string][] = [
+  ["1d", t("Last 24 hours")],
   ["7d", t("Last 7 days")],
   ["30d", t("Last 30 days")],
   ["90d", t("Last 90 days")],

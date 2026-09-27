@@ -34,6 +34,7 @@ export const CONDITION_TYPES = [
   { value: "threshold", label: "Threshold" },
   { value: "spatial", label: t("Geofence or area") },
   { value: "near", label: t("Near a feature or entity") },
+  { value: "far", label: t("Far from every feature") },
   { value: "no_data", label: t("No data") },
   { value: "window", label: t("Window aggregate") },
 ] as const;
@@ -143,6 +144,13 @@ function leafToForm(leaf: Doc): FormCondition | null {
         feature_ids: (leaf.feature_ids as string[] | undefined) ?? [],
         entity_ids: (leaf.entity_ids as string[] | undefined) ?? [],
       };
+    case "far":
+      return {
+        ...base,
+        meters: Number(leaf.meters),
+        feature_type: String(leaf.feature_type ?? ""),
+        feature_ids: (leaf.feature_ids as string[] | undefined) ?? [],
+      };
     case "no_data":
       return { ...base, for_seconds: Number(leaf.for_seconds) };
     case "window":
@@ -215,6 +223,12 @@ function formLeaf(c: FormCondition): Doc {
       if (c.entity_ids.length > 0) leaf.entity_ids = c.entity_ids;
       return leaf;
     }
+    case "far": {
+      const leaf: Doc = { type: "far", meters: c.meters };
+      if (c.feature_ids.length > 0) leaf.feature_ids = c.feature_ids;
+      else leaf.feature_type = c.feature_type || "route";
+      return leaf;
+    }
     case "no_data":
       return { type: "no_data", for_seconds: c.for_seconds };
     case "window":
@@ -274,6 +288,8 @@ export function describeDocument(doc: Doc): string {
         return `${String(l.relation)} ${String(l.feature_type ?? "selected features")}`;
       case "near":
         return `within ${String(l.meters)} m of ${l.feature_type ? `any ${String(l.feature_type)}` : (l.feature_ids as unknown[] | undefined)?.length ? "selected features" : ""}${(l.entity_ids as unknown[] | undefined)?.length ? `${l.feature_type || (l.feature_ids as unknown[] | undefined)?.length ? " or " : ""}selected entities` : ""}`;
+      case "far":
+        return `farther than ${String(l.meters)} m from ${l.feature_type ? `every ${String(l.feature_type)}` : "the selected features"}`;
       case "no_data":
         return `no data for ${Math.round(Number(l.for_seconds) / 3600)} h`;
       case "window":
@@ -292,6 +308,7 @@ const EVENT_ICONS: Record<string, string> = {
   NO_DATA: "event.device_offline",
   SPECIES_DETECTION: "event.detection",
   SPEED_LIMIT_VIOLATION: "event.speeding",
+  OFF_ROAD: "event.road_status",
   BATTERY_LOW: "event.low_battery",
   POSSIBLE_IMMOBILITY: "event.immobility",
   PROXIMITY: "event.proximity",

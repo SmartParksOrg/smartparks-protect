@@ -29,6 +29,7 @@ from shared.geodesy import metres_between
 from shared.rules.schema import (
     AllOf,
     AnyOf,
+    FarCondition,
     NearCondition,
     NoDataCondition,
     NotOf,
@@ -287,6 +288,31 @@ async def _leaf(cond: Any, e: _Eval) -> bool:
             e.feature = nearest[1]
             return True
         return False
+
+    if isinstance(cond, FarCondition):
+        point = await _point(e)
+        if point is None:
+            e.missing.append("position")
+            return False
+        # a fix that could itself lie beside the road by more than the distance says nothing
+        accuracy = e.sample.values.get("accuracy_m")
+        if accuracy is not None and accuracy > cond.meters:
+            e.values["accuracy_m"] = accuracy
+            return False
+        nearest_far: tuple[float, str] | None = None
+        for f in await e.data.features(e.subject.project_id, cond.feature_ids, cond.feature_type):
+            d = metres_to_geometry(point, f.geometry)
+            if nearest_far is None or d < nearest_far[0]:
+                nearest_far = (d, f.name)
+        if nearest_far is None:
+            e.missing.append("targets")
+            return False
+        distance = round(nearest_far[0], 1)
+        e.values["distance_m"] = distance
+        if e.metric is None:
+            e.metric, e.value = "distance_m", distance
+        e.feature = nearest_far[1]
+        return nearest_far[0] > cond.meters
 
     if isinstance(cond, NoDataCondition):
         last = await e.data.last_seen(e.subject, e.sample.time)

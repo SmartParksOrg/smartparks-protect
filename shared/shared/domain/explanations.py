@@ -138,6 +138,12 @@ EVENTS: dict[str, str] = {
         "receiver's speed over ground at that moment, not an average between two fixes. "
         "A device that reports no speed never raises this."
     ),
+    "OFF_ROAD": (
+        "The vehicle's position was farther from every route of the project than the rule "
+        "allows, for as long as the rule asks: it left the roads and tracks the project knows. "
+        "The title names the nearest route and the distance to it. A fix whose own accuracy "
+        "is worse than that distance never raises this."
+    ),
     "SYSTEM_WORKER_STALE": (
         "A background worker of the server has not reported for longer than allowed; the "
         "work it does (decoding, rules, exports, analyses) waits until it is back."

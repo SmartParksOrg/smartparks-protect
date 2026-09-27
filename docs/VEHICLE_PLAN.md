@@ -1,6 +1,6 @@
 # Vehicles: speed and course, speeding, roads, and a vehicle use module
 
-Design for phases 37 to 39, written 2026-09-26 from Tim's request of the same day: SP051307 with active tracking on tracked his car, and reported course and speed over ground in every position message. Decisions D296 to D301 were asked and taken on 2026-09-26. Phase 37 is built; phases 38 and 39 are planned here and start when Tim says so.
+Design for phases 37 to 39, written 2026-09-26 from Tim's request of the same day: SP051307 with active tracking on tracked his car, and reported course and speed over ground in every position message. Decisions D296 to D301 were asked and taken on 2026-09-26. Phase 37 is built; on 2026-09-27 Tim chose to build 39 and then 38 (decision D305), and phase 39 is built as section 5 says with the departures noted there.
 
 ## 1. What the device reports
 
@@ -17,7 +17,10 @@ The evaluator's `speed_kmh` is the reported speed. Nothing derives a speed betwe
 | D298 | Where it shows | A Speed row that unfolds its trend on the map's entity and device panels, the Last position line of the entity and device pages, the recent positions lists, the fix panel; not on the health card, since speed is not the device's health. |
 | D299 | A Speeding template, scoped by entity type | "Speeding": position trigger, `speed_kmh > 60`, cooldown 10 min, alert, the existing `SPEED_LIMIT_VIOLATION` event type; the rule editor gains the entity type scope the schema always had, and a type in a scope takes its sub-types on the server. Over reusing the zone template alone and over a separate event type. |
 | D300 | Leaving known roads: roads as route features, a far-from condition (planned) | Roads become route features of the project, imported from OpenStreetMap through the Overpass reading that proposes areas today or from a reserve's files; a new rule condition "farther than N m from any route" raises `OFF_ROAD`. Nothing external is called per position. Over matching every fix against OpenStreetMap live and over a corridor learned from the vehicle's history. |
-| D301 | A Vehicle use analysis module (planned) | Entities of type vehicle as subjects: trips, distance and driving hours per day, speeding episodes, time on and off known roads once roads exist, idle time, a map of trips coloured by speed, a PDF report. Over folding vehicle figures into the movement module and over a patrol coverage module. |
+| D303 | A stop rule folds a still device's drift | Consecutive fixes within a stop radius (15 m, widened to a fix's own accuracy) of where a run of them began take that place, in the vehicle module's trips and in the movement module's distance alike. Over the vehicle module alone (a resting animal drifts the same way) and over flagging drift invalid at ingest (data a person may want, and not what the outlier rule is for). Tim, 2026-09-27. |
+| D304 | What a trip is | A step is movement when its fixes stand apart after the fold or the fix it starts from reported a speed above 5 km/h; a trip opens at the fix a movement starts from and closes where the vehicle has stood for 10 minutes, a gap closes it and says so; a shorter halt is a pause inside it; the start and end are named by the nearest site within 200 m; speeding is read off the reported speed alone against 60 km/h. Every figure is a parameter of the form. Tim, 2026-09-27, the recommended shape. |
+| D305 | Build order | Phase 39 (the module) first, phase 38 (roads and the off-road rule) right after, so the module's on and off road figures land in one release. Tim, 2026-09-27. |
+| D301 | A Vehicle use analysis module (built 2026-09-27) | Entities of type vehicle as subjects: trips, distance and driving hours per day, speeding episodes, time on and off known roads once roads exist, idle time, a map of trips coloured by speed, a PDF report. Over folding vehicle figures into the movement module and over a patrol coverage module. |
 
 ## 3. Phase 37, built on 2026-09-26
 
@@ -42,7 +45,9 @@ Exit criteria, on the dev server: the Smart Parks project's entity Tim, tracked 
 
 **Not in this phase.** Roads drawn from the vehicle's own history; a road's direction; speed limits per road (a `max_speed_kmh` attribute on a route and a speeding rule that reads it is the natural next step, and the feature attributes already allow it).
 
-Deliverables: [ ] 38a `FarCondition`, evaluator, replay, the template, the explanation, Dutch, tests; [ ] 38b the OpenStreetMap roads import with its preview and bound; [ ] 38c the Features page's action, the docs, the changelog.
+Deliverables: [x] 38a `FarCondition`, evaluator, replay (the fix's accuracy rides on the sample), the template, the explanation, Dutch, tests (2026-09-27); [x] 38b the OpenStreetMap roads read (`roads_query`, `parse_roads`, `POST /features/roads`) with the recorded fixture, longest first, the box bound of the proposal (2026-09-27); [x] 38c the Features page's "Roads" dialog with the box gesture, the list with a checkbox per way, one route each or one route for all, the docs, the changelog (2026-09-27).
+
+**As built, where it departs from the text above.** The roads are read through their own query (highways alone, so the answer stays small) rather than through the area proposal's; a later read adds what is new but does not update a route already saved (the way id is in the attributes for whoever wants to); "Combine into one route" is a switch in the dialog that saves the kept ways as one MultiLineString, not a union after the fact; the module's on and off road figures wait for a run over roads that exist, so the vehicle module does not yet report them.
 
 ## 5. Phase 39, planned: the Vehicle use module (D301)
 
@@ -58,7 +63,9 @@ The sixth analysis module, on the framework of `ANALYTICS_PHASE1_PLAN.md`. Subje
 
 **Framework changes.** None expected: entity subjects, the parameters model, the result document and the report engine carry it. `AnalysisModuleKey` gains `vehicle_use`, migration for the run row's module check, `ANALYSIS_MODULES` offers it by default.
 
-Deliverables: [ ] 39a the primitives (`primitives/trips.py`: segmentation, trip figures, tests on synthetic tracks); [ ] 39b the module, the run, the document; [ ] 39c the form, the page, the result blocks, the map layers, the report; [ ] 39d docs (`docs/analytics/vehicle-use.md`), the changelog, Dutch. Exit: a run over Tim's car for the week of 2026-09-25 lists the drive of that afternoon as trips with plausible distance and top speed, and a run over a collar refuses with "no vehicle among the subjects".
+Deliverables: [x] 39a the primitives (`primitives/trips.py`: segmentation, trip figures, speeding episodes; `fold_stops` in `primitives/trajectory.py`; tests on synthetic tracks, 2026-09-27); [x] 39b the module `vehicle_use`, the run, the document, migration 0050 (2026-09-27); [x] 39c the form, the page, the result blocks, the map layers (trips as lines, speeding as points, in the vehicle's colour), the report (2026-09-27); [x] 39d docs (`docs/analytics/vehicle-use.md`), the changelog, Dutch (2026-09-27). Exit: a run over Tim's car for the week of 2026-09-25 lists the drive of that afternoon as trips with plausible distance and top speed, and a run over a collar refuses with "no vehicle among the subjects" (the second holds in `tests/api/test_analysis_vehicle_run.py`; the first waits for the deploy and Tim's reading).
+
+**As built, where it departs from the text above.** Trips are coloured by the vehicle, as every other module colours its shapes, with the top speed against the limit in the click and the table rather than a warm ramp per trip; the idle time became "paused inside trips" (still time shorter than the stop, which needs no active tracking to be honest); the speed histogram is the reported speeds while moving, else the step speeds; the trajectory carries the reported speed of every fix (`Trajectory.speed_mps`) so no join with the measurements is needed; the stop rule (D303) is shared with the movement module.
 
 ## 6. Later, not in these phases
 

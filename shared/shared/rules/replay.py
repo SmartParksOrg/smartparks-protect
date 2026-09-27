@@ -73,14 +73,23 @@ def in_scope(
 
 
 def position_values(
-    speed_mps: float | None, altitude_m: float | None, lon: float, lat: float
+    speed_mps: float | None,
+    altitude_m: float | None,
+    lon: float,
+    lat: float,
+    accuracy_m: float | None = None,
 ) -> dict[str, float]:
+    """The metrics a fix carries without a lookup. The accuracy is not a metric a rule compares,
+    but the far condition reads it (phase 38): a fix that could itself lie beside the road by
+    more than the distance says nothing about leaving it."""
     values: dict[str, float] = {"latitude": lat, "longitude": lon}
     if speed_mps is not None:
         values["speed_mps"] = speed_mps
         values["speed_kmh"] = speed_mps * 3.6
     if altitude_m is not None:
         values["altitude_m"] = altitude_m
+    if accuracy_m is not None:
+        values["accuracy_m"] = accuracy_m
     return values
 
 
@@ -200,6 +209,7 @@ async def replay(
                 Position.speed_mps,
                 Position.altitude_m,
                 Position.source_event_id,
+                Position.accuracy_m,
             )
             .where(
                 Position.project_id == project_id,
@@ -213,7 +223,7 @@ async def replay(
         rows = (await session.execute(statement)).all()
         if len(rows) > MAX_SAMPLES:
             raise ReplayTooLarge(f"more than {MAX_SAMPLES} positions in range; shorten it")
-        for time, entity_id, device_id, geom, speed, altitude, source_event_id in rows:
+        for time, entity_id, device_id, geom, speed, altitude, source_event_id, accuracy in rows:
             if not in_scope(doc.scope, entity_id, types.get(entity_id), device_id):
                 continue
             point = to_shape(geom)
@@ -223,7 +233,7 @@ async def replay(
                 Sample(
                     time=time,
                     kind=TriggerKind.POSITION,
-                    values=position_values(speed, altitude, point.x, point.y),
+                    values=position_values(speed, altitude, point.x, point.y, accuracy),
                     point=(point.x, point.y),
                     source_event_id=source_event_id,
                 ),

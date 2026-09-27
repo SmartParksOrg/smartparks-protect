@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.crud import apply_patch, flush_or_409, get_or_404
@@ -43,6 +43,8 @@ router = APIRouter(prefix="/projects/{project_id}/analytics", tags=["analytics"]
 
 DEFAULT_RANGE = timedelta(hours=24)
 DEFAULT_METRICS_RANGE = timedelta(days=30)
+#: Entities or devices a metrics read may name, the records read's own bound (decision D142).
+MAX_OWNERS = 500
 
 
 class SeriesPoint(BaseModel):
@@ -393,12 +395,29 @@ def _row(m: Measurement) -> MeasurementRow:
 async def metrics_with_data(
     time_from: datetime | None = Query(None, alias="from"),
     time_to: datetime | None = Query(None, alias="to"),
+    entity_id: list[uuid.UUID] = Query(default_factory=list, max_length=MAX_OWNERS),
+    device_id: list[uuid.UUID] = Query(default_factory=list, max_length=MAX_OWNERS),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> list[MetricWithData]:
     """Metrics that have measurements in this project within the range (default 30 days), for
-    the filter builder."""
+    the filter builder and the explorer's metrics picker (decision D302): with `entity_id` or
+    `device_id`, only what those entities and devices reported, so the picker offers what the
+    selection has and nothing else. Within the caller's scope."""
     frm, to = _window(time_from, time_to, DEFAULT_METRICS_RANGE)
+    where = [
+        Measurement.project_id == context.project.id,
+        context.visibility.rows(Measurement.entity_id, Measurement.device_id),
+        in_window(Measurement, frm, to),
+        visible(Measurement),
+    ]
+    if entity_id or device_id:
+        owners = []
+        if entity_id:
+            owners.append(Measurement.entity_id.in_(entity_id))
+        if device_id:
+            owners.append(Measurement.device_id.in_(device_id))
+        where.append(or_(*owners))
     counts = (
         select(
             Measurement.metric_key,
@@ -406,11 +425,7 @@ async def metrics_with_data(
             func.min(effective_time(Measurement)).label("first_time"),
             func.max(effective_time(Measurement)).label("last_time"),
         )
-        .where(
-            Measurement.project_id == context.project.id,
-            in_window(Measurement, frm, to),
-            visible(Measurement),
-        )
+        .where(*where)
         .group_by(Measurement.metric_key)
         .subquery()
     )

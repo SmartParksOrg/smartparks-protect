@@ -11,9 +11,9 @@ The page lists the module's analyses: every run a person may see, newest first, 
 ## The form
 
 - **Subjects**: entities picked by name, one or more groups (their members with the subgroups join the picks), or every entity of a type; at most 25 per run. Devices are not subjects: a collar's fixes belong to the animals it tracked, by the assignment history.
-- **Period**: the last 7, 30 or 90 days, the last year, or a custom range; at most 366 days.
+- **Period**: the last 24 hours, 7, 30 or 90 days, the last year, or a custom range; at most 366 days.
 - **Compare with**: nothing, or the period of the same length right before.
-- **Method**, folded with its defaults on one line: the gap threshold (4 hours; a longer silence between two fixes is a gap, not movement), the maximum plausible speed (15 m/s; a fix that would need more is left out and counted), the grid cell (100 m; residence time, hotspots and the cluster distance), and the home range methods: MCP 95 %, KDE 50 % and 95 % (bandwidth automatic or in metres), KDE corrected for autocorrelation, clusters; and the **Movement strategy** switch, on by default, which reads a class off the net squared displacement.
+- **Method**, folded with its defaults on one line: the gap threshold (4 hours; a longer silence between two fixes is a gap, not movement), the maximum plausible speed (15 m/s; a fix that would need more is left out and counted), the grid cell (100 m; residence time, hotspots and the cluster distance), the stop radius (15 m; fixes within it of where a stop began are one place, so a resting animal's GNSS drift adds no distance, decision D303; zero folds nothing), and the home range methods: MCP 95 %, KDE 50 % and 95 % (bandwidth automatic or in metres), KDE corrected for autocorrelation, clusters; and the **Movement strategy** switch, on by default, which reads a class off the net squared displacement.
 
 The line under the form estimates the run: how many animals, days and fixes it will read, and what to change when a bound is crossed. "Analyse movement" on an entity page opens the dialog with that animal and the last 30 days filled in.
 
@@ -33,6 +33,7 @@ The analysis worker computes a run, one at a time per server, with its own state
 
 All arithmetic is on the sphere with the haversine; positions are WGS 84 and a park is small.
 
+- The stop rule comes first (decision D303): consecutive fixes within the stop radius of the first fix of their run take that fix's coordinates, the radius widened to a fix's own accuracy when that is worse; the summary counts the fixes it folded. A receiver at rest wanders a few metres between fixes, and over a night that wandering added up to a walk nobody made.
 - Steps between consecutive fixes give length, duration and speed; a step longer than the gap threshold is a gap and counts in nothing but the quality report. Distance is the sum of non-gap steps, reported with the share of the period the non-gap steps cover, so a sparse track is not read as a short one. Daily distance divides by the covered time.
 - Displacement is the great-circle distance from the first fix; the net squared displacement per fix draws the chart.
 - A step below 0.05 m/s is stationary; runs of at least 30 minutes are stationary periods.
@@ -60,4 +61,4 @@ Export gives the summary table as CSV, the polygons as GeoJSON (with subject, ki
 
 ## Switching it on and off
 
-`ANALYSIS_MODULES` (default `movement,grazing`) names the modules a server offers; an empty value hides the section, the routes answer 404 and the worker sleeps. A project narrows the list with `analysis_modules` in its settings. `ANALYSIS_CONCURRENCY`, `ANALYSIS_TIMEOUT_SECONDS`, `ANALYSIS_STATEMENT_TIMEOUT_SECONDS` and `ANALYSIS_MAX_FIXES` bound the worker. The `analysis` service in `docker-compose.yml` runs it; the core keeps working when it is stopped, and queued runs wait for it.
+`ANALYSIS_MODULES` (every module by default) names the modules a server offers; an empty value hides the section, the routes answer 404 and the worker sleeps. A project narrows the list with `analysis_modules` in its settings. `ANALYSIS_CONCURRENCY`, `ANALYSIS_TIMEOUT_SECONDS`, `ANALYSIS_STATEMENT_TIMEOUT_SECONDS` and `ANALYSIS_MAX_FIXES` bound the worker. The `analysis` service in `docker-compose.yml` runs it; the core keeps working when it is stopped, and queued runs wait for it.

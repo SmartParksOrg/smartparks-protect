@@ -7,11 +7,14 @@ import {
   chartGroups,
   chartMetrics,
   nearestRowTime,
+  NO_METRICS,
+  readMetrics,
   pointsAt,
   readExploreState,
   scatterGroup,
   tracksOf,
   unitAxes,
+  withChosenMetrics,
   writeExploreState,
 } from "@/lib/explore";
 import { columnsOf } from "@/lib/records";
@@ -94,6 +97,19 @@ describe("explore state", () => {
       "mode=chart&entity=e1&range=30d&tz=UTC&metric=battery_voltage&chart=scatter&x=device_temperature&bucket=1h&agg=max",
     );
   });
+  it("keeps nothing chosen, positions only and a choice apart (D302)", () => {
+    expect(readMetrics([])).toBeNull();
+    expect(readMetrics([NO_METRICS])).toEqual([]);
+    expect(readMetrics(["battery_voltage", NO_METRICS])).toEqual([]);
+    expect(
+      readExploreState(new URLSearchParams("entity=e1")).metrics,
+    ).toBeNull();
+    const none = readExploreState(new URLSearchParams("entity=e1&metric=none"));
+    expect(none.metrics).toEqual([]);
+    expect(writeExploreState(none).toString()).toContain("metric=none");
+    const unset = readExploreState(new URLSearchParams("entity=e1&tz=UTC"));
+    expect(writeExploreState(unset).toString()).not.toContain("metric");
+  });
   it("writes only what differs from the defaults", () => {
     const state = readExploreState(
       new URLSearchParams("mode=map&device=d1&tz=UTC"),
@@ -106,10 +122,24 @@ describe("explore state", () => {
 
 describe("explore data", () => {
   const columns = columnsOf(ROWS, LABELS);
-  it("picks the first numeric metrics when none are chosen", () => {
-    expect(chartMetrics([], columns)).toEqual(["battery_voltage"]);
+  it("draws the chosen metrics the rows carry and nothing by default", () => {
+    expect(chartMetrics(null, columns)).toEqual([]);
+    expect(chartMetrics([], columns)).toEqual([]);
     expect(chartMetrics(["battery_voltage", "nope"], columns)).toEqual([
       "battery_voltage",
+    ]);
+  });
+  it("limits the table's metric columns to the choice, in its order", () => {
+    const keys = (cols: typeof columns) => cols.map((c) => c.key);
+    expect(keys(withChosenMetrics(columns, null))).not.toContain(
+      "m:battery_voltage",
+    );
+    expect(
+      keys(withChosenMetrics(columns, ["gnss_fix", "battery_voltage"])),
+    ).toEqual([
+      ...keys(columns.filter((c) => c.kind !== "metric")),
+      "m:gnss_fix",
+      "m:battery_voltage",
     ]);
   });
   it("makes one group per metric and one series per owner, oldest first", () => {

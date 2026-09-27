@@ -109,6 +109,27 @@ class NearCondition(BaseModel):
         return self
 
 
+class FarCondition(BaseModel):
+    """The subject's position is farther than `meters` from every feature named (`feature_ids`,
+    or every feature of `feature_type`, the roads as routes by default): a vehicle that left the
+    known roads (phase 38, decision D300). The counterpart of `near`, edge-triggered like every
+    condition; `for_seconds` on the document guards against one GNSS error beside the road, and
+    a fix whose own accuracy is worse than the distance does not count."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["far"]
+    meters: float = Field(gt=0, le=100_000)
+    feature_ids: list[uuid.UUID] = Field(default_factory=list)
+    feature_type: Literal["site", "zone", "geofence", "route", "fence"] | None = "route"
+
+    @model_validator(mode="after")
+    def _some_target(self) -> "FarCondition":
+        if not self.feature_ids and self.feature_type is None:
+            raise ValueError("far condition needs feature_ids or feature_type")
+        return self
+
+
 class NoDataCondition(BaseModel):
     """The subject has not been seen for `for_seconds`. Needs a schedule trigger."""
 
@@ -143,6 +164,7 @@ Leaf = Annotated[
     ThresholdCondition
     | SpatialCondition
     | NearCondition
+    | FarCondition
     | NoDataCondition
     | WindowCondition
     | ReservedCondition,
@@ -217,6 +239,7 @@ class RuleDocument(BaseModel):
             "window",
             "spatial",
             "near",
+            "far",
             "threshold",
             *RESERVED_TYPES,
         }:

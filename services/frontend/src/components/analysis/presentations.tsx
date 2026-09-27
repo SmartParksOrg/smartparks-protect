@@ -16,6 +16,7 @@ import {
   DevicePerformanceLimitations,
   GrazingLimitations,
   MovementLimitations,
+  VehicleLimitations,
 } from "@/components/analysis/Limitations";
 import { RestStrip } from "@/components/analysis/RestStrip";
 import { ResultMap } from "@/components/analysis/ResultMap";
@@ -152,6 +153,50 @@ export function contactTracingPresentation(
         />
       ),
       after: () => <ContactTracingLimitations />,
+    },
+  };
+}
+
+/** The figures on a vehicle's card, with their unit (phase 39). */
+export const VEHICLE_CARD_METRICS: [string, string][] = [
+  ["trips", ""],
+  ["distance_km", "km"],
+  ["driving_h", "h"],
+  ["mean_speed_kmh", "km/h"],
+  ["top_speed_kmh", "km/h"],
+  ["speeding_episodes", ""],
+  ["paused_min", "min"],
+  ["fixes", ""],
+];
+
+/** Vehicle use (docs/analytics/vehicle-use.md): a card per vehicle, the map of the trips
+ * with the speeding points, the charts, and the summary, trips, per day and speeding tables. */
+export function vehiclePresentation(
+  t: Translate,
+  projectId: string,
+): Presentation {
+  const labels = vehicleLabels(t);
+  return {
+    labels,
+    render: {
+      summary: (document, _run, colors) => (
+        <SubjectCards
+          document={document}
+          labels={labels}
+          metrics={VEHICLE_CARD_METRICS}
+          colors={colors}
+        />
+      ),
+      map: (document, run, colors) => (
+        <ResultMap
+          projectId={projectId}
+          runId={run.id}
+          document={document}
+          labels={labels}
+          colors={colors}
+        />
+      ),
+      after: () => <VehicleLimitations />,
     },
   };
 }
@@ -395,6 +440,7 @@ export const movementLabels = (t: Translate): Record<string, string> => ({
   cluster_count: t("Clusters"),
   missing_share: t("Missing fixes share"),
   excluded_fixes: t("Excluded fixes"),
+  folded_fixes: t("Fixes folded into a stop"),
   daily_distance: t("Daily distance"),
   speed_histogram: t("Speed"),
   hour_profile: t("Activity by hour"),
@@ -402,6 +448,52 @@ export const movementLabels = (t: Translate): Record<string, string> => ({
   nsd: t("Net squared displacement"),
   day_night: t("Day and night"),
   summary: t("Summary"),
+});
+
+/** The human names of the vehicle use result's keys (phase 39). */
+export const vehicleLabels = (t: Translate): Record<string, string> => ({
+  subject: t("Vehicle"),
+  period: t("Period"),
+  main: t("This period"),
+  comparison: t("Before"),
+  mean: t("Mean"),
+  fixes: t("Fixes"),
+  fixes_with_speed_share: t("Fixes with a reported speed"),
+  days_active: t("Days on the move"),
+  trips: t("Trips"),
+  distance_km: t("Distance (km)"),
+  driving_h: t("Driving time (h)"),
+  mean_speed_kmh: t("Mean speed (km/h)"),
+  top_speed_kmh: t("Top speed (km/h)"),
+  longest_trip_km: t("Longest trip (km)"),
+  paused_min: t("Paused inside trips (min)"),
+  speeding_episodes: t("Speeding episodes"),
+  speeding_minutes: t("Speeding (min)"),
+  speeding_top_kmh: t("Fastest speeding (km/h)"),
+  median_interval_min: t("Sampling interval (min)"),
+  missing_share: t("Missing fixes share"),
+  excluded_fixes: t("Excluded fixes"),
+  folded_fixes: t("Fixes folded into a stop"),
+  start: t("Start"),
+  end: t("End"),
+  duration_min: t("Duration (min)"),
+  mean_kmh: t("Mean (km/h)"),
+  top_kmh: t("Top (km/h)"),
+  speed_source: t("Speed from"),
+  from: t("From"),
+  to: t("To"),
+  ended_by: t("Ended by"),
+  date: t("Date"),
+  first_movement: t("First movement"),
+  last_movement: t("Last movement"),
+  where: t("Where"),
+  daily_distance: t("Distance per day"),
+  speed_histogram: t("Speed (km/h)"),
+  hour_profile: t("Distance by hour of the day"),
+  summary: t("Summary"),
+  days: t("Per day"),
+  speeding: t("Speeding"),
+  trip: t("Trips"),
 });
 
 /** The human names of the grazing result's keys; every header says use, not grazing. */

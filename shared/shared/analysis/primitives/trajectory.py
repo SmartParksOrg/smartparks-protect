@@ -5,7 +5,7 @@ attributed to the entity by the assignment history the rows already carry."""
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 import numpy as np
@@ -33,6 +33,13 @@ class Trajectory:
     satellites: NDArray[np.float64]  # nan when unknown
     device_ids: list[uuid.UUID]
     duplicates: int = 0
+    #: The speed the receiver reported with the fix, m/s; nan when the fix carried none
+    #: (phase 39). A trip reads it where it is and the step speed where it is not.
+    speed_mps: NDArray[np.float64] = field(default_factory=lambda: np.zeros(0))
+
+    def __post_init__(self) -> None:
+        if self.speed_mps.shape[0] != self.times.shape[0]:
+            self.speed_mps = np.full(self.times.shape[0], np.nan)
 
     def __len__(self) -> int:
         return int(self.times.shape[0])
@@ -74,6 +81,7 @@ async def load_trajectory(
             Position.accuracy_m,
             Position.satellites,
             Position.device_id,
+            Position.speed_mps,
         )
         .where(
             owner,
@@ -90,6 +98,7 @@ async def load_trajectory(
     lon: list[float] = []
     acc: list[float] = []
     sats: list[float] = []
+    speeds: list[float] = []
     devices: list[uuid.UUID] = []
     duplicates = 0
     last = None
@@ -104,6 +113,7 @@ async def load_trajectory(
         lon.append(float(row.lon))
         acc.append(float(row.accuracy_m) if row.accuracy_m is not None else np.nan)
         sats.append(float(row.satellites) if row.satellites is not None else np.nan)
+        speeds.append(float(row.speed_mps) if row.speed_mps is not None else np.nan)
         devices.append(row.device_id)
         if len(times) > max_fixes:
             raise AnalysisTooLarge(
@@ -118,6 +128,7 @@ async def load_trajectory(
         satellites=np.asarray(sats, dtype=np.float64),
         device_ids=devices,
         duplicates=duplicates,
+        speed_mps=np.asarray(speeds, dtype=np.float64),
     )
 
 
@@ -126,6 +137,8 @@ def trajectory_from(
     times: list[float],
     lat: list[float],
     lon: list[float],
+    speeds: list[float] | None = None,
+    accuracy: list[float] | None = None,
 ) -> Trajectory:
     """A trajectory from plain lists, for tests and synthetic checks."""
     n = len(times)
@@ -134,9 +147,51 @@ def trajectory_from(
         times=np.asarray(times, dtype=np.float64),
         lat=np.asarray(lat, dtype=np.float64),
         lon=np.asarray(lon, dtype=np.float64),
-        accuracy_m=np.full(n, np.nan),
+        accuracy_m=np.asarray(accuracy, dtype=np.float64) if accuracy else np.full(n, np.nan),
         satellites=np.full(n, np.nan),
         device_ids=[],
+        speed_mps=np.asarray(speeds, dtype=np.float64) if speeds else np.full(n, np.nan),
+    )
+
+
+def fold_stops(trajectory: Trajectory, radius_m: float) -> tuple[Trajectory, int]:
+    """The stop rule (decision D303): consecutive fixes within `radius_m` of the first fix of
+    their run take that fix's coordinates, so a device standing still whose receiver drifts
+    adds no distance and no false movement. The radius widens to a fix's own accuracy when
+    that is worse. Times, speeds and accuracies stay; returns how many fixes were moved. A
+    radius of zero folds nothing."""
+    n = len(trajectory)
+    if radius_m <= 0 or n < 2:
+        return trajectory, 0
+    lat = trajectory.lat.copy()
+    lon = trajectory.lon.copy()
+    folded = 0
+    anchor = 0
+    for i in range(1, n):
+        reach = radius_m
+        if np.isfinite(trajectory.accuracy_m[i]):
+            reach = max(reach, float(trajectory.accuracy_m[i]))
+        if haversine_m(lat[anchor], lon[anchor], lat[i], lon[i]) <= reach:
+            lat[i] = lat[anchor]
+            lon[i] = lon[anchor]
+            folded += 1
+        else:
+            anchor = i
+    if not folded:
+        return trajectory, 0
+    return (
+        Trajectory(
+            entity_id=trajectory.entity_id,
+            times=trajectory.times,
+            lat=lat,
+            lon=lon,
+            accuracy_m=trajectory.accuracy_m,
+            satellites=trajectory.satellites,
+            device_ids=trajectory.device_ids,
+            duplicates=trajectory.duplicates,
+            speed_mps=trajectory.speed_mps,
+        ),
+        folded,
     )
 
 
@@ -260,5 +315,6 @@ def exclude_impossible(trajectory: Trajectory, max_speed_mps: float) -> tuple[Tr
         if trajectory.device_ids
         else [],
         duplicates=trajectory.duplicates,
+        speed_mps=trajectory.speed_mps[keep],
     )
     return kept, int((~keep).sum())

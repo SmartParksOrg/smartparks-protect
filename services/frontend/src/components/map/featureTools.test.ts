@@ -25,6 +25,8 @@ describe("feature tools", () => {
     expect(ruleTemplateFor("geofence")).toBe("geofence_exit");
     expect(ruleTemplateFor("site")).toBe("near_site");
     expect(ruleTemplateFor("zone")).toBe("near_site");
-    expect(ruleTemplateFor("route")).toBeNull();
+    // a route starts the off-road rule (phase 38); a fence line starts nothing
+    expect(ruleTemplateFor("route")).toBe("off_road");
+    expect(ruleTemplateFor("fence")).toBeNull();
   });
 });

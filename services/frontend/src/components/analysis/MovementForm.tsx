@@ -41,6 +41,7 @@ import { inputValue } from "@/lib/records";
 
 const MAX_SUBJECTS = 25;
 const RANGES: [string, string][] = [
+  ["1d", t("Last 24 hours")],
   ["7d", t("Last 7 days")],
   ["30d", t("Last 30 days")],
   ["90d", t("Last 90 days")],
@@ -357,6 +358,14 @@ export function MovementForm({
             max={5000}
             step={1}
             onChange={(v) => method({ cell: v })}
+          />
+          <NumberField
+            label={t("Stop radius (m)")}
+            value={state.method.stop_radius}
+            min={0}
+            max={500}
+            step={1}
+            onChange={(v) => method({ stop_radius: v })}
           />
           {ALL_METHODS.map((m) => (
             <label key={m} className="flex items-center gap-2 text-sm">

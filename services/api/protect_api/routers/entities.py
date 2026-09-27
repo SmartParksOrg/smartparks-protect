@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
+from shapely.geometry import mapping
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,6 +65,8 @@ from protect_api.schemas.domain import (
     ProposeAreaRequest,
     ProposedArea,
     ProposedAreas,
+    ProposedRoad,
+    ProposedRoads,
     SearchAreasRequest,
     TrackingDevice,
     UnionAreasRequest,
@@ -81,7 +84,9 @@ from shared.domain.areas import (
     combine_areas,
     name_query,
     overpass_query,
+    parse_roads,
     propose,
+    roads_query,
     search_areas,
     search_box,
 )
@@ -666,6 +671,47 @@ async def propose_area(
     candidates = propose(document, read)
     return ProposedAreas(
         candidates=[ProposedArea(**asdict(candidate)) for candidate in candidates],
+        attribution=ATTRIBUTION,
+    )
+
+
+@router.post("/features/roads", response_model=ProposedRoads)
+async def propose_roads(
+    body: ProposeAreaRequest,
+    context: ProjectContext = Depends(require_permission(Permission.FEATURES_WRITE)),
+) -> ProposedRoads:
+    """The roads and tracks OpenStreetMap knows in a box (phase 38, decision D300): the
+    `highway` ways with the ways people walk on left out, longest first, each with its name (or
+    its reference, or its kind), so a person keeps the ones they want as route features and the
+    off-road rule has something to measure from. The same box bounds as the area proposal;
+    nothing is stored, and a 502 says OpenStreetMap did not answer."""
+    read = (
+        box_of(body.west, body.south, body.east, body.north)
+        if body.west is not None
+        and body.south is not None
+        and body.east is not None
+        and body.north is not None
+        else box_around(body.lon or 0.0, body.lat or 0.0, body.radius_m)
+    )
+    if read.too_large:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"That box is {read.area_km2:.0f} km²; a read takes at most {MAX_READ_KM2:.0f} km²",
+        )
+    try:
+        document = await fetch_overpass(get_settings().overpass_url, roads_query(read))
+    except ApplicationError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, error.message) from error
+    return ProposedRoads(
+        roads=[
+            ProposedRoad(
+                osm_id=road.osm_id,
+                name=road.name,
+                highway=road.highway,
+                geometry=mapping(road.geometry),
+            )
+            for road in parse_roads(document)
+        ],
         attribution=ATTRIBUTION,
     )
 

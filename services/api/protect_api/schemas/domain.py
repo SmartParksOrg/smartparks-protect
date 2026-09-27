@@ -245,6 +245,20 @@ class FenceMonitorUpdate(BaseModel):
     feature_id: uuid.UUID | None = None
 
 
+class ProposedRoad(BaseModel):
+    """One road of a roads read (phase 38): the OpenStreetMap way as a line to keep."""
+
+    osm_id: int
+    name: str
+    highway: str
+    geometry: dict[str, Any]
+
+
+class ProposedRoads(BaseModel):
+    roads: list[ProposedRoad]
+    attribution: str
+
+
 class ProposeAreaRequest(BaseModel):
     """What ground to read (phase 33, decisions D270 and D277): a click with a reach around it,
     or the box a person dragged. A box larger than the reader takes is refused rather than

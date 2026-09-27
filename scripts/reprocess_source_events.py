@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from collections import Counter
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 
@@ -43,9 +44,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", action="append", default=[], help="LoRaWAN fPort; repeatable")
     parser.add_argument("--device", action="append", default=[], help="Device name; repeatable")
-    parser.add_argument("--since", help="Only events ingested at or after this ISO timestamp")
+    parser.add_argument(
+        "--since",
+        type=_aware,
+        help="Only events ingested at or after this ISO timestamp (UTC when it names no zone)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Count them and stop")
     return parser.parse_args()
+
+
+def _aware(value: str) -> datetime:
+    """The driver wants a datetime, not the string the shell gives (a string raised a
+    DataError on the dev server, 2026-09-27); a time without a zone is read as UTC."""
+    parsed = datetime.fromisoformat(value)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 async def main() -> None:

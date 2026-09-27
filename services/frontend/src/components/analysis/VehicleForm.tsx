@@ -25,22 +25,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useGroups } from "@/hooks/useGroups";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePermissions } from "@/hooks/useProjects";
 import {
-  type ContactOptions,
-  contactTracingParameters,
-  DEFAULT_CONTACT,
+  DEFAULT_VEHICLE,
   type FormState,
+  type VehicleOptions,
+  vehicleParameters,
   withGroupMembers,
 } from "@/lib/analyses";
 import { inputValue } from "@/lib/records";
 
-/** Every pair is compared with every other, so the work grows with the square: forty subjects
- * is 780 pairs. The server holds the same bound. */
-const MAX_SUBJECTS = 40;
+/** The server holds the same bound (`MAX_SUBJECTS_VEHICLE`). */
+const MAX_SUBJECTS = 25;
+/** The catalogue key of the type whose entities, with its sub-types, are vehicles. */
+const VEHICLE_TYPE_KEY = "vehicle";
 const RANGES: [string, string][] = [
   ["1d", t("Last 24 hours")],
   ["7d", t("Last 7 days")],
@@ -50,12 +50,13 @@ const RANGES: [string, string][] = [
 ];
 
 /**
- * The question form of the contact tracing page: which subjects, which period, and under
- * "Method" the two kinds of evidence with the limits each is judged by. The defaults say what
- * they mean — a hundred metres is beyond GNSS error but within sight, ten minutes is tighter
- * than the usual fix interval — so the form is answerable without opening the method at all.
+ * The question form of the vehicle use page (phase 39, decision D304): which vehicles, which
+ * period, and under "Method" how a trip is read: the speed above which a fix counts as moving,
+ * the stop that ends a trip, the stop radius that folds a parked receiver's drift, the radius
+ * a site names a trip's start or end within, and the speed limit. Only entities of the
+ * Vehicles type and its sub-types are offered, since the server refuses the rest.
  */
-export function ContactTracingForm({
+export function VehicleForm({
   projectId,
   state,
   onChange,
@@ -86,8 +87,23 @@ export function ContactTracingForm({
         query: { limit: 500 },
       }),
   });
-  const items = entities.data?.items ?? [];
-  useResolveSubjects(state, entities.data?.items, MAX_SUBJECTS, onChange);
+  // the vehicle type and its sub-types, the only entities the module admits
+  const vehicleType = (types.data?.items ?? []).find(
+    (x) => x.key === VEHICLE_TYPE_KEY,
+  );
+  const vehicleTypeIds = new Set(
+    (types.data?.items ?? [])
+      .filter(
+        (x) =>
+          x.key === VEHICLE_TYPE_KEY ||
+          (vehicleType !== undefined && x.parent_id === vehicleType.id),
+      )
+      .map((x) => x.id),
+  );
+  const items = (entities.data?.items ?? []).filter((e) =>
+    vehicleTypeIds.has(e.entity_type_id),
+  );
+  useResolveSubjects(state, items, MAX_SUBJECTS, onChange);
   const subjects = withGroupMembers(
     state.entities,
     items,
@@ -99,7 +115,7 @@ export function ContactTracingForm({
   const typeOptions = (types.data?.items ?? []).filter((x) =>
     usedTypes.has(x.id),
   );
-  const parameters = contactTracingParameters({ ...state, entities: subjects });
+  const parameters = vehicleParameters({ ...state, entities: subjects });
   const estimate = useQuery({
     queryKey: queryKeys.analysisEstimate(projectId, parameters ?? {}),
     queryFn: () =>
@@ -107,7 +123,7 @@ export function ContactTracingForm({
         `/api/v1/projects/${projectId}/analyses/estimate`,
         {
           query: {
-            module: "contact_tracing",
+            module: "vehicle_use",
             parameters: JSON.stringify(parameters),
           },
         },
@@ -120,7 +136,7 @@ export function ContactTracingForm({
     mutationFn: async (replace: boolean) => {
       const created = await api.post<AnalysisRun>(
         `/api/v1/projects/${projectId}/analyses`,
-        { body: { module: "contact_tracing", parameters } },
+        { body: { module: "vehicle_use", parameters } },
       );
       if (replace && editing && (editing.name || editing.shared))
         return api.patch<AnalysisRun>(
@@ -130,10 +146,7 @@ export function ContactTracingForm({
       return created;
     },
     invalidate: [
-      queryKeys.analyses(projectId, {
-        module: "contact_tracing",
-        recent: true,
-      }),
+      queryKeys.analyses(projectId, { module: "vehicle_use", recent: true }),
     ],
     success: t("Analysis queued"),
     onSuccess: (r, replace) => onRun(r, replace),
@@ -145,23 +158,23 @@ export function ContactTracingForm({
         MAX_SUBJECTS,
       ),
     });
-  const contact = (patch: Partial<ContactOptions>) =>
-    onChange({ contact: { ...state.contact, ...patch } });
-  const c = state.contact;
+  const vehicle = (patch: Partial<VehicleOptions>) =>
+    onChange({ vehicle: { ...state.vehicle, ...patch } });
+  const v = state.vehicle;
   const e = estimate.data;
   const mayRun = can("analysis:run");
-  const neither = !c.bluetooth && !c.proximity;
+  const noVehicles = entities.data !== undefined && items.length === 0;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="space-y-1">
-          <Label className="text-xs">{t("Subjects")}</Label>
+          <Label className="text-xs">{t("Vehicles")}</Label>
           <MultiSelect
             options={items.map((x) => ({ value: x.id, label: x.name }))}
             value={state.entities}
-            onChange={(v) => onChange({ entities: v })}
-            placeholder={t("Choose subjects")}
-            label={t("subjects")}
+            onChange={(val) => onChange({ entities: val })}
+            placeholder={t("Choose vehicles")}
+            label={t("vehicles")}
             className="h-8 w-48"
             maxSelected={MAX_SUBJECTS}
           />
@@ -175,14 +188,14 @@ export function ContactTracingForm({
                 label: g.name,
               }))}
               value={state.groups}
-              onChange={(v) => onChange({ groups: v })}
+              onChange={(val) => onChange({ groups: val })}
               placeholder={t("Add groups")}
               label={t("groups")}
               className="h-8 w-40"
             />
           </div>
         )}
-        {typeOptions.length > 0 && (
+        {typeOptions.length > 1 && (
           <Select
             value="none"
             onValueChange={(id) =>
@@ -210,7 +223,7 @@ export function ContactTracingForm({
           <Label className="text-xs">{t("Period")}</Label>
           <Select
             value={state.range}
-            onValueChange={(v) => onChange({ range: v })}
+            onValueChange={(val) => onChange({ range: val })}
           >
             <SelectTrigger className="h-8 w-40" aria-label={t("Period")}>
               <SelectValue />
@@ -247,8 +260,8 @@ export function ContactTracingForm({
           <Label className="text-xs">{t("Compare with")}</Label>
           <Select
             value={state.compare ?? "none"}
-            onValueChange={(v) =>
-              onChange({ compare: v === "none" ? null : v })
+            onValueChange={(val) =>
+              onChange({ compare: val === "none" ? null : val })
             }
           >
             <SelectTrigger className="h-8 w-40" aria-label={t("Compare with")}>
@@ -309,115 +322,92 @@ export function ContactTracingForm({
         {t("Method")}
         {!methodOpen && (
           <span className="ml-1">
-            {t("{{evidence}} · within {{distance}} m and {{window}} min", {
-              evidence: neither
-                ? t("no evidence")
-                : [
-                    c.bluetooth ? t("Bluetooth") : null,
-                    c.proximity ? t("proximity") : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" + "),
-              distance: c.distance,
-              window: Math.round(c.window / 60),
-            })}
+            {t(
+              "moving above {{moving}} km/h · a stop after {{stop}} min within {{radius}} m · limit {{limit}} km/h",
+              {
+                moving: v.moving,
+                stop: v.stop,
+                radius: v.radius,
+                limit: v.limit,
+              },
+            )}
           </span>
         )}
       </button>
       {methodOpen && (
         <div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3">
-          <div className="space-y-1">
-            <Label className="text-xs">{t("Bluetooth sightings")}</Label>
-            <div className="flex h-8 items-center">
-              <Switch
-                checked={c.bluetooth}
-                onCheckedChange={(v) => contact({ bluetooth: v })}
-                aria-label={t("Bluetooth sightings")}
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">{t("Position proximity")}</Label>
-            <div className="flex h-8 items-center">
-              <Switch
-                checked={c.proximity}
-                onCheckedChange={(v) => contact({ proximity: v })}
-                aria-label={t("Position proximity")}
-              />
-            </div>
-          </div>
           <NumberField
-            label={t("Distance (m)")}
-            value={c.distance}
-            min={5}
-            max={10000}
-            step={5}
-            onChange={(v) => contact({ distance: v })}
+            label={t("Moving above (km/h)")}
+            value={v.moving}
+            min={1}
+            max={60}
+            step={1}
+            onChange={(val) => vehicle({ moving: val })}
           />
           <NumberField
-            label={t("Time window (s)")}
-            value={c.window}
-            min={30}
-            max={86400}
-            step={30}
-            onChange={(v) => contact({ window: v })}
+            label={t("Stop after (minutes)")}
+            value={v.stop}
+            min={1}
+            max={720}
+            step={1}
+            onChange={(val) => vehicle({ stop: val })}
           />
           <NumberField
-            label={t("Shortest contact (s)")}
-            value={c.shortest}
+            label={t("Stop radius (m)")}
+            value={v.radius}
             min={0}
-            max={86400}
-            step={30}
-            onChange={(v) => contact({ shortest: v })}
+            max={500}
+            step={1}
+            onChange={(val) => vehicle({ radius: val })}
           />
-          <div className="space-y-1">
-            <Label className="text-xs">{t("Signal floor (dBm)")}</Label>
-            <Input
-              type="number"
-              className="h-8 w-32"
-              min={-128}
-              max={0}
-              step={1}
-              placeholder={t("none")}
-              value={c.rssi ?? ""}
-              onChange={(ev) =>
-                contact({
-                  rssi: ev.target.value === "" ? null : Number(ev.target.value),
-                })
-              }
-            />
-          </div>
+          <NumberField
+            label={t("Site radius (m)")}
+            value={v.siteRadius}
+            min={10}
+            max={5000}
+            step={10}
+            onChange={(val) => vehicle({ siteRadius: val })}
+          />
+          <NumberField
+            label={t("Speed limit (km/h)")}
+            value={v.limit}
+            min={5}
+            max={300}
+            step={5}
+            onChange={(val) => vehicle({ limit: val })}
+          />
           <Button
             type="button"
             size="sm"
             variant="ghost"
             className="h-8"
-            onClick={() => onChange({ contact: DEFAULT_CONTACT })}
+            onClick={() => onChange({ vehicle: DEFAULT_VEHICLE })}
           >
             {t("Defaults")}
           </Button>
         </div>
       )}
       <p className="text-xs text-muted-foreground" aria-live="polite">
-        {neither
-          ? t("Switch on Bluetooth sightings or position proximity, or both.")
+        {noVehicles
+          ? t(
+              "This project has no entity of the Vehicles type or one of its sub-types yet.",
+            )
           : !parameters
-            ? t("Choose at least one subject and a period.")
+            ? t("Choose at least one vehicle and a period.")
             : !mayRun
               ? t("Your role can read results but not start a run.")
               : e
                 ? e.ok
                   ? t(
-                      "{{subjects}} subjects, {{pairs}} pairs, {{days}} days, about {{fixes}} fixes.",
+                      "{{subjects}} vehicles, {{days}} days, about {{fixes}} fixes.",
                       {
                         subjects: e.subjects,
-                        pairs: (e.subjects * (e.subjects - 1)) / 2,
                         days: e.days,
                         fixes: e.fixes.toLocaleString(),
                       },
                     )
                   : e.reasons?.join(" ") || t("The run is too large.")
-                : t("Estimating\u2026")}
+                : t("Estimating…")}
       </p>
     </div>
   );

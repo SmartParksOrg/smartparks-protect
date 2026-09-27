@@ -58,6 +58,12 @@ describe("analysis form state", () => {
     expect(
       windowOf(readFormState(new URLSearchParams("range=custom")), now),
     ).toBeNull();
+    expect(
+      windowOf(readFormState(new URLSearchParams("range=1d")), now),
+    ).toEqual({
+      time_from: "2026-09-13T10:17:00.000Z",
+      time_to: "2026-09-14T10:17:00.000Z",
+    });
   });
   it("reads a result document only at the version it knows", () => {
     expect(documentOf(undefined)).toBeNull();
@@ -80,9 +86,19 @@ describe("analysis form state", () => {
       methods: ["mcp"],
       kde_bandwidth: 250,
       strategy: true,
+      stop_radius: 15,
     });
     expect(writeFormState(state).toString()).toBe(
       "entity=a&gap=6&methods=mcp&kde=250",
+    );
+    // the stop radius (D303) and the vehicle options (D304) travel the same way
+    const vehicle = readFormState(
+      new URLSearchParams("entity=a&stop=0&moving=8&stop_min=15&limit=80"),
+    );
+    expect(vehicle.method.stop_radius).toBe(0);
+    expect(vehicle.vehicle).toMatchObject({ moving: 8, stop: 15, limit: 80 });
+    expect(writeFormState(vehicle).toString()).toBe(
+      "entity=a&stop=0&moving=8&stop_min=15&limit=80",
     );
     expect(
       readFormState(new URLSearchParams("gap=abc&methods=nope")).method,

@@ -246,6 +246,26 @@ def test_distances_in_metres():
     assert metres_to_geometry((0.5, 0.5), Memory().fences[0].geometry) == 0
 
 
+async def test_far_from_every_route_and_a_poor_fix_does_not_count():
+    """Phase 38 (decision D300): the off-road condition fires outside the distance from every
+    route, not inside it, and a fix whose own accuracy is worse than the distance is skipped."""
+    rule = doc(
+        trigger={"kind": "position"},
+        conditions={"type": "far", "meters": 50, "feature_type": "route"},
+        event={"event_type": "OFF_ROAD", "title": "{entity} {value} m from {feature}"},
+    )
+    state, data = SubjectState(), Memory()
+    on_road = await evaluate(rule, SUBJECT, position(0.5, 0.5, 0), state, data)
+    assert on_road.fire is False and on_road.condition is False
+    off_road = await evaluate(rule, SUBJECT, position(0.5, 1.001, 1), state, data)  # 111 m
+    assert off_road.fire is True and off_road.context["feature"] == "Core area"
+    assert off_road.context["value"] == pytest.approx(111, abs=1)
+    poor = position(0.5, 1.01, 2)
+    poor.values["accuracy_m"] = 200.0
+    state2 = SubjectState()
+    assert (await evaluate(rule, SUBJECT, poor, state2, data)).condition is False
+
+
 async def test_near_a_feature_and_near_another_entity():
     rule = doc(
         trigger={"kind": "position"},

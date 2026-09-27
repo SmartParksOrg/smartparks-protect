@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRightLeft,
+  Car,
   Footprints,
   HeartPulse,
   MapPin,
@@ -306,6 +307,9 @@ export function EntityPage() {
   });
   const e = entity.data;
   const type = types.data?.items.find((x) => x.id === e?.entity_type_id);
+  // a vehicle (the Vehicles type or one of its sub-types) is offered the vehicle use study
+  const parentType = types.data?.items.find((x) => x.id === type?.parent_id);
+  const isVehicle = type?.key === "vehicle" || parentType?.key === "vehicle";
   const groups = useGroups(projectId);
   const path = groupPath(groups.data, e?.group_id);
   const admin = can("entities:write");
@@ -368,6 +372,17 @@ export function EntityPage() {
                 </Link>
               </Button>
             )}
+            {isVehicle &&
+              modules.includes("vehicle_use") &&
+              can("analysis:run") && (
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    to={`/projects/${projectId}/analyze/vehicles?entity=${e.id}`}
+                  >
+                    <Car className="size-4" /> {t("Analyse vehicle use")}
+                  </Link>
+                </Button>
+              )}
             {admin && (
               <Button
                 variant="outline"
@@ -390,7 +405,11 @@ export function EntityPage() {
         }
       />
       <MoveToProjectDialog
-        subject={{ kind: "entities", projectId, items: [{ id: e.id, name: e.name }] }}
+        subject={{
+          kind: "entities",
+          projectId,
+          items: [{ id: e.id, name: e.name }],
+        }}
         open={moving}
         onOpenChange={setMoving}
         onMoved={(r) => {
@@ -551,10 +570,7 @@ export function EntityPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("Device")}</CardTitle>
                   {admin && !current && (
-                    <Button
-                      size="sm"
-                      onClick={() => setAssigning(true)}
-                    >
+                    <Button size="sm" onClick={() => setAssigning(true)}>
                       <Plus className="size-4" /> {t("Assign device")}
                     </Button>
                   )}

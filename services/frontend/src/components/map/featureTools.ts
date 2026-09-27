@@ -13,10 +13,11 @@ export function featureTypesFor(
 }
 
 /** The rule template a feature type starts from: a geofence the exit rule, a site or zone the
- * proximity rule, a route nothing. */
+ * proximity rule, a route the off-road rule (phase 38), a fence line nothing. */
 export function ruleTemplateFor(featureType: string): string | null {
   if (featureType === "geofence") return "geofence_exit";
   if (featureType === "site" || featureType === "zone") return "near_site";
+  if (featureType === "route") return "off_road";
   return null;
 }
 

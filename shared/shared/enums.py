@@ -309,6 +309,8 @@ class AnalysisModuleKey(StrEnum):
     DEVICE_PERFORMANCE = "device_performance"
     CONTACT_TRACING = "contact_tracing"
     CARDIAC = "cardiac"
+    #: What the vehicles did: trips, distance, speed, speeding (phase 39, decision D301).
+    VEHICLE_USE = "vehicle_use"
 
 
 class NotificationChannel(StrEnum):

@@ -218,7 +218,7 @@ class Settings(BaseSettings):
         default=500_000, ge=1_000, description="Fixes one run may read across its subjects"
     )
     analysis_modules: str = Field(
-        default="movement,grazing,device_performance,contact_tracing,cardiac",
+        default="movement,grazing,device_performance,contact_tracing,cardiac,vehicle_use",
         description="The analysis modules this deployment offers, a comma list; empty turns the "
         "analysis area off (docs/ANALYTICS_PHASE1_PLAN.md, section 16)",
     )

@@ -27,6 +27,21 @@ attributes. A file holds at most 200 shapes at once; altitudes are dropped, and 
 of several parts is imported as one feature per part. A shapefile in a projection other than
 WGS 84 is reprojected when its `.prj` file is in the zip.
 
+## Roads from OpenStreetMap
+
+"Roads" on the Features page (phase 38, decision D300) reads the roads and tracks OpenStreetMap
+knows in a box you drag on a small map, or in a box around a point you click. Every `highway`
+way comes back as a line with its name (or its reference, or its kind: "Track", "Service"), the
+ways people walk on left out as the area proposal leaves them out. Keep the ones you want and
+save them as route features, one each with the OpenStreetMap way id in the attributes, or joined
+as one route under a name of your own. The same bounds as the proposal: one read at a time, at
+most 25 km², and a refusal from OpenStreetMap is said plainly.
+
+The routes are what the **Off the roads** rule template measures from: a vehicle farther than
+50 metres from every route for two minutes raises `OFF_ROAD`. A route's panel on the live map and
+the Features list offer "Create rule" with that template. Roads change; run the read again over
+the same box to add what is new, and remove what is gone by hand.
+
 ## Propose an area from the map
 
 Most areas are already marked on the ground: a block between two roads and a river, a fenced

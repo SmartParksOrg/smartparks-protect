@@ -28,6 +28,7 @@ MODULE_LABELS = {
     "grazing": "Grazing",
     "device_performance": "Device performance",
     "cardiac": "Cardiac monitoring",
+    "vehicle_use": "Vehicle use",
 }
 
 #: The human names of the result keys, the frontend's `presentations.tsx` in English.
@@ -71,6 +72,7 @@ MOVEMENT_LABELS: dict[str, str] = {
     "cluster_count": "Clusters",
     "missing_share": "Missing fixes share",
     "excluded_fixes": "Excluded fixes",
+    "folded_fixes": "Fixes folded into a stop",
     "daily_distance": "Daily distance",
     "speed_histogram": "Speed",
     "hour_profile": "Activity by hour",
@@ -79,6 +81,73 @@ MOVEMENT_LABELS: dict[str, str] = {
     "day_night": "Day and night",
     "summary": "Summary",
 }
+#: The vehicle use keys (phase 39), the frontend's `vehicleLabels`.
+VEHICLE_LABELS: dict[str, str] = {
+    "subject": "Vehicle",
+    "period": "Period",
+    "main": "This period",
+    "comparison": "Before",
+    "mean": "Mean",
+    "fixes": "Fixes",
+    "fixes_with_speed_share": "Fixes with a reported speed",
+    "days_active": "Days on the move",
+    "trips": "Trips",
+    "distance_km": "Distance (km)",
+    "driving_h": "Driving time (h)",
+    "mean_speed_kmh": "Mean speed (km/h)",
+    "top_speed_kmh": "Top speed (km/h)",
+    "longest_trip_km": "Longest trip (km)",
+    "paused_min": "Paused inside trips (min)",
+    "speeding_episodes": "Speeding episodes",
+    "speeding_minutes": "Speeding (min)",
+    "speeding_top_kmh": "Fastest speeding (km/h)",
+    "median_interval_min": "Sampling interval (min)",
+    "missing_share": "Missing fixes share",
+    "excluded_fixes": "Excluded fixes",
+    "folded_fixes": "Fixes folded into a stop",
+    "start": "Start",
+    "end": "End",
+    "duration_min": "Duration (min)",
+    "mean_kmh": "Mean (km/h)",
+    "top_kmh": "Top (km/h)",
+    "speed_source": "Speed from",
+    "from": "From",
+    "to": "To",
+    "ended_by": "Ended by",
+    "date": "Date",
+    "first_movement": "First movement",
+    "last_movement": "Last movement",
+    "where": "Where",
+    "daily_distance": "Distance per day",
+    "speed_histogram": "Speed (km/h)",
+    "hour_profile": "Distance by hour of the day",
+    "summary": "Summary",
+    "days": "Per day",
+    "speeding": "Speeding",
+}
+VEHICLE_KEY_FIGURES: list[tuple[str, str]] = [
+    ("trips", ""),
+    ("distance_km", "km"),
+    ("driving_h", "h"),
+    ("mean_speed_kmh", "km/h"),
+    ("top_speed_kmh", "km/h"),
+    ("speeding_episodes", ""),
+    ("fixes", ""),
+]
+VEHICLE_LIMITATIONS = [
+    "A trip is what the fixes show of it: the distance is the sum of the steps between fixes "
+    "and misses the bends between them; the sampling interval stands beside it.",
+    "A reported speed is the receiver's reading at the moment of the fix, in whole metres per "
+    "second (a resolution of 3.6 km/h); a speed without one is the mean over a step and says "
+    "nothing about a moment. Speeding is judged on reported speeds alone.",
+    "Fixes within the stop radius of where a stop began are one place, so a parked vehicle's "
+    "GNSS drift is neither distance nor a trip; a real move shorter than the radius is lost.",
+    "A trip ends after the stop time; a shorter halt is a pause inside it. A trip cut by a "
+    "silence in the record may be two.",
+    "Where a trip started and ended is the nearest site within the site radius, else the "
+    "coordinates; a site the project has not drawn cannot be named.",
+    "The figures describe the tracked vehicles, not the fleet.",
+]
 GRAZING_LABELS: dict[str, str] = {
     "area": "Area",
     "period": "Period",
@@ -454,6 +523,11 @@ OPTION_LABELS: list[tuple[str, str]] = [
     ("quiet_to_hour", "Quiet hours to"),
     ("resting_quantile", "Resting quantile"),
     ("restless_activity", "Restless above (activity)"),
+    ("stop_radius_m", "Stop radius (m)"),
+    ("moving_kmh", "Moving above (km/h)"),
+    ("stop_minutes", "Stop after (minutes)"),
+    ("site_radius_m", "Site radius (m)"),
+    ("limit_kmh", "Speed limit (km/h)"),
 ]
 MOVEMENT_LIMITATIONS = [
     "Distance from fixes underestimates the path between them; a coarser sampling means a "
@@ -516,6 +590,7 @@ def labels_for(module: str, document: dict[str, Any]) -> dict[str, str]:
         "grazing": GRAZING_LABELS,
         "device_performance": DEVICE_PERFORMANCE_LABELS,
         "cardiac": CARDIAC_LABELS,
+        "vehicle_use": VEHICLE_LABELS,
     }
     labels = dict(by_module.get(module, MOVEMENT_LABELS))
     for subject in document.get("subjects", []):
@@ -828,11 +903,11 @@ def key_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
         ]
         first = "Area"
     else:
-        metrics = MOVEMENT_KEY_FIGURES
+        metrics = VEHICLE_KEY_FIGURES if inp.module == "vehicle_use" else MOVEMENT_KEY_FIGURES
         rows_source = [
             (str(s["id"]), s["name"], s.get("type") or "") for s in document.get("subjects", [])
         ]
-        first = "Subject"
+        first = "Vehicle" if inp.module == "vehicle_use" else "Subject"
     rows = []
     for key, name, note in rows_source:
         figures = main.get(key) if isinstance(main, dict) else None
@@ -934,6 +1009,8 @@ KIND_LEGEND: dict[str, str] = {
     "cluster": "Clusters of fixes",
     "coverage": "Coverage of the fixes: the hull around a device's valid fixes, in its colour",
     "gateway": "Gateways heard: a marker per gateway, larger for a bigger share of the uplinks",
+    "trip": "Trips: the path of each trip in the vehicle's colour",
+    "speeding": "Speeding: a marker where the fastest reported speed of an episode was",
 }
 #: Above this many subjects the legend names the colours in the sections instead.
 LEGEND_MAX_SUBJECTS = 12
@@ -945,7 +1022,17 @@ def map_legend(document: dict[str, Any], colors: dict[str, str]) -> list[dict[st
     entries: list[dict[str, Any]] = []
     subjects = document.get("subjects", [])
     kinds = [k for k, n in (document.get("geometries") or {}).items() if n]
-    coloured = {"mcp", "kde", "akde", "hotspot", "cluster", "coverage", "gateway"}
+    coloured = {
+        "mcp",
+        "kde",
+        "akde",
+        "hotspot",
+        "cluster",
+        "coverage",
+        "gateway",
+        "trip",
+        "speeding",
+    }
     if any(k in coloured for k in kinds):
         if len(subjects) <= LEGEND_MAX_SUBJECTS:
             entries.extend(
@@ -966,7 +1053,7 @@ def map_legend(document: dict[str, Any], colors: dict[str, str]) -> list[dict[st
             entries.append(
                 {"kind": "ramp", "colors": list(PRESSURE_RAMP), "text": KIND_LEGEND[kind]}
             )
-        elif kind == "gateway":
+        elif kind in ("gateway", "speeding"):
             entries.append({"kind": "marker", "text": KIND_LEGEND[kind]})
         else:
             entries.append({"kind": "outline", "text": KIND_LEGEND[kind]})
@@ -1058,6 +1145,8 @@ def render_html(inp: ReportInput) -> str:
             if inp.module == "grazing"
             else CARDIAC_LIMITATIONS
             if inp.module == "cardiac"
+            else VEHICLE_LIMITATIONS
+            if inp.module == "vehicle_use"
             else MOVEMENT_LIMITATIONS
         ),
         version=inp.version,

@@ -22,6 +22,7 @@ import type {
   EntityAssignment,
   Feature,
   Metric,
+  MetricWithData,
   Page as PageType,
   RecordRow,
   SavedView,
@@ -82,14 +83,17 @@ import {
   type ExploreMode,
   type ExploreState,
   groupsFromSeries,
+  MAX_METRICS,
   nearestRowTime,
   paramsOfView,
   readExploreState,
   scatterGroup,
   tracksOf,
   viewOfParams,
+  withChosenMetrics,
   writeExploreState,
 } from "@/lib/explore";
+import { CATEGORY_LABELS, groupMetrics } from "@/lib/metricGroups";
 import {
   columnsOf,
   DEFAULT_SORT,
@@ -114,6 +118,10 @@ const CHART_LABELS: Record<ChartType, string> = {
  * devices over a period, looked at as a table, a chart or a map. The rows load page after page
  * into the drawer whatever the mode; the chart and the map draw from them up to the canvas
  * bound and from the aggregate and track reads above it. One marked moment links the views.
+ * The metrics are asked for first (decision D302; Tim, 2026-09-27): the strip lists what the
+ * selection reported in the period, nothing loads for the table and the chart until at least
+ * one is chosen (or "positions only"), and the choice is remembered per user as the next
+ * visit's start. The map needs no metric and loads at once.
  */
 export function ExplorerPage() {
   const { t } = useTranslation();
@@ -219,9 +227,54 @@ export function ExplorerPage() {
     () => windowFor(state, assignedSince),
     [state, assignedSince],
   );
+  const owners = state.entities.length + state.devices.length > 0;
+  // the metrics the selection reported in the period: what the picker offers (D302)
+  const offered = useQuery({
+    queryKey: queryKeys.analyticsMetrics(projectId, {
+      entities: state.entities,
+      devices: state.devices,
+      from: window.from,
+      to: window.to,
+    }),
+    queryFn: () =>
+      api.get<MetricWithData[]>(
+        `/api/v1/projects/${projectId}/analytics/metrics`,
+        {
+          query: {
+            entity_id: state.entities,
+            device_id: state.devices,
+            from: window.from,
+            to: window.to,
+          },
+        },
+      ),
+    enabled: owners,
+    placeholderData: (previous) => previous,
+  });
+  // the last choice is the next visit's start, unless the link names its own (D302)
+  const [rememberedMetrics, setRememberedMetrics] = usePreference<string[]>(
+    "explore_metrics",
+    [],
+  );
+  const chosen = useMemo<string[] | null>(() => {
+    if (state.metrics !== null) return state.metrics;
+    if (!rememberedMetrics.length || !offered.data) return null;
+    const available = new Set(offered.data.map((m) => m.key));
+    const kept = rememberedMetrics.filter((m) => available.has(m));
+    return kept.length ? kept : null;
+  }, [state.metrics, rememberedMetrics, offered.data]);
+  const chooseMetrics = useCallback(
+    (next: string[]) => {
+      update({ metrics: next });
+      if (next.length) setRememberedMetrics(next);
+    },
+    [update, setRememberedMetrics],
+  );
+  // the table and the chart wait for the choice; the map shows tracks and needs none
+  const ready = chosen !== null || state.mode === "map";
   const selection = useMemo(
     () =>
-      state.entities.length + state.devices.length > 0
+      owners && ready
         ? {
             entities: state.entities,
             devices: state.devices,
@@ -230,7 +283,7 @@ export function ExplorerPage() {
             sources: state.sources ?? "device",
           }
         : null,
-    [state.entities, state.devices, state.sources, window],
+    [owners, ready, state.entities, state.devices, state.sources, window],
   );
   const selectionKey = JSON.stringify(selection);
   const records = useRecords(projectId, selection);
@@ -258,8 +311,8 @@ export function ExplorerPage() {
     [metricLabels],
   );
   const columns = useMemo(
-    () => columnsOf(records.rows, metricLabels),
-    [records.rows, metricLabels],
+    () => withChosenMetrics(columnsOf(records.rows, metricLabels), chosen),
+    [records.rows, metricLabels, chosen],
   );
   const [hiddenColumns, setHiddenColumns] = usePreference<string[]>(
     "records_hidden_columns",
@@ -312,13 +365,13 @@ export function ExplorerPage() {
   const total = records.total;
   const aggregated = total !== null && total > CANVAS_BOUND;
   const metricsOnChart = useMemo(
-    () => chartMetrics(state.metrics, columns),
-    [state.metrics, columns],
+    () => chartMetrics(chosen, columns),
+    [chosen, columns],
   );
   const seriesQuery = useMemo(() => {
     if (!aggregated || state.mode !== "chart") return null;
     const q = new URLSearchParams();
-    const keys = state.metrics.length ? state.metrics : metricsOnChart;
+    const keys = chosen ?? [];
     for (const m of keys) q.append("metric", m);
     if (state.entities.length)
       for (const e of state.entities) q.append("entity_id", e);
@@ -332,7 +385,7 @@ export function ExplorerPage() {
     for (const a of state.aggregates) q.append("agg", a);
     q.set("layout", "series");
     return keys.length ? q.toString() : null;
-  }, [aggregated, state, metricsOnChart, window]);
+  }, [aggregated, state, chosen, window]);
   const series = useQuery({
     queryKey: queryKeys.analyticsSeries(projectId, { q: seriesQuery }),
     queryFn: () =>
@@ -342,7 +395,7 @@ export function ExplorerPage() {
     enabled: seriesQuery !== null,
     placeholderData: (previous) => previous,
   });
-  const owners = useMemo(
+  const trackOwners = useMemo(
     () => [
       ...state.entities.map((id) => ({ entity_id: id })),
       ...state.devices.map((id) => ({ device_id: id })),
@@ -351,14 +404,14 @@ export function ExplorerPage() {
   );
   const trackReads = useQuery({
     queryKey: queryKeys.track(projectId, {
-      owners,
+      owners: trackOwners,
       from: window.from,
       to: window.to,
       explore: true,
     }),
     queryFn: () =>
       Promise.all(
-        owners.map((owner) =>
+        trackOwners.map((owner) =>
           api.get<Track>(`/api/v1/projects/${projectId}/tracks`, {
             query: {
               ...owner,
@@ -369,7 +422,7 @@ export function ExplorerPage() {
           }),
         ),
       ),
-    enabled: aggregated && state.mode === "map" && owners.length > 0,
+    enabled: aggregated && state.mode === "map" && trackOwners.length > 0,
   });
 
   const groupsOnChart = useMemo(() => {
@@ -474,24 +527,30 @@ export function ExplorerPage() {
 
   const stripOpen = stripChoice ?? !(phone && selection !== null);
   const summary = useMemo(() => {
-    const chosen = [
+    const picked = [
       ...state.entities.map((id) => names.get(id) ?? id.slice(0, 8)),
       ...state.devices.map((id) => names.get(id) ?? id.slice(0, 8)),
     ];
     const who =
-      chosen.length === 0
+      picked.length === 0
         ? t("Nothing selected")
-        : chosen.length <= 2
-          ? chosen.join(", ")
-          : `${chosen.slice(0, 2).join(", ")} +${chosen.length - 2}`;
+        : picked.length <= 2
+          ? picked.join(", ")
+          : `${picked.slice(0, 2).join(", ")} +${picked.length - 2}`;
     const period =
       state.range === "custom"
         ? t("Custom range")
         : state.range === "assignment"
           ? t("Since the device was assigned")
           : t(RANGE_PRESETS[state.range].label);
-    return `${who} · ${period} · ${state.timezone}`;
-  }, [state, names, t]);
+    const what =
+      chosen === null
+        ? t("no metrics chosen")
+        : chosen.length === 0
+          ? t("positions only")
+          : t("{{count}} metrics", { count: chosen.length });
+    return `${who} · ${period} · ${what} · ${state.timezone}`;
+  }, [state, names, chosen, t]);
   const loaded = records.rows.length;
   const percent = total ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
   const progress = (
@@ -605,17 +664,75 @@ export function ExplorerPage() {
     value: c.key.slice(2),
     label: t(c.label),
   }));
+  // the metrics the selection reported, grouped by the registry's category, the count as hint
+  const metricOptions = useMemo(
+    () =>
+      groupMetrics(
+        (offered.data ?? []).map((m) => ({ ...m, metric_key: m.key })),
+        (key) => offered.data?.find((m) => m.key === key)?.category,
+      ).flatMap(([category, items]) =>
+        items.map((m) => ({
+          value: m.key,
+          label: t(m.label),
+          hint: m.count.toLocaleString(),
+          group: CATEGORY_LABELS[category]
+            ? t(CATEGORY_LABELS[category])
+            : category,
+        })),
+      ),
+    [offered.data, t],
+  );
+  // the metrics of the table and the chart (D302); the picker is the same in every mode
+  const metricsPicker = owners && (
+    <>
+      <MultiSelect
+        options={metricOptions}
+        value={chosen ?? []}
+        onChange={chooseMetrics}
+        placeholder={
+          offered.isPending
+            ? t("Reading the metrics…")
+            : offered.data?.length === 0
+              ? t("No metrics in the period")
+              : t("Metrics")
+        }
+        label={t("metrics")}
+        className="h-8 w-44"
+        maxSelected={
+          state.mode === "chart" &&
+          (state.chart === "scatter" || state.chart === "histogram")
+            ? 1
+            : MAX_METRICS
+        }
+      />
+      {chosen === null && state.mode !== "map" && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => chooseMetrics([])}
+        >
+          {t("Positions only")}
+        </Button>
+      )}
+    </>
+  );
 
   const tools = (
     <>
       {state.mode === "table" && records.rows.length > 0 && (
         <MultiSelect
-          options={columns.map((c) => ({ value: c.key, label: t(c.label) }))}
-          value={shown.map((c) => c.key)}
+          options={columns
+            .filter((c) => c.kind !== "metric")
+            .map((c) => ({ value: c.key, label: t(c.label) }))}
+          value={shown.filter((c) => c.kind !== "metric").map((c) => c.key)}
           onChange={(visible) => {
             setHiddenColumns(
               columns
-                .filter((c) => !c.extra && !visible.includes(c.key))
+                .filter(
+                  (c) =>
+                    c.kind !== "metric" && !c.extra && !visible.includes(c.key),
+                )
                 .map((c) => c.key),
             );
             setAddedColumns(
@@ -631,17 +748,6 @@ export function ExplorerPage() {
       )}
       {state.mode === "chart" && (
         <>
-          <MultiSelect
-            options={chartOptions}
-            value={metricsOnChart}
-            onChange={(v) => update({ metrics: v })}
-            placeholder={t("Metrics")}
-            label={t("metrics")}
-            className="h-8 w-40"
-            maxSelected={
-              state.chart === "scatter" || state.chart === "histogram" ? 1 : 8
-            }
-          />
           {state.chart === "scatter" && (
             <Select
               value={state.xMetric ?? metricsOnChart[1] ?? ""}
@@ -821,13 +927,14 @@ export function ExplorerPage() {
               oneEntity={oneEntity !== null}
               onChange={(patch) => update({ ...patch, at: null })}
             />
+            {metricsPicker}
             {tools}
           </div>
         )}
       </div>
 
       <div className="relative min-h-0 flex-1">
-        {!selection ? (
+        {!owners ? (
           <div className="absolute inset-0 flex items-center justify-center p-6">
             <EmptyState
               icon={ChartLine}
@@ -835,6 +942,22 @@ export function ExplorerPage() {
               description={t(
                 "Every record they produced in the period follows: as a table, on a chart, or on the map, one row per moment.",
               )}
+            />
+          </div>
+        ) : !selection ? (
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <EmptyState
+              icon={ChartLine}
+              title={t("Choose the metrics to show")}
+              description={
+                offered.data?.length === 0
+                  ? t(
+                      "The selection reported no measurements in this period; positions only shows what it did produce.",
+                    )
+                  : t(
+                      "The strip lists every metric the selection reported in the period; pick the ones you want, or positions only. The choice is remembered for next time.",
+                    )
+              }
             />
           </div>
         ) : (
@@ -875,13 +998,17 @@ export function ExplorerPage() {
                         description={
                           aggregated && series.error
                             ? series.error.message
-                            : aggregated
+                            : metricsOnChart.length === 0
                               ? t(
-                                  "Above the canvas bound the chart reads buckets of the chosen metrics; pick metrics in the strip.",
+                                  "Pick a numeric metric in the strip; positions alone draw on the map.",
                                 )
-                              : t(
-                                  "The chart draws the numeric metrics of the loaded rows; pick metrics in the strip once rows are here.",
-                                )
+                              : aggregated
+                                ? t(
+                                    "Above the canvas bound the chart reads buckets of the chosen metrics.",
+                                  )
+                                : t(
+                                    "The loaded rows carry none of the chosen metrics yet.",
+                                  )
                         }
                       />
                     </div>

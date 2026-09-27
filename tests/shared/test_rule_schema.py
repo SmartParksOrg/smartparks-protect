@@ -94,6 +94,29 @@ def test_json_schema_builds():
     assert "$defs" in schema and "ThresholdCondition" in schema["$defs"]
 
 
+def test_far_is_the_counterpart_of_near_and_reads_routes_by_default():
+    """Phase 38, decision D300: `far` measures from every route unless told otherwise, and
+    needs a target like `near`."""
+    doc = RuleDocument.model_validate(
+        {
+            "trigger": {"kind": "position"},
+            "conditions": {"type": "far", "meters": 50},
+            "event": {"event_type": "OFF_ROAD", "title": "{entity} {value} m from {feature}"},
+        }
+    )
+    assert doc.reserved_types() == []
+    leaf = doc.conditions
+    assert leaf.type == "far" and leaf.feature_type == "route"
+    with pytest.raises(ValidationError):
+        RuleDocument.model_validate(
+            {
+                "trigger": {"kind": "position"},
+                "conditions": {"type": "far", "meters": 50, "feature_type": None},
+                "event": {"event_type": "OFF_ROAD", "title": "x"},
+            }
+        )
+
+
 def test_near_is_a_real_condition_now():
     """Decision D140: `near` is evaluated, so it is no longer reserved; it needs a target."""
     doc = RuleDocument.model_validate(

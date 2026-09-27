@@ -344,7 +344,9 @@ async def handle_position(bus: RedisStreamsBus, cache: RuleCache, payload: dict[
         sample = Sample(
             time=position.time,
             kind=TriggerKind.POSITION,
-            values=position_values(position.speed_mps, position.altitude_m, point.x, point.y),
+            values=position_values(
+                position.speed_mps, position.altitude_m, point.x, point.y, position.accuracy_m
+            ),
             point=(point.x, point.y),
             source_event_id=position.source_event_id,
             source_event_ingested_at=position.source_event_ingested_at,

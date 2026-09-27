@@ -252,6 +252,25 @@ async def test_drill_down_rows_and_metrics_with_data(client, db):
     assert battery["first_time"][:16] == "2026-04-01T00:00"
     assert battery["last_time"][:16] == "2026-04-01T02:00"
 
+    # the explorer's picker asks for the selection's metrics alone (decision D302): another
+    # entity of the project reported nothing, so it gets an empty list, and the device gets both
+    other = uuid.uuid4()
+    none = (
+        await client.get(
+            f"{base}/metrics?from={_ts(T0)}&to={_ts(T0 + timedelta(days=1))}&entity_id={other}",
+            headers=admin.headers,
+        )
+    ).json()
+    assert none == []
+    mine = (
+        await client.get(
+            f"{base}/metrics?from={_ts(T0)}&to={_ts(T0 + timedelta(days=1))}"
+            f"&device_id={device['id']}",
+            headers=admin.headers,
+        )
+    ).json()
+    assert [m["key"] for m in mine] == ["battery_voltage", "gnss_fix"]
+
 
 async def test_saved_views_are_shared_and_owned(client, db):
     from shared.enums import Role

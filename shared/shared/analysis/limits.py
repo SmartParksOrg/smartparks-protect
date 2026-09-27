@@ -9,6 +9,8 @@ MAX_SUBJECTS_CONTACT = 40
 #: A cardiac run reads one series per subject and compares nothing between them, so the
 #: bound is about how many curves a person can read on one page, not about the work.
 MAX_SUBJECTS_CARDIAC = 25
+#: A vehicle run reads one track per subject, like movement; the trips table grows per vehicle.
+MAX_SUBJECTS_VEHICLE = 25
 MAX_DEVICES = 100
 MAX_ROWS_PER_DEVICE = 500_000
 MAX_ANIMALS_GRAZING = 100

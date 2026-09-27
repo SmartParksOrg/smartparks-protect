@@ -42,6 +42,7 @@ from shared.analysis.limits import (
     MAX_SUBJECTS_CARDIAC,
     MAX_SUBJECTS_CONTACT,
     MAX_SUBJECTS_MOVEMENT,
+    MAX_SUBJECTS_VEHICLE,
 )
 from shared.analysis.parameters import CommonParameters
 from shared.analysis.report import publish_report, queue_report, remove_report
@@ -76,6 +77,7 @@ SUBJECT_LIMITS = {
     "device_performance": MAX_DEVICES,
     "contact_tracing": MAX_SUBJECTS_CONTACT,
     "cardiac": MAX_SUBJECTS_CARDIAC,
+    "vehicle_use": MAX_SUBJECTS_VEHICLE,
 }
 
 

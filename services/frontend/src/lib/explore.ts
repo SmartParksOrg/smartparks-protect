@@ -27,15 +27,18 @@ export const MODES: ExploreMode[] = ["table", "chart", "map"];
 /** Loaded rows draw raw points up to this many; above, the chart takes the aggregate read and
  * the map the track read (decision D155). */
 export const CANVAS_BOUND = 50_000;
-/** Metrics on the chart at once: one grid each. */
-export const MAX_CHART_METRICS = 8;
-export const DEFAULT_CHART_METRICS = 4;
+/** Metrics chosen at once (decision D302): the table's metric columns and the chart's lines. */
+export const MAX_METRICS = 12;
+/** The `metric` value that says "positions only": chosen, and none of them. */
+export const NO_METRICS = "none";
 const DEFAULT_AGGREGATES: Aggregate[] = ["mean", "min", "max", "count"];
 
 export interface ExploreState extends RecordsState {
   mode: ExploreMode;
-  /** Metric keys on the chart; empty means the first numeric columns of the loaded rows. */
-  metrics: string[];
+  /** The metrics chosen (decision D302): the table's metric columns and the chart's lines.
+   * `null` is nothing chosen yet, which is the question the page asks first; `[]` is the
+   * explicit "positions only". Nothing is picked by default any more. */
+  metrics: string[] | null;
   chart: ChartType;
   /** The metric on the x axis of a scatter chart; null means time. */
   xMetric: string | null;
@@ -64,7 +67,7 @@ export function readExploreState(
   return {
     ...readRecordsState(params, defaults),
     mode,
-    metrics: params.getAll("metric").slice(0, MAX_CHART_METRICS),
+    metrics: readMetrics(params.getAll("metric")),
     chart: ((CHART_TYPES as readonly string[]).includes(chart)
       ? chart
       : "line") as ChartType,
@@ -77,7 +80,10 @@ export function readExploreState(
 export function writeExploreState(state: ExploreState): URLSearchParams {
   const params = writeRecordsState(state);
   params.set("mode", state.mode);
-  for (const m of state.metrics) params.append("metric", m);
+  if (state.metrics !== null) {
+    if (state.metrics.length === 0) params.append("metric", NO_METRICS);
+    for (const m of state.metrics) params.append("metric", m);
+  }
   if (state.chart !== "line") params.set("chart", state.chart);
   if (state.xMetric) params.set("x", state.xMetric);
   if (state.bucket !== "auto") params.set("bucket", state.bucket);
@@ -111,14 +117,34 @@ export function chartableColumns(columns: RecordColumn[]): RecordColumn[] {
   );
 }
 
-/** The metric keys on the chart: the chosen ones that are loaded, else the first few. */
+/** The metric keys on the chart: the chosen ones the loaded rows carry, in the chosen order;
+ * nothing when nothing is chosen (decision D302: no default set, so Clear clears). */
 export function chartMetrics(
-  chosen: string[],
+  chosen: string[] | null,
   columns: RecordColumn[],
 ): string[] {
   const available = chartableColumns(columns).map((c) => c.key.slice(2));
-  if (chosen.length) return chosen.filter((m) => available.includes(m));
-  return available.slice(0, DEFAULT_CHART_METRICS);
+  return (chosen ?? []).filter((m) => available.includes(m));
+}
+
+/** The metric keys of the URL: absent is nothing chosen yet, `none` is positions only. */
+export function readMetrics(values: string[]): string[] | null {
+  if (values.length === 0) return null;
+  if (values.includes(NO_METRICS)) return [];
+  return values.slice(0, MAX_METRICS);
+}
+
+/** The columns with the metric ones limited to what is chosen, in the chosen order; the fixed
+ * and state columns stay as they are. */
+export function withChosenMetrics(
+  columns: RecordColumn[],
+  chosen: string[] | null,
+): RecordColumn[] {
+  const wanted = chosen ?? [];
+  const metrics = wanted
+    .map((key) => columns.find((c) => c.key === `m:${key}`))
+    .filter((c): c is RecordColumn => c !== undefined);
+  return [...columns.filter((c) => c.kind !== "metric"), ...metrics];
 }
 
 export interface ChartSeries {
@@ -276,7 +302,10 @@ export function groupsFromSeries(
       data: s.points
         .map((p) => {
           const value = p.values[aggregate];
-          return [Date.parse(p.time), value == null ? null : value * read.factor];
+          return [
+            Date.parse(p.time),
+            value == null ? null : value * read.factor,
+          ];
         })
         .filter((d): d is number[] => d[1] !== null),
     });

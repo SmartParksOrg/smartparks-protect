@@ -925,6 +925,97 @@ export function RuleEditor({
                               </div>
                             </>
                           )}
+                          {type === "far" && (
+                            <>
+                              <span className="text-xs text-muted-foreground">
+                                {t("farther than")}
+                              </span>
+                              <Input
+                                className={NUMBER}
+                                type="number"
+                                aria-label={t("Metres")}
+                                {...form.register(
+                                  `conditions.${index}.meters`,
+                                  { valueAsNumber: true },
+                                )}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                {t("m from")}
+                              </span>
+                              <Select
+                                value={
+                                  form.watch(`conditions.${index}.feature_ids`)
+                                    .length > 0
+                                    ? "selected"
+                                    : form.watch(
+                                        `conditions.${index}.feature_type`,
+                                      ) || "route"
+                                }
+                                onValueChange={(v) => {
+                                  if (v === "selected") return;
+                                  form.setValue(
+                                    `conditions.${index}.feature_type`,
+                                    v,
+                                  );
+                                  form.setValue(
+                                    `conditions.${index}.feature_ids`,
+                                    [],
+                                  );
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="h-8 w-36"
+                                  aria-label={t("Feature type")}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {FEATURE_TYPES.map((f) => (
+                                    <SelectItem key={f} value={f}>
+                                      {t("every")} {f}
+                                    </SelectItem>
+                                  ))}
+                                  <SelectItem value="selected" disabled>
+                                    {t("selected features")}
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="flex flex-wrap gap-1">
+                                {features.data?.items.map((f) => {
+                                  const on = form
+                                    .watch(`conditions.${index}.feature_ids`)
+                                    .includes(f.id);
+                                  return (
+                                    <Button
+                                      key={f.id}
+                                      type="button"
+                                      size="sm"
+                                      variant={on ? "default" : "outline"}
+                                      className="h-7"
+                                      onClick={() => {
+                                        const current = form.getValues(
+                                          `conditions.${index}.feature_ids`,
+                                        );
+                                        form.setValue(
+                                          `conditions.${index}.feature_ids`,
+                                          on
+                                            ? current.filter((x) => x !== f.id)
+                                            : [...current, f.id],
+                                        );
+                                        if (!on)
+                                          form.setValue(
+                                            `conditions.${index}.feature_type`,
+                                            "",
+                                          );
+                                      }}
+                                    >
+                                      {f.name}
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
                           {type === "no_data" && (
                             <>
                               <span className="text-xs text-muted-foreground">

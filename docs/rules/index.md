@@ -21,10 +21,12 @@ The subject of a rule is the entity the data belongs to, or the device when no e
 | --- | --- | --- |
 | Threshold | metric, operator, value | The triggering measurement, a derived position metric (`speed_kmh`, `speed_mps`, `altitude_m`) or the latest value of another metric of the subject (within seven days) compared with the value. `speed_kmh` is the speed the device reported with its fix (an OpenCollar with active tracking on, a Traccar tracker); a fix without a speed carries none and a speed rule stays quiet on it |
 | Geofence or area | relation (enter, exit, inside, outside), features by type or by selection | Enter and exit fire on the crossing and need a position trigger; inside and outside are checked on every sample |
+| Near a feature or entity | metres, features by type or by selection, or entities | The subject's position is within the distance of the nearest of them (decision D140); the distance is the event's value and the nearest one its feature |
+| Far from every feature | metres, features by type (routes by default) or by selection | The subject's position is farther than the distance from every one of them (phase 38, decision D300): a vehicle off the known roads. The nearest route and the distance to it are the event's feature and value. A fix whose own accuracy is worse than the distance does not count, and the document's `for` guards against one bad fix beside the road |
 | No data | duration | The subject has not been seen for this long; needs a schedule trigger. A subject that never reported does not count |
 | Window aggregate | metric, aggregate (avg, min, max, sum, count), window, operator, value | The aggregate over the last window of the metric compared with the value |
 
-Reserved for a later release, accepted by the schema but not by the evaluator: `near`, `dwell`, `crossed`, `baseline`, `correlation`, `event_chain`. A rule that uses one can be saved but not enabled.
+Reserved for a later release, accepted by the schema but not by the evaluator: `dwell`, `crossed`, `baseline`, `correlation`, `event_chain`. A rule that uses one can be saved but not enabled.
 
 ## Firing
 
@@ -40,6 +42,7 @@ The title is a template: `{entity}`, `{device}`, `{feature}`, `{metric}`, `{valu
 | Geofence enter | position | enter any geofence | `GEOFENCE_ENTER`, info |
 | Speed limit inside an area | position | `speed_kmh > 40` and inside any zone, for 30 s, cooldown 10 min | `SPEED_LIMIT_VIOLATION`, warning, alert |
 | Speeding | position | `speed_kmh > 60` anywhere, cooldown 10 min; scope it to the Vehicles type so a collar is never judged (a type in the scope takes its sub-types) | `SPEED_LIMIT_VIOLATION`, warning, alert |
+| Off the roads | position | farther than 50 m from every route for 120 s, cooldown 30 min; scope it to the Vehicles type; the routes are the roads imported from OpenStreetMap or drawn (phase 38) | `OFF_ROAD`, warning, alert |
 | No data for 12 hours | schedule, every 5 min | no data for 12 h, cooldown 24 h | `NO_DATA`, warning, alert |
 | Battery low | measurement `battery_voltage` | `battery_voltage < 3.2`, cooldown 24 h | `BATTERY_LOW`, warning, alert |
 | Collar not moving | schedule, hourly | `max(activity, 12 h) < 1.0` with at least three status messages in the window and `battery_voltage > 3.2`, cooldown 12 h; `activity` is the change of the accelerometer vector between status messages (m/s²) | `POSSIBLE_IMMOBILITY`, critical, alert |

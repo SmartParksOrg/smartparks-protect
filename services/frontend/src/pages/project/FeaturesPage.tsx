@@ -2,7 +2,16 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Combine, Plus, Trash2, Upload, Wand2, Wheat, Zap } from "lucide-react";
+import {
+  Combine,
+  Plus,
+  Route as RouteIcon,
+  Trash2,
+  Upload,
+  Wand2,
+  Wheat,
+  Zap,
+} from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router";
@@ -18,6 +27,7 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
 import { CombineFeaturesDialog } from "@/components/features/CombineFeaturesDialog";
 import { ImportFeaturesDialog } from "@/components/features/ImportFeaturesDialog";
+import { RoadsDialog } from "@/components/features/RoadsDialog";
 import { DrawMap } from "@/components/map/DrawMap";
 import { boundsOf, geometryBounds, type Bounds } from "@/components/map/fit";
 import { drawKindFor } from "@/components/map/featureTools";
@@ -92,6 +102,8 @@ export function FeaturesPage() {
   });
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // roads from OpenStreetMap as route features (phase 38, decision D300)
+  const [roadsOpen, setRoadsOpen] = useState(false);
   // rows ticked for combining (decision D274): only areas can make a zone between them
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [combineOpen, setCombineOpen] = useState(false);
@@ -268,6 +280,11 @@ export function FeaturesPage() {
                 <Upload className="size-4" /> {t("Import")}
               </Button>
             )}
+            {can("features:write") && (
+              <Button variant="outline" onClick={() => setRoadsOpen(true)}>
+                <RouteIcon className="size-4" /> {t("Roads")}
+              </Button>
+            )}
             <Button onClick={() => setOpen(true)}>
               <Plus className="size-4" /> {t("New feature")}
             </Button>
@@ -294,6 +311,12 @@ export function FeaturesPage() {
           }
         />
       </Page>
+      <RoadsDialog
+        projectId={projectId}
+        open={roadsOpen}
+        onOpenChange={setRoadsOpen}
+        around={around}
+      />
       <ImportFeaturesDialog
         projectId={projectId}
         open={importOpen}

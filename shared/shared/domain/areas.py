@@ -202,6 +202,52 @@ def overpass_query(read: ReadBox) -> str:
     return "[out:json][timeout:25];(" + "".join(parts) + ");out geom;"
 
 
+#: Ways one roads read keeps (phase 38, decision D300); the import's preview shows this many.
+MAX_ROADS = 200
+
+
+def roads_query(read: ReadBox) -> str:
+    """The Overpass QL for the roads and tracks in the box (phase 38): the `highway` ways with
+    the ways people walk on left out, as the area proposal leaves them out (decision D272)."""
+    bbox = f"({read.south:.6f},{read.west:.6f},{read.north:.6f},{read.east:.6f})"
+    return "[out:json][timeout:25];(" + _line_part("highway", bbox) + ");out geom;"
+
+
+@dataclass(slots=True)
+class OsmRoad:
+    """One `highway` way as a route to keep: its name (the `name`, else the `ref`, else the
+    kind in words), the kind, the OpenStreetMap way id and the line."""
+
+    osm_id: int
+    name: str
+    highway: str
+    geometry: LineString
+    tags: dict[str, str]
+
+
+def parse_roads(document: dict[str, Any]) -> list[OsmRoad]:
+    """The roads of an Overpass answer, longest first, at most `MAX_ROADS`; a way with fewer
+    than two points or a walking way is left out."""
+    roads: list[OsmRoad] = []
+    for element in document.get("elements", []):
+        if element.get("type") != "way":
+            continue
+        tags = {str(k): str(v) for k, v in (element.get("tags") or {}).items()}
+        highway = tags.get("highway")
+        if not highway or highway in WALKING_HIGHWAYS:
+            continue
+        coords = _coords(element.get("geometry") or [])
+        if len(coords) < 2:
+            continue
+        line = LineString(coords)
+        if len(coords) > MAX_VERTICES:
+            line = line.simplify(1e-5, preserve_topology=True)
+        name = tags.get("name") or tags.get("ref") or highway.replace("_", " ").capitalize()
+        roads.append(OsmRoad(int(element["id"]), name, highway, line, tags))
+    roads.sort(key=lambda road: -road.geometry.length)
+    return roads[:MAX_ROADS]
+
+
 def _coords(geometry: list[dict[str, float]]) -> list[tuple[float, float]]:
     return [(float(p["lon"]), float(p["lat"])) for p in geometry]
 

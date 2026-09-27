@@ -52,6 +52,48 @@ export function MovementLimitations() {
   );
 }
 
+/** What the vehicle figures cannot say (phase 39), folded under the results. */
+export function VehicleLimitations() {
+  const { t } = useTranslation();
+  return (
+    <details className="rounded-md border px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {t("What these figures can and cannot say")}
+      </summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+        <li>
+          {t(
+            "A trip is what the fixes show of it: the distance is the sum of the steps between fixes and misses the bends between them; the sampling interval stands beside it.",
+          )}
+        </li>
+        <li>
+          {t(
+            "A reported speed is the receiver's reading at the moment of the fix, in whole metres per second (a resolution of 3.6 km/h); a speed without one is the mean over a step and says nothing about a moment. Speeding is judged on reported speeds alone.",
+          )}
+        </li>
+        <li>
+          {t(
+            "Fixes within the stop radius of where a stop began are one place, so a parked vehicle's GNSS drift is neither distance nor a trip; a real move shorter than the radius is lost.",
+          )}
+        </li>
+        <li>
+          {t(
+            "A trip ends after the stop time; a shorter halt is a pause inside it. A trip cut by a silence in the record may be two.",
+          )}
+        </li>
+        <li>
+          {t(
+            "Where a trip started and ended is the nearest site within the site radius, else the coordinates; a site the project has not drawn cannot be named.",
+          )}
+        </li>
+        <li>
+          {t("The figures describe the tracked vehicles, not the fleet.")}
+        </li>
+      </ul>
+    </details>
+  );
+}
+
 /** What the grazing figures cannot say (plan, section 9.6), folded under the results. */
 export function GrazingLimitations() {
   const { t } = useTranslation();

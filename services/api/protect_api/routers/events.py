@@ -50,6 +50,7 @@ ICON_BY_TYPE = {
     "NO_DATA": "event.device_offline",
     "SPECIES_DETECTION": "event.detection",
     "SPEED_LIMIT_VIOLATION": "event.speeding",
+    "OFF_ROAD": "event.road_status",
     "BATTERY_LOW": "event.low_battery",
     "POSSIBLE_IMMOBILITY": "event.immobility",
     "PROXIMITY": "event.proximity",

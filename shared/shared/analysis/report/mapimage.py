@@ -380,6 +380,14 @@ def _draw_shape(ax: Any, item: Shape) -> None:
             zorder=7,
         )
         return
+    if geometry.geom_type in ("LineString", "MultiLineString"):
+        # a trip (vehicle use): the path in the vehicle's colour
+        lines = list(geometry.geoms) if geometry.geom_type == "MultiLineString" else [geometry]
+        for line in lines:
+            xy = [mercator(x, y) for x, y in line.coords]
+            xs, ys = zip(*xy, strict=True)
+            ax.plot(xs, ys, color=item.color, linewidth=1.4, alpha=0.9, zorder=5)
+        return
     polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
     alpha = FILL_ALPHA.get(item.kind, 0.2)
     for polygon in polygons:

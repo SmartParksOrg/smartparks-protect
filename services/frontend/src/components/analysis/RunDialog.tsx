@@ -7,6 +7,7 @@ import { ContactTracingForm } from "@/components/analysis/ContactTracingForm";
 import { DevicePerformanceForm } from "@/components/analysis/DevicePerformanceForm";
 import { GrazingForm } from "@/components/analysis/GrazingForm";
 import { MovementForm } from "@/components/analysis/MovementForm";
+import { VehicleForm } from "@/components/analysis/VehicleForm";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { type FormState, formStateOfRun } from "@/lib/analyses";
+
+/** The modules a dialog can set up; the pages name theirs. */
+export type AnalysisModuleKey =
+  | "movement"
+  | "grazing"
+  | "device_performance"
+  | "contact_tracing"
+  | "cardiac"
+  | "vehicle_use";
 
 /** The one place an analysis is set up: a dialog with the module's form, for a new run or
  * for a change to an existing one (its settings filled in; "Run as new" keeps the old run,
@@ -29,12 +39,7 @@ export function RunDialog({
   onCreated,
 }: {
   projectId: string;
-  module:
-    | "movement"
-    | "grazing"
-    | "device_performance"
-    | "contact_tracing"
-    | "cardiac";
+  module: AnalysisModuleKey;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The form's first state: defaults, a deep link's choices, or an existing run's. */
@@ -58,7 +63,9 @@ export function RunDialog({
                     ? t("New contact tracing analysis")
                     : module === "cardiac"
                       ? t("New cardiac analysis")
-                      : t("New device performance analysis")}
+                      : module === "vehicle_use"
+                        ? t("New vehicle use analysis")
+                        : t("New device performance analysis")}
           </DialogTitle>
           <DialogDescription>
             {editing
@@ -96,12 +103,7 @@ function RunDialogBody({
   onCreated,
 }: {
   projectId: string;
-  module:
-    | "movement"
-    | "grazing"
-    | "device_performance"
-    | "contact_tracing"
-    | "cardiac";
+  module: AnalysisModuleKey;
   initial: FormState;
   editing: AnalysisRun | null;
   onCreated: (run: AnalysisRun, replaced: AnalysisRun | null) => void;
@@ -121,5 +123,6 @@ function RunDialogBody({
   if (module === "grazing") return <GrazingForm {...props} />;
   if (module === "contact_tracing") return <ContactTracingForm {...props} />;
   if (module === "cardiac") return <CardiacForm {...props} />;
+  if (module === "vehicle_use") return <VehicleForm {...props} />;
   return <DevicePerformanceForm {...props} />;
 }

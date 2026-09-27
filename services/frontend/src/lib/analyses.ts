@@ -132,6 +132,8 @@ export interface MethodOptions {
   kde_bandwidth: number | null;
   /** Read the movement strategy off the net squared displacement (phase 2, section 4). */
   strategy: boolean;
+  /** Metres; fixes within this radius of where a stop began are one place (decision D303). */
+  stop_radius: number;
 }
 
 export const ALL_METHODS = ["mcp", "kde", "akde_like", "clusters"];
@@ -142,6 +144,29 @@ export const DEFAULT_METHOD: MethodOptions = {
   methods: ALL_METHODS,
   kde_bandwidth: null,
   strategy: true,
+  stop_radius: 15,
+};
+
+/** The vehicle use page's own choices (phase 39, decision D304). */
+export interface VehicleOptions {
+  /** km/h; a reported speed above this is movement before the next fix arrives. */
+  moving: number;
+  /** Minutes standing still that end a trip; a shorter halt is a pause inside it. */
+  stop: number;
+  /** Metres; the stop rule's radius (decision D303). */
+  radius: number;
+  /** Metres; a trip starting or ending within this of a site is named after it. */
+  siteRadius: number;
+  /** km/h; the speed limit a speeding episode is judged against. */
+  limit: number;
+}
+
+export const DEFAULT_VEHICLE: VehicleOptions = {
+  moving: 5,
+  stop: 10,
+  radius: 15,
+  siteRadius: 200,
+  limit: 60,
 };
 
 /** The grazing page's own choices (plan, section 9.4): the areas, the weighting, the second
@@ -242,6 +267,7 @@ export interface FormState {
   grazing: GrazingOptions;
   contact: ContactOptions;
   cardiac: CardiacOptions;
+  vehicle: VehicleOptions;
 }
 
 export const DEFAULT_RANGE = "30d";
@@ -302,6 +328,17 @@ export function readFormState(params: URLSearchParams): FormState {
         ? numberOr(params.get("kde"), 0) || null
         : null,
       strategy: params.get("strategy") !== "0",
+      stop_radius: numberOrZero(params.get("stop"), DEFAULT_METHOD.stop_radius),
+    },
+    vehicle: {
+      moving: numberOr(params.get("moving"), DEFAULT_VEHICLE.moving),
+      stop: numberOr(params.get("stop_min"), DEFAULT_VEHICLE.stop),
+      radius: numberOrZero(params.get("radius"), DEFAULT_VEHICLE.radius),
+      siteRadius: numberOr(
+        params.get("site_radius"),
+        DEFAULT_VEHICLE.siteRadius,
+      ),
+      limit: numberOr(params.get("limit"), DEFAULT_VEHICLE.limit),
     },
     grazing: {
       areas: params.getAll("area"),
@@ -344,6 +381,17 @@ export function writeFormState(state: FormState): URLSearchParams {
     params.set("methods", m.methods.join(","));
   if (m.kde_bandwidth) params.set("kde", String(m.kde_bandwidth));
   if (!m.strategy) params.set("strategy", "0");
+  if (m.stop_radius !== DEFAULT_METHOD.stop_radius)
+    params.set("stop", String(m.stop_radius));
+  const v = state.vehicle;
+  if (v.moving !== DEFAULT_VEHICLE.moving)
+    params.set("moving", String(v.moving));
+  if (v.stop !== DEFAULT_VEHICLE.stop) params.set("stop_min", String(v.stop));
+  if (v.radius !== DEFAULT_VEHICLE.radius)
+    params.set("radius", String(v.radius));
+  if (v.siteRadius !== DEFAULT_VEHICLE.siteRadius)
+    params.set("site_radius", String(v.siteRadius));
+  if (v.limit !== DEFAULT_VEHICLE.limit) params.set("limit", String(v.limit));
   const c = state.contact;
   if (!c.bluetooth) params.set("bluetooth", "0");
   if (!c.proximity) params.set("proximity", "0");
@@ -433,6 +481,31 @@ export function movementParameters(
     methods: m.methods,
     ...(m.kde_bandwidth ? { kde_bandwidth_m: m.kde_bandwidth } : {}),
     strategy: m.strategy,
+    stop_radius_m: m.stop_radius,
+  };
+}
+
+/** The parameters the vehicle use module takes (decision D304): the vehicles, the period,
+ * the gap, and how a trip, a stop, a site and speeding are read; null while no subject is
+ * chosen or a custom range lacks a date. */
+export function vehicleParameters(
+  state: FormState,
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  const window = windowOf(state, now);
+  if (!window || state.entities.length === 0) return null;
+  const comparison = comparisonOf(state, window);
+  const v = state.vehicle;
+  return {
+    entity_ids: state.entities,
+    ...window,
+    ...(comparison ? { comparison } : {}),
+    gap_hours: state.method.gap,
+    moving_kmh: v.moving,
+    stop_minutes: v.stop,
+    stop_radius_m: v.radius,
+    site_radius_m: v.siteRadius,
+    limit_kmh: v.limit,
   };
 }
 
@@ -657,7 +730,9 @@ export function windowOf(
 ): { time_from: string; time_to: string } | null {
   const end = new Date(now);
   end.setSeconds(0, 0);
+  // a day is the quick look that costs little (Tim, 2026-09-27); the forms offer it first
   const days: Record<string, number> = {
+    "1d": 1,
     "7d": 7,
     "30d": 30,
     "90d": 90,
@@ -932,6 +1007,14 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
       kde_bandwidth:
         typeof p.kde_bandwidth_m === "number" ? p.kde_bandwidth_m : null,
       strategy: p.strategy !== false,
+      stop_radius: num("stop_radius_m", DEFAULT_METHOD.stop_radius),
+    },
+    vehicle: {
+      moving: num("moving_kmh", DEFAULT_VEHICLE.moving),
+      stop: num("stop_minutes", DEFAULT_VEHICLE.stop),
+      radius: num("stop_radius_m", DEFAULT_VEHICLE.radius),
+      siteRadius: num("site_radius_m", DEFAULT_VEHICLE.siteRadius),
+      limit: num("limit_kmh", DEFAULT_VEHICLE.limit),
     },
     grazing: {
       areas: list("feature_ids"),

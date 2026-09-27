@@ -2851,6 +2851,65 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/features/roads": {
+   "post": {
+    "tags": [
+     "entities"
+    ],
+    "summary": "Propose Roads",
+    "description": "The roads and tracks OpenStreetMap knows in a box (phase 38, decision D300): the\n`highway` ways with the ways people walk on left out, longest first, each with its name (or\nits reference, or its kind), so a person keeps the ones they want as route features and the\noff-road rule has something to measure from. The same box bounds as the area proposal;\nnothing is stored, and a 502 says OpenStreetMap did not answer.",
+    "operationId": "propose_roads_api_v1_projects__project_id__features_roads_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProposeAreaRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProposedRoads"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/features/union": {
    "post": {
     "tags": [
@@ -11744,7 +11803,7 @@
      "analytics"
     ],
     "summary": "Metrics With Data",
-    "description": "Metrics that have measurements in this project within the range (default 30 days), for\nthe filter builder.",
+    "description": "Metrics that have measurements in this project within the range (default 30 days), for\nthe filter builder and the explorer's metrics picker (decision D302): with `entity_id` or\n`device_id`, only what those entities and devices reported, so the picker offers what the\nselection has and nothing else. Within the caller's scope.",
     "operationId": "metrics_with_data_api_v1_projects__project_id__analytics_metrics_get",
     "security": [
      {
@@ -11794,6 +11853,34 @@
         }
        ],
        "title": "To"
+      }
+     },
+     {
+      "name": "entity_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "maxItems": 500,
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "device_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "maxItems": 500,
+       "title": "Device Id"
       }
      }
     ],
@@ -39931,6 +40018,57 @@
      "attribution"
     ],
     "title": "ProposedAreas"
+   },
+   "ProposedRoad": {
+    "properties": {
+     "osm_id": {
+      "type": "integer",
+      "title": "Osm Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "highway": {
+      "type": "string",
+      "title": "Highway"
+     },
+     "geometry": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Geometry"
+     }
+    },
+    "type": "object",
+    "required": [
+     "osm_id",
+     "name",
+     "highway",
+     "geometry"
+    ],
+    "title": "ProposedRoad",
+    "description": "One road of a roads read (phase 38): the OpenStreetMap way as a line to keep."
+   },
+   "ProposedRoads": {
+    "properties": {
+     "roads": {
+      "items": {
+       "$ref": "#/components/schemas/ProposedRoad"
+      },
+      "type": "array",
+      "title": "Roads"
+     },
+     "attribution": {
+      "type": "string",
+      "title": "Attribution"
+     }
+    },
+    "type": "object",
+    "required": [
+     "roads",
+     "attribution"
+    ],
+    "title": "ProposedRoads"
    },
    "QueueItem": {
     "properties": {
