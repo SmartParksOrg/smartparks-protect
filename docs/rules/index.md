@@ -42,7 +42,7 @@ The title is a template: `{entity}`, `{device}`, `{feature}`, `{metric}`, `{valu
 | Geofence enter | position | enter any geofence | `GEOFENCE_ENTER`, info |
 | Speed limit inside an area | position | `speed_kmh > 40` and inside any zone, for 30 s, cooldown 10 min | `SPEED_LIMIT_VIOLATION`, warning, alert |
 | Speeding | position | `speed_kmh > 60` anywhere, cooldown 10 min; scope it to the Vehicles type so a collar is never judged (a type in the scope takes its sub-types) | `SPEED_LIMIT_VIOLATION`, warning, alert |
-| Off the roads | position | farther than 50 m from every route for 120 s, cooldown 30 min; scope it to the Vehicles type; the routes are the roads imported from OpenStreetMap or drawn (phase 38) | `OFF_ROAD`, warning, alert |
+| Off the roads | position | farther than 50 m from every route for 120 s, cooldown 30 min; scope it to the Vehicles type; the routes are the roads imported from a file, drawn or combined (phase 38) | `OFF_ROAD`, warning, alert |
 | No data for 12 hours | schedule, every 5 min | no data for 12 h, cooldown 24 h | `NO_DATA`, warning, alert |
 | Battery low | measurement `battery_voltage` | `battery_voltage < 3.2`, cooldown 24 h | `BATTERY_LOW`, warning, alert |
 | Collar not moving | schedule, hourly | `max(activity, 12 h) < 1.0` with at least three status messages in the window and `battery_voltage > 3.2`, cooldown 12 h; `activity` is the change of the accelerometer vector between status messages (m/s²) | `POSSIBLE_IMMOBILITY`, critical, alert |

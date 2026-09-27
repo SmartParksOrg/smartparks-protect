@@ -566,6 +566,31 @@ export function EntityPage() {
                   </dl>
                 </CardContent>
               </Card>
+              {/* what matters first (Tim, 2026-09-27): the device's health beside the entity,
+                  the map and the picture under them, the device and the location source below */}
+              {current && (
+                <HealthCard
+                  health={device.data?.health}
+                  projectId={projectId}
+                  deviceId={current.device_id}
+                />
+              )}
+              <MiniMap
+                positions={positions.data ?? []}
+                point={fixedPlace}
+                to={`/projects/${projectId}/map?entity=${e.id}`}
+              />
+              {/* the picture and the map side by side, the same frame (decision D194) */}
+              <PictureCard
+                path={`/api/v1/projects/${projectId}/entities/${e.id}/picture`}
+                updatedAt={e.picture_updated_at}
+                name={e.name}
+                editable={admin}
+                invalidate={[
+                  queryKeys.entity(projectId, e.id),
+                  queryKeys.entities(projectId),
+                ]}
+              />
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("Device")}</CardTitle>
@@ -627,13 +652,6 @@ export function EntityPage() {
                   )}
                 </CardContent>
               </Card>
-              {type?.key === "fence_monitor" && (
-                <FenceLineCard
-                  projectId={projectId}
-                  entityId={e.id}
-                  canEdit={can("entities:write")}
-                />
-              )}
               <LocationSourceCard
                 key={`${e.location_source ?? "device"}-${e.location_fallback_hours ?? 24}`}
                 path={`/api/v1/projects/${projectId}/entities/${e.id}`}
@@ -642,29 +660,13 @@ export function EntityPage() {
                 invalidate={[queryKeys.entity(projectId, e.id)]}
                 canEdit={admin}
               />
-              {current && (
-                <HealthCard
-                  health={device.data?.health}
+              {type?.key === "fence_monitor" && (
+                <FenceLineCard
                   projectId={projectId}
-                  deviceId={current.device_id}
+                  entityId={e.id}
+                  canEdit={can("entities:write")}
                 />
               )}
-              {/* the picture and the map side by side, the same frame (decision D194) */}
-              <PictureCard
-                path={`/api/v1/projects/${projectId}/entities/${e.id}/picture`}
-                updatedAt={e.picture_updated_at}
-                name={e.name}
-                editable={admin}
-                invalidate={[
-                  queryKeys.entity(projectId, e.id),
-                  queryKeys.entities(projectId),
-                ]}
-              />
-              <MiniMap
-                positions={positions.data ?? []}
-                point={fixedPlace}
-                to={`/projects/${projectId}/map?entity=${e.id}`}
-              />
               <Card className="lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("Assignments")}</CardTitle>

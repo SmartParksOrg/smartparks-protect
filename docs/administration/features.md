@@ -27,26 +27,21 @@ attributes. A file holds at most 200 shapes at once; altitudes are dropped, and 
 of several parts is imported as one feature per part. A shapefile in a projection other than
 WGS 84 is reprojected when its `.prj` file is in the zip.
 
-## Roads from OpenStreetMap
+## Roads
 
-A road is made where every feature is made: **New feature**, type **route**, then "Roads from
-OpenStreetMap" under the map (phase 38, decision D300; Tim, 2026-09-27). Click inside the map for
-a box around the point, or hold Shift and drag the box you want (a plain drag moves the map).
-Every `highway` way OpenStreetMap knows there comes back as a faint line with its name (or its
-reference, or its kind: "Track", "Service"), the ways people walk on left out as the area
-proposal leaves them out. "Use" puts one road in the editor, where it can be corrected and named;
-tick several and "Use N as one route" keeps them together as one route, saved as it came. The
-OpenStreetMap way ids stay in the feature's attributes. The same bounds as the proposal: one read
-at a time, at most 25 km², and a refusal from OpenStreetMap is said plainly.
+A road network is a **route** feature, and the **Off the roads** rule template measures from
+every route of the project (phase 38, decision D300): a vehicle farther than 50 metres from all
+of them for two minutes raises `OFF_ROAD`. A route's panel on the live map and the Features list
+offer "Create rule" with that template. Roads reach the project in three ways, and none of them
+asks a map service (Tim, 2026-09-27: organisations have their roads in GIS already):
 
-Roads an organisation already has in GIS go through **Import** (below): the lines of a shapefile,
-KML, KMZ, GPX or GeoJSON become routes, one each, or with "Save the kept lines as one route" as
-one road network under a name.
-
-The routes are what the **Off the roads** rule template measures from: a vehicle farther than
-50 metres from every route for two minutes raises `OFF_ROAD`. A route's panel on the live map and
-the Features list offer "Create rule" with that template. Roads change; run the read again over
-the same box to add what is new, and remove what is gone by hand.
+- **Import** the file the organisation has: the lines of a shapefile, KML, KMZ, GPX or GeoJSON
+  become routes, one each, or with "Save the kept lines as one route" one road network under a
+  name.
+- **Draw** a route with New feature, type route.
+- **Combine** existing line features: tick the routes on the Features page and "Combine N into
+  one route" keeps them as one, the parts staying unless asked to go with it, so roads drawn or
+  imported one by one become the road network the rule reads.
 
 ## Propose an area from the map
 

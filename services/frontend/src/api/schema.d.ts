@@ -639,30 +639,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{project_id}/features/roads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Propose Roads
-         * @description The roads and tracks OpenStreetMap knows in a box (phase 38, decision D300): the
-         *     `highway` ways with the ways people walk on left out, longest first, each with its name (or
-         *     its reference, or its kind), so a person keeps the ones they want as route features and the
-         *     off-road rule has something to measure from. The same box bounds as the area proposal;
-         *     nothing is stored, and a 502 says OpenStreetMap did not answer.
-         */
-        post: operations["propose_roads_api_v1_projects__project_id__features_roads_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/projects/{project_id}/features/union": {
         parameters: {
             query?: never;
@@ -11586,29 +11562,6 @@ export interface components {
              */
             narrowed: boolean;
         };
-        /**
-         * ProposedRoad
-         * @description One road of a roads read (phase 38): the OpenStreetMap way as a line to keep.
-         */
-        ProposedRoad: {
-            /** Osm Id */
-            osm_id: number;
-            /** Name */
-            name: string;
-            /** Highway */
-            highway: string;
-            /** Geometry */
-            geometry: {
-                [key: string]: unknown;
-            };
-        };
-        /** ProposedRoads */
-        ProposedRoads: {
-            /** Roads */
-            roads: components["schemas"]["ProposedRoad"][];
-            /** Attribution */
-            attribution: string;
-        };
         /** QueueItem */
         QueueItem: {
             /** Id */
@@ -14818,41 +14771,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProposedAreas"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    propose_roads_api_v1_projects__project_id__features_roads_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                project_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProposeAreaRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposedRoads"];
                 };
             };
             /** @description Validation Error */

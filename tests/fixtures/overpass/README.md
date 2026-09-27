@@ -15,12 +15,3 @@ natural multipolygon relations.
 way: one element, way 1018618514 `leisure=nature_reserve` "Het Kraansvlak", 285 points,
 the tags cut to the five that matter. It is the area Tim looked for on openstreetmap.org
 and could not find by clicking (decision D273).
-
-`castricum_roads.json` is a real answer of overpass.openstreetmap.fr (Overpass API 0.7.62.7,
-OpenStreetMap data of 2026-09-27, ODbL) to the query `shared.domain.areas.roads_query` builds
-over the box 52.5380 to 52.5520 north and 4.6200 to 4.6500 east: the dune roads east of
-Castricum aan Zee (Geversweg, Oude Schulpweg, Bredeweg, a scouting path, tracks). Captured on
-2026-09-27 with curl and trimmed the same day: the `nodes` lists and `bounds` removed, the tags
-cut to highway, name, ref, surface, tracktype and maxspeed, coordinates rounded to six decimals.
-Twelve ways remain, five of them named, none of them footways, which the query leaves out.
-

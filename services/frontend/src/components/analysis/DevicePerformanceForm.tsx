@@ -14,9 +14,9 @@ import type {
   EntityType,
   Page as PageType,
 } from "@/api/types";
+import { DateRangeField } from "@/components/analysis/DateRangeField";
 import { MultiSelect } from "@/components/analytics/MultiSelect";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -35,7 +35,6 @@ import {
   type FormState,
 } from "@/lib/analyses";
 import { typePath } from "@/lib/entityTypes";
-import { inputValue } from "@/lib/records";
 
 const MAX_DEVICES = 100;
 const RANGES: [string, string][] = [
@@ -291,29 +290,13 @@ export function DevicePerformanceForm({
         </div>
         {state.range === "custom" && (
           <>
-            <Input
-              type="datetime-local"
-              className="h-8 w-48"
-              aria-label={t("From")}
-              value={inputValue(state.from)}
-              onChange={(ev) =>
+            <DateRangeField
+              from={state.from}
+              to={state.to}
+              onChange={(range) =>
                 onChange({
-                  from: ev.target.value
-                    ? new Date(ev.target.value).toISOString()
-                    : null,
-                })
-              }
-            />
-            <Input
-              type="datetime-local"
-              className="h-8 w-48"
-              aria-label={t("To")}
-              value={inputValue(state.to)}
-              onChange={(ev) =>
-                onChange({
-                  to: ev.target.value
-                    ? new Date(ev.target.value).toISOString()
-                    : null,
+                  from: range.from ? new Date(range.from).toISOString() : null,
+                  to: range.to ? new Date(range.to).toISOString() : null,
                 })
               }
             />

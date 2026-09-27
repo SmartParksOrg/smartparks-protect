@@ -343,7 +343,7 @@ OPENCOLLAR_HEALTH: tuple[HealthField, ...] = (
     HealthField("hardware_version", "Hardware", source="state", kind="text"),
     HealthField("gnss_satellites", "Satellites of the last fix"),
     HealthField("gnss_accuracy", "Accuracy of the last fix", unit="m", warn_above=30),
-    HealthField("gnss_time_to_fix", "Time to the last fix", unit="s", warn_above=120),
+    HealthField("gnss_time_to_fix", "Time to fix", unit="s", warn_above=120),
     HealthField("lr_satellites", "LoRa satellites"),
     HealthField("flash_used_percent", "Flash used", unit="%", warn_above=80, critical_above=95),
     # the fence port (phase 32): the wire a FenceEdge listens on, and the switch a TrapEdge

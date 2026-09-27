@@ -13,6 +13,7 @@ import type {
   EntityType,
   Page as PageType,
 } from "@/api/types";
+import { DateRangeField } from "@/components/analysis/DateRangeField";
 import { useResolveSubjects } from "@/components/analysis/subjects";
 import { MultiSelect } from "@/components/analytics/MultiSelect";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,6 @@ import {
   vehicleParameters,
   withGroupMembers,
 } from "@/lib/analyses";
-import { inputValue } from "@/lib/records";
 
 /** The server holds the same bound (`MAX_SUBJECTS_VEHICLE`). */
 const MAX_SUBJECTS = 25;
@@ -240,19 +240,10 @@ export function VehicleForm({
         </div>
         {state.range === "custom" && (
           <>
-            <Input
-              type="datetime-local"
-              aria-label={t("From")}
-              className="h-8 w-48"
-              value={inputValue(state.from)}
-              onChange={(ev) => onChange({ from: ev.target.value })}
-            />
-            <Input
-              type="datetime-local"
-              aria-label={t("To")}
-              className="h-8 w-48"
-              value={inputValue(state.to)}
-              onChange={(ev) => onChange({ to: ev.target.value })}
+            <DateRangeField
+              from={state.from}
+              to={state.to}
+              onChange={onChange}
             />
           </>
         )}

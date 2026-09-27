@@ -79,9 +79,10 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "name": "Off the roads",
         "description": (
             "A vehicle farther than 50 metres from every route of the project for two minutes "
-            "(phase 38, decision D300): the roads and tracks imported from OpenStreetMap or "
-            "drawn by hand. Reminds every half hour while it stays off them. Scope the rule to "
-            "the vehicle type; a fix less accurate than 50 metres does not count."
+            "(phase 38, decision D300): the roads and tracks imported from a file, drawn by "
+            "hand or combined from other lines. Reminds every half hour while it stays off "
+            "them. Scope the rule to the vehicle type; a fix less accurate than 50 metres does "
+            "not count."
         ),
         "document": {
             "trigger": {"kind": "position"},

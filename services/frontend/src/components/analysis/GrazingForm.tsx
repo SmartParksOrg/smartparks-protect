@@ -15,6 +15,7 @@ import type {
   Feature,
   Page as PageType,
 } from "@/api/types";
+import { DateRangeField } from "@/components/analysis/DateRangeField";
 import { membersOf, useResolveSubjects } from "@/components/analysis/subjects";
 import { MultiSelect } from "@/components/analytics/MultiSelect";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,6 @@ import {
   withGroupMembers,
   isManagementUnit,
 } from "@/lib/analyses";
-import { inputValue } from "@/lib/records";
 
 const MAX_ANIMALS = 100;
 const MAX_AREAS = 50;
@@ -281,19 +281,10 @@ export function GrazingForm({
         </div>
         {state.range === "custom" && (
           <>
-            <Input
-              type="datetime-local"
-              aria-label={t("From")}
-              className="h-8 w-48"
-              value={inputValue(state.from)}
-              onChange={(ev) => onChange({ from: ev.target.value })}
-            />
-            <Input
-              type="datetime-local"
-              aria-label={t("To")}
-              className="h-8 w-48"
-              value={inputValue(state.to)}
-              onChange={(ev) => onChange({ to: ev.target.value })}
+            <DateRangeField
+              from={state.from}
+              to={state.to}
+              onChange={onChange}
             />
           </>
         )}

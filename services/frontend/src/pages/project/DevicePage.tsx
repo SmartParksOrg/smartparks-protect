@@ -569,13 +569,12 @@ export function DevicePage() {
                   </dl>
                 </CardContent>
               </Card>
-              <LocationSourceCard
-                key={`${d.location_source ?? "device"}-${d.location_fallback_hours ?? 24}`}
-                path={`/api/v1/devices/${d.id}`}
-                value={d.location_source ?? "device"}
-                fallbackHours={d.location_fallback_hours ?? 24}
-                invalidate={[queryKeys.device(d.id), ["devices"]]}
-                canEdit={Boolean(user?.is_superuser)}
+              {/* what matters first (Tim, 2026-09-27): the health beside the device, the map
+                  and the location source under them, the settings cards below */}
+              <HealthCard
+                health={d.health}
+                projectId={deviceProjectId}
+                deviceId={d.id}
               />
               {projectId && (
                 <MiniMap
@@ -587,6 +586,14 @@ export function DevicePage() {
                   }
                 />
               )}
+              <LocationSourceCard
+                key={`${d.location_source ?? "device"}-${d.location_fallback_hours ?? 24}`}
+                path={`/api/v1/devices/${d.id}`}
+                value={d.location_source ?? "device"}
+                fallbackHours={d.location_fallback_hours ?? 24}
+                invalidate={[queryKeys.device(d.id), ["devices"]]}
+                canEdit={Boolean(user?.is_superuser)}
+              />
               <BatteryCard
                 deviceId={d.id}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}
@@ -606,11 +613,6 @@ export function DevicePage() {
               <ReportingCard
                 deviceId={d.id}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}
-              />
-              <HealthCard
-                health={d.health}
-                projectId={deviceProjectId}
-                deviceId={d.id}
               />
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -676,10 +678,7 @@ export function DevicePage() {
                         {t("Release")}
                       </Button>
                     ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => setAssigning("entity")}
-                      >
+                      <Button size="sm" onClick={() => setAssigning("entity")}>
                         {t("Assign to entity")}
                       </Button>
                     ))}
