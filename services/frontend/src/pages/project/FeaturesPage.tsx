@@ -27,7 +27,8 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
 import { CombineFeaturesDialog } from "@/components/features/CombineFeaturesDialog";
 import { ImportFeaturesDialog } from "@/components/features/ImportFeaturesDialog";
-import { RoadsDialog } from "@/components/features/RoadsDialog";
+import { ProposedRoads } from "@/components/features/ProposedRoads";
+import { type ProposedRoad, useProposeRoads } from "@/hooks/useProposeRoads";
 import { DrawMap } from "@/components/map/DrawMap";
 import { boundsOf, geometryBounds, type Bounds } from "@/components/map/fit";
 import { drawKindFor } from "@/components/map/featureTools";
@@ -102,8 +103,6 @@ export function FeaturesPage() {
   });
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  // roads from OpenStreetMap as route features (phase 38, decision D300)
-  const [roadsOpen, setRoadsOpen] = useState(false);
   // rows ticked for combining (decision D274): only areas can make a zone between them
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [combineOpen, setCombineOpen] = useState(false);
@@ -137,6 +136,22 @@ export function FeaturesPage() {
     },
     [proposal],
   );
+  // roads from OpenStreetMap for a new route (phase 38, decision D300): the same gesture on
+  // the same map, reading the highways of the box instead of the areas (Tim, 2026-09-27: a
+  // road is made where every feature is made, under New feature)
+  const [roadsMode, setRoadsMode] = useState(false);
+  const roads = useProposeRoads(projectId);
+  const roadsBox = useCallback(
+    (box: ReadBox) => {
+      if (roads.isPending) return;
+      setReading(box);
+      if (readVerdict(box).tooLarge) return;
+      roads.ask(box);
+    },
+    [roads],
+  );
+  // where a route came from, kept on the feature so a later read can tell it apart
+  const [origin, setOrigin] = useState<Record<string, unknown> | null>(null);
   const searchByName = (name: string) => {
     const bounds = view.current ?? around;
     if (!bounds) return;
@@ -153,7 +168,9 @@ export function FeaturesPage() {
   } | null>(null);
   const takeShape = (geometry: GeoJSON.Geometry) => {
     setProposing(false);
+    setRoadsMode(false);
     proposal.reset();
+    roads.reset();
     if (heldByEditor(geometry)) {
       setKept(null);
       setLoaded({ geometry });
@@ -175,17 +192,50 @@ export function FeaturesPage() {
       { onSuccess: (combined) => takeShape(combined.geometry) },
     );
   };
+  const pickRoad = (road: ProposedRoad) => {
+    setOrigin({
+      imported_from: "openstreetmap",
+      osm_id: road.osm_id,
+      highway: road.highway,
+    });
+    takeShape(road.geometry);
+    if (!form.getValues("name")) form.setValue("name", road.name);
+  };
+  // the ticked roads as one route: a MultiLineString, which the editor keeps as it came
+  const combineRoads = (chosen: ProposedRoad[]) => {
+    setOrigin({
+      imported_from: "openstreetmap",
+      osm_ids: chosen.map((r) => r.osm_id),
+    });
+    takeShape(
+      chosen.length === 1
+        ? chosen[0].geometry
+        : {
+            type: "MultiLineString",
+            coordinates: chosen.map(
+              (r) => (r.geometry as GeoJSON.LineString).coordinates,
+            ),
+          },
+    );
+  };
   const closeDialog = () => {
     setOpen(false);
     setProposing(false);
+    setRoadsMode(false);
     setLoaded(null);
     setKept(null);
+    setOrigin(null);
     proposal.reset();
+    roads.reset();
   };
   const create = useMutationToast({
     mutationFn: (values: Values) =>
       api.post<Feature>(`/api/v1/projects/${projectId}/features`, {
-        body: { ...values, geometry: kept?.geometry ?? geometry },
+        body: {
+          ...values,
+          geometry: kept?.geometry ?? geometry,
+          ...(origin ? { attributes: origin } : {}),
+        },
       }),
     invalidate: [queryKeys.features(projectId)],
     success: t("Feature created"),
@@ -280,11 +330,6 @@ export function FeaturesPage() {
                 <Upload className="size-4" /> {t("Import")}
               </Button>
             )}
-            {can("features:write") && (
-              <Button variant="outline" onClick={() => setRoadsOpen(true)}>
-                <RouteIcon className="size-4" /> {t("Roads")}
-              </Button>
-            )}
             <Button onClick={() => setOpen(true)}>
               <Plus className="size-4" /> {t("New feature")}
             </Button>
@@ -311,12 +356,6 @@ export function FeaturesPage() {
           }
         />
       </Page>
-      <RoadsDialog
-        projectId={projectId}
-        open={roadsOpen}
-        onOpenChange={setRoadsOpen}
-        around={around}
-      />
       <ImportFeaturesDialog
         projectId={projectId}
         open={importOpen}
@@ -387,14 +426,14 @@ export function FeaturesPage() {
                 kind={drawKindFor(form.watch("feature_type"))}
                 around={around}
                 onChange={setGeometry}
-                proposing={proposing}
-                onProposeBox={proposeBox}
+                proposing={proposing || roadsMode}
+                onProposeBox={roadsMode ? roadsBox : proposeBox}
                 onProposePreview={setPreview}
                 onRefused={(geometry) => {
                   setLoaded(null);
                   setKept({ geometry, ...shapeParts(geometry) });
                 }}
-                reading={proposal.isPending ? reading : null}
+                reading={proposal.isPending || roads.isPending ? reading : null}
                 ghosts={
                   kept
                     ? [
@@ -406,13 +445,58 @@ export function FeaturesPage() {
                           clipped: false,
                         },
                       ]
-                    : (proposal.data?.candidates ?? [])
+                    : roadsMode
+                      ? (roads.data?.roads ?? []).map((r) => ({
+                          kind: "osm",
+                          name: r.name,
+                          geometry: r.geometry,
+                          area_m2: 0,
+                          clipped: false,
+                        }))
+                      : (proposal.data?.candidates ?? [])
                 }
                 load={loaded}
                 onView={(bounds) => {
                   view.current = bounds;
                 }}
               />
+            )}
+            {form.watch("feature_type") === "route" && (
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant={roadsMode ? "default" : "outline"}
+                  size="sm"
+                  aria-pressed={roadsMode}
+                  onClick={() => {
+                    setRoadsMode((m) => !m);
+                    setReading(null);
+                    roads.cancel();
+                  }}
+                >
+                  <RouteIcon className="size-4" />{" "}
+                  {t("Roads from OpenStreetMap")}
+                </Button>
+                {roadsMode && (
+                  <ProposedRoads
+                    roads={roads.data ?? null}
+                    busy={roads.isPending}
+                    error={roads.error?.message ?? null}
+                    reading={preview ?? reading}
+                    onPick={pickRoad}
+                    onCombine={combineRoads}
+                    onCancel={roads.cancel}
+                  />
+                )}
+                {kept && (
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      "This route is kept in {{count}} pieces, which the editor cannot correct by hand. It is saved as it is.",
+                      { count: kept.parts },
+                    )}
+                  </p>
+                )}
+              </div>
             )}
             {drawKindFor(form.watch("feature_type")) === "polygon" && (
               <div className="space-y-2">

@@ -143,10 +143,13 @@ export interface BoxGesture {
 }
 
 /**
- * Propose mode's gestures on a map: a click reads the default box around the point, a drag
- * reads the box it draws. While a drag is under way the map does not pan, the box follows the
- * pointer, and letting go asks for it. A tap on a touch screen arrives as a click, which is
- * why the click handler ignores one that follows a mouse gesture it already served.
+ * Propose mode's gestures on a map: a click reads the default box around the point, and a
+ * drag with Shift held reads the box it draws. A plain drag moves the map (Tim, 2026-09-27:
+ * with every drag reading a box there was no way to move to another part of the map first).
+ * While a Shift drag is under way the map does not pan, the box follows the pointer, and
+ * letting go asks for it; MapLibre's own Shift box zoom rests meanwhile. A tap on a touch
+ * screen arrives as a click, which is why the click handler ignores one that follows a mouse
+ * gesture it already served.
  */
 export function bindBoxGestures(
   map: MapLibreMap,
@@ -173,7 +176,9 @@ export function bindBoxGestures(
   const onDown = (e: {
     point: { x: number; y: number };
     lngLat: { lng: number; lat: number };
+    originalEvent?: { shiftKey?: boolean };
   }) => {
+    if (!e.originalEvent?.shiftKey) return; // a plain drag pans
     from = { point: { ...e.point }, lngLat: [e.lngLat.lng, e.lngLat.lat] };
     map.dragPan.disable();
   };
@@ -213,6 +218,8 @@ export function bindBoxGestures(
     if (Date.now() - servedAt < 400) return;
     finish(boxAround(e.lngLat.lng, e.lngLat.lat, reachM), false);
   };
+  const boxZoomWasOn = map.boxZoom.isEnabled();
+  map.boxZoom.disable();
   map.on("mousedown", onDown);
   map.on("mousemove", onMove);
   map.on("mouseup", onUp);
@@ -223,6 +230,7 @@ export function bindBoxGestures(
     map.off("mouseup", onUp);
     map.off("click", onClick);
     map.dragPan.enable();
+    if (boxZoomWasOn) map.boxZoom.enable();
     onPreview(null);
   };
 }

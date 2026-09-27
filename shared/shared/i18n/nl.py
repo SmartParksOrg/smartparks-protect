@@ -100,6 +100,7 @@ NL: dict[str, str] = {
     "No vegetation layer: this server has no environmental data provider yet. A server admin sets one up under Server admin, Environmental data.": "Geen vegetatielaag: deze server heeft nog geen omgevingsdataprovider. Een serverbeheerder richt er een in onder Serverbeheer, Omgevingsdata.",
     "The vegetation layer could not be read ({error}); the run is complete without it.": "De vegetatielaag kon niet worden gelezen ({error}); de analyse is compleet zonder die laag.",
     "{name}: only {share} percent of the weeks have a cloud-free observation.": "{name}: slechts {share} procent van de weken heeft een wolkenvrije waarneming.",
+    "Only {share} percent of the fixes of {name} carry a reported speed; the rest of its speeds are means over a step, and speeding is judged where a speed was reported alone.": "Slechts {share} procent van de fixes van {name} draagt een gerapporteerde snelheid; de overige snelheden zijn gemiddelden over een stap, en te hard rijden wordt alleen beoordeeld waar een snelheid is gerapporteerd.",
     "The subject changed device inside the period, on {when}.": "Het onderwerp wisselde binnen de periode van apparaat, op {when}.",
     "No value for '{key}' on {names}; they count as one animal each.": "Geen waarde voor '{key}' bij {names}; ze tellen elk als één dier.",
     "No fixes in the main period.": "Geen fixes in de hoofdperiode.",

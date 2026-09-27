@@ -20,6 +20,8 @@ import type { Track } from "@/api/types";
 import {
   ACCURACY_CLASSES,
   ANALYSIS_KINDS,
+  SPEED_CLASS_STARTS,
+  SPEED_RAMP,
   INTENSITY_RAMP,
   accuracyColor,
   bindAnalysisClicks,
@@ -483,7 +485,16 @@ export function ResultMap({
     coverage: t("Coverage of the fixes"),
     gateway: t("Gateways heard"),
     contact: t("Where pairs met"),
+    trip_segment: t("Trips by speed"),
+    trip_start: t("Trip starts"),
+    trip_end: t("Trip ends"),
+    speeding: t("Speeding"),
   };
+  // the speed legend reads against the run's limit (vehicle use)
+  const limitKmh = Number(
+    (document.provenance as { parameters?: { limit_kmh?: number } }).parameters
+      ?.limit_kmh ?? 0,
+  );
   const uplinkShare =
     typeof picked?.share === "number" && typeof picked?.uplinks === "number"
       ? { share: picked.share, uplinks: picked.uplinks }
@@ -654,6 +665,42 @@ export function ResultMap({
                   <dd>{picked.visits}</dd>
                 </>
               )}
+              {typeof picked.speed_kmh === "number" && (
+                <>
+                  <dt>{t("Speed here")}</dt>
+                  <dd>{t("{{value}} km/h", { value: picked.speed_kmh })}</dd>
+                </>
+              )}
+              {typeof picked.top_kmh === "number" && (
+                <>
+                  <dt>{t("Top speed")}</dt>
+                  <dd>{t("{{value}} km/h", { value: picked.top_kmh })}</dd>
+                </>
+              )}
+              {typeof picked.distance_km === "number" && (
+                <>
+                  <dt>{t("Distance")}</dt>
+                  <dd>{t("{{value}} km", { value: picked.distance_km })}</dd>
+                </>
+              )}
+              {typeof picked.duration_min === "number" && (
+                <>
+                  <dt>{t("Duration")}</dt>
+                  <dd>{t("{{value}} min", { value: picked.duration_min })}</dd>
+                </>
+              )}
+              {typeof picked.from === "string" && (
+                <>
+                  <dt>{t("From")}</dt>
+                  <dd>{picked.from}</dd>
+                </>
+              )}
+              {typeof picked.to === "string" && (
+                <>
+                  <dt>{t("To")}</dt>
+                  <dd>{picked.to}</dd>
+                </>
+              )}
               {typeof picked.period === "string" && (
                 <>
                   <dt>{t("Period")}</dt>
@@ -663,6 +710,21 @@ export function ResultMap({
             </dl>
           </div>
         )}
+        {document.geometries.trip_segment &&
+          !hidden.includes("trip_segment") &&
+          limitKmh > 0 && (
+            <MapLegend
+              title={t("Speed (km/h)")}
+              colors={SPEED_RAMP}
+              values={SPEED_CLASS_STARTS.map((share) =>
+                String(Math.round(share * limitKmh)),
+              )}
+              hint={t(
+                "The path by speed against the limit of {{limit}} km/h; the number is the speed each colour starts at",
+                { limit: limitKmh },
+              )}
+            />
+          )}
         {byDevice && !hidden.includes("points") && (
           <MapLegend
             title={t("Fix accuracy (m)")}

@@ -15,6 +15,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import numpy as np
+from numpy.typing import NDArray
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +45,7 @@ from shared.analysis.primitives.trajectory import (
 )
 from shared.analysis.primitives.trips import (
     Speeding,
+    Trip,
     moving_steps,
     segment_trips,
     speeding_episodes,
@@ -60,8 +62,16 @@ KMH = 3.6
 SPEED_EDGES_KMH = [0, 10, 20, 30, 40, 50, 60, 70, 80, 100, 120, np.inf]
 SPEED_LABELS = ["<10", "10", "20", "30", "40", "50", "60", "70", "80", "100", ">120"]
 FEW_FIXES = 10
+#: Below this share of fixes with a reported speed the run says the speeds are mostly means.
+FEW_SPEEDS_SHARE = 0.5
 #: Trips and speeding rows a run keeps per subject; the rest is counted.
 MAX_TRIP_ROWS = 500
+#: The speed classes of a trip's segments, as a share of the limit: well under, under, at,
+#: over, far over. Green to red on the map, the way fleet tools and sport apps colour a path
+#: (Tim, 2026-09-27); merged runs of one class keep the geometry count in hand.
+SPEED_CLASS_EDGES = (0.5, 0.85, 1.0, 1.25)
+#: Segment geometries per subject before a trip is drawn as one line in its top speed's class.
+SEGMENT_BUDGET = 1500
 
 #: The summary's keys in the order the table shows them.
 METRICS: list[str] = [
@@ -144,6 +154,51 @@ def _place(lat: float, lon: float, sites: list[Site], radius_m: float) -> str:
     return best[1] if best else f"{lat:.4f}, {lon:.4f}"
 
 
+def speed_class(level: float) -> int:
+    """The class of a speed given as a share of the limit, 0 to 4."""
+    for index, edge in enumerate(SPEED_CLASS_EDGES):
+        if level < edge:
+            return index
+    return len(SPEED_CLASS_EDGES)
+
+
+def _step_kmh(track: Trajectory, s: Any, i: int) -> float:
+    """The speed of step i in km/h: the faster of the speeds its two fixes reported (a step
+    that leaves a parked fix reporting zero is as fast as its arrival says), else the mean over
+    the step."""
+    ends = [float(v) for v in (track.speed_mps[i], track.speed_mps[i + 1]) if np.isfinite(v)]
+    if ends:
+        return max(ends) * KMH
+    return float(s.speed_mps[i]) * KMH if np.isfinite(s.speed_mps[i]) else 0.0
+
+
+def trip_segments(
+    track: Trajectory, s: Any, moving: NDArray[np.bool_], trip: Trip, limit_kmh: float
+) -> list[tuple[int, int, float, int]]:
+    """The trip cut into runs of one speed class: `(start_index, end_index, top_kmh, class)`
+    per run, consecutive moving steps of the same class joined, still steps folded into the
+    run around them."""
+    runs: list[tuple[int, int, float, int]] = []
+    current: list[Any] | None = None
+    for i in range(trip.start_index, trip.end_index):
+        if not moving[i]:
+            if current is not None:
+                current[1] = i + 1
+            continue
+        kmh = _step_kmh(track, s, i)
+        klass = speed_class(kmh / limit_kmh)
+        if current is not None and current[3] == klass:
+            current[1] = i + 1
+            current[2] = max(current[2], kmh)
+        else:
+            if current is not None:
+                runs.append((current[0], current[1], current[2], current[3]))
+            current = [i, i + 1, kmh, klass]
+    if current is not None:
+        runs.append((current[0], current[1], current[2], current[3]))
+    return runs
+
+
 def _line(track: Trajectory, start: int, end: int) -> list[list[float]]:
     """The distinct consecutive points of a stretch of the folded track, [lon, lat]."""
     out: list[list[float]] = []
@@ -206,6 +261,19 @@ def analyse_vehicle(
                 ),
             )
         )
+    elif with_speed < n * FEW_SPEEDS_SHARE:
+        warnings.append(
+            Warning(
+                code="few_reported_speeds",
+                level="notice",
+                subject_id=subject.id,
+                text=(
+                    f"Only {round(100 * with_speed / n)} percent of the fixes of {subject.name} "
+                    "carry a reported speed; the rest of its speeds are means over a step, and "
+                    "speeding is judged where a speed was reported alone."
+                ),
+            )
+        )
 
     trips = segment_trips(
         track, s, moving_mps=params.moving_kmh / KMH, stop_s=params.stop_minutes * 60
@@ -258,6 +326,7 @@ def analyse_vehicle(
             [
                 subject.name,
                 period.key,
+                k,
                 _iso(trip.start_s),
                 _iso(trip.end_s),
                 round(trip.duration_s / 60, 1),
@@ -272,28 +341,61 @@ def analyse_vehicle(
                 "gap" if trip.cut_by_gap else "stop",
             ]
         )
-        line = _line(track, trip.start_index, trip.end_index)
-        if len(line) >= 2:
+        about = {
+            "period": period.key,
+            "trip": k,
+            "start": _iso(trip.start_s),
+            "end": _iso(trip.end_s),
+            "distance_km": round(trip.distance_m / 1000, 3),
+            "duration_min": round(trip.duration_s / 60, 1),
+            "top_kmh": top_kmh,
+            "limit_kmh": params.limit_kmh,
+            "from": start_place,
+            "to": end_place,
+        }
+        title = f"{subject.name}: trip {k}, {trip.distance_m / 1000:.1f} km, top {top_kmh:.0f} km/h"
+        # the path in runs of one speed class, green to red against the limit; past the
+        # budget a trip is one line in the class of its top speed
+        runs = (
+            trip_segments(track, s, moving, trip, params.limit_kmh)
+            if len(result.geometries) < SEGMENT_BUDGET
+            else [
+                (trip.start_index, trip.end_index, top_kmh, speed_class(top_kmh / params.limit_kmh))
+            ]
+        )
+        for start_i, end_i, run_kmh, klass in runs:
+            line = _line(track, start_i, end_i)
+            if len(line) < 2:
+                continue
             result.geometries.append(
                 Geometry(
-                    kind="trip",
+                    kind="trip_segment",
                     subject_id=subject.id,
-                    label=(
-                        f"{subject.name}: trip {k}, {trip.distance_m / 1000:.1f} km, "
-                        f"top {top_kmh:.0f} km/h"
-                    ),
-                    level=round(min(trip.top_mps * KMH / params.limit_kmh, 2.0), 3),
+                    label=title,
+                    level=round(min(run_kmh / params.limit_kmh, 2.0), 3),
                     geojson={"type": "LineString", "coordinates": line},
-                    properties={
-                        "period": period.key,
-                        "start": _iso(trip.start_s),
-                        "end": _iso(trip.end_s),
-                        "distance_km": round(trip.distance_m / 1000, 3),
-                        "duration_min": round(trip.duration_s / 60, 1),
-                        "top_kmh": top_kmh,
-                        "from": start_place,
-                        "to": end_place,
+                    properties={**about, "speed_kmh": round(run_kmh, 1), "speed_class": klass},
+                )
+            )
+        # a numbered marker where the trip began and where it ended
+        for kind, index, place in (
+            ("trip_start", trip.start_index, start_place),
+            ("trip_end", trip.end_index, end_place),
+        ):
+            result.geometries.append(
+                Geometry(
+                    kind=kind,
+                    subject_id=subject.id,
+                    label=f"{title}; {'from' if kind == 'trip_start' else 'to'} {place}",
+                    level=None,
+                    geojson={
+                        "type": "Point",
+                        "coordinates": [
+                            round(float(track.lon[index]), 6),
+                            round(float(track.lat[index]), 6),
+                        ],
                     },
+                    properties={**about, "short": str(k)},
                 )
             )
 
@@ -395,6 +497,7 @@ def _speeding_figures(
                     "end": _iso(episode.end_s),
                     "top_kmh": top_kmh,
                     "limit_kmh": params.limit_kmh,
+                    "short": f"{top_kmh:.0f}",
                 },
             )
         )
@@ -450,7 +553,7 @@ def build_document(
                 mean_row.append(_round(sum(column) / len(column)) if len(column) >= 2 else None)
             rows.append(mean_row)
     # the trips worst first: the fastest at the top, as the design asks
-    trips.sort(key=lambda row: -float(row[7]))
+    trips.sort(key=lambda row: -float(row[8]))
     speeding.sort(key=lambda row: -float(row[5]))
     tables = [
         Table(key="summary", columns=["subject", "period", *METRICS], rows=rows),
@@ -459,6 +562,7 @@ def build_document(
             columns=[
                 "subject",
                 "period",
+                "trip",
                 "start",
                 "end",
                 "duration_min",

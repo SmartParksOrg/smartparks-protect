@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -148,11 +149,17 @@ export function ImportFeaturesDialog({
   const [saving, setSaving] = useState<{ done: number; total: number } | null>(
     null,
   );
+  // a road network from a GIS file is many lines that are one thing to the people who drive
+  // it (Tim, 2026-09-27): the kept lines may be saved as one route
+  const [asOne, setAsOne] = useState(false);
+  const [oneName, setOneName] = useState("");
   const reset = useCallback(() => {
     setRows([]);
     setFileName(null);
     setError(null);
     setSaving(null);
+    setAsOne(false);
+    setOneName("");
   }, []);
   const read = async (file: File) => {
     setError(null);
@@ -169,7 +176,46 @@ export function ImportFeaturesDialog({
     }
   };
   const kept = rows.filter((r) => r.keep);
+  const allLines =
+    kept.length > 1 &&
+    kept.every(
+      (r) =>
+        r.geometry.type === "LineString" ||
+        r.geometry.type === "MultiLineString",
+    );
   const save = async () => {
+    if (asOne && allLines) {
+      setSaving({ done: 0, total: 1 });
+      try {
+        await api.post<Feature>(`/api/v1/projects/${projectId}/features`, {
+          body: {
+            name: oneName.trim() || fileName || t("Roads"),
+            feature_type: "route",
+            geometry: {
+              type: "MultiLineString",
+              coordinates: kept.flatMap((r) =>
+                r.geometry.type === "LineString"
+                  ? [r.geometry.coordinates]
+                  : (r.geometry as GeoJSON.MultiLineString).coordinates,
+              ),
+            },
+            attributes: { imported_from: fileName, parts: kept.length },
+          },
+        });
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.features(projectId),
+        });
+        toast.success(
+          t("One route saved from {{count}} lines", { count: kept.length }),
+        );
+        reset();
+        onOpenChange(false);
+      } catch (e) {
+        setSaving(null);
+        setError(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
     setSaving({ done: 0, total: kept.length });
     const failed: string[] = [];
     for (const [index, row] of kept.entries()) {
@@ -338,6 +384,27 @@ export function ImportFeaturesDialog({
             </>
           )}
         </div>
+        {allLines && (
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <label className="flex items-center gap-2">
+              <Switch
+                checked={asOne}
+                onCheckedChange={setAsOne}
+                aria-label={t("Save the kept lines as one route")}
+              />
+              {t("Save the kept lines as one route")}
+            </label>
+            {asOne && (
+              <Input
+                className="h-8 w-56"
+                value={oneName}
+                placeholder={t("Name of the route")}
+                aria-label={t("Name of the route")}
+                onChange={(e) => setOneName(e.target.value)}
+              />
+            )}
+          </div>
+        )}
         <DialogFooter>
           {saving && (
             <span className="mr-auto self-center text-xs text-muted-foreground">
@@ -356,7 +423,9 @@ export function ImportFeaturesDialog({
             disabled={kept.length === 0 || saving !== null}
             onClick={() => void save()}
           >
-            {t("Import {{count}} features", { count: kept.length })}
+            {asOne && allLines
+              ? t("Save as one route")
+              : t("Import {{count}} features", { count: kept.length })}
           </Button>
         </DialogFooter>
       </DialogContent>

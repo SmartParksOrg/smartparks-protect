@@ -193,7 +193,7 @@ export function DrawMap({
         <span>
           {proposing
             ? t(
-                "Click inside the area you want, or drag a box over the ground to read",
+                "Click inside the area you want, or hold Shift and drag a box over the ground to read; a plain drag moves the map",
               )
             : kind === "point"
               ? t("Click to place the site")

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   PRESSURE_RAMP,
+  SPEED_RAMP,
   boundsOfFeatures,
   decorateAnalysisFeatures,
   pressureColor,
+  speedColor,
 } from "./analysisLayers";
 
 const feature = (
@@ -99,5 +101,31 @@ describe("analysis layers", () => {
     expect(pressureColor(null)).toBe(PRESSURE_RAMP[0]);
     expect(pressureColor(1)).toBe(PRESSURE_RAMP[2]);
     expect(pressureColor(0.5)).toBe(PRESSURE_RAMP[1]);
+  });
+  it("colours a trip's path by speed against the limit and its markers by kind", () => {
+    expect(speedColor(0.2)).toBe(SPEED_RAMP[0]);
+    expect(speedColor(0.9)).toBe(SPEED_RAMP[2]);
+    expect(speedColor(1.1)).toBe(SPEED_RAMP[3]);
+    expect(speedColor(2)).toBe(SPEED_RAMP[4]);
+    expect(speedColor(null)).toBe(SPEED_RAMP[0]);
+    const line: GeoJSON.Feature = {
+      type: "Feature",
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+      },
+      properties: { kind: "trip_segment", level: 1.3, subject_id: "a" },
+    };
+    const start: GeoJSON.Feature = {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { kind: "trip_start", subject_id: "a", short: "1" },
+    };
+    const [l, s] = decorateAnalysisFeatures([line, start], () => "#111111");
+    expect(l.properties?.color).toBe(SPEED_RAMP[4]);
+    expect(s.properties?.color).toBe("#52735E");
   });
 });

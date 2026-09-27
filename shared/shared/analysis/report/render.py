@@ -16,7 +16,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import CSS, HTML
 
 from shared.analysis.report.charts import PALETTE, chart_svg
-from shared.analysis.report.mapimage import PRESSURE_RAMP, MapPicture
+from shared.analysis.report.mapimage import PRESSURE_RAMP, SPEED_RAMP, MapPicture
 
 TEMPLATES = Path(__file__).parent / "templates"
 ASSETS = Path(__file__).parent / "assets"
@@ -1009,8 +1009,10 @@ KIND_LEGEND: dict[str, str] = {
     "cluster": "Clusters of fixes",
     "coverage": "Coverage of the fixes: the hull around a device's valid fixes, in its colour",
     "gateway": "Gateways heard: a marker per gateway, larger for a bigger share of the uplinks",
-    "trip": "Trips: the path of each trip in the vehicle's colour",
-    "speeding": "Speeding: a marker where the fastest reported speed of an episode was",
+    "trip_segment": "Trips by speed against the limit, from well under (green) to far over (red)",
+    "trip_start": "Where a trip began, with its number",
+    "trip_end": "Where a trip ended, with its number",
+    "speeding": "Speeding: a marker where an episode was fastest, with the speed",
 }
 #: Above this many subjects the legend names the colours in the sections instead.
 LEGEND_MAX_SUBJECTS = 12
@@ -1030,8 +1032,6 @@ def map_legend(document: dict[str, Any], colors: dict[str, str]) -> list[dict[st
         "cluster",
         "coverage",
         "gateway",
-        "trip",
-        "speeding",
     }
     if any(k in coloured for k in kinds):
         if len(subjects) <= LEGEND_MAX_SUBJECTS:
@@ -1053,7 +1053,9 @@ def map_legend(document: dict[str, Any], colors: dict[str, str]) -> list[dict[st
             entries.append(
                 {"kind": "ramp", "colors": list(PRESSURE_RAMP), "text": KIND_LEGEND[kind]}
             )
-        elif kind in ("gateway", "speeding"):
+        elif kind == "trip_segment":
+            entries.append({"kind": "ramp", "colors": list(SPEED_RAMP), "text": KIND_LEGEND[kind]})
+        elif kind in ("gateway", "speeding", "trip_start", "trip_end"):
             entries.append({"kind": "marker", "text": KIND_LEGEND[kind]})
         else:
             entries.append({"kind": "outline", "text": KIND_LEGEND[kind]})

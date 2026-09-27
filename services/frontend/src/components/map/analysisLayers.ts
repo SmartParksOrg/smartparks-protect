@@ -44,7 +44,41 @@ export const ANALYSIS_KINDS = [
   "cluster",
   "coverage",
   "gateway",
+  "trip_segment",
+  "trip_start",
+  "trip_end",
+  "speeding",
 ] as const;
+
+/** A trip's path by speed against the limit (vehicle use, phase 39): well under, under, at,
+ * over and far over, green to red, the way fleet tools and sport apps colour a path so the
+ * fast stretches read at a glance (Tim, 2026-09-27). `SPEED_CLASS_EDGES` in the module cut the
+ * classes; the report's `SPEED_RAMP` holds the same five colours. */
+export const SPEED_RAMP = [
+  "#3C8D5A",
+  "#8FBF4D",
+  "#E3B23C",
+  "#D9622B",
+  "#A13D2D",
+] as const;
+/** What each speed class starts at, as a share of the limit. */
+export const SPEED_CLASS_STARTS = [0, 0.5, 0.85, 1, 1.25] as const;
+export function speedColor(level: number | null | undefined): string {
+  if (level === null || level === undefined || !Number.isFinite(level))
+    return SPEED_RAMP[0];
+  if (level < 0.5) return SPEED_RAMP[0];
+  if (level < 0.85) return SPEED_RAMP[1];
+  if (level < 1) return SPEED_RAMP[2];
+  if (level < 1.25) return SPEED_RAMP[3];
+  return SPEED_RAMP[4];
+}
+/** The markers of a trip: where it began, where it ended, where it sped; a number or the
+ * speed on each, as fleet maps draw them. */
+const MARKER_COLORS: Record<string, string> = {
+  trip_start: "#52735E",
+  trip_end: "#1F2A24",
+  speeding: "#A13D2D",
+};
 export type AnalysisKind = (typeof ANALYSIS_KINDS)[number];
 
 const FILL_OPACITY: Record<string, number> = {
@@ -141,7 +175,12 @@ export function decorateAnalysisFeatures(
         ...f,
         properties: {
           ...f.properties,
-          color: kind === "area" ? pressureColor(level) : colorOf(subject),
+          color:
+            kind === "area"
+              ? pressureColor(level)
+              : kind === "trip_segment"
+                ? speedColor(level)
+                : (MARKER_COLORS[kind] ?? colorOf(subject)),
           opacity: FILL_OPACITY[kind] ?? 0.2,
         },
       };
@@ -179,9 +218,18 @@ export function ensureAnalysisLayers(map: MapLibreMap): void {
       source: ANALYSIS_SOURCE,
       paint: {
         "line-color": ["coalesce", ["get", "color"], "#52735E"],
-        "line-width": ["match", ["get", "kind"], "hotspot", 0.5, 1.5],
+        "line-width": [
+          "match",
+          ["get", "kind"],
+          "hotspot",
+          0.5,
+          "trip_segment",
+          4,
+          1.5,
+        ],
         "line-opacity": 0.9,
       },
+      layout: { "line-cap": "round", "line-join": "round" },
     },
     before,
   );
@@ -206,6 +254,8 @@ export function ensureAnalysisLayers(map: MapLibreMap): void {
           50,
           18,
         ],
+        ["has", "short"],
+        10,
         ["+", 5, ["*", 12, ["coalesce", ["get", "level"], 0]]],
       ],
       "circle-color": ["coalesce", ["get", "color"], "#52735E"],
@@ -213,6 +263,20 @@ export function ensureAnalysisLayers(map: MapLibreMap): void {
       "circle-stroke-color": "#ffffff",
       "circle-stroke-width": 1.5,
     },
+  });
+  // the number of a trip on its start and end markers and the speed on a speeding marker
+  map.addLayer({
+    id: "analysis-labels",
+    type: "symbol",
+    source: ANALYSIS_SOURCE,
+    filter: ["all", ["==", ["geometry-type"], "Point"], ["has", "short"]],
+    layout: {
+      "text-field": ["get", "short"],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": 10,
+      "text-allow-overlap": true,
+    },
+    paint: { "text-color": "#ffffff" },
   });
 }
 
@@ -280,6 +344,13 @@ export function setAnalysisKinds(map: MapLibreMap, kinds: string[]): void {
       ["==", ["geometry-type"], "Point"],
       filter,
     ]);
+  if (map.getLayer("analysis-labels"))
+    map.setFilter("analysis-labels", [
+      "all",
+      ["==", ["geometry-type"], "Point"],
+      ["has", "short"],
+      filter,
+    ]);
 }
 
 /** A click on a polygon reports its properties; returns the unbind. */
@@ -298,7 +369,12 @@ export function bindAnalysisClicks(
     map.getCanvas().style.cursor = "";
   };
   // the vegetation mosaic answers too, so a cell can be read (Tim, 2026-09-18)
-  const layers = ["analysis-fill", "analysis-points", "vegetation-fill"];
+  const layers = [
+    "analysis-fill",
+    "analysis-line",
+    "analysis-points",
+    "vegetation-fill",
+  ];
   for (const id of layers) {
     map.on("click", id, onClick);
     map.on("mouseenter", id, enter);

@@ -142,7 +142,7 @@ export function DrawBar({
         <div className="mt-2 space-y-2">
           <p className="text-xs text-muted-foreground">
             {t(
-              "Click inside the area you want, or drag a box over the ground to read.",
+              "Click inside the area you want, or hold Shift and drag a box over the ground to read; a plain drag moves the map.",
             )}
           </p>
           <ProposedAreas

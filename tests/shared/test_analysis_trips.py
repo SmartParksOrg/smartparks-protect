@@ -119,6 +119,24 @@ def test_a_drive_with_a_pause_and_a_stop_is_two_trips():
     assert second.start_s > first.end_s
 
 
+def test_a_parked_car_at_hourly_fixes_drifting_past_the_radius_makes_no_trip():
+    # a fix an hour, each 40 m from the last: past the stop radius, but 0.01 m/s is no movement
+    n = 24
+    times = [START.timestamp() + i * 3600 for i in range(n)]
+    lon = [LON + (40 * (i % 2)) / M_PER_DEG_LON for i in range(n)]
+    track = trajectory_from(SUBJECT.id, times, [LAT] * n, lon)
+    folded, moved = fold_stops(track, 15)
+    assert moved == 0
+    s = steps(folded, 4 * 3600)
+    assert segment_trips(folded, s, moving_mps=5 / 3.6, stop_s=600) == []
+    params = VehicleParameters(
+        entity_ids=[SUBJECT.id], time_from=START, time_to=START + timedelta(days=1)
+    )
+    r = analyse_vehicle(folded, params, _period(), "UTC", [], SUBJECT)
+    assert r.summary["trips"] == 0 and r.summary["distance_km"] == 0
+    assert r.summary["driving_h"] == 0 and r.summary["days_active"] == 0
+
+
 def test_a_gap_cuts_a_trip_and_the_step_speed_stands_in_without_a_reported_one():
     track = _drive((10, 1000, None), (10, 1000, None), speeds=False)
     # five hours of silence in the middle
@@ -141,7 +159,7 @@ def test_speeding_reads_the_reported_speed_alone():
 
 
 def test_the_vehicle_figures_and_the_document():
-    track = _drive((10, 0, 0), (30, 1000, 60), (20, 0, 0), (10, 1200, 72), (20, 0, 0))
+    track = _drive((10, 0, 0), (30, 1000, 60), (20, 0, 0), (10, 1200, 90), (20, 0, 0))
     params = VehicleParameters(
         entity_ids=[SUBJECT.id], time_from=START, time_to=START + timedelta(hours=2)
     )
@@ -155,18 +173,24 @@ def test_the_vehicle_figures_and_the_document():
     assert s["trips"] == 2 and s["fixes"] == 90
     assert s["distance_km"] == pytest.approx(42, rel=0.01)
     assert s["driving_h"] == pytest.approx(40 / 60, rel=0.05)
-    assert s["top_speed_kmh"] == 72 and s["speeding_episodes"] == 1
-    assert s["speeding_top_kmh"] == 72 and s["fixes_with_speed_share"] == 1
+    assert s["top_speed_kmh"] == 90 and s["speeding_episodes"] == 1
+    assert s["speeding_top_kmh"] == 90 and s["fixes_with_speed_share"] == 1
     assert s["days_active"] == 1 and s["longest_trip_km"] == pytest.approx(30, rel=0.01)
-    trips = sorted(r.trips, key=lambda row: row[2])
-    assert trips[0][9] == "Main gate" and trips[0][10] == "Camp"
-    assert trips[0][8] == "reported" and trips[0][13] == "stop"
+    trips = sorted(r.trips, key=lambda row: row[3])
+    assert trips[0][2] == 1 and trips[0][10] == "Main gate" and trips[0][11] == "Camp"
+    assert trips[0][9] == "reported" and trips[0][14] == "stop"
     assert len(r.days) == 1 and r.days[0][3] == 2
     assert r.days[0][6] == "14:10"  # the first movement, on the project's clock (UTC+2)
     kinds = [g.kind for g in r.geometries]
-    assert kinds.count("trip") == 2 and kinds.count("speeding") == 1
-    assert r.geometries[0].geojson["type"] == "LineString"
-    assert dict(r.speed_hist)["60"] == 30 and dict(r.speed_hist)["70"] == 10
+    assert kinds.count("trip_start") == 2 and kinds.count("trip_end") == 2
+    assert kinds.count("speeding") == 1
+    # the first trip runs at 60 km/h (at the limit, one class) and the second at 90 (far over)
+    segments = [g for g in r.geometries if g.kind == "trip_segment"]
+    assert len(segments) == 2 and segments[0].geojson["type"] == "LineString"
+    assert [g.properties["speed_class"] for g in segments] == [3, 4]
+    assert segments[0].properties["trip"] == 1 and segments[1].properties["speed_kmh"] == 90
+    assert [g.properties["short"] for g in r.geometries if g.kind == "speeding"] == ["90"]
+    assert dict(r.speed_hist)["60"] == 30 and dict(r.speed_hist)["80"] == 10
     assert sum(v for _, v in r.hour_km) == pytest.approx(42, rel=0.01)
 
     document = build_document(
@@ -175,7 +199,7 @@ def test_the_vehicle_figures_and_the_document():
     assert document.module == "vehicle_use"
     assert [t.key for t in document.tables] == ["summary", "trips", "days", "speeding"]
     assert [c.key for c in document.charts] == ["daily_distance", "speed_histogram", "hour_profile"]
-    assert document.tables[1].rows[0][7] == 72  # the trips table leads with the fastest
+    assert document.tables[1].rows[0][8] == 90  # the trips table leads with the fastest
 
 
 def test_a_vehicle_without_reported_speeds_says_so():
@@ -187,4 +211,4 @@ def test_a_vehicle_without_reported_speeds_says_so():
     assert "no_reported_speed" in {w.code for w in r.warnings}
     assert r.summary["speeding_episodes"] == 0 and r.summary["fixes_with_speed_share"] == 0
     assert r.summary["top_speed_kmh"] == pytest.approx(60, rel=0.01)
-    assert r.trips[0][8] == "between fixes"
+    assert r.trips[0][9] == "between fixes"

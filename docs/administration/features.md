@@ -29,13 +29,19 @@ WGS 84 is reprojected when its `.prj` file is in the zip.
 
 ## Roads from OpenStreetMap
 
-"Roads" on the Features page (phase 38, decision D300) reads the roads and tracks OpenStreetMap
-knows in a box you drag on a small map, or in a box around a point you click. Every `highway`
-way comes back as a line with its name (or its reference, or its kind: "Track", "Service"), the
-ways people walk on left out as the area proposal leaves them out. Keep the ones you want and
-save them as route features, one each with the OpenStreetMap way id in the attributes, or joined
-as one route under a name of your own. The same bounds as the proposal: one read at a time, at
-most 25 km², and a refusal from OpenStreetMap is said plainly.
+A road is made where every feature is made: **New feature**, type **route**, then "Roads from
+OpenStreetMap" under the map (phase 38, decision D300; Tim, 2026-09-27). Click inside the map for
+a box around the point, or hold Shift and drag the box you want (a plain drag moves the map).
+Every `highway` way OpenStreetMap knows there comes back as a faint line with its name (or its
+reference, or its kind: "Track", "Service"), the ways people walk on left out as the area
+proposal leaves them out. "Use" puts one road in the editor, where it can be corrected and named;
+tick several and "Use N as one route" keeps them together as one route, saved as it came. The
+OpenStreetMap way ids stay in the feature's attributes. The same bounds as the proposal: one read
+at a time, at most 25 km², and a refusal from OpenStreetMap is said plainly.
+
+Roads an organisation already has in GIS go through **Import** (below): the lines of a shapefile,
+KML, KMZ, GPX or GeoJSON become routes, one each, or with "Save the kept lines as one route" as
+one road network under a name.
 
 The routes are what the **Off the roads** rule template measures from: a vehicle farther than
 50 metres from every route for two minutes raises `OFF_ROAD`. A route's panel on the live map and

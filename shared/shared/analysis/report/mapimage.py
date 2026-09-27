@@ -55,6 +55,10 @@ BACKGROUND = "#F1F4F2"
 #: The areas by pressure, warm like the use they summarise (Tim, 2026-09-18); the same five
 #: steps as the interface's `PRESSURE_RAMP`, so a report and the map read alike.
 PRESSURE_RAMP = ["#F6F0EA", "#E6D6C6", "#D2B096", "#BE8663", "#AF4436"]
+#: A trip's path by speed against the limit (vehicle use), the interface's `SPEED_RAMP`.
+SPEED_RAMP = ["#3C8D5A", "#8FBF4D", "#E3B23C", "#D9622B", "#A13D2D"]
+#: The markers of a trip: where it began, where it ended, where it sped.
+MARKER_COLORS = {"trip_start": "#52735E", "trip_end": "#1F2A24", "speeding": "#A13D2D"}
 FILL_ALPHA = {
     "area": 0.45,
     "mcp": 0.12,
@@ -83,6 +87,8 @@ class Shape:
     label: str = ""
     #: A share or an isopleth level; a point (a gateway heard) is sized by it.
     level: float | None = None
+    #: A word on a marker: the number of a trip, the speed of an episode.
+    text: str | None = None
 
 
 @dataclass
@@ -165,6 +171,19 @@ def inverse_mercator(x: float, y: float) -> tuple[float, float]:
 
 def metres_per_pixel(zoom: float) -> float:
     return WORLD / (TILE * 2**zoom)
+
+
+def speed_color(level: float | None) -> str:
+    """The class of a speed given as a share of the limit, the module's `speed_class`."""
+    if level is None or not math.isfinite(level) or level < 0.5:
+        return SPEED_RAMP[0]
+    if level < 0.85:
+        return SPEED_RAMP[1]
+    if level < 1:
+        return SPEED_RAMP[2]
+    if level < 1.25:
+        return SPEED_RAMP[3]
+    return SPEED_RAMP[4]
 
 
 def pressure_color(level: float | None) -> str:
@@ -365,8 +384,22 @@ def draw_map(
 def _draw_shape(ax: Any, item: Shape) -> None:
     geometry = item.geometry
     if geometry.geom_type == "Point":
-        # a gateway heard: a marker sized by its share of the uplinks
         x, y = mercator(geometry.x, geometry.y)
+        if item.text is not None:
+            # a trip's start or end, or a speeding episode: a marker with its word on it
+            ax.plot(
+                x,
+                y,
+                marker="o",
+                markersize=9,
+                color=item.color,
+                markeredgecolor="white",
+                markeredgewidth=0.8,
+                zorder=8,
+            )
+            ax.text(x, y, item.text, ha="center", va="center", fontsize=4, color="white", zorder=9)
+            return
+        # a gateway heard: a marker sized by its share of the uplinks
         size = 4 + 10 * (item.level or 0)
         ax.plot(
             x,
@@ -383,10 +416,19 @@ def _draw_shape(ax: Any, item: Shape) -> None:
     if geometry.geom_type in ("LineString", "MultiLineString"):
         # a trip (vehicle use): the path in the vehicle's colour
         lines = list(geometry.geoms) if geometry.geom_type == "MultiLineString" else [geometry]
+        width = 2.2 if item.kind == "trip_segment" else 1.4
         for line in lines:
             xy = [mercator(x, y) for x, y in line.coords]
             xs, ys = zip(*xy, strict=True)
-            ax.plot(xs, ys, color=item.color, linewidth=1.4, alpha=0.9, zorder=5)
+            ax.plot(
+                xs,
+                ys,
+                color=item.color,
+                linewidth=width,
+                alpha=0.9,
+                zorder=5,
+                solid_capstyle="round",
+            )
         return
     polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
     alpha = FILL_ALPHA.get(item.kind, 0.2)
@@ -456,9 +498,15 @@ def shapes_from_geometries(
         kind = str(row.get("kind", ""))
         if kind == "area":
             color = pressure_color(row.get("level"))
+        elif kind == "trip_segment":
+            color = speed_color(row.get("level"))
+        elif kind in MARKER_COLORS:
+            color = MARKER_COLORS[kind]
         else:
             color = subject_colors.get(str(row.get("subject_id") or ""), "#B86B5C")
         level = row.get("level")
+        properties = row.get("properties") or {}
+        text = properties.get("short") if isinstance(properties, dict) else None
         shapes.append(
             Shape(
                 geometry,
@@ -466,6 +514,7 @@ def shapes_from_geometries(
                 kind,
                 str(row.get("label", "")),
                 float(level) if isinstance(level, int | float) else None,
+                str(text) if text is not None else None,
             )
         )
     shapes.sort(key=lambda s: -s.geometry.area)

@@ -73,13 +73,19 @@ class Speeding:
 
 
 def moving_steps(track: Trajectory, s: Steps, moving_mps: float) -> NDArray[np.bool_]:
-    """Which steps are movement: not a gap, and either the fixes stand apart (after the fold)
-    or the fix the step starts from reported a speed above the threshold."""
+    """Which steps are movement: not a gap, and either the step itself is faster than the
+    threshold (its fixes stand apart after the fold by more than the threshold over its time)
+    or the fix it starts from reported a speed above it. The step's own speed matters for a
+    vehicle whose fixes carry no speed: a parked car at hourly fixes drifts thirty metres in an
+    hour, which stands apart after a fold but is no movement (Tim's week on dev, 2026-09-27:
+    72 trips and 25 driving hours from a car that drove one afternoon)."""
     if len(s) == 0:
         return np.zeros(0, dtype=np.bool_)
     reported = track.speed_mps[:-1]
     fast = np.isfinite(reported) & (reported > moving_mps)
-    out: NDArray[np.bool_] = (~s.gap) & ((s.dist_m > 0) | fast)
+    with np.errstate(invalid="ignore"):
+        step_fast = (s.dist_m > 0) & (np.nan_to_num(s.speed_mps) > moving_mps)
+    out: NDArray[np.bool_] = (~s.gap) & (step_fast | fast)
     return out
 
 

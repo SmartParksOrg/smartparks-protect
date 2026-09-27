@@ -130,9 +130,13 @@ async def test_a_vehicle_run_over_a_drive(client, db):
     assert summary["folded_fixes"] >= 25 and summary["days_active"] == 1
     assert document["subjects"][0]["type"] == "Car"
     tables = {t["key"]: t for t in document["tables"]}
-    assert len(tables["trips"]["rows"]) == 1 and tables["trips"]["rows"][0][7] == 75
+    assert len(tables["trips"]["rows"]) == 1 and tables["trips"]["rows"][0][8] == 75
     assert len(tables["speeding"]["rows"]) == 1
-    assert document["geometries"] == {"trip": 1, "speeding": 1}
+    # the trip in runs of one speed class (60 then 75 then 60 km/h against a limit of 60),
+    # a numbered start and end, and the speeding marker
+    assert document["geometries"]["trip_segment"] == 3
+    assert document["geometries"]["trip_start"] == 1 and document["geometries"]["trip_end"] == 1
+    assert document["geometries"]["speeding"] == 1
 
     stored = (
         await db.execute(
@@ -141,11 +145,14 @@ async def test_a_vehicle_run_over_a_drive(client, db):
             )
         )
     ).all()
-    assert sorted(row.kind for row in stored) == ["speeding", "trip"]
-    trip = await client.get(f"{base}/{run_id}/geometries", params={"kind": "trip"}, headers=h)
-    feature = trip.json()["features"][0]
-    assert feature["geometry"]["type"] == "LineString"
-    assert feature["properties"]["top_kmh"] == 75
+    assert {row.kind for row in stored} == {"speeding", "trip_segment", "trip_start", "trip_end"}
+    trip = await client.get(
+        f"{base}/{run_id}/geometries", params={"kind": "trip_segment"}, headers=h
+    )
+    features = trip.json()["features"]
+    assert all(f["geometry"]["type"] == "LineString" for f in features)
+    assert {f["properties"]["speed_class"] for f in features} == {3, 4}
+    assert features[0]["properties"]["top_kmh"] == 75 and features[0]["properties"]["trip"] == 1
     count = await db.scalar(
         select(Position.id).where(Position.entity_id == uuid.UUID(car["id"])).limit(1)
     )

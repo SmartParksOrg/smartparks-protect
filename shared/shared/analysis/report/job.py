@@ -70,6 +70,7 @@ async def _geometries(session: Any, run_id: uuid.UUID) -> list[dict[str, Any]]:
             "subject_id": row.subject_id,
             "label": row.label,
             "level": row.level,
+            "properties": row.properties or {},
             "geojson": mapping(to_shape(row.geom)),
         }
         for row in rows
