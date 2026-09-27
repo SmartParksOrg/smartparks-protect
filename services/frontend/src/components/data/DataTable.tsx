@@ -73,6 +73,8 @@ interface Props<T> {
   isLoading?: boolean;
   emptyMessage?: string;
   onRowClick?: (row: T) => void;
+  /** The row under the pointer, null when it leaves the rows; a linked map reads it. */
+  onRowHover?: (row: T | null) => void;
   rowClassName?: (row: T) => string | undefined;
   footer?: ReactNode;
   /** Show a search box above the table that matches any column value (case-insensitive). */
@@ -109,6 +111,7 @@ export function DataTable<T>({
   isLoading,
   emptyMessage,
   onRowClick,
+  onRowHover,
   rowClassName,
   footer,
   searchable,
@@ -476,6 +479,8 @@ export function DataTable<T>({
                     rowClassName?.(row.original),
                   )}
                   onClick={() => onRowClick?.(row.original)}
+                  onMouseEnter={() => onRowHover?.(row.original)}
+                  onMouseLeave={() => onRowHover?.(null)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

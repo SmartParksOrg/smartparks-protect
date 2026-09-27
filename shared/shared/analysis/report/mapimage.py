@@ -58,7 +58,7 @@ PRESSURE_RAMP = ["#F6F0EA", "#E6D6C6", "#D2B096", "#BE8663", "#AF4436"]
 #: A trip's path by speed against the limit (vehicle use), the interface's `SPEED_RAMP`.
 SPEED_RAMP = ["#3C8D5A", "#8FBF4D", "#E3B23C", "#D9622B", "#A13D2D"]
 #: The markers of a trip: where it began, where it ended, where it sped.
-MARKER_COLORS = {"trip_start": "#52735E", "trip_end": "#1F2A24", "speeding": "#A13D2D"}
+MARKER_COLORS = {"trip_marker": "#52735E", "trip_end": "#1F2A24", "speeding": "#A13D2D"}
 FILL_ALPHA = {
     "area": 0.45,
     "mcp": 0.12,
@@ -501,7 +501,9 @@ def shapes_from_geometries(
         elif kind == "trip_segment":
             color = speed_color(row.get("level"))
         elif kind in MARKER_COLORS:
-            color = MARKER_COLORS[kind]
+            marker_props = row.get("properties") or {}
+            role = marker_props.get("role") if isinstance(marker_props, dict) else None
+            color = MARKER_COLORS["trip_end" if role == "end" else kind]
         else:
             color = subject_colors.get(str(row.get("subject_id") or ""), "#B86B5C")
         level = row.get("level")

@@ -361,6 +361,14 @@ export function VehicleForm({
             onChange={(val) => vehicle({ radius: val })}
           />
           <NumberField
+            label={t("Shortest trip (m)")}
+            value={v.minTrip}
+            min={0}
+            max={50000}
+            step={50}
+            onChange={(val) => vehicle({ minTrip: val })}
+          />
+          <NumberField
             label={t("Site radius (m)")}
             value={v.siteRadius}
             min={10}

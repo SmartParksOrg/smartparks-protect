@@ -122,10 +122,20 @@ describe("analysis layers", () => {
     const start: GeoJSON.Feature = {
       type: "Feature",
       geometry: { type: "Point", coordinates: [0, 0] },
-      properties: { kind: "trip_start", subject_id: "a", short: "1" },
+      properties: {
+        kind: "trip_marker",
+        subject_id: "a",
+        short: "1",
+        role: "start",
+      },
     };
     const [l, s] = decorateAnalysisFeatures([line, start], () => "#111111");
     expect(l.properties?.color).toBe(SPEED_RAMP[4]);
     expect(s.properties?.color).toBe("#52735E");
+    const [e] = decorateAnalysisFeatures(
+      [{ ...start, properties: { ...start.properties, role: "end" } }],
+      () => "#111111",
+    );
+    expect(e.properties?.color).toBe("#1F2A24");
   });
 });

@@ -159,14 +159,17 @@ export interface VehicleOptions {
   siteRadius: number;
   /** km/h; the speed limit a speeding episode is judged against. */
   limit: number;
+  /** Metres; a trip shorter than this is not a trip. */
+  minTrip: number;
 }
 
 export const DEFAULT_VEHICLE: VehicleOptions = {
   moving: 5,
-  stop: 10,
+  stop: 20,
   radius: 15,
   siteRadius: 200,
   limit: 60,
+  minTrip: 300,
 };
 
 /** The grazing page's own choices (plan, section 9.4): the areas, the weighting, the second
@@ -339,6 +342,7 @@ export function readFormState(params: URLSearchParams): FormState {
         DEFAULT_VEHICLE.siteRadius,
       ),
       limit: numberOr(params.get("limit"), DEFAULT_VEHICLE.limit),
+      minTrip: numberOrZero(params.get("min_trip"), DEFAULT_VEHICLE.minTrip),
     },
     grazing: {
       areas: params.getAll("area"),
@@ -392,6 +396,8 @@ export function writeFormState(state: FormState): URLSearchParams {
   if (v.siteRadius !== DEFAULT_VEHICLE.siteRadius)
     params.set("site_radius", String(v.siteRadius));
   if (v.limit !== DEFAULT_VEHICLE.limit) params.set("limit", String(v.limit));
+  if (v.minTrip !== DEFAULT_VEHICLE.minTrip)
+    params.set("min_trip", String(v.minTrip));
   const c = state.contact;
   if (!c.bluetooth) params.set("bluetooth", "0");
   if (!c.proximity) params.set("proximity", "0");
@@ -506,6 +512,7 @@ export function vehicleParameters(
     stop_radius_m: v.radius,
     site_radius_m: v.siteRadius,
     limit_kmh: v.limit,
+    min_trip_m: v.minTrip,
   };
 }
 
@@ -1015,6 +1022,7 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
       radius: num("stop_radius_m", DEFAULT_VEHICLE.radius),
       siteRadius: num("site_radius_m", DEFAULT_VEHICLE.siteRadius),
       limit: num("limit_kmh", DEFAULT_VEHICLE.limit),
+      minTrip: num("min_trip_m", DEFAULT_VEHICLE.minTrip),
     },
     grazing: {
       areas: list("feature_ids"),

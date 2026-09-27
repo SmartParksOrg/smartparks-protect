@@ -526,6 +526,7 @@ OPTION_LABELS: list[tuple[str, str]] = [
     ("stop_radius_m", "Stop radius (m)"),
     ("moving_kmh", "Moving above (km/h)"),
     ("stop_minutes", "Stop after (minutes)"),
+    ("min_trip_m", "Shortest trip (m)"),
     ("site_radius_m", "Site radius (m)"),
     ("limit_kmh", "Speed limit (km/h)"),
 ]
@@ -1010,8 +1011,7 @@ KIND_LEGEND: dict[str, str] = {
     "coverage": "Coverage of the fixes: the hull around a device's valid fixes, in its colour",
     "gateway": "Gateways heard: a marker per gateway, larger for a bigger share of the uplinks",
     "trip_segment": "Trips by speed against the limit, from well under (green) to far over (red)",
-    "trip_start": "Where a trip began, with its number",
-    "trip_end": "Where a trip ended, with its number",
+    "trip_marker": "Where a trip began (green) and ended (dark), with its number",
     "speeding": "Speeding: a marker where an episode was fastest, with the speed",
 }
 #: Above this many subjects the legend names the colours in the sections instead.
@@ -1055,7 +1055,7 @@ def map_legend(document: dict[str, Any], colors: dict[str, str]) -> list[dict[st
             )
         elif kind == "trip_segment":
             entries.append({"kind": "ramp", "colors": list(SPEED_RAMP), "text": KIND_LEGEND[kind]})
-        elif kind in ("gateway", "speeding", "trip_start", "trip_end"):
+        elif kind in ("gateway", "speeding", "trip_marker"):
             entries.append({"kind": "marker", "text": KIND_LEGEND[kind]})
         else:
             entries.append({"kind": "outline", "text": KIND_LEGEND[kind]})

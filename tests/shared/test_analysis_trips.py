@@ -105,7 +105,7 @@ def test_a_drive_with_a_pause_and_a_stop_is_two_trips():
     )
     folded, _ = fold_stops(track, 15)
     s = steps(folded, 4 * 3600)
-    trips = segment_trips(folded, s, moving_mps=5 / 3.6, stop_s=600)
+    trips = segment_trips(folded, s, moving_mps=5 / 3.6, stop_s=1200)
     assert len(trips) == 2
     first, second = trips
     assert first.distance_m == pytest.approx(30 * 1000 + 10 * 500, rel=0.01)
@@ -159,7 +159,7 @@ def test_speeding_reads_the_reported_speed_alone():
 
 
 def test_the_vehicle_figures_and_the_document():
-    track = _drive((10, 0, 0), (30, 1000, 60), (20, 0, 0), (10, 1200, 90), (20, 0, 0))
+    track = _drive((10, 0, 0), (30, 1000, 60), (25, 0, 0), (10, 1200, 90), (20, 0, 0))
     params = VehicleParameters(
         entity_ids=[SUBJECT.id], time_from=START, time_to=START + timedelta(hours=2)
     )
@@ -170,7 +170,7 @@ def test_the_vehicle_figures_and_the_document():
     )
     s = r.summary
     assert set(s) == set(METRICS)
-    assert s["trips"] == 2 and s["fixes"] == 90
+    assert s["trips"] == 2 and s["fixes"] == 95
     assert s["distance_km"] == pytest.approx(42, rel=0.01)
     assert s["driving_h"] == pytest.approx(40 / 60, rel=0.05)
     assert s["top_speed_kmh"] == 90 and s["speeding_episodes"] == 1
@@ -182,7 +182,9 @@ def test_the_vehicle_figures_and_the_document():
     assert len(r.days) == 1 and r.days[0][3] == 2
     assert r.days[0][6] == "14:10"  # the first movement, on the project's clock (UTC+2)
     kinds = [g.kind for g in r.geometries]
-    assert kinds.count("trip_start") == 2 and kinds.count("trip_end") == 2
+    assert kinds.count("trip_marker") == 4
+    roles = [g.properties["role"] for g in r.geometries if g.kind == "trip_marker"]
+    assert roles == ["start", "end", "start", "end"]
     assert kinds.count("speeding") == 1
     # the first trip runs at 60 km/h (at the limit, one class) and the second at 90 (far over)
     segments = [g for g in r.geometries if g.kind == "trip_segment"]
@@ -212,3 +214,19 @@ def test_a_vehicle_without_reported_speeds_says_so():
     assert r.summary["speeding_episodes"] == 0 and r.summary["fixes_with_speed_share"] == 0
     assert r.summary["top_speed_kmh"] == pytest.approx(60, rel=0.01)
     assert r.trips[0][9] == "between fixes"
+
+
+def test_a_move_shorter_than_the_minimum_is_not_a_trip():
+    track = _drive((5, 0, 0), (2, 100, 20), (30, 0, 0))
+    params = VehicleParameters(
+        entity_ids=[SUBJECT.id], time_from=START, time_to=START + timedelta(hours=1)
+    )
+    r = analyse_vehicle(track, params, _period(1), "UTC", [], SUBJECT)
+    assert r.summary["trips"] == 0 and r.geometries == []
+    loose = VehicleParameters(
+        entity_ids=[SUBJECT.id],
+        time_from=START,
+        time_to=START + timedelta(hours=1),
+        min_trip_m=0,
+    )
+    assert analyse_vehicle(track, loose, _period(1), "UTC", [], SUBJECT).summary["trips"] == 1

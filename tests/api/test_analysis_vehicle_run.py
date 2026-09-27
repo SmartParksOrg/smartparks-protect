@@ -135,7 +135,7 @@ async def test_a_vehicle_run_over_a_drive(client, db):
     # the trip in runs of one speed class (60 then 75 then 60 km/h against a limit of 60),
     # a numbered start and end, and the speeding marker
     assert document["geometries"]["trip_segment"] == 3
-    assert document["geometries"]["trip_start"] == 1 and document["geometries"]["trip_end"] == 1
+    assert document["geometries"]["trip_marker"] == 2
     assert document["geometries"]["speeding"] == 1
 
     stored = (
@@ -145,7 +145,7 @@ async def test_a_vehicle_run_over_a_drive(client, db):
             )
         )
     ).all()
-    assert {row.kind for row in stored} == {"speeding", "trip_segment", "trip_start", "trip_end"}
+    assert {row.kind for row in stored} == {"speeding", "trip_segment", "trip_marker"}
     trip = await client.get(
         f"{base}/{run_id}/geometries", params={"kind": "trip_segment"}, headers=h
     )

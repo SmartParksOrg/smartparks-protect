@@ -100,8 +100,12 @@ class VehicleParameters(CommonParameters):
 
     #: Above this a fix's reported speed is movement even before the next fix arrives.
     moving_kmh: float = Field(default=5, gt=0, le=60)
-    #: Standing still this long ends a trip; a shorter stop is a pause inside it.
-    stop_minutes: float = Field(default=10, ge=1, le=720)
+    #: Standing still this long ends a trip; a shorter halt (fuel, a gate, a look) is a pause
+    #: inside it. Twenty minutes, since ten cut a drive to Zeeland in two at a fuel stop (Tim,
+    #: 2026-09-27).
+    stop_minutes: float = Field(default=20, ge=1, le=720)
+    #: A trip shorter than this is not a trip: moving the car in the yard, a fix that wandered.
+    min_trip_m: float = Field(default=300, ge=0, le=50_000)
     #: The stop rule (decision D303): fixes within this radius of where a stop began are one
     #: place, so a parked vehicle's GNSS drift is neither distance nor a trip.
     stop_radius_m: float = Field(default=15, ge=0, le=500)
@@ -275,9 +279,13 @@ def analyse_vehicle(
             )
         )
 
-    trips = segment_trips(
-        track, s, moving_mps=params.moving_kmh / KMH, stop_s=params.stop_minutes * 60
-    )
+    trips = [
+        trip
+        for trip in segment_trips(
+            track, s, moving_mps=params.moving_kmh / KMH, stop_s=params.stop_minutes * 60
+        )
+        if trip.distance_m >= params.min_trip_m
+    ]
     moving = moving_steps(track, s, params.moving_kmh / KMH)
     zone = ZoneInfo(tz)
     days = local_days(track.times, tz)
@@ -377,16 +385,17 @@ def analyse_vehicle(
                     properties={**about, "speed_kmh": round(run_kmh, 1), "speed_class": klass},
                 )
             )
-        # a numbered marker where the trip began and where it ended
-        for kind, index, place in (
-            ("trip_start", trip.start_index, start_place),
-            ("trip_end", trip.end_index, end_place),
+        # one numbered marker where the trip began and one where it ended, one layer
+        # (Tim, 2026-09-27: two layers for the two ends of one trip made no sense)
+        for role, index, place in (
+            ("start", trip.start_index, start_place),
+            ("end", trip.end_index, end_place),
         ):
             result.geometries.append(
                 Geometry(
-                    kind=kind,
+                    kind="trip_marker",
                     subject_id=subject.id,
-                    label=f"{title}; {'from' if kind == 'trip_start' else 'to'} {place}",
+                    label=f"{title}; {'from' if role == 'start' else 'to'} {place}",
                     level=None,
                     geojson={
                         "type": "Point",
@@ -395,7 +404,7 @@ def analyse_vehicle(
                             round(float(track.lat[index]), 6),
                         ],
                     },
-                    properties={**about, "short": str(k)},
+                    properties={**about, "short": str(k), "role": role},
                 )
             )
 

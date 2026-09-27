@@ -32,6 +32,7 @@ import {
   ensureIntensityLayers,
   ensureVegetationLayers,
   setAnalysisFeatures,
+  setAnalysisHighlight,
   setAnalysisKinds,
   setFixFeatures,
   setFixesVisible,
@@ -67,6 +68,7 @@ import {
 } from "@/components/map/layers";
 import { useMap } from "@/components/map/useMap";
 import { useMapConfig } from "@/hooks/useMapConfig";
+import { useAnalysisHighlight } from "@/stores/analysisHighlight";
 import { usePreference } from "@/hooks/usePreference";
 import { useTheme } from "@/hooks/useTheme";
 import { boundsOfTracks } from "@/lib/explore";
@@ -371,6 +373,26 @@ export function ResultMap({
     byDevice,
   ]);
 
+  // the trip pointed at in the trips table lights up; a click pins it and fits the map
+  const highlightKey = useAnalysisHighlight((s) => s.key);
+  const highlightPinned = useAnalysisHighlight((s) => s.pinned);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    setAnalysisHighlight(map, highlightKey);
+    if (!highlightKey || !highlightPinned) return;
+    const [subject, trip] = highlightKey.split("|");
+    const bounds = boundsOfFeatures(
+      features.filter(
+        (f) =>
+          f.properties?.kind === "trip_segment" &&
+          String(f.properties?.subject_id) === subject &&
+          String(f.properties?.trip) === trip,
+      ),
+    );
+    if (bounds)
+      map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 400 });
+  }, [mapRef, ready, highlightKey, highlightPinned, features]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
@@ -486,8 +508,7 @@ export function ResultMap({
     gateway: t("Gateways heard"),
     contact: t("Where pairs met"),
     trip_segment: t("Trips by speed"),
-    trip_start: t("Trip starts"),
-    trip_end: t("Trip ends"),
+    trip_marker: t("Trip markers"),
     speeding: t("Speeding"),
   };
   // the speed legend reads against the run's limit (vehicle use)

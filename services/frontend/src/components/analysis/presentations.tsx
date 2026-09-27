@@ -22,6 +22,7 @@ import { RestStrip } from "@/components/analysis/RestStrip";
 import { ResultMap } from "@/components/analysis/ResultMap";
 import { ResultTable } from "@/components/analysis/ResultTable";
 import { SubjectCards } from "@/components/analysis/SubjectCards";
+import { TripsTable } from "@/components/analysis/TripsTable";
 import type { ResultDocument } from "@/lib/analyses";
 
 type Translate = (k: string) => string;
@@ -195,6 +196,29 @@ export function vehiclePresentation(
           labels={labels}
           colors={colors}
         />
+      ),
+      // the trips table is linked to the map; the others are plain
+      tables: (document) => (
+        <>
+          {document.tables
+            .filter((table) => table.rows.length > 0)
+            .map((table) => (
+              <div key={table.key} className="space-y-2">
+                <h2 className="text-base font-medium">
+                  {labels[table.key] ?? table.key}
+                </h2>
+                {table.key === "trips" ? (
+                  <TripsTable
+                    table={table}
+                    document={document}
+                    labels={labels}
+                  />
+                ) : (
+                  <ResultTable table={table} labels={labels} />
+                )}
+              </div>
+            ))}
+        </>
       ),
       after: () => <VehicleLimitations />,
     },
@@ -493,7 +517,9 @@ export const vehicleLabels = (t: Translate): Record<string, string> => ({
   summary: t("Summary"),
   days: t("Per day"),
   speeding: t("Speeding"),
-  trip: t("Trips"),
+  trip: t("Trip"),
+  trip_segment: t("Trips by speed"),
+  trip_marker: t("Trip markers"),
 });
 
 /** The human names of the grazing result's keys; every header says use, not grazing. */

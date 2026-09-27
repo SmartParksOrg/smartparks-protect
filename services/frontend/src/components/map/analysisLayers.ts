@@ -45,8 +45,7 @@ export const ANALYSIS_KINDS = [
   "coverage",
   "gateway",
   "trip_segment",
-  "trip_start",
-  "trip_end",
+  "trip_marker",
   "speeding",
 ] as const;
 
@@ -75,10 +74,15 @@ export function speedColor(level: number | null | undefined): string {
 /** The markers of a trip: where it began, where it ended, where it sped; a number or the
  * speed on each, as fleet maps draw them. */
 const MARKER_COLORS: Record<string, string> = {
-  trip_start: "#52735E",
+  trip_marker: "#52735E",
   trip_end: "#1F2A24",
   speeding: "#A13D2D",
 };
+/** The colour of a marker: a trip's end is dark, its start and everything else by kind. */
+function markerColor(kind: string, role: unknown): string | undefined {
+  if (kind === "trip_marker" && role === "end") return MARKER_COLORS.trip_end;
+  return MARKER_COLORS[kind];
+}
 export type AnalysisKind = (typeof ANALYSIS_KINDS)[number];
 
 const FILL_OPACITY: Record<string, number> = {
@@ -180,7 +184,7 @@ export function decorateAnalysisFeatures(
               ? pressureColor(level)
               : kind === "trip_segment"
                 ? speedColor(level)
-                : (MARKER_COLORS[kind] ?? colorOf(subject)),
+                : (markerColor(kind, f.properties?.role) ?? colorOf(subject)),
           opacity: FILL_OPACITY[kind] ?? 0.2,
         },
       };
@@ -204,10 +208,29 @@ export function ensureAnalysisLayers(map: MapLibreMap): void {
       id: "analysis-fill",
       type: "fill",
       source: ANALYSIS_SOURCE,
+      // polygons only: a fill layer closes a line into a shape and paints it, which is how
+      // a drive to Zeeland came back as a red triangle over the delta (Tim, 2026-09-27)
+      filter: ["==", ["geometry-type"], "Polygon"],
       paint: {
         "fill-color": ["coalesce", ["get", "color"], "#52735E"],
         "fill-opacity": ["coalesce", ["get", "opacity"], 0.2],
       },
+    },
+    before,
+  );
+  // the trip a person points at in the table: a blue casing under its segments
+  map.addLayer(
+    {
+      id: "analysis-highlight",
+      type: "line",
+      source: ANALYSIS_SOURCE,
+      filter: ["==", ["get", "trip"], "__none__"],
+      paint: {
+        "line-color": "#2563EB",
+        "line-width": 11,
+        "line-opacity": 0.55,
+      },
+      layout: { "line-cap": "round", "line-join": "round" },
     },
     before,
   );
@@ -335,9 +358,13 @@ export function setAnalysisKinds(map: MapLibreMap, kinds: string[]): void {
     ["get", "kind"],
     ["literal", kinds],
   ];
-  for (const id of ["analysis-fill", "analysis-line"]) {
-    if (map.getLayer(id)) map.setFilter(id, filter);
-  }
+  if (map.getLayer("analysis-fill"))
+    map.setFilter("analysis-fill", [
+      "all",
+      ["==", ["geometry-type"], "Polygon"],
+      filter,
+    ]);
+  if (map.getLayer("analysis-line")) map.setFilter("analysis-line", filter);
   if (map.getLayer("analysis-points"))
     map.setFilter("analysis-points", [
       "all",
@@ -351,6 +378,26 @@ export function setAnalysisKinds(map: MapLibreMap, kinds: string[]): void {
       ["has", "short"],
       filter,
     ]);
+}
+
+/** Light the trip of `key` (`<subject id>|<trip>`) up, or nothing. */
+export function setAnalysisHighlight(
+  map: MapLibreMap,
+  key: string | null,
+): void {
+  if (!map.getLayer("analysis-highlight")) return;
+  const [subject, trip] = key ? key.split("|") : ["", ""];
+  map.setFilter(
+    "analysis-highlight",
+    key
+      ? [
+          "all",
+          ["==", ["get", "kind"], "trip_segment"],
+          ["==", ["get", "subject_id"], subject],
+          ["==", ["to-string", ["get", "trip"]], trip],
+        ]
+      : ["==", ["get", "trip"], "__none__"],
+  );
 }
 
 /** A click on a polygon reports its properties; returns the unbind. */

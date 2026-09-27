@@ -2823,7 +2823,8 @@
   "Speed here": "Snelheid hier",
   "The path by speed against the limit of {{limit}} km/h; the number is the speed each colour starts at": "Het pad naar snelheid tegen de limiet van {{limit}} km/u; het getal is de snelheid waarbij elke kleur begint",
   "Top speed": "Topsnelheid",
-  "Trip ends": "Einden van ritten",
-  "Trip starts": "Beginpunten van ritten",
-  "Trips by speed": "Ritten naar snelheid"
+  "Trips by speed": "Ritten naar snelheid",
+  "Shortest trip (m)": "Kortste rit (m)",
+  "Trip": "Rit",
+  "Trip markers": "Ritmarkeringen"
 }
