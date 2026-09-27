@@ -18,6 +18,11 @@ function dayText(date: Date, end: boolean): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${end ? "23:59" : "00:00"}`;
 }
 
+function lastMonth(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+}
+
 function dayOf(value: string | null): Date | undefined {
   if (!value) return undefined;
   const d = new Date(value);
@@ -76,7 +81,10 @@ export function DateRangeField({
             mode="range"
             numberOfMonths={2}
             selected={range}
-            defaultMonth={range?.from}
+            // an analysis looks back: the month before this one and this one open first
+            defaultMonth={range?.from ?? lastMonth()}
+            weekStartsOn={1}
+            disabled={{ after: new Date() }}
             onSelect={(next) => {
               onChange({
                 from: next?.from ? dayText(next.from, false) : null,
