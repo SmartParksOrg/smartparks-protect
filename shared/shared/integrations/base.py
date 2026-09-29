@@ -3,9 +3,9 @@
 A connector owns the translation from canonical Smart Parks objects to one target platform and
 the delivery itself. It knows nothing about the delivery table, retries or filters: the
 integration service loads the object, calls `render`, then `deliver`, and records the outcome.
-Transient failures (network, 5xx) raise `TransientFailure` and are retried on the schedule;
-permanent ones (4xx, a payload the target refuses, no location) raise `PermanentFailure` and end
-the delivery as failed. `Skipped` ends it as skipped with a reason.
+Transient failures (network, 5xx, 429) raise `TransientFailure` and are retried on the schedule;
+permanent ones (other 4xx, a payload the target refuses, no location) raise `PermanentFailure`
+and end the delivery as failed. `Skipped` ends it as skipped with a reason.
 """
 
 import uuid
