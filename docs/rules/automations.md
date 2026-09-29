@@ -16,7 +16,7 @@ Project automations react to the project's events. Server-level automations (Ser
 
 ## Deliveries
 
-Every action of every automation for one event is an action delivery with a status (queued, sent, failed, skipped), attempts, the response of the channel and a processing trace. The Deliveries tab lists them; a failed delivery can be retried, which republishes the event and reruns only the actions that did not succeed. A transient failure (SMTP down, a webhook answering 5xx, a timeout) is retried by the bus with backoff; a permanent one (an unlinked Telegram chat, a webhook answering 4xx) is not.
+Every action of every automation for one event is an action delivery with a status (queued, sent, failed, skipped), attempts, the response of the channel and a processing trace. The Deliveries tab lists them; a failed delivery can be retried, which republishes the event and reruns only the actions that did not succeed. A transient failure (SMTP down, a webhook answering 5xx or 429, a timeout) is retried by the bus with backoff; a permanent one (an unlinked Telegram chat, a webhook answering another 4xx) is not.
 
 ## Notification targets
 
@@ -30,7 +30,7 @@ Use Test on a target to send a test message; the result says sent, skipped (with
 
 ## Webhooks
 
-A webhook action posts JSON to the URL with the event, the alert, the project, entity and device names and a link back. With a secret, the body is signed: `X-Protect-Signature: sha256=<hmac-sha256 of the body>`. Answers of 5xx are retried, 4xx are recorded as permanent failures, the first 500 characters of the response are stored on the delivery.
+A webhook action posts JSON to the URL with the event, the alert, the project, entity and device names and a link back. With a secret, the body is signed: `X-Protect-Signature: sha256=<hmac-sha256 of the body>`. Answers of 5xx and 429 are retried, other 4xx are recorded as permanent failures, the first 500 characters of the response are stored on the delivery.
 
 ## System alerts
 

@@ -1,8 +1,8 @@
 """Signed webhook: one JSON POST per object, `X-Protect-Signature` when a secret is set.
 
 The body is the same shape for every object type: `type`, `version`, `object` (the canonical
-row as JSON), `project`, `entity`, `device`, `link`. Answers of 5xx and network errors are
-transient, 4xx permanent.
+row as JSON), `project`, `entity`, `device`, `link`. Answers of 5xx and 429 and network errors
+are transient, other 4xx permanent.
 """
 
 import hashlib
@@ -94,7 +94,7 @@ async def post_json(
     except httpx.HTTPError as exc:
         raise TransientFailure(f"webhook: {type(exc).__name__}: {exc}") from exc
     summary = {"status": response.status_code, "body": response.text[:500]}
-    if response.status_code >= 500:
+    if response.status_code >= 500 or response.status_code == 429:
         raise TransientFailure(f"webhook answered {response.status_code}")
     if response.status_code >= 400:
         raise PermanentFailure(f"webhook answered {response.status_code}: {response.text[:200]}")

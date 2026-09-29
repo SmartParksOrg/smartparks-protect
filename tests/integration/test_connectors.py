@@ -208,6 +208,8 @@ async def test_webhook_signs_and_classifies(monkeypatch):
         seen.append(request)
         if request.url.path == "/down":
             return httpx.Response(502, text="bad gateway")
+        if request.url.path == "/busy":
+            return httpx.Response(429, text="too many requests")
         if request.url.path == "/refuse":
             return httpx.Response(400, text="no")
         return httpx.Response(200, json={"received": True})
@@ -232,6 +234,10 @@ async def test_webhook_signs_and_classifies(monkeypatch):
     with pytest.raises(TransientFailure):
         await connector.deliver(
             _context("webhook", {"url": "https://example.org/down"}), _position(), payload
+        )
+    with pytest.raises(TransientFailure):
+        await connector.deliver(
+            _context("webhook", {"url": "https://example.org/busy"}), _position(), payload
         )
     with pytest.raises(PermanentFailure):
         await connector.deliver(
