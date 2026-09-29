@@ -92,6 +92,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Fixed
 
+- **A click on an entity selects the entity, whatever lies under it** (decision D311; Tim, 2026-09-29: a click where an entity and an alert lie picks the alert). An alert is raised where the animal or the vehicle stood, so it lies under the marker of an entity that has not moved since, and a click there opened the alert; with the gateways shown and one under both it opened the gateway. The map draws the entity on top, but every layer under the cursor answered a click and the last one bound won. A click belongs to what is drawn on top now: the entity, then its device, an event, a point of a track, a gateway, and an area last. An alert that stands clear of a marker opens as before.
+
 - **The map on a dashboard shows the project's entities** (Tim, 2026-09-29: the map section is not showing anything). The tile stayed empty since it was built: its container was placed with a plain `absolute`, which MapLibre's own stylesheet turns back into `relative`, so the map had no height and drew into nothing. It holds its place now as every other map does, follows its card when the card changes size, and says how many entities have a position.
 
 - **Time labels under a narrow chart no longer run into each other**: a label that would touch its neighbour gives way, on the dashboard's tiles and in the Data Explorer.

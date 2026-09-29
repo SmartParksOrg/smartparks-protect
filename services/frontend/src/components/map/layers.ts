@@ -254,6 +254,43 @@ export function ensureEntityLayers(map: MapLibreMap): void {
   }
 }
 
+/** Who a click belongs to when several things lie under it, the first rank first.
+ *
+ * MapLibre calls the handler of every layer with something under the cursor, whatever the
+ * drawing order, and the handler bound last decided what the page showed. So a click on an
+ * animal that stands where its alert was raised opened the alert, and with the gateways on
+ * and one under both, the gateway (Tim, 2026-09-29). The ranks follow the drawing order, so
+ * what a person sees on top is what the click takes: the entity before its device, both
+ * before an event, an event before the point of a track it was raised at, the network under
+ * those, and an area last, since it is the largest thing on the map and the last one a person
+ * means to click. A new clickable layer takes its place here. */
+export const CLICK_RANKS: readonly (readonly string[])[] = [
+  ["entity-markers", "entity-clusters"],
+  ["device-markers", "device-clusters"],
+  ["event-markers"],
+  ["track-point-selected", "track-points"],
+  ["gateway-markers"],
+  ["features-fill", "features-line", "features-point"],
+];
+
+/** Whether the click on `layer` belongs to something of a higher rank under the same point. */
+export function yieldsClick(
+  map: MapLibreMap,
+  point: MapLayerMouseEvent["point"] | undefined,
+  layer: string,
+): boolean {
+  const rank = CLICK_RANKS.findIndex((layers) => layers.includes(layer));
+  if (rank <= 0 || !point) return false;
+  // only the layers this style has: queryRenderedFeatures refuses an id it does not know
+  const above = CLICK_RANKS.slice(0, rank)
+    .flat()
+    .filter((id) => map.getLayer(id));
+  return (
+    above.length > 0 &&
+    map.queryRenderedFeatures(point, { layers: above }).length > 0
+  );
+}
+
 /** Bind the entity and cluster clicks; the returned function unbinds them. */
 export function bindEntityClicks(
   map: MapLibreMap,
@@ -418,11 +455,13 @@ export function bindDeviceClicks(
   onClusterClick: (lngLat: [number, number], clusterId: number) => void,
 ): () => void {
   const onMarker = (e: MapLayerMouseEvent) => {
+    if (yieldsClick(map, e.point, "device-markers")) return;
     const feature = e.features?.[0];
     if (feature)
       onClick(feature.properties as unknown as DeviceFeatureProperties);
   };
   const onCluster = (e: MapLayerMouseEvent) => {
+    if (yieldsClick(map, e.point, "device-clusters")) return;
     const feature = e.features?.[0];
     if (!feature) return;
     const geometry = feature.geometry as GeoJSON.Point;
@@ -717,6 +756,7 @@ export function bindTrackPointClicks(
   onClick: (props: TrackPointProperties) => void,
 ): () => void {
   const onPoint = (e: MapLayerMouseEvent) => {
+    if (yieldsClick(map, e.point, "track-points")) return;
     const feature = e.features?.[0];
     if (feature) onClick(feature.properties as unknown as TrackPointProperties);
   };
@@ -884,39 +924,16 @@ const FEATURE_CLICK_LAYERS = [
   "features-point",
 ];
 
-/** What an area gives way to when both lie under the same click: everything drawn on top of it.
- *
- * A feature is drawn under the markers, but MapLibre calls the handler of every layer with
- * something under the cursor, whatever the drawing order, and the handler bound last decides
- * what the page shows. The feature's is bound last, so an animal standing in a geofence opened
- * the geofence (Tim, 2026-09-18). An area is the largest thing on the map and the last one a
- * person means to click, so it yields to all of these. */
-const ABOVE_FEATURES = [
-  "entity-markers",
-  "entity-clusters",
-  "device-markers",
-  "device-clusters",
-  "event-markers",
-  "gateway-markers",
-  "track-points",
-  "track-point-selected",
-];
-
 /** Bind the feature click (phase 19: a feature opens a panel); the returned function unbinds
  * it. The fill, the line and the point layers all answer, whichever is under the cursor, unless
- * something the person is likelier to have meant is under it too. */
+ * something the person is likelier to have meant is under it too: an area is the last rank of
+ * `CLICK_RANKS`, since an animal standing in a geofence opened the geofence (Tim, 2026-09-18). */
 export function bindFeatureClicks(
   map: MapLibreMap,
   onClick: (props: MapFeatureProperties) => void,
 ): () => void {
   const handler = (e: MapLayerMouseEvent) => {
-    // only the layers this style has: queryRenderedFeatures refuses an id it does not know
-    const above = ABOVE_FEATURES.filter((id) => map.getLayer(id));
-    if (
-      above.length > 0 &&
-      map.queryRenderedFeatures(e.point, { layers: above }).length > 0
-    )
-      return;
+    if (yieldsClick(map, e.point, FEATURE_CLICK_LAYERS[0])) return;
     const feature = e.features?.[0];
     if (feature) onClick(feature.properties as unknown as MapFeatureProperties);
   };
@@ -988,6 +1005,7 @@ export function bindEventClicks(
   onClick: (props: EventFeatureProperties) => void,
 ): () => void {
   const onMarker = (e: MapLayerMouseEvent) => {
+    if (yieldsClick(map, e.point, "event-markers")) return;
     const feature = e.features?.[0];
     if (feature)
       onClick(feature.properties as unknown as EventFeatureProperties);
@@ -1111,6 +1129,7 @@ export function bindGatewayClicks(
   onClick: (props: GatewayFeatureProperties) => void,
 ): () => void {
   const onMarker = (e: MapLayerMouseEvent) => {
+    if (yieldsClick(map, e.point, "gateway-markers")) return;
     const feature = e.features?.[0];
     if (feature)
       onClick(feature.properties as unknown as GatewayFeatureProperties);

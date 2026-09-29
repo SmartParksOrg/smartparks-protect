@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   BASEMAP_SOURCE_IDS,
+  CLICK_RANKS,
   SOURCES,
   assignTrackColors,
+  bindDeviceClicks,
   bindEntityClicks,
   bindEventClicks,
   bindFeatureClicks,
@@ -196,6 +198,77 @@ describe("map click binding", () => {
       features: [{ properties: { id: "f1", name: "F", feature_type: "zone" } }],
     });
     expect(seen).toEqual([]);
+  });
+});
+
+describe("who a click belongs to", () => {
+  const POINT = { x: 5, y: 5 };
+  /** Everything bound on one map, in the order the live map binds it, so the handler bound
+   * last is the area's and the event's comes after the entity's, as on the page. */
+  function bindAll(under: string[]) {
+    const { map, fire } = fakeMap(under);
+    const seen: string[] = [];
+    bindEntityClicks(map, (p) => seen.push(`entity:${p.entity_id}`), (_at, id) => seen.push(`entities:${id}`));
+    bindDeviceClicks(map, (p) => seen.push(`device:${p.device_id}`), (_at, id) => seen.push(`devices:${id}`));
+    bindEventClicks(map, (p) => seen.push(`event:${p.event_id}`));
+    bindGatewayClicks(map, (p) => seen.push(`gateway:${p.gateway_id}`));
+    bindTrackPointClicks(map, (p) => seen.push(`point:${p.key}`));
+    bindFeatureClicks(map, (p) => seen.push(`feature:${p.id}`));
+    /** One click: MapLibre calls the handler of every layer with something under it. */
+    const click = () => {
+      const properties = { entity_id: "e", device_id: "d", event_id: "ev", gateway_id: "g", key: "k", id: "f", cluster_id: 1 };
+      for (const layer of under)
+        fire(layer, { point: POINT, features: [{ properties, geometry: { type: "Point", coordinates: [0, 0] } }] });
+      return seen;
+    };
+    return click;
+  }
+
+  it("gives an animal that stands on its alert to the animal (Tim, 2026-09-29)", () => {
+    expect(bindAll(["entity-markers", "event-markers"])()).toEqual(["entity:e"]);
+  });
+
+  it("gives it to the animal with a gateway, a track point and an area under it too", () => {
+    const under = ["features-fill", "gateway-markers", "track-points", "event-markers", "entity-markers"];
+    expect(bindAll(under)()).toEqual(["entity:e"]);
+  });
+
+  it.each([
+    [["device-markers", "entity-markers"], "entity:e"],
+    [["event-markers", "device-markers"], "device:d"],
+    [["event-markers", "device-clusters"], "devices:1"],
+    [["track-points", "event-markers"], "event:ev"],
+    [["gateway-markers", "track-points"], "point:k"],
+    [["gateway-markers", "track-point-selected"], "point:k"],
+    [["features-point", "gateway-markers"], "gateway:g"],
+    [["event-markers", "entity-clusters"], "entities:1"],
+  ])("under %j the click is %s", (under, winner) => {
+    expect(bindAll(under)()).toEqual([winner]);
+  });
+
+  it.each([
+    ["event-markers", "event:ev"],
+    ["gateway-markers", "gateway:g"],
+    ["track-points", "point:k"],
+    ["device-markers", "device:d"],
+    ["features-line", "feature:f"],
+  ])("alone under the click, %s answers", (layer, winner) => {
+    expect(bindAll([layer])()).toEqual([winner]);
+  });
+
+  it("ranks every layer a handler is bound to, once", () => {
+    const ranked = CLICK_RANKS.flat();
+    expect(new Set(ranked).size).toBe(ranked.length);
+    const { map, count } = fakeMap();
+    bindEntityClicks(map, () => undefined, () => undefined);
+    bindDeviceClicks(map, () => undefined, () => undefined);
+    bindEventClicks(map, () => undefined);
+    bindGatewayClicks(map, () => undefined);
+    bindTrackPointClicks(map, () => undefined);
+    bindFeatureClicks(map, () => undefined);
+    // a handler per ranked layer: a layer that is clicked and not ranked would win by accident
+    expect(count()).toBe(ranked.length);
+    for (const id of ranked) expect(map.getLayer(id), id).toBeTruthy();
   });
 });
 
