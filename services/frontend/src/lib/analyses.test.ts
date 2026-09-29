@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  barDays,
   cardiacParameters,
+  dayLabel,
+  limitName,
+  type ResultChart,
   comparisonOf,
   documentOf,
   fixesPreset,
@@ -508,5 +512,65 @@ describe("the devices a performance form chooses", () => {
         all,
       ),
     ).toMatchObject({ device_type_id: "tag" });
+  });
+});
+
+describe("the charts of a vehicle run", () => {
+  const DAY = Date.UTC(2026, 8, 25);
+  const bars = (kind: ResultChart["kind"], ...xs: number[][]): ResultChart => ({
+    key: "daily_distance",
+    kind,
+    series: xs.map((days, i) => ({
+      subject: `s${i}`,
+      data: days.map((d) => [d, 1] as [number, number]),
+    })),
+  });
+
+  it("stands bars of days on their dates when every series has the same days", () => {
+    expect(barDays(bars("stacked", [DAY]))).toEqual([DAY]);
+    const week = [0, 1, 2].map((d) => DAY + d * 86_400_000);
+    expect(barDays(bars("bar", week, week))).toEqual(week);
+    // series of different days, a moment that is no midnight, a line, nothing at all
+    expect(barDays(bars("bar", week, week.slice(1)))).toBeNull();
+    expect(barDays(bars("bar", [DAY + 3_600_000]))).toBeNull();
+    expect(barDays(bars("line", week))).toBeNull();
+    expect(barDays(bars("bar", []))).toBeNull();
+    expect(
+      barDays({
+        key: "speed_bands",
+        kind: "bar",
+        series: [{ subject: "a", data: [["<10", 4]] }],
+      }),
+    ).toBeNull();
+    // the month's short name is the runtime's; the day and the month are what matters
+    expect(dayLabel(DAY, "en-GB")).toMatch(/^25 Sep/);
+    expect(dayLabel(DAY, "nl")).toMatch(/^25 sep/);
+    // a day of the project's calendar stays that day wherever the reader sits
+    expect(dayLabel(DAY + 86_400_000 - 1, "en-GB")).toMatch(/^25 Sep/);
+  });
+
+  it("names a limit by its speed, its source and where it holds", () => {
+    const t = (key: string, options?: Record<string, unknown>) =>
+      key.replace(/{{(\w+)}}/g, (_, name) => String(options?.[name]));
+    const labels = { run_limit: "limit of this run" };
+    expect(
+      limitName(
+        { value: 60, label: "run_limit", source: "run" },
+        labels,
+        "km/h",
+        t,
+      ),
+    ).toBe("60 km/h · limit of this run");
+    expect(
+      limitName(
+        { value: 40, label: "Camp road", source: "rule", zone: true },
+        labels,
+        "km/h",
+        t,
+      ),
+    ).toBe("40 km/h · Camp road, inside its area");
+    expect(
+      limitName({ value: 80, label: "", source: "rule" }, labels, null, t),
+    ).toBe("80");
   });
 });

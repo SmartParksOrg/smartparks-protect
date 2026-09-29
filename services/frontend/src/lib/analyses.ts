@@ -91,6 +91,41 @@ export interface ResultChart {
   breaks?: boolean;
 }
 
+const DAY_MS = 86_400_000;
+
+/** The days of a bar chart whose bars are days, as epoch milliseconds, or null when the chart
+ * is something else. Bars of days stand on a category axis, a bar to a day with its date
+ * under it: on a time axis a period of one day drew one bar as wide as the chart over the
+ * hours of a clock (found on dev, 2026-09-29). It holds when every series has the same days,
+ * each the midnight the module writes a day as; series of different days keep the time axis,
+ * where each bar finds its own place. */
+export function barDays(chart: ResultChart): number[] | null {
+  if (chart.kind !== "bar" && chart.kind !== "stacked") return null;
+  const first = (chart.series[0]?.data ?? []).map((d) => d[0]);
+  if (first.length === 0) return null;
+  const days: number[] = [];
+  for (const x of first) {
+    if (typeof x !== "number" || x < 1e11 || x % DAY_MS !== 0) return null;
+    days.push(x);
+  }
+  for (const s of chart.series) {
+    const xs = s.data ?? [];
+    if (xs.length !== days.length) return null;
+    if (xs.some((d, i) => d[0] !== days[i])) return null;
+  }
+  return days;
+}
+
+/** A day under its bar: the day and a short month, in the reader's language. The module
+ * writes a day of the project's calendar as that date's midnight in UTC, so UTC reads it. */
+export function dayLabel(day: number, language?: string): string {
+  return new Date(day).toLocaleDateString(language, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
 /** What a limit line says: its value, the rule or the run it comes from, and that it holds
  * inside an area when it does. The report's `limit_name` says the same in English. */
 export function limitName(

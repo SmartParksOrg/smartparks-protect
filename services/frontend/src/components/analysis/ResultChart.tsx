@@ -13,6 +13,8 @@ import { useEffect, useRef } from "react";
 
 import { useTheme } from "@/hooks/useTheme";
 import {
+  barDays,
+  dayLabel,
   farFromZero,
   limitName,
   type ResultChart as ResultChartData,
@@ -58,7 +60,8 @@ export function ResultChart({
   pointColors?: readonly string[];
   className?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language;
   const { resolved } = useTheme();
   const dark = resolved === "dark";
   const container = useRef<HTMLDivElement | null>(null);
@@ -152,6 +155,8 @@ export function ResultChart({
       ? Math.max(...limits.map((limit) => limit.value))
       : null;
     const banded = pointColors && chart.series.length === 1;
+    // bars of days stand a bar to a day with its date under it
+    const days = barDays(chart);
     const option: echarts.EChartsCoreOption = {
       animation: false,
       color: colors,
@@ -190,10 +195,12 @@ export function ResultChart({
           }
         : {
             xAxis: {
-              type:
-                typeof chart.series[0]?.data?.[0]?.[0] === "number"
+              type: days
+                ? "category"
+                : typeof chart.series[0]?.data?.[0]?.[0] === "number"
                   ? "time"
                   : "category",
+              data: days?.map((day) => dayLabel(day, language)),
               axisLabel: {
                 color: th.text,
                 fontSize: 10,
@@ -230,14 +237,17 @@ export function ResultChart({
           type: chart.kind === "line" ? "line" : "bar",
           coordinateSystem: rose ? "polar" : "cartesian2d",
           stack: chart.kind === "stacked" ? "all" : undefined,
-          data: rose
-            ? (s.data ?? []).map((d) => d[1])
-            : banded
-              ? (s.data ?? []).map((d, at) => ({
-                  value: d,
-                  itemStyle: { color: pointColors[at % pointColors.length] },
-                }))
-              : (s.data ?? []),
+          // a bar is never wider than a day of a fortnight, however few the days
+          barMaxWidth: days ? 56 : undefined,
+          data:
+            rose || days
+              ? (s.data ?? []).map((d) => d[1])
+              : banded
+                ? (s.data ?? []).map((d, at) => ({
+                    value: d,
+                    itemStyle: { color: pointColors[at % pointColors.length] },
+                  }))
+                : (s.data ?? []),
           showSymbol: false,
           connectNulls: !chart.breaks,
           markLine: i === 0 ? markLine : undefined,
@@ -259,7 +269,7 @@ export function ResultChart({
       ],
     };
     instance.current?.setOption(option, true);
-  }, [chart, labels, colorOf, pointColors, dark, t]);
+  }, [chart, labels, colorOf, pointColors, dark, t, language]);
   return (
     <div
       ref={container}
