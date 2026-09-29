@@ -32,6 +32,14 @@ PALETTE = [
 ]
 TEXT = "#3F4A44"
 GRID = "#DCE3DE"
+#: A speed limit across a chart (vehicle use, decision D307).
+LIMIT = "#A13D2D"
+#: The parts of a day or of a figure drawn dashed beside their solid partner: the night
+#: beside the day, the fastest beside the typical.
+DASHED_PARTS = frozenset({"night", "top"})
+#: The bars of the time per speed band in the colours of the map (`mapimage.SPEED_RAMP`).
+BAND_COLORS = ["#3C8D5A", "#B7D968", "#FBE251", "#F39A2B", "#CE3B25", "#55113A"]
+BAND_CHART = "speed_bands"
 #: An edge of the contact network carries data, so it is drawn darker than a gridline: on paper
 #: a pale dashed line at this width disappears, and the pairs it stands for are the finding.
 EDGE = "#9AA8A0"
@@ -103,7 +111,18 @@ def chart_svg(
         _box(fig, series, chart.get("unit"), labels, colors)
     else:
         marks = chart.get("marks") or []
-        _cartesian(fig, kind, series, chart.get("unit"), labels, colors, marks)
+        _cartesian(
+            fig,
+            kind,
+            series,
+            chart.get("unit"),
+            labels,
+            colors,
+            marks,
+            limits=chart.get("limits") or [],
+            breaks=bool(chart.get("breaks")),
+            banded=chart.get("key") == BAND_CHART,
+        )
     buffer = io.StringIO()
     fig.savefig(buffer, format="svg", bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
@@ -125,6 +144,10 @@ def _cartesian(
     labels: dict[str, str],
     colors: dict[str, str],
     marks: list[dict[str, Any]] | None = None,
+    *,
+    limits: list[dict[str, Any]] | None = None,
+    breaks: bool = False,
+    banded: bool = False,
 ) -> None:
     ax = fig.add_subplot(111)
     ax.grid(axis="x", visible=False)
@@ -143,7 +166,7 @@ def _cartesian(
             comparison = s.get("period") == "comparison"
             fit = bool(s.get("fit"))
             # a night series beside its day is dashed, as a comparison is
-            dashed = comparison or s.get("part") == "night"
+            dashed = comparison or s.get("part") in DASHED_PARTS
             ax.plot(
                 x,
                 y,
@@ -154,7 +177,14 @@ def _cartesian(
                 label=series_name(s, labels),
             )
             if len(series) == 1:
-                ax.fill_between(x, 0, np.nan_to_num(y), color=_color(s, i, colors), alpha=0.1)
+                # where the line breaks the fill stops too: a silence is not a zero
+                ax.fill_between(
+                    x,
+                    0,
+                    y if breaks else np.nan_to_num(y),
+                    color=_color(s, i, colors),
+                    alpha=0.1,
+                )
     else:
         n = len(series)
         positions = np.arange(len(xs))
@@ -178,11 +208,15 @@ def _cartesian(
                 )
                 bottom += y
             else:
+                # one vehicle's time per speed band wears the colours of the map's bands
+                in_bands = banded and n == 1 and len(y) == len(BAND_COLORS)
                 ax.bar(
                     positions - 0.4 + width * (i + 0.5),
                     y,
                     width,
-                    color=_color(s, i, colors),
+                    color=BAND_COLORS if in_bands else _color(s, i, colors),
+                    edgecolor=GRID if in_bands else None,
+                    linewidth=0.4 if in_bands else 0,
                     alpha=0.55 if s.get("period") == "comparison" else 1.0,
                     label=series_name(s, labels),
                 )
@@ -196,8 +230,10 @@ def _cartesian(
             for i, tick in enumerate(ax.get_xticklabels()):
                 tick.set_visible(i % max(1, len(xs) // 8) == 0)
         else:
+            # a week of dates is wider than a week of bars: they lean further to stay apart
+            lean = 40 if axis == "time" and len(xs) > 5 else 20
             for tick in ax.get_xticklabels():
-                tick.set_rotation(20)
+                tick.set_rotation(lean)
                 tick.set_horizontalalignment("right")
     if kind == "line" and axis == "time":
         locator = mdates.AutoDateLocator(minticks=3, maxticks=7)  # type: ignore[no-untyped-call]
@@ -217,6 +253,20 @@ def _cartesian(
     if kind == "line" and axis == "category" and len(xs) > 12:
         for i, tick in enumerate(ax.get_xticklabels()):
             tick.set_visible(i % 3 == 0)
+    for limit in limits or []:
+        value = limit.get("value")
+        if not isinstance(value, int | float):
+            continue
+        ax.axhline(float(value), color=LIMIT, linestyle="--", linewidth=0.8)
+        ax.annotate(
+            limit_name(limit, labels),
+            (1.0, float(value)),
+            xycoords=("axes fraction", "data"),
+            fontsize=6,
+            color=LIMIT,
+            ha="right",
+            va="bottom",
+        )
     if unit:
         ax.set_ylabel(unit)
     if not (kind == "line" and far_from_zero(series)):
@@ -230,6 +280,17 @@ def _cartesian(
             frameon=False,
             ncol=2,
         )
+
+
+def limit_name(limit: dict[str, Any], labels: dict[str, str]) -> str:
+    """What a limit line says: its speed, the rule or the run it comes from, and that it
+    holds inside an area when it does. The interface's `limitName` says the same."""
+    value = float(limit.get("value", 0))
+    label = str(limit.get("label", ""))
+    name = labels.get(label, label)
+    name = name[:36] + "…" if len(name) > 37 else name
+    where = ", inside its area" if limit.get("zone") else ""
+    return f"{value:g} km/h · {name}{where}" if name else f"{value:g} km/h"
 
 
 def far_from_zero(series: list[dict[str, Any]]) -> bool:

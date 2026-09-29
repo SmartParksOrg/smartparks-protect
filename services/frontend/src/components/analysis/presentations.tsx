@@ -23,6 +23,7 @@ import { ResultMap } from "@/components/analysis/ResultMap";
 import { ResultTable } from "@/components/analysis/ResultTable";
 import { SubjectCards } from "@/components/analysis/SubjectCards";
 import { TripsTable } from "@/components/analysis/TripsTable";
+import { VehicleCharts } from "@/components/analysis/VehicleCharts";
 import type { ResultDocument } from "@/lib/analyses";
 
 type Translate = (k: string) => string;
@@ -196,6 +197,9 @@ export function vehiclePresentation(
           labels={labels}
           colors={colors}
         />
+      ),
+      charts: (document, _run, colors) => (
+        <VehicleCharts document={document} labels={labels} colors={colors} />
       ),
       // the trips table is linked to the map; the others are plain
       tables: (document) => (
@@ -511,7 +515,17 @@ export const vehicleLabels = (t: Translate): Record<string, string> => ({
   first_movement: t("First movement"),
   last_movement: t("Last movement"),
   where: t("Where"),
+  speed_over_time: t("Speed over the period"),
   daily_distance: t("Distance per day"),
+  daily_driving: t("Driving time per day"),
+  hour_driving: t("Driving time by hour of the day"),
+  hour_speed: t("Speed by hour of the day"),
+  speed_bands: t("Time per speed band (from km/h)"),
+  daily_speeding: t("Speeding per day"),
+  typical: t("typical"),
+  top: t("fastest"),
+  run_limit: t("limit of this run"),
+  // the charts of a run made before decision D308
   speed_histogram: t("Speed (km/h)"),
   hour_profile: t("Distance by hour of the day"),
   summary: t("Summary"),

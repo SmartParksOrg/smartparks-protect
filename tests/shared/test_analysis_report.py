@@ -646,3 +646,98 @@ def _drawing(svg: str) -> str:
 
     without_date = re.sub(r"<dc:date>.*?</dc:date>", "", svg)
     return re.sub(r'(id|xlink:href|clip-path)="[^"]*"', "", without_date)
+
+
+def test_a_speed_chart_draws_its_limits_and_breaks_at_a_silence():
+    """The vehicle charts of decision D308: a limit is a named line across the chart, a
+    missing value breaks the line, and one vehicle's time per band wears the map's colours."""
+    from shared.analysis.report.charts import BAND_COLORS, LIMIT, chart_svg, limit_name
+
+    start = 1_790_000_000_000
+    speed = {
+        "key": "speed_over_time",
+        "kind": "line",
+        "unit": "km/h",
+        "breaks": True,
+        "limits": [
+            {"value": 60, "label": "run_limit", "source": "run", "zone": False},
+            {"value": 40, "label": "Camp road", "source": "rule", "zone": True},
+        ],
+        "series": [
+            {
+                "subject": str(A),
+                "period": "main",
+                "data": [
+                    [start + i * 600_000, v] for i, v in enumerate([0, 50, 70, None, None, 30])
+                ],
+            }
+        ],
+    }
+    labels = {str(A): "Bakkie", "run_limit": "limit of this run"}
+    svg = chart_svg(speed, labels, {})
+    assert "60 km/h · limit of this run" in svg
+    assert "40 km/h · Camp road, inside its area" in svg
+    assert LIMIT.lower() in svg.lower()
+    assert limit_name({"value": 80.0, "label": ""}, {}) == "80 km/h"
+
+    bands = {
+        "key": "speed_bands",
+        "kind": "bar",
+        "unit": "min",
+        "series": [
+            {
+                "subject": str(A),
+                "period": "main",
+                "data": [
+                    [k, v]
+                    for k, v in zip(["<10", "10", "20", "40", "80", ">120"], range(6), strict=True)
+                ],
+            }
+        ],
+    }
+    svg = chart_svg(bands, labels, {str(A): "#52735E"})
+    assert all(color.lower() in svg.lower() for color in BAND_COLORS)
+    # two vehicles side by side keep their own colours
+    two = dict(bands, series=[bands["series"][0], dict(bands["series"][0], subject=str(B))])
+    svg = chart_svg(two, labels, {str(A): "#52735E", str(B): "#D9825F"})
+    assert BAND_COLORS[5].lower() not in svg.lower()
+
+
+def test_a_trip_is_coloured_by_its_speed_and_outlined_over_the_limit():
+    from shared.analysis.report.mapimage import (
+        SPEED_BAND_EDGES_KMH,
+        SPEED_RAMP,
+        shapes_from_geometries,
+        speed_color,
+    )
+
+    assert len(SPEED_RAMP) == len(SPEED_BAND_EDGES_KMH) + 1
+    assert [SPEED_RAMP.index(speed_color(v)) for v in (5, 10, 39.9, 79, 100, 130)] == [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+    ]
+    assert speed_color(None) == SPEED_RAMP[0]
+    line = {"type": "LineString", "coordinates": [[31.5, -24.9], [31.6, -24.9]]}
+    rows = [
+        # a run of today: the module says which side of the limit the stretch was on
+        {
+            "kind": "trip_segment",
+            "geojson": line,
+            "level": 0.8,
+            "properties": {"speed_kmh": 48, "limit_kmh": 60, "over_limit": False},
+        },
+        # a run of before decision D306: the speed and the limit say it
+        {
+            "kind": "trip_segment",
+            "geojson": line,
+            "level": 1.5,
+            "properties": {"speed_kmh": 90, "limit_kmh": 60},
+        },
+    ]
+    shapes = shapes_from_geometries(rows, {})
+    assert [s.color for s in shapes] == [SPEED_RAMP[3], SPEED_RAMP[4]]
+    assert [s.outlined for s in shapes] == [False, True]

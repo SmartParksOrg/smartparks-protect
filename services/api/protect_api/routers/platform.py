@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,14 +22,15 @@ from protect_api.schemas.platform import (
     DashboardRead,
     DashboardUpdate,
     EventCreate,
+    MetricTileOptions,
     ProjectIconCreate,
     ProjectIconRead,
 )
 from protect_api.schemas.rules import EventRead
 from shared.bus import RedisStreamsBus
 from shared.database import get_session
-from shared.enums import ActorType
-from shared.models import Dashboard, Device, Entity, ProjectIcon, SavedView, User
+from shared.enums import ActorType, ValueType
+from shared.models import Dashboard, Device, Entity, Metric, ProjectIcon, SavedView, User
 from shared.permissions import Permission
 from shared.rules.events import NewEvent, create_event, event_messages
 from shared.timeutil import require_aware, utc_now
@@ -242,6 +244,65 @@ async def delete_icon(
 # Dashboards (decision D86)
 
 
+async def _metric_options(
+    session: AsyncSession, project_id: uuid.UUID, tile: Any
+) -> dict[str, Any]:
+    """The options of a metric tile, checked: metrics the registry knows and can aggregate,
+    subjects of the kind the tile groups by, entities of this project. What the tile may
+    show of them is decided when it is read, by the reader's own scope."""
+
+    def refuse(reason: str) -> HTTPException:
+        return HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"metric tile {tile.id}: {reason}"
+        )
+
+    try:
+        options = MetricTileOptions.model_validate(tile.options)
+    except ValidationError as error:
+        first = error.errors()[0]
+        where = ".".join(str(part) for part in first["loc"])
+        raise refuse(f"{where}: {first['msg']}") from None
+    if options.display == "number" and len(options.metrics) > 1:
+        raise refuse("a single number shows one metric")
+    if options.group_by == "entity" and options.device_ids:
+        raise refuse("a tile per entity takes entities, not devices")
+    if options.group_by == "device" and options.entity_ids:
+        raise refuse("a tile per device takes devices, not entities")
+    known = {
+        m.key: m
+        for m in (
+            await session.scalars(select(Metric).where(Metric.key.in_(options.metrics)))
+        ).all()
+    }
+    for key in options.metrics:
+        metric = known.get(key)
+        if metric is None:
+            raise refuse(f"unknown metric {key}")
+        if metric.value_type not in (ValueType.NUMERIC, ValueType.BOOLEAN):
+            raise refuse(f"{key} is not a number and cannot be drawn")
+    if options.entity_ids:
+        found = set(
+            (
+                await session.scalars(
+                    select(Entity.id).where(
+                        Entity.id.in_(options.entity_ids), Entity.project_id == project_id
+                    )
+                )
+            ).all()
+        )
+        if len(found) < len(set(options.entity_ids)):
+            raise refuse("an entity is not in this project")
+    if options.device_ids:
+        found = set(
+            (
+                await session.scalars(select(Device.id).where(Device.id.in_(options.device_ids)))
+            ).all()
+        )
+        if len(found) < len(set(options.device_ids)):
+            raise refuse("a device does not exist")
+    return options.model_dump(mode="json")
+
+
 async def _validate_tiles(
     session: AsyncSession, project_id: uuid.UUID, tiles: list[Any]
 ) -> list[dict[str, Any]]:
@@ -262,6 +323,8 @@ async def _validate_tiles(
                     status.HTTP_422_UNPROCESSABLE_CONTENT,
                     f"saved view {tile.saved_view_id} is not in this project",
                 )
+        if tile.kind == "metric":
+            tile.options = await _metric_options(session, project_id, tile)
         result.append(tile.model_dump(mode="json"))
     return result
 

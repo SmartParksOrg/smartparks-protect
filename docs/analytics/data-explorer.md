@@ -42,7 +42,7 @@ The chart above the canvas bound, the dashboards' saved view tiles and the aggre
 | `data_source_id` | Restrict to rows that came through one data source. |
 | `from`, `to` | Time range, ISO 8601 with offset. Default: the last 24 hours. |
 | `bucket` | `1s`, `10s`, `1m`, `5m`, `15m`, `1h`, `6h`, `1d`, `7d`, or `all` for one bucket over the whole range (the statistics view). Empty means automatic. |
-| `agg` (repeatable) | `mean`, `min`, `max`, `median`, `sum`, `count`, `first`, `last`. Default `mean`, `min`, `max`, `count`. |
+| `agg` (repeatable) | `mean`, `min`, `max`, `median`, `sum`, `count`, `first`, `last`, and `last_at`, the moment the last value was measured in seconds since the epoch. Default `mean`, `min`, `max`, `count`. |
 | `group_by` | `entity` (default) or `device`. One series per metric and entity or device. |
 | `layout` | `series` (default, arrays per series for charts), `long` (one row per bucket and series) or `wide` (one row per bucket, one column per series and aggregate, named `metric|owner|aggregate`). |
 

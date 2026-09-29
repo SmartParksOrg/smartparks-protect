@@ -1,9 +1,12 @@
 """The stop rule and the trips on synthetic tracks (phase 39, decisions D303 and D304): a
 parked receiver drifting adds no distance, a drive is one trip with its figures, a halt shorter
-than the stop time is a pause and a longer one ends the trip, speeding reads the reported speed."""
+than the stop time is a pause and a longer one ends the trip, speeding reads the reported speed.
+And phase 40 (decisions D306 to D308): the bands of the path, the speed over the period with
+its breaks, the series per day on every day of the period, the limits of the rules."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 
 import numpy as np
 import pytest
@@ -12,10 +15,17 @@ from shared.analysis.base import Period, Subject
 from shared.analysis.modules.movement import MovementParameters, analyse_trajectory
 from shared.analysis.modules.vehicle_use import (
     METRICS,
+    SPEED_BAND_EDGES_KMH,
+    SPEED_BAND_LABELS,
+    Limit,
     Site,
     VehicleParameters,
     analyse_vehicle,
     build_document,
+    merge_limits,
+    speed_bucket_s,
+    speed_class,
+    speed_limits_of,
 )
 from shared.analysis.primitives.trajectory import fold_stops, steps, trajectory_from
 from shared.analysis.primitives.trips import segment_trips, speeding_episodes
@@ -186,22 +196,171 @@ def test_the_vehicle_figures_and_the_document():
     roles = [g.properties["role"] for g in r.geometries if g.kind == "trip_marker"]
     assert roles == ["start", "end", "start", "end"]
     assert kinds.count("speeding") == 1
-    # the first trip runs at 60 km/h (at the limit, one class) and the second at 90 (far over)
+    # the first trip runs at 60 km/h (the band from 40, at the limit and not over it) and the
+    # second at 90 (the band from 80, over the limit)
     segments = [g for g in r.geometries if g.kind == "trip_segment"]
     assert len(segments) == 2 and segments[0].geojson["type"] == "LineString"
     assert [g.properties["speed_class"] for g in segments] == [3, 4]
+    assert [g.properties["over_limit"] for g in segments] == [False, True]
     assert segments[0].properties["trip"] == 1 and segments[1].properties["speed_kmh"] == 90
     assert [g.properties["short"] for g in r.geometries if g.kind == "speeding"] == ["90"]
-    assert dict(r.speed_hist)["60"] == 30 and dict(r.speed_hist)["80"] == 10
-    assert sum(v for _, v in r.hour_km) == pytest.approx(42, rel=0.01)
+    # thirty minutes in the band from 40 and ten in the band from 80
+    bands = dict(r.band_min)
+    assert list(bands) == SPEED_BAND_LABELS
+    assert bands["40"] == pytest.approx(30, abs=1) and bands["80"] == pytest.approx(10, abs=1)
+    assert sum(bands.values()) == pytest.approx(40, abs=1)
+    assert sum(v for _, v in r.hour_h) == pytest.approx(40 / 60, rel=0.05)
+    # 12:00 UTC is 14:00 on the project's clock: both hours of the drive have their speeds
+    typical, top = dict(r.hour_typical_kmh), dict(r.hour_top_kmh)
+    assert typical["14"] == 60 and top["15"] == 90 and typical["3"] is None
+    # the period touches one local day; its distance, driving time and speeding stand on it
+    assert [len(x) for x in (r.daily_km, r.daily_h, r.daily_speeding_min)] == [1, 1, 1]
+    assert r.daily_km[0][1] == pytest.approx(42, rel=0.01)
+    assert r.daily_speeding_min[0][1] == pytest.approx(9, abs=1)
+    # the speed over the two hours, a point a minute: parked is zero, the drive its speed,
+    # and after the last fix the record is silent, which is no value at all
+    speeds = [v for _, v in r.speed_series]
+    assert len(speeds) == 120 and speeds[0] == 0 and speeds[20] == 60
+    assert max(v for v in speeds if v is not None) == 90
+    assert speeds[94] == 0 and speeds[95] is None and speeds[-1] is None
 
+    limits = [
+        Limit(40, "Camp road", "rule", zone=True),
+        Limit(60, "Speeding", "rule"),
+        Limit(40, "School", "rule", zone=True),
+    ]
     document = build_document(
-        [SUBJECT], [_period(2)], {("main", SUBJECT.id): r}, params, input_count=90, excluded_count=0
+        [SUBJECT],
+        [_period(2)],
+        {("main", SUBJECT.id): r},
+        params,
+        input_count=90,
+        excluded_count=0,
+        limits=limits,
     )
     assert document.module == "vehicle_use"
     assert [t.key for t in document.tables] == ["summary", "trips", "days", "speeding"]
-    assert [c.key for c in document.charts] == ["daily_distance", "speed_histogram", "hour_profile"]
+    assert [c.key for c in document.charts] == [
+        "speed_over_time",
+        "daily_distance",
+        "daily_driving",
+        "hour_driving",
+        "hour_speed",
+        "speed_bands",
+        "daily_speeding",
+    ]
+    charts = {c.key: c for c in document.charts}
+    # the run's limit leads and keeps its name where a rule judges by the same speed; two
+    # rules of one speed share a line
+    assert [(x["value"], x["label"], x["zone"]) for x in charts["speed_over_time"].limits] == [
+        (60, "run_limit", False),
+        (40, "Camp road, School", True),
+    ]
+    assert charts["speed_over_time"].breaks and charts["hour_speed"].limits
+    assert [s["part"] for s in charts["hour_speed"].series] == ["typical", "top"]
     assert document.tables[1].rows[0][8] == 90  # the trips table leads with the fastest
+
+
+def test_the_bands_widen_and_the_limit_cuts_a_stretch():
+    assert [speed_class(v) for v in (0, 9.9, 10, 19, 20, 39, 40, 79, 80, 119, 120, 200)] == [
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        3,
+        3,
+        4,
+        4,
+        5,
+        5,
+    ]
+    # every band is at least as wide as the one before it
+    edges = (0.0, *SPEED_BAND_EDGES_KMH)
+    widths = [b - a for a, b in pairwise(edges)]
+    assert widths == sorted(widths)
+    # 50 and 70 km/h are one band; a limit of 60 between them still cuts the path in two
+    track = _drive((5, 0, 0), (10, 830, 50), (10, 1170, 70), (25, 0, 0))
+    params = VehicleParameters(
+        entity_ids=[SUBJECT.id], time_from=START, time_to=START + timedelta(hours=1)
+    )
+    r = analyse_vehicle(track, params, _period(1), "UTC", [], SUBJECT)
+    segments = [g for g in r.geometries if g.kind == "trip_segment"]
+    assert [g.properties["speed_class"] for g in segments] == [3, 3]
+    assert [g.properties["over_limit"] for g in segments] == [False, True]
+
+
+def test_the_speed_over_time_keeps_its_points_in_hand():
+    hour, week, year = 3600, 7 * 86_400, 366 * 86_400
+    assert speed_bucket_s(hour, 1) == 60
+    assert speed_bucket_s(week, 1) == 900 and week / 900 <= 1000
+    # many vehicles share the document's points, so each gets a coarser line
+    assert speed_bucket_s(week, 25) == 3 * 3600 and week / (3 * 3600) <= 4000 / 25
+    assert speed_bucket_s(year, 1) == 86_400
+
+
+def test_a_gap_breaks_the_speed_line_and_a_quiet_vehicle_keeps_its_days():
+    # a drive, three hours of silence (longer than the gap), a drive again
+    first = _drive((10, 1000, 60))
+    times = list(first.times) + [t + 4 * 3600 for t in first.times]
+    lon = list(first.lon) + [x + 0.2 for x in first.lon]
+    track = trajectory_from(
+        SUBJECT.id, times, [LAT] * len(times), lon, speeds=[60 / 3.6] * len(times)
+    )
+    params = VehicleParameters(
+        entity_ids=[SUBJECT.id],
+        time_from=START,
+        time_to=START + timedelta(hours=6),
+        gap_hours=2,
+    )
+    r = analyse_vehicle(track, params, _period(6), "UTC", [], SUBJECT, bucket_s=600)
+    speeds = [v for _, v in r.speed_series]
+    assert len(speeds) == 36
+    assert speeds[0] == 60 and speeds[24] == 60
+    assert all(v is None for v in speeds[1:24])  # the silence, not a standstill
+
+    # a vehicle without a fix in a period of three days still has three days on its axis
+    nothing = trajectory_from(SUBJECT.id, [], [], [])
+    long = Period(time_from=START, time_to=START + timedelta(days=3) - timedelta(hours=12))
+    quiet = analyse_vehicle(nothing, params, long, "UTC", [], SUBJECT)
+    assert [v for _, v in quiet.daily_km] == [0, 0, 0]
+    assert all(v is None for _, v in quiet.speed_series)
+
+
+def test_the_limits_a_rule_judges_by():
+    anywhere = {"conditions": {"type": "threshold", "metric": "speed_kmh", "op": ">", "value": 60}}
+    assert [(x.value, x.label, x.zone) for x in speed_limits_of("Speeding", anywhere)] == [
+        (60, "Speeding", False)
+    ]
+    inside = {
+        "conditions": {
+            "all": [
+                {"type": "threshold", "metric": "speed_kmh", "op": ">=", "value": 40},
+                {"type": "spatial", "relation": "inside", "feature_type": "zone"},
+            ]
+        }
+    }
+    assert [(x.value, x.zone) for x in speed_limits_of("Camp", inside)] == [(40, True)]
+    # a rule about something else, or one that asks for a slow vehicle, draws no line
+    battery = {
+        "conditions": {"type": "threshold", "metric": "battery_voltage", "op": ">", "value": 3}
+    }
+    slow = {"conditions": {"type": "threshold", "metric": "speed_kmh", "op": "<", "value": 5}}
+    assert speed_limits_of("Battery", battery) == [] and speed_limits_of("Slow", slow) == []
+    nested = {
+        "conditions": {
+            "any": [
+                {"not": {"type": "threshold", "metric": "speed_kmh", "op": ">", "value": 30}},
+                {"all": [{"type": "threshold", "metric": "speed_kmh", "op": ">", "value": 80}]},
+            ]
+        }
+    }
+    assert sorted(x.value for x in speed_limits_of("Nested", nested)) == [30, 80]
+    # the lowest stay when a project has more rules than a chart can carry
+    many = [Limit(float(v), f"Rule {v}", "rule") for v in range(10, 130, 10)]
+    kept = merge_limits([Limit(60, "run_limit", "run"), *many])
+    assert [x.value for x in kept] == [60, 10, 20, 30, 40, 50]
 
 
 def test_a_vehicle_without_reported_speeds_says_so():

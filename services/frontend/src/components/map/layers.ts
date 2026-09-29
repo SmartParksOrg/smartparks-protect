@@ -177,6 +177,12 @@ export function stateFor(
   return "normal";
 }
 
+/** How near two markers must stand, in pixels, before they become one cluster. A marker is
+ * 29 px wide, so at 48 px animals a marker's width apart were already one circle with a
+ * number, long before they touched (Tim, 2026-09-29: the icons group too early). At 28 px
+ * they group when they would overlap, and the devices follow the same rule. */
+export const CLUSTER_RADIUS_PX = 28;
+
 /** Add the entity source and layers once; features are pushed with `setEntities`. Click
  * handlers are not bound here: the map outlives a project change on the same page, so a handler
  * registered once would keep the callbacks of the first project. Use `bindEntityClicks` from an
@@ -188,7 +194,7 @@ export function ensureEntityLayers(map: MapLibreMap): void {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
     cluster: true,
-    clusterRadius: 48,
+    clusterRadius: CLUSTER_RADIUS_PX,
     clusterMaxZoom: 14,
     promoteId: "entity_id",
   });
@@ -333,7 +339,7 @@ export function ensureDeviceLayers(map: MapLibreMap): void {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
     cluster: true,
-    clusterRadius: 48,
+    clusterRadius: CLUSTER_RADIUS_PX,
     clusterMaxZoom: 14,
     promoteId: "device_id",
   });

@@ -101,6 +101,33 @@ async def test_a_vehicle_run_over_a_drive(client, db):
     )
     assert "Rhino 14 is not a vehicle" in mixed.json()["reasons"][0]
 
+    # a rule of the project that judges a speed inside an area, and one that is switched
+    # off: the first gives the speed chart a line beside the run's own limit
+    zone_rule = {
+        "trigger": {"kind": "position"},
+        "conditions": {
+            "all": [
+                {"type": "threshold", "metric": "speed_kmh", "op": ">", "value": 40},
+                {"type": "spatial", "relation": "inside", "feature_type": "zone"},
+            ]
+        },
+        "event": {"event_type": "SPEED_LIMIT_VIOLATION", "title": "{entity} at {value} km/h"},
+    }
+    off_rule = dict(
+        zone_rule,
+        conditions={"type": "threshold", "metric": "speed_kmh", "op": ">", "value": 25},
+    )
+    for name, document, enabled in (
+        ("Camp road", zone_rule, True),
+        ("Switched off", off_rule, False),
+    ):
+        made = await client.post(
+            f"/api/v1/projects/{project.id}/rules",
+            json={"name": unique_name(name), "document": document, "enabled": enabled},
+            headers=h,
+        )
+        assert made.status_code == 201, made.text
+
     params = {"entity_ids": [car["id"]], **window, "limit_kmh": 60}
     estimate = await client.get(
         f"{base}/estimate",
@@ -115,7 +142,7 @@ async def test_a_vehicle_run_over_a_drive(client, db):
     )
     assert created.status_code == 201, created.text
     run_id = uuid.UUID(created.json()["id"])
-    assert created.json()["method_version"] == "vehicle_use/1"
+    assert created.json()["method_version"] == "vehicle_use/2"
 
     await run_analysis(db, await db.get(AnalysisRun, run_id))
     body = (await client.get(f"{base}/{run_id}", headers=h)).json()
@@ -132,8 +159,29 @@ async def test_a_vehicle_run_over_a_drive(client, db):
     tables = {t["key"]: t for t in document["tables"]}
     assert len(tables["trips"]["rows"]) == 1 and tables["trips"]["rows"][0][8] == 75
     assert len(tables["speeding"]["rows"]) == 1
-    # the trip in runs of one speed class (60 then 75 then 60 km/h against a limit of 60),
-    # a numbered start and end, and the speeding marker
+    charts = {c["key"]: c for c in document["charts"]}
+    assert list(charts) == [
+        "speed_over_time",
+        "daily_distance",
+        "daily_driving",
+        "hour_driving",
+        "hour_speed",
+        "speed_bands",
+        "daily_speeding",
+    ]
+    lines = charts["speed_over_time"]["limits"]
+    assert [(x["value"], x["source"], x["zone"]) for x in lines] == [
+        (60, "run", False),
+        (40, "rule", True),
+    ]
+    assert lines[1]["label"].startswith("Camp road")
+    speeds = [v for _, v in charts["speed_over_time"]["series"][0]["data"]]
+    assert len(speeds) == 120 and max(v for v in speeds if v is not None) == 75
+    assert speeds[-1] is None  # the second hour has no fix: a silence, not a standstill
+    assert charts["daily_distance"]["series"][0]["data"][0][1] == pytest.approx(30, rel=0.02)
+    # the trip in runs of one band on one side of the limit (60 then 75 then 60 km/h, all in
+    # the band from 40, the middle one over the limit of 60), a numbered start and end, and
+    # the speeding marker
     assert document["geometries"]["trip_segment"] == 3
     assert document["geometries"]["trip_marker"] == 2
     assert document["geometries"]["speeding"] == 1
@@ -151,7 +199,8 @@ async def test_a_vehicle_run_over_a_drive(client, db):
     )
     features = trip.json()["features"]
     assert all(f["geometry"]["type"] == "LineString" for f in features)
-    assert {f["properties"]["speed_class"] for f in features} == {3, 4}
+    assert {f["properties"]["speed_class"] for f in features} == {3}
+    assert sorted(f["properties"]["over_limit"] for f in features) == [False, False, True]
     assert features[0]["properties"]["top_kmh"] == 75 and features[0]["properties"]["trip"] == 1
     count = await db.scalar(
         select(Position.id).where(Position.entity_id == uuid.UUID(car["id"])).limit(1)

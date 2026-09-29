@@ -71,6 +71,12 @@ class Chart(BaseModel):
     #: Moments to mark on a time axis, each `{at: epoch ms, label}`: an event the chart is read
     #: around (decision D289).
     marks: list[dict[str, Any]] = Field(default_factory=list)
+    #: Values to mark on the value axis, each `{value, label, source, zone}`: a speed limit
+    #: the line is read against (decision D307). `label` is a key of the labels or a name.
+    limits: list[dict[str, Any]] = Field(default_factory=list)
+    #: A missing value breaks the line rather than being bridged: a silence in the record is
+    #: not a value between its neighbours (the speed over time, decision D308).
+    breaks: bool = False
 
 
 class Table(BaseModel):

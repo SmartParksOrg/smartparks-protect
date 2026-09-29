@@ -4,13 +4,18 @@ speed and where they started and ended, distance and driving hours per day, the 
 episodes the reported speed shows, the time paused inside trips, and a map of the trips.
 Everything comes from the positions and the speed a device reports with its fix; nothing new
 is collected. Subjects are entities of the Vehicles type and its sub-types; the check refuses
-anything else before a run is queued."""
+anything else before a run is queued.
+
+Phase 40 (decisions D306 to D308): the path is coloured by the speed itself in bands that
+widen, a stretch over the limit is marked apart, and the charts are the ones a vehicle manager
+reads: the speed over the period with the known limits as lines, distance and driving time
+per day, use and speed by the hour of the day, the time per speed band and speeding per day."""
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -52,25 +57,34 @@ from shared.analysis.primitives.trips import (
 )
 from shared.analysis.quality import quality_report
 from shared.geodesy import haversine_m
-from shared.models import Entity, EntityType, Project
+from shared.models import Entity, EntityType, Project, Rule, RuleVersion
 
-METHOD_VERSION = "vehicle_use/1"
+METHOD_VERSION = "vehicle_use/2"
 #: The catalogue key of the type whose entities (and sub-types) are vehicles.
 VEHICLE_TYPE_KEY = "vehicle"
 KMH = 3.6
-#: Fixed bins in km/h, so every vehicle shares one axis.
-SPEED_EDGES_KMH = [0, 10, 20, 30, 40, 50, 60, 70, 80, 100, 120, np.inf]
-SPEED_LABELS = ["<10", "10", "20", "30", "40", "50", "60", "70", "80", "100", ">120"]
+#: The speed bands in km/h, the same for the map, its legend and the chart (decision D306).
+#: They widen as the speed rises, roughly doubling: a vehicle in a park spends its day under
+#: 40 km/h and one on a highway above 80, and even steps gave the first one colour and the
+#: second another (Tim, 2026-09-29: almost everything was red above 50 km/h). The last edge is
+#: 120 and not 160 because that is where a highway's limit sits.
+SPEED_BAND_EDGES_KMH = (10.0, 20.0, 40.0, 80.0, 120.0)
+#: What each band starts at, as the legend shows it under its colour.
+SPEED_BAND_LABELS = ["<10", "10", "20", "40", "80", ">120"]
+#: Bucket widths of the speed over time, seconds; the finest that fits the points is taken.
+SPEED_BUCKETS_S = (60, 300, 600, 900, 1800, 3600, 3 * 3600, 6 * 3600, 86_400)
+#: Points of the speed over time in one document, shared by its vehicles and periods.
+SPEED_POINTS = 4000
+#: And per series, however few the vehicles.
+SPEED_POINTS_PER_SERIES = 1000
+#: Limit lines a chart carries: the run's and the lowest of the project's rules.
+MAX_LIMITS = 6
 FEW_FIXES = 10
 #: Below this share of fixes with a reported speed the run says the speeds are mostly means.
 FEW_SPEEDS_SHARE = 0.5
 #: Trips and speeding rows a run keeps per subject; the rest is counted.
 MAX_TRIP_ROWS = 500
-#: The speed classes of a trip's segments, as a share of the limit: well under, under, at,
-#: over, far over. Green to red on the map, the way fleet tools and sport apps colour a path
-#: (Tim, 2026-09-27); merged runs of one class keep the geometry count in hand.
-SPEED_CLASS_EDGES = (0.5, 0.85, 1.0, 1.25)
-#: Segment geometries per subject before a trip is drawn as one line in its top speed's class.
+#: Segment geometries per subject before a trip is drawn as one line in its top speed's band.
 SEGMENT_BUDGET = 1500
 
 #: The summary's keys in the order the table shows them.
@@ -133,8 +147,13 @@ class SubjectResult:
     days: list[list[Any]] = field(default_factory=list)
     speeding: list[list[Any]] = field(default_factory=list)
     daily_km: list[list[float]] = field(default_factory=list)
-    speed_hist: list[list[Any]] = field(default_factory=list)
-    hour_km: list[list[Any]] = field(default_factory=list)
+    daily_h: list[list[float]] = field(default_factory=list)
+    daily_speeding_min: list[list[float]] = field(default_factory=list)
+    speed_series: list[list[float | None]] = field(default_factory=list)
+    hour_h: list[list[Any]] = field(default_factory=list)
+    hour_typical_kmh: list[list[Any]] = field(default_factory=list)
+    hour_top_kmh: list[list[Any]] = field(default_factory=list)
+    band_min: list[list[Any]] = field(default_factory=list)
     warnings: list[Warning] = field(default_factory=list)
     geometries: list[Geometry] = field(default_factory=list)
     figures: dict[str, float] = field(default_factory=dict)
@@ -158,12 +177,41 @@ def _place(lat: float, lon: float, sites: list[Site], radius_m: float) -> str:
     return best[1] if best else f"{lat:.4f}, {lon:.4f}"
 
 
-def speed_class(level: float) -> int:
-    """The class of a speed given as a share of the limit, 0 to 4."""
-    for index, edge in enumerate(SPEED_CLASS_EDGES):
-        if level < edge:
+@dataclass(slots=True)
+class Limit:
+    """A speed limit the charts draw as a line: the run's own, or one a rule of the project
+    judges by (decision D307). A rule's limit inside an area holds only there."""
+
+    value: float
+    label: str
+    source: str  # "run" or "rule"
+    zone: bool = False
+
+    def document(self) -> dict[str, Any]:
+        return {
+            "value": self.value,
+            "label": self.label,
+            "source": self.source,
+            "zone": self.zone,
+        }
+
+
+def speed_class(kmh: float) -> int:
+    """The band of a speed in km/h, 0 to 5 (`SPEED_BAND_EDGES_KMH`)."""
+    for index, edge in enumerate(SPEED_BAND_EDGES_KMH):
+        if kmh < edge:
             return index
-    return len(SPEED_CLASS_EDGES)
+    return len(SPEED_BAND_EDGES_KMH)
+
+
+def speed_bucket_s(period_s: float, series: int) -> int:
+    """The width of a bucket of the speed over time: the finest of the ladder that keeps a
+    series within its share of the document's points."""
+    points = max(100, min(SPEED_POINTS_PER_SERIES, SPEED_POINTS // max(1, series)))
+    for width in SPEED_BUCKETS_S:
+        if period_s / width <= points:
+            return width
+    return SPEED_BUCKETS_S[-1]
 
 
 def _step_kmh(track: Trajectory, s: Any, i: int) -> float:
@@ -171,18 +219,20 @@ def _step_kmh(track: Trajectory, s: Any, i: int) -> float:
     that leaves a parked fix reporting zero is as fast as its arrival says), else the mean over
     the step."""
     ends = [float(v) for v in (track.speed_mps[i], track.speed_mps[i + 1]) if np.isfinite(v)]
+    # rounded, so a speed that came in as 60 km/h is 60 again and not a hair over the limit
     if ends:
-        return max(ends) * KMH
-    return float(s.speed_mps[i]) * KMH if np.isfinite(s.speed_mps[i]) else 0.0
+        return round(max(ends) * KMH, 3)
+    return round(float(s.speed_mps[i]) * KMH, 3) if np.isfinite(s.speed_mps[i]) else 0.0
 
 
 def trip_segments(
     track: Trajectory, s: Any, moving: NDArray[np.bool_], trip: Trip, limit_kmh: float
-) -> list[tuple[int, int, float, int]]:
-    """The trip cut into runs of one speed class: `(start_index, end_index, top_kmh, class)`
-    per run, consecutive moving steps of the same class joined, still steps folded into the
-    run around them."""
-    runs: list[tuple[int, int, float, int]] = []
+) -> list[tuple[int, int, float, int, bool]]:
+    """The trip cut into runs of one speed band on one side of the limit:
+    `(start_index, end_index, top_kmh, band, over)` per run, consecutive moving steps alike in
+    both joined, still steps folded into the run around them. The limit cuts as well as the
+    band, so the stretch drawn as over the limit is the stretch that was."""
+    runs: list[tuple[int, int, float, int, bool]] = []
     current: list[Any] | None = None
     for i in range(trip.start_index, trip.end_index):
         if not moving[i]:
@@ -190,17 +240,71 @@ def trip_segments(
                 current[1] = i + 1
             continue
         kmh = _step_kmh(track, s, i)
-        klass = speed_class(kmh / limit_kmh)
-        if current is not None and current[3] == klass:
+        klass = speed_class(kmh)
+        over = kmh > limit_kmh
+        if current is not None and current[3] == klass and current[4] == over:
             current[1] = i + 1
             current[2] = max(current[2], kmh)
         else:
             if current is not None:
-                runs.append((current[0], current[1], current[2], current[3]))
-            current = [i, i + 1, kmh, klass]
+                runs.append((current[0], current[1], current[2], current[3], current[4]))
+            current = [i, i + 1, kmh, klass, over]
     if current is not None:
-        runs.append((current[0], current[1], current[2], current[3]))
+        runs.append((current[0], current[1], current[2], current[3], current[4]))
     return runs
+
+
+def speed_over_time(
+    track: Trajectory,
+    s: Any,
+    moving: NDArray[np.bool_],
+    period: Period,
+    bucket_s: int,
+) -> list[list[float | None]]:
+    """The fastest speed per bucket over the whole period, `[epoch ms, km/h]`. A bucket with
+    fixes takes the fastest of them (the reported speed, else the speed of the moving step the
+    fix starts or ends); a bucket between two fixes takes the step over it, zero when the
+    vehicle stood; a bucket the record is silent over (a gap, before the first fix, after the
+    last) is None, which breaks the line, since a silence is not a standstill."""
+    n = len(track)
+    start = period.time_from.timestamp()
+    count = max(1, int(np.ceil((period.time_to.timestamp() - start) / bucket_s)))
+    if n == 0:
+        return [[_ms(start + b * bucket_s), None] for b in range(count)]
+    fix_kmh = np.where(np.isfinite(track.speed_mps), track.speed_mps * KMH, 0.0)
+    step_kmh = np.array([_step_kmh(track, s, i) if moving[i] else 0.0 for i in range(len(s))])
+    unreported = ~np.isfinite(track.speed_mps)
+    if len(s):
+        # a fix without a reported speed is as fast as the moving step it ends or starts
+        around = np.zeros(n)
+        around[:-1] = step_kmh
+        around[1:] = np.maximum(around[1:], step_kmh)
+        fix_kmh = np.where(unreported, around, fix_kmh)
+    top = np.full(count, -1.0)
+    index = np.clip(((track.times - start) // bucket_s).astype(int), 0, count - 1)
+    np.maximum.at(top, index, fix_kmh)
+    out: list[list[float | None]] = []
+    for b in range(count):
+        at = start + b * bucket_s
+        if top[b] >= 0:
+            out.append([_ms(at), round(float(top[b]), 1)])
+            continue
+        # no fix in the bucket: the step that spans it says what happened meanwhile
+        i = int(np.searchsorted(track.times, at, side="right")) - 1
+        if i < 0 or i >= len(s) or bool(s.gap[i]):
+            out.append([_ms(at), None])
+        else:
+            out.append([_ms(at), round(float(step_kmh[i]), 1)])
+    return out
+
+
+def days_of(period: Period, zone: ZoneInfo) -> list[date]:
+    """Every local day the period touches, so the vehicles of a run share one axis and a day
+    nothing moved on reads as zero rather than missing."""
+    first = period.time_from.astimezone(zone).date()
+    # the period ends just before `time_to`: a run to midnight does not touch the next day
+    last = (period.time_to - timedelta(seconds=1)).astimezone(zone).date()
+    return [first + timedelta(days=d) for d in range(max(0, (last - first).days) + 1)]
 
 
 def _line(track: Trajectory, start: int, end: int) -> list[list[float]]:
@@ -223,12 +327,17 @@ def analyse_vehicle(
     *,
     excluded: int = 0,
     folded: int = 0,
+    bucket_s: int | None = None,
 ) -> SubjectResult:
     """The figures of one vehicle in one period from a trajectory already filtered and
-    folded; pure apart from the arrays it reads."""
+    folded; pure apart from the arrays it reads. `bucket_s` is the width of a bucket of the
+    speed over time, which the run sets for all its vehicles together."""
     gap_s = params.gap_hours * 3600
     s = steps(track, gap_s)
     window_s = (period.time_to - period.time_from).total_seconds()
+    zone = ZoneInfo(tz)
+    all_days = days_of(period, zone)
+    width_s = bucket_s or speed_bucket_s(window_s, 1)
     n = len(track)
     summary: dict[str, float | str | None] = dict.fromkeys(METRICS)
     summary["fixes"] = float(n)
@@ -248,6 +357,10 @@ def analyse_vehicle(
         summary["median_interval_min"] = round(figures["median_interval_s"] / 60, 1)
     result = SubjectResult(summary, warnings=warnings, figures=figures)
     if n == 0:
+        # the charts keep their axes: a vehicle that reported nothing is a flat line of days
+        empty = np.zeros(0, dtype=np.bool_)
+        result.speed_series = speed_over_time(track, s, empty, period, width_s)
+        _daily_series(result, all_days, {}, {})
         return result
 
     with_speed = int(np.isfinite(track.speed_mps).sum())
@@ -287,7 +400,6 @@ def analyse_vehicle(
         if trip.distance_m >= params.min_trip_m
     ]
     moving = moving_steps(track, s, params.moving_kmh / KMH)
-    zone = ZoneInfo(tz)
     days = local_days(track.times, tz)
 
     distance_m = sum(t.distance_m for t in trips)
@@ -362,16 +474,22 @@ def analyse_vehicle(
             "to": end_place,
         }
         title = f"{subject.name}: trip {k}, {trip.distance_m / 1000:.1f} km, top {top_kmh:.0f} km/h"
-        # the path in runs of one speed class, green to red against the limit; past the
-        # budget a trip is one line in the class of its top speed
+        # the path in runs of one speed band, and of one side of the limit; past the budget
+        # a trip is one line in the band of its top speed
         runs = (
             trip_segments(track, s, moving, trip, params.limit_kmh)
             if len(result.geometries) < SEGMENT_BUDGET
             else [
-                (trip.start_index, trip.end_index, top_kmh, speed_class(top_kmh / params.limit_kmh))
+                (
+                    trip.start_index,
+                    trip.end_index,
+                    top_kmh,
+                    speed_class(top_kmh),
+                    top_kmh > params.limit_kmh,
+                )
             ]
         )
-        for start_i, end_i, run_kmh, klass in runs:
+        for start_i, end_i, run_kmh, klass, over in runs:
             line = _line(track, start_i, end_i)
             if len(line) < 2:
                 continue
@@ -382,7 +500,12 @@ def analyse_vehicle(
                     label=title,
                     level=round(min(run_kmh / params.limit_kmh, 2.0), 3),
                     geojson={"type": "LineString", "coordinates": line},
-                    properties={**about, "speed_kmh": round(run_kmh, 1), "speed_class": klass},
+                    properties={
+                        **about,
+                        "speed_kmh": round(run_kmh, 1),
+                        "speed_class": klass,
+                        "over_limit": over,
+                    },
                 )
             )
         # one numbered marker where the trip began and one where it ended, one layer
@@ -409,9 +532,12 @@ def analyse_vehicle(
             )
 
     # per local day: trips that started, distance of the moving steps that started that day,
-    # the driving time of those steps, and the first and last movement
+    # the driving time of those steps, and the first and last movement; per hour of the day
+    # the driving time and the speeds driven; per speed band the minutes driven in it
     per_day: dict[Any, dict[str, float]] = {}
-    per_hour = [0.0] * 24
+    hour_h = [0.0] * 24
+    hour_speeds: list[list[float]] = [[] for _ in range(24)]
+    band_min = [0.0] * len(SPEED_BAND_LABELS)
     for i in np.where(moving)[0]:
         day = days[i]
         row = per_day.setdefault(day, {"km": 0.0, "h": 0.0, "first": np.inf, "last": -np.inf})
@@ -420,7 +546,10 @@ def analyse_vehicle(
         row["first"] = min(row["first"], float(track.times[i]))
         row["last"] = max(row["last"], float(track.times[i + 1]))
         hour = datetime.fromtimestamp(float(track.times[i]), tz=UTC).astimezone(zone).hour
-        per_hour[hour] += float(s.dist_m[i]) / 1000
+        kmh = _step_kmh(track, s, int(i))
+        hour_h[hour] += float(s.dt_s[i]) / 3600
+        hour_speeds[hour].append(kmh)
+        band_min[speed_class(kmh)] += float(s.dt_s[i]) / 60
     trips_by_day: dict[Any, int] = {}
     for trip in trips:
         day = days[trip.start_index]
@@ -443,24 +572,45 @@ def analyse_vehicle(
                 clock(row["last"]),
             ]
         )
-    result.daily_km = [
-        [_ms(datetime(d.year, d.month, d.day, tzinfo=UTC).timestamp()), round(row["km"], 3)]
-        for d, row in sorted(per_day.items())
+    result.hour_h = [[str(h), round(v, 2)] for h, v in enumerate(hour_h)]
+    # the speed a vehicle usually drives at that hour and the fastest it drove; an hour it
+    # never drove in has neither
+    result.hour_typical_kmh = [
+        [str(h), round(float(np.median(v)), 1) if v else None] for h, v in enumerate(hour_speeds)
     ]
-    result.hour_km = [[str(h), round(v, 3)] for h, v in enumerate(per_hour)]
-
-    # the speed histogram: the reported speeds while moving, else the step speeds
-    reported = track.speed_mps[np.isfinite(track.speed_mps)]
-    reported = reported[reported > params.moving_kmh / KMH]
-    speeds_kmh = (reported if reported.size else s.speed_mps[moving & (s.dt_s > 0)]) * KMH
-    if speeds_kmh.size:
-        hist, _ = np.histogram(speeds_kmh, bins=SPEED_EDGES_KMH)
-        result.speed_hist = [[SPEED_LABELS[i], int(hist[i])] for i in range(len(SPEED_LABELS))]
+    result.hour_top_kmh = [
+        [str(h), round(float(max(v)), 1) if v else None] for h, v in enumerate(hour_speeds)
+    ]
+    result.band_min = [[SPEED_BAND_LABELS[i], round(v, 1)] for i, v in enumerate(band_min)]
+    result.speed_series = speed_over_time(track, s, moving, period, width_s)
 
     episodes = speeding_episodes(track, params.limit_kmh / KMH) if with_speed else []
     _speeding_figures(result, episodes, track, subject, period, sites, params)
+    # an episode counts on the day it began
+    speeding_by_day: dict[Any, float] = {}
+    for episode in episodes:
+        day = days[episode.start_index]
+        speeding_by_day[day] = speeding_by_day.get(day, 0.0) + episode.duration_s / 60
+    _daily_series(result, all_days, per_day, speeding_by_day)
     result.figures = figures
     return result
+
+
+def _daily_series(
+    result: SubjectResult,
+    all_days: list[date],
+    per_day: dict[Any, dict[str, float]],
+    speeding_by_day: dict[Any, float],
+) -> None:
+    """The three series per day over every day of the period, a day without movement as zero,
+    so the bars of several vehicles stand on the same days."""
+
+    def at(day: date) -> float:
+        return _ms(datetime(day.year, day.month, day.day, tzinfo=UTC).timestamp())
+
+    result.daily_km = [[at(d), round(per_day.get(d, {}).get("km", 0.0), 3)] for d in all_days]
+    result.daily_h = [[at(d), round(per_day.get(d, {}).get("h", 0.0), 2)] for d in all_days]
+    result.daily_speeding_min = [[at(d), round(speeding_by_day.get(d, 0.0), 1)] for d in all_days]
 
 
 def _speeding_figures(
@@ -525,10 +675,18 @@ def build_document(
     input_count: int,
     excluded_count: int,
     geometries: dict[str, int] | None = None,
+    limits: list[Limit] | None = None,
 ) -> ResultDocument:
     """The result document: the summary per subject and period, the summary table with a
-    mean row for several vehicles, the trips, days and speeding tables, the charts."""
+    mean row for several vehicles, the trips, days and speeding tables, the charts. `limits`
+    are the limits the project's rules judge by; the run's own always leads them."""
     geometries = geometries or {}
+    lines = [
+        limit.document()
+        for limit in merge_limits(
+            [Limit(value=params.limit_kmh, label="run_limit", source="run"), *(limits or [])]
+        )
+    ]
     summary: dict[str, dict[str, dict[str, float | str | None]]] = {}
     warnings: list[Warning] = []
     rows: list[list[Any]] = []
@@ -608,25 +766,51 @@ def build_document(
         ),
     ]
 
-    def series(pick: Any) -> list[dict[str, Any]]:
+    def series(pick: Any, part: str | None = None) -> list[dict[str, Any]]:
         out = []
         for period in periods:
             for subject in subjects:
                 r = results.get((period.key, subject.id))
                 if r is None:
                     continue
-                out.append({"subject": str(subject.id), "period": period.key, "data": pick(r)})
+                row = {"subject": str(subject.id), "period": period.key, "data": pick(r)}
+                if part:
+                    row["part"] = part
+                out.append(row)
         return out
 
+    # what a vehicle manager reads, in the order of the questions: how fast and against which
+    # limit, how far and how long per day, when in the day, at which speeds, how often too fast
     charts = [
-        Chart(key="daily_distance", kind="bar", unit="km", series=series(lambda r: r.daily_km)),
         Chart(
-            key="speed_histogram",
-            kind="bar",
-            unit="fixes",
-            series=series(lambda r: r.speed_hist),
+            key="speed_over_time",
+            kind="line",
+            unit="km/h",
+            series=series(lambda r: r.speed_series),
+            limits=lines,
+            breaks=True,
         ),
-        Chart(key="hour_profile", kind="bar", unit="km", series=series(lambda r: r.hour_km)),
+        Chart(key="daily_distance", kind="stacked", unit="km", series=series(lambda r: r.daily_km)),
+        Chart(key="daily_driving", kind="stacked", unit="h", series=series(lambda r: r.daily_h)),
+        Chart(key="hour_driving", kind="stacked", unit="h", series=series(lambda r: r.hour_h)),
+        Chart(
+            key="hour_speed",
+            kind="line",
+            unit="km/h",
+            series=[
+                *series(lambda r: r.hour_typical_kmh, "typical"),
+                *series(lambda r: r.hour_top_kmh, "top"),
+            ],
+            limits=lines,
+            breaks=True,
+        ),
+        Chart(key="speed_bands", kind="bar", unit="min", series=series(lambda r: r.band_min)),
+        Chart(
+            key="daily_speeding",
+            kind="stacked",
+            unit="min",
+            series=series(lambda r: r.daily_speeding_min),
+        ),
     ]
     return ResultDocument(
         module="vehicle_use",
@@ -651,9 +835,81 @@ def build_document(
                 "positions (device fixes, effective time and geometry, valid rows) with the "
                 "speed the receiver reported",
                 "features of type site, for the names of where a trip started and ended",
+                "the enabled rules of the project that judge a speed, for the limit lines",
             ],
         ),
     )
+
+
+def merge_limits(limits: list[Limit]) -> list[Limit]:
+    """One line per value: limits of the same speed share a line and their names, the run's
+    first; the lowest `MAX_LIMITS` stay, since a chart with ten lines says nothing."""
+    by_value: dict[float, Limit] = {}
+    for limit in limits:
+        known = by_value.get(limit.value)
+        if known is None:
+            by_value[limit.value] = Limit(limit.value, limit.label, limit.source, limit.zone)
+        elif limit.source == "rule":
+            if known.source == "run":
+                # the run's limit is one a rule judges by too; the line keeps the run's name
+                continue
+            known.label = f"{known.label}, {limit.label}"
+            known.zone = known.zone and limit.zone
+    ordered = sorted(by_value.values(), key=lambda limit: (limit.source != "run", limit.value))
+    return ordered[:MAX_LIMITS]
+
+
+def speed_limits_of(name: str, document: dict[str, Any]) -> list[Limit]:
+    """The limits a rule document judges a speed by: every threshold on `speed_kmh` that asks
+    for more than a value, anywhere in its conditions. The rule holds inside an area when the
+    same document has a spatial condition that says inside."""
+    found: list[float] = []
+    inside = False
+
+    def walk(node: Any) -> None:
+        nonlocal inside
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+        kind = node.get("type")
+        if (
+            kind == "threshold"
+            and node.get("metric") == "speed_kmh"
+            and node.get("op") in (">", ">=")
+            and isinstance(node.get("value"), int | float)
+        ):
+            found.append(float(node["value"]))
+        if kind == "spatial" and node.get("relation") == "inside":
+            inside = True
+        for key in ("all", "any", "not"):
+            if key in node:
+                walk(node[key])
+
+    walk(document.get("conditions"))
+    return [Limit(value=v, label=name, source="rule", zone=inside) for v in found if v > 0]
+
+
+async def load_speed_limits(session: AsyncSession, project_id: uuid.UUID) -> list[Limit]:
+    """The limits of the project's enabled rules, each in the version that runs today."""
+    rows = (
+        await session.execute(
+            select(Rule.name, RuleVersion.document)
+            .join(
+                RuleVersion,
+                (RuleVersion.rule_id == Rule.id) & (RuleVersion.version == Rule.current_version),
+            )
+            .where(Rule.project_id == project_id, Rule.enabled.is_(True))
+            .order_by(Rule.name)
+            .limit(200)
+        )
+    ).all()
+    limits: list[Limit] = []
+    for name, document in rows:
+        limits.extend(speed_limits_of(name, document or {}))
+    return limits
 
 
 async def load_sites(session: AsyncSession, project_id: uuid.UUID) -> list[Site]:
@@ -740,6 +996,10 @@ class VehicleUseModule:
                 )
             )
         sites = await load_sites(session, ctx.project_id)
+        limits = await load_speed_limits(session, ctx.project_id)
+        # one bucket width for the run, from its longest period and the series it draws
+        longest_s = max((p.time_to - p.time_from).total_seconds() for p in periods)
+        bucket_s = speed_bucket_s(longest_s, len(subjects) * len(periods))
         results: dict[tuple[str, uuid.UUID], SubjectResult] = {}
         geometries: list[Geometry] = []
         input_count = excluded_count = 0
@@ -768,6 +1028,7 @@ class VehicleUseModule:
                     subject,
                     excluded=dropped,
                     folded=folded,
+                    bucket_s=bucket_s,
                 )
                 results[(period.key, subject.id)] = r
                 geometries.extend(r.geometries)
@@ -784,5 +1045,6 @@ class VehicleUseModule:
             input_count=input_count,
             excluded_count=excluded_count,
             geometries=counts,
+            limits=limits,
         )
         return RunResult(document=document, geometries=geometries)

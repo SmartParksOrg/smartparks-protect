@@ -127,6 +127,18 @@ async def test_automatic_bucket_and_layouts(client, db):
     assert long["bucket"] == "all" and len(long["rows"]) == 1
     assert long["rows"][0]["count"] == 13 and long["rows"][0]["metric_key"] == "battery_voltage"
 
+    # the latest value with the moment it was measured, over the whole range: what a
+    # dashboard's table and single number read (decision D309)
+    latest = (
+        await client.get(
+            _url(project, metric="battery_voltage", bucket="all", agg=["last", "last_at"]) + window,
+            headers=admin.headers,
+        )
+    ).json()
+    values = latest["series"][0]["points"][0]["values"]
+    assert values["last"] == pytest.approx(4.2)
+    assert values["last_at"] == pytest.approx((T0 + timedelta(minutes=120)).timestamp())
+
     by_device = (
         await client.get(
             _url(project, metric="battery_voltage", group_by="device", device_id=device["id"])

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import * as maplibregl from "maplibre-gl";
+import type { GeoJSONSource } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router";
 
@@ -28,6 +28,7 @@ import {
   ensureEntityLayers,
   setEntities,
 } from "@/components/map/layers";
+import { maplibregl } from "@/components/map/maplibre";
 import { useMap } from "@/components/map/useMap";
 import {
   type Aggregate,
@@ -169,7 +170,12 @@ export function SavedViewTile({
   );
 }
 
-/** Latest positions of the project's entities on a small map. */
+/** Latest positions of the project's entities on a small map.
+ *
+ * The tile stayed empty until 2026-09-29: MapLibre's stylesheet sets `position: relative` on
+ * its container, which beat the plain `absolute` here, so the container had no height and the
+ * map drew into nothing. `absolute!` holds, as on every other map (the z-index ladder of the
+ * frontend conventions says so), and the map is told when its card changes size. */
 export function MapTile({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
   const container = useRef<HTMLDivElement | null>(null);
@@ -196,8 +202,7 @@ export function MapTile({ projectId }: { projectId: string }) {
       map,
       () => undefined,
       (lngLat, clusterId) => {
-        const source = map.getSource("entities") as
-          maplibregl.GeoJSONSource | undefined;
+        const source = map.getSource("entities") as GeoJSONSource | undefined;
         void source
           ?.getClusterExpansionZoom(clusterId)
           .then((zoom) => map.easeTo({ center: lngLat, zoom }));
@@ -216,11 +221,24 @@ export function MapTile({ projectId }: { projectId: string }) {
       fitted.current = true;
     }
   }, [mapRef, ready, features]);
+  // a tile changes size with the dashboard's edit mode and the window; the map follows
+  useEffect(() => {
+    const map = mapRef.current;
+    const box = container.current;
+    if (!map || !ready || !box) return;
+    const observer = new ResizeObserver(() => map.resize());
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [mapRef, ready]);
   return (
-    <div className="relative h-full min-h-64">
-      <div ref={container} className="absolute inset-0 rounded-md" />
-      <div className="absolute bottom-1 right-1 rounded bg-background/80 px-1 text-xs text-muted-foreground">
-        {current.data ? `${current.data.total} entities` : ""}{" "}
+    <div className="relative h-full min-h-64 overflow-hidden rounded-md">
+      <div ref={container} className="absolute! inset-0 z-0" />
+      <div className="absolute top-1 left-1 z-10 rounded bg-background/80 px-1 text-xs text-muted-foreground">
+        {current.data
+          ? t("{{count}} entities with a position", {
+              count: current.data.total,
+            })
+          : ""}{" "}
         <Link className="underline" to={`/projects/${projectId}/map`}>
           {t("open map")}
         </Link>

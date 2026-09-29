@@ -118,7 +118,17 @@ VEHICLE_LABELS: dict[str, str] = {
     "first_movement": "First movement",
     "last_movement": "Last movement",
     "where": "Where",
+    "speed_over_time": "Speed over the period",
     "daily_distance": "Distance per day",
+    "daily_driving": "Driving time per day",
+    "hour_driving": "Driving time by hour of the day",
+    "hour_speed": "Speed by hour of the day",
+    "speed_bands": "Time per speed band (from km/h)",
+    "daily_speeding": "Speeding per day",
+    "typical": "typical",
+    "top": "fastest",
+    "run_limit": "limit of this run",
+    # the charts of a run made before decision D308
     "speed_histogram": "Speed (km/h)",
     "hour_profile": "Distance by hour of the day",
     "summary": "Summary",
@@ -1010,7 +1020,8 @@ KIND_LEGEND: dict[str, str] = {
     "cluster": "Clusters of fixes",
     "coverage": "Coverage of the fixes: the hull around a device's valid fixes, in its colour",
     "gateway": "Gateways heard: a marker per gateway, larger for a bigger share of the uplinks",
-    "trip_segment": "Trips by speed against the limit, from well under (green) to far over (red)",
+    "trip_segment": "Trips by speed: under 10 km/h, from 10, 20, 40 and 80, and over 120; "
+    "a dark outline where the speed was over the limit",
     "trip_marker": "Where a trip began (green) and ended (dark), with its number",
     "speeding": "Speeding: a marker where an episode was fastest, with the speed",
 }

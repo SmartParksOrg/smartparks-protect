@@ -118,9 +118,26 @@ class ProjectIconRead(ORMModel):
     created_at: datetime
 
 
+class MetricTileOptions(BaseModel):
+    """What a metric tile shows (decision D309): any metric of the registry that can be
+    aggregated, for the chosen entities or devices or for the first of the project that fit,
+    over a period that moves with the clock, as a line, bars, a table with a row per subject
+    or the latest value as a number."""
+
+    model_config = {"extra": "forbid"}
+
+    metrics: list[str] = Field(min_length=1, max_length=4)
+    entity_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
+    device_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
+    group_by: Literal["entity", "device"] = "entity"
+    range: Literal["24h", "7d", "30d", "90d", "1y"] = "7d"
+    aggregate: Literal["mean", "min", "max", "median", "sum", "count", "first", "last"] = "mean"
+    display: Literal["line", "bar", "table", "number"] = "line"
+
+
 class DashboardTile(BaseModel):
     id: str = Field(min_length=1, max_length=64)
-    kind: Literal["saved_view", "map", "alerts", "events", "entity_status"]
+    kind: Literal["saved_view", "map", "alerts", "events", "entity_status", "metric"]
     size: Literal["s", "m", "l"] = "m"
     title: str | None = Field(default=None, max_length=120)
     saved_view_id: uuid.UUID | None = None

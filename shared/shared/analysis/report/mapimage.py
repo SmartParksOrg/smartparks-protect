@@ -55,8 +55,15 @@ BACKGROUND = "#F1F4F2"
 #: The areas by pressure, warm like the use they summarise (Tim, 2026-09-18); the same five
 #: steps as the interface's `PRESSURE_RAMP`, so a report and the map read alike.
 PRESSURE_RAMP = ["#F6F0EA", "#E6D6C6", "#D2B096", "#BE8663", "#AF4436"]
-#: A trip's path by speed against the limit (vehicle use), the interface's `SPEED_RAMP`.
-SPEED_RAMP = ["#3C8D5A", "#8FBF4D", "#E3B23C", "#D9622B", "#A13D2D"]
+#: A trip's path by its speed (vehicle use, decision D306), the interface's `SPEED_RAMP`:
+#: six bands that widen, green through yellow and red to dark. Measured against five other
+#: candidates, this one keeps its steps furthest apart under both red-green colour
+#: blindnesses, because after the green its lightness only falls.
+SPEED_RAMP = ["#3C8D5A", "#B7D968", "#FBE251", "#F39A2B", "#CE3B25", "#55113A"]
+#: Where each band after the first starts, km/h; the module's `SPEED_BAND_EDGES_KMH`.
+SPEED_BAND_EDGES_KMH = (10.0, 20.0, 40.0, 80.0, 120.0)
+#: The outline of a stretch driven over the limit.
+OVER_LIMIT_COLOR = "#1F2A24"
 #: The markers of a trip: where it began, where it ended, where it sped.
 MARKER_COLORS = {"trip_marker": "#52735E", "trip_end": "#1F2A24", "speeding": "#A13D2D"}
 FILL_ALPHA = {
@@ -89,6 +96,8 @@ class Shape:
     level: float | None = None
     #: A word on a marker: the number of a trip, the speed of an episode.
     text: str | None = None
+    #: A stretch of a trip driven over the limit: drawn with a dark outline.
+    outlined: bool = False
 
 
 @dataclass
@@ -173,17 +182,29 @@ def metres_per_pixel(zoom: float) -> float:
     return WORLD / (TILE * 2**zoom)
 
 
-def speed_color(level: float | None) -> str:
-    """The class of a speed given as a share of the limit, the module's `speed_class`."""
-    if level is None or not math.isfinite(level) or level < 0.5:
+def speed_color(kmh: float | None) -> str:
+    """The colour of a speed in km/h by its band, the module's `speed_class`."""
+    if kmh is None or not math.isfinite(kmh):
         return SPEED_RAMP[0]
-    if level < 0.85:
-        return SPEED_RAMP[1]
-    if level < 1:
-        return SPEED_RAMP[2]
-    if level < 1.25:
-        return SPEED_RAMP[3]
-    return SPEED_RAMP[4]
+    for index, edge in enumerate(SPEED_BAND_EDGES_KMH):
+        if kmh < edge:
+            return SPEED_RAMP[index]
+    return SPEED_RAMP[-1]
+
+
+def _segment_speed(row: dict[str, Any]) -> tuple[float | None, bool]:
+    """The speed of a trip's stretch and whether it was over the limit. A run of before
+    decision D306 has no `over_limit`, and its speed and limit say the same."""
+    properties = row.get("properties")
+    if not isinstance(properties, dict):
+        return None, False
+    kmh = properties.get("speed_kmh")
+    limit = properties.get("limit_kmh")
+    speed = float(kmh) if isinstance(kmh, int | float) else None
+    over = properties.get("over_limit")
+    if not isinstance(over, bool):
+        over = speed is not None and isinstance(limit, int | float) and speed > float(limit)
+    return speed, over
 
 
 def pressure_color(level: float | None) -> str:
@@ -420,6 +441,18 @@ def _draw_shape(ax: Any, item: Shape) -> None:
         for line in lines:
             xy = [mercator(x, y) for x, y in line.coords]
             xs, ys = zip(*xy, strict=True)
+            if item.kind == "trip_segment":
+                # a thin dark edge keeps the light bands readable on a light map; over the
+                # limit it is wide enough to be the message
+                ax.plot(
+                    xs,
+                    ys,
+                    color=OVER_LIMIT_COLOR,
+                    linewidth=width + (2.0 if item.outlined else 0.7),
+                    alpha=0.9 if item.outlined else 0.45,
+                    zorder=4,
+                    solid_capstyle="round",
+                )
             ax.plot(
                 xs,
                 ys,
@@ -496,10 +529,12 @@ def shapes_from_geometries(
         if geometry.is_empty:
             continue
         kind = str(row.get("kind", ""))
+        outlined = False
         if kind == "area":
             color = pressure_color(row.get("level"))
         elif kind == "trip_segment":
-            color = speed_color(row.get("level"))
+            kmh, outlined = _segment_speed(row)
+            color = speed_color(kmh)
         elif kind in MARKER_COLORS:
             marker_props = row.get("properties") or {}
             role = marker_props.get("role") if isinstance(marker_props, dict) else None
@@ -517,6 +552,7 @@ def shapes_from_geometries(
                 str(row.get("label", "")),
                 float(level) if isinstance(level, int | float) else None,
                 str(text) if text is not None else None,
+                outlined,
             )
         )
     shapes.sort(key=lambda s: -s.geometry.area)

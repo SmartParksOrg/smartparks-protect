@@ -49,27 +49,45 @@ export const ANALYSIS_KINDS = [
   "speeding",
 ] as const;
 
-/** A trip's path by speed against the limit (vehicle use, phase 39): well under, under, at,
- * over and far over, green to red, the way fleet tools and sport apps colour a path so the
- * fast stretches read at a glance (Tim, 2026-09-27). `SPEED_CLASS_EDGES` in the module cut the
- * classes; the report's `SPEED_RAMP` holds the same five colours. */
+/** A trip's path by its speed (vehicle use, decision D306): six bands in km/h that widen,
+ * green through yellow and red to dark, the way fleet tools and sport apps colour a path.
+ * The bands were shares of the run's limit before, and with a limit of 60 everything above
+ * 75 km/h was the last red, so a drive over a highway was one colour (Tim, 2026-09-29).
+ * Speeding is said apart now: a stretch over the limit has a dark outline.
+ *
+ * Measured against five other candidates, this ramp keeps its steps furthest apart under
+ * both red-green colour blindnesses, because after the green its lightness only falls. The
+ * report's `SPEED_RAMP` and the module's `SPEED_BAND_EDGES_KMH` hold the same. */
 export const SPEED_RAMP = [
   "#3C8D5A",
-  "#8FBF4D",
-  "#E3B23C",
-  "#D9622B",
-  "#A13D2D",
+  "#B7D968",
+  "#FBE251",
+  "#F39A2B",
+  "#CE3B25",
+  "#55113A",
 ] as const;
-/** What each speed class starts at, as a share of the limit. */
-export const SPEED_CLASS_STARTS = [0, 0.5, 0.85, 1, 1.25] as const;
-export function speedColor(level: number | null | undefined): string {
-  if (level === null || level === undefined || !Number.isFinite(level))
+/** Where each band after the first starts, km/h. */
+export const SPEED_BAND_EDGES_KMH = [10, 20, 40, 80, 120] as const;
+/** What the legend and the chart show under each colour. */
+export const SPEED_BAND_LABELS = ["<10", "10", "20", "40", "80", ">120"];
+/** The outline of a stretch driven over the limit, and the thin edge of every other. */
+export const OVER_LIMIT_COLOR = "#1F2A24";
+export function speedColor(kmh: number | null | undefined): string {
+  if (kmh === null || kmh === undefined || !Number.isFinite(kmh))
     return SPEED_RAMP[0];
-  if (level < 0.5) return SPEED_RAMP[0];
-  if (level < 0.85) return SPEED_RAMP[1];
-  if (level < 1) return SPEED_RAMP[2];
-  if (level < 1.25) return SPEED_RAMP[3];
-  return SPEED_RAMP[4];
+  for (let i = 0; i < SPEED_BAND_EDGES_KMH.length; i++)
+    if (kmh < SPEED_BAND_EDGES_KMH[i]) return SPEED_RAMP[i];
+  return SPEED_RAMP[SPEED_RAMP.length - 1];
+}
+/** Whether a stretch of a trip was over the limit. The module says so; a run of before
+ * decision D306 does not, and its speed and limit say the same. */
+export function overLimit(
+  properties: Record<string, unknown> | null | undefined,
+): boolean {
+  if (typeof properties?.over_limit === "boolean") return properties.over_limit;
+  const kmh = properties?.speed_kmh;
+  const limit = properties?.limit_kmh;
+  return typeof kmh === "number" && typeof limit === "number" && kmh > limit;
 }
 /** The markers of a trip: where it began, where it ended, where it sped; a number or the
  * speed on each, as fleet maps draw them. */
@@ -183,9 +201,10 @@ export function decorateAnalysisFeatures(
             kind === "area"
               ? pressureColor(level)
               : kind === "trip_segment"
-                ? speedColor(level)
+                ? speedColor(f.properties?.speed_kmh as number | undefined)
                 : (markerColor(kind, f.properties?.role) ?? colorOf(subject)),
           opacity: FILL_OPACITY[kind] ?? 0.2,
+          ...(kind === "trip_segment" ? { over: overLimit(f.properties) } : {}),
         },
       };
     });
@@ -229,6 +248,23 @@ export function ensureAnalysisLayers(map: MapLibreMap): void {
         "line-color": "#2563EB",
         "line-width": 11,
         "line-opacity": 0.55,
+      },
+      layout: { "line-cap": "round", "line-join": "round" },
+    },
+    before,
+  );
+  // under a trip's path: a thin dark edge, so the light bands read on a light map, and a
+  // wide dark one where the vehicle was over the limit, which is then the message
+  map.addLayer(
+    {
+      id: "analysis-casing",
+      type: "line",
+      source: ANALYSIS_SOURCE,
+      filter: ["==", ["get", "kind"], "trip_segment"],
+      paint: {
+        "line-color": OVER_LIMIT_COLOR,
+        "line-width": ["case", ["==", ["get", "over"], true], 9, 5.5],
+        "line-opacity": ["case", ["==", ["get", "over"], true], 0.9, 0.45],
       },
       layout: { "line-cap": "round", "line-join": "round" },
     },
@@ -365,6 +401,12 @@ export function setAnalysisKinds(map: MapLibreMap, kinds: string[]): void {
       filter,
     ]);
   if (map.getLayer("analysis-line")) map.setFilter("analysis-line", filter);
+  if (map.getLayer("analysis-casing"))
+    map.setFilter("analysis-casing", [
+      "all",
+      ["==", ["get", "kind"], "trip_segment"],
+      filter,
+    ]);
   if (map.getLayer("analysis-points"))
     map.setFilter("analysis-points", [
       "all",

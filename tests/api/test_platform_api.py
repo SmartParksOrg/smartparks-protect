@@ -31,7 +31,7 @@ async def bus():
 
 
 async def test_manual_events_icons_and_dashboards(client, db):
-    admin, project, entity, _source, _device, _ = await _setup(client, db)
+    admin, project, entity, _source, device, _ = await _setup(client, db)
     h = admin.headers
     base = f"/api/v1/projects/{project.id}"
     viewer = await project_actor(
@@ -146,6 +146,57 @@ async def test_manual_events_icons_and_dashboards(client, db):
     assert (
         await client.post(f"{base}/dashboards", json={"name": "Operations", "tiles": []}, headers=h)
     ).status_code == 409
+    # a metric tile (decision D309): any metric that can be aggregated, the options checked
+    # and stored with their defaults
+    tile = {
+        "id": "metric-1",
+        "kind": "metric",
+        "size": "m",
+        "options": {
+            "metrics": ["battery_voltage"],
+            "entity_ids": [entity["id"]],
+            "display": "table",
+            "range": "30d",
+        },
+    }
+    with_metric = await client.patch(
+        f"{base}/dashboards/{dashboard['id']}", json={"tiles": [tile]}, headers=h
+    )
+    assert with_metric.status_code == 200, with_metric.text
+    stored = with_metric.json()["tiles"][0]["options"]
+    assert stored["display"] == "table" and stored["aggregate"] == "mean"
+    assert stored["group_by"] == "entity" and stored["entity_ids"] == [entity["id"]]
+    for options, reason in (
+        ({"metrics": []}, "metrics"),
+        ({"metrics": ["no_such_metric"]}, "unknown metric no_such_metric"),
+        ({"metrics": ["battery_voltage"], "display": "pie"}, "display"),
+        ({"metrics": ["battery_voltage"], "colour": "red"}, "colour"),
+        ({"metrics": ["battery_voltage", "temperature"], "display": "number"}, "one metric"),
+        (
+            {"metrics": ["battery_voltage"], "entity_ids": [str(uuid.uuid4())]},
+            "not in this project",
+        ),
+        ({"metrics": ["battery_voltage"], "device_ids": [device["id"]]}, "takes entities"),
+    ):
+        refused = await client.patch(
+            f"{base}/dashboards/{dashboard['id']}",
+            json={"tiles": [dict(tile, options=options)]},
+            headers=h,
+        )
+        assert refused.status_code == 422 and reason in refused.text, (options, refused.text)
+    per_device = dict(
+        tile,
+        options={
+            "metrics": ["battery_voltage"],
+            "group_by": "device",
+            "device_ids": [device["id"]],
+        },
+    )
+    assert (
+        await client.patch(
+            f"{base}/dashboards/{dashboard['id']}", json={"tiles": [per_device]}, headers=h
+        )
+    ).status_code == 200
     updated = await client.patch(
         f"{base}/dashboards/{dashboard['id']}",
         json={"tiles": [{"id": "events", "kind": "events", "size": "s"}]},

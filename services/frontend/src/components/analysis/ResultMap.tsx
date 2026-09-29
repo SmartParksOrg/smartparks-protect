@@ -20,7 +20,8 @@ import type { Track } from "@/api/types";
 import {
   ACCURACY_CLASSES,
   ANALYSIS_KINDS,
-  SPEED_CLASS_STARTS,
+  OVER_LIMIT_COLOR,
+  SPEED_BAND_LABELS,
   SPEED_RAMP,
   INTENSITY_RAMP,
   accuracyColor,
@@ -99,6 +100,7 @@ function MapLegend({
   colors,
   values,
   hint,
+  outline,
 }: {
   title: string;
   colors: readonly string[];
@@ -106,6 +108,8 @@ function MapLegend({
   values: string[];
   /** What the reader should know about how the colours were divided. */
   hint?: string;
+  /** What the dark outline around a stretch means, when the layer has one. */
+  outline?: string;
 }) {
   return (
     <div
@@ -122,6 +126,15 @@ function MapLegend({
           <span className="tabular-nums">{values[i]}</span>
         </span>
       ))}
+      {outline && (
+        <span className="ml-1 flex flex-col items-center gap-0.5">
+          <span
+            className="block h-3 w-9 rounded-[2px] border-[3px] bg-transparent"
+            style={{ borderColor: OVER_LIMIT_COLOR }}
+          />
+          <span className="tabular-nums whitespace-nowrap">{outline}</span>
+        </span>
+      )}
     </div>
   );
 }
@@ -689,7 +702,15 @@ export function ResultMap({
               {typeof picked.speed_kmh === "number" && (
                 <>
                   <dt>{t("Speed here")}</dt>
-                  <dd>{t("{{value}} km/h", { value: picked.speed_kmh })}</dd>
+                  <dd>
+                    {picked.over === true &&
+                    typeof picked.limit_kmh === "number"
+                      ? t("{{value}} km/h, over the limit of {{limit}}", {
+                          value: picked.speed_kmh,
+                          limit: picked.limit_kmh,
+                        })
+                      : t("{{value}} km/h", { value: picked.speed_kmh })}
+                  </dd>
                 </>
               )}
               {typeof picked.top_kmh === "number" && (
@@ -732,18 +753,19 @@ export function ResultMap({
           </div>
         )}
         {document.geometries.trip_segment &&
-          !hidden.includes("trip_segment") &&
-          limitKmh > 0 && (
+          !hidden.includes("trip_segment") && (
             <MapLegend
               title={t("Speed (km/h)")}
               colors={SPEED_RAMP}
-              values={SPEED_CLASS_STARTS.map((share) =>
-                String(Math.round(share * limitKmh)),
-              )}
+              values={SPEED_BAND_LABELS}
               hint={t(
-                "The path by speed against the limit of {{limit}} km/h; the number is the speed each colour starts at",
-                { limit: limitKmh },
+                "The path by its speed; the number is the speed each colour starts at",
               )}
+              outline={
+                limitKmh > 0
+                  ? t("over {{limit}}", { limit: limitKmh })
+                  : undefined
+              }
             />
           )}
         {byDevice && !hidden.includes("points") && (

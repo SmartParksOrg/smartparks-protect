@@ -50,6 +50,9 @@ class Aggregate(StrEnum):
     COUNT = "count"
     FIRST = "first"
     LAST = "last"
+    #: When the last value was measured, in seconds since the epoch: the time beside `last`
+    #: (a dashboard's table and single number, decision D309).
+    LAST_AT = "last_at"
 
 
 DEFAULT_AGGREGATES = (Aggregate.MEAN, Aggregate.MIN, Aggregate.MAX, Aggregate.COUNT)
@@ -122,6 +125,7 @@ def aggregate_columns(
         Aggregate.COUNT: func.count(value),
         Aggregate.FIRST: func.first(value, effective_time(Measurement)),
         Aggregate.LAST: func.last(value, effective_time(Measurement)),
+        Aggregate.LAST_AT: func.extract("epoch", func.max(effective_time(Measurement))),
     }
     return [by_name[a].label(a.value) for a in aggregates]
 

@@ -69,6 +69,15 @@ export interface ResultChartMark {
   at: number;
   label: string;
 }
+/** A value marked across a chart: a speed limit the line is read against (decision D307). */
+export interface ResultChartLimit {
+  value: number;
+  /** A key of the labels (the run's own limit) or a name (the rule that judges by it). */
+  label: string;
+  source: "run" | "rule";
+  /** The limit holds inside an area only. */
+  zone?: boolean;
+}
 export interface ResultChart {
   key: string;
   kind: "line" | "bar" | "rose" | "stacked" | "network" | "box";
@@ -76,6 +85,27 @@ export interface ResultChart {
   series: ResultChartSeries[];
   /** Moments marked on a time axis, such as the event a cardiac run is read around. */
   marks?: ResultChartMark[];
+  /** Values marked on the value axis: the speed limits of a vehicle run. */
+  limits?: ResultChartLimit[];
+  /** A missing value breaks the line: a silence in the record is not a value. */
+  breaks?: boolean;
+}
+
+/** What a limit line says: its value, the rule or the run it comes from, and that it holds
+ * inside an area when it does. The report's `limit_name` says the same in English. */
+export function limitName(
+  limit: ResultChartLimit,
+  labels: Record<string, string>,
+  unit: string | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const value = unit ? `${limit.value} ${unit}` : String(limit.value);
+  const known = labels[limit.label] ?? limit.label;
+  const name = known.length > 37 ? `${known.slice(0, 36)}…` : known;
+  if (!name) return value;
+  return limit.zone
+    ? t("{{value}} · {{name}}, inside its area", { value, name })
+    : t("{{value}} · {{name}}", { value, name });
 }
 
 /** Whether every value of a line sits so far above zero that an axis from zero would flatten

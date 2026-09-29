@@ -5438,7 +5438,7 @@ export interface components {
          * Aggregate
          * @enum {string}
          */
-        Aggregate: "mean" | "min" | "max" | "median" | "sum" | "count" | "first" | "last";
+        Aggregate: "mean" | "min" | "max" | "median" | "sum" | "count" | "first" | "last" | "last_at";
         /** AiActionInfo */
         AiActionInfo: {
             /** Action */
@@ -7039,7 +7039,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "saved_view" | "map" | "alerts" | "events" | "entity_status";
+            kind: "saved_view" | "map" | "alerts" | "events" | "entity_status" | "metric";
             /**
              * Size
              * @default m

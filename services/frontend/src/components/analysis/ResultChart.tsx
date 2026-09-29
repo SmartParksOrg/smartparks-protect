@@ -14,6 +14,7 @@ import { useEffect, useRef } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import {
   farFromZero,
+  limitName,
   type ResultChart as ResultChartData,
   type ResultChartSeries,
 } from "@/lib/analyses";
@@ -32,6 +33,12 @@ echarts.use([
   CanvasRenderer,
 ]);
 
+/** The colour of a limit line: the destructive red of the tokens, on both themes. */
+const LIMIT_COLOR = "#A13D2D";
+/** The parts drawn dashed beside their solid partner: the night beside the day, the fastest
+ * beside the typical. The report's `DASHED_PARTS` is the same set. */
+const DASHED_PARTS = new Set(["night", "top"]);
+
 /** A chart of a result document: a line or bar over time, a stacked bar, a rose of directions,
  * a box plot per category, or the contact network; the data comes from the document, the look
  * from the brand palette. */
@@ -39,12 +46,16 @@ export function ResultChart({
   chart,
   labels,
   colorOf,
+  pointColors,
   className,
 }: {
   chart: ResultChartData;
   labels?: Record<string, string>;
   /** The colour of a series, or null for the palette's; a subject keeps its map colour. */
   colorOf?: (series: ResultChartSeries) => string | null;
+  /** A colour per category for a chart of one series, where the categories carry the
+   * meaning: the speed bands in the colours of the map. */
+  pointColors?: readonly string[];
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -114,6 +125,33 @@ export function ResultChart({
           })),
         }
       : undefined;
+    // the values the chart is read against (the speed limits of a vehicle run): a series
+    // of its own without data per limit, so a limit is drawn whatever the vehicles' own
+    // series hold, and the legend names the vehicles alone
+    const limits = chart.limits ?? [];
+    const limitSeries = limits.map((limit) => ({
+      type: "line" as const,
+      data: [],
+      silent: true,
+      tooltip: { show: false },
+      markLine: {
+        symbol: "none",
+        silent: true,
+        lineStyle: { type: "dashed" as const, color: LIMIT_COLOR, width: 1.2 },
+        label: {
+          color: LIMIT_COLOR,
+          fontSize: 10,
+          position: "insideEndTop",
+          formatter: limitName(limit, labels ?? {}, chart.unit, t),
+        },
+        data: [{ yAxis: limit.value }],
+      },
+    }));
+    // the axis makes room for a limit nothing reached, or its line would fall off the chart
+    const highest = limits.length
+      ? Math.max(...limits.map((limit) => limit.value))
+      : null;
+    const banded = pointColors && chart.series.length === 1;
     const option: echarts.EChartsCoreOption = {
       animation: false,
       color: colors,
@@ -128,6 +166,8 @@ export function ResultChart({
             top: 0,
             left: 44,
             right: 12,
+            // the subjects alone: a limit is named on its line
+            data: names,
             textStyle: { color: th.text, fontSize: 11 },
             pageTextStyle: { color: th.text },
           }
@@ -171,38 +211,55 @@ export function ResultChart({
               type: "value",
               // a line far above zero reads its own range, as on paper
               scale: farFromZero(chart),
+              max:
+                highest === null
+                  ? undefined
+                  : (extent: { max: number }) =>
+                      extent.max >= highest * 1.05
+                        ? undefined
+                        : Math.ceil((highest * 1.1) / 10) * 10,
               name: chart.unit ?? undefined,
               nameTextStyle: { color: th.text, fontSize: 10 },
               axisLabel: { color: th.text, fontSize: 10 },
               splitLine: { lineStyle: { color: th.grid } },
             },
           }),
-      series: chart.series.map((s, i) => ({
-        name: names[i],
-        type: chart.kind === "line" ? "line" : "bar",
-        coordinateSystem: rose ? "polar" : "cartesian2d",
-        stack: chart.kind === "stacked" ? "all" : undefined,
-        data: rose ? (s.data ?? []).map((d) => d[1]) : (s.data ?? []),
-        showSymbol: false,
-        connectNulls: true,
-        markLine: i === 0 ? markLine : undefined,
-        lineStyle: {
-          width: s.fit ? 1.2 : 1.5,
-          type: s.fit
-            ? "dotted"
-            : s.period === "comparison" || s.part === "night"
-              ? "dashed"
-              : "solid",
-        },
-        itemStyle: s.period === "comparison" ? { opacity: 0.55 } : undefined,
-        areaStyle:
-          chart.kind === "line" && chart.series.length === 1 && !s.fit
-            ? { opacity: 0.1 }
-            : undefined,
-      })),
+      series: [
+        ...chart.series.map((s, i) => ({
+          name: names[i],
+          type: chart.kind === "line" ? "line" : "bar",
+          coordinateSystem: rose ? "polar" : "cartesian2d",
+          stack: chart.kind === "stacked" ? "all" : undefined,
+          data: rose
+            ? (s.data ?? []).map((d) => d[1])
+            : banded
+              ? (s.data ?? []).map((d, at) => ({
+                  value: d,
+                  itemStyle: { color: pointColors[at % pointColors.length] },
+                }))
+              : (s.data ?? []),
+          showSymbol: false,
+          connectNulls: !chart.breaks,
+          markLine: i === 0 ? markLine : undefined,
+          lineStyle: {
+            width: s.fit ? 1.2 : 1.5,
+            type: s.fit
+              ? "dotted"
+              : s.period === "comparison" || DASHED_PARTS.has(s.part ?? "")
+                ? "dashed"
+                : "solid",
+          },
+          itemStyle: s.period === "comparison" ? { opacity: 0.55 } : undefined,
+          areaStyle:
+            chart.kind === "line" && chart.series.length === 1 && !s.fit
+              ? { opacity: 0.1 }
+              : undefined,
+        })),
+        ...limitSeries,
+      ],
     };
     instance.current?.setOption(option, true);
-  }, [chart, labels, colorOf, dark, t]);
+  }, [chart, labels, colorOf, pointColors, dark, t]);
   return (
     <div
       ref={container}

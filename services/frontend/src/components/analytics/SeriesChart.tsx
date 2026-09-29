@@ -81,7 +81,8 @@ function buildOption(response: SeriesResponse | undefined, type: ChartType, aggr
   const timeAxis = {
     ...axis,
     type: "time",
-    axisLabel: { formatter: (value: number) => formatInZone(new Date(value).toISOString(), timezone, { dateStyle: undefined, timeStyle: undefined, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) },
+    // labels that would run into each other give way, so a narrow tile stays readable
+    axisLabel: { ...axis.axisLabel, hideOverlap: true, formatter: (value: number) => formatInZone(new Date(value).toISOString(), timezone, { dateStyle: undefined, timeStyle: undefined, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) },
   };
   const series = all.map((s, index) => {
     const data = s.points.map((p) => [new Date(p.time).getTime(), p.values[aggregate] ?? null]);

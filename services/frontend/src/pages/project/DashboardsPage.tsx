@@ -1,7 +1,15 @@
 import { t } from "@/lib/i18nMark";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Pencil,
+  Plus,
+  Settings2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -19,6 +27,11 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Field } from "@/components/common/FormField";
 import { Page, PageHeader } from "@/components/common/PageHeader";
+import { MetricTile } from "@/components/dashboards/MetricTile";
+import {
+  type MetricTileDraft,
+  MetricTileDialog,
+} from "@/components/dashboards/MetricTileDialog";
 import {
   AlertsTile,
   EntityStatusTile,
@@ -44,8 +57,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useMetricsByKey } from "@/hooks/useMetrics";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePermissions } from "@/hooks/useProjects";
+import {
+  METRIC_TILE_DEFAULTS,
+  readMetricOptions,
+  writeMetricOptions,
+} from "@/lib/dashboards";
 
 type Tile = DashboardTile;
 const KINDS: Record<Tile["kind"], string> = {
@@ -53,7 +72,8 @@ const KINDS: Record<Tile["kind"], string> = {
   map: t("Latest positions map"),
   alerts: t("Open alerts"),
   events: t("Recent events"),
-  entity_status: "Entity status counts",
+  entity_status: t("Entity status counts"),
+  metric: t("A metric: graph, table or number"),
 };
 const SIZES: Record<string, string> = {
   s: "col-span-12 md:col-span-4",
@@ -61,12 +81,22 @@ const SIZES: Record<string, string> = {
   l: "col-span-12",
 };
 
-function tileTitle(tile: Tile, views: SavedView[]): string {
+/** The title a person gave the tile, else what the tile shows: the saved view's name, the
+ * metrics by their labels, the kind. */
+function tileTitle(
+  tile: Tile,
+  views: SavedView[],
+  metricLabel: (key: string) => string,
+): string {
   if (tile.title) return tile.title;
   if (tile.kind === "saved_view")
     return (
       views.find((v) => v.id === tile.saved_view_id)?.name ?? t("Saved view")
     );
+  if (tile.kind === "metric") {
+    const metrics = readMetricOptions(tile.options).metrics;
+    if (metrics.length > 0) return metrics.map(metricLabel).join(", ");
+  }
   return KINDS[tile.kind];
 }
 
@@ -102,6 +132,10 @@ export function DashboardsPage() {
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // the metric tile whose settings are open: the index of one on the grid, or "new"
+  const [setting, setSetting] = useState<number | "new" | null>(null);
+  const registry = useMetricsByKey();
+  const metricLabel = (key: string) => t(registry.get(key)?.label ?? key);
   const tiles: Tile[] = draft ?? ((current?.tiles ?? []) as Tile[]);
   const select = (id: string) =>
     setParams(
@@ -187,6 +221,31 @@ export function DashboardsPage() {
     ]);
     setAdding(false);
   };
+  const saveMetricTile = (draft: MetricTileDraft) => {
+    const options = writeMetricOptions(draft.options);
+    if (setting === "new") {
+      const next =
+        tiles.reduce(
+          (m, t) => Math.max(m, Number(t.id.split("-").pop()) || 0),
+          0,
+        ) + 1;
+      setDraft([
+        ...tiles,
+        {
+          id: `metric-${next}`,
+          kind: "metric",
+          // a table and a graph want the room; a number is a glance
+          size: draft.options.display === "number" ? "s" : "m",
+          title: draft.title || null,
+          saved_view_id: null,
+          options,
+        },
+      ]);
+    } else if (setting !== null) {
+      update(setting, { title: draft.title || null, options });
+    }
+    setSetting(null);
+  };
   return (
     <>
       <PageHeader
@@ -252,7 +311,7 @@ export function DashboardsPage() {
             description={
               admin
                 ? t(
-                    "Create one: it starts with the map, open alerts and recent events, and takes saved Data Explorer views as chart tiles.",
+                    "Create one: it starts with the map, open alerts and recent events, and takes any metric as a graph, a table or a number.",
                   )
                 : "A project admin can create dashboards."
             }
@@ -264,10 +323,20 @@ export function DashboardsPage() {
               <Card key={tile.id} className={SIZES[tile.size] ?? SIZES.m}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
                   <CardTitle className="text-base">
-                    {t(tileTitle(tile, views.data?.items ?? []))}
+                    {t(tileTitle(tile, views.data?.items ?? [], metricLabel))}
                   </CardTitle>
                   {editing && (
                     <span className="flex items-center gap-1">
+                      {tile.kind === "metric" && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label={t("Tile settings")}
+                          onClick={() => setSetting(index)}
+                        >
+                          <Settings2 className="size-4" />
+                        </Button>
+                      )}
                       <Select
                         value={tile.size}
                         onValueChange={(v) =>
@@ -341,6 +410,12 @@ export function DashboardsPage() {
                   {tile.kind === "entity_status" && (
                     <EntityStatusTile projectId={projectId} />
                   )}
+                  {tile.kind === "metric" && (
+                    <MetricTile
+                      projectId={projectId}
+                      options={readMetricOptions(tile.options)}
+                    />
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -393,10 +468,19 @@ export function DashboardsPage() {
           <DialogHeader>
             <DialogTitle>{t("Add a tile")}</DialogTitle>
             <DialogDescription>
-              {t("A saved Data Explorer view, or a live tile.")}
+              {t("A metric, a live tile, or a saved Data Explorer view.")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
+            <Button
+              className="w-full justify-start"
+              onClick={() => {
+                setAdding(false);
+                setSetting("new");
+              }}
+            >
+              {t(KINDS.metric)}
+            </Button>
             {(["map", "alerts", "events", "entity_status"] as const).map(
               (k) => (
                 <Button
@@ -427,6 +511,22 @@ export function DashboardsPage() {
           </div>
         </DialogContent>
       </Dialog>
+      {setting !== null && (
+        <MetricTileDialog
+          projectId={projectId}
+          adding={setting === "new"}
+          initial={
+            setting === "new"
+              ? { title: "", options: METRIC_TILE_DEFAULTS }
+              : {
+                  title: tiles[setting]?.title ?? "",
+                  options: readMetricOptions(tiles[setting]?.options),
+                }
+          }
+          onSave={saveMetricTile}
+          onClose={() => setSetting(null)}
+        />
+      )}
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}

@@ -22900,7 +22900,8 @@
      "sum",
      "count",
      "first",
-     "last"
+     "last",
+     "last_at"
     ],
     "title": "Aggregate"
    },
@@ -27212,7 +27213,8 @@
        "map",
        "alerts",
        "events",
-       "entity_status"
+       "entity_status",
+       "metric"
       ],
       "title": "Kind"
      },

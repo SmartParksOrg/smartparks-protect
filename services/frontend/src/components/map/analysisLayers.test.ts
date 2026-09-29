@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   PRESSURE_RAMP,
+  SPEED_BAND_EDGES_KMH,
+  SPEED_BAND_LABELS,
   SPEED_RAMP,
   boundsOfFeatures,
   decorateAnalysisFeatures,
+  overLimit,
   pressureColor,
   speedColor,
 } from "./analysisLayers";
@@ -102,12 +105,22 @@ describe("analysis layers", () => {
     expect(pressureColor(1)).toBe(PRESSURE_RAMP[2]);
     expect(pressureColor(0.5)).toBe(PRESSURE_RAMP[1]);
   });
-  it("colours a trip's path by speed against the limit and its markers by kind", () => {
-    expect(speedColor(0.2)).toBe(SPEED_RAMP[0]);
-    expect(speedColor(0.9)).toBe(SPEED_RAMP[2]);
-    expect(speedColor(1.1)).toBe(SPEED_RAMP[3]);
-    expect(speedColor(2)).toBe(SPEED_RAMP[4]);
+  it("colours a trip's path by its speed, outlines it over the limit, and its markers by kind", () => {
+    expect(SPEED_RAMP).toHaveLength(SPEED_BAND_EDGES_KMH.length + 1);
+    expect(SPEED_BAND_LABELS).toHaveLength(SPEED_RAMP.length);
+    expect(
+      [5, 10, 39.9, 79, 100, 130].map((v) =>
+        SPEED_RAMP.indexOf(speedColor(v) as (typeof SPEED_RAMP)[number]),
+      ),
+    ).toEqual([0, 1, 2, 3, 4, 5]);
     expect(speedColor(null)).toBe(SPEED_RAMP[0]);
+    // the module says which side of the limit a stretch was on; an older run's speed does
+    expect(overLimit({ over_limit: false, speed_kmh: 90, limit_kmh: 60 })).toBe(
+      false,
+    );
+    expect(overLimit({ speed_kmh: 90, limit_kmh: 60 })).toBe(true);
+    expect(overLimit({ speed_kmh: 60, limit_kmh: 60 })).toBe(false);
+    expect(overLimit(null)).toBe(false);
     const line: GeoJSON.Feature = {
       type: "Feature",
       geometry: {
@@ -117,7 +130,13 @@ describe("analysis layers", () => {
           [1, 1],
         ],
       },
-      properties: { kind: "trip_segment", level: 1.3, subject_id: "a" },
+      properties: {
+        kind: "trip_segment",
+        level: 1.3,
+        subject_id: "a",
+        speed_kmh: 78,
+        limit_kmh: 60,
+      },
     };
     const start: GeoJSON.Feature = {
       type: "Feature",
@@ -130,8 +149,11 @@ describe("analysis layers", () => {
       },
     };
     const [l, s] = decorateAnalysisFeatures([line, start], () => "#111111");
-    expect(l.properties?.color).toBe(SPEED_RAMP[4]);
+    // 78 km/h is the band from 40, whatever the limit; the limit of 60 gives the outline
+    expect(l.properties?.color).toBe(SPEED_RAMP[3]);
+    expect(l.properties?.over).toBe(true);
     expect(s.properties?.color).toBe("#52735E");
+    expect(s.properties?.over).toBeUndefined();
     const [e] = decorateAnalysisFeatures(
       [{ ...start, properties: { ...start.properties, role: "end" } }],
       () => "#111111",

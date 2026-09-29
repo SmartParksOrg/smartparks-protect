@@ -67,6 +67,18 @@ Deliverables: [x] 39a the primitives (`primitives/trips.py`: segmentation, trip 
 
 **As built, where it departs from the text above.** Trips are drawn as runs of one speed class against the limit, green to red, with numbered start and end markers and the speed on each speeding marker (Tim, 2026-09-27, after the first build coloured a trip by its vehicle: a path in one colour and plain dots said nothing, and the trips could not be told from the tracks); the idle time became "paused inside trips" (still time shorter than the stop, which needs no active tracking to be honest); the speed histogram is the reported speeds while moving, else the step speeds; the trajectory carries the reported speed of every fix (`Trajectory.speed_mps`) so no join with the measurements is needed; the stop rule (D303) is shared with the movement module.
 
+## 5a. Phase 40, built: bands that widen, and the charts a manager reads (D306 to D308)
+
+Tim's look at the module on dev (2026-09-29): with a limit of 60 km/h almost everything above 50 was red, and the three charts did not help.
+
+**The colours (D306).** The path is coloured by the speed itself in six bands that widen: under 10 km/h, from 10, 20, 40, 80, and over 120 (`SPEED_BAND_EDGES_KMH`). The five classes of the first build were shares of the limit (0.5, 0.85, 1, 1.25), so everything above 75 km/h was one red. Speeding is said apart: a stretch over the limit has a dark outline, and the path is cut where the band or the side of the limit changes. Two other scales were offered and not taken: shares of the limit on widening steps (the colours change meaning with the limit) and classes by the run's own speeds (two runs cannot be compared). The ramp was measured against five candidates under both red-green colour blindnesses; the smallest difference between two of its steps is 17 where the first build's ramp had 8.
+
+**The limits (D307).** The speed charts draw the run's limit and one line per enabled rule of the project with a threshold on `speed_kmh` that asks for more than a value (`speed_limits_of`, `load_speed_limits`), named after the rule, marked when the rule holds inside an area. The lowest six stay and limits of one speed share a line (`merge_limits`). Speeding episodes stay judged against the run's limit alone.
+
+**The charts (D308).** Seven in place of three: the speed over the period (`speed_over_time`: the fastest speed per bucket, zero where the vehicle stood, no value where the record is silent), distance and driving time per day on every day of the period (`days_of`), driving time and speed by hour of the day, the minutes per speed band, and the minutes of speeding per day. `Chart` gained `limits` and `breaks`; both renderers draw them.
+
+**Still later.** A limit per road: a `max_speed_kmh` attribute on a route, a stretch judged against the limit of the road it is on. Until then the run has one limit and the lines of the rules are what the project knows, not what held where.
+
 ## 6. Later, not in these phases
 
 Speed limits per road and a speeding rule that reads them; a corridor learned from history for tracks nobody has mapped; patrol coverage (which areas the vehicles and people covered, how often), which is a different question and a module of its own; fuel and maintenance figures, which need data nobody sends.
