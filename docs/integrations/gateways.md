@@ -35,17 +35,16 @@ Administrators can override the name and location of a gateway under `PATCH /adm
 ## Screens
 
 Network, Gateways lists every gateway of the project's data sources: the ones that heard the
-project's devices in the window busiest first with state, when the network last heard from
-the gateway itself, source, receptions, devices, mean RSSI and SNR, last reception and
+project's devices in the last 30 days busiest first with state, when the network last heard
+from the gateway itself, source, receptions, devices, mean RSSI and SNR, last reception and
 location, then the ones that heard nothing, most recently seen first; a source filter narrows
-the list to one network and the footer says how many heard nothing in the window. The
-receptions, the devices and the signal are the window's; the last reception is the newest of
-the last 30 days whatever the window, so a project whose devices report in one burst a day
-reads "none in 30 days" only when that is true. On a phone both tabs show a card per row
-with the same figures. The
-detail shows when the gateway was seen and its last reception, the platform counters, links
-to the platform (when the data source has a gateway link template), diagnostics and the
-devices heard.
+the list to one network and the footer says how many heard nothing in the last 30 days. There
+is no window to pick: every figure covers the last 30 days, and the gateway's own last seen has
+no window at all, so a gateway that heard nothing in a month still says when the network last
+heard from it. On a phone both tabs show a card per row with the same figures. The detail
+shows when the gateway was seen and its last reception, the platform counters, links to the
+platform (when the data source has a gateway link template), diagnostics and the devices
+heard.
 
 Device connectivity lists every device with the number of gateways that heard it, the best
 gateway and its share of the device's uplinks, mean signal and last reception, least covered

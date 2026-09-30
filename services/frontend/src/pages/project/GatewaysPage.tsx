@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next";
-import i18n from "@/i18n";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
@@ -38,12 +37,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatAgo, formatTime } from "@/lib/format";
 import { gatewayCoords, isRelay, locationSourceLabel } from "@/lib/gateways";
 
-const WINDOWS = [
-  { hours: 1, label: i18n.t("Last hour") },
-  { hours: 24, label: i18n.t("Last 24 hours") },
-  { hours: 168, label: i18n.t("Last 7 days") },
-  { hours: 720, label: i18n.t("Last 30 days") },
-];
+/** Every figure on the page covers the last 30 days, and nobody picks a window (Tim,
+ * 2026-09-30): the gateway's own last seen has no window at all, so a gateway that heard
+ * nothing in a month still says when the network last heard from it. */
+const HOURS = 24 * 30;
 
 const coords = (g: Gateway) => gatewayCoords(g);
 const signal = (
@@ -59,7 +56,7 @@ export function GatewaysPage() {
   const [params, setParams] = useSearchParams();
   const tab =
     params.get("tab") === "connectivity" ? "connectivity" : "gateways";
-  const hours = Number(params.get("hours") ?? 24) || 24;
+  const hours = HOURS;
   // the source filter (Tim, 2026-09-12): one data source's gateways, or all of them
   const sourceFilter = params.get("source") ?? "all";
   const base = `/api/v1/projects/${projectId}`;
@@ -296,29 +293,6 @@ export function GatewaysPage() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Select
-            value={String(hours)}
-            onValueChange={(v) =>
-              setParams(
-                (p) => {
-                  p.set("hours", v);
-                  return p;
-                },
-                { replace: true },
-              )
-            }
-          >
-            <SelectTrigger className="w-40" aria-label={t("Window")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {WINDOWS.map((w) => (
-                <SelectItem key={w.hours} value={String(w.hours)}>
-                  {w.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           {tab === "gateways" && sources.length > 1 && (
             <Select
               value={sourceFilter}
@@ -384,10 +358,12 @@ export function GatewaysPage() {
                 <div className="text-xs">
                   {g.receptions > 0
                     ? t(
-                        "{{receptions}} receptions from {{devices}} devices in the window",
+                        "{{receptions}} receptions from {{devices}} devices in the last 30 days",
                         { receptions: g.receptions, devices: g.devices },
                       )
-                    : t("Heard none of the project's devices in the window")}
+                    : t(
+                        "Heard none of the project's devices in the last 30 days",
+                      )}
                   {signal(g.mean_rssi, g.mean_snr) &&
                     ` · ${signal(g.mean_rssi, g.mean_snr)}`}
                 </div>
@@ -415,7 +391,7 @@ export function GatewaysPage() {
               shown &&
               (silent > 0
                 ? t(
-                    "{{count}} gateways, busiest first; {{silent}} heard none of the project's devices in the window",
+                    "{{count}} gateways, busiest first; {{silent}} heard none of the project's devices in the last 30 days",
                     { count: shown.length, silent },
                   )
                 : t("{{count}} gateways, busiest first", {
@@ -460,7 +436,7 @@ export function GatewaysPage() {
             data={connectivity.data}
             searchable
             isLoading={connectivity.isPending}
-            emptyMessage={t("No receptions in the window.")}
+            emptyMessage={t("No receptions in the last 30 days.")}
             footer={
               connectivity.data &&
               `${connectivity.data.length} devices, least covered first`
@@ -570,7 +546,7 @@ export function GatewaysPage() {
               )}
               <div>
                 <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">
-                  {t("Devices heard in the window")}
+                  {t("Devices heard in the last 30 days")}
                 </div>
                 {detail.data ? (
                   <table className="w-full text-xs">
