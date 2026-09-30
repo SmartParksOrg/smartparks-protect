@@ -146,6 +146,21 @@ export function GatewaysPage() {
       accessorKey: "status",
       cell: ({ getValue }) => <StatusBadge value={getValue<string>()} />,
     },
+    {
+      // the platform's own word on the gateway (its heartbeats, or any reception), apart from
+      // what it heard of this project's devices (Tim, 2026-09-30)
+      header: t("Last seen"),
+      accessorKey: "last_seen_at",
+      cell: ({ getValue }) => (
+        <span
+          title={t(
+            "When the network last heard from the gateway itself, whatever it received",
+          )}
+        >
+          {formatAgo(getValue<string | null>())}
+        </span>
+      ),
+    },
     { header: t("Source"), accessorKey: "data_source_name" },
     { header: t("Receptions"), accessorKey: "receptions" },
     { header: t("Devices"), accessorKey: "devices" },
@@ -155,9 +170,18 @@ export function GatewaysPage() {
       cell: ({ row }) => signal(row.original.mean_rssi, row.original.mean_snr),
     },
     {
+      // the newest reception of this project's devices in the last 30 days, whatever the
+      // window: a day without a burst must not read as "never"
       header: t("Last reception"),
       accessorKey: "last_reception_at",
-      cell: ({ getValue }) => formatAgo(getValue<string | null>()),
+      cell: ({ getValue }) => {
+        const value = getValue<string | null>();
+        return value ? (
+          formatAgo(value)
+        ) : (
+          <span className="text-muted-foreground">{t("none in 30 days")}</span>
+        );
+      },
     },
     {
       header: t("Location"),
@@ -332,7 +356,12 @@ export function GatewaysPage() {
           <DataTable
             columns={columns}
             data={shown}
-            defaultHiddenSmall={["signal", "last_reception_at", "location"]}
+            defaultHiddenSmall={[
+              "last_seen_at",
+              "signal",
+              "last_reception_at",
+              "location",
+            ]}
             searchable
             isLoading={gateways.isPending}
             emptyMessage={t(
@@ -417,7 +446,9 @@ export function GatewaysPage() {
                     onClick={() => setPlacing(selected)}
                   >
                     <MapPin className="size-4" />{" "}
-                    {coords(selected) ? t("Change location") : t("Set location")}
+                    {coords(selected)
+                      ? t("Change location")
+                      : t("Set location")}
                   </Button>
                 </div>
               )}

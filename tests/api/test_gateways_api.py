@@ -16,13 +16,16 @@ from tests.conftest import unique_name
 pytestmark = pytest.mark.asyncio
 
 
-async def _uplink(db, bus, source, external_id, receptions, when):  # noqa: F811
+async def _uplink(db, bus, source, external_id, receptions, when, received_at=None):  # noqa: F811
+    """A reception takes the network's receive time when the message carries one, else the
+    ingest time; `received_at` dates the receptions themselves, as a real network does."""
     message = InboundMessage(
         external_id=external_id,
         event_type="uplink",
         payload={"time": when, "lat": -24.9, "lon": 31.5},
         acquisition_channel=AcquisitionChannel.LORAWAN,
         ingestion_method=IngestionMethod.MQTT,
+        network_received_at=received_at,
         gateway_receptions=[
             GatewayReceptionData(gateway_id=g, rssi=r, snr=s) for g, r, s in receptions
         ],
@@ -66,6 +69,33 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     assert detail["devices"][0]["device_name"] == device["name"]
     assert detail["devices"][0]["receptions"] == 3
 
+    # a window the uplinks fall outside keeps the last reception (the newest of the last 30
+    # days) beside empty counts, so a quiet day does not read as "never" (Tim, 2026-09-30);
+    # the last hour holds the three uplinks of a minute ago, so one from two days ago is added
+    two_days_ago = now - timedelta(days=2)
+    await _uplink(
+        db,
+        bus,
+        row,
+        external_id,
+        [("gw-d", -90, 5.0)],
+        two_days_ago.isoformat(),
+        received_at=two_days_ago,
+    )
+    hour = {
+        g["external_id"]: g
+        for g in (await client.get(f"{base}/gateways", params={"hours": 1}, headers=h)).json()
+    }
+    assert hour["gw-d"]["receptions"] == 0 and hour["gw-d"]["devices"] == 0
+    assert hour["gw-d"]["mean_rssi"] is None
+    assert hour["gw-d"]["last_reception_at"] is not None
+    assert hour["gw-a"]["receptions"] == 3 and hour["gw-a"]["last_reception_at"] is not None
+    quiet = (
+        await client.get(f"{base}/gateways/{hour['gw-d']['id']}", params={"hours": 1}, headers=h)
+    ).json()
+    assert quiet["gateway"]["receptions"] == 0 and quiet["gateway"]["last_reception_at"] is not None
+    assert quiet["devices"] == []
+
     connectivity = (await client.get(f"{base}/connectivity", headers=h)).json()
     assert len(connectivity) == 1
     item = connectivity[0]
@@ -87,7 +117,7 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
             "/api/v1/admin/gateways", params={"data_source_id": source["id"]}, headers=h
         )
     ).json()
-    assert {g["external_id"] for g in registry["items"]} == {"gw-a", "gw-b"}
+    assert {g["external_id"] for g in registry["items"]} == {"gw-a", "gw-b", "gw-d"}
     patched = await client.patch(
         f"/api/v1/admin/gateways/{best['id']}",
         json={"name_override": "North ridge", "latitude": -24.95, "longitude": 31.55},
@@ -135,9 +165,11 @@ async def test_gateways_connectivity_and_admin(client, db, bus, monkeypatch):  #
     assert by_id["gw-c"]["status"] == "unknown" and by_id["gw-c"]["geometry"] is None
     # the project page lists every gateway of its sources: the silent one last, with nothing
     # heard (decision D175); another project's sources stay out
+    # the silent ones by last seen: the synced Spare was seen at the sync, gw-d two days ago
     listed = (await client.get(f"{base}/gateways", headers=h)).json()
-    assert [g["external_id"] for g in listed] == ["gw-a", "gw-b", "gw-c"]
+    assert [g["external_id"] for g in listed] == ["gw-a", "gw-b", "gw-c", "gw-d"]
     assert listed[2]["display_name"] == "Spare" and listed[2]["receptions"] == 0
+    assert listed[3]["receptions"] == 0 and listed[3]["last_reception_at"] is not None
     assert (await client.get(f"/api/v1/projects/{other.id}/gateways", headers=h)).json() == []
 
     generic = await client.post(

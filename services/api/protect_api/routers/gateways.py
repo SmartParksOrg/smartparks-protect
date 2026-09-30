@@ -57,7 +57,11 @@ def gateway_read(
     gateway: Gateway,
     source: DataSource | None,
     stats: dict[str, Any] | None = None,
+    newest: datetime | None = None,
 ) -> GatewayRead:
+    """`stats` are the window's figures; `newest` is the last reception of the scope's
+    devices in the last `MAX_HOURS`, whatever the window (Tim, 2026-09-30: a page opened on
+    24 hours read "never" for a gateway that heard thirteen devices the morning before)."""
     data = GatewayRead.model_validate(gateway)
     data.geometry = geom_to_geojson(gateway.geom)
     data.display_name = gateway.name_override or gateway.name or gateway.external_id
@@ -73,7 +77,8 @@ def gateway_read(
         data.devices = int(stats.get("devices") or 0)
         data.mean_rssi = stats.get("mean_rssi")
         data.mean_snr = stats.get("mean_snr")
-        data.last_reception_at = stats.get("last_reception_at")
+    if newest is not None:
+        data.last_reception_at = newest
     return data
 
 
@@ -131,6 +136,30 @@ def _window(hours: int) -> tuple[datetime, datetime]:
     return until - timedelta(hours=hours), until
 
 
+async def _newest_receptions(
+    session: AsyncSession,
+    context: ScopeContext,
+    hours: int,
+    stats: dict[tuple[uuid.UUID, str], dict[str, Any]],
+) -> dict[tuple[uuid.UUID, str], datetime]:
+    """The last reception per gateway of the scope's devices over the longest window the
+    page offers (`MAX_HOURS`), so a short window says "none in the last 24 hours, last
+    reception 29 h ago" rather than "never". Bounded to `MAX_HOURS`: the receptions hypertable
+    is compressed by gateway and time, and a read over its whole history would decompress
+    every batch of a busy gateway. The window's own figures serve when they cover it."""
+    if hours >= MAX_HOURS:
+        wide = stats
+    else:
+        since, until = _window(MAX_HOURS)
+        device_ids = await _scope_device_ids(session, context, since, until)
+        wide = await _reception_stats(session, device_ids, since, until)
+    return {
+        key: value["last_reception_at"]
+        for key, value in wide.items()
+        if value.get("last_reception_at") is not None
+    }
+
+
 async def visible_source_ids(
     session: AsyncSession, project_id: uuid.UUID | None, device_ids: list[uuid.UUID]
 ) -> set[uuid.UUID]:
@@ -167,10 +196,14 @@ async def project_gateways(
     """Every gateway of the data sources the project's devices have an identity on (decision
     D175) and of the data sources assigned to the project (decision D235, the scope adds and
     never removes): the ones that received the project's devices in the window busiest first,
-    then the silent ones, most recently seen first; the all scope lists the whole registry."""
+    then the silent ones, most recently seen first; the all scope lists the whole registry.
+    The counts and the signal are the window's; `last_reception_at` is the newest reception
+    of the last 30 days whatever the window, and `last_seen_at` is the platform's own word
+    (heartbeats, or any reception)."""
     since, until = _window(hours)
     device_ids = await _scope_device_ids(session, context, since, until)
     stats = await _reception_stats(session, device_ids, since, until)
+    newest = await _newest_receptions(session, context, hours, stats)
     statement = select(Gateway)
     if not context.is_all:
         source_ids = await visible_source_ids(session, context.project_id, device_ids)
@@ -181,7 +214,12 @@ async def project_gateways(
     gateways = (await session.scalars(statement)).all()
     sources = await _sources(session, {g.data_source_id for g in gateways})
     items = [
-        gateway_read(g, sources.get(g.data_source_id), stats.get((g.data_source_id, g.external_id)))
+        gateway_read(
+            g,
+            sources.get(g.data_source_id),
+            stats.get((g.data_source_id, g.external_id)),
+            newest.get((g.data_source_id, g.external_id)),
+        )
         for g in gateways
     ]
     floor = datetime.min.replace(tzinfo=UTC)
@@ -200,6 +238,7 @@ async def project_gateway(
     since, until = _window(hours)
     device_ids = await _scope_device_ids(session, context, since, until)
     stats = await _reception_stats(session, device_ids, since, until)
+    newest = await _newest_receptions(session, context, hours, stats)
     source = await session.get(DataSource, gateway.data_source_id)
     rows = (
         await session.execute(
@@ -232,7 +271,10 @@ async def project_gateway(
     }
     return GatewayDetail(
         gateway=gateway_read(
-            gateway, source, stats.get((gateway.data_source_id, gateway.external_id))
+            gateway,
+            source,
+            stats.get((gateway.data_source_id, gateway.external_id)),
+            newest.get((gateway.data_source_id, gateway.external_id)),
         ),
         devices=[
             GatewayDeviceStat(

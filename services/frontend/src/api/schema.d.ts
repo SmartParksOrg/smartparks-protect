@@ -4613,6 +4613,9 @@ export interface paths {
          *     D175) and of the data sources assigned to the project (decision D235, the scope adds and
          *     never removes): the ones that received the project's devices in the window busiest first,
          *     then the silent ones, most recently seen first; the all scope lists the whole registry.
+         *     The counts and the signal are the window's; `last_reception_at` is the newest reception
+         *     of the last 30 days whatever the window, and `last_seen_at` is the platform's own word
+         *     (heartbeats, or any reception).
          */
         get: operations["project_gateways_api_v1_projects__project_id__gateways_get"];
         put?: never;

@@ -138,10 +138,13 @@ class GatewayRead(ORMModel):
     last_stats_at: datetime | None
     stats: dict[str, Any]
     attributes: dict[str, Any]
+    #: The window's figures: receptions of the scope's devices, distinct devices, mean signal.
     receptions: int = 0
     devices: int = 0
     mean_rssi: float | None = None
     mean_snr: float | None = None
+    #: The newest reception of the scope's devices in the last 30 days, whatever the window,
+    #: so a quiet day does not read as "never"; None when there was none in 30 days.
     last_reception_at: datetime | None = None
     links: list[dict[str, str]] = Field(default_factory=list)
     created_at: datetime

@@ -35,10 +35,13 @@ Administrators can override the name and location of a gateway under `PATCH /adm
 ## Screens
 
 Network, Gateways lists every gateway of the project's data sources: the ones that heard the
-project's devices in the window busiest first with state, source, receptions, devices, mean
-RSSI and SNR, last reception and location, then the ones that heard nothing, most recently
-seen first; a source filter narrows the list to one network and the footer says how many heard
-nothing in the window. The
+project's devices in the window busiest first with state, when the network last heard from
+the gateway itself, source, receptions, devices, mean RSSI and SNR, last reception and
+location, then the ones that heard nothing, most recently seen first; a source filter narrows
+the list to one network and the footer says how many heard nothing in the window. The
+receptions, the devices and the signal are the window's; the last reception is the newest of
+the last 30 days whatever the window, so a project whose devices report in one burst a day
+reads "none in 30 days" only when that is true. The
 detail shows the platform counters, links to the platform (when the data source has a gateway
 link template), diagnostics and the devices heard.
 
