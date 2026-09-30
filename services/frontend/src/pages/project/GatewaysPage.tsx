@@ -362,6 +362,49 @@ export function GatewaysPage() {
               "last_reception_at",
               "location",
             ]}
+            // a phone showed the name and the status alone, the counts a swipe away nobody
+            // could see, and the last seen and last reception not at all (Tim, 2026-09-30)
+            cardOf={(g) => (
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{g.display_name}</span>
+                  {isRelay(g) && (
+                    <Badge variant="outline">{t("Relay (mesh)")}</Badge>
+                  )}
+                  <StatusBadge value={g.status} />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {g.display_name !== g.external_id && (
+                    <span className="mr-2 font-mono">{g.external_id}</span>
+                  )}
+                  {g.data_source_name}
+                  {" · "}
+                  {t("seen {{ago}}", { ago: formatAgo(g.last_seen_at) })}
+                </div>
+                <div className="text-xs">
+                  {g.receptions > 0
+                    ? t(
+                        "{{receptions}} receptions from {{devices}} devices in the window",
+                        { receptions: g.receptions, devices: g.devices },
+                      )
+                    : t("Heard none of the project's devices in the window")}
+                  {signal(g.mean_rssi, g.mean_snr) &&
+                    ` · ${signal(g.mean_rssi, g.mean_snr)}`}
+                </div>
+                <div className="text-xs">
+                  {g.last_reception_at
+                    ? t("Last reception {{ago}}", {
+                        ago: formatAgo(g.last_reception_at),
+                      })
+                    : t("No reception in 30 days")}
+                  {coords(g) && (
+                    <span className="ml-2 font-mono text-muted-foreground">
+                      {coords(g)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
             searchable
             isLoading={gateways.isPending}
             emptyMessage={t(
@@ -383,6 +426,37 @@ export function GatewaysPage() {
         ) : (
           <DataTable
             columns={deviceColumns}
+            cardOf={(d) => (
+              <div className="space-y-1">
+                <a
+                  className="font-medium underline"
+                  href={`/projects/${projectId}/devices/${d.device_id}?tab=network`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {d.device_name ?? d.device_id}
+                </a>
+                <div className="text-xs">
+                  <span
+                    className={d.gateway_count < 2 ? "text-destructive" : ""}
+                  >
+                    {t("{{count}} gateways", { count: d.gateway_count })}
+                  </span>
+                  {" · "}
+                  {t("{{count}} uplinks", { count: d.uplinks })}
+                  {signal(d.mean_rssi, d.mean_snr) &&
+                    ` · ${signal(d.mean_rssi, d.mean_snr)}`}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {d.best_gateway_name}
+                  {d.best_gateway_share != null &&
+                    ` (${Math.round(d.best_gateway_share * 100)} ${t("% of uplinks")})`}
+                  {" · "}
+                  {t("Last reception {{ago}}", {
+                    ago: formatAgo(d.last_reception_at),
+                  })}
+                </div>
+              </div>
+            )}
             data={connectivity.data}
             searchable
             isLoading={connectivity.isPending}
@@ -407,7 +481,9 @@ export function GatewaysPage() {
             </DialogDescription>
           </DialogHeader>
           {selected && (
-            <div className="space-y-3 text-sm">
+            // min-w-0: a grid item takes the width of its widest child, and the diagnostics
+            // block pushed the map and its button past the dialog's edge on a phone
+            <div className="min-w-0 space-y-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge value={selected.status} />
                 <span className="text-xs text-muted-foreground">
@@ -415,6 +491,12 @@ export function GatewaysPage() {
                     ago: formatAgo(selected.last_seen_at),
                     first: formatTime(selected.first_seen_at),
                   })}
+                  {" · "}
+                  {selected.last_reception_at
+                    ? t("last reception {{ago}}", {
+                        ago: formatAgo(selected.last_reception_at),
+                      })
+                    : t("no reception in 30 days")}
                 </span>
               </div>
               {coords(selected) ? (

@@ -41,9 +41,11 @@ location, then the ones that heard nothing, most recently seen first; a source f
 the list to one network and the footer says how many heard nothing in the window. The
 receptions, the devices and the signal are the window's; the last reception is the newest of
 the last 30 days whatever the window, so a project whose devices report in one burst a day
-reads "none in 30 days" only when that is true. The
-detail shows the platform counters, links to the platform (when the data source has a gateway
-link template), diagnostics and the devices heard.
+reads "none in 30 days" only when that is true. On a phone both tabs show a card per row
+with the same figures. The
+detail shows when the gateway was seen and its last reception, the platform counters, links
+to the platform (when the data source has a gateway link template), diagnostics and the
+devices heard.
 
 Device connectivity lists every device with the number of gateways that heard it, the best
 gateway and its share of the device's uplinks, mean signal and last reception, least covered
