@@ -138,9 +138,10 @@ async def test_unlinked_telegram_target_fails_permanently(db, world):
     assert delivery.status == DeliveryStatus.FAILED and "not linked" in delivery.error_message
 
 
-async def test_webhook_is_signed_and_transient_failures_retry(db, world, monkeypatch):
+@pytest.mark.parametrize("busy", [503, 429])
+async def test_webhook_is_signed_and_transient_failures_retry(db, world, monkeypatch, busy):
     calls: list[httpx.Request] = []
-    status_codes = iter([503, 200])
+    status_codes = iter([busy, 200])
 
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(request)
@@ -157,7 +158,7 @@ async def test_webhook_is_signed_and_transient_failures_retry(db, world, monkeyp
         world.project,
         [{"type": "webhook", "url": "https://hooks.example.org/protect", "secret": "s3cret"}],
     )
-    assert await handle_event(db, payload(world)) is True  # 503: retry wanted
+    assert await handle_event(db, payload(world)) is True  # 503 or 429: retry wanted
     (delivery,) = await _deliveries(db, world.event)
     assert delivery.status == DeliveryStatus.FAILED and delivery.attempts == 1
     assert await handle_event(db, payload(world)) is False  # 200 on the retry

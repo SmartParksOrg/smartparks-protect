@@ -1,6 +1,6 @@
 """Actions for an event (architecture 16): one `ActionDelivery` per automation action per
-event, idempotent under bus re-delivery. Transient failures (SMTP, HTTP 5xx, timeouts) raise a
-retryable error after the successful actions are committed, so the bus re-delivers and only
+event, idempotent under bus re-delivery. Transient failures (SMTP, HTTP 5xx and 429, timeouts)
+raise a retryable error after the successful actions are committed, so the bus re-delivers and only
 the failed actions run again. Stale events (older than the automation's freshness bound) are
 skipped and recorded, never acted on (architecture 25.8)."""
 
@@ -123,7 +123,7 @@ async def post_webhook(action: dict[str, Any], payload: dict[str, Any]) -> dict[
     except httpx.HTTPError as exc:
         raise TransientFailure(f"webhook: {type(exc).__name__}: {exc}") from exc
     summary = {"status": response.status_code, "body": response.text[:500]}
-    if response.status_code >= 500:
+    if response.status_code >= 500 or response.status_code == 429:
         raise TransientFailure(f"webhook answered {response.status_code}")
     if response.status_code >= 400:
         raise PermanentFailure(f"webhook answered {response.status_code}: {response.text[:200]}")
