@@ -132,6 +132,8 @@ function ExportForm({
 
   const formats = DATASETS[dataset].formats as readonly string[];
   const format = formats.includes(chosenFormat) ? chosenFormat : formats[0];
+  // GeoParquet carries a point per moment, which only the wide layout has (decision D312)
+  const recordsLayout = format === "parquet" ? "wide" : layout;
 
   const entities = useQuery({
     queryKey: queryKeys.entities(projectId),

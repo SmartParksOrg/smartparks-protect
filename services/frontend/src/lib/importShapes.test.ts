@@ -1,14 +1,15 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { shapesOfFile, shapesOfGeoJson } from "@/lib/importShapes";
+import areasB64 from "./__fixtures__/areas.parquet.b64?raw";
+import campB64 from "./__fixtures__/camp-zstd.parquet.b64?raw";
+import plainB64 from "./__fixtures__/plain.parquet.b64?raw";
 
-/** The GeoParquet files of `__fixtures__/`, written with GeoPandas (its README says how). */
-function fixture(name: string): File {
-  const bytes = readFileSync(join(__dirname, "__fixtures__", name));
-  return new File([new Uint8Array(bytes)], name);
+/** The GeoParquet files of `__fixtures__/`, written with GeoPandas and kept as base64 text
+ * (its README says how). */
+function fixture(name: string, base64: string): File {
+  const bytes = Uint8Array.from(atob(base64.trim()), (c) => c.charCodeAt(0));
+  return new File([bytes], name);
 }
 
 describe("shapesOfGeoJson", () => {
@@ -94,7 +95,7 @@ describe("shapesOfFile", () => {
   });
 
   it("reads a GeoParquet file from GeoPandas: a zone and a road, named from a column", async () => {
-    const shapes = await shapesOfFile(fixture("areas.parquet"));
+    const shapes = await shapesOfFile(fixture("areas.parquet", areasB64));
     expect(shapes.map((s) => [s.name, s.featureType, s.geometry.type])).toEqual([
       ["North block", "zone", "Polygon"],
       ["Patrol road", "route", "LineString"],
@@ -103,13 +104,13 @@ describe("shapesOfFile", () => {
   });
 
   it("reads a zstd-compressed GeoParquet file and a name under another key", async () => {
-    const shapes = await shapesOfFile(fixture("camp-zstd.parquet"));
+    const shapes = await shapesOfFile(fixture("camp-zstd.parquet", campB64));
     expect(shapes.map((s) => [s.name, s.featureType])).toEqual([["Camp", "site"]]);
     expect((shapes[0].geometry as GeoJSON.Point).coordinates).toEqual([4.7, 52.6]);
   });
 
   it("refuses a Parquet file without GeoParquet metadata", async () => {
-    await expect(shapesOfFile(fixture("plain.parquet"))).rejects.toThrow(
+    await expect(shapesOfFile(fixture("plain.parquet", plainB64))).rejects.toThrow(
       "without GeoParquet metadata",
     );
   });
