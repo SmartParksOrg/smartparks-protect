@@ -105,7 +105,7 @@ The result document carries the summary per period and device, the levels and ra
 
 ## Exports, the report and the API
 
-Export gives every table as CSV, the geometries as GeoJSON, the document as JSON, and "Make PDF report": the fleet table as the key figures with its level dots, one section per device with the four cards and the device's charts, the map with the coverage hulls and the gateways, the thresholds behind the levels and the limitations. "The fixes behind it" opens the export dialog with the positions of the devices over the period. The API is the analysis API of [Movement](movement.md) with the module key `device_performance`; the parameters take `device_ids`, `device_type_id` or `all_devices` in place of the entity fields, and a run stores the resolved `device_ids`.
+Export gives every table as CSV, the geometries as GeoJSON or GeoParquet, the document as JSON, and "Make PDF report": the fleet table as the key figures with its level dots, one section per device with the four cards and the device's charts, the map with the coverage hulls and the gateways, the thresholds behind the levels and the limitations. "The fixes behind it" opens the export dialog with the positions of the devices over the period. The API is the analysis API of [Movement](movement.md) with the module key `device_performance`; the parameters take `device_ids`, `device_type_id` or `all_devices` in place of the entity fields, and a run stores the resolved `device_ids`.
 
 ## Switching it on and off
 

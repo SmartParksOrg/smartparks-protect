@@ -3177,8 +3177,8 @@ export interface paths {
         };
         /**
          * Export Run
-         * @description The result to take elsewhere: the document as JSON, the geometries as GeoJSON, or one
-         *     of the document's tables (by its key) as CSV.
+         * @description The result to take elsewhere: the document as JSON, the geometries as GeoJSON or
+         *     GeoParquet, or one of the document's tables (by its key) as CSV.
          */
         get: operations["export_run_api_v1_projects__project_id__analyses__run_id__export_get"];
         put?: never;
@@ -8979,7 +8979,7 @@ export interface components {
          * ExportFormat
          * @enum {string}
          */
-        ExportFormat: "csv" | "xlsx" | "json" | "geojson" | "gpx";
+        ExportFormat: "csv" | "xlsx" | "json" | "geojson" | "gpx" | "parquet";
         /** ExportJobRead */
         ExportJobRead: {
             /**

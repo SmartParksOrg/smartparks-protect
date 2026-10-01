@@ -13299,7 +13299,7 @@
      "analyses"
     ],
     "summary": "Export Run",
-    "description": "The result to take elsewhere: the document as JSON, the geometries as GeoJSON, or one\nof the document's tables (by its key) as CSV.",
+    "description": "The result to take elsewhere: the document as JSON, the geometries as GeoJSON or\nGeoParquet, or one of the document's tables (by its key) as CSV.",
     "operationId": "export_run_api_v1_projects__project_id__analyses__run_id__export_get",
     "security": [
      {
@@ -13344,7 +13344,7 @@
       "required": false,
       "schema": {
        "type": "string",
-       "pattern": "^(json|geojson|csv)$",
+       "pattern": "^(json|geojson|csv|parquet)$",
        "default": "json",
        "title": "Format"
       }
@@ -32532,7 +32532,8 @@
      "xlsx",
      "json",
      "geojson",
-     "gpx"
+     "gpx",
+     "parquet"
     ],
     "title": "ExportFormat"
    },

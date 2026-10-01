@@ -6,9 +6,11 @@ import json
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pyarrow.parquet as pq
 import pytest
 from geoalchemy2 import WKTElement
 from minio.error import S3Error
+from shapely import from_wkb
 
 from shared.config import get_settings
 from shared.exports import runner
@@ -137,6 +139,28 @@ async def test_direct_exports_every_dataset(client, db):
     ).json()
     assert len(geojson["features"]) == 5 and geojson["metadata"]["timezone"] == "UTC"
 
+    # GeoParquet (decision D312): a typed file with a point per row and the spec's metadata
+    parquet = await client.get(
+        f"{base}?dataset=positions&format=parquet&{window}&timezone=Africa/Johannesburg",
+        headers=admin.headers,
+    )
+    assert parquet.status_code == 200, parquet.text
+    assert parquet.headers["content-type"].startswith("application/vnd.apache.parquet")
+    assert (
+        'filename="positions-20260401-20260402.parquet"' in parquet.headers["content-disposition"]
+    )
+    table = pq.read_table(io.BytesIO(parquet.content))
+    assert table.num_rows == 5 and table.column_names[-1] == "geometry"
+    assert "latitude" not in table.column_names
+    assert str(table.schema.field("time").type) == "timestamp[us, tz=Africa/Johannesburg]"
+    geo = json.loads(table.schema.metadata[b"geo"])
+    assert geo["version"] == "1.1.0" and geo["columns"]["geometry"]["geometry_types"] == ["Point"]
+    first = table.slice(0, 1).to_pylist()[0]
+    assert from_wkb(first["geometry"]).coords[0] == (31.5, -24.9)
+    assert first["entity_name"] == "Rhino 14" and json.loads(first["attributes"]) == {"fix_type": 3}
+    own = json.loads(table.schema.metadata[b"smartparks_protect"])
+    assert own["timezone"] == "Africa/Johannesburg" and own["parameters"]["format"] == "parquet"
+
     measurements = await client.get(
         f"{base}?dataset=measurements&format=json&{window}&metric_keys=battery_voltage",
         headers=admin.headers,
@@ -194,6 +218,19 @@ async def test_direct_export_bounds_and_validation(client, db, monkeypatch):
         headers=admin.headers,
     )
     assert wrong_format.status_code == 422 and "measurements exports support" in wrong_format.text
+    long_parquet = await client.post(
+        base,
+        json={
+            "dataset": "records",
+            "format": "parquet",
+            "records_layout": "long",
+            "entity_ids": [entity["id"]],
+            "time_from": FROM,
+            "time_to": TO,
+        },
+        headers=admin.headers,
+    )
+    assert long_parquet.status_code == 422 and "wide layout" in long_parquet.text
     bad_zone = await client.post(
         base,
         json={

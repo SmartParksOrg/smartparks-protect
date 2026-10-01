@@ -2,12 +2,15 @@
 catalogue, the estimate, the run's life through the worker's runner, the scope, the bounds,
 the flags and the exports."""
 
+import io
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pyarrow.parquet as pq
 import pytest
 from pydantic import BaseModel
+from shapely import from_wkb
 
 from shared.analysis import MODULES
 from shared.analysis.base import (
@@ -190,6 +193,28 @@ async def test_catalogue_estimate_and_the_life_of_a_run(client, db, stub):
         f"{base}/{run['id']}/export", params={"what": "geometries", "format": "geojson"}, headers=h
     )
     assert geojson.status_code == 200 and geojson.json()["features"]
+    parquet = await client.get(
+        f"{base}/{run['id']}/export", params={"what": "geometries", "format": "parquet"}, headers=h
+    )
+    assert parquet.status_code == 200
+    assert parquet.headers["content-type"].startswith("application/vnd.apache.parquet")
+    table = pq.read_table(io.BytesIO(parquet.content))
+    assert table.num_rows == len(geojson.json()["features"])
+    assert table.column_names == [
+        "id",
+        "kind",
+        "subject_id",
+        "label",
+        "level",
+        "area_m2",
+        "properties",
+        "geometry",
+    ]
+    footer = pq.read_metadata(io.BytesIO(parquet.content)).metadata
+    geo = json.loads(footer[b"geo"])["columns"]["geometry"]
+    assert geo["encoding"] == "WKB" and "Polygon" in geo["geometry_types"]
+    assert from_wkb(table.column("geometry")[0].as_py()).geom_type == "Polygon"
+    assert table.column("kind")[0].as_py() == "mcp"
 
     kept = await client.patch(f"{base}/{run['id']}", json={"name": "Wolves, week one"}, headers=h)
     assert kept.status_code == 200 and kept.json()["expires_at"] is None

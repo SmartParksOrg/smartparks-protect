@@ -1,12 +1,14 @@
 import { gpx, kml } from "@tmcw/togeojson";
 import { unzipSync } from "fflate";
+import { parquetMetadataAsync, parquetReadObjects } from "hyparquet";
+import { compressors } from "hyparquet-compressors";
 import shp from "shpjs";
 
 /**
  * Shapes read from a file people already have (phase 33, decisions D268 and D269): a
- * shapefile as a zip, KML, KMZ, GPX or GeoJSON, parsed in the browser into the shapes the
- * Features page previews and saves as features. Nothing reaches the server but the features
- * a person keeps.
+ * shapefile as a zip, KML, KMZ, GPX, GeoJSON or GeoParquet (decision D312), parsed in the
+ * browser into the shapes the Features page previews and saves as features. Nothing reaches
+ * the server but the features a person keeps.
  */
 
 export interface ImportedShape {
@@ -30,6 +32,7 @@ export const ACCEPTED_EXTENSIONS = [
   ".gpx",
   ".geojson",
   ".json",
+  ".parquet",
 ];
 
 const NAME_KEYS = ["name", "Name", "NAME", "title", "label", "id"];
@@ -129,6 +132,59 @@ function kmlOfKmz(bytes: Uint8Array): string {
   return new TextDecoder().decode(entries[name]);
 }
 
+interface GeoMetadata {
+  primary_column?: string;
+  columns?: Record<string, { encoding?: string }>;
+}
+
+/** A row's value as a GeoJSON property: a 64-bit integer arrives as a bigint, which JSON and
+ * the name lookup do not take. */
+function property(value: unknown): unknown {
+  if (typeof value === "bigint")
+    return Number.isSafeInteger(Number(value)) ? Number(value) : String(value);
+  return value;
+}
+
+/** The shapes of a GeoParquet file (decision D312): the `geo` metadata names the geometry
+ * column, hyparquet decodes its WKB into GeoJSON geometries, and the other columns are the
+ * properties the names are read from. Only the WKB encoding is read, which is what QGIS,
+ * ArcGIS and GeoPandas write by default; a native (GeoArrow) encoding is refused by name. */
+export async function shapesOfParquet(buffer: ArrayBuffer): Promise<ImportedShape[]> {
+  const metadata = await parquetMetadataAsync(buffer);
+  const geoText = metadata.key_value_metadata?.find((kv) => kv.key === "geo")?.value;
+  if (!geoText)
+    throw new Error(
+      "The file is Parquet without GeoParquet metadata, so no column is known to hold the shapes",
+    );
+  const geo = JSON.parse(geoText) as GeoMetadata;
+  const column = geo.primary_column ?? Object.keys(geo.columns ?? {})[0];
+  const encoding = column ? geo.columns?.[column]?.encoding : undefined;
+  if (!column || !encoding)
+    throw new Error("The GeoParquet metadata names no geometry column");
+  if (encoding !== "WKB")
+    throw new Error(`The geometry encoding ${encoding} is not supported, WKB is`);
+  const rows = Number(metadata.num_rows);
+  if (rows > MAX_SHAPES)
+    throw new Error(
+      `The file holds ${rows} shapes; at most ${MAX_SHAPES} are imported at once`,
+    );
+  const records = await parquetReadObjects({ file: buffer, compressors });
+  return shapesOfGeoJson({
+    type: "FeatureCollection",
+    features: records.map((record) => {
+      const { [column]: geometry, ...rest } = record;
+      const properties: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(rest))
+        properties[key] = property(value);
+      return {
+        type: "Feature",
+        geometry: (geometry ?? null) as GeoJSON.Geometry | null,
+        properties,
+      };
+    }),
+  });
+}
+
 /** Every shape of a file, by its extension. Throws with a plain reason when the file cannot
  * be read; a file with more than `MAX_SHAPES` shapes is refused rather than cut. */
 export async function shapesOfFile(file: File): Promise<ImportedShape[]> {
@@ -136,6 +192,8 @@ export async function shapesOfFile(file: File): Promise<ImportedShape[]> {
   let shapes: ImportedShape[];
   if (extension === ".geojson" || extension === ".json")
     shapes = shapesOfGeoJson(JSON.parse(await file.text()));
+  else if (extension === ".parquet")
+    shapes = await shapesOfParquet(await file.arrayBuffer());
   else if (extension === ".kml")
     shapes = shapesOfGeoJson(kml(parseXml(await file.text())));
   else if (extension === ".kmz")

@@ -45,7 +45,7 @@ The estimate line under the form names what the run cannot use before Run is pre
 
 ## Reports and exports
 
-A saved run with a name, shared with the project, is the report of phase 1; the tables export as CSV, the polygons as GeoJSON and the whole document as JSON, "Make PDF report" has the server render the run to A4 and "Download PDF" appears when it is ready (the PDF stays with the run), and "The fixes behind it" opens the export dialog with the herd's positions over the period. A monthly utilisation report as a fixed document is noted for later; the result already holds every number and the provenance it needs.
+A saved run with a name, shared with the project, is the report of phase 1; the tables export as CSV, the polygons as GeoJSON or GeoParquet and the whole document as JSON, "Make PDF report" has the server render the run to A4 and "Download PDF" appears when it is ready (the PDF stays with the run), and "The fixes behind it" opens the export dialog with the herd's positions over the period. A monthly utilisation report as a fixed document is noted for later; the result already holds every number and the provenance it needs.
 
 ## The vegetation of each area
 

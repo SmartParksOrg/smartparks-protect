@@ -3,9 +3,12 @@ row per value (long), streamed like the other datasets; the direct path counts t
 
 import csv
 import io
+import json
 from datetime import UTC, datetime, timedelta
 
+import pyarrow.parquet as pq
 import pytest
+from shapely import from_wkb
 
 from tests.api.test_network_and_map import _feed, _setup, bus  # noqa: F401
 
@@ -35,6 +38,22 @@ async def test_records_export_wide_and_long(client, db, bus):  # noqa: F811
     assert "m_battery_voltage" in rows[0] and rows[0]["m_battery_voltage"] == "3.8"
     assert rows[0]["entity_name"] == "Rhino 14" and rows[0]["latitude"].startswith("-24.9")
     assert [r["longitude"][:5] for r in rows] == ["31.5", "31.51", "31.52"]  # oldest first
+
+    # the same moments as GeoParquet (decision D312): a point per moment, a typed metric column
+    parquet = await client.get(
+        f"/api/v1/projects/{project.id}/exports/direct",
+        params={**query, "format": "parquet"},
+        headers=admin.headers,
+    )
+    assert parquet.status_code == 200, parquet.text
+    table = pq.read_table(io.BytesIO(parquet.content))
+    assert table.num_rows == 3 and "latitude" not in table.column_names
+    assert str(table.schema.field("m_battery_voltage").type) == "double"
+    first = table.slice(0, 1).to_pylist()[0]
+    assert first["m_battery_voltage"] == 3.8 and first["entity_name"] == "Rhino 14"
+    assert from_wkb(first["geometry"]).coords[0] == (31.5, -24.9)
+    footer = pq.read_metadata(io.BytesIO(parquet.content)).metadata
+    assert json.loads(footer[b"geo"])["columns"]["geometry"]["bbox"][0] == 31.5
 
     long = await client.get(
         f"/api/v1/projects/{project.id}/exports/direct",

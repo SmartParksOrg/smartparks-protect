@@ -191,12 +191,12 @@ async def check_direct_size(
 async def direct_export(
     session: AsyncSession, project_id: uuid.UUID, params: ExportParameters
 ) -> AsyncIterator[bytes]:
-    """Stream a small export. Formats that are complete only at the end (XLSX) go through a
-    temporary file; the rest are yielded as they are written."""
+    """Stream a small export. Formats that are complete only at the end (XLSX, and GeoParquet
+    with its footer) go through a temporary file; the rest are yielded as they are written."""
     try:
         lookups = await load_lookups(session, project_id, params)
-        if params.format is ExportFormat.XLSX:
-            with tempfile.TemporaryFile(suffix=".xlsx") as handle:
+        if params.format in (ExportFormat.XLSX, ExportFormat.PARQUET):
+            with tempfile.TemporaryFile(suffix=f".{params.format.value}") as handle:
                 await _write_all(session, project_id, params, lookups, cast(BinaryIO, handle))
                 handle.seek(0)
                 while chunk := handle.read(CHUNK):

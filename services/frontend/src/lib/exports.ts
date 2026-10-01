@@ -5,11 +5,11 @@ import type { Aggregate, RangePreset } from "@/lib/analytics";
 export const DATASETS = {
   records: {
     label: t("Records (one row per moment)"),
-    formats: ["csv", "xlsx", "json"],
+    formats: ["csv", "xlsx", "json", "parquet"],
   },
   positions: {
     label: "Positions",
-    formats: ["csv", "xlsx", "json", "geojson", "gpx"],
+    formats: ["csv", "xlsx", "json", "geojson", "gpx", "parquet"],
   },
   measurements: { label: "Measurements", formats: ["csv", "xlsx", "json"] },
   aggregates: {
@@ -30,6 +30,12 @@ export const DATASETS = {
   },
 } as const;
 export type Dataset = keyof typeof DATASETS;
+
+/** How a format is named: its extension in capitals, GeoParquet by its own name since the
+ * file is `.parquet` (decision D312). */
+export function formatLabel(format: string): string {
+  return format === "parquet" ? "GeoParquet" : format.toUpperCase();
+}
 
 export interface ExportPreset {
   dataset?: Dataset;

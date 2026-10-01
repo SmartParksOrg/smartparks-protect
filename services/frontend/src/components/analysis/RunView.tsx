@@ -240,6 +240,16 @@ export function RunView({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() =>
+                    void downloadFile(`${base}/export`, "geometries.parquet", {
+                      what: "geometries",
+                      format: "parquet",
+                    })
+                  }
+                >
+                  {t("Geometries as GeoParquet")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
                     void downloadFile(`${base}/export`, "analysis.json", {
                       what: "document",
                       format: "json",

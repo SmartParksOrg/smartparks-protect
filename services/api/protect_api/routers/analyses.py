@@ -12,6 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
+from geoalchemy2.shape import to_shape
 from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,7 +51,8 @@ from shared.bus import RedisStreamsBus, Topic
 from shared.config import get_settings
 from shared.curation.effective import device_fix, effective_time, visible
 from shared.database import get_session
-from shared.enums import AnalysisStatus, ReportStatus
+from shared.enums import AnalysisStatus, ExportFormat, ReportStatus
+from shared.exports.writers import CONTENT_TYPES, GeoParquetWriter
 from shared.i18n import translate
 from shared.models import (
     AnalysisGeometry,
@@ -65,6 +67,7 @@ from shared.models import (
 from shared.permissions import Permission
 from shared.storage import stream_object
 from shared.timeutil import utc_now
+from shared.version import read_version
 
 router = APIRouter(tags=["analyses"])
 MAX_GEOMETRIES_PER_CALL = 2_000
@@ -582,12 +585,7 @@ async def run_geometries(
 ) -> dict[str, Any]:
     """The run's result geometries as a GeoJSON feature collection, by kind and subject."""
     run = await _run_for(session, context, run_id)
-    statement = select(AnalysisGeometry).where(AnalysisGeometry.run_id == run.id)
-    if kind:
-        statement = statement.where(AnalysisGeometry.kind == kind)
-    if subject_id:
-        statement = statement.where(AnalysisGeometry.subject_id == subject_id)
-    rows = list(await session.scalars(statement.order_by(AnalysisGeometry.id).limit(limit)))
+    rows = await _geometries(session, run, kind, subject_id, limit)
     return {
         "type": "FeatureCollection",
         "features": [
@@ -609,16 +607,71 @@ async def run_geometries(
     }
 
 
+async def _geometries(
+    session: AsyncSession,
+    run: AnalysisRun,
+    kind: str | None,
+    subject_id: uuid.UUID | None,
+    limit: int,
+) -> list[AnalysisGeometry]:
+    statement = select(AnalysisGeometry).where(AnalysisGeometry.run_id == run.id)
+    if kind:
+        statement = statement.where(AnalysisGeometry.kind == kind)
+    if subject_id:
+        statement = statement.where(AnalysisGeometry.subject_id == subject_id)
+    return list(await session.scalars(statement.order_by(AnalysisGeometry.id).limit(limit)))
+
+
+# The columns of a run's geometries as GeoParquet (decision D312): what the GeoJSON features
+# carry as properties, the module's own properties as one JSON document, the shape last.
+GEOMETRY_COLUMNS = [
+    "id",
+    "kind",
+    "subject_id",
+    "label",
+    "level",
+    "area_m2",
+    "properties",
+    "geometry",
+]
+
+
+def _geometries_parquet(run: AnalysisRun, rows: list[AnalysisGeometry]) -> bytes:
+    stream = io.BytesIO()
+    metadata = {
+        "generator": f"Smart Parks Protect {read_version()}",
+        "run_id": str(run.id),
+        "module": run.module,
+        "name": run.name,
+    }
+    writer = GeoParquetWriter(stream, GEOMETRY_COLUMNS, metadata)
+    for row in rows:
+        writer.write_row(
+            {
+                "id": row.id,
+                "kind": row.kind,
+                "subject_id": str(row.subject_id) if row.subject_id else None,
+                "label": row.label,
+                "level": row.level,
+                "area_m2": row.area_m2,
+                "properties": row.properties,
+                "geometry": to_shape(row.geom),
+            }
+        )
+    writer.finish()
+    return stream.getvalue()
+
+
 @router.get("/projects/{project_id}/analyses/{run_id}/export")
 async def export_run(
     run_id: uuid.UUID,
     what: str = Query("document", pattern="^(document|geometries|[a-z_]+)$"),
-    format: str = Query("json", pattern="^(json|geojson|csv)$"),
+    format: str = Query("json", pattern="^(json|geojson|csv|parquet)$"),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    """The result to take elsewhere: the document as JSON, the geometries as GeoJSON, or one
-    of the document's tables (by its key) as CSV."""
+    """The result to take elsewhere: the document as JSON, the geometries as GeoJSON or
+    GeoParquet, or one of the document's tables (by its key) as CSV."""
     run = await _run_for(session, context, run_id)
     if run.result is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "The run has no result yet")
@@ -627,6 +680,13 @@ async def export_run(
     if what == "document":
         body = json.dumps(run.result, indent=2).encode()
         return Response(body, media_type="application/json", headers=_attachment(f"{name}.json"))
+    if what == "geometries" and format == "parquet":
+        rows = await _geometries(session, run, None, None, MAX_GEOMETRIES_PER_CALL)
+        return Response(
+            _geometries_parquet(run, rows),
+            media_type=CONTENT_TYPES[ExportFormat.PARQUET],
+            headers=_attachment(f"{name}.parquet"),
+        )
     if what == "geometries":
         collection = await run_geometries(
             run_id, None, None, MAX_GEOMETRIES_PER_CALL, context, session

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { formatInZone } from "@/lib/analytics";
-import { DATASETS } from "@/lib/exports";
+import { DATASETS, formatLabel } from "@/lib/exports";
 import { formatTime } from "@/lib/format";
 
 /** Export jobs of the project: progress while they run, download and reproduce when done. */
@@ -89,7 +89,7 @@ export function ExportsPage() {
     {
       header: t("Format"),
       accessorKey: "format",
-      cell: ({ getValue }) => getValue<string>().toUpperCase(),
+      cell: ({ getValue }) => formatLabel(getValue<string>()),
     },
     {
       header: t("Range"),

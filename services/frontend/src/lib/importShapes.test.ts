@@ -1,6 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { shapesOfFile, shapesOfGeoJson } from "@/lib/importShapes";
+
+/** The GeoParquet files of `__fixtures__/`, written with GeoPandas (its README says how). */
+function fixture(name: string): File {
+  const bytes = readFileSync(join(__dirname, "__fixtures__", name));
+  return new File([new Uint8Array(bytes)], name);
+}
 
 describe("shapesOfGeoJson", () => {
   it("reads a collection, names shapes from their properties and types them by geometry", () => {
@@ -82,6 +91,27 @@ describe("shapesOfFile", () => {
     expect(shapes.map((s) => [s.name, s.featureType, s.geometry.type])).toEqual([
       ["Patrol", "route", "LineString"],
     ]);
+  });
+
+  it("reads a GeoParquet file from GeoPandas: a zone and a road, named from a column", async () => {
+    const shapes = await shapesOfFile(fixture("areas.parquet"));
+    expect(shapes.map((s) => [s.name, s.featureType, s.geometry.type])).toEqual([
+      ["North block", "zone", "Polygon"],
+      ["Patrol road", "route", "LineString"],
+    ]);
+    expect((shapes[0].geometry as GeoJSON.Polygon).coordinates[0][0]).toEqual([4.6, 52.5]);
+  });
+
+  it("reads a zstd-compressed GeoParquet file and a name under another key", async () => {
+    const shapes = await shapesOfFile(fixture("camp-zstd.parquet"));
+    expect(shapes.map((s) => [s.name, s.featureType])).toEqual([["Camp", "site"]]);
+    expect((shapes[0].geometry as GeoJSON.Point).coordinates).toEqual([4.7, 52.6]);
+  });
+
+  it("refuses a Parquet file without GeoParquet metadata", async () => {
+    await expect(shapesOfFile(fixture("plain.parquet"))).rejects.toThrow(
+      "without GeoParquet metadata",
+    );
   });
 
   it("refuses a file type it does not know", async () => {

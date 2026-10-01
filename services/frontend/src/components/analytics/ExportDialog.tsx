@@ -50,6 +50,7 @@ import {
   DATASETS,
   directExportQuery,
   type ExportPreset,
+  formatLabel,
 } from "@/lib/exports";
 
 interface Props {
@@ -201,7 +202,7 @@ function ExportForm({
         dataset === "records"
           ? []
           : metricKeys,
-      ...(dataset === "records" ? { records_layout: layout } : {}),
+      ...(dataset === "records" ? { records_layout: recordsLayout } : {}),
       timezone,
       include_names: includeNames,
       ...(dataset === "positions" || dataset === "measurements"
@@ -281,7 +282,7 @@ function ExportForm({
             <SelectContent>
               {formats.map((f) => (
                 <SelectItem key={f} value={f}>
-                  {f.toUpperCase()}
+                  {formatLabel(f)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -353,10 +354,19 @@ function ExportForm({
           </Field>
         )}
         {dataset === "records" && (
-          <Field label={t("Layout")} htmlFor="records-layout">
+          <Field
+            label={t("Layout")}
+            htmlFor="records-layout"
+            hint={
+              format === "parquet"
+                ? t("GeoParquet takes the wide layout, where a moment carries its position")
+                : undefined
+            }
+          >
             <Select
-              value={layout}
+              value={recordsLayout}
               onValueChange={(v) => setLayout(v as "long" | "wide")}
+              disabled={format === "parquet"}
             >
               <SelectTrigger id="records-layout" className="w-full">
                 <SelectValue />

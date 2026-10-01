@@ -266,6 +266,7 @@ class ExportFormat(StrEnum):
     JSON = "json"
     GEOJSON = "geojson"
     GPX = "gpx"
+    PARQUET = "parquet"  # GeoParquet 1.1.0 (decision D312); the value is the file extension
 
 
 class ExportDataset(StrEnum):

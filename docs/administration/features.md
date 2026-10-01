@@ -18,8 +18,10 @@ add one, Delete removes one. The bar shows the length, area or radius while you 
 ## Import a file
 
 "Import" on the Features page reads a file people already have: a shapefile (the `.shp`,
-`.shx`, `.dbf` and `.prj` files zipped together), KML, KMZ, GPX or GeoJSON. The file is read in
-the browser and never uploaded; every shape it holds is shown on a map and listed with a
+`.shx`, `.dbf` and `.prj` files zipped together), KML, KMZ, GPX, GeoJSON or GeoParquet (a
+`.parquet` file as QGIS, ArcGIS Pro, GeoPandas or Ecoscope write it: the geometry as WKB in
+longitude and latitude, named in the file's `geo` metadata; the other columns give the shape
+its name). The file is read in the browser and never uploaded; every shape it holds is shown on a map and listed with a
 checkbox, a name taken from the file where it has one, and a type: a polygon becomes a zone
 (or a geofence), a line a route (or a fence line), a point a site. Keep the shapes you want and
 import them; each becomes a feature of the project with the file's name kept in its
@@ -35,8 +37,8 @@ of them for two minutes raises `OFF_ROAD`. A route's panel on the live map and t
 offer "Create rule" with that template. Roads reach the project in three ways, and none of them
 asks a map service (Tim, 2026-09-27: organisations have their roads in GIS already):
 
-- **Import** the file the organisation has: the lines of a shapefile, KML, KMZ, GPX or GeoJSON
-  become routes, one each, or with "Save the kept lines as one route" one road network under a
+- **Import** the file the organisation has: the lines of a shapefile, KML, KMZ, GPX, GeoJSON
+  or GeoParquet become routes, one each, or with "Save the kept lines as one route" one road network under a
   name.
 - **Draw** a route with New feature, type route.
 - **Combine** existing line features: tick the routes on the Features page and "Combine N into

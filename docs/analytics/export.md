@@ -9,7 +9,7 @@ Both paths take the same parameters, as a JSON body for jobs and as query parame
 | Parameter | Meaning |
 | --- | --- |
 | `dataset` | `records` (one row per moment of a device with its position, measurements and state, see below), `positions`, `measurements` (normalized), `source_events` (raw inbound messages with payload), `aggregates` (the Data explorer series), `movebank_events` or `movebank_reference` (see Movebank below). |
-| `format` | `csv`, `xlsx`, `json`; positions also `geojson` and `gpx`. |
+| `format` | `csv`, `xlsx`, `json`; positions also `geojson`, `gpx` and `parquet` (GeoParquet); records also `parquet` in the wide layout. |
 | `time_from`, `time_to` | Required, with offset. Source events are selected on `ingested_at`, everything else on the device time. |
 | `entity_ids`, `device_ids`, `metric_keys`, `data_source_id` | Filters. Source events are per device and refuse `entity_ids`. |
 | `timezone` | IANA name, default `UTC`. Times in the file are written in this zone with their offset. |
@@ -27,7 +27,7 @@ In the app the export dialog starts from the records view's selection, counts fi
 
 `GET /api/v1/projects/{project_id}/exports/direct?dataset=positions&format=gpx&time_from=...&time_to=...`
 
-Streams the file. The row count is checked first; above 100,000 rows the answer is 413 with the advice to create a job (architecture 13.8), and the app's export dialog then creates the job by itself. XLSX is assembled in a temporary file because the format is complete only at the end; every other format streams as it is written.
+Streams the file. The row count is checked first; above 100,000 rows the answer is 413 with the advice to create a job (architecture 13.8), and the app's export dialog then creates the job by itself. XLSX and GeoParquet are assembled in a temporary file because those formats are complete only at the end; every other format streams as it is written.
 
 ## Jobs
 
@@ -50,6 +50,7 @@ Files are kept for seven days (`expires_at`); the export service removes expired
 - **JSON**: `{"metadata": {...}, "columns": [...], "rows": [...]}`.
 - **GeoJSON**: a FeatureCollection of points, the other columns as properties.
 - **GPX**: one track per entity (per device when unassigned), points in time order with elevation and UTC time.
+- **GeoParquet** (`parquet`, decision D312): a [GeoParquet 1.1.0](https://geoparquet.org/releases/v1.1.0/) file, which QGIS (through GDAL 3.9 or later), ArcGIS Pro 3.5, GeoPandas and Ecoscope read directly. The position is a point in the `geometry` column as WKB in WGS 84 (longitude, latitude); `latitude` and `longitude` columns are left out, every other column of the CSV is there with a proper type: `time` as a timestamp in the export's timezone, `time_utc` as a UTC timestamp, numbers as numbers, `valid` as a boolean, identifiers as text, `attributes` as a JSON document. A records export carries a metric column `m_<key>` as a number or a boolean and a state column `s_<key>` as text; a moment without a position has no geometry. The file's metadata holds the `geo` key the specification asks for (with the geometry types and their bounding box) and, under `smartparks_protect`, the same generator, parameters, timezone and metric definitions a JSON export carries. In Ecoscope (1.7): `from ecoscope.base import Relocations` and `Relocations.from_gdf(geopandas.read_parquet("positions.parquet"), groupby_col="entity_id", time_col="time_utc")`.
 
 ## Movebank
 

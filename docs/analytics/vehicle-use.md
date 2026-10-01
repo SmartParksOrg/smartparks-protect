@@ -56,7 +56,7 @@ A vehicle is an entity of the **Vehicles** type or one of its sub-types (a car, 
 
 ## Exports and API
 
-Export gives the summary table as CSV, the trips and speeding points as GeoJSON, the whole document as JSON, and "Make PDF report" renders the run to A4 with the cards as key figures, the map, the charts and the tables. The API is the analysis API of every module (`GET /analysis-modules`, `GET /projects/{id}/analyses/estimate`, `GET|POST /projects/{id}/analyses`, and on a run `GET`, `PATCH`, `POST .../cancel`, `DELETE`, `GET .../geometries` with `kind=trip` or `kind=speeding`, and `GET .../export`), with `module=vehicle_use` and the parameters `entity_ids`, `time_from`, `time_to`, `comparison`, `gap_hours`, `moving_kmh`, `stop_minutes`, `stop_radius_m`, `site_radius_m`, `limit_kmh` and `max_speed_mps`.
+Export gives the summary table as CSV, the trips and speeding points as GeoJSON or GeoParquet, the whole document as JSON, and "Make PDF report" renders the run to A4 with the cards as key figures, the map, the charts and the tables. The API is the analysis API of every module (`GET /analysis-modules`, `GET /projects/{id}/analyses/estimate`, `GET|POST /projects/{id}/analyses`, and on a run `GET`, `PATCH`, `POST .../cancel`, `DELETE`, `GET .../geometries` with `kind=trip` or `kind=speeding`, and `GET .../export`), with `module=vehicle_use` and the parameters `entity_ids`, `time_from`, `time_to`, `comparison`, `gap_hours`, `moving_kmh`, `stop_minutes`, `stop_radius_m`, `site_radius_m`, `limit_kmh` and `max_speed_mps`.
 
 ## Switching it on and off
 

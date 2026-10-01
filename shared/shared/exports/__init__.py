@@ -22,10 +22,10 @@ FORMATS_BY_DATASET: dict[ExportDataset, frozenset[ExportFormat]] = {
     ExportDataset.SOURCE_EVENTS: _TABULAR,
     ExportDataset.MEASUREMENTS: _TABULAR,
     ExportDataset.AGGREGATES: _TABULAR,
-    ExportDataset.POSITIONS: frozenset(ExportFormat),  # also GeoJSON and GPX
+    ExportDataset.POSITIONS: frozenset(ExportFormat),  # also GeoJSON, GPX and GeoParquet
     ExportDataset.MOVEBANK_EVENTS: _TABULAR,
     ExportDataset.MOVEBANK_REFERENCE: _TABULAR,
-    ExportDataset.RECORDS: _TABULAR,
+    ExportDataset.RECORDS: _TABULAR | {ExportFormat.PARQUET},  # wide layout only (D312)
 }
 
 
@@ -93,6 +93,14 @@ class ExportParameters(BaseModel):
             raise ValueError("aggregates need at least one metric")
         if self.dataset is ExportDataset.RECORDS and not (self.entity_ids or self.device_ids):
             raise ValueError("records need at least one entity or device")
+        if (
+            self.dataset is ExportDataset.RECORDS
+            and self.records_layout == "long"
+            and self.format is ExportFormat.PARQUET
+        ):
+            raise ValueError(
+                "records as GeoParquet take the wide layout, where a moment carries its position"
+            )
         if self.dataset is ExportDataset.SOURCE_EVENTS and self.entity_ids:
             raise ValueError("source events are per device; filter by device_ids")
         if self.dataset is ExportDataset.MOVEBANK_EVENTS and self.view == "original":

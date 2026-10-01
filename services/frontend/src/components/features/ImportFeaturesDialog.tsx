@@ -267,7 +267,7 @@ export function ImportFeaturesDialog({
           <DialogTitle>{t("Import features")}</DialogTitle>
           <DialogDescription>
             {t(
-              "A shapefile (as a zip), KML, KMZ, GPX or GeoJSON file. Every shape is shown first; keep the ones you want, name them and choose their type. At most {{count}} shapes per file.",
+              "A shapefile (as a zip), KML, KMZ, GPX, GeoJSON or GeoParquet file. Every shape is shown first; keep the ones you want, name them and choose their type. At most {{count}} shapes per file.",
               { count: MAX_SHAPES },
             )}
           </DialogDescription>
