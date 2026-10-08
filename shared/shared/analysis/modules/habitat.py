@@ -366,7 +366,8 @@ class HabitatModule:
                     period.time_to if periodic else None,
                 )
         outcomes: dict[RasterRequest, tuple[bytes, bool] | BaseException] = {}
-        if requests and provider is not None and getattr(provider, "raster_layers", ()):
+        offers: tuple[str, ...] = getattr(provider, "raster_layers", ()) if provider else ()
+        if requests and provider is not None and offers:
             await ctx.progress(25, "the satellite layers")
             started = time.monotonic()
             outcomes = await cached_rasters(
