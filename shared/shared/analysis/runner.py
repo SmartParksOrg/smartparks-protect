@@ -80,11 +80,12 @@ async def run_analysis(session: AsyncSession, run: AnalysisRun) -> None:
         progress=progress,
         cancelled=lambda: _cancel_requested(run_id),
     )
+    # a module may carry a longer timeout of its own: the habitat module waits on openEO
+    # batch jobs that take minutes each over a large area
+    timeout = int(getattr(module, "timeout_seconds", 0) or settings.analysis_timeout_seconds)
     try:
         params: BaseModel = module.parameters.model_validate(run.parameters)
-        result = await asyncio.wait_for(
-            module.run(ctx, params), timeout=settings.analysis_timeout_seconds
-        )
+        result = await asyncio.wait_for(module.run(ctx, params), timeout=timeout)
         await _store(session, run, result)
         await _finish(session, run, AnalysisStatus.COMPLETED)
     except AnalysisCancelled as stopped:
@@ -97,7 +98,7 @@ async def run_analysis(session: AsyncSession, run: AnalysisRun) -> None:
             run,
             AnalysisStatus.FAILED,
             "ANALYSIS_TIMEOUT",
-            f"the run exceeded {settings.analysis_timeout_seconds} seconds",
+            f"the run exceeded {timeout} seconds",
         )
     except AnalysisTooLarge as error:
         await _reset(session, run)

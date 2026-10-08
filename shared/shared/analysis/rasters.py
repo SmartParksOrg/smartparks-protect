@@ -7,6 +7,7 @@ module runs in the lean API as well as in the worker; the pixels are the worker'
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import uuid
@@ -193,6 +194,18 @@ def layer_key(project_id: uuid.UUID, layer_id: uuid.UUID) -> str:
     return f"projects/{project_id}/layers/{layer_id}.tif"
 
 
+@dataclass(frozen=True, slots=True)
+class RasterRequest:
+    """One layer over one grid and period, as `cached_rasters` takes it."""
+
+    layer: str
+    bbox: tuple[float, float, float, float]
+    epsg: int
+    resolution_m: float
+    time_from: datetime | None
+    time_to: datetime | None
+
+
 async def cached_raster(
     session: AsyncSession,
     provider: RasterProvider,
@@ -204,44 +217,80 @@ async def cached_raster(
     time_to: datetime | None,
     project_id: uuid.UUID,
 ) -> tuple[bytes, bool]:
-    """The layer as a GeoTIFF over the grid: from the bucket when the cache holds it, else
-    from the provider, stored for the next run. Answers the bytes and whether they were
-    fetched now. A provider's failure propagates: the module turns it into a warning."""
+    """One layer through `cached_rasters`; a provider's failure propagates."""
+    request = RasterRequest(layer, bbox, epsg, resolution_m, time_from, time_to)
+    outcome = (await cached_rasters(session, provider, [request], project_id))[request]
+    if isinstance(outcome, BaseException):
+        raise outcome
+    return outcome
+
+
+async def cached_rasters(
+    session: AsyncSession,
+    provider: RasterProvider,
+    requests: Sequence[RasterRequest],
+    project_id: uuid.UUID,
+) -> dict[RasterRequest, tuple[bytes, bool] | BaseException]:
+    """The layers as GeoTIFFs over the grid: each from the bucket when the cache holds it,
+    else from the provider, stored for the next run. The provider's fetches run at the same
+    time (an openEO batch job per layer takes minutes, and the run on Okonjima of 2026-10-08
+    timed out waiting for them one after the other); the session is used by one step at a
+    time. Answers, per request, the bytes and whether they were fetched now, or the
+    provider's exception, which the module turns into a warning."""
     settings = get_settings()
-    hashed = area_hash(bbox, epsg, resolution_m)
-    period = period_key(time_from, time_to)
-    row = await session.scalar(
-        select(EnvironmentRaster).where(
-            EnvironmentRaster.provider == provider.key,
-            EnvironmentRaster.layer == layer,
-            EnvironmentRaster.area_hash == hashed,
-            EnvironmentRaster.epsg == epsg,
-            EnvironmentRaster.resolution_m == resolution_m,
-            EnvironmentRaster.period == period,
+    outcomes: dict[RasterRequest, tuple[bytes, bool] | BaseException] = {}
+    missing: list[tuple[RasterRequest, str, str]] = []
+    for request in dict.fromkeys(requests):
+        hashed = area_hash(request.bbox, request.epsg, request.resolution_m)
+        period = period_key(request.time_from, request.time_to)
+        row = await session.scalar(
+            select(EnvironmentRaster).where(
+                EnvironmentRaster.provider == provider.key,
+                EnvironmentRaster.layer == request.layer,
+                EnvironmentRaster.area_hash == hashed,
+                EnvironmentRaster.epsg == request.epsg,
+                EnvironmentRaster.resolution_m == request.resolution_m,
+                EnvironmentRaster.period == period,
+            )
         )
+        if row is not None:
+            outcomes[request] = (
+                await get_object(settings.minio_bucket_analysis_layers, row.object_key),
+                False,
+            )
+        else:
+            missing.append((request, hashed, period))
+    fetched = await asyncio.gather(
+        *(
+            provider.fetch_raster(
+                r.layer, r.bbox, r.epsg, r.resolution_m, r.time_from, r.time_to, project_id
+            )
+            for r, _h, _p in missing
+        ),
+        return_exceptions=True,
     )
-    if row is not None:
-        return await get_object(settings.minio_bucket_analysis_layers, row.object_key), False
-    data = await provider.fetch_raster(
-        layer, bbox, epsg, resolution_m, time_from, time_to, project_id
-    )
-    key = raster_key(provider.key, layer, hashed, period)
-    await put_object(settings.minio_bucket_analysis_layers, key, data, "image/tiff")
-    session.add(
-        EnvironmentRaster(
-            provider=provider.key,
-            layer=layer,
-            area_hash=hashed,
-            epsg=epsg,
-            resolution_m=resolution_m,
-            period=period,
-            object_key=key,
-            size_bytes=len(data),
-            fetched_at=datetime.now(UTC),
+    for (request, hashed, period), data in zip(missing, fetched, strict=True):
+        if isinstance(data, BaseException):
+            outcomes[request] = data
+            continue
+        key = raster_key(provider.key, request.layer, hashed, period)
+        await put_object(settings.minio_bucket_analysis_layers, key, data, "image/tiff")
+        session.add(
+            EnvironmentRaster(
+                provider=provider.key,
+                layer=request.layer,
+                area_hash=hashed,
+                epsg=request.epsg,
+                resolution_m=request.resolution_m,
+                period=period,
+                object_key=key,
+                size_bytes=len(data),
+                fetched_at=datetime.now(UTC),
+            )
         )
-    )
+        outcomes[request] = (data, True)
     await session.flush()
-    return data, True
+    return outcomes
 
 
 async def project_layer_bytes(layer: ProjectLayer) -> bytes:

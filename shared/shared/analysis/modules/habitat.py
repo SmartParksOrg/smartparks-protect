@@ -10,6 +10,7 @@ with `MODULE_UNAVAILABLE` (decision D318)."""
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -47,7 +48,8 @@ from shared.analysis.rasters import (
     DISTANCE_PREFIX,
     FETCHED_LAYERS,
     LayerChoice,
-    cached_raster,
+    RasterRequest,
+    cached_rasters,
     project_layer_bytes,
     project_layers,
 )
@@ -70,6 +72,8 @@ MAX_LAYERS = 8
 BOYCE_WEAK = 0.5
 #: A layer with a value in fewer cells than this share of the grid is warned about.
 SPARSE_COVERAGE = 0.9
+#: The runner's timeout for a habitat run, in seconds (see `HabitatModule.timeout_seconds`).
+HABITAT_TIMEOUT_SECONDS = 3600
 #: The finest grid a distance layer or an upload asks for, in metres.
 DISTANCE_RESOLUTION_M = 30.0
 
@@ -114,6 +118,10 @@ class HabitatModule:
     #: animal needs, so the form says so before the run is queued (the first run on Okonjima,
     #: 2026-10-08, failed in the worker on an animal with 18 fixes in the week).
     min_fixes: int = FEW_FIXES
+    #: The runner's timeout for this module: the openEO batch jobs behind the satellite
+    #: layers take minutes each and scale with the area (a 340 km² grid over 30 days passed
+    #: the shared 900 s on 2026-10-08); they run at the same time, and a rerun reads the cache.
+    timeout_seconds: int = HABITAT_TIMEOUT_SECONDS
 
     async def check(
         self, session: AsyncSession, project_id: uuid.UUID, params: BaseModel
@@ -343,8 +351,44 @@ class HabitatModule:
         rows: list[list[Any]] = []
         provider = await configured_provider(session, "ndvi")
         elevation: Any = None
+        # the provider's rasters first, all at once: a batch job per layer takes minutes
+        requests: dict[str, RasterRequest] = {}
+        for choice in chosen:
+            if choice.source == "provider":
+                base = "elevation" if choice.name == "slope" else choice.name
+                periodic = bool(FETCHED_LAYERS[base]["periodic"])
+                requests[base] = RasterRequest(
+                    base,
+                    grid.bbox_wgs84,
+                    grid.epsg,
+                    grid.resolution_m,
+                    period.time_from if periodic else None,
+                    period.time_to if periodic else None,
+                )
+        outcomes: dict[RasterRequest, tuple[bytes, bool] | BaseException] = {}
+        if requests and provider is not None and getattr(provider, "raster_layers", ()):
+            await ctx.progress(25, "the satellite layers")
+            started = time.monotonic()
+            outcomes = await cached_rasters(
+                session,
+                provider,  # type: ignore[arg-type]
+                list(requests.values()),
+                ctx.project_id,
+            )
+            log.info(
+                "habitat rasters ready",
+                layers=sorted(requests),
+                fetched=sorted(
+                    r.layer
+                    for r, o in outcomes.items()
+                    if not isinstance(o, BaseException) and o[1]
+                ),
+                seconds=round(time.monotonic() - started, 1),
+                grid_cells=grid.cells,
+                grid_m=grid.resolution_m,
+            )
         for index, choice in enumerate(chosen):
-            await ctx.progress(25 + int(index * 30 / max(1, len(chosen))), f"layer {choice.name}")
+            await ctx.progress(40 + int(index * 15 / max(1, len(chosen))), f"layer {choice.name}")
             source = choice.source
             resolution = grid.resolution_m
             fetched = False
@@ -353,18 +397,10 @@ class HabitatModule:
                     if provider is None or not getattr(provider, "raster_layers", ()):
                         raise ValueError("no environmental data provider is set up")
                     base = "elevation" if choice.name == "slope" else choice.name
-                    periodic = bool(FETCHED_LAYERS[base]["periodic"])
-                    data, fetched = await cached_raster(
-                        session,
-                        provider,  # type: ignore[arg-type]
-                        base,
-                        grid.bbox_wgs84,
-                        grid.epsg,
-                        grid.resolution_m,
-                        period.time_from if periodic else None,
-                        period.time_to if periodic else None,
-                        ctx.project_id,
-                    )
+                    outcome = outcomes[requests[base]]
+                    if isinstance(outcome, BaseException):
+                        raise outcome
+                    data, fetched = outcome
                     if choice.name == "slope":
                         if elevation is None:
                             elevation = hab.layer_from_geotiff(data, grid)

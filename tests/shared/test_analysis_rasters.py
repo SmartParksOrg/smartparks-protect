@@ -3,6 +3,7 @@ the catalogue of what a project may name (a provider's layers when one is set up
 layer per feature type the project has, the uploads), and the cache itself: a provider is
 asked once for an area and period and the bucket answers the next time."""
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 
@@ -13,8 +14,10 @@ from sqlalchemy import select
 from shared.analysis import environment
 from shared.analysis.rasters import (
     LayerChoice,
+    RasterRequest,
     area_hash,
     cached_raster,
+    cached_rasters,
     period_key,
     project_layers,
     raster_key,
@@ -139,3 +142,41 @@ async def test_the_cache_asks_once_per_area_and_period(session):
     assert all(r.size_bytes == len(TIFF) for r in rows)
     stored = await get_object(get_settings().minio_bucket_analysis_layers, rows[0].object_key)
     assert stored == TIFF
+
+
+class SlowRasterProvider(FakeRasterProvider):
+    """Every fetch waits for the others to have started: the fetches must run at once."""
+
+    def __init__(self, expected: int) -> None:
+        super().__init__()
+        self.expected = expected
+        self.started = 0
+        self.all_started = asyncio.Event()
+
+    async def fetch_raster(self, layer, bbox, epsg, resolution_m, time_from, time_to, project_id):
+        self.started += 1
+        if self.started >= self.expected:
+            self.all_started.set()
+        await asyncio.wait_for(self.all_started.wait(), timeout=5)
+        if layer == "broken":
+            raise RuntimeError("the job failed")
+        return await super().fetch_raster(
+            layer, bbox, epsg, resolution_m, time_from, time_to, project_id
+        )
+
+
+async def test_several_layers_are_fetched_at_the_same_time_and_one_failure_is_its_own(session):
+    provider = SlowRasterProvider(expected=3)
+    bbox = (16.80, -20.86, 16.86, -20.83)
+    t0, t1 = datetime(2026, 7, 1, tzinfo=UTC), datetime(2026, 9, 1, tzinfo=UTC)
+    ndvi = RasterRequest("ndvi", bbox, 32733, 30.0, t0, t1)
+    dem = RasterRequest("elevation", bbox, 32733, 30.0, None, None)
+    broken = RasterRequest("broken", bbox, 32733, 30.0, None, None)
+    outcomes = await cached_rasters(session, provider, [ndvi, dem, broken, dem], uuid.uuid4())
+    assert outcomes[ndvi] == (TIFF, True) and outcomes[dem] == (TIFF, True)
+    assert isinstance(outcomes[broken], RuntimeError)
+    assert provider.started == 3  # the repeated request was asked once
+    # the next call reads the two from the cache without the provider
+    again = await cached_rasters(session, provider, [ndvi, dem], uuid.uuid4())
+    assert again[ndvi] == (TIFF, False) and again[dem] == (TIFF, False)
+    assert provider.started == 3
