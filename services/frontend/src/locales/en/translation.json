@@ -2389,6 +2389,8 @@
   "Shortest trip (m)": "Shortest trip (m)",
   "Show": "Show",
   "Show all": "Show all",
+  "Show all {{count}} warnings_one": "Show all {{count}} warnings",
+  "Show all {{count}} warnings_other": "Show all {{count}} warnings",
   "Show archived ({{count}})_one": "Show archived ({{count}})",
   "Show archived ({{count}})_other": "Show archived ({{count}})",
   "Show archived projects": "Show archived projects",

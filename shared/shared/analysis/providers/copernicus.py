@@ -19,6 +19,7 @@ from typing import Any, ClassVar
 import httpx
 
 from shared.analysis.environment import LayerSample
+from shared.analysis.rasters import area_hash, period_key
 from shared.logger import get_logger
 
 log = get_logger("analysis.copernicus")
@@ -30,6 +31,9 @@ API = "https://openeo.dataspace.copernicus.eu/openeo/1.2"
 COLLECTION = "SENTINEL2_L2A"
 #: How long a job may take before the provider gives up, and how often it looks.
 JOB_TIMEOUT_S = 20 * 60
+#: A raster job's limit: the NDVI of a month over a few hundred km² takes longer than the
+#: weekly series, and the habitat module waits an hour in all.
+RASTER_JOB_TIMEOUT_S = 50 * 60
 POLL_S = 15
 #: The first wait after a 429 from openEO, doubled each time.
 RETRY_S = 5
@@ -342,46 +346,88 @@ class CopernicusProvider:
             await asyncio.sleep(wait)
             wait = min(wait * 2, 120.0)
 
+    async def _our_job(
+        self, client: httpx.AsyncClient, headers: dict[str, str], title: str
+    ) -> tuple[str, str] | None:
+        """The newest of the account's jobs with this title that is still worth something
+        (created, queued, running or finished), as (id, status); None when there is none.
+        A raster job's title names its layer, grid and period, so a run that gave up on a
+        job (the pangolin run of 2026-10-08 passed the 20 minute limit inside its NDVI job)
+        leaves it running on their side and the next run picks it up."""
+        listing = await client.get(f"{API}/jobs", headers=headers)
+        if listing.status_code != 200:
+            return None
+        jobs = [
+            j
+            for j in (listing.json() or {}).get("jobs") or []
+            if j.get("title") == title
+            and str(j.get("status")) in ("created", "queued", "running", "finished")
+        ]
+        if not jobs:
+            return None
+        newest = max(jobs, key=lambda j: str(j.get("created") or ""))
+        return str(newest["id"]), str(newest["status"])
+
     async def _run_job(
-        self, process: dict[str, Any], title: str, media_type: str
+        self,
+        process: dict[str, Any],
+        title: str,
+        media_type: str,
+        *,
+        timeout_s: float = JOB_TIMEOUT_S,
+        reuse: bool = False,
     ) -> tuple[httpx.Response, str]:
-        """One batch job: created, started, polled to its end, and its first asset of the
-        media type (else any asset) downloaded. Answers the download and the job id."""
+        """One batch job: created (or, with `reuse`, found by its title), started, polled to
+        its end within `timeout_s`, and its first asset of the media type (else any asset)
+        downloaded. Answers the download and the job id. A job the deadline cuts off is left
+        running on their side, for a later call with `reuse` to pick up."""
         async with self._client() as client:
             headers = await self._token(client)
-            deadline = asyncio.get_running_loop().time() + JOB_TIMEOUT_S
-            created = await self._until_accepted(
-                client,
-                lambda: client.post(
-                    f"{API}/jobs", json={"process": process, "title": title}, headers=headers
-                ),
-                deadline,
-            )
-            if created.status_code not in (201, 202):
-                raise ProviderError(
-                    f"openEO refused the job ({created.status_code}): {created.text[:200]}"
+            deadline = asyncio.get_running_loop().time() + timeout_s
+            found = await self._our_job(client, headers, title) if reuse else None
+            if found is not None:
+                job_id, status = found
+                log.info("openEO job reused", job=job_id, status=status, title=title)
+            else:
+                created = await self._until_accepted(
+                    client,
+                    lambda: client.post(
+                        f"{API}/jobs", json={"process": process, "title": title}, headers=headers
+                    ),
+                    deadline,
                 )
-            job_id = created.headers.get("OpenEO-Identifier") or (created.json() or {}).get("id")
-            if not job_id:
+                if created.status_code not in (201, 202):
+                    raise ProviderError(
+                        f"openEO refused the job ({created.status_code}): {created.text[:200]}"
+                    )
+                job_id = str(
+                    created.headers.get("OpenEO-Identifier") or (created.json() or {}).get("id")
+                )
+                status = "created"
+            if not job_id or job_id == "None":
                 raise ProviderError("openEO gave the job no id")
-            started = await self._until_accepted(
-                client,
-                lambda: client.post(f"{API}/jobs/{job_id}/results", headers=headers),
-                deadline,
-            )
-            if started.status_code not in (200, 202):
-                # the job stays "created" on their side otherwise, forever
-                await client.delete(f"{API}/jobs/{job_id}", headers=headers)
-                raise ProviderError(f"openEO did not start the job ({started.status_code})")
-            status = "queued"
-            while asyncio.get_running_loop().time() < deadline:
+            if status == "created":
+                started = await self._until_accepted(
+                    client,
+                    lambda: client.post(f"{API}/jobs/{job_id}/results", headers=headers),
+                    deadline,
+                )
+                if started.status_code not in (200, 202):
+                    # the job stays "created" on their side otherwise, forever
+                    await client.delete(f"{API}/jobs/{job_id}", headers=headers)
+                    raise ProviderError(f"openEO did not start the job ({started.status_code})")
+            while status != "finished" and asyncio.get_running_loop().time() < deadline:
                 await asyncio.sleep(POLL_S)
                 state = await client.get(f"{API}/jobs/{job_id}", headers=headers)
                 status = str((state.json() or {}).get("status", "unknown"))
                 if status in ("finished", "error", "canceled"):
                     break
             if status != "finished":
-                raise ProviderError(f"openEO job {job_id} ended as {status}")
+                log.warning("openEO job left running", job=job_id, status=status, title=title)
+                raise ProviderError(
+                    f"openEO job {job_id} ended as {status} within {int(timeout_s)} s; "
+                    "it goes on on their side and a later run picks it up"
+                )
             results = await client.get(f"{API}/jobs/{job_id}/results", headers=headers)
             assets = (results.json() or {}).get("assets") or {}
             hrefs = [
@@ -417,7 +463,13 @@ class CopernicusProvider:
             process = elevation_process(bbox, epsg, resolution_m)
         else:
             raise ProviderError(f"layer {layer!r} is not one this provider answers as a raster")
-        answer, job_id = await self._run_job(process, f"protect {layer} {project_id}", "image/tiff")
+        title = (
+            f"protect {layer} {area_hash(bbox, epsg, resolution_m)} "
+            f"{period_key(time_from, time_to)}"
+        )
+        answer, job_id = await self._run_job(
+            process, title, "image/tiff", timeout_s=RASTER_JOB_TIMEOUT_S, reuse=True
+        )
         data = answer.content
         if not data.startswith((b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")):
             raise ProviderError(f"openEO job {job_id} answered something that is not a TIFF")

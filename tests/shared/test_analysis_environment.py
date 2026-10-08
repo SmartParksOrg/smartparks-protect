@@ -20,6 +20,7 @@ from shared.analysis.providers.copernicus import (
     ndvi_process,
     parse_timeseries,
 )
+from shared.analysis.rasters import area_hash
 
 AREA_A = {
     "type": "Polygon",
@@ -241,6 +242,8 @@ def _raster_transport(*, body: bytes = b"II*\x00" + b"\x00" * 64) -> httpx.MockT
         url = str(request.url)
         if url.endswith("/token"):
             return httpx.Response(200, json={"access_token": "t0ken"})
+        if url.endswith("/jobs") and request.method == "GET":
+            return httpx.Response(200, json={"jobs": []})
         if url.endswith("/jobs") and request.method == "POST":
             return httpx.Response(201, headers={"OpenEO-Identifier": "j-2"}, json={"id": "j-2"})
         if url.endswith("/jobs/j-2/results") and request.method == "POST":
@@ -321,3 +324,42 @@ async def test_a_job_start_refused_with_429_is_tried_again(monkeypatch):
         "elevation", (16.7, -20.86, 16.76, -20.83), 32733, 30.0, None, None, uuid.uuid4()
     )
     assert data.startswith(b"II*\x00") and starts["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_a_raster_job_of_the_same_grid_still_running_on_their_side_is_picked_up(
+    monkeypatch,
+):
+    from shared.analysis.providers import copernicus
+
+    monkeypatch.setattr(copernicus, "POLL_S", 0)
+    inner = _raster_transport()
+    seen: list[str] = []
+    title = f"protect elevation {area_hash((16.7, -20.86, 16.76, -20.83), 32733, 30.0)} static"
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        seen.append(f"{request.method} {url.rsplit('/openeo/1.2', 1)[-1]}")
+        if url.endswith("/jobs") and request.method == "GET":
+            jobs = [
+                {"id": "j-old", "title": title, "status": "error", "created": "2026-10-08T10:00Z"},
+                {"id": "j-2", "title": title, "status": "running", "created": "2026-10-08T11:00Z"},
+                {
+                    "id": "j-x",
+                    "title": "protect ndvi x",
+                    "status": "running",
+                    "created": "2026-10-09",
+                },
+            ]
+            return httpx.Response(200, json={"jobs": jobs})
+        if url.endswith("/jobs") and request.method == "POST":
+            raise AssertionError("a new job was created although one runs")
+        return inner.handler(request)  # type: ignore[attr-defined]
+
+    provider = CopernicusProvider("id", "secret", transport=httpx.MockTransport(handle))
+    data = await provider.fetch_raster(
+        "elevation", (16.7, -20.86, 16.76, -20.83), 32733, 30.0, None, None, uuid.uuid4()
+    )
+    assert data.startswith(b"II*\x00")
+    assert "POST /jobs/j-2/results" not in seen  # a running job is not started again
+    assert "GET /jobs/j-2" in seen

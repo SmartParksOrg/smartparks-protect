@@ -2946,5 +2946,7 @@
   "Use is not habitat quality: animals are where they are for many reasons, and a place used much may be a poor one that is all there is.": "Gebruik is geen habitatkwaliteit: dieren zijn waar ze zijn om veel redenen, en een veelgebruikte plek kan een slechte zijn die het enige is wat er is.",
   "Validate animal by animal": "Dier voor dier valideren",
   "Validation, one animal held out at a time": "Validatie, telkens één dier weggelaten",
-  "Which habitat the animals selected against what was available to them: a resource selection function fitted with hrHSA, validated animal by animal, and the selection surface on the map": "Welke habitat de dieren kozen ten opzichte van wat voor ze beschikbaar was: een resource selection function gefit met hrHSA, dier voor dier gevalideerd, en het selectieoppervlak op de kaart"
+  "Which habitat the animals selected against what was available to them: a resource selection function fitted with hrHSA, validated animal by animal, and the selection surface on the map": "Welke habitat de dieren kozen ten opzichte van wat voor ze beschikbaar was: een resource selection function gefit met hrHSA, dier voor dier gevalideerd, en het selectieoppervlak op de kaart",
+  "Show all {{count}} warnings_one": "Alle {{count}} waarschuwingen tonen",
+  "Show all {{count}} warnings_other": "Alle {{count}} waarschuwingen tonen"
 }
