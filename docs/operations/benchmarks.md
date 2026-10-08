@@ -48,6 +48,7 @@ Measured on runs people started on dev-protect (4 vCPU, 8 GB), not on the benchm
 | Run | Wall time | Of which | Worker memory | Notes |
 | --- | --- | --- | --- | --- |
 | habitat selection, 1 animal, 7 days, NDVI and elevation (BPC, 2026-10-08) | 6 min 52 s | openEO NDVI job 4 min 38 s, DEM job 1 min 50 s, fit, surface and document 14 s | under 300 MiB | 41 fixes, 6 used after thinning; 559,328 grid cells at 10 m; both rasters cached afterwards, so a rerun over the area and period skips the jobs |
+| habitat selection, 25 pangolins, 30 days, NDVI, elevation and slope (Okonjima, 2026-10-08) | 22 min 34 s | openEO NDVI job 20 min 24 s (the DEM from the cache), fit with 25 validation folds, surface and document about 2 min | under 300 MiB | 2,036 fixes, 564 used after thinning; 1,176,069 grid cells at 20 m over about 500 km² |
 
 ## Reading the run
 
