@@ -4440,6 +4440,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/analysis-layers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Layer Choices
+         * @description Every layer a habitat run of the project may name, in the order the form offers them.
+         */
+        get: operations["list_layer_choices_api_v1_projects__project_id__analysis_layers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/layers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Project Layers */
+        get: operations["list_project_layers_api_v1_projects__project_id__layers_get"];
+        put?: never;
+        /**
+         * Upload Project Layer
+         * @description Upload a GeoTIFF as a covariate layer of the project. The file must carry a CRS with an
+         *     EPSG code, be north-up, and sit within the size bound; its name must not be one of the
+         *     provider's or a distance layer's.
+         */
+        post: operations["upload_project_layer_api_v1_projects__project_id__layers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/layers/{layer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Project Layer */
+        delete: operations["delete_project_layer_api_v1_projects__project_id__layers__layer_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/integrations/connectors": {
         parameters: {
             query?: never;
@@ -6235,6 +6295,11 @@ export interface components {
         };
         /** Body_upload_log_file_api_v1_devices__device_id__log_files_post */
         Body_upload_log_file_api_v1_devices__device_id__log_files_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_project_layer_api_v1_projects__project_id__layers_post */
+        Body_upload_project_layer_api_v1_projects__project_id__layers_post: {
             /** File */
             file: string;
         };
@@ -10227,6 +10292,39 @@ export interface components {
             updated_at: string;
         };
         /**
+         * LayerChoiceRead
+         * @description A layer a habitat run may name: the provider's, a distance to the project's features,
+         *     or an upload (`shared.analysis.rasters.LayerChoice`).
+         */
+        LayerChoiceRead: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Source */
+            source: string;
+            /** Kind */
+            kind: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Periodic
+             * @default false
+             */
+            periodic: boolean;
+            /** Feature Type */
+            feature_type?: string | null;
+            /** Layer Id */
+            layer_id?: string | null;
+        };
+        /**
+         * LayerKind
+         * @description How a habitat covariate enters the model (phase 41, decision D317): a number the fit
+         *     standardises, or classes it dummy-encodes.
+         * @enum {string}
+         */
+        LayerKind: "continuous" | "categorical";
+        /**
          * Layout
          * @enum {string}
          */
@@ -11344,6 +11442,49 @@ export interface components {
             sha256: string;
             /** Created By User Id */
             created_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * ProjectLayerRead
+         * @description A raster a project uploaded for the habitat analysis (phase 41, decision D315).
+         */
+        ProjectLayerRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Epsg */
+            epsg: number;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Pixel M */
+            pixel_m: number;
+            /** Extent */
+            extent: {
+                [key: string]: unknown;
+            };
+            /** Nodata */
+            nodata: number | null;
             /**
              * Created At
              * Format: date-time
@@ -22881,6 +23022,138 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceLogFileRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_layer_choices_api_v1_projects__project_id__analysis_layers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LayerChoiceRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_layers_api_v1_projects__project_id__layers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectLayerRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_project_layer_api_v1_projects__project_id__layers_post: {
+        parameters: {
+            query: {
+                /** @description The band name, a-z, 0-9, _ */
+                name: string;
+                label: string;
+                kind?: components["schemas"]["LayerKind"];
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_project_layer_api_v1_projects__project_id__layers_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectLayerRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project_layer_api_v1_projects__project_id__layers__layer_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                layer_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

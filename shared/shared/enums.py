@@ -299,6 +299,14 @@ class AnalysisStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class LayerKind(StrEnum):
+    """How a habitat covariate enters the model (phase 41, decision D317): a number the fit
+    standardises, or classes it dummy-encodes."""
+
+    CONTINUOUS = "continuous"
+    CATEGORICAL = "categorical"
+
+
 class AnalysisModuleKey(StrEnum):
     """The analysis modules: the two of phase 1, device performance (phase 28), contact tracing
     (phase 31) and the cardiac study (phase 34). A run row's module is checked against this in
@@ -312,6 +320,9 @@ class AnalysisModuleKey(StrEnum):
     CARDIAC = "cardiac"
     #: What the vehicles did: trips, distance, speed, speeding (phase 39, decision D301).
     VEHICLE_USE = "vehicle_use"
+    #: Which habitat an animal selected against what was available, through hrHSA (phase 41,
+    #: decision D313).
+    HABITAT_SELECTION = "habitat_selection"
 
 
 class NotificationChannel(StrEnum):

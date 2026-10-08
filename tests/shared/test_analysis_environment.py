@@ -200,3 +200,94 @@ def test_the_registry_answers_by_layer_only_for_what_a_provider_has():
     finally:
         env.PROVIDERS.clear()
         env.PROVIDERS.extend(before)
+
+
+# phase 41: the rasters of a habitat run (decision D315)
+
+
+def test_the_raster_process_graphs_ask_for_the_period_mean_and_the_dem_on_the_grid():
+    from shared.analysis.providers.copernicus import (
+        DEM_COLLECTION,
+        elevation_process,
+        ndvi_raster_process,
+    )
+
+    bbox = (16.70, -20.86, 16.76, -20.83)
+    ndvi = ndvi_raster_process(bbox, 32733, 30.0, FROM, TO)["process_graph"]
+    assert ndvi["load"]["arguments"]["id"] == "SENTINEL2_L2A"
+    assert ndvi["load"]["arguments"]["spatial_extent"] == {
+        "west": 16.70,
+        "south": -20.86,
+        "east": 16.76,
+        "north": -20.83,
+    }
+    assert ndvi["mean"]["arguments"]["dimension"] == "t"
+    assert ndvi["grid"]["arguments"] == {
+        "data": {"from_node": "mean"},
+        "projection": 32733,
+        "resolution": 30.0,
+        "method": "average",
+    }
+    assert ndvi["save"]["arguments"]["format"] == "GTiff"
+    dem = elevation_process(bbox, 32733, 30.0)["process_graph"]
+    assert dem["load"]["arguments"]["id"] == DEM_COLLECTION
+    assert dem["load"]["arguments"]["bands"] == ["DEM"]
+    assert dem["grid"]["arguments"]["method"] == "bilinear"
+    assert dem["save"]["result"] is True
+
+
+def _raster_transport(*, body: bytes = b"II*\x00" + b"\x00" * 64) -> httpx.MockTransport:
+    def handle(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("/token"):
+            return httpx.Response(200, json={"access_token": "t0ken"})
+        if url.endswith("/jobs") and request.method == "POST":
+            return httpx.Response(201, headers={"OpenEO-Identifier": "j-2"}, json={"id": "j-2"})
+        if url.endswith("/jobs/j-2/results") and request.method == "POST":
+            return httpx.Response(202)
+        if url.endswith("/jobs/j-2"):
+            return httpx.Response(200, json={"status": "finished"})
+        if url.endswith("/jobs/j-2/results"):
+            return httpx.Response(
+                200,
+                json={
+                    "assets": {
+                        "openEO.tif": {
+                            "href": "https://store.example/j-2/openEO.tif",
+                            "type": "image/tiff; application=geotiff",
+                        },
+                        "job-results.json": {
+                            "href": "https://store.example/j-2/job-results.json",
+                            "type": "application/json",
+                        },
+                    }
+                },
+            )
+        if url.endswith("/openEO.tif"):
+            assert "authorization" not in {k.lower() for k in request.headers}
+            return httpx.Response(200, content=body)
+        raise AssertionError(f"unexpected request {url}")
+
+    return httpx.MockTransport(handle)
+
+
+@pytest.mark.asyncio
+async def test_a_raster_job_answers_the_tiff_asset_and_refuses_what_is_not_one(monkeypatch):
+    from shared.analysis.providers import copernicus
+
+    monkeypatch.setattr(copernicus, "POLL_S", 0)
+    provider = CopernicusProvider("id", "secret", transport=_raster_transport())
+    data = await provider.fetch_raster(
+        "elevation", (16.7, -20.86, 16.76, -20.83), 32733, 30.0, None, None, uuid.uuid4()
+    )
+    assert data.startswith(b"II*\x00") and len(data) == 68
+    assert provider.raster_layers == ("ndvi", "elevation")
+    with pytest.raises(ProviderError, match="needs a period"):
+        await provider.fetch_raster(
+            "ndvi", (16.7, -20.86, 16.76, -20.83), 32733, 30.0, None, None, uuid.uuid4()
+        )
+    html = CopernicusProvider("id", "secret", transport=_raster_transport(body=b"<html>no</html>"))
+    with pytest.raises(ProviderError, match="not a TIFF"):
+        await html.fetch_raster(
+            "elevation", (16.7, -20.86, 16.76, -20.83), 32733, 30.0, None, None, uuid.uuid4()
+        )

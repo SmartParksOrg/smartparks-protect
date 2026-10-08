@@ -129,6 +129,118 @@ def ndvi_process(
     }
 
 
+#: The rasters of a habitat run (phase 41, decision D315): the period's mean NDVI from
+#: Sentinel-2, and the elevation of the Copernicus 30 m DEM (`COPERNICUS_30` on the same
+#: backend: one band `DEM`, 2010 to 2015, global). The slope is derived on our side.
+DEM_COLLECTION = "COPERNICUS_30"
+RASTER_LAYERS: tuple[str, ...] = ("ndvi", "elevation")
+
+
+def _spatial_extent(bbox: tuple[float, float, float, float]) -> dict[str, float]:
+    west, south, east, north = bbox
+    return {"west": west, "south": south, "east": east, "north": north}
+
+
+def ndvi_raster_process(
+    bbox: tuple[float, float, float, float],
+    epsg: int,
+    resolution_m: float,
+    time_from: datetime,
+    time_to: datetime,
+) -> dict[str, Any]:
+    """The openEO process graph of the period's mean NDVI as one GeoTIFF on the run's grid:
+    the level 2A scenes over the extent (WGS84) and the period, the cloud mask, NDVI, the mean
+    over time (`reduce_dimension` over `t`), resampled onto the run's CRS and resolution
+    (`resample_spatial`, so the file comes in the grid the run reads), saved as a Cloud
+    Optimized GeoTIFF with deflate compression."""
+    return {
+        "process_graph": {
+            "load": {
+                "process_id": "load_collection",
+                "arguments": {
+                    "id": COLLECTION,
+                    "spatial_extent": _spatial_extent(bbox),
+                    "temporal_extent": [time_from.date().isoformat(), time_to.date().isoformat()],
+                    "bands": ["B04", "B08", "SCL"],
+                },
+            },
+            "mask": {
+                "process_id": "mask_scl_dilation",
+                "arguments": {"data": {"from_node": "load"}, "scl_band_name": "SCL"},
+            },
+            "ndvi": {
+                "process_id": "ndvi",
+                "arguments": {"data": {"from_node": "mask"}, "nir": "B08", "red": "B04"},
+            },
+            "mean": {
+                "process_id": "reduce_dimension",
+                "arguments": {"data": {"from_node": "ndvi"}, "dimension": "t", "reducer": MEAN},
+            },
+            "grid": {
+                "process_id": "resample_spatial",
+                "arguments": {
+                    "data": {"from_node": "mean"},
+                    "projection": int(epsg),
+                    "resolution": float(resolution_m),
+                    "method": "average",
+                },
+            },
+            "save": {
+                "process_id": "save_result",
+                "arguments": {
+                    "data": {"from_node": "grid"},
+                    "format": "GTiff",
+                    "options": {"compression": "deflate"},
+                },
+                "result": True,
+            },
+        }
+    }
+
+
+def elevation_process(
+    bbox: tuple[float, float, float, float], epsg: int, resolution_m: float
+) -> dict[str, Any]:
+    """The openEO process graph of the elevation over the extent as one GeoTIFF on the run's
+    grid: the DEM collection's single band, reduced over its (one) time step and resampled
+    with bilinear interpolation, since a height is continuous."""
+    return {
+        "process_graph": {
+            "load": {
+                "process_id": "load_collection",
+                "arguments": {
+                    "id": DEM_COLLECTION,
+                    "spatial_extent": _spatial_extent(bbox),
+                    "temporal_extent": None,
+                    "bands": ["DEM"],
+                },
+            },
+            "one": {
+                "process_id": "reduce_dimension",
+                "arguments": {"data": {"from_node": "load"}, "dimension": "t", "reducer": MEAN},
+            },
+            "grid": {
+                "process_id": "resample_spatial",
+                "arguments": {
+                    "data": {"from_node": "one"},
+                    "projection": int(epsg),
+                    "resolution": float(resolution_m),
+                    "method": "bilinear",
+                },
+            },
+            "save": {
+                "process_id": "save_result",
+                "arguments": {
+                    "data": {"from_node": "grid"},
+                    "format": "GTiff",
+                    "options": {"compression": "deflate"},
+                },
+                "result": True,
+            },
+        }
+    }
+
+
 def parse_timeseries(body: Any, count: int) -> list[list[tuple[datetime, float | None]]]:
     """The JSON the backend writes for an `aggregate_spatial` over time: a mapping from the
     timestamp to one list per geometry, each a list of band values (one band here). A null or
@@ -156,6 +268,7 @@ def parse_timeseries(body: Any, count: int) -> list[list[tuple[datetime, float |
 class CopernicusProvider:
     key: str = "copernicus_openeo"
     layers: tuple[str, ...] = ("ndvi",)
+    raster_layers: tuple[str, ...] = RASTER_LAYERS
     source = "Sentinel-2 L2A via Copernicus Data Space openEO"
     resolution = "10 m, weekly mean"
 
@@ -201,25 +314,15 @@ class CopernicusProvider:
                 )
         return f"Connected; {COLLECTION} is available"
 
-    async def sample(
-        self,
-        layer: str,
-        geometries: Sequence[dict[str, Any]],
-        time_from: datetime,
-        time_to: datetime,
-        project_id: uuid.UUID,
-    ) -> LayerSample:
-        if layer not in self.layers:
-            raise ProviderError(f"layer {layer!r} is not one this provider answers")
-        if not geometries or len(geometries) > MAX_GEOMETRIES:
-            raise ProviderError(f"between 1 and {MAX_GEOMETRIES} geometries, not {len(geometries)}")
-        process = ndvi_process(geometries, time_from, time_to)
+    async def _run_job(
+        self, process: dict[str, Any], title: str, media_type: str
+    ) -> tuple[httpx.Response, str]:
+        """One batch job: created, started, polled to its end, and its first asset of the
+        media type (else any asset) downloaded. Answers the download and the job id."""
         async with self._client() as client:
             headers = await self._token(client)
             created = await client.post(
-                f"{API}/jobs",
-                json={"process": process, "title": f"protect ndvi {project_id}"},
-                headers=headers,
+                f"{API}/jobs", json={"process": process, "title": title}, headers=headers
             )
             if created.status_code not in (201, 202):
                 raise ProviderError(
@@ -243,21 +346,63 @@ class CopernicusProvider:
                 raise ProviderError(f"openEO job {job_id} ended as {status}")
             results = await client.get(f"{API}/jobs/{job_id}/results", headers=headers)
             assets = (results.json() or {}).get("assets") or {}
-            body: Any = None
             hrefs = [
                 str(asset.get("href"))
                 for asset in assets.values()
-                if asset.get("href") and str(asset.get("type", "")).startswith("application/json")
+                if asset.get("href") and str(asset.get("type", "")).startswith(media_type)
             ] or [str(asset.get("href")) for asset in assets.values() if asset.get("href")]
             for href in hrefs:
                 # the asset lives on their object store behind a signed URL: our own
                 # authorization header makes it refuse the download
                 answer = await client.get(href)
                 if answer.status_code == 200:
-                    body = answer.json()
-                    break
-            if body is None:
-                raise ProviderError(f"openEO job {job_id} finished without a result")
+                    return answer, str(job_id)
+            raise ProviderError(f"openEO job {job_id} finished without a result")
+
+    async def fetch_raster(
+        self,
+        layer: str,
+        bbox: tuple[float, float, float, float],
+        epsg: int,
+        resolution_m: float,
+        time_from: datetime | None,
+        time_to: datetime | None,
+        project_id: uuid.UUID,
+    ) -> bytes:
+        """A layer as one GeoTIFF on the grid (phase 41): the period's mean NDVI, or the
+        elevation. The bytes are the job's asset as the backend wrote it."""
+        if layer == "ndvi":
+            if time_from is None or time_to is None:
+                raise ProviderError("the NDVI raster needs a period")
+            process = ndvi_raster_process(bbox, epsg, resolution_m, time_from, time_to)
+        elif layer == "elevation":
+            process = elevation_process(bbox, epsg, resolution_m)
+        else:
+            raise ProviderError(f"layer {layer!r} is not one this provider answers as a raster")
+        answer, job_id = await self._run_job(process, f"protect {layer} {project_id}", "image/tiff")
+        data = answer.content
+        if not data.startswith((b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")):
+            raise ProviderError(f"openEO job {job_id} answered something that is not a TIFF")
+        log.info("copernicus raster fetched", layer=layer, job=job_id, bytes=len(data))
+        return data
+
+    async def sample(
+        self,
+        layer: str,
+        geometries: Sequence[dict[str, Any]],
+        time_from: datetime,
+        time_to: datetime,
+        project_id: uuid.UUID,
+    ) -> LayerSample:
+        if layer not in self.layers:
+            raise ProviderError(f"layer {layer!r} is not one this provider answers")
+        if not geometries or len(geometries) > MAX_GEOMETRIES:
+            raise ProviderError(f"between 1 and {MAX_GEOMETRIES} geometries, not {len(geometries)}")
+        process = ndvi_process(geometries, time_from, time_to)
+        answer, job_id = await self._run_job(
+            process, f"protect ndvi {project_id}", "application/json"
+        )
+        body = answer.json()
         log.info("copernicus ndvi sampled", geometries=len(geometries), job=job_id)
         return LayerSample(
             layer=layer,

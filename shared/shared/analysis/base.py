@@ -150,3 +150,9 @@ class AnalysisCancelled(Exception):
 
 class AnalysisTooLarge(Exception):
     """The module read or produced more than the run may hold; the runner stores it."""
+
+
+class ModuleUnavailable(Exception):
+    """The module's engine is not installed in the worker that took the run (decision D318:
+    the habitat module needs the analysis image of D314); the runner stores it as
+    `MODULE_UNAVAILABLE` with the message, so the page says what to build."""

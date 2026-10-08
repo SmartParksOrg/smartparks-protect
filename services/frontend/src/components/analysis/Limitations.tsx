@@ -255,3 +255,53 @@ export function ContactTracingLimitations() {
     </details>
   );
 }
+
+/** What a resource selection function cannot say (phase 41, decision D317): the three
+ * cautions hrHSA's authors state, and the ones of this module's reading. */
+export function HabitatLimitations() {
+  const { t } = useTranslation();
+  return (
+    <details className="rounded-md border px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {t("What these figures can and cannot say")}
+      </summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+        <li>
+          {t(
+            "Use is not habitat quality: animals are where they are for many reasons, and a place used much may be a poor one that is all there is.",
+          )}
+        </li>
+        <li>
+          {t(
+            "A coefficient says how the animals redistributed relative to what was available to them, and the available area decides every contrast: a different area gives different coefficients.",
+          )}
+        </li>
+        <li>
+          {t(
+            "The selection surface is relative: a higher value means a stronger selection under the fitted relationship, never a probability of finding an animal there.",
+          )}
+        </li>
+        <li>
+          {t(
+            "The coefficients are on the standardised scale: one unit is one spread of the layer over the available points, which the summary gives per layer.",
+          )}
+        </li>
+        <li>
+          {t(
+            "The Boyce index of an animal says how well a model fitted on the other animals ranks its fixes; under 0.5 the animal chooses differently from the rest, or the layers do not carry what it chose.",
+          )}
+        </li>
+        <li>
+          {t(
+            "A layer fetched for the period is its mean over the period; a selection that changes within the period is averaged out.",
+          )}
+        </li>
+        <li>
+          {t(
+            "The engine is hrHSA (Paul Kasko and Ralph Kühn, BSD 3-Clause); Protect assembles its inputs and reads its answer.",
+          )}
+        </li>
+      </ul>
+    </details>
+  );
+}

@@ -9,7 +9,13 @@ from shared.models.access import (
     ProjectRole,
     User,
 )
-from shared.models.analysis import AnalysisGeometry, AnalysisRun, EnvironmentSample
+from shared.models.analysis import (
+    AnalysisGeometry,
+    AnalysisRun,
+    EnvironmentRaster,
+    EnvironmentSample,
+    ProjectLayer,
+)
 from shared.models.analytics import ExportJob, SavedView
 from shared.models.attribution import AttributionJob
 from shared.models.backup import BackupRun
@@ -96,6 +102,7 @@ __all__ = [
     "Entity",
     "EntityCurrentState",
     "EntityType",
+    "EnvironmentRaster",
     "EnvironmentSample",
     "Event",
     "ExportJob",
@@ -122,6 +129,7 @@ __all__ = [
     "ProcessingTrace",
     "Project",
     "ProjectIcon",
+    "ProjectLayer",
     "ProjectMembership",
     "ProjectRole",
     "Rule",

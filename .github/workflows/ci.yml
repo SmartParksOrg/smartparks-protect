@@ -191,6 +191,11 @@ jobs:
         run: |
           uv export --frozen --all-groups --no-hashes --no-emit-workspace --format requirements-txt -o requirements-audit.txt
           uvx pip-audit -r requirements-audit.txt --strict
+      - name: The analysis image's dependencies (decision D314)
+        run: |
+          cd services/analysis/image
+          uv export --frozen --no-hashes --no-emit-workspace --no-emit-package hrhsa --format requirements-txt -o requirements-audit.txt
+          uvx pip-audit -r requirements-audit.txt --strict
       - name: Frontend dependencies (npm audit, high and critical fail)
         run: cd services/frontend && npm ci --ignore-scripts && npm audit --audit-level=high
 
@@ -202,3 +207,55 @@ jobs:
       - run: docker compose config --quiet
       - run: docker compose --profile chirpstack config --quiet
       - run: docker build -f docker/python.Dockerfile .
+      - run: docker build -f docker/analysis.Dockerfile .
+
+  analysis-image:
+    # The habitat selection module runs only where hrHSA is installed (decision D314), so its
+    # tests run inside the worker's image, against the same services as the python jobs.
+    name: python (analysis image)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb-ha:pg17.10-ts2.29.2
+        env:
+          POSTGRES_USER: protect
+          POSTGRES_PASSWORD: protect-dev-password
+          POSTGRES_DB: smartparks_protect
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U protect -d smartparks_protect"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=protect -e MINIO_ROOT_PASSWORD=protect-dev-minio \
+            cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1 server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 1
+          done
+      - name: Build the image with the test group
+        run: docker build -f docker/analysis.Dockerfile --build-arg INSTALL_DEV=1 -t protect-analysis-test .
+      - name: Pytest inside the image
+        run: |
+          set -o pipefail
+          docker run --rm --network host \
+            -v "$PWD/tests:/app/tests" -v "$PWD/pyproject.toml:/app/pyproject.toml" \
+            -e ENVIRONMENT=test \
+            -e DATABASE_URL=postgresql+asyncpg://protect:protect-dev-password@localhost:5432/smartparks_protect \
+            -e REDIS_URL=redis://localhost:6379/0 \
+            -e MINIO_ENDPOINT=localhost:9000 -e MINIO_ROOT_USER=protect -e MINIO_ROOT_PASSWORD=protect-dev-minio \
+            -e JWT_SECRET=ci-secret-that-is-at-least-32-bytes-long \
+            protect-analysis-test /app/.venv/bin/python -m pytest \
+            tests/shared/test_analysis_habitat.py tests/shared/test_analysis_rasters.py tests/api/test_analysis_habitat_run.py \
+            -q -rfE --tb=short 2>&1 | tee pytest.log
+      - name: Failures as annotations
+        if: failure()
+        run: grep -E "^(FAILED|ERROR) " pytest.log | head -10 | while read -r line; do echo "::error::$line"; done

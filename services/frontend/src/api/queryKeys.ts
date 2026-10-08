@@ -84,6 +84,10 @@ export const queryKeys = {
     ["projects", projectId, "analyses", runId, "geometries", params] as const,
   analysisEstimate: (projectId: string, params: Record<string, unknown>) =>
     ["projects", projectId, "analyses", "estimate", params] as const,
+  analysisLayers: (projectId: string) =>
+    ["projects", projectId, "analysis-layers"] as const,
+  projectLayers: (projectId: string) =>
+    ["projects", projectId, "layers"] as const,
   users: ["admin", "users"] as const,
   user: (userId: string) => ["admin", "users", userId] as const,
   serverInvitations: ["admin", "invitations"] as const,

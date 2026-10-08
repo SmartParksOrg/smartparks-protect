@@ -44,3 +44,4 @@ Copy `template.md` for a new record. Number sequentially. Link the ADR from `PRO
 - [0036 Contacts as a canonical record type, and a place a device does not report](0036-contacts-as-a-canonical-record-type.md)
 - [0037 Cardiac readings on the scanning device, with only what is published derived](0037-cardiac-readings-on-the-scanning-device.md)
 - [0038 Moves take the history along, and assignment changes never wait for a job](0038-moves-take-history-and-jobs-never-block.md)
+- [0039 Habitat selection through hrHSA, in an image of the analysis worker's own](0039-habitat-selection-through-hrhsa-in-a-worker-image.md)

@@ -26,7 +26,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from shared.enums import AnalysisModuleKey, AnalysisStatus
+from shared.enums import AnalysisModuleKey, AnalysisStatus, LayerKind
 from shared.models.base import Base, UuidPrimaryKeyMixin, enum_check
 
 
@@ -127,6 +127,79 @@ class AnalysisGeometry(Base):
     properties: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
+
+
+class ProjectLayer(UuidPrimaryKeyMixin, Base):
+    """A raster a project uploaded as a covariate for the habitat analysis (phase 41, decision
+    D315): a GeoTIFF in the analysis layers bucket with what its header says, read at upload
+    without a raster library (`shared/analysis/geotiff.py`)."""
+
+    __tablename__ = "project_layers"
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="uq_project_layers_project_name"),
+        enum_check("kind", LayerKind, "ck_project_layers_kind"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(
+        String(64), nullable=False, comment="The band name the run reads it under"
+    )
+    label: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(
+        String(16), nullable=False, comment="continuous or categorical (decision D317)"
+    )
+    object_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    epsg: Mapped[int] = mapped_column(Integer, nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
+    pixel_m: Mapped[float] = mapped_column(
+        Float, nullable=False, comment="The pixel size in metres, from the header"
+    )
+    extent: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, comment="west, south, east, north in the layer's own CRS"
+    )
+    nodata: Mapped[float | None] = mapped_column(Float)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class EnvironmentRaster(Base):
+    """A raster a provider answered for one area and period (phase 41, decision D315): the
+    cache beside the weekly samples, keyed by the layer, the area's hash, the grid and the
+    period, so a rerun over the same area reads the file back from the bucket."""
+
+    __tablename__ = "environment_rasters"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "layer",
+            "area_hash",
+            "epsg",
+            "resolution_m",
+            "period",
+            name="uq_environment_rasters_key",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    layer: Mapped[str] = mapped_column(String(64), nullable=False)
+    area_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    epsg: Mapped[int] = mapped_column(Integer, nullable=False)
+    resolution_m: Mapped[float] = mapped_column(Float, nullable=False)
+    period: Mapped[str] = mapped_column(
+        String(32), nullable=False, comment="`from/to` dates, or `static` for a layer without time"
+    )
+    object_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class EnvironmentSample(Base):

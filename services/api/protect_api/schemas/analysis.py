@@ -76,3 +76,35 @@ class AnalysisEstimate(BaseModel):
     max_fixes: int
     ok: bool
     reasons: list[str] = Field(default_factory=list)
+
+
+class ProjectLayerRead(ORMModel):
+    """A raster a project uploaded for the habitat analysis (phase 41, decision D315)."""
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    name: str
+    label: str
+    kind: str
+    size_bytes: int
+    epsg: int
+    width: int
+    height: int
+    pixel_m: float
+    extent: dict[str, Any]
+    nodata: float | None
+    created_at: datetime
+
+
+class LayerChoiceRead(BaseModel):
+    """A layer a habitat run may name: the provider's, a distance to the project's features,
+    or an upload (`shared.analysis.rasters.LayerChoice`)."""
+
+    name: str
+    label: str
+    source: str
+    kind: str
+    description: str | None = None
+    periodic: bool = False
+    feature_type: str | None = None
+    layer_id: uuid.UUID | None = None

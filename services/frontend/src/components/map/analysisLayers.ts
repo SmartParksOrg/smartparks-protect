@@ -47,7 +47,25 @@ export const ANALYSIS_KINDS = [
   "trip_segment",
   "trip_marker",
   "speeding",
+  "domain",
+  "selection",
 ] as const;
+
+/** The relative selection surface of a habitat run (phase 41, decision D317): five steps by
+ * rank, each a fifth of the cells, light to dark. Purple, since green is the vegetation
+ * layer's, warm the use intensity's and blue the water's on every base map. */
+export const SELECTION_RAMP = [
+  "#F3E9F5",
+  "#D7BBE0",
+  "#B48AC4",
+  "#8B5AA3",
+  "#5A2E73",
+] as const;
+export function selectionColor(rank: number | null | undefined): string {
+  if (rank === null || rank === undefined || !Number.isFinite(rank))
+    return SELECTION_RAMP[0];
+  return SELECTION_RAMP[Math.max(0, Math.min(4, Math.round(rank)))];
+}
 
 /** A trip's path by its speed (vehicle use, decision D306): six bands in km/h that widen,
  * green through yellow and red to dark, the way fleet tools and sport apps colour a path.
@@ -111,6 +129,8 @@ const FILL_OPACITY: Record<string, number> = {
   hotspot: 0.45,
   cluster: 0.18,
   coverage: 0.1,
+  domain: 0.05,
+  selection: 0.6,
 };
 
 /** The colour of a fix by its accuracy: under 10 m, under 30 m, under 100 m, worse, unknown
@@ -180,6 +200,8 @@ export function decorateAnalysisFeatures(
     const kind = String(f.properties?.kind ?? "");
     const level = Number(f.properties?.level ?? 0);
     if (kind === "area") return -1;
+    if (kind === "selection") return -0.9;
+    if (kind === "domain") return -0.7;
     if (kind === "coverage") return -0.5;
     if (kind === "mcp") return 0;
     if (kind === "akde") return level >= 0.9 ? 0.5 : 1.5;
@@ -200,9 +222,12 @@ export function decorateAnalysisFeatures(
           color:
             kind === "area"
               ? pressureColor(level)
-              : kind === "trip_segment"
-                ? speedColor(f.properties?.speed_kmh as number | undefined)
-                : (markerColor(kind, f.properties?.role) ?? colorOf(subject)),
+              : kind === "selection"
+                ? selectionColor(f.properties?.rank as number | undefined)
+                : kind === "trip_segment"
+                  ? speedColor(f.properties?.speed_kmh as number | undefined)
+                  : (markerColor(kind, f.properties?.role) ??
+                    colorOf(subject)),
           opacity: FILL_OPACITY[kind] ?? 0.2,
           ...(kind === "trip_segment" ? { over: overLimit(f.properties) } : {}),
         },

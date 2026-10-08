@@ -41,6 +41,7 @@ import {
   setIntensityVisible,
   setVegetationFeatures,
   setVegetationVisible,
+  SELECTION_RAMP,
   VEGETATION_RAMP,
   setTracksVisible,
 } from "@/components/map/analysisLayers";
@@ -523,7 +524,13 @@ export function ResultMap({
     trip_segment: t("Trips by speed"),
     trip_marker: t("Trip markers"),
     speeding: t("Speeding"),
+    domain: t("Available area (MCP)"),
+    selection: t("Relative selection"),
   };
+  // the selection surface's fifths read with the value each colour starts at
+  const selectionBreaks = Array.isArray(document.summary.selection_breaks)
+    ? (document.summary.selection_breaks as number[])
+    : null;
   // the speed legend reads against the run's limit (vehicle use)
   const limitKmh = Number(
     (document.provenance as { parameters?: { limit_kmh?: number } }).parameters
@@ -766,6 +773,21 @@ export function ResultMap({
                   ? t("over {{limit}}", { limit: limitKmh })
                   : undefined
               }
+            />
+          )}
+        {document.geometries.selection &&
+          !hidden.includes("selection") &&
+          selectionBreaks &&
+          selectionBreaks.length === 5 && (
+            <MapLegend
+              title={t("Relative selection")}
+              colors={SELECTION_RAMP}
+              values={selectionBreaks.map((v) =>
+                v >= 100 ? v.toFixed(0) : v.toPrecision(2),
+              )}
+              hint={t(
+                "Each colour holds a fifth of the cells; the number is the selection strength it starts at, relative and not a probability",
+              )}
             />
           )}
         {byDevice && !hidden.includes("points") && (

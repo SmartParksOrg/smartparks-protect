@@ -1,0 +1,37 @@
+[project]
+name = "smartparks-protect-analysis-image"
+version = "0.0.0"
+description = "The analysis worker's own environment (decision D314): the workspace packages plus hrHSA and its stack, which the lean image does not carry."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "smartparks-protect-shared",
+    "smartparks-protect-analysis",
+    # hrHSA at one commit (BSD 3-Clause, LICENSE-hrHSA beside this file). Its `rsf` package
+    # imports dask at module level although the authors list dask as optional, so the extra
+    # is taken.
+    "hrhsa[dask]",
+]
+
+[dependency-groups]
+# The tests that run inside the image in CI (the API package for the run tests).
+dev = [
+    "smartparks-protect-api",
+    "smartparks-protect-decoder",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "httpx==0.28.1",
+    "httpx-ws==0.9.0",
+]
+
+[tool.uv]
+package = false
+# hrHSA pins numpy below 2.5 while the workspace pins 2.5.2 (shared/pyproject.toml); this
+# environment takes the older line, and only this environment.
+override-dependencies = ["numpy==2.4.2"]
+
+[tool.uv.sources]
+smartparks-protect-shared = { path = "../../../shared", editable = true }
+smartparks-protect-analysis = { path = "..", editable = true }
+smartparks-protect-api = { path = "../../api", editable = true }
+smartparks-protect-decoder = { path = "../../decoder", editable = true }
+hrhsa = { git = "https://github.com/PantheraPaulus/hrHSA", rev = "c6e975be149a7e33c095b0739f02593102050663" }

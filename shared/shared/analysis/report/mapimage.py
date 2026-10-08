@@ -60,6 +60,9 @@ PRESSURE_RAMP = ["#F6F0EA", "#E6D6C6", "#D2B096", "#BE8663", "#AF4436"]
 #: candidates, this one keeps its steps furthest apart under both red-green colour
 #: blindnesses, because after the green its lightness only falls.
 SPEED_RAMP = ["#3C8D5A", "#B7D968", "#FBE251", "#F39A2B", "#CE3B25", "#55113A"]
+#: The relative selection surface of a habitat run by rank in fifths (phase 41), the
+#: interface's `SELECTION_RAMP`.
+SELECTION_RAMP = ["#F3E9F5", "#D7BBE0", "#B48AC4", "#8B5AA3", "#5A2E73"]
 #: Where each band after the first starts, km/h; the module's `SPEED_BAND_EDGES_KMH`.
 SPEED_BAND_EDGES_KMH = (10.0, 20.0, 40.0, 80.0, 120.0)
 #: The outline of a stretch driven over the limit.
@@ -73,6 +76,8 @@ FILL_ALPHA = {
     "akde": 0.15,
     "cluster": 0.25,
     "hotspot": 0.35,
+    "domain": 0.05,
+    "selection": 0.6,
 }
 
 Bounds = tuple[float, float, float, float]  # xmin, xmax, ymin, ymax in Mercator metres
@@ -532,6 +537,12 @@ def shapes_from_geometries(
         outlined = False
         if kind == "area":
             color = pressure_color(row.get("level"))
+        elif kind == "selection":
+            props = row.get("properties") or {}
+            rank = props.get("rank") if isinstance(props, dict) else None
+            color = SELECTION_RAMP[
+                int(max(0, min(4, rank if isinstance(rank, int | float) else 0)))
+            ]
         elif kind == "trip_segment":
             kmh, outlined = _segment_speed(row)
             color = speed_color(kmh)

@@ -27,6 +27,7 @@ import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
 import { CombineFeaturesDialog } from "@/components/features/CombineFeaturesDialog";
 import { ImportFeaturesDialog } from "@/components/features/ImportFeaturesDialog";
+import { LayersCard } from "@/components/features/LayersCard";
 import { CombineRoutesDialog } from "@/components/features/CombineRoutesDialog";
 import { DrawMap } from "@/components/map/DrawMap";
 import { boundsOf, geometryBounds, type Bounds } from "@/components/map/fit";
@@ -326,6 +327,7 @@ export function FeaturesPage() {
               : undefined
           }
         />
+        <LayersCard projectId={projectId} canWrite={can("features:write")} />
       </Page>
       <ImportFeaturesDialog
         projectId={projectId}

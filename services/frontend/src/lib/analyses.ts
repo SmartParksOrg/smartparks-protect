@@ -237,6 +237,36 @@ export const DEFAULT_VEHICLE: VehicleOptions = {
   minTrip: 300,
 };
 
+/** The habitat selection page's own choices (phase 41, decisions D315 and D316): the layers
+ * by name, the ones squared, and hrHSA's availability and sampling settings. */
+export interface HabitatOptions {
+  layers: string[];
+  quadratic: string[];
+  /** The quantile of the minimum convex polygon that is each animal's available area. */
+  quantile: number;
+  /** Available points sampled per used fix. */
+  sampling: number;
+  /** Hours between two fixes kept for the fit; null keeps every fix. */
+  thin: number | null;
+  /** Metres added around the animals' areas for the rasters. */
+  buffer: number;
+  /** Leave-one-individual-out validation. */
+  loio: boolean;
+  /** Metres; the stop rule's radius (decision D303), off at zero. */
+  stopRadius: number;
+}
+
+export const DEFAULT_HABITAT: HabitatOptions = {
+  layers: [],
+  quadratic: [],
+  quantile: 0.95,
+  sampling: 10,
+  thin: 12,
+  buffer: 1000,
+  loio: true,
+  stopRadius: 0,
+};
+
 /** The grazing page's own choices (plan, section 9.4): the areas, the weighting, the second
  * herd, and the visit and rest options. */
 export interface GrazingOptions {
@@ -336,6 +366,7 @@ export interface FormState {
   contact: ContactOptions;
   cardiac: CardiacOptions;
   vehicle: VehicleOptions;
+  habitat: HabitatOptions;
 }
 
 export const DEFAULT_RANGE = "30d";
@@ -409,6 +440,22 @@ export function readFormState(params: URLSearchParams): FormState {
       limit: numberOr(params.get("limit"), DEFAULT_VEHICLE.limit),
       minTrip: numberOrZero(params.get("min_trip"), DEFAULT_VEHICLE.minTrip),
     },
+    habitat: {
+      layers: params.getAll("layer"),
+      quadratic: params.getAll("squared"),
+      quantile: numberOr(params.get("quantile_mcp"), DEFAULT_HABITAT.quantile),
+      sampling: numberOr(params.get("sampling"), DEFAULT_HABITAT.sampling),
+      thin:
+        params.get("thin") === "0"
+          ? null
+          : numberOr(params.get("thin"), DEFAULT_HABITAT.thin ?? 12),
+      buffer: numberOrZero(params.get("buffer"), DEFAULT_HABITAT.buffer),
+      loio: params.get("loio") !== "0",
+      stopRadius: numberOrZero(
+        params.get("stop_habitat"),
+        DEFAULT_HABITAT.stopRadius,
+      ),
+    },
     grazing: {
       areas: params.getAll("area"),
       weighting: (["equal", "attribute", "metabolic"] as const).includes(
@@ -463,6 +510,19 @@ export function writeFormState(state: FormState): URLSearchParams {
   if (v.limit !== DEFAULT_VEHICLE.limit) params.set("limit", String(v.limit));
   if (v.minTrip !== DEFAULT_VEHICLE.minTrip)
     params.set("min_trip", String(v.minTrip));
+  const hb = state.habitat;
+  for (const name of hb.layers) params.append("layer", name);
+  for (const name of hb.quadratic) params.append("squared", name);
+  if (hb.quantile !== DEFAULT_HABITAT.quantile)
+    params.set("quantile_mcp", String(hb.quantile));
+  if (hb.sampling !== DEFAULT_HABITAT.sampling)
+    params.set("sampling", String(hb.sampling));
+  if (hb.thin !== DEFAULT_HABITAT.thin) params.set("thin", String(hb.thin ?? 0));
+  if (hb.buffer !== DEFAULT_HABITAT.buffer)
+    params.set("buffer", String(hb.buffer));
+  if (!hb.loio) params.set("loio", "0");
+  if (hb.stopRadius !== DEFAULT_HABITAT.stopRadius)
+    params.set("stop_habitat", String(hb.stopRadius));
   const c = state.contact;
   if (!c.bluetooth) params.set("bluetooth", "0");
   if (!c.proximity) params.set("proximity", "0");
@@ -578,6 +638,33 @@ export function vehicleParameters(
     site_radius_m: v.siteRadius,
     limit_kmh: v.limit,
     min_trip_m: v.minTrip,
+  };
+}
+
+/** The parameters the habitat selection module takes (phase 41): the animals, the period,
+ * the layers and the method; null while no subject or no layer is chosen, or a custom range
+ * lacks a date. A comparison period is not offered by the module. */
+export function habitatParameters(
+  state: FormState,
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  const window = windowOf(state, now);
+  if (!window || state.entities.length === 0) return null;
+  const hb = state.habitat;
+  if (hb.layers.length === 0) return null;
+  return {
+    entity_ids: state.entities,
+    ...window,
+    gap_hours: state.method.gap,
+    max_speed_mps: state.method.speed_max,
+    layers: hb.layers,
+    quadratic: hb.quadratic.filter((name) => hb.layers.includes(name)),
+    domain_quantile: hb.quantile,
+    sampling_factor: hb.sampling,
+    thin_hours: hb.thin,
+    area_buffer_m: hb.buffer,
+    loio: hb.loio,
+    stop_radius_m: hb.stopRadius,
   };
 }
 
@@ -1088,6 +1175,16 @@ export function formStateOfRun(run: AnalysisRun, base: FormState): FormState {
       siteRadius: num("site_radius_m", DEFAULT_VEHICLE.siteRadius),
       limit: num("limit_kmh", DEFAULT_VEHICLE.limit),
       minTrip: num("min_trip_m", DEFAULT_VEHICLE.minTrip),
+    },
+    habitat: {
+      layers: list("layers"),
+      quadratic: list("quadratic"),
+      quantile: num("domain_quantile", DEFAULT_HABITAT.quantile),
+      sampling: num("sampling_factor", DEFAULT_HABITAT.sampling),
+      thin: typeof p.thin_hours === "number" ? p.thin_hours : null,
+      buffer: num("area_buffer_m", DEFAULT_HABITAT.buffer),
+      loio: p.loio !== false,
+      stopRadius: num("stop_radius_m", DEFAULT_HABITAT.stopRadius),
     },
     grazing: {
       areas: list("feature_ids"),

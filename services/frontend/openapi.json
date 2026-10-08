@@ -18912,6 +18912,252 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/analysis-layers": {
+   "get": {
+    "tags": [
+     "analysis layers"
+    ],
+    "summary": "List Layer Choices",
+    "description": "Every layer a habitat run of the project may name, in the order the form offers them.",
+    "operationId": "list_layer_choices_api_v1_projects__project_id__analysis_layers_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/LayerChoiceRead"
+         },
+         "title": "Response List Layer Choices Api V1 Projects  Project Id  Analysis Layers Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/layers": {
+   "get": {
+    "tags": [
+     "analysis layers"
+    ],
+    "summary": "List Project Layers",
+    "operationId": "list_project_layers_api_v1_projects__project_id__layers_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ProjectLayerRead"
+         },
+         "title": "Response List Project Layers Api V1 Projects  Project Id  Layers Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "analysis layers"
+    ],
+    "summary": "Upload Project Layer",
+    "description": "Upload a GeoTIFF as a covariate layer of the project. The file must carry a CRS with an\nEPSG code, be north-up, and sit within the size bound; its name must not be one of the\nprovider's or a distance layer's.",
+    "operationId": "upload_project_layer_api_v1_projects__project_id__layers_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "name",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 64,
+       "description": "The band name, a-z, 0-9, _",
+       "title": "Name"
+      },
+      "description": "The band name, a-z, 0-9, _"
+     },
+     {
+      "name": "label",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "Label"
+      }
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "$ref": "#/components/schemas/LayerKind",
+       "default": "continuous"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_project_layer_api_v1_projects__project_id__layers_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectLayerRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/layers/{layer_id}": {
+   "delete": {
+    "tags": [
+     "analysis layers"
+    ],
+    "summary": "Delete Project Layer",
+    "operationId": "delete_project_layer_api_v1_projects__project_id__layers__layer_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "layer_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Layer Id"
+      }
+     },
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/integrations/connectors": {
    "get": {
     "tags": [
@@ -25040,6 +25286,20 @@
      "file"
     ],
     "title": "Body_upload_log_file_api_v1_devices__device_id__log_files_post"
+   },
+   "Body_upload_project_layer_api_v1_projects__project_id__layers_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_project_layer_api_v1_projects__project_id__layers_post"
    },
    "BrowserResult": {
     "properties": {
@@ -36073,6 +36333,83 @@
     ],
     "title": "JobRead"
    },
+   "LayerChoiceRead": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "periodic": {
+      "type": "boolean",
+      "title": "Periodic",
+      "default": false
+     },
+     "feature_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Feature Type"
+     },
+     "layer_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Layer Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "label",
+     "source",
+     "kind"
+    ],
+    "title": "LayerChoiceRead",
+    "description": "A layer a habitat run may name: the provider's, a distance to the project's features,\nor an upload (`shared.analysis.rasters.LayerChoice`)."
+   },
+   "LayerKind": {
+    "type": "string",
+    "enum": [
+     "continuous",
+     "categorical"
+    ],
+    "title": "LayerKind",
+    "description": "How a habitat covariate enters the model (phase 41, decision D317): a number the fit\nstandardises, or classes it dummy-encodes."
+   },
    "Layout": {
     "type": "string",
     "enum": [
@@ -39374,6 +39711,91 @@
      "created_at"
     ],
     "title": "ProjectIconRead"
+   },
+   "ProjectLayerRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "size_bytes": {
+      "type": "integer",
+      "title": "Size Bytes"
+     },
+     "epsg": {
+      "type": "integer",
+      "title": "Epsg"
+     },
+     "width": {
+      "type": "integer",
+      "title": "Width"
+     },
+     "height": {
+      "type": "integer",
+      "title": "Height"
+     },
+     "pixel_m": {
+      "type": "number",
+      "title": "Pixel M"
+     },
+     "extent": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Extent"
+     },
+     "nodata": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nodata"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "name",
+     "label",
+     "kind",
+     "size_bytes",
+     "epsg",
+     "width",
+     "height",
+     "pixel_m",
+     "extent",
+     "nodata",
+     "created_at"
+    ],
+    "title": "ProjectLayerRead",
+    "description": "A raster a project uploaded for the habitat analysis (phase 41, decision D315)."
    },
    "ProjectRead": {
     "properties": {

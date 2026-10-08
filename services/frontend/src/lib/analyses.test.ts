@@ -11,6 +11,7 @@ import {
   fixesPreset,
   formStateOfRun,
   grazingParameters,
+  habitatParameters,
   groupWithSubgroups,
   withGroupMembers,
   deviceSelection,
@@ -572,5 +573,82 @@ describe("the charts of a vehicle run", () => {
     expect(
       limitName({ value: 80, label: "", source: "rule" }, labels, null, t),
     ).toBe("80");
+  });
+});
+
+describe("habitat selection form state (phase 41)", () => {
+  it("round-trips the layers and the method through the URL", () => {
+    const state = readFormState(
+      new URLSearchParams(
+        "entity=a&entity=b&layer=ndvi&layer=slope&squared=slope&thin=0&loio=0&buffer=500",
+      ),
+    );
+    expect(state.habitat.layers).toEqual(["ndvi", "slope"]);
+    expect(state.habitat.quadratic).toEqual(["slope"]);
+    expect(state.habitat.thin).toBeNull();
+    expect(state.habitat.loio).toBe(false);
+    expect(state.habitat.buffer).toBe(500);
+    expect(writeFormState(state).toString()).toBe(
+      "entity=a&entity=b&layer=ndvi&layer=slope&squared=slope&thin=0&buffer=500&loio=0",
+    );
+  });
+
+  it("sends the layers and hrHSA's settings, and nothing without a layer", () => {
+    const now = new Date("2026-10-08T12:00:00Z");
+    const base = readFormState(new URLSearchParams("entity=a&range=30d"));
+    expect(habitatParameters(base, now)).toBeNull();
+    const state = {
+      ...base,
+      habitat: {
+        ...base.habitat,
+        layers: ["ndvi", "distance_to_site"],
+        quadratic: ["distance_to_site", "gone"],
+        thin: 6,
+      },
+    };
+    const params = habitatParameters(state, now);
+    expect(params).toMatchObject({
+      entity_ids: ["a"],
+      layers: ["ndvi", "distance_to_site"],
+      quadratic: ["distance_to_site"],
+      domain_quantile: 0.95,
+      sampling_factor: 10,
+      thin_hours: 6,
+      area_buffer_m: 1000,
+      loio: true,
+      stop_radius_m: 0,
+      gap_hours: 4,
+    });
+    expect(params).not.toHaveProperty("comparison");
+  });
+
+  it("fills the form from a run's parameters", () => {
+    const base = readFormState(new URLSearchParams());
+    const run = {
+      parameters: {
+        entity_ids: ["a"],
+        time_from: "2026-09-01T00:00:00Z",
+        time_to: "2026-09-11T00:00:00Z",
+        layers: ["greenness"],
+        quadratic: ["greenness"],
+        domain_quantile: 0.9,
+        sampling_factor: 5,
+        thin_hours: null,
+        area_buffer_m: 300,
+        loio: false,
+        stop_radius_m: 15,
+      },
+    } as unknown as Parameters<typeof formStateOfRun>[0];
+    const state = formStateOfRun(run, base);
+    expect(state.habitat).toEqual({
+      layers: ["greenness"],
+      quadratic: ["greenness"],
+      quantile: 0.9,
+      sampling: 5,
+      thin: null,
+      buffer: 300,
+      loio: false,
+      stopRadius: 15,
+    });
   });
 });

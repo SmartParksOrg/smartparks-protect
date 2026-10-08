@@ -16,7 +16,13 @@ from sqlalchemy import delete, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.analysis import MODULES, enabled_modules
-from shared.analysis.base import AnalysisCancelled, AnalysisTooLarge, RunContext, RunResult
+from shared.analysis.base import (
+    AnalysisCancelled,
+    AnalysisTooLarge,
+    ModuleUnavailable,
+    RunContext,
+    RunResult,
+)
 from shared.analysis.limits import MAX_GEOMETRIES, MAX_RESULT_BYTES
 from shared.config import get_settings
 from shared.database import get_session_factory
@@ -96,6 +102,10 @@ async def run_analysis(session: AsyncSession, run: AnalysisRun) -> None:
     except AnalysisTooLarge as error:
         await _reset(session, run)
         await _finish(session, run, AnalysisStatus.FAILED, "INPUT_TOO_LARGE", str(error))
+    except ModuleUnavailable as error:
+        await _reset(session, run)
+        await _finish(session, run, AnalysisStatus.FAILED, "MODULE_UNAVAILABLE", str(error))
+        log.warning("module unavailable in this worker", run_id=str(run_id), module=key)
     except Exception as error:
         await _reset(session, run)
         await _finish(session, run, AnalysisStatus.FAILED, "ANALYSIS_FAILED", str(error))

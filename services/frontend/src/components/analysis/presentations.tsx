@@ -15,6 +15,7 @@ import {
   ContactTracingLimitations,
   DevicePerformanceLimitations,
   GrazingLimitations,
+  HabitatLimitations,
   MovementLimitations,
   VehicleLimitations,
 } from "@/components/analysis/Limitations";
@@ -225,6 +226,47 @@ export function vehiclePresentation(
         </>
       ),
       after: () => <VehicleLimitations />,
+    },
+  };
+}
+
+/** The figures on an animal's card in a habitat run, with their unit (phase 41). */
+export const HABITAT_CARD_METRICS: [string, string][] = [
+  ["fixes", ""],
+  ["domain_ha", "ha"],
+  ["boyce", ""],
+  ["excluded_fixes", ""],
+];
+
+/** Habitat selection (docs/analytics/habitat-selection.md): a card per animal, the map with
+ * the selection surface and the available areas, the estimates and the Boyce curves, and
+ * the summary, coefficient, validation and layer tables. */
+export function habitatPresentation(
+  t: Translate,
+  projectId: string,
+): Presentation {
+  const labels = habitatLabels(t);
+  return {
+    labels,
+    render: {
+      summary: (document, _run, colors) => (
+        <SubjectCards
+          document={document}
+          labels={labels}
+          metrics={HABITAT_CARD_METRICS}
+          colors={colors}
+        />
+      ),
+      map: (document, run, colors) => (
+        <ResultMap
+          projectId={projectId}
+          runId={run.id}
+          document={document}
+          labels={labels}
+          colors={colors}
+        />
+      ),
+      after: () => <HabitatLimitations />,
     },
   };
 }
@@ -476,6 +518,45 @@ export const movementLabels = (t: Translate): Record<string, string> => ({
   nsd: t("Net squared displacement"),
   day_night: t("Day and night"),
   summary: t("Summary"),
+});
+
+/** The human names of the habitat selection result's keys (phase 41). */
+export const habitatLabels = (t: Translate): Record<string, string> => ({
+  subject: t("Animal"),
+  period: t("Period"),
+  main: t("This period"),
+  mean: t("Mean"),
+  fixes: t("Fixes"),
+  domain_ha: t("Available area (ha)"),
+  boyce: t("Boyce index"),
+  excluded_fixes: t("Excluded fixes"),
+  folded_fixes: t("Fixes folded into a stop"),
+  median_interval_min: t("Sampling interval (min)"),
+  missing_share: t("Missing fixes share"),
+  summary: t("Summary"),
+  coefficients: t("Coefficients (standardised scale)"),
+  term: t("Term"),
+  estimate: t("Estimate"),
+  std_error: t("Standard error"),
+  p_value: t("p value"),
+  lower: t("Lower (95%)"),
+  upper: t("Upper (95%)"),
+  validation: t("Validation, one animal held out at a time"),
+  test_fixes: t("Fixes of the held-out animal"),
+  train_fixes: t("Fixes the model was fitted on"),
+  error: t("Problem"),
+  layers: t("Layers"),
+  name: t("Name"),
+  label: t("Layer"),
+  source: t("Source"),
+  resolution_m: t("Resolution (m)"),
+  cells: t("Cells with a value"),
+  spread: t("Spread"),
+  cache: t("Read"),
+  estimates: t("Selection coefficients"),
+  const: t("constant"),
+  domain: t("Available area (MCP)"),
+  selection: t("Relative selection"),
 });
 
 /** The human names of the vehicle use result's keys (phase 39). */

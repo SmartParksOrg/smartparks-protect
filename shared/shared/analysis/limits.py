@@ -11,6 +11,14 @@ MAX_SUBJECTS_CONTACT = 40
 MAX_SUBJECTS_CARDIAC = 25
 #: A vehicle run reads one track per subject, like movement; the trips table grows per vehicle.
 MAX_SUBJECTS_VEHICLE = 25
+#: A habitat run validates leave-one-individual-out, one model per animal (phase 41).
+MAX_SUBJECTS_HABITAT = 40
+#: The raster stack of a habitat run: cells per layer, the resolution doubled until the area
+#: fits (a 60 by 60 km park at 30 m); and the cells the selection surface is drawn on.
+MAX_RASTER_CELLS = 4_000_000
+MAX_SURFACE_CELLS = 2_000
+#: Fewer animals than this and a habitat run skips the leave-one-individual-out validation.
+MIN_SUBJECTS_LOIO = 3
 MAX_DEVICES = 100
 MAX_ROWS_PER_DEVICE = 500_000
 MAX_ANIMALS_GRAZING = 100

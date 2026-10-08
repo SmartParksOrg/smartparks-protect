@@ -217,8 +217,17 @@ class Settings(BaseSettings):
     analysis_max_fixes: int = Field(
         default=500_000, ge=1_000, description="Fixes one run may read across its subjects"
     )
+    minio_bucket_analysis_layers: str = Field(
+        default="analysis-layers",
+        description="The rasters of a habitat run: a project's uploaded layers and the cache of "
+        "what the providers answered (phase 41, decision D315)",
+    )
+    layer_max_bytes: int = Field(
+        default=200 * 1024 * 1024,
+        description="Largest GeoTIFF a project may upload as a layer (phase 41)",
+    )
     analysis_modules: str = Field(
-        default="movement,grazing,device_performance,contact_tracing,cardiac,vehicle_use",
+        default="movement,grazing,device_performance,contact_tracing,cardiac,vehicle_use,habitat_selection",
         description="The analysis modules this deployment offers, a comma list; empty turns the "
         "analysis area off (docs/ANALYTICS_PHASE1_PLAN.md, section 16)",
     )

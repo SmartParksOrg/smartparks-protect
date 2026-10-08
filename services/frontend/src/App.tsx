@@ -83,6 +83,11 @@ const VehiclePage = lazy(() =>
     default: m.VehiclePage,
   })),
 );
+const HabitatPage = lazy(() =>
+  import("@/pages/project/HabitatPage").then((m) => ({
+    default: m.HabitatPage,
+  })),
+);
 const ContactTracingPage = lazy(() =>
   import("@/pages/project/ContactTracingPage").then((m) => ({
     default: m.ContactTracingPage,
@@ -304,6 +309,11 @@ export default function App() {
               </Route>
               <Route element={<RequireAnalysisModule module="vehicle_use" />}>
                 <Route path="analyze/vehicles" element={<VehiclePage />} />
+              </Route>
+              <Route
+                element={<RequireAnalysisModule module="habitat_selection" />}
+              >
+                <Route path="analyze/habitat" element={<HabitatPage />} />
               </Route>
               <Route
                 element={<RequireAnalysisModule module="device_performance" />}

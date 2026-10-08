@@ -5,6 +5,7 @@ import {
   Car,
   Footprints,
   HeartPulse,
+  TreePine,
   MapPin,
   Pencil,
   Plus,
@@ -360,6 +361,15 @@ export function EntityPage() {
                   to={`/projects/${projectId}/analyze/movement?entity=${e.id}`}
                 >
                   <Footprints className="size-4" /> {t("Analyse movement")}
+                </Link>
+              </Button>
+            )}
+            {modules.includes("habitat_selection") && can("analysis:run") && (
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to={`/projects/${projectId}/analyze/habitat?entity=${e.id}`}
+                >
+                  <TreePine className="size-4" /> {t("Analyse habitat")}
                 </Link>
               </Button>
             )}

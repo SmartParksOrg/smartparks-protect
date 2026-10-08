@@ -15,6 +15,7 @@ from protect_analysis.main import build_worker
 from shared.analysis import MODULES
 from shared.analysis.base import (
     Geometry,
+    ModuleUnavailable,
     Period,
     Provenance,
     ResultDocument,
@@ -47,6 +48,8 @@ class StubModule:
         await ctx.progress(10, "start")
         if params.behaviour == "raise":
             raise RuntimeError("the module broke")
+        if params.behaviour == "unavailable":
+            raise ModuleUnavailable("the analysis worker is not built with hrHSA")
         if params.behaviour == "slow":
             await asyncio.sleep(5)
         if params.behaviour == "cancel":
@@ -194,3 +197,14 @@ async def test_a_kept_run_never_expires(db, stub):
     await _deliver(run.id)
     await db.refresh(run)
     assert run.status == AnalysisStatus.COMPLETED and run.expires_at is None
+
+
+async def test_a_module_without_its_engine_fails_the_run_with_the_image_to_build(db, stub):
+    """Decision D318: a worker whose image lacks hrHSA refuses a habitat run with a reason
+    the page can show, and the handler returns, so the bus does not retry."""
+    run = await _queued(db, "unavailable")
+    await _deliver(run.id)
+    await db.refresh(run)
+    assert run.status == AnalysisStatus.FAILED
+    assert run.error_code == "MODULE_UNAVAILABLE"
+    assert "not built with hrHSA" in (run.error_message or "")

@@ -29,6 +29,7 @@ MODULE_LABELS = {
     "device_performance": "Device performance",
     "cardiac": "Cardiac monitoring",
     "vehicle_use": "Vehicle use",
+    "habitat_selection": "Habitat selection",
 }
 
 #: The human names of the result keys, the frontend's `presentations.tsx` in English.
@@ -157,6 +158,68 @@ VEHICLE_LIMITATIONS = [
     "Where a trip started and ended is the nearest site within the site radius, else the "
     "coordinates; a site the project has not drawn cannot be named.",
     "The figures describe the tracked vehicles, not the fleet.",
+]
+#: The habitat selection keys (phase 41), the frontend's `habitatLabels`.
+HABITAT_LABELS: dict[str, str] = {
+    "subject": "Animal",
+    "period": "Period",
+    "main": "This period",
+    "mean": "Mean",
+    "fixes": "Fixes",
+    "domain_ha": "Available area (ha)",
+    "boyce": "Boyce index",
+    "excluded_fixes": "Excluded fixes",
+    "folded_fixes": "Fixes folded into a stop",
+    "median_interval_min": "Sampling interval (min)",
+    "missing_share": "Missing fixes share",
+    "summary": "Summary",
+    "coefficients": "Coefficients (standardised scale)",
+    "term": "Term",
+    "estimate": "Estimate",
+    "std_error": "Standard error",
+    "p_value": "p value",
+    "lower": "Lower (95%)",
+    "upper": "Upper (95%)",
+    "validation": "Validation, one animal held out at a time",
+    "test_fixes": "Fixes of the held-out animal",
+    "train_fixes": "Fixes the model was fitted on",
+    "error": "Problem",
+    "layers": "Layers",
+    "name": "Name",
+    "label": "Layer",
+    "source": "Source",
+    "resolution_m": "Resolution (m)",
+    "cells": "Cells with a value",
+    "spread": "Spread",
+    "cache": "Read",
+    "estimates": "Selection coefficients",
+    "const": "constant",
+    "domain": "Available area (MCP)",
+    "selection": "Relative selection",
+}
+HABITAT_KEY_FIGURES: list[tuple[str, str]] = [
+    ("fixes", ""),
+    ("domain_ha", "ha"),
+    ("boyce", ""),
+    ("excluded_fixes", ""),
+]
+HABITAT_LIMITATIONS = [
+    "Use is not habitat quality: animals are where they are for many reasons, and a place used "
+    "much may be a poor one that is all there is.",
+    "A coefficient says how the animals redistributed relative to what was available to them, "
+    "and the available area decides every contrast: a different area gives different "
+    "coefficients.",
+    "The selection surface is relative: a higher value means a stronger selection under the "
+    "fitted relationship, never a probability of finding an animal there.",
+    "The coefficients are on the standardised scale: one unit is one spread of the layer over "
+    "the available points, which the summary gives per layer.",
+    "The Boyce index of an animal says how well a model fitted on the other animals ranks its "
+    "fixes; under 0.5 the animal chooses differently from the rest, or the layers do not carry "
+    "what it chose.",
+    "A layer fetched for the period is its mean over the period; a selection that changes "
+    "within the period is averaged out.",
+    "The engine is hrHSA (Paul Kasko and Ralph Kühn, BSD 3-Clause); Protect assembles its "
+    "inputs and reads its answer.",
 ]
 GRAZING_LABELS: dict[str, str] = {
     "area": "Area",
@@ -539,6 +602,13 @@ OPTION_LABELS: list[tuple[str, str]] = [
     ("min_trip_m", "Shortest trip (m)"),
     ("site_radius_m", "Site radius (m)"),
     ("limit_kmh", "Speed limit (km/h)"),
+    ("layers", "Layers"),
+    ("quadratic", "Layers also squared"),
+    ("domain_quantile", "Available area (MCP quantile)"),
+    ("sampling_factor", "Available points per fix"),
+    ("thin_hours", "One fix per (hours)"),
+    ("area_buffer_m", "Buffer around the areas (m)"),
+    ("loio", "Validated animal by animal"),
 ]
 MOVEMENT_LIMITATIONS = [
     "Distance from fixes underestimates the path between them; a coarser sampling means a "
@@ -602,6 +672,7 @@ def labels_for(module: str, document: dict[str, Any]) -> dict[str, str]:
         "device_performance": DEVICE_PERFORMANCE_LABELS,
         "cardiac": CARDIAC_LABELS,
         "vehicle_use": VEHICLE_LABELS,
+        "habitat_selection": HABITAT_LABELS,
     }
     labels = dict(by_module.get(module, MOVEMENT_LABELS))
     for subject in document.get("subjects", []):
@@ -914,11 +985,23 @@ def key_figures(inp: ReportInput, labels: dict[str, str]) -> dict[str, Any]:
         ]
         first = "Area"
     else:
-        metrics = VEHICLE_KEY_FIGURES if inp.module == "vehicle_use" else MOVEMENT_KEY_FIGURES
+        metrics = (
+            VEHICLE_KEY_FIGURES
+            if inp.module == "vehicle_use"
+            else HABITAT_KEY_FIGURES
+            if inp.module == "habitat_selection"
+            else MOVEMENT_KEY_FIGURES
+        )
         rows_source = [
             (str(s["id"]), s["name"], s.get("type") or "") for s in document.get("subjects", [])
         ]
-        first = "Vehicle" if inp.module == "vehicle_use" else "Subject"
+        first = (
+            "Vehicle"
+            if inp.module == "vehicle_use"
+            else "Animal"
+            if inp.module == "habitat_selection"
+            else "Subject"
+        )
     rows = []
     for key, name, note in rows_source:
         figures = main.get(key) if isinstance(main, dict) else None
@@ -1160,6 +1243,8 @@ def render_html(inp: ReportInput) -> str:
             if inp.module == "cardiac"
             else VEHICLE_LIMITATIONS
             if inp.module == "vehicle_use"
+            else HABITAT_LIMITATIONS
+            if inp.module == "habitat_selection"
             else MOVEMENT_LIMITATIONS
         ),
         version=inp.version,

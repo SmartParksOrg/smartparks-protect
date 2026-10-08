@@ -1,6 +1,6 @@
 # Habitat selection with hrHSA
 
-Design for phase 41, asked for by Tim on 2026-10-08: check the hrHSA package by Paul Kasko and Ralph Kühn and see whether its functionality can be a separate analysis module. It can. Decisions D313 to D318 were asked and taken on 2026-10-08, the recommended answer each time. Nothing is built; this document is the plan.
+Design for phase 41, asked for by Tim on 2026-10-08: check the hrHSA package by Paul Kasko and Ralph Kühn and see whether its functionality can be a separate analysis module. It can. Decisions D313 to D318 were asked and taken on 2026-10-08, the recommended answer each time. H1 to H7 were built the same day (section 11 says where the build departed from this text); H8 is open. This document is the plan.
 
 ## 1. What hrHSA is
 
@@ -67,13 +67,13 @@ Bounds: 40 animals, 366 days, 200,000 fixes per animal before thinning, 4 millio
 
 ## 7. Phase 41 tasks
 
-- [ ] H1 the image: `docker/analysis.Dockerfile`, `services/analysis/image/`, its lock with hrHSA pinned to a commit and its licence, compose, Ansible, CI (`compose` builds it, `analysis-image` runs the tests in it, the audit covers its lock), `MODULE_UNAVAILABLE` in the runner.
-- [ ] H2 the raster boundary: `shared/analysis/rasters.py`, the cache table and bucket (migration), the openEO NDVI and DEM rasters with their recorded fixtures, the PostGIS distance layers, the grid.
-- [ ] H3 the project layers: the upload endpoint and bucket, the Layers card on the Features page, Dutch.
-- [ ] H4 the module and its primitives, the key, the migration of the run row's check, the limits, the default list.
-- [ ] H5 the frontend: the page, the form, the presentation, the map kinds and legend, the entity page's button, the navigation, Dutch.
-- [ ] H6 the report.
-- [ ] H7 docs: the guide, the pages guide, `DEVELOPERS.md`, ADR 0039, the changelog, this document.
+- [x] H1 the image: `docker/analysis.Dockerfile`, `services/analysis/image/`, its lock with hrHSA pinned to a commit and its licence, compose, Ansible, CI (`compose` builds it, `analysis-image` runs the tests in it, the audit covers its lock), `MODULE_UNAVAILABLE` in the runner.
+- [x] H2 the raster boundary: `shared/analysis/rasters.py`, the cache table and bucket (migration), the openEO NDVI and DEM rasters with their recorded fixtures, the PostGIS distance layers, the grid.
+- [x] H3 the project layers: the upload endpoint and bucket, the Layers card on the Features page, Dutch.
+- [x] H4 the module and its primitives, the key, the migration of the run row's check, the limits, the default list.
+- [x] H5 the frontend: the page, the form, the presentation, the map kinds and legend, the entity page's button, the navigation, Dutch.
+- [x] H6 the report.
+- [x] H7 docs: the guide, the pages guide, `DEVELOPERS.md`, ADR 0039, the changelog, this document.
 - [ ] H8 the dev server: the image built and deployed, a run over a real project of Tim's choice with NDVI, slope and a distance layer, read by Tim; the by-hand check of section 6 against hrHSA outside Protect; the run time and memory in `docs/operations/benchmarks.md`.
 
 Order: H1 first, since nothing runs without `hsa` in the worker; H2 and H3 together, since the module has nothing to fit without layers; then H4 to H7; H8 last. Each task lands with its tests and docs, committed on Tim's word.
@@ -95,3 +95,17 @@ The step selection and integrated step selection functions (the choice sets per 
 - Which project and animals run first (no pangolin entities exist on dev today; FreeNature's SP050969 holds four months of five-minute fixes, the Natuurmonumenten and Grazelands cattle a season each).
 - Whether to ask the authors to relax `numpy<2.5` and to tag a release, which would let the pin move from a commit to a version; and whether the pangolin case study used Smart Parks data, which decides whether their coefficients are a check for ours.
 - The openEO quota: a DEM read per project area once, an NDVI read per run area and period; the first real run says what a run costs.
+
+## 11. As built, 2026-10-08
+
+H1 to H7 landed on 2026-10-08 in one session, in the order of section 7. Where the build departs from the sections above:
+
+- **The distance layers are not PostGIS.** `primitives/habitat.py` computes `distance_to_<type>` on the run's grid with a shapely `STRtree` over the project's features projected to the grid's CRS: faster than a round trip per cell, bounded by the grid, and the worker already holds the features. The API's `project_layers` still decides which types a project may name from the features it has.
+- **hrHSA needs its `dask` extra.** `hsa.rsf` imports dask at module level although the authors list it as optional; the image's lock carries `hrhsa[dask]`. The lock holds 109 packages (numpy 2.4.2, pandas 3.0.6, geopandas 1.2.0, rasterio 1.5.2, statsmodels 0.15.0, xarray 2026.9.0, scipy 1.18.1, pyproj 3.8.0). The decoder is in the image's dev group because the API test helpers import it.
+- **One `uv sync` in the Dockerfile.** The workspace packages are path dependencies of the image project, not workspace members, so the dependency layer cannot be built before the sources are copied; the sync runs once after the copy, and the uv cache keeps a code change to seconds. `INSTALL_DEV=1` adds the test group for CI.
+- **The lean API reads a GeoTIFF header itself.** `shared/analysis/geotiff.py` parses TIFF 6.0 and BigTIFF with the GeoTIFF 1.1 keys, so an upload without a CRS, with more than one band or outside the size bound is refused by the API without rasterio.
+- **Ansible needs nothing.** The server builds through `docker compose build`, which builds the analysis image beside the others.
+- **A `Fit` carries the rank breaks**, so the map legend and the report read the same five values the cells were coloured by.
+- **Test lessons.** A site at the centre of a gradient makes the distance to it collinear with the gradient; the run test's site stands 3 km north and the distance's interval is asserted to hold zero. The habitat tests skip where `hsa` does not import and run in the `analysis-image` job.
+
+Open from section 8: the run on dev over a real project, Tim's reading, and the by-hand check against hrHSA outside Protect (H8).

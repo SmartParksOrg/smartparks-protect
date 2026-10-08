@@ -30,6 +30,7 @@ from protect_api.routers.gateways import router as gateways_router
 from protect_api.routers.groups import router as groups_router
 from protect_api.routers.ingest import router as ingest_router
 from protect_api.routers.integrations import router as integrations_router
+from protect_api.routers.layers import router as layers_router
 from protect_api.routers.log_files import router as log_files_router
 from protect_api.routers.map import router as map_router
 from protect_api.routers.map_config import router as map_config_router
@@ -74,6 +75,7 @@ for router in (
     control_router,
     curation_router,
     log_files_router,
+    layers_router,
     integrations_router,
     gateways_router,
     admin_gateways_router,

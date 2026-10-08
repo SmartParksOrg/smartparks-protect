@@ -6,6 +6,7 @@ import { CardiacForm } from "@/components/analysis/CardiacForm";
 import { ContactTracingForm } from "@/components/analysis/ContactTracingForm";
 import { DevicePerformanceForm } from "@/components/analysis/DevicePerformanceForm";
 import { GrazingForm } from "@/components/analysis/GrazingForm";
+import { HabitatForm } from "@/components/analysis/HabitatForm";
 import { MovementForm } from "@/components/analysis/MovementForm";
 import { VehicleForm } from "@/components/analysis/VehicleForm";
 import {
@@ -24,7 +25,8 @@ export type AnalysisModuleKey =
   | "device_performance"
   | "contact_tracing"
   | "cardiac"
-  | "vehicle_use";
+  | "vehicle_use"
+  | "habitat_selection";
 
 /** The one place an analysis is set up: a dialog with the module's form, for a new run or
  * for a change to an existing one (its settings filled in; "Run as new" keeps the old run,
@@ -65,7 +67,9 @@ export function RunDialog({
                       ? t("New cardiac analysis")
                       : module === "vehicle_use"
                         ? t("New vehicle use analysis")
-                        : t("New device performance analysis")}
+                        : module === "habitat_selection"
+                          ? t("New habitat selection analysis")
+                          : t("New device performance analysis")}
           </DialogTitle>
           <DialogDescription>
             {editing
@@ -124,5 +128,6 @@ function RunDialogBody({
   if (module === "contact_tracing") return <ContactTracingForm {...props} />;
   if (module === "cardiac") return <CardiacForm {...props} />;
   if (module === "vehicle_use") return <VehicleForm {...props} />;
+  if (module === "habitat_selection") return <HabitatForm {...props} />;
   return <DevicePerformanceForm {...props} />;
 }

@@ -145,6 +145,7 @@ async def test_catalogue_estimate_and_the_life_of_a_run(client, db, stub):
         "contact_tracing",
         "cardiac",
         "vehicle_use",
+        "habitat_selection",
     ]
     assert catalogue[0]["limits"]["subjects"] == 25 and catalogue[0]["limits"]["days"] == 366
 
