@@ -10,6 +10,7 @@ import type {
   AnalysisEstimate,
   AnalysisRun,
   Entity,
+  EntityType,
   LayerChoiceRead,
   Page as PageType,
 } from "@/api/types";
@@ -28,6 +29,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useGroups } from "@/hooks/useGroups";
+
+/** The tracked types whose entities, with their sub-types, are not animals. */
+const NOT_ANIMAL_TYPE_KEYS = new Set(["vehicle", "person"]);
 import { useMutationToast } from "@/hooks/useMutationToast";
 import { usePermissions } from "@/hooks/useProjects";
 import {
@@ -86,6 +90,13 @@ export function HabitatForm({
       }),
   });
   const groups = useGroups(projectId);
+  const types = useQuery({
+    queryKey: queryKeys.entityTypes,
+    queryFn: () =>
+      api.get<PageType<EntityType>>("/api/v1/entity-types", {
+        query: { limit: 500 },
+      }),
+  });
   const layers = useQuery({
     queryKey: queryKeys.analysisLayers(projectId),
     queryFn: () =>
@@ -93,7 +104,25 @@ export function HabitatForm({
         `/api/v1/projects/${projectId}/analysis-layers`,
       ),
   });
-  const items = entities.data?.items ?? [];
+  // the animals: every tracked type but people and vehicles and their sub-types, the only
+  // entities the module admits
+  const allTypes = types.data?.items ?? [];
+  const notAnimalIds = new Set(
+    allTypes.filter((x) => NOT_ANIMAL_TYPE_KEYS.has(x.key)).map((x) => x.id),
+  );
+  const animalTypeIds = new Set(
+    allTypes
+      .filter(
+        (x) =>
+          x.group_key === "tracked" &&
+          !notAnimalIds.has(x.id) &&
+          (x.parent_id == null || !notAnimalIds.has(x.parent_id)),
+      )
+      .map((x) => x.id),
+  );
+  const items = (entities.data?.items ?? []).filter((e) =>
+    animalTypeIds.has(e.entity_type_id),
+  );
   useResolveSubjects(state, items, MAX_SUBJECTS, onChange);
   const subjects = withGroupMembers(
     state.entities,

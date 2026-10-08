@@ -19,6 +19,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from shared.analysis.base import (
     Chart,
@@ -53,7 +54,7 @@ from shared.analysis.rasters import (
     project_layer_bytes,
     project_layers,
 )
-from shared.enums import LayerKind
+from shared.enums import EntityGroup, LayerKind
 from shared.logger import get_logger
 from shared.models import Entity, EntityType, Feature, Project, ProjectLayer
 
@@ -74,6 +75,11 @@ BOYCE_WEAK = 0.5
 SPARSE_COVERAGE = 0.9
 #: The runner's timeout for a habitat run, in seconds (see `HabitatModule.timeout_seconds`).
 HABITAT_TIMEOUT_SECONDS = 3600
+#: The catalogue keys of the tracked types whose entities, with their sub-types, are not
+#: animals: a habitat is selected by an animal, and the example run of 2026-10-08 on Okonjima
+#: had picked three 4x4s by their fix counts. Every other tracked type is admitted, a
+#: project's own type without a parent among them.
+NOT_ANIMAL_TYPE_KEYS = frozenset({"vehicle", "person"})
 #: The finest grid a distance layer or an upload asks for, in metres.
 DISTANCE_RESOLUTION_M = 30.0
 
@@ -86,6 +92,28 @@ FLEET_METRICS: list[str] = [
     "layers",
     "grid_m",
 ]
+
+
+async def non_animals(session: AsyncSession, entity_ids: list[uuid.UUID]) -> list[str]:
+    """The names of the subjects that are not animals: not of a tracked type, or of the
+    People or Vehicles type or one of their sub-types."""
+    parent = aliased(EntityType)
+    rows = (
+        await session.execute(
+            select(Entity.name, EntityType.key, EntityType.group_key, parent.key)
+            .join(EntityType, EntityType.id == Entity.entity_type_id)
+            .outerjoin(parent, parent.id == EntityType.parent_id)
+            .where(Entity.id.in_(entity_ids))
+            .order_by(Entity.name)
+        )
+    ).all()
+    return [
+        name
+        for name, key, group_key, parent_key in rows
+        if group_key != EntityGroup.TRACKED
+        or key in NOT_ANIMAL_TYPE_KEYS
+        or parent_key in NOT_ANIMAL_TYPE_KEYS
+    ]
 
 
 class HabitatParameters(CommonParameters):
@@ -130,6 +158,15 @@ class HabitatModule:
         is one of the chosen, and no comparison period (not offered yet)."""
         assert isinstance(params, HabitatParameters)
         reasons: list[str] = []
+        if params.entity_ids:
+            others = await non_animals(session, params.entity_ids)
+            if others and len(others) == len(params.entity_ids):
+                reasons.append(
+                    "No animal among the subjects: the module reads tracked entities other "
+                    "than people and vehicles."
+                )
+            elif others:
+                reasons.append(f"{others[0]} is not an animal; choose animals only.")
         choices = {c.name: c for c in await project_layers(session, project_id)}
         unknown = [name for name in params.layers if name not in choices]
         if unknown:
@@ -292,13 +329,12 @@ class HabitatModule:
             )
         for fold in fit.folds:
             figures.setdefault(fold.subject_id, {})["boyce"] = fold.boyce
-            name = names.get(fold.subject_id, str(fold.subject_id))
             if fold.error:
                 warnings.append(
                     Warning(
                         code="fold_failed",
                         subject_id=fold.subject_id,
-                        text=f"{name}: the validation fold failed ({fold.error}).",
+                        text=f"The validation fold failed ({fold.error}).",
                     )
                 )
             elif fold.boyce is not None and fold.boyce < BOYCE_WEAK:
@@ -307,8 +343,8 @@ class HabitatModule:
                         code="boyce_weak",
                         subject_id=fold.subject_id,
                         text=(
-                            f"{name}: a Boyce index of {fold.boyce:.2f}: the model fitted on the "
-                            "other animals ranks this one's fixes little better than chance."
+                            f"A Boyce index of {fold.boyce:.2f}: the model fitted on the other "
+                            "animals ranks this one's fixes little better than chance."
                         ),
                     )
                 )

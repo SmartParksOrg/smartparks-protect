@@ -141,7 +141,7 @@ async def test_the_check_refuses_what_the_project_lacks(client, db):
     )
     assert refused.status_code == 200, refused.text
     assert not refused.json()["ok"]
-    assert "No layer named ndvi" in refused.json()["reasons"][0]
+    assert any("No layer named ndvi" in r for r in refused.json()["reasons"])
     # a period in which the animal has fewer fixes than the fit needs is refused up front
     empty = {
         "entity_ids": [rhino["id"]],
@@ -156,6 +156,24 @@ async def test_the_check_refuses_what_the_project_lacks(client, db):
     )
     assert refused.status_code == 200, refused.text
     assert any("needs 20 per animal" in r for r in refused.json()["reasons"])
+    # a vehicle is not an animal
+    types = (
+        await client.get("/api/v1/entity-types", params={"limit": 500}, headers=admin.headers)
+    ).json()
+    car_kind = next(t for t in types["items"] if t["key"] == "vehicle")
+    car = await client.post(
+        f"/api/v1/projects/{project.id}/entities",
+        json={"entity_type_id": car_kind["id"], "name": unique_name("Car")},
+        headers=admin.headers,
+    )
+    assert car.status_code == 201, car.text
+    mixed = {**parameters, "entity_ids": [rhino["id"], car.json()["id"]]}
+    refused = await client.get(
+        f"{base}/estimate",
+        params={"module": "habitat_selection", "parameters": json.dumps(mixed)},
+        headers=admin.headers,
+    )
+    assert any("is not an animal" in r for r in refused.json()["reasons"])
     modules = (await client.get("/api/v1/analysis-modules", headers=admin.headers)).json()
     habitat = next(m for m in modules if m["key"] == "habitat_selection")
     assert habitat["limits"]["subjects"] == 40

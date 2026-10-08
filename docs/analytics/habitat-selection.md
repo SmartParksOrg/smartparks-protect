@@ -8,7 +8,7 @@ Every fix is a place the animal used. hrHSA draws, inside each animal's own avai
 
 ## The subjects
 
-Any entity of the project; in practice the animals. An animal with fewer than twenty fixes in the period is left out with a warning, and when the chosen animals together have fewer than twenty the form says so before the run starts. The run needs at least one animal; the validation needs three.
+The project's animals: every tracked entity but the people and the vehicles (the People and Vehicles types and their sub-types), which is what the form offers and what the run admits; a vehicle has no habitat to select. An animal with fewer than twenty fixes in the period is left out with a warning, and when the chosen animals together have fewer than twenty the form says so before the run starts. The run needs at least one animal; the validation needs three.
 
 ## The layers
 

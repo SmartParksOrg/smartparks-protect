@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
@@ -31,6 +31,8 @@ COLLECTION = "SENTINEL2_L2A"
 #: How long a job may take before the provider gives up, and how often it looks.
 JOB_TIMEOUT_S = 20 * 60
 POLL_S = 15
+#: The first wait after a 429 from openEO, doubled each time.
+RETRY_S = 5
 #: Areas and the cells of the vegetation mosaic go up in one job (Tim, 2026-09-18), so the cap
 #: sits above `grazing.MAX_VEGETATION_CELLS` plus the areas. The pixels processed decide the
 #: cost, not the number of polygons the result is aggregated onto.
@@ -319,6 +321,27 @@ class CopernicusProvider:
                 )
         return f"Connected; {COLLECTION} is available"
 
+    async def _until_accepted(
+        self,
+        client: httpx.AsyncClient,
+        request: Callable[[], Awaitable[httpx.Response]],
+        deadline: float,
+    ) -> httpx.Response:
+        """The request's answer, retried while openEO answers 429: two jobs of a run started
+        in the same second had the second refused (2026-10-08). `Retry-After` when they say,
+        else a wait that doubles from `RETRY_S`, up to the job deadline."""
+        wait = float(RETRY_S)
+        while True:
+            answer = await request()
+            if answer.status_code != 429 or asyncio.get_running_loop().time() + wait > deadline:
+                return answer
+            after = answer.headers.get("Retry-After")
+            if after and after.isdigit():
+                wait = max(wait, float(after))
+            log.info("openEO asks to wait", seconds=wait)
+            await asyncio.sleep(wait)
+            wait = min(wait * 2, 120.0)
+
     async def _run_job(
         self, process: dict[str, Any], title: str, media_type: str
     ) -> tuple[httpx.Response, str]:
@@ -326,8 +349,13 @@ class CopernicusProvider:
         media type (else any asset) downloaded. Answers the download and the job id."""
         async with self._client() as client:
             headers = await self._token(client)
-            created = await client.post(
-                f"{API}/jobs", json={"process": process, "title": title}, headers=headers
+            deadline = asyncio.get_running_loop().time() + JOB_TIMEOUT_S
+            created = await self._until_accepted(
+                client,
+                lambda: client.post(
+                    f"{API}/jobs", json={"process": process, "title": title}, headers=headers
+                ),
+                deadline,
             )
             if created.status_code not in (201, 202):
                 raise ProviderError(
@@ -336,10 +364,15 @@ class CopernicusProvider:
             job_id = created.headers.get("OpenEO-Identifier") or (created.json() or {}).get("id")
             if not job_id:
                 raise ProviderError("openEO gave the job no id")
-            started = await client.post(f"{API}/jobs/{job_id}/results", headers=headers)
+            started = await self._until_accepted(
+                client,
+                lambda: client.post(f"{API}/jobs/{job_id}/results", headers=headers),
+                deadline,
+            )
             if started.status_code not in (200, 202):
+                # the job stays "created" on their side otherwise, forever
+                await client.delete(f"{API}/jobs/{job_id}", headers=headers)
                 raise ProviderError(f"openEO did not start the job ({started.status_code})")
-            deadline = asyncio.get_running_loop().time() + JOB_TIMEOUT_S
             status = "queued"
             while asyncio.get_running_loop().time() < deadline:
                 await asyncio.sleep(POLL_S)

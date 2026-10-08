@@ -298,3 +298,26 @@ def test_each_raster_layer_names_its_own_source():
     assert CopernicusProvider.raster_sources["ndvi"].startswith("Sentinel-2")
     assert "COPERNICUS_30" in CopernicusProvider.raster_sources["elevation"]
     assert set(CopernicusProvider.raster_sources) == set(CopernicusProvider.raster_layers)
+
+
+@pytest.mark.asyncio
+async def test_a_job_start_refused_with_429_is_tried_again(monkeypatch):
+    from shared.analysis.providers import copernicus
+
+    monkeypatch.setattr(copernicus, "POLL_S", 0)
+    monkeypatch.setattr(copernicus, "RETRY_S", 0)
+    inner = _raster_transport()
+    starts = {"count": 0}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith("/jobs/j-2/results") and request.method == "POST":
+            starts["count"] += 1
+            if starts["count"] == 1:
+                return httpx.Response(429, headers={"Retry-After": "0"})
+        return inner.handler(request)  # type: ignore[attr-defined]
+
+    provider = CopernicusProvider("id", "secret", transport=httpx.MockTransport(handle))
+    data = await provider.fetch_raster(
+        "elevation", (16.7, -20.86, 16.76, -20.83), 32733, 30.0, None, None, uuid.uuid4()
+    )
+    assert data.startswith(b"II*\x00") and starts["count"] == 2
