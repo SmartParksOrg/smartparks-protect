@@ -74,7 +74,7 @@ Bounds: 40 animals, 366 days, 200,000 fixes per animal before thinning, 4 millio
 - [x] H5 the frontend: the page, the form, the presentation, the map kinds and legend, the entity page's button, the navigation, Dutch.
 - [x] H6 the report.
 - [x] H7 docs: the guide, the pages guide, `DEVELOPERS.md`, ADR 0039, the changelog, this document.
-- [ ] H8 the dev server: the image built and deployed, a run over a real project of Tim's choice with NDVI, slope and a distance layer, read by Tim; the by-hand check of section 6 against hrHSA outside Protect; the run time and memory in `docs/operations/benchmarks.md`.
+- [ ] H8 the dev server: the image built and deployed, a run over a real project of Tim's choice with NDVI, slope and a distance layer, read by Tim; the by-hand check of section 6 against hrHSA outside Protect; the run time and memory in `docs/operations/benchmarks.md` (the first run is there and in section 11; the six-animal run follows).
 
 Order: H1 first, since nothing runs without `hsa` in the worker; H2 and H3 together, since the module has nothing to fit without layers; then H4 to H7; H8 last. Each task lands with its tests and docs, committed on Tim's word.
 

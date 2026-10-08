@@ -41,6 +41,14 @@ Last run: 2026-09-05 09:26 UTC.
 
 - Live map returned 125 features (mode geojson).
 
+## Analysis runs on the dev server
+
+Measured on runs people started on dev-protect (4 vCPU, 8 GB), not on the benchmark dataset.
+
+| Run | Wall time | Of which | Worker memory | Notes |
+| --- | --- | --- | --- | --- |
+| habitat selection, 1 animal, 7 days, NDVI and elevation (BPC, 2026-10-08) | 6 min 52 s | openEO NDVI job 4 min 38 s, DEM job 1 min 50 s, fit, surface and document 14 s | under 300 MiB | 41 fixes, 6 used after thinning; 559,328 grid cells at 10 m; both rasters cached afterwards, so a rerun over the area and period skips the jobs |
+
 ## Reading the run
 
 Measured on a 4 vCPU, 8 GB DigitalOcean droplet against a dataset at 0.2 of the reference
