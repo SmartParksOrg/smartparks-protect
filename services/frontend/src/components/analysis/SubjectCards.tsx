@@ -26,6 +26,8 @@ export function SubjectCards({
     // a class rather than a figure (the movement strategy) reads by its label
     if (typeof v === "string") return labels[`strategy_${v}`] ?? v;
     if (unit === "%") return `${Math.round(v * 100)}%`;
+    // a count (fixes, excluded fixes) is a whole number and reads as one
+    if (!unit && Number.isInteger(v)) return v.toFixed(0);
     const text =
       Math.abs(v) >= 100
         ? v.toFixed(0)

@@ -14,7 +14,7 @@ import asyncio
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx
 
@@ -270,6 +270,11 @@ class CopernicusProvider:
     layers: tuple[str, ...] = ("ndvi",)
     raster_layers: tuple[str, ...] = RASTER_LAYERS
     source = "Sentinel-2 L2A via Copernicus Data Space openEO"
+    #: Where each raster layer comes from, for a run's layers table and provenance.
+    raster_sources: ClassVar[dict[str, str]] = {
+        "ndvi": "Sentinel-2 L2A via Copernicus Data Space openEO",
+        "elevation": f"Copernicus DEM ({DEM_COLLECTION}) via Copernicus Data Space openEO",
+    }
     resolution = "10 m, weekly mean"
 
     def __init__(

@@ -252,6 +252,21 @@ class HabitatModule:
             loio=loio,
         )
         await ctx.progress(90, "the surface")
+        if fit.used < FEW_FIXES:
+            thinned = (
+                f"after thinning to one fix per {params.thin_hours:g} h, "
+                if params.thin_hours
+                else ""
+            )
+            warnings.append(
+                Warning(
+                    code="few_used",
+                    text=(
+                        f"Only {fit.used} fixes carry the fit {thinned}so the coefficients "
+                        "rest on few points; a longer period or less thinning gives more."
+                    ),
+                )
+            )
         if not fit.converged:
             warnings.append(
                 Warning(
@@ -352,7 +367,11 @@ class HabitatModule:
                         layer = elevation
                     else:
                         layer = hab.layer_from_geotiff(data, grid)
-                    source_text = str(getattr(provider, "source", provider.key))
+                    source_text = str(
+                        getattr(provider, "raster_sources", {}).get(base)
+                        or getattr(provider, "source", provider.key)
+                    )
+                    resolution = float(FETCHED_LAYERS[base]["resolution_m"])
                 elif source == "distance":
                     feature_type = choice.feature_type or choice.name.removeprefix(DISTANCE_PREFIX)
                     shapes = (

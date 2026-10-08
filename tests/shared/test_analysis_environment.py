@@ -291,3 +291,10 @@ async def test_a_raster_job_answers_the_tiff_asset_and_refuses_what_is_not_one(m
         await html.fetch_raster(
             "elevation", (16.7, -20.86, 16.76, -20.83), 32733, 30.0, None, None, uuid.uuid4()
         )
+
+
+def test_each_raster_layer_names_its_own_source():
+    """The DEM is not Sentinel-2: the layers table and the provenance say where each came from."""
+    assert CopernicusProvider.raster_sources["ndvi"].startswith("Sentinel-2")
+    assert "COPERNICUS_30" in CopernicusProvider.raster_sources["elevation"]
+    assert set(CopernicusProvider.raster_sources) == set(CopernicusProvider.raster_layers)
