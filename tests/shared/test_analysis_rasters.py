@@ -53,7 +53,9 @@ async def _empty(*_args, **_kwargs):
 def test_the_keys_name_the_grid_and_the_period():
     bbox = (16.70, -20.86, 16.76, -20.83)
     near = (16.7000004, -20.86, 16.76, -20.83)
+    far = (16.70, -20.86, 16.80, -20.83)  # the same degree cell, another extent
     assert area_hash(bbox, 32733, 30.0) == area_hash(near, 32733, 30.0)
+    assert area_hash(bbox, 32733, 30.0) != area_hash(far, 32733, 30.0)
     assert area_hash(bbox, 32733, 30.0) != area_hash(bbox, 32733, 60.0)
     assert area_hash(bbox, 32733, 30.0) != area_hash(bbox, 32734, 30.0)
     assert period_key(None, None) == "static"
@@ -104,11 +106,11 @@ async def test_the_catalogue_follows_the_provider_the_features_and_the_uploads(
     assert set(choices) == {"distance_to_route", "soil"}
     assert choices["soil"].kind == "categorical" and choices["soil"].source == "project"
     assert choices["distance_to_route"].feature_type == "route"
-    # with a provider that answers rasters: NDVI and elevation join, first
+    # with a provider that answers rasters: NDVI, elevation and the slope from it join, first
     provider = FakeRasterProvider()
     monkeypatch.setattr(environment, "provider_for", lambda *_a, **_k: provider)
     names = [c.name for c in await project_layers(session, project.id)]
-    assert names == ["ndvi", "elevation", "distance_to_route", "soil"]
+    assert names == ["ndvi", "elevation", "slope", "distance_to_route", "soil"]
 
 
 async def test_the_cache_asks_once_per_area_and_period(session):

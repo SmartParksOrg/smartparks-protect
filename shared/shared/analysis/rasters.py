@@ -111,6 +111,10 @@ async def project_layers(session: AsyncSession, project_id: uuid.UUID) -> list[L
     choices: list[LayerChoice] = []
     provider = await configured_provider(session, "ndvi")
     names: tuple[str, ...] = getattr(provider, "raster_layers", ()) if provider else ()
+    # the slope is derived from the elevation here, so a provider that answers the elevation
+    # offers the slope too (the first catalogue on dev, 2026-10-08, left it out)
+    if "elevation" in names and "slope" not in names:
+        names = (*names, "slope")
     for name in names:
         meta = FETCHED_LAYERS.get(name)
         if meta is not None:
@@ -166,8 +170,11 @@ async def project_layers(session: AsyncSession, project_id: uuid.UUID) -> list[L
 
 
 def area_hash(bbox: Sequence[float], epsg: int, resolution_m: float) -> str:
-    """The key of a raster's grid: the extent to the metre, the CRS and the resolution."""
-    rounded = [round(float(v)) for v in bbox]
+    """The key of a raster's grid: the extent in degrees to a hundred-thousandth (about a
+    metre), the CRS and the resolution. Rounding to the degree, as the first version did,
+    served one run's raster to another run in the same degree cell (Okonjima, 2026-10-08),
+    whose grid it did not cover."""
+    rounded = [round(float(v), 5) for v in bbox]
     payload = json.dumps([rounded, int(epsg), round(float(resolution_m), 3)])
     return hashlib.sha256(payload.encode()).hexdigest()[:32]
 

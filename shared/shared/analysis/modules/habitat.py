@@ -68,6 +68,8 @@ MAX_LAYERS = 8
 #: A Boyce index under this says the model ranks the held-out animal's fixes little better
 #: than chance (the index runs from -1 to 1).
 BOYCE_WEAK = 0.5
+#: A layer with a value in fewer cells than this share of the grid is warned about.
+SPARSE_COVERAGE = 0.9
 #: The finest grid a distance layer or an upload asks for, in metres.
 DISTANCE_RESOLUTION_M = 30.0
 
@@ -417,6 +419,18 @@ class HabitatModule:
                 continue
             values = np.asarray(layer.values, dtype=np.float64)
             valid = np.isfinite(values)
+            coverage = float(valid.mean()) if valid.size else 0.0
+            if valid.any() and coverage < SPARSE_COVERAGE:
+                warnings.append(
+                    Warning(
+                        code="layer_sparse",
+                        text=(
+                            f"The layer {choice.label} has a value in {coverage:.0%} of the "
+                            "grid's cells; a fix or an available point without one is left "
+                            "out of the fit."
+                        ),
+                    )
+                )
             if not valid.any() or float(np.nanstd(values)) == 0.0:
                 warnings.append(
                     Warning(
