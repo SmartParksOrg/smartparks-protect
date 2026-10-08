@@ -108,6 +108,11 @@ class HabitatModule:
     version = METHOD_VERSION
     parameters: type[BaseModel] = HabitatParameters
 
+    #: The API's estimate refuses a run whose subjects together have fewer fixes than one
+    #: animal needs, so the form says so before the run is queued (the first run on Okonjima,
+    #: 2026-10-08, failed in the worker on an animal with 18 fixes in the week).
+    min_fixes: int = FEW_FIXES
+
     async def check(
         self, session: AsyncSession, project_id: uuid.UUID, params: BaseModel
     ) -> list[str]:

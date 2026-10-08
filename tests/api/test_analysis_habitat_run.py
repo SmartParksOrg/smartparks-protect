@@ -142,6 +142,20 @@ async def test_the_check_refuses_what_the_project_lacks(client, db):
     assert refused.status_code == 200, refused.text
     assert not refused.json()["ok"]
     assert "No layer named ndvi" in refused.json()["reasons"][0]
+    # a period in which the animal has fewer fixes than the fit needs is refused up front
+    empty = {
+        "entity_ids": [rhino["id"]],
+        "layers": ["ndvi"],
+        "time_from": (T0 - timedelta(days=30)).isoformat(),
+        "time_to": (T0 - timedelta(days=20)).isoformat(),
+    }
+    refused = await client.get(
+        f"{base}/estimate",
+        params={"module": "habitat_selection", "parameters": json.dumps(empty)},
+        headers=admin.headers,
+    )
+    assert refused.status_code == 200, refused.text
+    assert any("needs 20 per animal" in r for r in refused.json()["reasons"])
     modules = (await client.get("/api/v1/analysis-modules", headers=admin.headers)).json()
     habitat = next(m for m in modules if m["key"] == "habitat_selection")
     assert habitat["limits"]["subjects"] == 40

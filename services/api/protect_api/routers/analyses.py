@@ -301,6 +301,14 @@ async def _estimate(
             f"{fixes} fixes; at most {limits['fixes']} in one run. Choose fewer subjects or a "
             "shorter period."
         )
+    # a module that needs a number of fixes per subject refuses before the run is queued when
+    # the subjects together have fewer (the habitat fit: 20 per animal)
+    min_fixes = int(getattr(module, "min_fixes", 0))
+    if subjects and fixes < min_fixes:
+        reasons.append(
+            f"{fixes} fixes in the period; this analysis needs {min_fixes} per animal. "
+            "Choose a longer period or another animal."
+        )
     estimate = AnalysisEstimate(
         module=key,
         subjects=len(subjects),
