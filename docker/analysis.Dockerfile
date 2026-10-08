@@ -27,6 +27,8 @@ RUN apt-get update \
 COPY shared shared
 COPY services/analysis services/analysis
 COPY services/api services/api
+# The decoder is in the test group alone (the API test helpers import it); the lock names it.
+COPY services/decoder services/decoder
 COPY VERSIO[N] ./
 # INSTALL_DEV=1 adds pytest and the API package, for the CI job that runs the tests inside
 # this image; a server builds without it.

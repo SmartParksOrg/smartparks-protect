@@ -193,9 +193,15 @@ jobs:
           uvx pip-audit -r requirements-audit.txt --strict
       - name: The analysis image's dependencies (decision D314)
         run: |
+          # The workspace packages are path dependencies here and pin numpy 2.5, which the image
+          # overrides to 2.4 for hrHSA; pip cannot resolve that, so the audit reads the pins as
+          # they are (--no-deps) without the path packages, whose own dependencies are audited above.
           cd services/analysis/image
-          uv export --frozen --no-hashes --no-emit-workspace --no-emit-package hrhsa --format requirements-txt -o requirements-audit.txt
-          uvx pip-audit -r requirements-audit.txt --strict
+          uv export --frozen --no-hashes --no-emit-workspace --no-editable --format requirements-txt \
+            --no-emit-package hrhsa --no-emit-package smartparks-protect-shared \
+            --no-emit-package smartparks-protect-analysis --no-emit-package smartparks-protect-api \
+            --no-emit-package smartparks-protect-decoder -o requirements-audit.txt
+          uvx pip-audit -r requirements-audit.txt --strict --no-deps
       - name: Frontend dependencies (npm audit, high and critical fail)
         run: cd services/frontend && npm ci --ignore-scripts && npm audit --audit-level=high
 
