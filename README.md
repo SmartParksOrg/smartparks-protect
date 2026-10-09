@@ -2,9 +2,26 @@
   <img src="docs/assets/logo-landscape.webp" alt="Smart Parks" width="220">
 </p>
 
+<div align="center">
+
+[![Project status: active. The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+![Licence](https://img.shields.io/github/license/SmartParksOrg/smartparks-protect)
+![Last commit](https://img.shields.io/github/last-commit/SmartParksOrg/smartparks-protect)
+![Latest release](https://img.shields.io/github/v/tag/SmartParksOrg/smartparks-protect?label=release)
+[![CI and docs](https://github.com/SmartParksOrg/smartparks-protect/actions/workflows/ci.yml/badge.svg)](https://smartparksorg.github.io/smartparks-protect/)
+
+Documentation: https://smartparksorg.github.io/smartparks-protect/
+
+</div>
+
 # Smart Parks Protect
 
 Self-hosted operational data platform for [Smart Parks](https://www.smartparks.org) deployments. It connects field devices and IoT platforms to one Smart Parks domain and makes that data useful: a live map, analysis and export, a rules engine that turns observations into events and alerts, device control, and durable integrations with systems such as EarthRanger.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/hero-dark.webp">
+  <img alt="Smart Parks Protect on a desktop, a tablet and a phone: the live map with an animal's track of the last seven days and its panel" src="docs/assets/screenshots/hero-light.webp">
+</picture>
 
 **Status: v2.9.0 released on 2026-09-19**, closing phase 29 with the movement methods: a home range corrected for the autocorrelation of the fixes (our own approximation, named as such) and the movement strategy read off the net squared displacement, on the movement analysis page and in its report. v2.8.0, the same day, brought contact tracing end to end: Bluetooth sightings as a canonical record type of their own, a device's place set by hand, and the analysis module that reads sightings beside position proximity with the warnings that keep the figures honest; with it the Sentinel-2 vegetation of each management area in the grazing analysis, a Dutch interface, the AWT tracker driver, a battery type per device and a gateway named by hand; see `CHANGELOG.md`. `v2.7.0` was skipped. Since then `main` carries fence lines and traps read from the FenceEdge and TrapEdge modes, areas imported from the files people already have or proposed from OpenStreetMap, cardiac monitoring from a LINQII tag with an analysis module that reads the whole record (heart rate, variability, activity and temperature by day, night and resting, before and after an event), the Entities page saying what the devices report, a project that can be archived and then deleted, the live map opening where you left it, a device or an entity moved to another project with its history, with bulk actions for a selection of devices or entities, the speed and course a device reports on the map, the pages and the metrics with a speeding rule, a vehicle use analysis with trips, a stop rule for GPS drift, a path coloured by speed and charts with the known speed limits, roads from an organisation's own files with an off-road rule, a data explorer that asks for its metrics first, and dashboards that take any metric as a graph, a table or a number; none of that is tagged yet. The documentation site is at https://smartparksorg.github.io/smartparks-protect/.
 
