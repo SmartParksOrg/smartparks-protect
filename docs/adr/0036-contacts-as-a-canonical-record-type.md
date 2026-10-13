@@ -24,7 +24,7 @@ was there. What the platform can honestly say about a sighting differs in each: 
 name a device, the third never can, because a phone changes its advertised address every few
 minutes by design.
 
-The readers also showed what the real data does to a design. They report no positions at all —
+The readers also showed what the real data does to a design. They report no positions at all:
 turned off on purpose, because they do not move and reporting would spend power and airtime on a
 fact already known. One of them has a clock 45 hours behind. The tags are heard weakly, between
 -86 and -95 dBm.
@@ -59,7 +59,7 @@ Any device may be given a place by hand (D261). Setting one states that the devi
 `location_source` becomes `static`, the place goes on the current state at once, and nothing the
 device sends moves it afterwards. A sighting by a placed device then writes a `proximity`
 position for the device it heard, at the reader, with `CONTACT_POSITION_ACCURACY_M` as its radius
-(D258) — a stated assumption, not a measurement. An estimate never displaces a newer device fix,
+(D258), a stated assumption, not a measurement. An estimate never displaces a newer device fix,
 but a device that has never fixed at all takes the estimate whatever its location setting says:
 that setting chooses between a fix and an estimate, and for a tag there is no fix to choose.
 
@@ -75,7 +75,7 @@ A sighting under the phone filter counts as human presence and never as identity
 - A measurement with the counterpart in attributes: no index on the counterpart, no resolution
   state, and every query over pairs would be a JSON scan of a hypertable.
 - An event per sighting: events are read by people and by the rules engine, and a scanning collar
-  would drown both — one aggregated window is hundreds of rows.
+  would drown both: one aggregated window is hundreds of rows.
 - A table in the analysis subsystem: the analysis subsystem is optional and its tables are
   derived (ADR 0031). Contacts are what the device said; deleting an analysis must not delete
   them.
@@ -88,9 +88,9 @@ A sighting under the phone filter counts as human presence and never as identity
 
 ## Consequences
 
-The canonical set is five types, not four. Everything that enumerates them — the export
+The canonical set is five types, not four. Everything that enumerates them, the export
 machinery, the data explorer, the retention policy, the MCP surface, the device Data tab, the
-attribution repair — gains a case, and the ones that have not yet gained it are the work that
+attribution repair, gains a case, and the ones that have not yet gained it are the work that
 remains.
 
 Three octets stay ambiguous forever in a large fleet: the ambiguous count is a number every

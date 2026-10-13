@@ -18,7 +18,7 @@ The analysis built on these sightings is [Contact tracing](../analytics/contact-
 ## What a device actually reports
 
 A scan reports how many devices it **detected**, then the **last three octets** of each address
-it heard — not the whole address — and a signal strength in dBm.
+it heard, not the whole address, and a signal strength in dBm.
 
 Those are two different numbers and the difference matters. Only as many sightings as fit in one
 message go over the air; the rest stay in the device's flash until a log is uploaded. So a collar
@@ -30,12 +30,12 @@ differ, and the `ble_contacts` metric behind the chart is the device's own count
 Three octets are not an identity: several devices can end with the same three. Protect resolves each sighting once, on the way in, and says which of three things it
 found:
 
-- **Resolved** — exactly one device in the project has an address ending in those octets. The
+- **Resolved**: exactly one device in the project has an address ending in those octets. The
   contact names that device and the entity it was on.
-- **Unknown** — no device in the project matches. The sighting is kept anyway, named by its
+- **Unknown**: no device in the project matches. The sighting is kept anyway, named by its
   octets (decision D253): a collar that meets the same unknown address every night is a finding,
   and it becomes a name the moment somebody records whose address it was.
-- **Ambiguous** — more than one device matches. The sighting keeps the list of candidates and is
+- **Ambiguous**: more than one device matches. The sighting keeps the list of candidates and is
   counted in no pair figure (decision D254). A wrong contact between two named animals is worse
   than a missing one.
 
@@ -76,8 +76,8 @@ The filters come from the firmware: every device, Smart Parks devices, one manuf
 On the live map, a device's panel and the panel of the entity it is on show **Bluetooth
 sightings** of the last 24 hours when the device reports scans at all. The figure unfolds a chart
 of how much the device hears, over a day, a week or a month, the way the battery does, with a
-link to the list underneath. Every scan window leaves one `ble_contacts` measurement — the
-devices it saw — so the same figure is available in the data explorer, on a dashboard and to a
+link to the list underneath. Every scan window leaves one `ble_contacts` measurement, the
+devices it saw, so the same figure is available in the data explorer, on a dashboard and to a
 rule. A scan that saw nothing is a **zero**; a gap in the line means the device was not looking
 at all, which is a different thing.
 
@@ -142,8 +142,8 @@ list whenever the filter is the phone one.
 Some OpenCollar firmware sets the device clock wrongly; one PWN reader is 45 hours behind. On a
 path that delivers as it happens, a contact whose device time is further behind its delivery than
 `CLOCK_BEHIND_TOLERANCE_SECONDS` (a day) is recorded at the delivery time instead, with the
-device's own claim and the offset kept on the row (decision D259). The whole scan moves together
-— its sightings, the record of the scan and the count it reported — because they are one reading
+device's own claim and the offset kept on the row (decision D259). The whole scan moves together,
+its sightings, the record of the scan and the count it reported, because they are one reading
 of one clock and filing them apart would put the same scan in two places. A log file carries the past on
 purpose and is never moved this way, and a device out of coverage for a few hours delivers late
 for good reasons, which is why the tolerance is generous.

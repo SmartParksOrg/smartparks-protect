@@ -19,7 +19,7 @@ Colours are CSS variables in `src/index.css`, exposed to Tailwind through `@them
 | `--brand-coral` | `#EDA08F` | Logo variant, attention tint (not for errors) |
 | `--destructive` | `#A13D2D` | Errors and destructive actions |
 
-State colours on the map communicate status, not object type; the icon communicates type. Dark mode is not implemented. Do not add `dark:` classes until a dark palette exists.
+State colours on the map communicate status, not object type; the icon communicates type. Night mode exists since phase 26 (decision D183): the tokens are defined twice, see Themes below, so a component never needs a `dark:` class for a colour.
 
 ## Logo
 

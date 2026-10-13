@@ -15,7 +15,7 @@ A contact is **evidence that two subjects were near each other**. That is all.
 
 It is not evidence that anything passed between them. This module infers no transmission and says so in its own limitations block, in the result, where a reader will see it. What to make of a contact is a question for somebody who knows the disease, the species and the season.
 
-A signal strength is **never converted to metres**. Doing that needs a calibration per device, per antenna and per whatever stands between them, and nobody has one. A sighting's signal is banded — near, middling, far — and the dBm is carried through so a reader can judge for themselves.
+A signal strength is **never converted to metres**. Doing that needs a calibration per device, per antenna and per whatever stands between them, and nobody has one. A sighting's signal is banded, near, middling, far, and the dBm is carried through so a reader can judge for themselves.
 
 ## The form
 
@@ -41,7 +41,7 @@ The sampling warning measures **what a subject actually did**, not what its sett
 
 ## What comes out
 
-**The network** is the picture: subjects as nodes sized by how many contacts they had, pairs as edges thickened by how often they met and dashed when only one kind of evidence saw them. A subject that met nobody stays on the picture as a small unattached dot — leaving it out would answer "who met" instead of "who met whom", and the animals that met nothing are often the finding. On screen the layout can be dragged and roamed; in the PDF it is a circle in the subjects' own order, so a report filed this month can be held against last month's and the same animal is in the same place.
+**The network** is the picture: subjects as nodes sized by how many contacts they had, pairs as edges thickened by how often they met and dashed when only one kind of evidence saw them. A subject that met nobody stays on the picture as a small unattached dot, leaving it out would answer "who met" instead of "who met whom", and the animals that met nothing are often the finding. On screen the layout can be dragged and roamed; in the PDF it is a circle in the subjects' own order, so a report filed this month can be held against last month's and the same animal is in the same place.
 
 **The pair table**, the pairs that spent longest together first: the two names, the period, how many contacts, how many hours, which evidence saw them, the sightings behind it, the signal band, the closest the fixes came, and when it started and ended.
 
@@ -49,7 +49,7 @@ The sampling warning measures **what a subject actually did**, not what its sett
 
 **The charts**: contacts per day, and a rose of the hour of day, since when animals meet is half the question. Both count on the project's own clock, as the movement and grazing modules do.
 
-**The map**: a point where each pair met, sized by how often. For a pair the fixes found it is the midpoint of the two, because neither of them is the place and the meeting is — usually a water hole, which is the answer a map gives that a table cannot. For a pair only a sighting found it is the place of the device that did the hearing: exactly, when that device stands on a post with a place set by hand, and its nearest fix when it was walking about (decision D261). The device that was heard has no say, since its position is what the sighting was meant to establish. Clicking a point gives the contacts, the hours, the first and last time and which evidence saw them. The "Where pairs met" chip switches the layer.
+**The map**: a point where each pair met, sized by how often. For a pair the fixes found it is the midpoint of the two, because neither of them is the place and the meeting is, usually a water hole, which is the answer a map gives that a table cannot. For a pair only a sighting found it is the place of the device that did the hearing: exactly, when that device stands on a post with a place set by hand, and its nearest fix when it was walking about (decision D261). The device that was heard has no say, since its position is what the sighting was meant to establish. Clicking a point gives the contacts, the hours, the first and last time and which evidence saw them. The "Where pairs met" chip switches the layer.
 
 **What was set aside** is in the summary and not hidden: sightings whose neighbour no device of the project matches (an unknown neighbour is a real finding, decision D253, but it is not a pair) and sightings whose three octets could be more than one device, which are deliberately in no pair figure at all (D254).
 

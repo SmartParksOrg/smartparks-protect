@@ -57,7 +57,7 @@ what is being asked for is never a guess. The server joins OpenStreetMap's roads
 rivers, fences and railways inside it into the faces they enclose, and answers the face that
 contains the middle of the box together with every OpenStreetMap area that contains it (a
 protected area, a forest, a lake, a landuse), smallest first, with its size. The ways people
-walk on — footpaths, paths, steps, cycleways and bridleways — do not cut the face: a dune
+walk on, footpaths, paths, steps, cycleways and bridleways, do not cut the face: a dune
 reserve is threaded with them, and a block cut by every one of them is a fragment of a few
 hectares rather than a zone.
 
@@ -66,13 +66,13 @@ where it is adjusted like any drawn shape, named and saved; an area OpenStreetMa
 the name in.
 
 A read takes seconds, so while one is running the bar shows a spinner with **Cancel**, and
-another click or drag is ignored rather than starting a second read — a second read is what
+another click or drag is ignored rather than starting a second read, a second read is what
 makes the public server refuse the first. The map keeps panning and zooming throughout.
 
 A box larger than **25 km²** is refused before anything is sent, and one over 9 km² says it may
 take a while. Those are not arbitrary: a box of 9 km² over the Kennemer dunes answers in about
 3 seconds with a megabyte, one of 100 km² takes 11 seconds and 14 megabytes, and the same box
-over a Namibian reserve comes back as a refusal. For a whole reserve, find it by name instead —
+over a Namibian reserve comes back as a refusal. For a whole reserve, find it by name instead, through a search
 that reads only the named areas and stays fast whatever the size.
 
 ### Or find it by name
@@ -80,7 +80,7 @@ that reads only the named areas and stays fast whatever the size.
 Under the same Propose, a box takes a name: type "Kraansvlak" and the OpenStreetMap areas whose
 name holds that text, in the part of the map on screen, come back as the same candidates, best
 match first. It is the way in when you know what the area is called and not exactly where its
-edge runs — and it does not depend on clicking the right spot. Only areas answer, never a
+edge runs, and it does not depend on clicking the right spot. Only areas answer, never a
 street or a building of the same name. Move the map over the reserve first; if the view is
 wider than about 150 km, its middle is searched and the list says so.
 
@@ -107,8 +107,8 @@ Kruidberg, Midden-Herenduin and Heerenduinen are one dune area to the people who
 They are combined into one feature, which rules, the grazing analysis and the map then read as
 a single zone.
 
-- **While proposing.** Tick as many candidates as you want in the Propose list — after a name
-  search or a click — and "Use N areas as one zone" puts their union in the editor, ready to be
+- **While proposing.** Tick as many candidates as you want in the Propose list, after a name
+  search or a click, and "Use N areas as one zone" puts their union in the editor, ready to be
   named and saved.
 - **From the features you already have.** Tick the rows on the Features page and "Combine N
   into one zone" shows the union over its parts with its size, takes a name and a type, and

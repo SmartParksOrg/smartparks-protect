@@ -94,7 +94,7 @@ How, in `primitives/strategy.py`:
    fixtures.
 
 As built (2026-09-19): the migratory curve keeps one time scale for the way out and the way
-back (four parameters, not five), and a departure must lie at least a week inside the period —
+back (four parameters, not five), and a departure must lie at least a week inside the period:
 a step before the first fix is a plateau and belongs to the resident curve, a step after the
 last fix is a line and belongs to the nomad's; without that bound the dispersal curve imitated
 both and a simulated resident year read "unclear". No real track is in the fixtures yet; the
