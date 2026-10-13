@@ -136,6 +136,7 @@ import { isProjectSwitch, rememberProject } from "@/components/map/mapSession";
 import {
   DEFAULT_HEAT,
   type HeatSettings,
+  heatWindow,
   parseHeatSettings,
 } from "@/components/map/heat";
 import { locationFeatures } from "@/components/map/networkLocations";
@@ -446,6 +447,11 @@ export function MapPage() {
     () => parseHeatSettings(params, preferredHeat),
     [params, preferredHeat],
   );
+  // an owner without an assignment gets the custom length, as a track does
+  const heatFallbackHours =
+    typeof preferredHeat.hours === "number"
+      ? preferredHeat.hours
+      : DEFAULT_TRACK_HOURS;
   const [heatSettingsOpen, setHeatSettingsOpen] = useState(false);
   const [heatCardHidden, setHeatCardHidden] = useState(false);
   const setHeatLists = useCallback(
@@ -491,7 +497,7 @@ export function MapPage() {
         (p) => {
           p.set("heat_radius", String(next.radius_m));
           p.set("heat_sensitivity", String(next.sensitivity));
-          p.set("heat_hours", String(next.hours));
+          p.set("heat_hours", trackLengthParam(next.hours));
           return p;
         },
         { replace: true },
@@ -602,11 +608,11 @@ export function MapPage() {
   const heatParams = useMemo(
     () => ({
       bbox: viewport?.bbox,
-      hours: heat.hours,
+      ...heatWindow(heat, heatFallbackHours),
       entity_id: heatIds,
       device_id: heatDeviceIds,
     }),
-    [viewport, heat.hours, heatIds, heatDeviceIds],
+    [viewport, heat, heatFallbackHours, heatIds, heatDeviceIds],
   );
   const heatPoints = useQuery({
     queryKey: queryKeys.heat(projectId, heatParams),

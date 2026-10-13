@@ -11,24 +11,11 @@ import {
   type HeatSettings,
   sensitivityLabel,
 } from "@/components/map/heat";
-import {
-  clampHours,
-  describeHours,
-  TRACK_MAX_DAYS,
-  TRACK_MAX_HOURS,
-  TRACK_MIN_HOURS,
-  TRACK_QUICK_PICKS,
-} from "@/components/map/trackLength";
+import { type TrackLength } from "@/components/map/trackLength";
+import { LengthSettings } from "@/components/map/TrackSettings";
 import { useTrackLengthLabel } from "@/components/map/useTrackLengthLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 
 /** What is on the map while heatmaps are on: how many, how many points over what length, the
@@ -52,7 +39,7 @@ export function HeatCard({
   /** The read stops at a number of devices, most recently seen first. */
   devicesScanned: number;
   devicesTotal: number;
-  hours: number;
+  hours: TrackLength;
   loading: boolean;
   settingsOpen: boolean;
   onToggleSettings: () => void;
@@ -106,10 +93,8 @@ export function HeatCard({
   );
 }
 
-type Unit = "hours" | "days";
-
-/** The heatmap's radius in metres, its sensitivity and its look-back, with sliders; one
- * setting for every heatmap on the map. */
+/** The heatmap's radius in metres, its sensitivity and its look-back (a track length: since
+ * the assignment or a custom length), with sliders; one setting for every heatmap on the map. */
 export function HeatSettingsPanel({
   settings,
   onChange,
@@ -121,34 +106,11 @@ export function HeatSettingsPanel({
 }) {
   const { t } = useTranslation();
   const [radiusText, setRadiusText] = useState(String(settings.radius_m));
-  const [unit, setUnit] = useState<Unit>(describeHours(settings.hours).unit);
-  const [hoursText, setHoursText] = useState(
-    String(describeHours(settings.hours).value),
-  );
   const setRadius = (metres: number) => {
     const clamped = clampRadius(metres);
     setRadiusText(String(clamped));
     onChange({ ...settings, radius_m: clamped });
   };
-  const setHours = (next: number, nextUnit: Unit = unit) => {
-    const clamped = clampHours(next);
-    setUnit(nextUnit);
-    setHoursText(
-      String(
-        nextUnit === "days" ? Math.round((clamped / 24) * 100) / 100 : clamped,
-      ),
-    );
-    onChange({ ...settings, hours: clamped });
-  };
-  const commitHours = (value: string, nextUnit: Unit) => {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) return;
-    setHours(nextUnit === "days" ? n * 24 : n, nextUnit);
-  };
-  const days = Math.min(
-    TRACK_MAX_DAYS,
-    Math.max(1, Math.round(settings.hours / 24)),
-  );
   // literal keys so the catalogue carries them; `sensitivityLabel` is the untranslated form
   const labelFor = (value: number) =>
     ({
@@ -220,78 +182,12 @@ export function HeatSettingsPanel({
         />
         <span className="text-xs text-muted-foreground">{t("High")}</span>
       </div>
-      <div className="mb-1 text-muted-foreground">{t("Look back")}</div>
-      <div className="mb-2 flex items-center gap-3">
-        <Slider
-          value={[days]}
-          min={1}
-          max={TRACK_MAX_DAYS}
-          step={1}
-          aria-label={t("Look back in days")}
-          onValueChange={([d]) => setHours(d * 24, "days")}
-          className="flex-1"
-        />
-        <Input
-          type="number"
-          inputMode="numeric"
-          min={unit === "days" ? 1 : TRACK_MIN_HOURS}
-          max={unit === "days" ? TRACK_MAX_DAYS : TRACK_MAX_HOURS}
-          value={hoursText}
-          aria-label={t("Look back")}
-          className="h-8 w-16 px-2"
-          onChange={(e) => setHoursText(e.target.value)}
-          onBlur={(e) => commitHours(e.target.value, unit)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter")
-              commitHours((e.target as HTMLInputElement).value, unit);
-          }}
-        />
-        <Select
-          value={unit}
-          onValueChange={(v) => commitHours(hoursText, v as Unit)}
-        >
-          <SelectTrigger className="h-8 w-24" aria-label={t("Unit")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hours">{t("hours")}</SelectItem>
-            <SelectItem value="days">{t("days")}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex flex-wrap gap-1">
-        {TRACK_QUICK_PICKS.map((pick) => (
-          <QuickPick
-            key={pick}
-            hours={pick}
-            active={settings.hours === pick}
-            onClick={() => setHours(pick, describeHours(pick).unit)}
-          />
-        ))}
-      </div>
+      <LengthSettings
+        title={t("Look back")}
+        titleInDays={t("Look back in days")}
+        length={settings.hours}
+        onChange={(hours) => onChange({ ...settings, hours })}
+      />
     </div>
-  );
-}
-
-function QuickPick({
-  hours,
-  active,
-  onClick,
-}: {
-  hours: number;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const label = useTrackLengthLabel(hours);
-  return (
-    <Button
-      variant={active ? "default" : "outline"}
-      size="sm"
-      className="h-7 px-2 text-xs"
-      aria-pressed={active}
-      onClick={onClick}
-    >
-      {label}
-    </Button>
   );
 }

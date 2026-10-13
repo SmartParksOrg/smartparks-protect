@@ -1,14 +1,20 @@
-import { clampHours, DEFAULT_TRACK_HOURS } from "@/components/map/trackLength";
+import {
+  DEFAULT_TRACK_HOURS,
+  parseTrackLength,
+  type TrackLength,
+} from "@/components/map/trackLength";
 
 /** The heatmap's settings (decision D138): a radius in metres, a sensitivity from low to high
- * and a look-back in hours, carried in the URL and kept per user as the default. A heatmap is
- * switched on per entity and device like a track (`?heat=` and `?device_heat=` list them), and
- * one setting applies to every heatmap on the map. */
+ * and a look-back, carried in the URL and kept per user as the default. The look-back is a
+ * track length: a number of hours, or "assigned" for the time since the device tracking the
+ * entity was assigned to it (a device: since it joined the project), which the server resolves
+ * per owner. A heatmap is switched on per entity and device like a track (`?heat=` and
+ * `?device_heat=` list them), and one setting applies to every heatmap on the map. */
 export interface HeatSettings {
   radius_m: number;
   /** 1 (low) to 5 (high). */
   sensitivity: number;
-  hours: number;
+  hours: TrackLength;
 }
 
 export const HEAT_MIN_RADIUS_M = 10;
@@ -41,8 +47,8 @@ export function clampSensitivity(value: number): number {
   );
 }
 
-/** The settings from `heat_radius=`, `heat_sensitivity=` and `heat_hours=`, the defaults for
- * what is missing. */
+/** The settings from `heat_radius=`, `heat_sensitivity=` and `heat_hours=` (hours or
+ * "assigned"), the defaults for what is missing. */
 export function parseHeatSettings(
   params: URLSearchParams,
   defaults: HeatSettings,
@@ -55,8 +61,19 @@ export function parseHeatSettings(
     sensitivity: sensitivity
       ? clampSensitivity(Number(sensitivity))
       : defaults.sensitivity,
-    hours: hours ? clampHours(Number(hours)) : defaults.hours,
+    hours: parseTrackLength(hours, defaults.hours),
   };
+}
+
+/** The window the heat read asks for: the hours, or `since_assigned` with the hours as the
+ * length for an owner without an assignment, as `trackFrom` falls back for a track. */
+export function heatWindow(
+  settings: HeatSettings,
+  fallbackHours: number,
+): { hours: number; since_assigned: boolean } {
+  return settings.hours === "assigned"
+    ? { hours: fallbackHours, since_assigned: true }
+    : { hours: settings.hours, since_assigned: false };
 }
 
 /** Metres per pixel of Web Mercator at a latitude and zoom. */

@@ -88,6 +88,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Changed
 
+- **The heatmap's look-back can be "since the device was assigned", as a track's length can** (Tim, 2026-10-13: the tracks could and the heatmap not). The Heatmap settings offer the same choice as the Track settings: since the device tracking the entity was assigned to it (a device: since it joined the project), or a custom length; an entity without a device today gets the custom length. The server resolves each owner's own moment, so one request still draws every heatmap on the map. API: `GET /projects/{id}/map/heat` takes `since_assigned` beside `hours` and answers it; the URL carries `heat_hours=assigned`.
+
 - The README opens with status badges (project status, licence, last commit, the latest tag, CI with a link to the docs site), and a picture of the live map on a desktop, a tablet and a phone, in light and in dark, taken on the dev server over demo data and kept as WebP under `docs/assets/screenshots/` (Tim, 2026-10-09).
 
 - **The Gateways page has no window to pick** (Tim, 2026-09-30: a user should not have to select anything). Every figure on both tabs covers the last 30 days: receptions, devices and signal per gateway, and per device its gateways, uplinks, best gateway and share. The gateway's own **Last seen** has no window at all, so a gateway that heard nothing in a month still says when the network last heard from it, and **Last reception** says the newest of the 30 days or "none in 30 days". The window selector of the page is gone; the API keeps its `hours` parameter.

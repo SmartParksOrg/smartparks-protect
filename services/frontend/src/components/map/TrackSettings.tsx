@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Settings2, X } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import {
   clampHours,
@@ -83,6 +83,48 @@ export function TrackSettingsPanel({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  return (
+    <div className="min-h-0 w-full shrink overflow-y-auto rounded-md border bg-card p-3 text-sm shadow-md">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-medium">{t("Track settings")}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          aria-label={t("Close")}
+          onClick={onClose}
+        >
+          <X className="size-4" />
+        </Button>
+      </div>
+      <LengthSettings
+        title={t("Track length")}
+        titleInDays={t("Track length in days")}
+        length={length}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
+/** One length for every track or heatmap on the map: since the device was assigned to the
+ * entity (a device: since it joined the project), or a custom length from one hour to ninety
+ * days with a slider in days, a number in hours or days and the quick picks. The track
+ * settings and the heatmap settings share it (decisions D109 and D138). */
+export function LengthSettings({
+  title,
+  titleInDays,
+  length,
+  onChange,
+}: {
+  title: string;
+  /** The slider's label, "Track length in days" or "Look back in days". */
+  titleInDays: string;
+  length: TrackLength;
+  onChange: (next: TrackLength) => void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
   const hours = length === "assigned" ? null : length;
   // the custom length stays visible and editable while "since assignment" is chosen, so a
   // person can switch back to what they had; this panel is the only writer of the length while
@@ -106,29 +148,17 @@ export function TrackSettingsPanel({
   const days = Math.min(TRACK_MAX_DAYS, Math.max(1, Math.round(customHours / 24)));
 
   return (
-    <div className="min-h-0 w-full shrink overflow-y-auto rounded-md border bg-card p-3 text-sm shadow-md">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-medium">{t("Track settings")}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7"
-          aria-label={t("Close")}
-          onClick={onClose}
-        >
-          <X className="size-4" />
-        </Button>
-      </div>
-      <div className="mb-1 text-muted-foreground">{t("Track length")}</div>
+    <>
+      <div className="mb-1 text-muted-foreground">{title}</div>
       <RadioGroup
         value={length === "assigned" ? "assigned" : "custom"}
         onValueChange={(v) => onChange(v === "assigned" ? "assigned" : customHours)}
         className="gap-2"
       >
         <div className="flex items-start gap-2">
-          <RadioGroupItem value="assigned" id="track-assigned" className="mt-0.5" />
+          <RadioGroupItem value="assigned" id={`${id}-assigned`} className="mt-0.5" />
           <Label
-            htmlFor="track-assigned"
+            htmlFor={`${id}-assigned`}
             className="flex-col items-start gap-0.5 font-normal leading-snug"
           >
             <span>{t("Since the device was assigned to the entity")}</span>
@@ -138,8 +168,8 @@ export function TrackSettingsPanel({
           </Label>
         </div>
         <div className="flex items-center gap-2">
-          <RadioGroupItem value="custom" id="track-custom" />
-          <Label htmlFor="track-custom" className="font-normal">
+          <RadioGroupItem value="custom" id={`${id}-custom`} />
+          <Label htmlFor={`${id}-custom`} className="font-normal">
             {t("Custom length")}
           </Label>
         </div>
@@ -154,7 +184,7 @@ export function TrackSettingsPanel({
             min={1}
             max={TRACK_MAX_DAYS}
             step={1}
-            aria-label={t("Track length in days")}
+            aria-label={titleInDays}
             onValueChange={([d]) => setHours(d * 24, "days")}
             className="flex-1"
           />
@@ -164,7 +194,7 @@ export function TrackSettingsPanel({
             min={unit === "days" ? 1 : TRACK_MIN_HOURS}
             max={unit === "days" ? TRACK_MAX_DAYS : TRACK_MAX_HOURS}
             value={text}
-            aria-label={t("Track length")}
+            aria-label={title}
             className="h-8 w-16 px-2"
             onChange={(e) => setText(e.target.value)}
             onBlur={(e) => commitText(e.target.value, unit)}
@@ -196,7 +226,7 @@ export function TrackSettingsPanel({
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

@@ -73,3 +73,104 @@ async def test_heat_points_by_entity_device_window_and_view(client, db, bus):  #
         headers=superuser.headers,
     )
     assert everywhere.status_code == 200 and everywhere.json()["returned"] == 5
+
+
+async def test_heat_points_since_assignment(client, db, bus):  # noqa: F811
+    """`since_assigned`: an entity's window starts when the device tracking it today was
+    assigned to it, a device's when it joined the project, and `hours` applies to an owner
+    without such a moment, as the track length "since assignment" does."""
+    from sqlalchemy import text
+
+    admin, project, entity, source, device, external_id = await _setup(client, db)
+    now = datetime.now(tz=UTC)
+    for i in range(5):
+        await _feed(
+            db, bus, source["id"], external_id, now - timedelta(hours=i * 6), -24.9, 31.5 + i / 10
+        )
+    # the assignments were made for 2026-01-01; move their starts to inside the record
+    await db.execute(
+        text(
+            "UPDATE device_entity_assignments SET validity = tstzrange(:start, upper(validity))"
+            " WHERE device_id = :device_id"
+        ),
+        {"start": now - timedelta(hours=15), "device_id": device["id"]},
+    )
+    await db.execute(
+        text(
+            "UPDATE device_project_assignments SET validity = tstzrange(:start, upper(validity))"
+            " WHERE device_id = :device_id"
+        ),
+        {"start": now - timedelta(hours=9), "device_id": device["id"]},
+    )
+    await db.commit()
+    base = f"/api/v1/projects/{project.id}/map/heat"
+
+    by_hours = await client.get(
+        base, params={"hours": 48, "entity_id": entity["id"]}, headers=admin.headers
+    )
+    assert by_hours.json()["returned"] == 5 and by_hours.json()["since_assigned"] is False
+
+    entity_window = await client.get(
+        base,
+        params={"hours": 48, "entity_id": entity["id"], "since_assigned": "true"},
+        headers=admin.headers,
+    )
+    assert entity_window.status_code == 200, entity_window.text
+    body = entity_window.json()
+    assert body["returned"] == 3 and body["since_assigned"] is True  # now, 6 h and 12 h ago
+    assert body["devices_total"] == 1
+
+    device_window = await client.get(
+        base,
+        params={"hours": 48, "device_id": device["id"], "since_assigned": "true"},
+        headers=admin.headers,
+    )
+    assert device_window.json()["returned"] == 2  # now and 6 h ago
+
+    # both at once: each owner keeps its own start, and a position counts once
+    both = await client.get(
+        base,
+        params={
+            "hours": 48,
+            "entity_id": entity["id"],
+            "device_id": device["id"],
+            "since_assigned": "true",
+        },
+        headers=admin.headers,
+    )
+    assert both.json()["returned"] == 3
+
+    # the assignment's start wins over a shorter `hours`, and `hours` holds for an entity
+    # without a device today (its device left it three hours ago)
+    shorter = await client.get(
+        base,
+        params={"hours": 7, "entity_id": entity["id"], "since_assigned": "true"},
+        headers=admin.headers,
+    )
+    assert shorter.json()["returned"] == 3
+    await db.execute(
+        text(
+            "UPDATE device_entity_assignments SET validity = tstzrange(lower(validity), :end)"
+            " WHERE device_id = :device_id"
+        ),
+        {"end": now - timedelta(hours=3), "device_id": device["id"]},
+    )
+    await db.commit()
+    untracked = await client.get(
+        base,
+        params={"hours": 7, "entity_id": entity["id"], "since_assigned": "true"},
+        headers=admin.headers,
+    )
+    assert untracked.json()["returned"] == 2  # now and 6 h ago: the custom length
+    # beside a device with a start of its own, the entity still gets the custom length
+    beside = await client.get(
+        base,
+        params={
+            "hours": 7,
+            "entity_id": entity["id"],
+            "device_id": device["id"],
+            "since_assigned": "true",
+        },
+        headers=admin.headers,
+    )
+    assert beside.json()["returned"] == 2

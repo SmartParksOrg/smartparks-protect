@@ -10,7 +10,8 @@
 - `GET /projects/{id}/positions/at`: the position of an entity or device at one device time with
   the measurements of that moment, what a click on a track point opens (phase 19).
 - `GET /projects/{id}/map/heat`: the positions behind the heatmap (decision D138): the newest
-  `MAX_HEAT_POINTS` in the viewport and window for the given entities and devices.
+  `MAX_HEAT_POINTS` in the viewport and window for the given entities and devices; the window
+  is a number of hours or, with `since_assigned`, each owner's own since its assignment.
 """
 
 import uuid
@@ -107,6 +108,10 @@ class HeatResponse(BaseModel):
 
     type: str = "FeatureCollection"
     hours: int
+    since_assigned: bool = Field(
+        default=False,
+        description="The window of an entity or device started at its assignment, not `hours` ago",
+    )
     returned: int
     capped: bool = Field(description="More positions than the cap were in view")
     devices_scanned: int = Field(description="Devices whose positions were read")
@@ -998,6 +1003,14 @@ async def network_locations(
     )
 
 
+def _owner_window(column: str, ids: str, starts: str) -> str:
+    """The SQL that keeps a position of one of the owners in `ids` from the start listed at the
+    same index in `starts`: the two arrays unnest side by side into (id, start) rows."""
+    return f"""EXISTS (
+        SELECT 1 FROM unnest(CAST(:{ids} AS uuid[]), CAST(:{starts} AS timestamptz[])) AS w(id, s)
+        WHERE w.id = p.{column} AND COALESCE(p.curated_time, p.time) >= w.s)"""
+
+
 @router.get("/map/heat", response_model=HeatResponse)
 async def heat_points(
     bbox: str | None = Query(None, description="west,south,east,north in WGS84"),
@@ -1005,6 +1018,12 @@ async def heat_points(
     entity_id: list[uuid.UUID] | None = Query(None, description="Positions of these entities"),
     device_id: list[uuid.UUID] | None = Query(None, description="Positions of these devices"),
     limit: int = Query(MAX_HEAT_POINTS, ge=1, le=MAX_HEAT_POINTS),
+    since_assigned: bool = Query(
+        False,
+        description="An entity's positions from the moment the device tracking it today was "
+        "assigned to it, a device's from the moment it joined the project; `hours` where there "
+        "is no such moment, as the track length 'since assignment' of the live map",
+    ),
     context: ScopeContext = Depends(require_scope_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> HeatResponse:
@@ -1014,14 +1033,52 @@ async def heat_points(
     invalid rows left out (architecture 28). Bounded twice: the scan runs per device through the
     device and time index of the compressed chunks (a bounding-box scan over every chunk of the
     window decompresses them all), for at most `MAX_HEAT_DEVICES` devices, the most recently seen
-    first, and stops at `limit` points; the answer says how many devices it read of how many."""
+    first, and stops at `limit` points; the answer says how many devices it read of how many.
+    With `since_assigned` the window of each entity and device starts at its own assignment
+    (the same moments the current-state and device-layer features carry as `assigned_since`
+    and `project_since`); the scan's lower bound is the earliest of them and the owner filter
+    holds each to its own."""
     if len(entity_id or []) > MAX_HEAT_IDS or len(device_id or []) > MAX_HEAT_IDS:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             f"At most {MAX_HEAT_IDS} entities and {MAX_HEAT_IDS} devices per request",
         )
     until = utc_now()
-    since = until - timedelta(hours=hours)
+    window_start = until - timedelta(hours=hours)
+    entity_starts: dict[uuid.UUID, datetime] = {}
+    device_starts: dict[uuid.UUID, datetime] = {}
+    if since_assigned and entity_id:
+        entity_starts = {
+            owner: start
+            for owner, start in (
+                await session.execute(
+                    select(
+                        DeviceEntityAssignment.entity_id,
+                        func.lower(DeviceEntityAssignment.validity),
+                    ).where(
+                        DeviceEntityAssignment.entity_id.in_(entity_id),
+                        DeviceEntityAssignment.validity.op("@>")(until),
+                    )
+                )
+            ).all()
+        }
+    if since_assigned and device_id:
+        device_starts = {
+            owner: start
+            for owner, start in (
+                await session.execute(
+                    select(
+                        DeviceProjectAssignment.device_id,
+                        func.lower(DeviceProjectAssignment.validity),
+                    ).where(
+                        DeviceProjectAssignment.device_id.in_(device_id),
+                        DeviceProjectAssignment.validity.op("@>")(until),
+                        context.where(DeviceProjectAssignment.project_id),
+                    )
+                )
+            ).all()
+        }
+    since = min([window_start, *entity_starts.values(), *device_starts.values()])
     box = _bbox(bbox) or (-180.0, -90.0, 180.0, 90.0)
     params: dict[str, Any] = {
         "project_id": context.project_id,
@@ -1046,13 +1103,16 @@ async def heat_points(
         )
     owner_filter = ""
     if entity_id or device_id:
+        # each owner's positions, from its own start when `since_assigned` asked for that
         owner = []
         if entity_id:
             params["entity_ids"] = list(entity_id)
-            owner.append("p.entity_id = ANY(CAST(:entity_ids AS uuid[]))")
+            params["entity_starts"] = [entity_starts.get(e, window_start) for e in entity_id]
+            owner.append(_owner_window("entity_id", "entity_ids", "entity_starts"))
         if device_id:
             params["device_ids"] = list(device_id)
-            owner.append("p.device_id = ANY(CAST(:device_ids AS uuid[]))")
+            params["device_starts"] = [device_starts.get(d, window_start) for d in device_id]
+            owner.append(_owner_window("device_id", "device_ids", "device_starts"))
         owner_filter = " AND (" + " OR ".join(owner) + ")"
         params["all_device_ids"] = list(device_id or [])
         params["all_entity_ids"] = list(entity_id or [])
@@ -1100,6 +1160,7 @@ async def heat_points(
 
     return HeatResponse(
         hours=hours,
+        since_assigned=since_assigned,
         returned=len(rows),
         capped=len(rows) >= limit,
         devices_scanned=devices_scanned,

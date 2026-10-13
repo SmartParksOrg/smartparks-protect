@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampRadius,
   DEFAULT_HEAT,
+  heatWindow,
   intensityFor,
   metresPerPixel,
   parseHeatSettings,
@@ -32,6 +33,23 @@ describe("heatmap settings", () => {
     });
     expect(clampRadius(Number.NaN)).toBe(DEFAULT_HEAT.radius_m);
     expect(clampRadius(1)).toBe(10);
+  });
+
+  it("takes the look-back since the assignment like a track length", () => {
+    const settings = parseHeatSettings(
+      new URLSearchParams("heat_hours=assigned"),
+      DEFAULT_HEAT,
+    );
+    expect(settings.hours).toBe("assigned");
+    expect(heatWindow(settings, 48)).toEqual({ hours: 48, since_assigned: true });
+    expect(heatWindow({ ...settings, hours: 6 }, 48)).toEqual({
+      hours: 6,
+      since_assigned: false,
+    });
+    expect(
+      parseHeatSettings(new URLSearchParams("heat_hours=nonsense"), DEFAULT_HEAT)
+        .hours,
+    ).toBe(DEFAULT_HEAT.hours);
   });
 
   it("turns metres into pixels per zoom at the map's latitude", () => {

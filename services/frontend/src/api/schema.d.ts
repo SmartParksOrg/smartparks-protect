@@ -2760,6 +2760,10 @@ export interface paths {
          *     device and time index of the compressed chunks (a bounding-box scan over every chunk of the
          *     window decompresses them all), for at most `MAX_HEAT_DEVICES` devices, the most recently seen
          *     first, and stops at `limit` points; the answer says how many devices it read of how many.
+         *     With `since_assigned` the window of each entity and device starts at its own assignment
+         *     (the same moments the current-state and device-layer features carry as `assigned_since`
+         *     and `project_since`); the scan's lower bound is the earliest of them and the owner filter
+         *     holds each to its own.
          */
         get: operations["heat_points_api_v1_projects__project_id__map_heat_get"];
         put?: never;
@@ -9622,6 +9626,12 @@ export interface components {
             type: string;
             /** Hours */
             hours: number;
+            /**
+             * Since Assigned
+             * @description The window of an entity or device started at its assignment, not `hours` ago
+             * @default false
+             */
+            since_assigned: boolean;
             /** Returned */
             returned: number;
             /**
@@ -19270,6 +19280,8 @@ export interface operations {
                 /** @description Positions of these devices */
                 device_id?: string[] | null;
                 limit?: number;
+                /** @description An entity's positions from the moment the device tracking it today was assigned to it, a device's from the moment it joined the project; `hours` where there is no such moment, as the track length 'since assignment' of the live map */
+                since_assigned?: boolean;
             };
             header?: never;
             path: {
