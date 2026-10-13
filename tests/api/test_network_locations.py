@@ -3,11 +3,12 @@ fixes in the positions list, the tracks and the records unless asked, drawn by t
 network locations read, and the location source set per entity and per device."""
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+import protect_api.routers.map as map_router
 from protect_decoder.pipeline import process_source_event
 from tests.api.conftest import actor, create_project
 from tests.conftest import unique_name
@@ -17,7 +18,7 @@ pytestmark = pytest.mark.asyncio
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "payloads" / "rock7"
 
 
-async def test_network_positions_are_kept_apart_and_opted_into(client, db):
+async def test_network_positions_are_kept_apart_and_opted_into(client, db, monkeypatch):
     admin = await actor(client, db, superuser=True)
     h = admin.headers
     project = await create_project(db)
@@ -179,14 +180,18 @@ async def test_network_positions_are_kept_apart_and_opted_into(client, db):
     ).json()
     assert more["count"] == plain["count"] + 1
 
-    # the map's network locations read draws it with its radius; the current position stays the fix
-    drawn = (
-        await client.get(
-            f"/api/v1/projects/{project.id}/map/network-locations",
-            params={"hours": 24 * 30},
-            headers=h,
-        )
-    ).json()
+    # the map's network locations read draws it with its radius; the current position stays the
+    # fix. The read looks back from the clock, so the clock stands at the day after the recorded
+    # delivery (it aged out of the window on 2026-10-10)
+    with monkeypatch.context() as clock:
+        clock.setattr(map_router, "utc_now", lambda: datetime(2026, 9, 11, tzinfo=UTC))
+        drawn = (
+            await client.get(
+                f"/api/v1/projects/{project.id}/map/network-locations",
+                params={"hours": 24 * 30},
+                headers=h,
+            )
+        ).json()
     assert drawn["total"] == 1
     props = drawn["features"][0]["properties"]
     assert props["accuracy_m"] == 5000.0 and props["method"] == "iridium_estimate"
