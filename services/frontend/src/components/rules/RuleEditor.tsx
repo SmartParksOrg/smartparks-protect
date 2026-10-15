@@ -403,7 +403,7 @@ export function RuleEditor({
                   </Select>
                 </Field>
               )}
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field
                   label={t("Name")}
                   htmlFor="rule-name"
@@ -437,7 +437,7 @@ export function RuleEditor({
                 </Field>
               ) : (
                 <>
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Field label={t("Trigger")} htmlFor="rule-trigger">
                       <Select
                         value={kind}
@@ -497,7 +497,8 @@ export function RuleEditor({
                               type="button"
                               size="sm"
                               variant={on ? "default" : "outline"}
-                              className="h-7"
+                              className="h-7 max-w-full"
+                              title={e.name}
                               onClick={() =>
                                 form.setValue(
                                   "entity_ids",
@@ -509,7 +510,7 @@ export function RuleEditor({
                                 )
                               }
                             >
-                              {e.name}
+                              <span className="truncate">{e.name}</span>
                             </Button>
                           );
                         })}
@@ -536,7 +537,8 @@ export function RuleEditor({
                               type="button"
                               size="sm"
                               variant={on ? "default" : "outline"}
-                              className="h-7"
+                              className="h-7 max-w-full"
+                              title={type.label}
                               onClick={() =>
                                 form.setValue(
                                   "entity_type_ids",
@@ -551,7 +553,7 @@ export function RuleEditor({
                                 )
                               }
                             >
-                              {type.label}
+                              <span className="truncate">{type.label}</span>
                             </Button>
                           );
                         })}
@@ -779,7 +781,8 @@ export function RuleEditor({
                                       type="button"
                                       size="sm"
                                       variant={on ? "default" : "outline"}
-                                      className="h-7"
+                                      className="h-7 max-w-full"
+                                      title={f.name}
                                       onClick={() => {
                                         const current = form.getValues(
                                           `conditions.${index}.feature_ids`,
@@ -792,7 +795,7 @@ export function RuleEditor({
                                         );
                                       }}
                                     >
-                                      {f.name}
+                                      <span className="truncate">{f.name}</span>
                                     </Button>
                                   );
                                 })}
@@ -868,7 +871,8 @@ export function RuleEditor({
                                       type="button"
                                       size="sm"
                                       variant={on ? "default" : "outline"}
-                                      className="h-7"
+                                      className="h-7 max-w-full"
+                                      title={f.name}
                                       onClick={() => {
                                         const current = form.getValues(
                                           `conditions.${index}.feature_ids`,
@@ -886,7 +890,7 @@ export function RuleEditor({
                                           );
                                       }}
                                     >
-                                      {f.name}
+                                      <span className="truncate">{f.name}</span>
                                     </Button>
                                   );
                                 })}
@@ -905,7 +909,8 @@ export function RuleEditor({
                                       type="button"
                                       size="sm"
                                       variant={on ? "default" : "outline"}
-                                      className="h-7"
+                                      className="h-7 max-w-full"
+                                      title={e.name}
                                       onClick={() => {
                                         const current = form.getValues(
                                           `conditions.${index}.entity_ids`,
@@ -918,7 +923,7 @@ export function RuleEditor({
                                         );
                                       }}
                                     >
-                                      {e.name}
+                                      <span className="truncate">{e.name}</span>
                                     </Button>
                                   );
                                 })}
@@ -991,7 +996,8 @@ export function RuleEditor({
                                       type="button"
                                       size="sm"
                                       variant={on ? "default" : "outline"}
-                                      className="h-7"
+                                      className="h-7 max-w-full"
+                                      title={f.name}
                                       onClick={() => {
                                         const current = form.getValues(
                                           `conditions.${index}.feature_ids`,
@@ -1009,7 +1015,7 @@ export function RuleEditor({
                                           );
                                       }}
                                     >
-                                      {f.name}
+                                      <span className="truncate">{f.name}</span>
                                     </Button>
                                   );
                                 })}
@@ -1049,7 +1055,7 @@ export function RuleEditor({
                       );
                     })}
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field
                       label={t("Must hold for (seconds)")}
                       htmlFor="rule-for"
@@ -1083,7 +1089,7 @@ export function RuleEditor({
                   </div>
                   <div className="space-y-3 rounded-md border p-3">
                     <span className="text-sm font-medium">{t("Event")}</span>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <Field
                         label={t("Event type")}
                         htmlFor="rule-event-type"
