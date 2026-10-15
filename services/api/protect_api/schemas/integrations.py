@@ -132,6 +132,11 @@ class GatewayRead(ORMModel):
     altitude_m: float | None
     location_source: str | None = None
     location_at: datetime | None = None
+    device_id: uuid.UUID | None = Field(
+        default=None,
+        description="The device this gateway is, when it is one of ours (decision D319): an "
+        "offload station",
+    )
     status: str
     first_seen_at: datetime | None
     last_seen_at: datetime | None

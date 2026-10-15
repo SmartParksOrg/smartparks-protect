@@ -46,7 +46,8 @@ export type BulkAssignResult = Schemas["BulkAssignResult"];
 export type MoveResult = Schemas["MoveResult"];
 export type MoveDevice = Schemas["MoveDeviceRead"];
 export type MoveEntity = Schemas["MoveEntityRead"];
-export type EntityAssignmentsBulkResult = Schemas["EntityAssignmentsBulkResult"];
+export type EntityAssignmentsBulkResult =
+  Schemas["EntityAssignmentsBulkResult"];
 export type ConnectApplicationsResult = Schemas["ConnectApplicationsResult"];
 export type DisconnectApplicationsResult =
   Schemas["DisconnectApplicationsResult"];
@@ -160,3 +161,6 @@ export type EntityFence = Schemas["EntityFenceRead"];
 export type DeviceTrap = Schemas["DeviceTrap"];
 export type FenceMonitorItem = Schemas["FenceMonitorRead"];
 export type MetricSummary = Schemas["MetricSummaryRead"];
+export type Lp0Credentials = Schemas["Lp0CredentialsRead"];
+export type OffloadStation = Schemas["OffloadStationRead"];
+export type OffloadUpload = Schemas["OffloadUpload"];

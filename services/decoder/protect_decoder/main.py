@@ -101,11 +101,14 @@ def build_worker() -> Worker:
                     statement = statement.where(
                         tuple_(SourceEvent.ingested_at, SourceEvent.id) > after
                     )
-                page = [
-                    (int(event_id), ingested_at)
-                    for event_id, ingested_at in (await session.execute(statement)).all()
-                ]
-                receptions = await unlinked_receptions(session, page)
+                rows = (
+                    await session.execute(statement.add_columns(SourceEvent.network_received_at))
+                ).all()
+                page = [(int(event_id), ingested_at) for event_id, ingested_at, _ in rows]
+                received = [r for _, _, r in rows if r is not None]
+                receptions = await unlinked_receptions(
+                    session, page, earliest=min(received) if received else None
+                )
             if not page:
                 break
             for event_id, ingested_at in page:

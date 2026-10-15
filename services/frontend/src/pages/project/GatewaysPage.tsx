@@ -35,7 +35,12 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatAgo, formatTime } from "@/lib/format";
-import { gatewayCoords, isRelay, locationSourceLabel } from "@/lib/gateways";
+import {
+  gatewayCoords,
+  isOffloadStation,
+  isRelay,
+  locationSourceLabel,
+} from "@/lib/gateways";
 
 /** Every figure on the page covers the last 30 days, and nobody picks a window (Tim,
  * 2026-09-30): the gateway's own last seen has no window at all, so a gateway that heard
@@ -134,6 +139,25 @@ export function GatewaysPage() {
             >
               {t("Relay (mesh)")}
             </Badge>
+          )}
+          {isOffloadStation(row.original) && (
+            <Badge
+              variant="outline"
+              className="ml-2 align-middle"
+              title={t(
+                "An offload station: a RangerEdge whose SD card holds the frames trackers offloaded to it",
+              )}
+            >
+              {t("Offload station")}
+            </Badge>
+          )}
+          {row.original.device_id && (
+            <Link
+              className="ml-2 text-xs underline"
+              to={`/projects/${projectId}/devices/${row.original.device_id}`}
+            >
+              {t("device")}
+            </Link>
           )}
         </span>
       ),
@@ -344,6 +368,9 @@ export function GatewaysPage() {
                   <span className="font-medium">{g.display_name}</span>
                   {isRelay(g) && (
                     <Badge variant="outline">{t("Relay (mesh)")}</Badge>
+                  )}
+                  {isOffloadStation(g) && (
+                    <Badge variant="outline">{t("Offload station")}</Badge>
                   )}
                   <StatusBadge value={g.status} />
                 </div>

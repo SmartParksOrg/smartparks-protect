@@ -32,7 +32,7 @@ from shared.connectivity.base import (
 from shared.connectivity.network_location import NetworkLocation
 from shared.connectivity.satellite import DELIVERED_STATUSES, SatelliteSession
 from shared.database import session_scope
-from shared.enums import ConnectivityStatus, ProcessingStatus, TraceClass
+from shared.enums import AcquisitionChannel, ConnectivityStatus, ProcessingStatus, TraceClass
 from shared.logger import get_logger
 from shared.models import (
     DataSource,
@@ -317,6 +317,37 @@ async def _satellite_session(
     return outcome
 
 
+#: An offload station saves a frame again when its receipt was lost, and a tracker whose
+#: records went unconfirmed sends them to the next station it meets; the same bytes under the
+#: same address and counter within this window are that repeat (decision D321). The counter
+#: wraps at 65,536 frames, which is months of offloading, hence the bytes in the key.
+LP0_REPEAT_WINDOW = timedelta(days=30)
+
+
+async def _lp0_repeat(
+    session: AsyncSession, source: DataSource, message: InboundMessage, now: datetime
+) -> int | None:
+    """The earlier source event an offloaded frame repeats, by the frame's own digest under
+    the same address on this source, or None."""
+    if message.acquisition_channel != AcquisitionChannel.LP0 or message.external_id is None:
+        return None
+    digest = message.provider_metadata.get("phy_sha256")
+    if not digest:
+        return None
+    earlier = await session.scalar(
+        select(SourceEvent.id)
+        .where(
+            SourceEvent.data_source_id == source.id,
+            SourceEvent.external_id == message.external_id,
+            SourceEvent.ingested_at >= now - LP0_REPEAT_WINDOW,
+            SourceEvent.provider_metadata["phy_sha256"].astext == str(digest),
+        )
+        .order_by(SourceEvent.ingested_at)
+        .limit(1)
+    )
+    return int(earlier) if earlier is not None else None
+
+
 async def store_inbound(
     session: AsyncSession, source: DataSource, message: InboundMessage
 ) -> StoredEvent:
@@ -349,7 +380,12 @@ async def store_inbound(
     )
     if network_location is not None:
         provider_metadata["network_location"] = network_location.to_dict()
-    duplicate = satellite is not None and satellite.duplicate_of is not None
+    repeat_of = await _lp0_repeat(session, source, message, now)
+    if repeat_of is not None:
+        provider_metadata["duplicate_of"] = repeat_of
+    duplicate = (satellite is not None and satellite.duplicate_of is not None) or (
+        repeat_of is not None
+    )
     event = SourceEvent(
         ingested_at=now,
         data_source_id=source.id,
@@ -442,6 +478,20 @@ async def store_inbound(
             step.skip("unknown identity, kept for Needs Attention")
         else:
             step.output_ref = f"device:{device_id}"
+    if message.acquisition_channel == AcquisitionChannel.LP0:
+        offload: dict[str, Any] = {
+            k: provider_metadata.get(k)
+            for k in ("station_eui", "received_at", "rssi", "snr", "f_cnt", "f_port")
+            if provider_metadata.get(k) is not None
+        }
+        async with tracer.step("ingest", "offload frame", metadata=offload) as step:
+            if repeat_of is not None:
+                step.skip(f"repeat of source event {repeat_of}, kept as duplicate")
+            elif message.network_received_at is None and provider_metadata.get("received_at"):
+                step.metadata["note"] = (
+                    "the station's clock is not believed (decision D324); the upload time "
+                    "stands as the delivery time"
+                )
     if satellite is not None:
         async with tracer.step(
             "ingest", "satellite session", metadata=satellite.step_metadata()
@@ -484,11 +534,15 @@ async def store_inbound(
 
 
 async def builtin_source(session: AsyncSession, adapter_key: str) -> DataSource:
-    """The built-in data source of a channel (`webble`, `log_file`), created by migration 0011
-    and recreated here if an installation lost it."""
-    from shared.connectivity.adapters import log_file, webble
+    """The built-in data source of a channel (`webble`, `log_file`, `lp0_station`), created by
+    migrations 0011 and 0053 and recreated here if an installation lost it."""
+    from shared.connectivity.adapters import log_file, lp0_station, webble
 
-    known = {webble.WebBleAdapter.key: webble, log_file.LogFileAdapter.key: log_file}
+    known = {
+        webble.WebBleAdapter.key: webble,
+        log_file.LogFileAdapter.key: log_file,
+        lp0_station.Lp0StationAdapter.key: lp0_station,
+    }
     module = known[adapter_key]
     source = await session.get(DataSource, module.SOURCE_ID)
     if source is None:
@@ -571,15 +625,22 @@ def retained_events(identity: ExternalIdentity) -> Select[tuple[int, datetime]]:
 
 
 async def unlinked_receptions(
-    session: AsyncSession, events: Sequence[tuple[int, datetime]]
+    session: AsyncSession,
+    events: Sequence[tuple[int, datetime]],
+    *,
+    earliest: datetime | None = None,
 ) -> dict[tuple[int, datetime], list[ReceptionRef]]:
     """The receptions without a device of these source events, keyed by the event. Receptions
     stored while the identity was unknown carry no device; the walk gives them the device their
     event gets, so the gateway layer and the coverage see those uplinks. Read over the events'
-    time window, so the chunks and the compressed batches outside it are never opened."""
+    time window, so the chunks and the compressed batches outside it are never opened.
+    `earliest` widens the window's start to the oldest reception time the events carry: a
+    frame from an offload station's card was received weeks before it was uploaded (phase 42)."""
     if not events:
         return {}
     lo = min(ingested_at for _, ingested_at in events) - RECEPTION_WINDOW
+    if earliest is not None and earliest - RECEPTION_WINDOW < lo:
+        lo = earliest - RECEPTION_WINDOW
     hi = max(ingested_at for _, ingested_at in events) + RECEPTION_WINDOW
     rows = await session.execute(
         select(

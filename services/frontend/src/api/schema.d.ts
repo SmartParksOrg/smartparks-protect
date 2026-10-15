@@ -4444,6 +4444,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/lp0-credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lp0 Credentials
+         * @description The device's LP0 address and whether its keys are set; the keys themselves never.
+         */
+        get: operations["get_lp0_credentials_api_v1_devices__device_id__lp0_credentials_get"];
+        /**
+         * Set Lp0 Credentials
+         * @description Set the tracker's LP0 address and keys (decision D320): typed in, or taken from what
+         *     the device reported in its settings readback. The address becomes the device's identity
+         *     on the offload station source; frames stored for it before are handed to the decoder.
+         */
+        put: operations["set_lp0_credentials_api_v1_devices__device_id__lp0_credentials_put"];
+        post?: never;
+        /** Delete Lp0 Credentials */
+        delete: operations["delete_lp0_credentials_api_v1_devices__device_id__lp0_credentials_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/offload-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Offload Files
+         * @description The files of an offload station's SD card (decision D321): one `.jsonl`, or a zip of
+         *     the card's `LOG_*` folders, uploaded on the station's device page. Every file becomes a
+         *     raw log file row of the station with channel `lp0`; a file seen before is skipped with
+         *     its reason, as is a member that is not a station file.
+         */
+        post: operations["upload_offload_files_api_v1_devices__device_id__offload_files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/offload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Offload Station
+         * @description The Offload station card (decision D322): the files a station's cards brought, their
+         *     frames and records, the trackers the station served in the last 30 days from its
+         *     receptions, and the station's own last report.
+         */
+        get: operations["offload_station_api_v1_devices__device_id__offload_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/analysis-layers": {
         parameters: {
             query?: never;
@@ -6299,6 +6371,11 @@ export interface components {
         };
         /** Body_upload_log_file_api_v1_devices__device_id__log_files_post */
         Body_upload_log_file_api_v1_devices__device_id__log_files_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_offload_files_api_v1_devices__device_id__offload_files_post */
+        Body_upload_offload_files_api_v1_devices__device_id__offload_files_post: {
             /** File */
             file: string;
         };
@@ -9497,6 +9574,11 @@ export interface components {
             location_source?: string | null;
             /** Location At */
             location_at?: string | null;
+            /**
+             * Device Id
+             * @description The device this gateway is, when it is one of ours (decision D319): an offload station
+             */
+            device_id?: string | null;
             /** Status */
             status: string;
             /** First Seen At */
@@ -10407,6 +10489,105 @@ export interface components {
          * @enum {string}
          */
         LocationSource: "device" | "network" | "device_else_network" | "static";
+        /** Lp0CredentialsRead */
+        Lp0CredentialsRead: {
+            /**
+             * Dev Addr
+             * @description Eight uppercase hex digits
+             */
+            dev_addr?: string | null;
+            /**
+             * Keys Set
+             * @default false
+             */
+            keys_set: boolean;
+            /** Set At */
+            set_at?: string | null;
+            /**
+             * Source
+             * @description person or device
+             */
+            source?: string | null;
+            readback?: components["schemas"]["Lp0Readback"];
+            /**
+             * Frames Waiting
+             * @description Frames stored for this address before the device had it, waiting for the decoder's walk
+             * @default 0
+             */
+            frames_waiting: number;
+        };
+        /** Lp0CredentialsResult */
+        Lp0CredentialsResult: {
+            /**
+             * Dev Addr
+             * @description Eight uppercase hex digits
+             */
+            dev_addr?: string | null;
+            /**
+             * Keys Set
+             * @default false
+             */
+            keys_set: boolean;
+            /** Set At */
+            set_at?: string | null;
+            /**
+             * Source
+             * @description person or device
+             */
+            source?: string | null;
+            readback?: components["schemas"]["Lp0Readback"];
+            /**
+             * Frames Waiting
+             * @description Frames stored for this address before the device had it, waiting for the decoder's walk
+             * @default 0
+             */
+            frames_waiting: number;
+            /**
+             * Queued
+             * @description Retained frames handed to the decoder's walk
+             * @default 0
+             */
+            queued: number;
+        };
+        /**
+         * Lp0CredentialsUpdate
+         * @description The address and both keys typed in, or `from_device` to take the three values the
+         *     device reported in its settings readback.
+         */
+        Lp0CredentialsUpdate: {
+            /** Dev Addr */
+            dev_addr?: string | null;
+            /** App S Key */
+            app_s_key?: string | null;
+            /** Nwk S Key */
+            nwk_s_key?: string | null;
+            /**
+             * From Device
+             * @default false
+             */
+            from_device: boolean;
+        };
+        /**
+         * Lp0Readback
+         * @description What the device itself reported of its LP0 settings (the settings table, D228): the
+         *     address in the clear, and whether the two keys are known, never their values.
+         */
+        Lp0Readback: {
+            /** Dev Addr */
+            dev_addr?: string | null;
+            /**
+             * App Key Known
+             * @default false
+             */
+            app_key_known: boolean;
+            /**
+             * Network Key Known
+             * @default false
+             */
+            network_key_known: boolean;
+            /** Observed At */
+            observed_at?: string | null;
+        };
         /** MapConfig */
         MapConfig: {
             /** Maptiler Key */
@@ -10840,6 +11021,161 @@ export interface components {
             address?: string | null;
             /** Enabled */
             enabled?: boolean | null;
+        };
+        /**
+         * OffloadLink
+         * @description What offload stations carried for the device in the period (decision D322): the frames
+         *     stored for it on their cards, by station, with repeats and the frames that did not
+         *     verify counted apart.
+         */
+        OffloadLink: {
+            /**
+             * Frames
+             * @description Frames decoded in the period, repeats left out
+             */
+            frames: number;
+            /**
+             * Repeats
+             * @description Frames a station saved again, or another did
+             * @default 0
+             */
+            repeats: number;
+            /**
+             * Failed
+             * @description Frames that did not verify or had no keys
+             * @default 0
+             */
+            failed: number;
+            /**
+             * Records New
+             * @default 0
+             */
+            records_new: number;
+            /**
+             * Records Known
+             * @default 0
+             */
+            records_known: number;
+            /**
+             * Last Offload At
+             * @description The newest reception time a station wrote
+             */
+            last_offload_at?: string | null;
+            /** Stations */
+            stations?: components["schemas"]["OffloadStation"][];
+        };
+        /** OffloadStation */
+        OffloadStation: {
+            /** Station Eui */
+            station_eui: string;
+            /** Gateway Id */
+            gateway_id?: string | null;
+            /** Device Id */
+            device_id?: string | null;
+            /** Device Name */
+            device_name?: string | null;
+            /** Frames */
+            frames: number;
+            /** Share */
+            share?: number | null;
+            /** Mean Rssi */
+            mean_rssi?: number | null;
+            /** Last Reception At */
+            last_reception_at?: string | null;
+        };
+        /**
+         * OffloadStationRead
+         * @description What a station's card brought to Protect: the files, their frames and records, the
+         *     trackers it served in the last 30 days, and the station's own report when it sent one.
+         */
+        OffloadStationRead: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Station Eui */
+            station_eui?: string | null;
+            /**
+             * Is Station
+             * @description The device has received files or reports as a station
+             */
+            is_station: boolean;
+            /**
+             * Files
+             * @default 0
+             */
+            files: number;
+            /**
+             * Frames
+             * @default 0
+             */
+            frames: number;
+            /**
+             * Frames Retained
+             * @default 0
+             */
+            frames_retained: number;
+            /**
+             * Frames Repeated
+             * @default 0
+             */
+            frames_repeated: number;
+            /**
+             * Records New
+             * @default 0
+             */
+            records_new: number;
+            /**
+             * Records Known
+             * @default 0
+             */
+            records_known: number;
+            /** Last Upload At */
+            last_upload_at?: string | null;
+            /** Last Reception At */
+            last_reception_at?: string | null;
+            /** Trackers */
+            trackers?: components["schemas"]["OffloadTracker"][];
+            /**
+             * State
+             * @description The station's last port 23 report (decision D323)
+             */
+            state?: {
+                [key: string]: unknown;
+            } | null;
+            /** State Time */
+            state_time?: string | null;
+        };
+        /** OffloadTracker */
+        OffloadTracker: {
+            /** Dev Addr */
+            dev_addr?: string | null;
+            /** Device Id */
+            device_id?: string | null;
+            /** Device Name */
+            device_name?: string | null;
+            /**
+             * Frames
+             * @default 0
+             */
+            frames: number;
+            /** Last Reception At */
+            last_reception_at?: string | null;
+            /** Mean Rssi */
+            mean_rssi?: number | null;
+        };
+        /** OffloadUpload */
+        OffloadUpload: {
+            /** Files */
+            files: components["schemas"]["DeviceLogFileRead"][];
+            /** Skipped */
+            skipped?: components["schemas"]["SkippedMember"][];
+            /**
+             * Other Station
+             * @description Files named after another station's EUI, accepted as they are
+             */
+            other_station?: string[];
         };
         /**
          * OrganizationCreate
@@ -12438,6 +12774,13 @@ export interface components {
          * @enum {string}
          */
         Severity: "info" | "warning" | "critical";
+        /** SkippedMember */
+        SkippedMember: {
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
+        };
         /** SourceConnectivity */
         SourceConnectivity: {
             /**
@@ -12451,7 +12794,7 @@ export interface components {
             adapter_key: string;
             /**
              * Channel
-             * @description lorawan, iridium, webble, log_file, api or cellular
+             * @description lorawan, iridium, lp0, webble, log_file, api or cellular
              */
             channel: string;
             /**
@@ -12473,6 +12816,7 @@ export interface components {
             last_snr?: number | null;
             lorawan?: components["schemas"]["LoRaWANLink"] | null;
             iridium?: components["schemas"]["IridiumLink"] | null;
+            offload?: components["schemas"]["OffloadLink"] | null;
         };
         /** SourceEventRead */
         SourceEventRead: {
@@ -23033,6 +23377,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceLogFileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lp0_credentials_api_v1_devices__device_id__lp0_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Lp0CredentialsRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_lp0_credentials_api_v1_devices__device_id__lp0_credentials_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Lp0CredentialsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Lp0CredentialsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_lp0_credentials_api_v1_devices__device_id__lp0_credentials_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_offload_files_api_v1_devices__device_id__offload_files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_offload_files_api_v1_devices__device_id__offload_files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffloadUpload"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    offload_station_api_v1_devices__device_id__offload_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffloadStationRead"];
                 };
             };
             /** @description Validation Error */

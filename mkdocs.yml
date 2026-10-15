@@ -77,6 +77,7 @@ nav:
       - Fences and traps: devices/fences-and-traps.md
       - Cardiac monitoring: devices/cardiac-monitoring.md
       - Raw log files: devices/raw-log-files.md
+      - Offload stations: devices/offload-stations.md
   - Integrations:
       - integrations/index.md
       - Adapter interface: integrations/adapter-interface.md
@@ -92,6 +93,7 @@ nav:
       - AddaxAI Connect: integrations/addaxai-connect/index.md
       - Cloudloop (Iridium): integrations/cloudloop/index.md
       - Rock7 RockBLOCK (Iridium): integrations/rock7/index.md
+      - Offload station files (LP0): integrations/lp0-station/index.md
       - Gateways and connectivity: integrations/gateways.md
       - Outbound integrations: integrations/outbound.md
       - EarthRanger via Gundi: integrations/earthranger-gundi/index.md
@@ -116,6 +118,7 @@ nav:
       - Analysis design (phase 2): ANALYTICS_PHASE2_PLAN.md
       - Analysis design (contact tracing): ANALYTICS_CONTACT_TRACING_PLAN.md
       - Analysis design (habitat selection): HABITAT_SELECTION_PLAN.md
+      - Offload stations design (LP0 files): LP0_OFFLOAD_PLAN.md
   - Rules:
       - rules/index.md
       - Automations and notifications: rules/automations.md

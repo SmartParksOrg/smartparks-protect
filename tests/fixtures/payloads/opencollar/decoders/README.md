@@ -8,3 +8,11 @@ test: `scripts/opencollar_golden.py` runs every recorded frame through each deco
 writes `../golden.json`; `tests/shared/test_opencollar_golden.py` checks our driver, with the
 layout of the matching firmware, against those outputs. Regenerate the golden file when a
 frame is added or a decoder is updated; the test itself needs no node.
+
+`ttn_decoder-lp0-5ff74907.js` is `scripts/ttn_decoder.js` of the firmware repository
+`SmartParksOrg/smartparks-opencollar-edge-fw` at commit 5ff74907 (branch
+`fix/existing-lp0-implementation`, 2026-10-15, unreleased firmware 8.1): the first decoder with
+`decodeLP0Statistics`, the offload station's port 23 report (phase 42, decision D323).
+`tests/shared/test_opencollar_lp0_statistics.py` runs it with node, when node is on the path,
+over constructed reports and compares our driver's reading; no recorded port 23 frame exists
+yet. It is not part of `golden.json`.

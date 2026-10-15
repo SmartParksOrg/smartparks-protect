@@ -95,6 +95,7 @@ KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
     PORT_SWITCH_CHANGE: (0x98, 5),
     PORT_SWITCH_STATUS: (0x99, 5),
     21: (0x9A, None),
+    23: (0x9D, 97),
     27: (0x91, None),
     28: (0x90, None),
 }
@@ -141,6 +142,45 @@ PORT_BLE_SCAN = 11  # msg 0xFA, one scan as it happened (research 3.9)
 PORT_RF_SCAN = 8  # firmware 4.x to 6.16, removed in 7.1.0 (research 3.23)
 PORT_OPEN_SKY = 17  # firmware 6.x, removed in 7.1.0; the message has no id byte
 PORT_AIR_QUALITY = 21  # firmware 7.2.0 and later
+PORT_LP0_STATISTICS = 23  # msg 0x9D, an offload station's report (firmware 8.1, phase 42)
+#: The status observations of the port 23 report, bit 0 first (the firmware's README).
+LP0_STATUS_BITS = (
+    "card_detected",
+    "card_writable",
+    "sdfs_unresponsive",
+    "sdfs_recovery_required",
+    "sdfs_active",
+    "lp0_enabled",
+    "lp0_listening",
+    "session_active",
+    "radio_fault",
+    "storage_queue_full",
+    "flash_available",
+)
+#: The 21 cumulative counters of the report, in wire order.
+LP0_COUNTERS = (
+    "visits_complete",
+    "visits_partial",
+    "visits_cancelled",
+    "visits_timed_out",
+    "visits_failed",
+    "data_received",
+    "data_saved",
+    "data_failed",
+    "data_dropped",
+    "data_saved_bytes",
+    "sd_media_errors",
+    "sdfs_errors",
+    "cad_rejections",
+    "rssi_rejections",
+    "rx_rejections",
+    "radio_errors",
+    "reports_generated",
+    "reports_superseded",
+    "report_tx_failed",
+    "report_rx_dropped",
+    "report_sd_failed",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,7 +200,9 @@ def _ports(
     *, legacy: bool, switches: bool, air_quality: bool, cmdq: bool
 ) -> dict[int, tuple[int | None, int | None]]:
     ports: dict[int, tuple[int | None, int | None]] = {
-        k: v for k, v in KNOWN_PORTS.items() if k not in (PORT_AIR_QUALITY, 15, 18, 19, 20)
+        k: v
+        for k, v in KNOWN_PORTS.items()
+        if k not in (PORT_AIR_QUALITY, PORT_LP0_STATISTICS, 15, 18, 19, 20)
     }
     if legacy:
         ports[PORT_RF_SCAN] = (0xFB, None)
@@ -171,6 +213,7 @@ def _ports(
         ports[PORT_SWITCH_STATUS] = KNOWN_PORTS[PORT_SWITCH_STATUS]
     if air_quality:
         ports[PORT_AIR_QUALITY] = KNOWN_PORTS[PORT_AIR_QUALITY]
+        ports[PORT_LP0_STATISTICS] = KNOWN_PORTS[PORT_LP0_STATISTICS]  # 8.1 and later
     if cmdq:
         ports[15] = KNOWN_PORTS[15]
     return ports
@@ -360,6 +403,17 @@ OPENCOLLAR_HEALTH: tuple[HealthField, ...] = (
     ),
     HealthField("fence_pulse_count", "Fence pulses", warn_below=1),
     HealthField("trap_triggered", "Trap", kind="bool", words=("closed", "open")),
+    # an offload station's report of itself (port 23, firmware 8.1; phase 42, decision D323)
+    HealthField(
+        "lp0_sd_card_ok",
+        "SD card",
+        kind="bool",
+        words=("in and writable", "absent or not writable"),
+        critical_below=1,
+    ),
+    HealthField("lp0_sd_media_errors", "SD card errors", warn_above=0),
+    HealthField("lp0_storage_pending", "Frames waiting for the card", warn_above=2),
+    HealthField("lp0_visits_complete", "Offload visits completed"),
     HealthField("switch_active", "Switch", kind="bool", words=("active", "inactive")),
 )
 
@@ -427,11 +481,14 @@ class OpenCollarDriver:
             return records
         if event.f_port is None:
             raise _fail("uplink carries no LoRaWAN port", event_type=event.event_type)
+        # an offload station's card holds ordinary LoRaWAN frames (phase 42): port 29 the
+        # stored stream, port 23 the station's own statistics, any other a live message
+        via = "lp0" if channel == AcquisitionChannel.LP0 else "lorawan"
         if event.f_port == PORT_FLASH_LOG:
             self._decode_flash_log(event.frame, records, layout)
         else:
             self._decode_message(
-                event.f_port, event.frame, received, records, via="lorawan", layout=layout
+                event.f_port, event.frame, received, records, via=via, layout=layout
             )
         return records
 
@@ -713,6 +770,67 @@ class OpenCollarDriver:
         )
 
     @staticmethod
+    def _decode_lp0_statistics(data: bytes, time: datetime, records: DecodedRecords) -> None:
+        """Port 23 (firmware 8.1, `decodeLP0Statistics` of the branch decoder; phase 42,
+        decision D323): an offload station's report of itself. The 97 data bytes after the
+        two byte header: the schema version, the value and known bitmaps of eleven status
+        observations (a bit that is not known is unknown, never false), uptime, the SD jobs
+        pending and the most at once, then 21 cumulative counters. The report is kept as the
+        state `lp0_station` and the figures as measurements, so the health card, the rules
+        and the trends read them like any other."""
+        if len(data) != 97 or data[0] != 1:
+            raise _fail(
+                "LP0 statistics message has an unknown version or length",
+                version=data[0] if data else None,
+                length=len(data),
+            )
+        flags, known = struct.unpack_from("<HH", data, 1)
+        uptime, pending, high_water = struct.unpack_from("<IHH", data, 5)
+        if known & ~0x07FF or flags & ~known or pending > high_water:
+            raise _fail(
+                "LP0 statistics observations are inconsistent",
+                flags=flags,
+                known=known,
+                pending=pending,
+                high_water=high_water,
+            )
+        status = {
+            name: (bool(flags & (1 << bit)) if known & (1 << bit) else None)
+            for bit, name in enumerate(LP0_STATUS_BITS)
+        }
+        counters = dict(
+            zip(LP0_COUNTERS, struct.unpack_from(f"<{len(LP0_COUNTERS)}I", data, 13), strict=True)
+        )
+        records.states.append(
+            DecodedState(
+                time=time,
+                state={
+                    "lp0_station": {
+                        "version": data[0],
+                        "uptime_seconds": uptime,
+                        "storage_pending": pending,
+                        "storage_high_water": high_water,
+                        "status": status,
+                        "counters": counters,
+                    }
+                },
+                record_type="lp0_station",
+            )
+        )
+        figures: dict[str, float | bool] = {
+            "lp0_uptime": float(uptime),
+            "lp0_storage_pending": float(pending),
+            "lp0_storage_high_water": float(high_water),
+            **{f"lp0_{name}": float(value) for name, value in counters.items()},
+        }
+        if status["card_detected"] is not None and status["card_writable"] is not None:
+            figures["lp0_sd_card_ok"] = bool(status["card_detected"] and status["card_writable"])
+        records.measurements += [
+            DecodedMeasurement(time=time, metric_key=key, value=value, record_type="lp0_station")
+            for key, value in figures.items()
+        ]
+
+    @staticmethod
     def _decode_open_sky(payload: bytes, time: datetime, records: DecodedRecords) -> None:
         """Port 17 (decoders up to 6.15.x `decodeOpenSkyDetection`): the length byte then
         pairs of negated average and maximum RSSI."""
@@ -843,6 +961,8 @@ class OpenCollarDriver:
             self._decode_status(data, time, records, via, layout)
         elif port == PORT_AIR_QUALITY:
             self._decode_air_quality(data, time, records)
+        elif port == PORT_LP0_STATISTICS:
+            self._decode_lp0_statistics(data, time, records)
         elif port == PORT_BLE_SCAN:
             self._decode_ble_scan(data, time, records)
         elif port == PORT_BLE_SCAN_AGGREGATED:

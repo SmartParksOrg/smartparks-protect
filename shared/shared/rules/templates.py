@@ -214,6 +214,29 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "offload_station_no_card": {
+        "name": "Offload station without a card",
+        "description": (
+            "An offload station reports that its SD card is absent or not writable (phase 42, "
+            "decision D323): nothing a tracker offloads there is kept. Reminds once a day."
+        ),
+        "document": {
+            "trigger": {"kind": "measurement", "metric_key": "lp0_sd_card_ok"},
+            "conditions": {
+                "type": "threshold",
+                "metric": "lp0_sd_card_ok",
+                "op": "<",
+                "value": 1,
+            },
+            "cooldown_seconds": 86_400,
+            "event": {
+                "event_type": "OFFLOAD_STATION_NO_CARD",
+                "severity": "critical",
+                "title": "{entity} has no usable SD card",
+                "create_alert": True,
+            },
+        },
+    },
     "possible_immobility": {
         "name": "Device not moving",
         "description": (

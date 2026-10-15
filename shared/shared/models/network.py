@@ -29,6 +29,13 @@ class Gateway(UuidPrimaryKeyMixin, TimestampMixin, Base):
     )
     external_id: Mapped[str] = mapped_column(String(64), nullable=False)
     name: Mapped[str | None] = mapped_column(String(200))
+    device_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("devices.id", ondelete="SET NULL"),
+        index=True,
+        comment="The device this gateway is, when it is one of ours: an offload station is a "
+        "RangerEdge with an SD card and a gateway of the offload station source (decision D319)",
+    )
     description: Mapped[str | None] = mapped_column(Text)
     geom: Mapped[Any | None] = mapped_column(
         Geometry(geometry_type="POINT", srid=4326, spatial_index=True)

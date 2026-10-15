@@ -163,6 +163,21 @@ function detailsText(r: TrafficRow, t: T): string {
       );
     if (r.gateway_count)
       parts.push(t("{{count}} gateways", { count: r.gateway_count }));
+  } else if (r.acquisition_channel === "lp0") {
+    // a frame an offload station stored (phase 42, decision D322): the port and counter of
+    // the LoRaWAN frame, the signal the station saw, the station, when the card was read
+    if (r.f_port != null) parts.push(t("port {{port}}", { port: r.f_port }));
+    if (r.f_cnt != null) parts.push(t("FCnt {{count}}", { count: r.f_cnt }));
+    if (r.spreading_factor != null) parts.push(`SF${r.spreading_factor}`);
+    if (r.best_rssi != null)
+      parts.push(
+        `${r.best_rssi.toFixed(0)} dBm${r.best_snr != null ? ` / ${r.best_snr.toFixed(1)} dB` : ""}`,
+      );
+    const station = r.receptions[0]?.gateway_id;
+    if (station)
+      parts.push(t("station {{eui}}", { eui: station.toUpperCase() }));
+    if (r.delivered_at)
+      parts.push(t("uploaded {{when}}", { when: formatAgo(r.delivered_at) }));
   } else if (r.acquisition_channel === "iridium" && r.satellite) {
     // the Iridium session behind the delivery (decision D158): its counter, its outcome, the
     // network's own idea of where the device was, and what went missing before it

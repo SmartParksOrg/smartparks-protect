@@ -10,3 +10,4 @@
 - [Cardiac monitoring](cardiac-monitoring.md): heart rate, variability and body temperature from a LINQII tag the animal wears, heard over Bluetooth by its collar, and what the five undocumented fields are and are not.
 - [Fences and traps](fences-and-traps.md): a fence line that reads its status section by section from the FenceEdge devices on it, and a trap whose door a TrapEdge watches.
 - [Raw log files](raw-log-files.md): uploaded logs as managed assets, decoded through the same pipeline.
+- [Offload stations](offload-stations.md): a RangerEdge with an SD card that trackers offload their flash logs to over LP0, the card's files read into Protect with each tracker's own keys, the station an entity and a gateway.

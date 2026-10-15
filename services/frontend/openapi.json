@@ -18924,6 +18924,259 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/lp0-credentials": {
+   "get": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Get Lp0 Credentials",
+    "description": "The device's LP0 address and whether its keys are set; the keys themselves never.",
+    "operationId": "get_lp0_credentials_api_v1_devices__device_id__lp0_credentials_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Lp0CredentialsRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Set Lp0 Credentials",
+    "description": "Set the tracker's LP0 address and keys (decision D320): typed in, or taken from what\nthe device reported in its settings readback. The address becomes the device's identity\non the offload station source; frames stored for it before are handed to the decoder.",
+    "operationId": "set_lp0_credentials_api_v1_devices__device_id__lp0_credentials_put",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Lp0CredentialsUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Lp0CredentialsResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Delete Lp0 Credentials",
+    "operationId": "delete_lp0_credentials_api_v1_devices__device_id__lp0_credentials_delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/offload-files": {
+   "post": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Upload Offload Files",
+    "description": "The files of an offload station's SD card (decision D321): one `.jsonl`, or a zip of\nthe card's `LOG_*` folders, uploaded on the station's device page. Every file becomes a\nraw log file row of the station with channel `lp0`; a file seen before is skipped with\nits reason, as is a member that is not a station file.",
+    "operationId": "upload_offload_files_api_v1_devices__device_id__offload_files_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_offload_files_api_v1_devices__device_id__offload_files_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OffloadUpload"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/devices/{device_id}/offload": {
+   "get": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Offload Station",
+    "description": "The Offload station card (decision D322): the files a station's cards brought, their\nframes and records, the trackers the station served in the last 30 days from its\nreceptions, and the station's own last report.",
+    "operationId": "offload_station_api_v1_devices__device_id__offload_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OffloadStationRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/analysis-layers": {
    "get": {
     "tags": [
@@ -25298,6 +25551,20 @@
      "file"
     ],
     "title": "Body_upload_log_file_api_v1_devices__device_id__log_files_post"
+   },
+   "Body_upload_offload_files_api_v1_devices__device_id__offload_files_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_offload_files_api_v1_devices__device_id__offload_files_post"
    },
    "Body_upload_project_layer_api_v1_projects__project_id__layers_post": {
     "properties": {
@@ -34040,6 +34307,19 @@
       ],
       "title": "Location At"
      },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id",
+      "description": "The device this gateway is, when it is one of ours (decision D319): an offload station"
+     },
      "status": {
       "type": "string",
       "title": "Status"
@@ -36595,6 +36875,212 @@
     "title": "LocationSource",
     "description": "Which positions decide an entity's or a device's current position (decision D164)."
    },
+   "Lp0CredentialsRead": {
+    "properties": {
+     "dev_addr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Addr",
+      "description": "Eight uppercase hex digits"
+     },
+     "keys_set": {
+      "type": "boolean",
+      "title": "Keys Set",
+      "default": false
+     },
+     "set_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Set At"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source",
+      "description": "person or device"
+     },
+     "readback": {
+      "$ref": "#/components/schemas/Lp0Readback"
+     },
+     "frames_waiting": {
+      "type": "integer",
+      "title": "Frames Waiting",
+      "description": "Frames stored for this address before the device had it, waiting for the decoder's walk",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "title": "Lp0CredentialsRead"
+   },
+   "Lp0CredentialsResult": {
+    "properties": {
+     "dev_addr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Addr",
+      "description": "Eight uppercase hex digits"
+     },
+     "keys_set": {
+      "type": "boolean",
+      "title": "Keys Set",
+      "default": false
+     },
+     "set_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Set At"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source",
+      "description": "person or device"
+     },
+     "readback": {
+      "$ref": "#/components/schemas/Lp0Readback"
+     },
+     "frames_waiting": {
+      "type": "integer",
+      "title": "Frames Waiting",
+      "description": "Frames stored for this address before the device had it, waiting for the decoder's walk",
+      "default": 0
+     },
+     "queued": {
+      "type": "integer",
+      "title": "Queued",
+      "description": "Retained frames handed to the decoder's walk",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "title": "Lp0CredentialsResult"
+   },
+   "Lp0CredentialsUpdate": {
+    "properties": {
+     "dev_addr": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 16
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Addr"
+     },
+     "app_s_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 48
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "App S Key"
+     },
+     "nwk_s_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 48
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nwk S Key"
+     },
+     "from_device": {
+      "type": "boolean",
+      "title": "From Device",
+      "default": false
+     }
+    },
+    "type": "object",
+    "title": "Lp0CredentialsUpdate",
+    "description": "The address and both keys typed in, or `from_device` to take the three values the\ndevice reported in its settings readback."
+   },
+   "Lp0Readback": {
+    "properties": {
+     "dev_addr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Addr"
+     },
+     "app_key_known": {
+      "type": "boolean",
+      "title": "App Key Known",
+      "default": false
+     },
+     "network_key_known": {
+      "type": "boolean",
+      "title": "Network Key Known",
+      "default": false
+     },
+     "observed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Observed At"
+     }
+    },
+    "type": "object",
+    "title": "Lp0Readback",
+    "description": "What the device itself reported of its LP0 settings (the settings table, D228): the\naddress in the clear, and whether the two keys are known, never their values."
+   },
    "MapConfig": {
     "properties": {
      "maptiler_key": {
@@ -37820,6 +38306,367 @@
     },
     "type": "object",
     "title": "NotificationTargetUpdate"
+   },
+   "OffloadLink": {
+    "properties": {
+     "frames": {
+      "type": "integer",
+      "title": "Frames",
+      "description": "Frames decoded in the period, repeats left out"
+     },
+     "repeats": {
+      "type": "integer",
+      "title": "Repeats",
+      "description": "Frames a station saved again, or another did",
+      "default": 0
+     },
+     "failed": {
+      "type": "integer",
+      "title": "Failed",
+      "description": "Frames that did not verify or had no keys",
+      "default": 0
+     },
+     "records_new": {
+      "type": "integer",
+      "title": "Records New",
+      "default": 0
+     },
+     "records_known": {
+      "type": "integer",
+      "title": "Records Known",
+      "default": 0
+     },
+     "last_offload_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Offload At",
+      "description": "The newest reception time a station wrote"
+     },
+     "stations": {
+      "items": {
+       "$ref": "#/components/schemas/OffloadStation"
+      },
+      "type": "array",
+      "title": "Stations"
+     }
+    },
+    "type": "object",
+    "required": [
+     "frames"
+    ],
+    "title": "OffloadLink",
+    "description": "What offload stations carried for the device in the period (decision D322): the frames\nstored for it on their cards, by station, with repeats and the frames that did not\nverify counted apart."
+   },
+   "OffloadStation": {
+    "properties": {
+     "station_eui": {
+      "type": "string",
+      "title": "Station Eui"
+     },
+     "gateway_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gateway Id"
+     },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "frames": {
+      "type": "integer",
+      "title": "Frames"
+     },
+     "share": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Share"
+     },
+     "mean_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Rssi"
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "station_eui",
+     "frames"
+    ],
+    "title": "OffloadStation"
+   },
+   "OffloadStationRead": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "station_eui": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Station Eui"
+     },
+     "is_station": {
+      "type": "boolean",
+      "title": "Is Station",
+      "description": "The device has received files or reports as a station"
+     },
+     "files": {
+      "type": "integer",
+      "title": "Files",
+      "default": 0
+     },
+     "frames": {
+      "type": "integer",
+      "title": "Frames",
+      "default": 0
+     },
+     "frames_retained": {
+      "type": "integer",
+      "title": "Frames Retained",
+      "default": 0
+     },
+     "frames_repeated": {
+      "type": "integer",
+      "title": "Frames Repeated",
+      "default": 0
+     },
+     "records_new": {
+      "type": "integer",
+      "title": "Records New",
+      "default": 0
+     },
+     "records_known": {
+      "type": "integer",
+      "title": "Records Known",
+      "default": 0
+     },
+     "last_upload_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Upload At"
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     },
+     "trackers": {
+      "items": {
+       "$ref": "#/components/schemas/OffloadTracker"
+      },
+      "type": "array",
+      "title": "Trackers"
+     },
+     "state": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State",
+      "description": "The station's last port 23 report (decision D323)"
+     },
+     "state_time": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State Time"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "is_station"
+    ],
+    "title": "OffloadStationRead",
+    "description": "What a station's card brought to Protect: the files, their frames and records, the\ntrackers it served in the last 30 days, and the station's own report when it sent one."
+   },
+   "OffloadTracker": {
+    "properties": {
+     "dev_addr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Addr"
+     },
+     "device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Id"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name"
+     },
+     "frames": {
+      "type": "integer",
+      "title": "Frames",
+      "default": 0
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     },
+     "mean_rssi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mean Rssi"
+     }
+    },
+    "type": "object",
+    "title": "OffloadTracker"
+   },
+   "OffloadUpload": {
+    "properties": {
+     "files": {
+      "items": {
+       "$ref": "#/components/schemas/DeviceLogFileRead"
+      },
+      "type": "array",
+      "title": "Files"
+     },
+     "skipped": {
+      "items": {
+       "$ref": "#/components/schemas/SkippedMember"
+      },
+      "type": "array",
+      "title": "Skipped"
+     },
+     "other_station": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Other Station",
+      "description": "Files named after another station's EUI, accepted as they are"
+     }
+    },
+    "type": "object",
+    "required": [
+     "files"
+    ],
+    "title": "OffloadUpload"
    },
    "OrganizationCreate": {
     "properties": {
@@ -42402,6 +43249,24 @@
     ],
     "title": "Severity"
    },
+   "SkippedMember": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "reason"
+    ],
+    "title": "SkippedMember"
+   },
    "SourceConnectivity": {
     "properties": {
      "data_source_id": {
@@ -42420,7 +43285,7 @@
      "channel": {
       "type": "string",
       "title": "Channel",
-      "description": "lorawan, iridium, webble, log_file, api or cellular"
+      "description": "lorawan, iridium, lp0, webble, log_file, api or cellular"
      },
      "status": {
       "type": "string",
@@ -42511,6 +43376,16 @@
       "anyOf": [
        {
         "$ref": "#/components/schemas/IridiumLink"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "offload": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/OffloadLink"
        },
        {
         "type": "null"

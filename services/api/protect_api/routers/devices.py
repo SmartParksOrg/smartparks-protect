@@ -1,6 +1,7 @@
 """Devices are server-level objects. Project membership is a time-bounded assignment; moving a
 device is a handover that closes one assignment and opens the next (architecture 28)."""
 
+import contextlib
 import csv
 import io
 import json
@@ -105,7 +106,7 @@ from shared.domain.static_place import (
     place_past_sightings_of,
 )
 from shared.domain.trap import TRAP_ATTRIBUTE, closed_when_active
-from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource
+from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource, ProcessingStatus
 from shared.models import (
     AttributionJob,
     ConnectivityState,
@@ -1880,11 +1881,38 @@ class IridiumLink(BaseModel):
     duplicates: int = Field(description="Redeliveries in the period")
 
 
+class OffloadStation(BaseModel):
+    station_eui: str
+    gateway_id: uuid.UUID | None = None
+    device_id: uuid.UUID | None = None
+    device_name: str | None = None
+    frames: int
+    share: float | None = None
+    mean_rssi: float | None = None
+    last_reception_at: datetime | None = None
+
+
+class OffloadLink(BaseModel):
+    """What offload stations carried for the device in the period (decision D322): the frames
+    stored for it on their cards, by station, with repeats and the frames that did not
+    verify counted apart."""
+
+    frames: int = Field(description="Frames decoded in the period, repeats left out")
+    repeats: int = Field(default=0, description="Frames a station saved again, or another did")
+    failed: int = Field(default=0, description="Frames that did not verify or had no keys")
+    records_new: int = 0
+    records_known: int = 0
+    last_offload_at: datetime | None = Field(
+        default=None, description="The newest reception time a station wrote"
+    )
+    stations: list[OffloadStation] = Field(default_factory=list)
+
+
 class SourceConnectivity(BaseModel):
     data_source_id: uuid.UUID
     data_source_name: str
     adapter_key: str
-    channel: str = Field(description="lorawan, iridium, webble, log_file, api or cellular")
+    channel: str = Field(description="lorawan, iridium, lp0, webble, log_file, api or cellular")
     status: str = Field(description="online, silent or unknown")
     last_contact_at: datetime | None = None
     last_uplink_at: datetime | None = None
@@ -1894,6 +1922,7 @@ class SourceConnectivity(BaseModel):
     last_snr: float | None = None
     lorawan: LoRaWANLink | None = None
     iridium: IridiumLink | None = None
+    offload: OffloadLink | None = None
 
 
 class DeviceConnectivityRead(BaseModel):
@@ -2000,6 +2029,13 @@ async def device_connectivity(
             block.lorawan = await _lorawan_link(session, device.id, source.id, since, until)
         elif channel == "iridium":
             block.iridium = await _iridium_link(session, device.id, source.id, state, since, until)
+        elif channel == "lp0":
+            block.offload = await _lp0_link(session, device.id, source.id, since, until)
+            if block.offload.last_offload_at is not None and block.last_contact_at is None:
+                block.last_contact_at = block.offload.last_offload_at
+                block.status = (
+                    "online" if until - block.offload.last_offload_at <= SILENT_AFTER else "silent"
+                )
         result.append(block)
     return DeviceConnectivityRead(device_id=device.id, hours=hours, sources=result)
 
@@ -2109,6 +2145,98 @@ async def _lorawan_link(
             for r in rows
         ],
     )
+
+
+async def _lp0_link(
+    session: AsyncSession,
+    device_id: uuid.UUID,
+    source_id: uuid.UUID,
+    since: datetime,
+    until: datetime,
+) -> OffloadLink:
+    """The frames offload stations stored for the device (decision D322), read from the
+    source events of the period: one per frame, the station and the signal in the metadata,
+    a repeat marked by the ingest (`duplicate_of`), a failure by its status."""
+    meta = SourceEvent.provider_metadata
+    rows = (
+        await session.execute(
+            select(
+                SourceEvent.processing_status,
+                meta["station_eui"].astext,
+                meta["rssi"].astext,
+                meta["received_at"].astext,
+                meta["duplicate_of"].astext,
+            )
+            .where(
+                SourceEvent.device_id == device_id,
+                SourceEvent.data_source_id == source_id,
+                SourceEvent.acquisition_channel == AcquisitionChannel.LP0,
+                SourceEvent.ingested_at >= since,
+                SourceEvent.ingested_at < until,
+            )
+            .limit(MAX_COUNTER_ROWS)
+        )
+    ).all()
+    link = OffloadLink(frames=0)
+    per_station: dict[str, dict[str, Any]] = {}
+    newest: datetime | None = None
+    for status_value, station, rssi, received, repeat_of in rows:
+        if repeat_of:
+            link.repeats += 1
+            continue
+        if status_value == ProcessingStatus.FAILED:
+            link.failed += 1
+            continue
+        link.frames += 1
+        entry = per_station.setdefault(str(station or "?"), {"frames": 0, "rssi": [], "last": None})
+        entry["frames"] += 1
+        if rssi is not None:
+            entry["rssi"].append(float(rssi))
+        when = None
+        if received:
+            with contextlib.suppress(ValueError):
+                when = datetime.fromisoformat(str(received))
+        if when is not None and (entry["last"] is None or when > entry["last"]):
+            entry["last"] = when
+        if when is not None and (newest is None or when > newest):
+            newest = when
+    link.last_offload_at = newest
+    if per_station:
+        gateways = {
+            g.external_id.upper(): g
+            for g in (
+                await session.scalars(
+                    select(Gateway).where(
+                        Gateway.data_source_id == source_id,
+                        Gateway.external_id.in_([k.lower() for k in per_station]),
+                    )
+                )
+            ).all()
+        }
+        device_ids = [g.device_id for g in gateways.values() if g.device_id is not None]
+        names = {
+            d.id: d.name
+            for d in (await session.scalars(select(Device).where(Device.id.in_(device_ids)))).all()
+        }
+        for eui, entry in sorted(per_station.items(), key=lambda kv: -kv[1]["frames"]):
+            gateway = gateways.get(eui)
+            link.stations.append(
+                OffloadStation(
+                    station_eui=eui,
+                    gateway_id=gateway.id if gateway else None,
+                    device_id=gateway.device_id if gateway else None,
+                    device_name=names.get(gateway.device_id)
+                    if gateway and gateway.device_id
+                    else None,
+                    frames=int(entry["frames"]),
+                    share=round(entry["frames"] / link.frames, 3) if link.frames else None,
+                    mean_rssi=(
+                        round(sum(entry["rssi"]) / len(entry["rssi"]), 1) if entry["rssi"] else None
+                    ),
+                    last_reception_at=entry["last"],
+                )
+            )
+    return link
 
 
 async def _iridium_link(

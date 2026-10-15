@@ -43,6 +43,13 @@ The row shows:
 already known are recognised by their canonical keys. "Original" downloads the file byte for
 byte. Files up to `LOG_FILE_MAX_BYTES` (64 MB by default) are accepted.
 
+## An offload station's card
+
+The same card and the same worker take the files of an offload station's SD card, one `.jsonl`
+or a zip of its `LOG_*` folders, as rows of the station with channel `lp0`: every line is a frame
+another device offloaded, verified and decrypted with that device's own keys by the pipeline. See
+[Offload stations](offload-stations.md).
+
 ## Provenance
 
 A position delivered over LoRaWAN, from a file and over WebBLE is one position with three

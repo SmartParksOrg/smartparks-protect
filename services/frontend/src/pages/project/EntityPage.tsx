@@ -53,6 +53,7 @@ import { ConnectivityCards } from "@/components/devices/ConnectivityCard";
 import { LocationSourceCard } from "@/components/devices/LocationSourceCard";
 import { MeasurementsCard } from "@/components/data/MeasurementsCard";
 import { FenceLineCard } from "@/components/entities/FenceLineCard";
+import { OffloadStationCard } from "@/components/devices/OffloadStationCard";
 import {
   Table,
   TableBody,
@@ -670,6 +671,12 @@ export function EntityPage() {
                 invalidate={[queryKeys.entity(projectId, e.id)]}
                 canEdit={admin}
               />
+              {current && (
+                <OffloadStationCard
+                  deviceId={current.device_id}
+                  projectId={projectId}
+                />
+              )}
               {type?.key === "fence_monitor" && (
                 <FenceLineCard
                   projectId={projectId}

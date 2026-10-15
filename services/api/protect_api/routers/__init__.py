@@ -37,6 +37,7 @@ from protect_api.routers.map_config import router as map_config_router
 from protect_api.routers.mcp_actions import admin_router as admin_ai_policy_router
 from protect_api.routers.mcp_actions import router as mcp_actions_router
 from protect_api.routers.network import router as network_router
+from protect_api.routers.offload import router as offload_router
 from protect_api.routers.permissions import router as permissions_router
 from protect_api.routers.platform import router as platform_router
 from protect_api.routers.projects import router as projects_router
@@ -75,6 +76,7 @@ for router in (
     control_router,
     curation_router,
     log_files_router,
+    offload_router,
     layers_router,
     integrations_router,
     gateways_router,

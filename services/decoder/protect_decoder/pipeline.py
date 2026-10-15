@@ -9,6 +9,7 @@ with a code; the bus dead-letters them without retry because a decode failure do
 itself.
 """
 
+import base64
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -67,6 +68,7 @@ from shared.domain.fence import (
     recompute_fence,
     status_title,
 )
+from shared.domain.lp0 import credentials_for, last_counter, remember_counter
 from shared.domain.movement import derive_activity, movement_times, previous_sample
 from shared.domain.outliers import ATTRIBUTE as OUTLIER_ATTRIBUTE
 from shared.domain.outliers import EVENT_TYPE as OUTLIER_EVENT_TYPE
@@ -115,6 +117,8 @@ from shared.trace import ApplicationError, Tracer
 log = get_logger("decoder")
 
 AttributionAt = Callable[[datetime], Awaitable[Attribution]]
+# Channels whose deliveries carry a LoRaWAN port: the network, and an offload station's card.
+PORTED_CHANNELS = frozenset({AcquisitionChannel.LORAWAN, AcquisitionChannel.LP0})
 # Channels whose deliveries are raw frames without a LoRaWAN port (architecture 25.1).
 FRAME_CHANNELS = frozenset(
     {AcquisitionChannel.WEBBLE, AcquisitionChannel.LOG_FILE, AcquisitionChannel.IRIDIUM}
@@ -408,11 +412,13 @@ async def process_source_event(
             frame, f_port = (None, None)
             if event.acquisition_channel == AcquisitionChannel.LORAWAN:
                 frame, f_port = lorawan_frame(payload, event.provider_metadata)
+            elif event.acquisition_channel == AcquisitionChannel.LP0:
+                frame, f_port = await _unwrap_lp0(session, event, device, payload, step)
             elif event.acquisition_channel in FRAME_CHANNELS:
                 frame = raw_frame(payload, event.provider_metadata)
             if (
                 event.event_type in driver.decodable_event_types
-                and event.acquisition_channel == AcquisitionChannel.LORAWAN
+                and event.acquisition_channel in PORTED_CHANNELS
                 and (f_port == 0 or frame == b"")
             ):
                 # A MAC-only uplink (port 0) or an explicitly empty payload holds nothing for a
@@ -553,6 +559,73 @@ async def process_source_event(
         await tracer.finish()
     event.error_code = None
     return outcome
+
+
+async def _unwrap_lp0(
+    session: AsyncSession,
+    event: SourceEvent,
+    device: Device,
+    payload: dict[str, Any],
+    step: Any,
+) -> tuple[bytes | None, int | None]:
+    """A frame an offload station stored (decisions D320 and D321): verified and decrypted
+    once with the device's own LP0 keys, the result kept in the provider metadata so a walk
+    after a link and a re-decode read it back; the stored line is never changed. A device
+    without keys fails plainly, and "Decode again" takes the frame up once they are set."""
+    meta = dict(event.provider_metadata or {})
+    if "frame_hex" in meta:
+        return lorawan_frame(payload, meta)
+    from shared.connectivity.adapters.lp0_station import FrameError, Lp0StationAdapter
+    from shared.connectivity.adapters.lp0_station.lorawan import parse_uplink
+
+    rxpk = payload.get("rxpk") if isinstance(payload, dict) else None
+    data = rxpk.get("data") if isinstance(rxpk, dict) else None
+    try:
+        phy = base64.b64decode(str(data or ""), validate=True)
+    except (ValueError, TypeError):
+        raise ApplicationError(
+            code=ErrorCode.PAYLOAD_DECODE_FAILED,
+            message="the stored line carries no frame",
+            component="decoder",
+        ) from None
+    credentials = await credentials_for(session, device.id)
+    if credentials is None:
+        raise ApplicationError(
+            code=ErrorCode.CREDENTIALS_MISSING,
+            message=f"{device.name} has no LP0 keys; set the address and keys on the device, "
+            "then decode again",
+            component="decoder",
+            retryable=False,
+            user_actionable=True,
+        )
+    frame_format = meta.get("frame_format")
+    try:
+        unwrapped = Lp0StationAdapter.unwrap_frame(
+            phy,
+            credentials,
+            last_f_cnt=await last_counter(session, device.id),
+            frame_format=str(frame_format) if frame_format is not None else None,
+        )
+    except FrameError as exc:
+        raise ApplicationError(
+            code=ErrorCode.PAYLOAD_DECODE_FAILED,
+            message=str(exc),
+            component="decoder",
+            retryable=False,
+            user_actionable=True,
+        ) from None
+    uplink = parse_uplink(phy)
+    await remember_counter(session, device.id, unwrapped.f_cnt, event.network_received_at)
+    meta.update(
+        frame_hex=unwrapped.payload.hex(),
+        f_port=unwrapped.f_port,
+        f_cnt=uplink.f_cnt,
+        f_cnt32=unwrapped.f_cnt,
+        mic_ok=True,
+    )
+    event.provider_metadata = meta
+    step.metadata.update(unwrapped=True, f_cnt=unwrapped.f_cnt, f_port=unwrapped.f_port)
+    return unwrapped.payload, unwrapped.f_port
 
 
 def _summarize(outcome: Outcome, records: DecodedRecords) -> None:

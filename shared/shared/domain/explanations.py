@@ -122,6 +122,11 @@ EVENTS: dict[str, str] = {
         "A fence monitor has not reported for the time the rule sets, so the stretch of fence "
         "it watches reads unknown. Check the device and the network near it."
     ),
+    "OFFLOAD_STATION_NO_CARD": (
+        "The offload station reports that its SD card is absent or cannot be written, so "
+        "trackers that visit it cannot offload. Check the card and the reader; a card that was "
+        "swapped needs its files read into Protect first."
+    ),
     "TRAP_CLOSED": (
         "The switch on the trap says the door shut. Somebody has to go and look; a trap that "
         "stays shut holds whatever it caught."

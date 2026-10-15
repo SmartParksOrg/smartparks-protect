@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { api, downloadFile } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { DeviceLogFile } from "@/api/types";
+import type { DeviceLogFile, OffloadUpload } from "@/api/types";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { TraceDialog } from "@/components/devices/ProvenancePanel";
 import { ProgressBar } from "@/components/common/ProgressBar";
@@ -19,7 +19,14 @@ import { formatAgo, formatTime } from "@/lib/format";
 const CHANNEL_LABEL: Record<string, string> = {
   log_file: "uploaded file",
   webble: "browser sync",
+  lp0: "station card",
 };
+
+/** A station's card: one JSONL file of the card, or a zip of its LOG folders (phase 42). */
+function isStationUpload(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".jsonl") || name.endsWith(".zip");
+}
 
 /** How far the decoder is with a file: the frames done of the frames in the file, as a bar
  * with the percentage; the row is refetched every few seconds while it is processing. */
@@ -73,7 +80,41 @@ function Counts({ f }: { f: DeviceLogFile }) {
         ? `, ${formatTime(f.period_start)} to ${formatTime(f.period_end)}`
         : ""}
       {f.firmware_version ? `, firmware ${f.firmware_version}` : ""}
+      {f.acquisition_channel === "lp0" && <StationCounts f={f} />}
     </span>
+  );
+}
+
+/** What a station's file adds to the counts: frames a station saved again, frames of trackers
+ * nobody named yet, frames of a tracker without keys (phase 42, decision D321). */
+function StationCounts({ f }: { f: DeviceLogFile }) {
+  const { t } = useTranslation();
+  const a = f.attributes as {
+    frames_repeated?: number;
+    frames_retained?: number;
+    errors?: Record<string, number>;
+    folder?: string;
+  };
+  const withoutKeys = a.errors?.CREDENTIALS_MISSING ?? 0;
+  const unverified = a.errors?.PAYLOAD_DECODE_FAILED ?? 0;
+  return (
+    <>
+      {a.frames_repeated
+        ? t(", {{count}} repeated", { count: a.frames_repeated })
+        : ""}
+      {a.frames_retained
+        ? t(", {{count}} of trackers not known yet", {
+            count: a.frames_retained,
+          })
+        : ""}
+      {withoutKeys
+        ? t(", {{count}} of a tracker without keys", { count: withoutKeys })
+        : ""}
+      {unverified
+        ? t(", {{count}} that did not verify", { count: unverified })
+        : ""}
+      {a.folder ? ` · ${a.folder}` : ""}
+    </>
   );
 }
 
@@ -101,15 +142,38 @@ export function LogFilesCard({
         : false,
   });
   const upload = useMutationToast({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const body = new FormData();
       body.append("file", file);
-      return api.post<DeviceLogFile>(`/api/v1/devices/${deviceId}/log-files`, {
-        body,
-      });
+      if (isStationUpload(file)) {
+        // a station's card goes through its own endpoint: a zip becomes one row per file
+        const result = await api.post<OffloadUpload>(
+          `/api/v1/devices/${deviceId}/offload-files`,
+          { body },
+        );
+        return {
+          name: file.name,
+          files: result.files.length,
+          skipped: (result.skipped ?? []).length,
+        };
+      }
+      const row = await api.post<DeviceLogFile>(
+        `/api/v1/devices/${deviceId}/log-files`,
+        { body },
+      );
+      return { name: row.original_filename, files: 1, skipped: 0 };
     },
-    invalidate: [queryKeys.logFiles(deviceId)],
-    success: (f) => `${f.original_filename} uploaded, decoding`,
+    invalidate: [
+      queryKeys.logFiles(deviceId),
+      queryKeys.offloadStation(deviceId),
+    ],
+    success: (r) =>
+      r.files === 1 && r.skipped === 0
+        ? `${r.name} uploaded, decoding`
+        : t(
+            "{{name}}: {{files}} files uploaded, {{skipped}} skipped, decoding",
+            r,
+          ),
     onError: (error) =>
       toast.error(
         error.message.includes("uploaded before")
@@ -135,7 +199,7 @@ export function LogFilesCard({
               <input
                 ref={input}
                 type="file"
-                accept=".txt,.log,text/plain"
+                accept=".txt,.log,.jsonl,.zip,text/plain,application/zip"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -158,7 +222,7 @@ export function LogFilesCard({
         <CardContent className="space-y-2 text-sm">
           <p className="text-xs text-muted-foreground">
             {t(
-              "Raw logs retrieved from the device: one frame per line as the OpenCollar BLE app exports them, or the frames synced from this browser. Every frame is a delivery; records already known from another path are recognised, not duplicated.",
+              "Raw logs retrieved from the device: one frame per line as the OpenCollar BLE app exports them, the frames synced from this browser, or the files of an offload station's SD card (a .jsonl file, or a zip of its LOG folders). Every frame is a delivery; records already known from another path are recognised, not duplicated.",
             )}
           </p>
           {files.isSuccess && files.data.length === 0 && (

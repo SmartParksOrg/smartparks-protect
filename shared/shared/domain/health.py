@@ -43,6 +43,14 @@ def _level_of(field: HealthField, value: Any) -> str | None:
         if not active:
             return "ok"
         return "warn" if field.flags_are_problems else None
+    if field.kind == "bool" and isinstance(value, bool | int | float):
+        # a yes or no with a threshold: the SD card of an offload station is critical when out
+        value = 1 if value else 0
+        if field.critical_below is not None and value < field.critical_below:
+            return "critical"
+        if field.warn_below is not None and value < field.warn_below:
+            return "warn"
+        return "ok" if field.critical_below is not None or field.warn_below is not None else None
     if field.kind in ("number", "duration") and isinstance(value, int | float):
         if field.critical_below is not None and value < field.critical_below:
             return "critical"

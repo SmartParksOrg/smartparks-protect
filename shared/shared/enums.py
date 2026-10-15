@@ -176,6 +176,7 @@ class AcquisitionChannel(StrEnum):
     WEBBLE = "webble"
     LOG_FILE = "log_file"
     IRIDIUM = "iridium"
+    LP0 = "lp0"  # an offload station's SD card (phase 42, decision D321)
     CELLULAR = "cellular"
     API = "api"
     OTHER = "other"
@@ -250,6 +251,7 @@ class ErrorCode(StrEnum):
     COMMAND_REJECTED = "COMMAND_REJECTED"
     COMMAND_EXPIRED = "COMMAND_EXPIRED"
     FILE_PARSE_FAILED = "FILE_PARSE_FAILED"
+    CREDENTIALS_MISSING = "CREDENTIALS_MISSING"  # a device without the keys a frame needs
     EXPORT_FAILED = "EXPORT_FAILED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 

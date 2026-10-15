@@ -62,6 +62,8 @@ import { TrapCard } from "@/components/devices/TrapCard";
 import { BleAddress } from "@/components/devices/BleAddress";
 import { ReportingCard } from "@/components/devices/ReportingCard";
 import { StaticPositionCard } from "@/components/devices/StaticPositionCard";
+import { Lp0CredentialsCard } from "@/components/devices/Lp0CredentialsCard";
+import { OffloadStationCard } from "@/components/devices/OffloadStationCard";
 import { DeviceSettingsTab } from "@/components/devices/DeviceSettingsTab";
 import { useAttributionJob } from "@/hooks/useAttributionJob";
 import { useDecoding } from "@/hooks/useDecoding";
@@ -602,6 +604,15 @@ export function DevicePage() {
                 device={d}
                 canEdit={Boolean(user?.is_superuser) || can("project:write")}
               />
+              {type?.driver_key === "opencollar" && (
+                <Lp0CredentialsCard
+                  deviceId={d.id}
+                  canEdit={
+                    Boolean(user?.is_superuser) || can("devices:control")
+                  }
+                />
+              )}
+              <OffloadStationCard deviceId={d.id} projectId={projectId} />
               {projectId && currentEntityId && (
                 <TrapCard
                   deviceId={d.id}

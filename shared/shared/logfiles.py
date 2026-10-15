@@ -9,10 +9,13 @@ worker and one re-decode.
 
 import base64
 import binascii
+import io
+import json
 import re
 import uuid
+import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -33,6 +36,7 @@ MAX_FRAME_BYTES = 4096
 CHANNEL_ADAPTERS = {
     AcquisitionChannel.LOG_FILE: "log_file",
     AcquisitionChannel.WEBBLE: "webble",
+    AcquisitionChannel.LP0: "lp0_station",
 }
 
 
@@ -126,7 +130,10 @@ async def store_log_file(
         raise DuplicateLogFile(existing)
     now = utc_now()
     source = await builtin_source(session, CHANNEL_ADAPTERS[channel])
-    await ensure_channel_identity(session, source, device.id)
+    if channel != AcquisitionChannel.LP0:
+        # a station's card carries other devices' frames, addressed by their LP0 addresses;
+        # the station itself is a gateway of the source, not an identity on it (D319)
+        await ensure_channel_identity(session, source, device.id)
     attribution = await resolve_attribution(session, device.id, now)
     key = f"{device.id}/{now:%Y/%m}/{digest}.txt"
     await put_object(settings.minio_bucket_log_files, key, data, "text/plain")
@@ -164,3 +171,181 @@ def log_file_message(row: DeviceLogFile, *, reprocess: bool = False) -> tuple[st
 
 async def channel_source(session: AsyncSession, channel: AcquisitionChannel) -> DataSource:
     return await builtin_source(session, CHANNEL_ADAPTERS[channel])
+
+
+# --- An offload station's SD card (phase 42, decisions D321 and D324) -----------------------
+
+#: `STATIONEUI_timestamp[_NNN].jsonl` under `LOG_N/`, the station's files on its card.
+STATION_MEMBER = re.compile(r"(?:^|/)([0-9A-Fa-f]{16}_\d+(?:_\d+)?\.jsonl)$")
+
+
+@dataclass(slots=True)
+class StationFrame:
+    """One line of a station's file: the Semtech `rxpk` document the station writes, with the
+    frame it stored (an ordinary LoRaWAN uplink under the tracker's keys) and the reception."""
+
+    line: int
+    station_eui: str
+    data: bytes
+    document: dict[str, Any]
+    received_at: datetime | None = None
+    rssi: float | None = None
+    snr: float | None = None
+    frequency_hz: int | None = None
+    data_rate: str | None = None
+    coding_rate: str | None = None
+    #: What a line may add after firmware issue 772: the tracker's EUI as routing metadata
+    #: (`devEui`), and a name for the stored frame's format. Kept, never trusted for more
+    #: than naming: the identity is the address, the keys decide.
+    dev_eui: str | None = None
+    frame_format: str | None = None
+
+    @property
+    def spreading_factor(self) -> int | None:
+        match = re.match(r"SF(\d+)", self.data_rate or "")
+        return int(match.group(1)) if match else None
+
+
+@dataclass(slots=True)
+class ParsedStationLog:
+    frames: list[StationFrame] = field(default_factory=list)
+    errors: list[tuple[int, str]] = field(default_factory=list)
+
+    @property
+    def lines(self) -> int:
+        return len(self.frames) + len(self.errors)
+
+
+def _number(value: Any) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_station_line(number: int, text: str) -> StationFrame:
+    """One JSON line to a frame; raises `ValueError` with the reason."""
+    try:
+        document = json.loads(text)
+    except ValueError as exc:
+        raise ValueError(f"not JSON: {exc}") from None
+    if not isinstance(document, dict) or not isinstance(document.get("rxpk"), dict):
+        raise ValueError("no rxpk document")
+    rxpk = document["rxpk"]
+    station = str(document.get("gatewayEui") or "").strip().upper()
+    if not re.fullmatch(r"[0-9A-F]{16}", station):
+        raise ValueError("gatewayEui is not sixteen hex digits")
+    try:
+        data = base64.b64decode(str(rxpk.get("data") or ""), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError(f"data is not base64: {exc}") from None
+    if len(data) < 12:
+        raise ValueError("frame shorter than a LoRaWAN uplink")
+    if len(data) > MAX_FRAME_BYTES:
+        raise ValueError(f"frame longer than {MAX_FRAME_BYTES} bytes")
+    received: datetime | None = None
+    time_text = rxpk.get("time")
+    if isinstance(time_text, str) and time_text:
+        try:
+            received = datetime.fromisoformat(time_text.replace("Z", "+00:00"))
+            received = received if received.tzinfo else received.replace(tzinfo=UTC)
+        except ValueError:
+            received = None
+    if received is None and isinstance(rxpk.get("tmst"), int) and rxpk["tmst"] > 0:
+        # the station writes Unix seconds in `tmst`, not a gateway's microsecond counter
+        received = datetime.fromtimestamp(rxpk["tmst"], tz=UTC)
+    frequency = _number(rxpk.get("freq"))
+    eui = next(
+        (
+            str(document[k]).strip().upper()
+            for k in ("devEui", "deviceEui", "dev_eui", "trackerEui")
+            if isinstance(document.get(k), str) and document[k].strip()
+        ),
+        None,
+    )
+    frame_format = next(
+        (
+            str(document[k]).strip()
+            for k in ("frameFormat", "format", "lp0Format")
+            if isinstance(document.get(k), str) and document[k].strip()
+        ),
+        None,
+    )
+    return StationFrame(
+        line=number,
+        station_eui=station,
+        data=data,
+        document=document,
+        received_at=received,
+        rssi=_number(rxpk.get("rssi")),
+        snr=_number(rxpk.get("lsnr")),
+        frequency_hz=round(frequency * 1_000_000) if frequency else None,
+        data_rate=str(rxpk["datr"]) if rxpk.get("datr") else None,
+        coding_rate=str(rxpk["codr"]) if rxpk.get("codr") else None,
+        dev_eui=eui if eui and re.fullmatch(r"[0-9A-F]{16}", eui) else None,
+        frame_format=frame_format,
+    )
+
+
+def parse_station_jsonl(text: str) -> ParsedStationLog:
+    """A station's file: one JSON document per line (the firmware writes a newline before each
+    line, so a file starts with an empty one); an unreadable line is an error with its number."""
+    result = ParsedStationLog()
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line:
+            continue
+        try:
+            result.frames.append(parse_station_line(number, line))
+        except ValueError as exc:
+            result.errors.append((number, str(exc)))
+    return result
+
+
+def looks_like_station_file(filename: str, data: bytes) -> bool:
+    """A card's file by its name, or by its first non-empty line being a JSON document."""
+    if filename.lower().endswith(".jsonl"):
+        return True
+    head = data[:4096].lstrip()
+    return head.startswith(b"{")
+
+
+@dataclass(slots=True)
+class CardMember:
+    name: str
+    folder: str
+    data: bytes
+
+
+@dataclass(slots=True)
+class UnpackedCard:
+    members: list[CardMember] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
+
+
+def unpack_card_zip(data: bytes, *, member_max_bytes: int) -> UnpackedCard:
+    """The `*.jsonl` members of a zip of a card's folders, each with the folder it sat in;
+    other members are skipped by name. A member over the per-file limit is skipped too.
+    Raises `ValueError` when the bytes are not a zip."""
+    result = UnpackedCard()
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile as exc:
+        raise ValueError(f"not a zip file: {exc}") from None
+    with archive:
+        for info in archive.infolist():
+            if info.is_dir():
+                continue
+            name = info.filename.replace("\\", "/")
+            if not STATION_MEMBER.search(name):
+                result.skipped.append(name)
+                continue
+            if info.file_size > member_max_bytes:
+                result.skipped.append(f"{name} (over {member_max_bytes} bytes)")
+                continue
+            parts = name.split("/")
+            folder = parts[-2] if len(parts) > 1 else ""
+            result.members.append(
+                CardMember(name=parts[-1], folder=folder, data=archive.read(info))
+            )
+    return result

@@ -4,6 +4,7 @@ Every variable is documented in `.env.example`. Missing required values raise at
 intended: a service must not start with a half configured environment.
 """
 
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Literal
 
@@ -158,6 +159,15 @@ class Settings(BaseSettings):
     )
     log_file_max_bytes: int = Field(
         default=64 * 1024 * 1024, description="Largest raw device log file accepted for upload"
+    )
+    lp0_earliest_reception: datetime = Field(
+        default=datetime(2024, 1, 1, tzinfo=UTC),
+        description="An offload station's reception time before this is a clock the station "
+        "never set (decision D324): the frame then carries no delivery time of its own",
+    )
+    lp0_zip_max_bytes: int = Field(
+        default=512 * 1024 * 1024,
+        description="Largest zip of an SD card's LOG folders accepted in one upload (phase 42)",
     )
     log_file_batch_size: int = Field(
         default=200, ge=1, description="Frames of a log file decoded per transaction"

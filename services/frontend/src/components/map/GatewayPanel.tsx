@@ -95,6 +95,14 @@ export function GatewayPanel({
             <span className="text-muted-foreground">
               {t("{{count}} receptions", { count: g.receptions })}
             </span>
+            {g.device_id && (
+              <Link
+                className="underline"
+                to={`/projects/${projectId}/devices/${g.device_id}`}
+              >
+                {t("Offload station device")}
+              </Link>
+            )}
           </div>
         ) : undefined
       }

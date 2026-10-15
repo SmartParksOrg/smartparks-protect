@@ -80,7 +80,11 @@ export const queryKeys = {
     ["projects", projectId, "analyses", params] as const,
   analysis: (projectId: string, runId: string) =>
     ["projects", projectId, "analyses", runId] as const,
-  analysisGeometries: (projectId: string, runId: string, params: Record<string, unknown>) =>
+  analysisGeometries: (
+    projectId: string,
+    runId: string,
+    params: Record<string, unknown>,
+  ) =>
     ["projects", projectId, "analyses", runId, "geometries", params] as const,
   analysisEstimate: (projectId: string, params: Record<string, unknown>) =>
     ["projects", projectId, "analyses", "estimate", params] as const,
@@ -141,6 +145,10 @@ export const queryKeys = {
     ["devices", deviceId, "downlink-queue"] as const,
   deviceRoutes: (deviceId: string) => ["devices", deviceId, "routes"] as const,
   logFiles: (deviceId: string) => ["devices", deviceId, "log-files"] as const,
+  lp0Credentials: (deviceId: string) =>
+    ["devices", deviceId, "lp0-credentials"] as const,
+  offloadStation: (deviceId: string) =>
+    ["devices", deviceId, "offload"] as const,
   deviceWalks: (deviceId: string) => ["devices", deviceId, "walks"] as const,
   driverCatalog: (deviceId: string) =>
     ["devices", deviceId, "driver-catalog"] as const,
@@ -157,7 +165,8 @@ export const queryKeys = {
     ["projects", projectId, "curation", "summary"] as const,
   corrections: (projectId: string, params: Record<string, unknown>) =>
     ["projects", projectId, "curation", "corrections", params] as const,
-  outliers: (projectId: string) => ["projects", projectId, "curation", "outliers"] as const,
+  outliers: (projectId: string) =>
+    ["projects", projectId, "curation", "outliers"] as const,
   curationJobs: (projectId: string, params: Record<string, unknown>) =>
     ["projects", projectId, "curation", "jobs", params] as const,
   curationJob: (projectId: string, id: string) =>

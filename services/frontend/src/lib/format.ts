@@ -91,6 +91,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   webble: "WebBLE",
   log_file: "log file",
   iridium: "Iridium",
+  lp0: "offload station",
   cellular: "cellular",
   api: "API",
   other: "other",

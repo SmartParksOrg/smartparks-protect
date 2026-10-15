@@ -185,6 +185,13 @@ function SourceCard({
           {source.iridium && (
             <IridiumRows link={source.iridium} hours={hours} />
           )}
+          {source.offload && (
+            <OffloadRows
+              link={source.offload}
+              projectId={projectId}
+              hours={hours}
+            />
+          )}
         </dl>
       </CardContent>
     </Card>
@@ -196,17 +203,25 @@ function Row({
   value,
   title,
   muted,
+  to,
 }: {
   label: string;
   value: string | null | undefined;
   title?: string;
   muted?: boolean;
+  to?: string;
 }) {
   return (
     <>
       <dt className="text-muted-foreground">{label}</dt>
       <dd className={cn(muted ? "text-muted-foreground" : "")} title={title}>
-        {value ?? ""}
+        {to ? (
+          <Link className="underline" to={to}>
+            {value ?? ""}
+          </Link>
+        ) : (
+          (value ?? "")
+        )}
       </dd>
     </>
   );
@@ -222,9 +237,76 @@ function channelLabel(channel: string, t: (key: string) => string): string {
       return t("Bluetooth");
     case "log_file":
       return t("log files");
+    case "lp0":
+      return t("offload stations");
     default:
       return channel;
   }
+}
+
+/** What offload stations carried for the device (phase 42, decision D322): the frames stored
+ * for it on their cards, by station, with repeats and failures apart. */
+function OffloadRows({
+  link,
+  projectId,
+  hours,
+}: {
+  link: NonNullable<SourceConnectivity["offload"]>;
+  projectId?: string;
+  hours: number;
+}) {
+  const { t } = useTranslation();
+  const now = useNow();
+  const period = periodLabel(hours, t);
+  return (
+    <>
+      <Row
+        label={t("Frames offloaded, {{period}}", { period })}
+        value={String(link.frames)}
+      />
+      {link.repeats > 0 && (
+        <Row label={t("Repeated frames")} value={String(link.repeats)} muted />
+      )}
+      {link.failed > 0 && (
+        <Row
+          label={t("Frames not verified")}
+          value={String(link.failed)}
+          title={t(
+            "Frames that did not verify under the device's keys, or arrived before the keys were set",
+          )}
+        />
+      )}
+      <Row
+        label={t("Records")}
+        value={t("{{fresh}} new, {{known}} known through another path", {
+          fresh: link.records_new,
+          known: link.records_known,
+        })}
+      />
+      <Row
+        label={t("Last offload")}
+        value={
+          link.last_offload_at
+            ? formatAgo(link.last_offload_at, now)
+            : t("none in the period")
+        }
+        title={formatTime(link.last_offload_at)}
+        muted={!link.last_offload_at}
+      />
+      {(link.stations ?? []).map((station) => (
+        <Row
+          key={station.station_eui}
+          label={t("Station")}
+          value={`${station.device_name ?? station.station_eui} · ${t("{{count}} frames", { count: station.frames })}${station.share != null ? ` · ${Math.round(station.share * 100)}%` : ""}${station.mean_rssi != null ? ` · ${station.mean_rssi.toFixed(0)} dBm` : ""}`}
+          to={
+            projectId && station.device_id
+              ? `/projects/${projectId}/devices/${station.device_id}`
+              : undefined
+          }
+        />
+      ))}
+    </>
+  );
 }
 
 function LoRaWANRows({

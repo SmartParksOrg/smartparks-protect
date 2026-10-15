@@ -42,6 +42,7 @@ def test_registries():
         "rock7",
         "webble",
         "log_file",
+        "lp0_station",
         "tts",
         "actility_thingpark",
         "cra_iot",

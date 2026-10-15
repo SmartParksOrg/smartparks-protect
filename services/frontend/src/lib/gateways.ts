@@ -10,6 +10,17 @@ export function isRelay(gateway: Pick<Gateway, "attributes">): boolean {
   );
 }
 
+/** An offload station: a RangerEdge with an SD card, a gateway of the offload station source
+ * and a device of ours (phase 42, decision D319). */
+export function isOffloadStation(
+  gateway: Pick<Gateway, "attributes">,
+): boolean {
+  return (
+    (gateway.attributes as Record<string, unknown> | undefined)?.kind ===
+    "offload_station"
+  );
+}
+
 /** Where a gateway's location came from, in words: the raw key is a column value, not a
  * label (Tim, 2026-09-18: the live map's panel showed "(admin)"). */
 export function locationSourceLabel(source: string, t: Translate): string {
