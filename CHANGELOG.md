@@ -106,6 +106,16 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 - **The MinIO server and client images come from Chainguard** (decision D295, 2026-09-25): MinIO's own images are no longer served by quay.io (nor by Docker Hub since 2026-09-11), so a fresh install could not pull them and every CI job died starting MinIO. `docker-compose.yml` and CI name `cgr.dev/chainguard/minio` and `cgr.dev/chainguard/minio-client` pinned by digest (Chainguard publishes `latest` alone; the client is the `-dev` variant for its shell). The same commands, environment and data: a server pulls the two images once on its next update and keeps its buckets. The digests are bumped by hand like the other pins.
 
+- The selected entity or device on the live map stands out (Tim, 2026-09-21: a slightly darker green was not enough): its marker takes a blue ring no state uses, a translucent blue halo behind it, and a fifth more size than the others.
+
+- The Data explorer's `via` column shows the route a position came by as well as a status message's (Tim, 2026-09-20): it read as empty on every position row, which looked like missing data. Only status messages store the route on the state; a position stores it on its attributes, and the row now shows either. The moment does not count as a state record for it, and a records export gets the column whenever a position in the window carries a route.
+
+- The fence line's panel on the live map reads as one line per section, the range and the monitors at its ends, with each monitor's voltage chart folded behind its reading, instead of every word wrapping in the narrow value column and three charts stacked open (Tim, 2026-09-19, after looking at it on a phone, a tablet and a desktop).
+
+- A GPS attempt that got no fix no longer raises a device error event (Tim, 2026-09-19). The `ublox_fix` flag is a fact about the sky and the antenna, not about the device, and it comes with every status of a device under canopy; an event on each one drowned the flag that matters, `ublox`, which says the receiver itself did not answer and usually needs a person to go and look. The flag stays in the state, on the health card and in the device performance figures; it only raises no event, so no automation fires on it.
+
+- An offline gateway is a red dot on the live map, not a green one (Tim, 2026-09-19): the same red a critical marker uses, because an offline gateway is the thing a person opening the map needs to see first. A gateway the network has never seen is grey. The layers panel lists the gateways in two groups, online and offline, each switched as a whole; ticking a gateway switches its group on.
+
 ### Fixed
 
 - A webhook receiver that answers 429 (too many requests) gets the object again later. The webhook connector and the webhook action of an automation took a 429 for a refusal: the delivery failed for good and the object never reached the receiver. A failed row did not stop the integration's share of the delivery cycle as a transient failure does, so a receiver that limits its rate got every due row of the cycle one after the other, and each one it refused failed for good. A 429 is transient now, as a 5xx is, which is what the EarthRanger, Gundi, WildlifeNL and FerusTracker connectors already do and what the outbound integrations guide says.
@@ -177,18 +187,6 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 - An entity's page showed no map for an entity whose device has a place set by hand: the small map draws position rows and a fixed place has none. It takes the current position instead when there is nothing else to draw. (Tim, 2026-09-19.)
 
 - An entity whose device reports readings but no positions read "Last seen: never" on the live map, a fence monitor with a place set by hand, a scanner, a trap, while its readings arrived every hour. The decoder marked the entity as seen only when a position came in; any record of the device does now, and a position still moves it. (Tim, 2026-09-19, on the demo projects.)
-
-### Changed
-
-- The selected entity or device on the live map stands out (Tim, 2026-09-21: a slightly darker green was not enough): its marker takes a blue ring no state uses, a translucent blue halo behind it, and a fifth more size than the others.
-
-- The Data explorer's `via` column shows the route a position came by as well as a status message's (Tim, 2026-09-20): it read as empty on every position row, which looked like missing data. Only status messages store the route on the state; a position stores it on its attributes, and the row now shows either. The moment does not count as a state record for it, and a records export gets the column whenever a position in the window carries a route.
-
-- The fence line's panel on the live map reads as one line per section, the range and the monitors at its ends, with each monitor's voltage chart folded behind its reading, instead of every word wrapping in the narrow value column and three charts stacked open (Tim, 2026-09-19, after looking at it on a phone, a tablet and a desktop).
-
-- A GPS attempt that got no fix no longer raises a device error event (Tim, 2026-09-19). The `ublox_fix` flag is a fact about the sky and the antenna, not about the device, and it comes with every status of a device under canopy; an event on each one drowned the flag that matters, `ublox`, which says the receiver itself did not answer and usually needs a person to go and look. The flag stays in the state, on the health card and in the device performance figures; it only raises no event, so no automation fires on it.
-
-- An offline gateway is a red dot on the live map, not a green one (Tim, 2026-09-19): the same red a critical marker uses, because an offline gateway is the thing a person opening the map needs to see first. A gateway the network has never seen is grey. The layers panel lists the gateways in two groups, online and offline, each switched as a whole; ticking a gateway switches its group on.
 
 ## v2.9.0, 2026-09-19
 

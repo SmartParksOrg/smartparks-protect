@@ -99,11 +99,11 @@ Stations that upload their own files (a RangerEdge with Wi-Fi or cellular postin
 
 ## 10. Inputs from Tim
 
-- The LP0 DevAddr, AppSKey and NwkSKey of each tracker in the test (SP052362, SP051830, SP052363, SP100557 and the replaced SP051883 per the firmware plan's reference table), to be set on each device's page on dev by Tim; never in chat.
-- The outcome of Tim's discussion with the firmware author (section 1): the station should hold no keys and not decrypt, so the tracker must send, and the station store, an ordinary LoRaWAN 1.0 frame under the tracker's own keys with the record stream as payload; and whether the station's own port 23 broadcasts are then written under the station's pair.
-- A copy of a card's `LOG_*` folders from the running test, and the station's own log of the same period, for the by-hand check of section 6 and for a recorded fixture once its records are decoded (the fixture committed is the synthetic one).
+- The firmware developer's change for issue 772, and what it did to the card's line: whether the frame stays an ordinary LoRaWAN 1.0 uplink under the tracker's own credentials (what Protect reads), or becomes a versioned envelope (then `unwrap_frame` learns it by name), the counter width, and which of the device's credentials are used (its LP0 pair, or the LoRaWAN or satellite session keys). Tim waits for this change before testing (2026-10-15, end of day).
+- Then, on dev: the LP0 DevAddr, AppSKey and NwkSKey of each test tracker (SP052362, SP051830, SP052363, SP100557 and the replaced SP051883 per the firmware plan's reference table), set by Tim on each device's page; never in chat.
+- A copy of a card's `LOG_*` folders from the test, and the station's own log of the same period, for the by-hand check of section 6 and for a recorded fixture once its records are decoded (the fixture committed is the synthetic one).
 - The station's EUI and whether it has a place on dev; which project the test runs in.
-- Whether the test firmware already writes port 23 reports, so O5's golden can be a recorded frame.
+- Whether the test firmware writes port 23 reports, so O5's golden can be a recorded frame.
 - Confirmation of the catalogue placement: Offload station under Equipment beside Fence monitor and Trap, icon `device.lora_gateway`.
 
 ## 11. As built, 2026-10-15
