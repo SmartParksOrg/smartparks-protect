@@ -22,6 +22,12 @@ class Lp0Readback(BaseModel):
 class Lp0CredentialsRead(BaseModel):
     dev_addr: str | None = Field(default=None, description="Eight uppercase hex digits")
     keys_set: bool = False
+    app_s_key: str | None = Field(
+        default=None,
+        description="The application session key as 32 hex digits, for a caller who may set "
+        "the keys (device control in the project, or a server admin); null for a viewer",
+    )
+    nwk_s_key: str | None = Field(default=None, description="The network session key, the same")
     set_at: datetime | None = None
     source: str | None = Field(default=None, description="person or device")
     readback: Lp0Readback = Field(default_factory=Lp0Readback)

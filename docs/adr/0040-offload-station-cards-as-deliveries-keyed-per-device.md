@@ -50,7 +50,7 @@ believed as the delivery time.
 Any LoRaWAN-framed file can enter this way later (a station that uploads its own files, a
 different medium with the same record stream). The keys are a secret Protect now holds for each
 tracker, under the server's credentials key, and a server admin or an operator of the project sets
-them. The firmware's on-air DATA is encrypted under session keys derived from the discovery and
+them and reads them back, a viewer never sees them. The firmware's on-air DATA is encrypted under session keys derived from the discovery and
 wrapped in an LP0 header; a card can only be read because the station rebuilds the ordinary frame.
 If the station is to hold no keys at all, the tracker must send that ordinary frame itself, which
 is the one requirement this design puts on the firmware. Firmware issue 772 (2026-10-15) takes

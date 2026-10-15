@@ -44,7 +44,7 @@ The tracker's LP0 address is its identity on this source (`identity_type` `dev_a
 address as eight uppercase hex digits). It is written when the address and keys are set on the
 device (`PUT /devices/{id}/lp0-credentials`); a frame from an address no device has makes an
 unknown identity on Needs attention. The two keys are the device's, encrypted at rest with the
-server's credentials key and never returned. There is no shared network key in Protect: a
+server's credentials key and returned to callers who may set them (device control in the project, or a server admin), so they can be read back and changed; a viewer sees only that they are set. There is no shared network key in Protect: a
 network whose devices share one pair is every device holding the same pair.
 
 ## Stations

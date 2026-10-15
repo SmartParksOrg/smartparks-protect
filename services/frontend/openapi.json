@@ -18930,7 +18930,7 @@
      "offload stations"
     ],
     "summary": "Get Lp0 Credentials",
-    "description": "The device's LP0 address and whether its keys are set; the keys themselves never.",
+    "description": "The device's LP0 address and keys: the keys for a caller who may set them, a viewer\nsees only that they are set.",
     "operationId": "get_lp0_credentials_api_v1_devices__device_id__lp0_credentials_get",
     "security": [
      {
@@ -18977,7 +18977,7 @@
      "offload stations"
     ],
     "summary": "Set Lp0 Credentials",
-    "description": "Set the tracker's LP0 address and keys (decision D320): typed in, or taken from what\nthe device reported in its settings readback. The address becomes the device's identity\non the offload station source; frames stored for it before are handed to the decoder.",
+    "description": "Set the tracker's LP0 address and keys (decision D320): typed in, or taken from what\nthe device reported in its settings readback. The address becomes the device's identity\non the offload station source; frames stored for it before are handed to the decoder.\nThe answer carries the keys, since the caller may set them.",
     "operationId": "set_lp0_credentials_api_v1_devices__device_id__lp0_credentials_put",
     "security": [
      {
@@ -36894,6 +36894,30 @@
       "title": "Keys Set",
       "default": false
      },
+     "app_s_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "App S Key",
+      "description": "The application session key as 32 hex digits, for a caller who may set the keys (device control in the project, or a server admin); null for a viewer"
+     },
+     "nwk_s_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nwk S Key",
+      "description": "The network session key, the same"
+     },
      "set_at": {
       "anyOf": [
        {
@@ -36949,6 +36973,30 @@
       "type": "boolean",
       "title": "Keys Set",
       "default": false
+     },
+     "app_s_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "App S Key",
+      "description": "The application session key as 32 hex digits, for a caller who may set the keys (device control in the project, or a server admin); null for a viewer"
+     },
+     "nwk_s_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nwk S Key",
+      "description": "The network session key, the same"
      },
      "set_at": {
       "anyOf": [

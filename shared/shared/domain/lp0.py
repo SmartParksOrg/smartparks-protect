@@ -258,8 +258,8 @@ async def station_device(session: AsyncSession, station_eui: str) -> Device | No
 
 
 def credentials_summary(row: DeviceLp0Credentials | None) -> dict[str, object]:
-    """What the API tells about a device's credentials: the address and that keys are set,
-    never the keys."""
+    """What the API tells everyone about a device's credentials: the address and that keys
+    are set; the keys themselves go to those who may set them (the router decides)."""
     if row is None:
         return {"dev_addr": None, "keys_set": False, "set_at": None, "source": None}
     return {

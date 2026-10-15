@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
+from protect_api.routers.control import _control_permissions
 from protect_api.routers.devices import _visible_device
 from protect_api.routers.log_files import _publish, _writable_device
 from protect_api.schemas.offload import (
@@ -35,6 +36,7 @@ from shared.domain.device_settings import known_settings
 from shared.domain.lp0 import (
     AddressTaken,
     clear_credentials,
+    credentials_for,
     credentials_summary,
     keys_from_readback,
     lp0_source,
@@ -61,6 +63,7 @@ from shared.models import (
     GatewayReception,
     User,
 )
+from shared.permissions import Permission
 from shared.timeutil import utc_now
 from shared.trace import ApplicationError
 
@@ -114,10 +117,21 @@ async def _frames_waiting(session: AsyncSession, dev_addr: str | None) -> int:
     )
 
 
-async def _credentials_read(session: AsyncSession, device: Device) -> Lp0CredentialsRead:
+async def _may_set(session: AsyncSession, user: User, device: Device) -> bool:
+    """Whether the caller may set the device's keys, and so read them back (Tim, 2026-10-15:
+    the credentials are important and must be visible and changeable when needed)."""
+    if user.is_superuser:
+        return True
+    _project, permissions = await _control_permissions(session, user, device)
+    return Permission.DEVICES_CONTROL in permissions
+
+
+async def _credentials_read(
+    session: AsyncSession, device: Device, *, reveal: bool
+) -> Lp0CredentialsRead:
     row = await session.get(DeviceLp0Credentials, device.id)
     summary = credentials_summary(row)
-    return Lp0CredentialsRead(
+    read = Lp0CredentialsRead(
         dev_addr=summary["dev_addr"],
         keys_set=bool(summary["keys_set"]),
         set_at=summary["set_at"],
@@ -125,6 +139,12 @@ async def _credentials_read(session: AsyncSession, device: Device) -> Lp0Credent
         readback=await _readback(session, device.id),
         frames_waiting=await _frames_waiting(session, row.dev_addr if row else None),
     )
+    if reveal and row is not None:
+        keys = await credentials_for(session, device.id)
+        if keys is not None:
+            read.app_s_key = keys.app_s_key.hex().upper()
+            read.nwk_s_key = keys.nwk_s_key.hex().upper()
+    return read
 
 
 @router.get("/devices/{device_id}/lp0-credentials", response_model=Lp0CredentialsRead)
@@ -133,9 +153,10 @@ async def get_lp0_credentials(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> Lp0CredentialsRead:
-    """The device's LP0 address and whether its keys are set; the keys themselves never."""
+    """The device's LP0 address and keys: the keys for a caller who may set them, a viewer
+    sees only that they are set."""
     device = await _visible_device(session, user, device_id)
-    return await _credentials_read(session, device)
+    return await _credentials_read(session, device, reveal=await _may_set(session, user, device))
 
 
 @router.put("/devices/{device_id}/lp0-credentials", response_model=Lp0CredentialsResult)
@@ -148,7 +169,8 @@ async def set_lp0_credentials(
 ) -> Lp0CredentialsResult:
     """Set the tracker's LP0 address and keys (decision D320): typed in, or taken from what
     the device reported in its settings readback. The address becomes the device's identity
-    on the offload station source; frames stored for it before are handed to the decoder."""
+    on the offload station source; frames stored for it before are handed to the decoder.
+    The answer carries the keys, since the caller may set them."""
     device = await _writable_device(session, user, device_id)
     source = "person"
     if body.from_device:
@@ -198,7 +220,7 @@ async def set_lp0_credentials(
     queued = 0
     if result.linked_waiting:
         queued = await queue_identity_reprocess(session, bus, result.identity)
-    read = await _credentials_read(session, device)
+    read = await _credentials_read(session, device, reveal=True)
     return Lp0CredentialsResult(**read.model_dump(), queued=queued)
 
 

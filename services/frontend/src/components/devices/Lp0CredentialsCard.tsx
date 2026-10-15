@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { KeyRound } from "lucide-react";
+import { Copy, Eye, EyeOff, KeyRound } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -21,8 +22,9 @@ const clean = (text: string) => text.replace(/[\s:_-]/g, "");
  * The tracker's LP0 address and keys (phase 42, decision D320): provisioned per device like its
  * DevEUI, they are what lets Protect verify and decrypt the frames an offload station stored
  * for it. Typed in, or taken from what the device reported in its own settings readback. The
- * keys are never shown again; the address is, since it is the device's identity on the offload
- * station source and the frames on a card are addressed by it.
+ * keys are shown and changeable to whoever may set them (Tim, 2026-10-15: the credentials are
+ * important and must be visible and changeable when needed), folded behind "Show" so a screen
+ * over a shoulder does not carry them; a viewer sees only that they are set.
  */
 export function Lp0CredentialsCard({
   deviceId,
@@ -34,6 +36,7 @@ export function Lp0CredentialsCard({
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [shown, setShown] = useState(false);
   const [address, setAddress] = useState("");
   const [appKey, setAppKey] = useState("");
   const [nwkKey, setNwkKey] = useState("");
@@ -65,11 +68,7 @@ export function Lp0CredentialsCard({
             count: r.queued,
           })
         : t("LP0 keys saved"),
-    onSuccess: () => {
-      setEditing(false);
-      setAppKey("");
-      setNwkKey("");
-    },
+    onSuccess: () => setEditing(false),
   });
   const clear = useMutationToast({
     mutationFn: () =>
@@ -88,6 +87,12 @@ export function Lp0CredentialsCard({
     Boolean(readback?.dev_addr) &&
     Boolean(readback?.app_key_known) &&
     Boolean(readback?.network_key_known);
+  const copy = (value: string, label: string) => {
+    navigator.clipboard
+      .writeText(value)
+      .then(() => toast.success(t("{{label}} copied", { label })))
+      .catch(() => toast.error(t("Could not copy")));
+  };
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -101,6 +106,8 @@ export function Lp0CredentialsCard({
               variant="outline"
               onClick={() => {
                 setAddress(c.dev_addr ?? readback?.dev_addr ?? "");
+                setAppKey(c.app_s_key ?? "");
+                setNwkKey(c.nwk_s_key ?? "");
                 setEditing(true);
               }}
             >
@@ -141,7 +148,63 @@ export function Lp0CredentialsCard({
                       time: formatTime(c.set_at),
                     })
                 : t("not set")}
+              {c.keys_set && c.app_s_key && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-2 h-6 px-2"
+                  onClick={() => setShown((v) => !v)}
+                >
+                  {shown ? (
+                    <>
+                      <EyeOff className="size-3.5" /> {t("Hide")}
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="size-3.5" /> {t("Show")}
+                    </>
+                  )}
+                </Button>
+              )}
             </dd>
+            {shown && c.app_s_key && c.nwk_s_key && (
+              <>
+                <dt className="text-muted-foreground">
+                  {t("Application session key")}
+                </dt>
+                <dd className="flex items-center gap-1 font-mono text-xs">
+                  {c.app_s_key}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-1"
+                    aria-label={t("Copy the application session key")}
+                    onClick={() =>
+                      copy(c.app_s_key ?? "", t("Application session key"))
+                    }
+                  >
+                    <Copy className="size-3.5" />
+                  </Button>
+                </dd>
+                <dt className="text-muted-foreground">
+                  {t("Network session key")}
+                </dt>
+                <dd className="flex items-center gap-1 font-mono text-xs">
+                  {c.nwk_s_key}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-1"
+                    aria-label={t("Copy the network session key")}
+                    onClick={() =>
+                      copy(c.nwk_s_key ?? "", t("Network session key"))
+                    }
+                  >
+                    <Copy className="size-3.5" />
+                  </Button>
+                </dd>
+              </>
+            )}
             {c.frames_waiting > 0 && (
               <>
                 <dt className="text-muted-foreground">{t("Waiting")}</dt>
@@ -165,7 +228,7 @@ export function Lp0CredentialsCard({
                   {readbackComplete
                     ? t(", both keys read")
                     : t(", keys not read")}
-                  {canEdit && readbackComplete && !c.keys_set && (
+                  {canEdit && readbackComplete && (
                     <Button
                       size="sm"
                       variant="link"
@@ -208,20 +271,20 @@ export function Lp0CredentialsCard({
               {t("Application session key (32 hex digits)")}
               <Input
                 className="mt-1 font-mono"
-                type="password"
                 value={appKey}
                 onChange={(e) => setAppKey(e.target.value)}
                 autoComplete="off"
+                spellCheck={false}
               />
             </label>
             <label className="block text-xs text-muted-foreground">
               {t("Network session key (32 hex digits)")}
               <Input
                 className="mt-1 font-mono"
-                type="password"
                 value={nwkKey}
                 onChange={(e) => setNwkKey(e.target.value)}
                 autoComplete="off"
+                spellCheck={false}
               />
             </label>
             <div className="flex gap-2">

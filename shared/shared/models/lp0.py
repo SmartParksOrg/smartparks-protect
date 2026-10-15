@@ -2,8 +2,8 @@
 
 Provisioned per device like its DevEUI: the address in the clear (it is also the device's
 identity on the built-in offload station source), the two session keys as one encrypted
-document (`shared/secrets.py`), never returned by the API. The pipeline reads them to verify and
-decrypt the frames an offload station stored for the device.
+document (`shared/secrets.py`), returned by the API to those who may set them. The pipeline
+reads them to verify and decrypt the frames an offload station stored for the device.
 """
 
 import uuid
@@ -30,7 +30,7 @@ class DeviceLp0Credentials(TimestampMixin, Base):
     keys_encrypted: Mapped[bytes] = mapped_column(
         LargeBinary,
         nullable=False,
-        comment="Fernet token of {app_s_key, nwk_s_key} as hex; never returned",
+        comment="Fernet token of {app_s_key, nwk_s_key} as hex; returned to those who may set them",
     )
     source: Mapped[str] = mapped_column(
         String(16),

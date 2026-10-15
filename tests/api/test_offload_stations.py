@@ -138,7 +138,13 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     )
     assert put.status_code == 200, put.text
     assert put.json()["dev_addr"] == ADDR_A and put.json()["keys_set"] is True
-    assert APP_S_KEY.hex() not in put.text and NWK_S_KEY.hex() not in put.text
+    # the keys are visible and changeable to whoever may set them (Tim, 2026-10-15)
+    assert put.json()["app_s_key"] == APP_S_KEY.hex().upper()
+    assert put.json()["nwk_s_key"] == NWK_S_KEY.hex().upper()
+    shown = (
+        await client.get(f"/api/v1/devices/{tracker_a['id']}/lp0-credentials", headers=h)
+    ).json()
+    assert shown["app_s_key"] == APP_S_KEY.hex().upper() and shown["keys_set"] is True
     taken = await client.put(
         f"/api/v1/devices/{tracker_b['id']}/lp0-credentials",
         json={"dev_addr": ADDR_A, "app_s_key": APP_S_KEY.hex(), "nwk_s_key": NWK_S_KEY.hex()},
@@ -408,7 +414,15 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
         f"/api/v1/devices/{tracker_a['id']}/lp0-credentials", headers=viewer.headers
     )
     assert summary.status_code == 200 and summary.json()["keys_set"] is True
-    assert "app_s_key" not in summary.text
+    assert summary.json()["app_s_key"] is None and summary.json()["nwk_s_key"] is None
+    assert APP_S_KEY.hex().upper() not in summary.text
+    operator = await project_actor(client, db, project, Role.PROJECT_OPERATOR)
+    for_operator = (
+        await client.get(
+            f"/api/v1/devices/{tracker_a['id']}/lp0-credentials", headers=operator.headers
+        )
+    ).json()
+    assert for_operator["app_s_key"] == APP_S_KEY.hex().upper()
     forbidden = await client.put(
         f"/api/v1/devices/{tracker_a['id']}/lp0-credentials",
         json={"dev_addr": ADDR_A, "app_s_key": APP_S_KEY.hex(), "nwk_s_key": NWK_S_KEY.hex()},

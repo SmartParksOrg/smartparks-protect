@@ -4453,7 +4453,8 @@ export interface paths {
         };
         /**
          * Get Lp0 Credentials
-         * @description The device's LP0 address and whether its keys are set; the keys themselves never.
+         * @description The device's LP0 address and keys: the keys for a caller who may set them, a viewer
+         *     sees only that they are set.
          */
         get: operations["get_lp0_credentials_api_v1_devices__device_id__lp0_credentials_get"];
         /**
@@ -4461,6 +4462,7 @@ export interface paths {
          * @description Set the tracker's LP0 address and keys (decision D320): typed in, or taken from what
          *     the device reported in its settings readback. The address becomes the device's identity
          *     on the offload station source; frames stored for it before are handed to the decoder.
+         *     The answer carries the keys, since the caller may set them.
          */
         put: operations["set_lp0_credentials_api_v1_devices__device_id__lp0_credentials_put"];
         post?: never;
@@ -10501,6 +10503,16 @@ export interface components {
              * @default false
              */
             keys_set: boolean;
+            /**
+             * App S Key
+             * @description The application session key as 32 hex digits, for a caller who may set the keys (device control in the project, or a server admin); null for a viewer
+             */
+            app_s_key?: string | null;
+            /**
+             * Nwk S Key
+             * @description The network session key, the same
+             */
+            nwk_s_key?: string | null;
             /** Set At */
             set_at?: string | null;
             /**
@@ -10528,6 +10540,16 @@ export interface components {
              * @default false
              */
             keys_set: boolean;
+            /**
+             * App S Key
+             * @description The application session key as 32 hex digits, for a caller who may set the keys (device control in the project, or a server admin); null for a viewer
+             */
+            app_s_key?: string | null;
+            /**
+             * Nwk S Key
+             * @description The network session key, the same
+             */
+            nwk_s_key?: string | null;
             /** Set At */
             set_at?: string | null;
             /**

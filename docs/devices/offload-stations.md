@@ -51,7 +51,7 @@ deduplicates nothing and leaves that to Protect.
    address and the two session keys (eight and twice 32 hex digits) that were provisioned on
    the device; "Use the device's reported values" takes the three from the device's own
    settings readback when it has sent one. The address becomes the tracker's identity on the
-   offload station source; the keys are encrypted at rest and never shown again. A tracker
+   offload station source; the keys are encrypted at rest and shown, behind Show, to whoever may set them; a viewer sees only that they are set. A tracker
    whose address another device holds is refused with that device's name. Project admins and
    operators (`devices:control`) set them, as they upload log files.
 3. **A card.** On the station's device page, under Log files, upload one `.jsonl` file or a zip
