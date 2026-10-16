@@ -29,9 +29,11 @@ from shared.enums import AcquisitionChannel, ErrorCode
 from shared.trace import ApplicationError
 
 SOURCE_ID = uuid.UUID("a0000000-0000-0000-0000-0000000000c1")
-#: The stored frame formats this version reads: the ordinary LoRaWAN 1.0 uplink the station
-#: writes today (named `lorawan` when a line says so, unnamed otherwise).
-FRAME_FORMATS = frozenset({"lorawan"})
+#: The LP0 metadata versions whose stored frame this version reads: 5 (the collar builds the
+#: inner LoRaWAN frame under its own keys, the station stores it unchanged and writes the `lp0`
+#: object). A line without the object is a file of an earlier station firmware, whose frame has
+#: the same shape. Another version is refused by name until Protect has read its contract.
+METADATA_VERSIONS = frozenset({5})
 SOURCE_NAME = "Offload station files"
 IDENTITY_TYPE = "dev_addr"
 
@@ -74,21 +76,24 @@ class Lp0StationAdapter:
         credentials: Credentials,
         *,
         last_f_cnt: int | None = None,
-        frame_format: str | None = None,
+        lp0_version: int | None = None,
     ) -> Unwrapped:
         """The application payload, port and verified counter of a stored frame, decrypted
         with the tracker's keys; `FrameError` when it is not this device's, does not verify,
-        or is of a frame format this version does not read. The firmware (issue 772) may
-        version the stored frame or wrap it in an envelope; a line that names a format other
-        than the ordinary LoRaWAN frame is refused here by name, never guessed at."""
-        if frame_format is not None and frame_format not in FRAME_FORMATS:
-            raise FrameError(f"frame format {frame_format!r} is not one this version reads")
+        or carries an LP0 metadata version this version does not read (D327): a later
+        firmware may change what `rxpk.data` holds, so an unknown version is refused by
+        name, never guessed at. No version (an older file) reads as today's frame."""
+        if lp0_version is not None and lp0_version not in METADATA_VERSIONS:
+            raise FrameError(
+                f"LP0 metadata version {lp0_version} is not one this version reads "
+                f"(known: {', '.join(str(v) for v in sorted(METADATA_VERSIONS))})"
+            )
         return unwrap(phy, credentials, last_f_cnt=last_f_cnt)
 
 
 __all__ = [
-    "FRAME_FORMATS",
     "IDENTITY_TYPE",
+    "METADATA_VERSIONS",
     "SOURCE_ID",
     "SOURCE_NAME",
     "Credentials",

@@ -79,17 +79,59 @@ def test_unreadable_lines_say_why():
     ]
 
 
-def test_a_line_may_name_the_tracker_and_its_frame_format():
-    """Issue 772 lets a station keep the tracker's EUI as routing metadata and may version
-    the stored frame; both are kept on the frame and nothing is read into them."""
+def test_a_v5_line_carries_the_lp0_metadata():
+    """LP0 v5 (firmware issue 772): the station writes an `lp0` object beside `rxpk` with the
+    protocol version, the tracker EUI it learnt in discovery and the transport's session,
+    window and slot, as `prv_stringify` in `lp0_offload.c` prints them. All five are kept on
+    the frame; nothing is read into them, the address and the keys decide."""
+    document = json.loads(line())
+    document["lp0"] = {
+        "version": 5,
+        "source_eui": "0016c001f09c74fc",
+        "session": 7,
+        "window": 12,
+        "slot": 3,
+    }
+    frame = parse_station_line(1, json.dumps(document))
+    assert (frame.lp0_version, frame.source_eui) == (5, "0016C001F09C74FC")
+    assert (frame.session, frame.window, frame.slot) == (7, 12, 3)
+    # the firmware prints an all-zero EUI when it has none: no EUI
+    document["lp0"]["source_eui"] = "0000000000000000"
+    assert parse_station_line(1, json.dumps(document)).source_eui is None
+    # a line of an earlier station firmware has no object at all
+    older = parse_station_line(1, line())
+    assert (older.lp0_version, older.source_eui, older.session) == (None, None, None)
+    # the guessed keys of 2026-10-15 are not read
     document = json.loads(line())
     document["devEui"] = "0016c001f09c74fc"
     document["frameFormat"] = "lorawan"
-    frame = parse_station_line(1, json.dumps(document))
-    assert (frame.dev_eui, frame.frame_format) == ("0016C001F09C74FC", "lorawan")
-    document["devEui"] = "not an eui"
-    assert parse_station_line(1, json.dumps(document)).dev_eui is None
-    assert parse_station_line(1, line()).dev_eui is None
+    assert parse_station_line(1, json.dumps(document)).source_eui is None
+
+
+def test_a_malformed_lp0_object_is_a_line_error():
+    """The firmware never writes a partial or odd object, so one is an error with its reason,
+    as the other unreadable lines are, and the rest of the file is read."""
+    good = line()
+    documents = []
+    for lp0 in (
+        "five",
+        {"version": "5", "source_eui": "0016C001F09C74FC"},
+        {"version": 5, "source_eui": "nope"},
+        {"version": 5, "source_eui": "0016C001F09C74FC", "session": "a"},
+        {"version": True},
+    ):
+        document = json.loads(good)
+        document["lp0"] = lp0
+        documents.append(json.dumps(document))
+    parsed = parse_station_jsonl("\n".join([good, *documents, good]))
+    assert [f.line for f in parsed.frames] == [1, 7]
+    assert [m for _, m in parsed.errors] == [
+        "lp0 metadata is not an object",
+        "lp0.version is not a whole number",
+        "lp0.source_eui is not sixteen hex digits",
+        "lp0.session is not a whole number",
+        "lp0.version is not a whole number",
+    ]
 
 
 def test_station_file_names_and_recognition():

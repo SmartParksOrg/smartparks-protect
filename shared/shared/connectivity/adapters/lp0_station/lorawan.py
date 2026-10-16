@@ -1,11 +1,15 @@
 """The LoRaWAN 1.0 uplink an offload station writes to its card (phase 42, decision D321).
 
 A station stores each offloaded frame as an ordinary LoRaWAN 1.0 uplink under the tracker's own
-keys (firmware issue 772: the station holds no device key and stores the frame as opaque bytes):
-MHDR, the DevAddr, FCtrl, a 16-bit frame counter, the port, the FRMPayload encrypted with the
-AppSKey (the NwkSKey on port 0) and a MIC under the NwkSKey. The frame carries the counter's low
-16 bits; the firmware uses the counter in its 16-bit mode today, and `unwrap` also tries the
-upper half the device was last verified at, as a LoRaWAN receiver does across a rollover.
+keys (LP0 v5, firmware issue 772: the collar builds the frame with `lorawan_tools_build` under
+its own `lp0_dev_addr`, `lp0_app_key` and `lp0_network_key`, the station authenticates the
+transport with the deployment master key and stores the frame unchanged): MHDR `0x40`, the
+DevAddr, FCtrl, a 16-bit frame counter, port 29, the FRMPayload encrypted with the AppSKey (the
+NwkSKey on port 0) and a MIC under the NwkSKey. The counter is the firmware's wrapping 16-bit
+allocator passed as a 32-bit value with the upper half zero, so the frame carries the whole
+counter the MIC was computed with; `unwrap` tries that first and, as a LoRaWAN receiver would,
+the upper half the device was last verified at. The 16-bit wrap under unchanged keys reuses the
+keystream after 65536 frames; that is the firmware's limit, recorded here, never worked around.
 
 Pure: bytes and keys in, bytes out. The arithmetic is the LoRaWAN 1.0.x specification's (the
 A and B0 blocks), as the public replay app's `make_test_log.py` builds them; the golden test is

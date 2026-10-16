@@ -51,6 +51,7 @@ from shared.domain.lp0 import (
     clear_credentials,
     credentials_for,
     credentials_summary,
+    device_eui,
     keys_from_readback,
     lp0_source,
     normalise_dev_addr,
@@ -512,19 +513,6 @@ async def _current_entities(
     return {device_id: (entity_id, name, key) for device_id, entity_id, name, key in rows}
 
 
-async def _station_eui(session: AsyncSession, device: Device) -> str | None:
-    """The EUI a station's files are named after: the device's serial (an OpenCollar's serial
-    is its DevEUI, decision D101), else a `dev_eui` identity of the device on any source."""
-    if device.serial_number:
-        return device.serial_number.upper()
-    identity = await session.scalar(
-        select(ExternalIdentity.external_id).where(
-            ExternalIdentity.device_id == device.id, ExternalIdentity.identity_type == "dev_eui"
-        )
-    )
-    return identity.upper() if identity else None
-
-
 @router.post(
     "/projects/{project_id}/offload/stations",
     response_model=OffloadStationSetupResult,
@@ -551,7 +539,7 @@ async def set_up_offload_station(
         device.id
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found in this project")
-    eui = await _station_eui(session, device)
+    eui = await device_eui(session, device)
     if eui is None:
         raise HTTPException(
             status.HTTP_409_CONFLICT,

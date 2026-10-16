@@ -22,21 +22,32 @@ seconds), `freq` (MHz), `datr` (`SF7BW250`), `codr`, `rssi` (dBm), `lsnr` (dB), 
 `data` is an ordinary LoRaWAN 1.0 uplink: MHDR `0x40`, the tracker's DevAddr, FCtrl, a 16-bit
 counter (the upper half of the 32-bit counter is zero), port 29, the FRMPayload encrypted with
 the tracker's AppSKey and a MIC under its NwkSKey. The payload is the flash record stream
-(`port, msg_id, len, data, store time`, repeated), at most 228 bytes per frame.
+(`port, msg_id, len, data, store time`, repeated), at most 228 bytes per frame. Since LP0 v5 a
+line also carries `lp0`: `{"version": 5, "source_eui": "<tracker EUI>", "session": n,
+"window": n, "slot": n}`, written by the station from its discovery with the tracker; files of
+earlier firmware have no `lp0` object.
 
-## The model of firmware issue 772
+## LP0 v5, the model of firmware issue 772
 
 Tim's issue 772 in the firmware repository (2026-10-15) separates the LP0 link's authentication
-(a deployment master key, per-session keys derived from the discovery) from the payload's
-encryption (each collar's own unique DevAddr, NwkSKey and AppSKey, under LoRaWAN counter and MIC
-semantics), makes the station an opaque store that keeps routing metadata and no device key, and
-has the backend decrypt per device. This source is built for that model: the keys per device, the
-decryption in the pipeline, the station a gateway. Three of the issue's open points are met
-halfway: a counter is read across a rollover from the device's last verified one (`last_f_cnt`
-on the credentials, `f_cnt32` on the frame); a line that names a frame format (`frameFormat`,
-`format`, `lp0Format`) is read only when the format is `lorawan`, so an envelope the firmware
-may introduce is refused by name until Protect reads it; and a line that carries the tracker's
-EUI (`devEui`) names the unknown identity on Needs attention with it, without linking by itself.
+(a deployment master key, per-session keys derived from the discovery by an SP 800-108 CMAC
+KDF) from the payload's encryption (each collar's own unique DevAddr, NwkSKey and AppSKey, under
+LoRaWAN counter and MIC semantics), makes the station an opaque store that keeps routing
+metadata and no device key, and has the backend decrypt per device. LP0 v5 (the branch's
+`docs/reviews/lp0-master-key-wire.md`, 2026-10-16) implements it: the collar calls
+`lorawan_tools_build` with its own `lp0_*` credentials and the next value of its wrapping 16-bit
+counter (passed as a 32-bit counter with the upper half zero), the station authenticates the
+transport with the master key, reassembles the inner frame and stores it unchanged, and writes
+the `lp0` object. This source was built for that model and reads v5 as it read the frames
+before: the keys per device, the decryption in the pipeline, the station a gateway. What v5
+added (decision D327): the `lp0` object is read (`lp0_version`, `source_eui`, `lp0_session`,
+`lp0_window`, `lp0_slot` in the provider metadata), the source EUI names an unknown identity on
+Needs attention and is cross-checked against the EUI of the device the address belongs to (a
+contradiction is `DEVICE_IDENTITY_AMBIGUOUS`, the frame decoded onto nobody), and a metadata
+version other than 5 is refused by name (`METADATA_VERSIONS`), a missing object being an older
+file. The master key is never stored in Protect; nothing here needs it. The 16-bit counter's
+wrap under unchanged keys is the firmware's limit: Protect keeps `last_f_cnt` and `f_cnt32`, and
+tries the upper half zero first, as the firmware signs.
 
 ## Identities and keys
 

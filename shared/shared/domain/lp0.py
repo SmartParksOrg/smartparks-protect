@@ -274,6 +274,21 @@ async def register_station_gateway(
     return gateway, created
 
 
+async def device_eui(session: AsyncSession, device: Device) -> str | None:
+    """The DevEUI a device is known by: its serial when that is sixteen hex digits (an
+    OpenCollar's serial is its DevEUI, decision D101), else a `dev_eui` identity of the device
+    on any source. None when neither is known."""
+    serial = (device.serial_number or "").strip().upper()
+    if re.fullmatch(r"[0-9A-F]{16}", serial):
+        return serial
+    identity = await session.scalar(
+        select(ExternalIdentity.external_id).where(
+            ExternalIdentity.device_id == device.id, ExternalIdentity.identity_type == "dev_eui"
+        )
+    )
+    return identity.upper() if identity else None
+
+
 async def station_device(session: AsyncSession, station_eui: str) -> Device | None:
     """The device a station EUI names: by serial number (an OpenCollar's serial is its DevEUI,
     decision D101) or by a `dev_eui` identity on any source."""
@@ -311,6 +326,7 @@ __all__ = [
     "clear_credentials",
     "credentials_for",
     "credentials_summary",
+    "device_eui",
     "ensure_station_gateway",
     "keys_from_readback",
     "last_counter",

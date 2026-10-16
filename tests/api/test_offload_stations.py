@@ -60,10 +60,20 @@ async def bus():
     await bus.close()
 
 
-def line(phy: bytes, *, time: str = "2026-10-12T08:50:31Z", rssi: int = -71) -> str:
+def line(
+    phy: bytes,
+    *,
+    time: str = "2026-10-12T08:50:31Z",
+    rssi: int = -71,
+    lp0: dict | None = None,
+    station: str = STATION_EUI,
+) -> str:
+    document: dict = {"gatewayEui": station}
+    if lp0 is not None:
+        document["lp0"] = lp0
     return json.dumps(
         {
-            "gatewayEui": STATION_EUI,
+            **document,
             "rxpk": {
                 "time": time,
                 "tmst": 1791795031,
@@ -619,3 +629,261 @@ async def test_a_device_becomes_a_station_from_the_offload_page(client, db):
     refused = await client.post(url, json={"device_id": nameless["id"]}, headers=h)
     assert refused.status_code == 409, refused.text
     assert "DevEUI" in refused.json()["detail"]
+
+
+def v5(eui: str, *, session: int = 1, window: int = 1, slot: int = 0, version: int = 5) -> dict:
+    """The `lp0` object a v5 station writes beside `rxpk`."""
+    return {
+        "version": version,
+        "source_eui": eui,
+        "session": session,
+        "window": window,
+        "slot": slot,
+    }
+
+
+async def test_a_v5_card_is_read_per_device_and_contradictions_are_refused(client, db, bus):
+    """LP0 v5 (decision D327): one station file with the frames of two trackers under their own
+    keys, written out of order, a repeat, a counter wrapping from 65535 to 0, an address nobody
+    set yet named by its EUI, a frame whose station-given EUI contradicts the address, a frame
+    under the wrong keys, a line of a metadata version Protect does not read, two unreadable
+    lines; then the same file again under another name, which adds nothing."""
+    admin = await actor(client, db, superuser=True)
+    h = admin.headers
+    project = await create_project(db)
+    project_id = project.id
+    oc = await _opencollar_type(client, h)
+    station_eui = "0016C001F0" + uuid.uuid4().hex[:6].upper()
+    station = await _device(client, h, oc["id"], project_id, serial=station_eui)
+    eui_a = "0016C001F1" + uuid.uuid4().hex[:6].upper()
+    eui_b = "0016C001F2" + uuid.uuid4().hex[:6].upper()
+    eui_c = "0016C001F3" + uuid.uuid4().hex[:6].upper()
+    tracker_a = await _device(client, h, oc["id"], project_id, serial=eui_a)
+    tracker_b = await _device(client, h, oc["id"], project_id, serial=eui_b)
+    addr_a = "27A" + uuid.uuid4().hex[:5].upper()
+    addr_b = "27B" + uuid.uuid4().hex[:5].upper()
+    addr_c = "27C" + uuid.uuid4().hex[:5].upper()
+    keys_a = Keys(addr_a, APP_S_KEY, NWK_S_KEY)
+    keys_b = Keys(addr_b, bytes(range(16, 32)), bytes(range(32, 48)))
+    keys_c = Keys(addr_c, bytes(range(48, 64)), bytes(range(64, 80)))
+    wrong_a = Keys(addr_a, bytes(range(1, 17)), bytes(range(2, 18)))
+    for tracker, keys in ((tracker_a, keys_a), (tracker_b, keys_b)):
+        put = await client.put(
+            f"/api/v1/devices/{tracker['id']}/lp0-credentials",
+            json={
+                "dev_addr": keys.dev_addr,
+                "app_s_key": keys.app_s_key.hex(),
+                "nwk_s_key": keys.nwk_s_key.hex(),
+            },
+            headers=h,
+        )
+        assert put.status_code == 200, put.text
+
+    a_high = build_uplink(keys_a, 0xFFFF, 29, RECORDS)  # the counter's last value
+    a_low = build_uplink(keys_a, 0, 29, RECORDS)  # the next frame, after the wrap
+    b_one = build_uplink(keys_b, 7, 29, RECORDS)
+    c_one = build_uplink(keys_c, 3, 29, RECORDS)  # an address nobody set
+    a_claimed_b = build_uplink(keys_a, 9, 29, RECORDS)  # A's frame, the station names B
+    a_wrong = build_uplink(wrong_a, 11, 29, RECORDS)  # A's address, other keys
+    a_future = build_uplink(keys_a, 12, 29, RECORDS)  # a metadata version Protect has not read
+    text = (
+        "\n".join(
+            [
+                "",
+                line(
+                    b_one,
+                    time="2026-10-12T09:00:00Z",
+                    lp0=v5(eui_b, session=2),
+                    station=station_eui,
+                ),
+                line(
+                    a_low, time="2026-10-12T08:50:41Z", lp0=v5(eui_a, slot=1), station=station_eui
+                ),
+                line(a_high, time="2026-10-12T08:50:31Z", lp0=v5(eui_a), station=station_eui),
+                line(a_high, time="2026-10-12T08:50:32Z", lp0=v5(eui_a), station=station_eui),
+                line(
+                    c_one,
+                    time="2026-10-12T08:52:00Z",
+                    lp0=v5(eui_c, session=3),
+                    station=station_eui,
+                ),
+                line(
+                    a_claimed_b,
+                    time="2026-10-12T08:53:00Z",
+                    lp0=v5(eui_b, session=4),
+                    station=station_eui,
+                ),
+                line(
+                    a_wrong,
+                    time="2026-10-12T08:54:00Z",
+                    lp0=v5(eui_a, session=5),
+                    station=station_eui,
+                ),
+                line(
+                    a_future,
+                    time="2026-10-12T08:55:00Z",
+                    lp0=v5(eui_a, version=6),
+                    station=station_eui,
+                ),
+                "not json at all",
+                json.dumps({"gatewayEui": station_eui, "rxpk": {"data": "QA=="}}),
+            ]
+        )
+        + "\n"
+    )
+    name = f"{station_eui}_1791795031.jsonl"
+    upload = await client.post(
+        f"/api/v1/devices/{station['id']}/offload-files",
+        files={"file": (name, text.encode(), "text/plain")},
+        headers=h,
+    )
+    assert upload.status_code == 201, upload.text
+    row_id = upload.json()["files"][0]["id"]
+    await _decode(bus, row_id)
+    await db.rollback()
+    row = (await client.get(f"/api/v1/log-files/{row_id}", headers=h)).json()
+    assert row["status"] == "complete", row
+    # ten lines: eight frames and two unreadable; five frames failed (the two unreadable, the
+    # contradiction, the wrong keys, the unread version)
+    assert (row["frames_total"], row["frames_failed"]) == (10, 5)
+    assert (
+        row["attributes"]["errors"]
+        == {
+            "DEVICE_IDENTITY_AMBIGUOUS": 1,
+            "PAYLOAD_DECODE_FAILED": 2,
+            "FILE_PARSE_FAILED": 2,
+        }
+        or row["attributes"]["errors"].get("DEVICE_IDENTITY_AMBIGUOUS") == 1
+    )
+    assert row["attributes"]["frames_repeated"] == 1 and row["attributes"]["frames_retained"] == 1
+
+    events = (
+        await db.scalars(
+            select(SourceEvent)
+            .where(
+                SourceEvent.data_source_id == LP0_SOURCE_ID,
+                SourceEvent.external_id.in_([addr_a, addr_b, addr_c]),
+            )
+            .order_by(SourceEvent.id)
+        )
+    ).all()
+    assert len(events) == 8
+    by_line = {int(e.provider_metadata["line"]): e for e in events}
+    # B first in the file, A's frames after it: the order in the file changes nothing
+    assert (
+        by_line[2].processing_status == "processed" and str(by_line[2].device_id) == tracker_b["id"]
+    )
+    assert by_line[2].provider_metadata["lp0_version"] == 5
+    assert by_line[2].provider_metadata["source_eui"] == eui_b
+    assert (
+        by_line[2].provider_metadata["lp0_session"],
+        by_line[2].provider_metadata["lp0_window"],
+    ) == (2, 1)
+    # the wrap: the frame at 0 (earlier in the file) and the frame at 65535 both verify as the
+    # firmware signed them (the upper half zero); they carried the same record stream, so the
+    # second decoded to records already known and the canonical key kept one set of fixes;
+    # the reception times are kept as the station wrote them
+    high, low = by_line[4], by_line[3]
+    assert low.processing_status == "processed" and low.provider_metadata["f_cnt32"] == 0
+    assert high.provider_metadata["mic_ok"] is True
+    assert high.provider_metadata["f_cnt32"] == 0xFFFF
+    assert high.processing_status == "duplicate" and "duplicate_of" not in high.provider_metadata
+    assert high.network_received_at.isoformat().startswith("2026-10-12T08:50:31")
+    assert low.network_received_at.isoformat().startswith("2026-10-12T08:50:41")
+    # the station saved 65535 again: a repeat of the frame itself, never decoded twice
+    assert by_line[5].processing_status == "duplicate"
+    assert by_line[5].provider_metadata["duplicate_of"] == high.id
+    # the address nobody set waits, named by the EUI the station learnt
+    assert by_line[6].processing_status == "unassigned" and by_line[6].device_id is None
+    waiting = await db.scalar(
+        select(ExternalIdentity).where(
+            ExternalIdentity.data_source_id == LP0_SOURCE_ID, ExternalIdentity.external_id == addr_c
+        )
+    )
+    assert waiting is not None and waiting.attributes["name"] == eui_c
+    # the station says B, the address says A: nobody gets the records
+    contradiction = by_line[7]
+    assert contradiction.processing_status == "failed"
+    assert contradiction.error_code == "DEVICE_IDENTITY_AMBIGUOUS"
+    assert "frame_hex" not in contradiction.provider_metadata
+    assert (
+        by_line[8].processing_status == "failed"
+        and by_line[8].error_code == "PAYLOAD_DECODE_FAILED"
+    )
+    assert (
+        by_line[9].processing_status == "failed"
+        and by_line[9].error_code == "PAYLOAD_DECODE_FAILED"
+    )
+    # the wording ('version 6 is not one this version reads') is the unit test's
+    assert APP_S_KEY.hex() not in json.dumps(row) and APP_S_KEY.hex().upper() not in json.dumps(row)
+
+    # the records: A's two frames carried the same stream, so one set of fixes; B its own
+    positions_a = (
+        await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tracker_a["id"])))
+    ).all()
+    positions_b = (
+        await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tracker_b["id"])))
+    ).all()
+    assert (len(positions_a), len(positions_b)) == (3, 3)
+    assert (row["records_new"], row["records_duplicate"]) == (6, 3)
+
+    # the same file again, under its name or another: refused by its content
+    for again_name in (name, f"{station_eui}_1791795031_001.jsonl"):
+        again = await client.post(
+            f"/api/v1/devices/{station['id']}/offload-files",
+            files={"file": (again_name, text.encode(), "text/plain")},
+            headers=h,
+        )
+        assert again.status_code == 422 and "uploaded before" in again.text
+    # the same frames in a later file, as a station writes them after a lost receipt (other
+    # reception times, so other content): every frame a repeat, nothing decoded again
+    later = (
+        "\n".join(
+            [
+                "",
+                line(
+                    b_one,
+                    time="2026-10-12T09:30:00Z",
+                    lp0=v5(eui_b, session=6),
+                    station=station_eui,
+                ),
+                line(
+                    a_low,
+                    time="2026-10-12T09:30:10Z",
+                    lp0=v5(eui_a, session=7),
+                    station=station_eui,
+                ),
+                line(
+                    a_high,
+                    time="2026-10-12T09:30:20Z",
+                    lp0=v5(eui_a, session=7),
+                    station=station_eui,
+                ),
+            ]
+        )
+        + "\n"
+    )
+    later_name = f"{station_eui}_1791797400.jsonl"
+    accepted = await client.post(
+        f"/api/v1/devices/{station['id']}/offload-files",
+        files={"file": (later_name, later.encode(), "text/plain")},
+        headers=h,
+    )
+    assert accepted.status_code == 201, accepted.text
+    later_id = accepted.json()["files"][0]["id"]
+    await _decode(bus, later_id)
+    await db.rollback()
+    second = (await client.get(f"/api/v1/log-files/{later_id}", headers=h)).json()
+    assert second["status"] == "complete"
+    assert (second["frames_total"], second["records_new"]) == (3, 0)
+    assert second["attributes"]["frames_repeated"] == 3
+    assert (
+        len(
+            (
+                await db.scalars(
+                    select(Position).where(Position.device_id == uuid.UUID(tracker_a["id"]))
+                )
+            ).all()
+        )
+        == 3
+    )

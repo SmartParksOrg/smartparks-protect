@@ -25,14 +25,17 @@ SNR, and the frame as base64 in `data`.
 The frame is an ordinary LoRaWAN 1.0 uplink on port 29 addressed by the tracker's LP0 address,
 encrypted with the tracker's application session key and signed with its network session key.
 Its payload is the device's flash record stream, the same records a raw log file or a port 29
-uplink carries, each with the time it was stored at. The station holds no keys and reads nothing
-of the frame; the tracker's EUI is not on the card today, only its LP0 address. Firmware issue
-772 (2026-10-15) sets the model Protect builds for: a deployment master key authenticates the
-LP0 link, each tracker encrypts its records with its own unique credentials, the station stores
-them as opaque bytes and may keep the tracker's EUI as routing metadata, and the backend decrypts
-per device. A line that carries the EUI (`devEui`) names the unknown identity on Needs attention
-with it; a line that names a frame format other than the ordinary LoRaWAN frame is refused by
-name until Protect reads it.
+uplink carries, each with the time it was stored at. Since LP0 version 5 (firmware issue 772,
+2026-10-16) the tracker builds that frame itself under its own keys before the LP0 transfer, a
+deployment master key authenticates the LP0 link alone, and the station stores the frame
+unchanged without any device key; the master key never reaches the card and Protect never needs
+it. A v5 line adds an `lp0` object beside `rxpk`: the protocol `version` (5), the tracker's
+`source_eui` as the station learnt it in discovery, and the transport's `session`, `window` and
+`slot`. Files of earlier station firmware have no `lp0` object and read the same way. The
+source EUI names an unknown address on Needs attention; when it contradicts the EUI of the
+device the address belongs to, the frame is refused rather than decoded (decision D327), since
+the registry, not the card, is then wrong somewhere. A line whose `lp0.version` Protect does
+not know is refused by name until Protect reads that version.
 
 A station that received a frame again, because its receipt was lost, writes it again; a tracker
 whose records went unconfirmed at one station offloads them to the next. The firmware
@@ -83,10 +86,16 @@ are: positions keep their fix time, clockless messages the time the device store
   them up. Setting the keys on a device that already has retained frames hands them to the
   decoder at once.
 - A frame that does not verify under the device's keys (a wrong key, a frame of another
-  network) fails with `PAYLOAD_DECODE_FAILED` and is never guessed around. The frame carries
-  the counter's low 16 bits; Protect tries the upper half zero, then the half the device was
-  last verified at and the next, as a LoRaWAN receiver does across a rollover, and the MIC
-  decides.
+  network) fails with `PAYLOAD_DECODE_FAILED` and is never guessed around. The counter in the
+  frame is the whole counter the tracker signed with (its 16-bit allocator, upper half zero),
+  so it verifies as it stands; Protect also tries the upper half the device was last verified
+  at, as a LoRaWAN receiver does, and the MIC decides. After 65536 frames the tracker's counter
+  wraps and reuses its keystream under unchanged keys; that is a limit of the firmware, which
+  Protect records (`f_cnt32` on the frame) and does not work around.
+- A frame whose station-given tracker EUI (`lp0.source_eui`) is not the EUI of the device its
+  address belongs to fails with `DEVICE_IDENTITY_AMBIGUOUS` and lands on no device: either the
+  address is set on the wrong device, or a serial is wrong. Correct the registry, then "Decode
+  again".
 - A frame with the same address, counter and bytes as one stored in the last 30 days is the
   station's repeat after a lost receipt: it is stored as a duplicate of the first and not decoded
   again. A record that also came over LoRaWAN, from another card or over Bluetooth is one record

@@ -571,12 +571,17 @@ async def _unwrap_lp0(
     """A frame an offload station stored (decisions D320 and D321): verified and decrypted
     once with the device's own LP0 keys, the result kept in the provider metadata so a walk
     after a link and a re-decode read it back; the stored line is never changed. A device
-    without keys fails plainly, and "Decode again" takes the frame up once they are set."""
+    without keys fails plainly, and "Decode again" takes the frame up once they are set.
+    LP0 v5 (decision D327): the station names the tracker EUI it learnt in discovery; when
+    it contradicts the EUI of the device the address belongs to, the frame is refused rather
+    than decoded onto a device the registry may have wrong, and the metadata version is
+    read only when Protect knows it."""
     meta = dict(event.provider_metadata or {})
     if "frame_hex" in meta:
         return lorawan_frame(payload, meta)
     from shared.connectivity.adapters.lp0_station import FrameError, Lp0StationAdapter
     from shared.connectivity.adapters.lp0_station.lorawan import parse_uplink
+    from shared.domain.lp0 import device_eui
 
     rxpk = payload.get("rxpk") if isinstance(payload, dict) else None
     data = rxpk.get("data") if isinstance(rxpk, dict) else None
@@ -598,13 +603,26 @@ async def _unwrap_lp0(
             retryable=False,
             user_actionable=True,
         )
-    frame_format = meta.get("frame_format")
+    claimed = meta.get("source_eui")
+    if claimed:
+        known = await device_eui(session, device)
+        if known is not None and str(claimed).upper() != known:
+            raise ApplicationError(
+                code=ErrorCode.DEVICE_IDENTITY_AMBIGUOUS,
+                message=f"the station says the frame is from tracker {claimed}, but address "
+                f"{meta.get('dev_addr')} belongs to {device.name} ({known}); check the "
+                "device's LP0 address and keys, or its serial, then decode again",
+                component="decoder",
+                retryable=False,
+                user_actionable=True,
+            )
+    version = meta.get("lp0_version")
     try:
         unwrapped = Lp0StationAdapter.unwrap_frame(
             phy,
             credentials,
             last_f_cnt=await last_counter(session, device.id),
-            frame_format=str(frame_format) if frame_format is not None else None,
+            lp0_version=int(version) if version is not None else None,
         )
     except FrameError as exc:
         raise ApplicationError(

@@ -145,13 +145,36 @@ def test_a_rolled_over_counter_is_read_from_the_last_verified_one():
     assert unwrap(plain, CREDENTIALS, last_f_cnt=0x10002).f_cnt == 7  # zero is tried first
 
 
-def test_an_unknown_frame_format_is_refused_by_name():
-    from shared.connectivity.adapters.lp0_station import Lp0StationAdapter
+def test_an_unknown_metadata_version_is_refused_by_name():
+    """LP0 v5 writes `lp0.version`; a version Protect has not read the contract of is refused
+    by name (decision D327), a missing one is an older station firmware's file."""
+    from shared.connectivity.adapters.lp0_station import METADATA_VERSIONS, Lp0StationAdapter
 
+    assert {5} == METADATA_VERSIONS
     assert Lp0StationAdapter.unwrap_frame(SAVED_REPLAY_PACKET, CREDENTIALS).f_cnt == 101
-    assert Lp0StationAdapter.unwrap_frame(SAVED_REPLAY_PACKET, CREDENTIALS, frame_format="lorawan")
-    with pytest.raises(FrameError, match="not one this version reads"):
-        Lp0StationAdapter.unwrap_frame(SAVED_REPLAY_PACKET, CREDENTIALS, frame_format="lp0-env-1")
+    assert Lp0StationAdapter.unwrap_frame(SAVED_REPLAY_PACKET, CREDENTIALS, lp0_version=5)
+    with pytest.raises(FrameError, match="version 6 is not one this version reads"):
+        Lp0StationAdapter.unwrap_frame(SAVED_REPLAY_PACKET, CREDENTIALS, lp0_version=6)
+    with pytest.raises(FrameError, match="version 4 is not one"):
+        Lp0StationAdapter.unwrap_frame(SAVED_REPLAY_PACKET, CREDENTIALS, lp0_version=4)
+
+
+def test_the_firmware_signs_with_the_sixteen_bit_counter_and_wraps():
+    """LP0 v5: `lorawan_tools_build` takes the wrapping 16-bit allocator's value as a 32-bit
+    counter with the upper half zero, so the frame carries the whole counter it was signed
+    with. 65535 verifies, the next frame at 0 verifies after it (the upper half zero is tried
+    first, whatever the device was last seen at), and the wrap reuses the keystream, which
+    is the firmware's limit: the same records at counter 0 encrypt to the same bytes."""
+    high = build_uplink(CREDENTIALS, 0xFFFF, 29, THREE_RECORDS)
+    assert parse_uplink(high).f_cnt == 0xFFFF
+    assert unwrap(high, CREDENTIALS).f_cnt == 0xFFFF
+    low = build_uplink(CREDENTIALS, 0, 29, THREE_RECORDS)
+    after_wrap = unwrap(low, CREDENTIALS, last_f_cnt=0xFFFF)
+    assert (after_wrap.f_cnt, after_wrap.payload) == (0, THREE_RECORDS)
+    assert counter_candidates(0, 0xFFFF)[0] == 0
+    assert build_uplink(CREDENTIALS, 0, 29, THREE_RECORDS) == low  # the reuse, recorded
+    # the frames the firmware builds are unconfirmed, port 29
+    assert high[0] == 0x40 and parse_uplink(high).f_port == 29
 
 
 def test_credentials_validate_their_shape():

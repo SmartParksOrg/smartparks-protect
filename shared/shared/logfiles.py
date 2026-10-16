@@ -194,11 +194,16 @@ class StationFrame:
     frequency_hz: int | None = None
     data_rate: str | None = None
     coding_rate: str | None = None
-    #: What a line may add after firmware issue 772: the tracker's EUI as routing metadata
-    #: (`devEui`), and a name for the stored frame's format. Kept, never trusted for more
-    #: than naming: the identity is the address, the keys decide.
-    dev_eui: str | None = None
-    frame_format: str | None = None
+    #: The station's `lp0` object (LP0 v5, firmware issue 772): the protocol version, the
+    #: tracker EUI the station learnt in discovery ("claimed source; backend must confirm
+    #: registry mapping and MIC", says the firmware header), and the transport's session,
+    #: window and slot. Absent on the files of earlier versions. Never trusted for more than
+    #: naming and cross-checking: the identity is the address, the keys decide.
+    lp0_version: int | None = None
+    source_eui: str | None = None
+    session: int | None = None
+    window: int | None = None
+    slot: int | None = None
 
     @property
     def spreading_factor(self) -> int | None:
@@ -255,22 +260,7 @@ def parse_station_line(number: int, text: str) -> StationFrame:
         # the station writes Unix seconds in `tmst`, not a gateway's microsecond counter
         received = datetime.fromtimestamp(rxpk["tmst"], tz=UTC)
     frequency = _number(rxpk.get("freq"))
-    eui = next(
-        (
-            str(document[k]).strip().upper()
-            for k in ("devEui", "deviceEui", "dev_eui", "trackerEui")
-            if isinstance(document.get(k), str) and document[k].strip()
-        ),
-        None,
-    )
-    frame_format = next(
-        (
-            str(document[k]).strip()
-            for k in ("frameFormat", "format", "lp0Format")
-            if isinstance(document.get(k), str) and document[k].strip()
-        ),
-        None,
-    )
+    lp0 = _lp0_metadata(document.get("lp0"))
     return StationFrame(
         line=number,
         station_eui=station,
@@ -282,9 +272,47 @@ def parse_station_line(number: int, text: str) -> StationFrame:
         frequency_hz=round(frequency * 1_000_000) if frequency else None,
         data_rate=str(rxpk["datr"]) if rxpk.get("datr") else None,
         coding_rate=str(rxpk["codr"]) if rxpk.get("codr") else None,
-        dev_eui=eui if eui and re.fullmatch(r"[0-9A-F]{16}", eui) else None,
-        frame_format=frame_format,
+        lp0_version=lp0["version"],
+        source_eui=lp0["source_eui"],
+        session=lp0["session"],
+        window=lp0["window"],
+        slot=lp0["slot"],
     )
+
+
+def _lp0_metadata(value: Any) -> dict[str, Any]:
+    """The `lp0` object of a v5 line as the firmware writes it (`version`, `source_eui`,
+    `session`, `window`, `slot`, all present together); absent on earlier files. A present
+    object that is not that shape is an error: the firmware never writes a partial one. An
+    all-zero EUI is no EUI."""
+    empty: dict[str, Any] = {
+        "version": None,
+        "source_eui": None,
+        "session": None,
+        "window": None,
+        "slot": None,
+    }
+    if value is None:
+        return empty
+    if not isinstance(value, dict):
+        raise ValueError("lp0 metadata is not an object")
+    version = value.get("version")
+    if not isinstance(version, int) or isinstance(version, bool) or version < 0:
+        raise ValueError("lp0.version is not a whole number")
+    eui = str(value.get("source_eui") or "").strip().upper()
+    if eui and not re.fullmatch(r"[0-9A-F]{16}", eui):
+        raise ValueError("lp0.source_eui is not sixteen hex digits")
+    counters: dict[str, Any] = {}
+    for key in ("session", "window", "slot"):
+        number = value.get(key)
+        if number is not None and (not isinstance(number, int) or isinstance(number, bool)):
+            raise ValueError(f"lp0.{key} is not a whole number")
+        counters[key] = number
+    return {
+        "version": version,
+        "source_eui": eui if eui and set(eui) != {"0"} else None,
+        **counters,
+    }
 
 
 def parse_station_jsonl(text: str) -> ParsedStationLog:

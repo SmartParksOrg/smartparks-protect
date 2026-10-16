@@ -59,3 +59,11 @@ the station opaque; its open points (an envelope or a PHYPayload on the card, th
 which credentials) are met by reading a counter across a rollover from the device's last verified
 one, refusing a named frame format Protect does not read, and keeping a station-given EUI as the
 identity's name on Needs attention. The research document's section 3.17 on LP0 is superseded.
+
+Update 2026-10-16, LP0 v5 (decision D327): the firmware took that direction. The tracker builds
+the ordinary frame itself under its own keys, the station authenticates the transport with a
+deployment master key and stores the frame unchanged, and writes an `lp0` object (version 5, the
+tracker EUI from discovery, session, window, slot). This design reads v5 as it read the frames
+before; it adds the object to the metadata, cross-checks the station-given EUI against the device
+the address belongs to and refuses a contradiction, and refuses a metadata version it does not
+know. The master key is not stored in Protect, which never needs it.

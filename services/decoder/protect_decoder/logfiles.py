@@ -127,14 +127,21 @@ def station_frame_message(row: DeviceLogFile, frame: StationFrame) -> InboundMes
         metadata["best_rssi"] = frame.rssi
     if frame.snr is not None:
         metadata["best_snr"] = frame.snr
-    if frame.frame_format is not None:
-        metadata["frame_format"] = frame.frame_format
+    for key, value in (
+        ("lp0_version", frame.lp0_version),
+        ("lp0_session", frame.session),
+        ("lp0_window", frame.window),
+        ("lp0_slot", frame.slot),
+    ):
+        if value is not None:
+            metadata[key] = value
     identity_attributes: dict[str, Any] = {}
-    if frame.dev_eui is not None:
-        # the station's word on who the tracker is (issue 772 lets it keep the EUI as
-        # routing metadata): Needs attention shows it as the identity's name, a person links
-        metadata["dev_eui"] = frame.dev_eui
-        identity_attributes = {"dev_eui": frame.dev_eui, "name": frame.dev_eui}
+    if frame.source_eui is not None:
+        # the station's word on who the tracker is (LP0 v5: the EUI it learnt in discovery):
+        # Needs attention shows it as the identity's name, a person links; the pipeline
+        # refuses the frame when it contradicts the device the address belongs to
+        metadata["source_eui"] = frame.source_eui
+        identity_attributes = {"dev_eui": frame.source_eui, "name": frame.source_eui}
     return InboundMessage(
         external_id=uplink.dev_addr,
         event_type="uplink",
