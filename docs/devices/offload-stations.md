@@ -40,9 +40,12 @@ deduplicates nothing and leaves that to Protect.
 
 ## Setting up
 
-1. **The station.** Create the RangerEdge as a device if it is not one already (its serial
-   number is its DevEUI, as for every OpenCollar; the station names the card's files after it)
-   and assign it to the project. Then, on the Offload page under Network, **Make an offload
+1. **The station.** On the Offload page under Network, **Add a device** makes the RangerEdge
+   a device of this project if it is not one already (decision D326): over Bluetooth the
+   device gives its own name, DevEUI (the serial of every OpenCollar, which the station names
+   the card's files after), hardware and firmware, and the dialog carries on into the
+   station's setup; by hand you type the name and the DevEUI. A server admin may also create
+   it under Server admin, Devices, and assign it to the project. Then **Make an offload
    station**: pick the device, give it a place (a click on the map, the coordinates, or the
    browser's position while standing at it) and it gets an entity of the type **Offload
    station** (under Equipment; the entity the device tracks today is kept), the place, and its
@@ -51,7 +54,9 @@ deduplicates nothing and leaves that to Protect.
    it before its first card. The same can be done by hand: an Offload station entity with the
    device assigned, the place on the device page (the Place card), and the gateway row comes
    with the first card. A station does not move, so its place is never read from its data.
-2. **The trackers.** On each tracker's device page, the **LP0 offload** card takes the LP0
+2. **The trackers.** A tracker added over Bluetooth with **Add a device** brings its LP0
+   address and keys with it, read from the device and saved on it in the same call (source:
+   the device). Otherwise, on each tracker's device page, the **LP0 offload** card takes the LP0
    address and the two session keys (eight and twice 32 hex digits) that were provisioned on
    the device; "Use the device's reported values" takes the three from the device's own
    settings readback when it has sent one. The address becomes the tracker's identity on the
@@ -120,7 +125,9 @@ a real card was read (Tim, 2026-10-16), to be tuned once there is data.
 
 The one thing the page does itself is the station's setup (Tim, the same day: a guide and an
 easy way to turn a device into a station belong in one place). **Make an offload station**
-opens the dialog of step 1 above for project admins; a station with an Offload station entity
+opens the dialog of step 1 above for project admins; **Add a device** makes a RangerEdge or a
+tracker a device of the project first, by hand or read over Bluetooth with its LP0 credentials
+(decision D326), and a station carries on into its setup; a station with an Offload station entity
 is listed from then on, with no card. The **Setup** column says what a row still misses: for a
 station no entity, no place, not a gateway yet (each opens the dialog for that station), no card
 yet (a link to its device page) and card not writable (its own report); for a tracker the
@@ -161,6 +168,12 @@ takes minutes and the row's bar says where it is.
   station.
 - `GET /api/v1/devices/{device_id}/offload`: the Offload station card.
 - `GET /api/v1/projects/{project_id}/offload`: the Offload page, for anyone who reads the project.
+- `POST /api/v1/projects/{project_id}/devices` (a device as `POST /devices` takes it, status
+  active by default, plus optional `lp0` with `dev_addr`, `app_s_key`, `nwk_s_key` and `source`
+  person or device): the device made and assigned to the project from now, its LP0 credentials
+  set at once; `devices:write`; a serial or an LP0 address another device holds is 409.
+- `GET /api/v1/device-types/{device_type_id}/driver-catalog`: the driver's protocol catalogue
+  by device type, for reading a device over Bluetooth before it exists.
 - `POST /api/v1/projects/{project_id}/offload/stations` (`device_id`, optional `entity_id` or
   `entity_name`, optional `latitude` and `longitude`): a device of the project becomes an offload
   station, or a station is completed; answers what was made (`entity_created`, `entity_kept`,

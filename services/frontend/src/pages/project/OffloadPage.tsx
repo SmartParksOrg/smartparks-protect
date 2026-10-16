@@ -16,6 +16,7 @@ import type {
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { AddProjectDeviceDialog } from "@/components/devices/AddProjectDeviceDialog";
 import { OffloadStationDialog } from "@/components/network/OffloadStationDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,10 @@ import { formatAgo, formatTime } from "@/lib/format";
  * page does itself is the station's setup (Tim, 2026-10-16, the same day): "Make an offload
  * station" turns a device of the project into one in one dialog, the Setup column says what a
  * row still misses and opens that dialog for it, and the guide under "How to set up" is the
- * three steps in one place, hidden until the button is pressed (Tim, 2026-10-16). Figures cover the last 30 days, as on the Gateways page.
+ * three steps in one place, hidden until the button is pressed (Tim, 2026-10-16). "Add a
+ * device" (decision D326) makes a RangerEdge or a tracker a device of the project here, by hand
+ * or read over Bluetooth with its LP0 credentials, and a station carries on into its setup.
+ * Figures cover the last 30 days, as on the Gateways page.
  */
 export function OffloadPage() {
   const { t } = useTranslation();
@@ -45,6 +49,7 @@ export function OffloadPage() {
     deviceId: null,
   });
   const [guideOpen, setGuideOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const overview = useQuery({
     queryKey: queryKeys.projectOffload(projectId),
     queryFn: () =>
@@ -455,13 +460,23 @@ export function OffloadPage() {
               <BookOpen className="size-4" /> {t("How to set up")}
             </Button>
             {canSetUp && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setSetup({ open: true, deviceId: null })}
-              >
-                <Plus className="size-4" /> {t("Make an offload station")}
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddOpen(true)}
+                >
+                  <Plus className="size-4" /> {t("Add a device")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setSetup({ open: true, deviceId: null })}
+                >
+                  <HardDrive className="size-4" /> {t("Make an offload station")}
+                </Button>
+              </>
             )}
           </>
         }
@@ -476,12 +491,12 @@ export function OffloadPage() {
             <ol className="mt-1 list-decimal space-y-1 pl-4">
               <li>
                 {t(
-                  "The station: a RangerEdge with an SD card, a device of this project with its DevEUI as serial number. \"Make an offload station\" gives it an Offload station entity, its place and its row among the gateways. A station does not move, so its place is set by hand.",
+                  "The station: a RangerEdge with an SD card. \"Add a device\" makes it a device of this project, by hand or read over Bluetooth, with its DevEUI as serial number; \"Make an offload station\" gives it an Offload station entity, its place and its row among the gateways. A station does not move, so its place is set by hand.",
                 )}
               </li>
               <li>
                 {t(
-                  "The trackers: on each tracker's device page, under LP0 offload, set the LP0 address and the two session keys provisioned on the device, or take them from the device's own readback. The address is how a frame on a card finds its device; the keys decrypt it.",
+                  "The trackers: a tracker added over Bluetooth brings its LP0 address and keys with it. Otherwise set them on its device page, under LP0 offload, or take them from the device's own readback. The address is how a frame on a card finds its device; the keys decrypt it.",
                 )}
               </li>
               <li>
@@ -493,12 +508,26 @@ export function OffloadPage() {
           </Callout>
         )}
         {canSetUp && (
-          <OffloadStationDialog
-            projectId={projectId}
-            open={setup.open}
-            deviceId={setup.deviceId}
-            onOpenChange={(open) => setSetup((s) => ({ ...s, open }))}
-          />
+          <>
+            <OffloadStationDialog
+              projectId={projectId}
+              open={setup.open}
+              deviceId={setup.deviceId}
+              onOpenChange={(open) => setSetup((s) => ({ ...s, open }))}
+              onAddDevice={() => {
+                setSetup((s) => ({ ...s, open: false }));
+                setAddOpen(true);
+              }}
+            />
+            <AddProjectDeviceDialog
+              projectId={projectId}
+              open={addOpen}
+              onOpenChange={setAddOpen}
+              onCreated={(device, station) => {
+                if (station) setSetup({ open: true, deviceId: device.id });
+              }}
+            />
+          </>
         )}
         <section className="space-y-2">
           <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -566,7 +595,7 @@ export function OffloadPage() {
             emptyMessage={
               canSetUp
                 ? t(
-                    "No offload station yet. Make one from a RangerEdge of this project with \"Make an offload station\" above; the guide says what comes next.",
+                    "No offload station yet. Add the RangerEdge with \"Add a device\" if it is not one yet, then \"Make an offload station\"; the guide says what comes next.",
                   )
                 : t(
                     "No offload station yet. A project admin makes one from a RangerEdge of this project with \"Make an offload station\".",

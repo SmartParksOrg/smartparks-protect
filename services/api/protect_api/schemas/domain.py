@@ -433,6 +433,25 @@ class DeviceCreate(BaseModel):
     )
 
 
+class Lp0Provisioned(BaseModel):
+    """A device's LP0 address and session keys as provisioned on it, read over Bluetooth in the
+    browser (`source` device) or typed (`source` person), saved on creation (phase 42)."""
+
+    dev_addr: str = Field(max_length=16, description="Eight hex digits")
+    app_s_key: str = Field(max_length=48, description="32 hex digits")
+    nwk_s_key: str = Field(max_length=48, description="32 hex digits")
+    source: Literal["person", "device"] = "device"
+
+
+class ProjectDeviceCreate(DeviceCreate):
+    """A device created inside a project by a project admin (decision D326): made at server
+    level as every device is, assigned to the project from now, and, when the hardware was read
+    over Bluetooth, with its LP0 credentials set at once."""
+
+    status: DeviceStatus = DeviceStatus.ACTIVE
+    lp0: Lp0Provisioned | None = None
+
+
 class DeviceUpdate(BaseModel):
     device_type_id: uuid.UUID | None = None
     name: str | None = Field(default=None, min_length=1, max_length=200)

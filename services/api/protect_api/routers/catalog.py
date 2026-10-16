@@ -24,7 +24,9 @@ from protect_api.schemas.domain import (
     MetricRead,
     MetricUpdate,
 )
+from protect_api.schemas.log_files import DriverCatalog
 from shared.database import get_session
+from shared.device_drivers.registry import DRIVERS
 from shared.models import DeviceType, EntityType, Metric, User
 
 router = APIRouter(tags=["catalog"])
@@ -163,6 +165,22 @@ async def list_device_types(
     return PageResponse(
         items=[DeviceTypeRead.model_validate(r) for r in rows], next_cursor=next_cursor
     )
+
+
+@router.get("/device-types/{device_type_id}/driver-catalog", response_model=DriverCatalog)
+async def device_type_driver_catalog(
+    device_type_id: uuid.UUID,
+    _: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> DriverCatalog:
+    """The driver's protocol catalogue by device type, for reading a device over Bluetooth
+    before it exists in Protect (the Offload page's "Add a device"); the per-device route in
+    `log_files.py` serves a device that does. Empty for drivers without one."""
+    device_type = await get_or_404(session, DeviceType, device_type_id, "Device type")
+    driver = DRIVERS.get(device_type.driver_key)
+    catalog = getattr(driver, "catalog", None)
+    data: dict[str, Any] = catalog() if callable(catalog) else {}
+    return DriverCatalog(driver_key=device_type.driver_key, catalog=data)
 
 
 @router.post("/device-types", response_model=DeviceTypeRead, status_code=status.HTTP_201_CREATED)

@@ -13,8 +13,10 @@ import {
   parseFrame,
   parseTlv,
   PORT,
+  readIdentity,
   settingFrame,
   toBase64,
+  type Catalog,
   type Transport,
 } from "@/lib/opencollar-ble";
 
@@ -146,5 +148,51 @@ describe("OpenCollar BLE session", () => {
     const result = await session.writeSetting({ id: 2, name: "ublox_send_interval", length: 4, type: "uint32", default: 0, min: 0, max: 172800 }, 60);
     expect(result).toBeNull();
     expect(hex(transport.written[0])).toBe("0302043c000000");
+  });
+});
+
+describe("a device's identity read over Bluetooth (phase 42)", () => {
+  const catalog: Catalog = {
+    settings: [
+      { id: 17, name: "device_eui", length: 8, type: "byte_array", default: "0000000000000000", min: null, max: null },
+      { id: 33, name: "device_name", length: 8, type: "string", default: "", min: null, max: null },
+      { id: 66, name: "lp0_app_key", length: 16, type: "byte_array", default: "", min: null, max: null },
+      { id: 67, name: "lp0_network_key", length: 16, type: "byte_array", default: "", min: null, max: null },
+      { id: 68, name: "lp0_dev_addr", length: 4, type: "byte_array", default: "", min: null, max: null },
+    ],
+    commands: [],
+  };
+  // the wiki status example (research 3.4) with the type byte set to RangerEdge hardware
+  const status = decodeStatus(fromHex("00 00 88 00 80 05 80 80 ff 12 81 05 00 00".replace(/ /g, "")));
+
+  it("takes the EUI, the name, the hardware and the LP0 credentials from the settings and the status", () => {
+    const values = new Map<number, Uint8Array>([
+      [17, fromHex("0016c001f0abcdef")],
+      [33, new TextEncoder().encode("SP0518\0\0")],
+      [66, fromHex("2b7e151628aed2a6abf7158809cf4f3c")],
+      [67, fromHex("000102030405060708090a0b0c0d0e0f")],
+      [68, fromHex("26010203")],
+    ]);
+    const identity = readIdentity(catalog, values, status, "SP05-adv");
+    expect(identity.name).toBe("SP0518");
+    expect(identity.eui).toBe("0016C001F0ABCDEF");
+    expect(identity.hardwareType).toBe(5);
+    expect(identity.hardwareKey).toBe("rangeredge");
+    expect(identity.firmwareVersion).toBe("8.1");
+    expect(identity.lp0).toEqual({ devAddr: "26010203", appSKey: "2B7E151628AED2A6ABF7158809CF4F3C", nwkSKey: "000102030405060708090A0B0C0D0E0F" });
+  });
+
+  it("counts an all-zero EUI or key as not set and falls back to the advertised name", () => {
+    const values = new Map<number, Uint8Array>([
+      [17, fromHex("0000000000000000")],
+      [66, fromHex("2b7e151628aed2a6abf7158809cf4f3c")],
+      [67, fromHex("00000000000000000000000000000000")],
+      [68, fromHex("26010203")],
+    ]);
+    const identity = readIdentity(catalog, values, null, "SP05-adv");
+    expect(identity.name).toBe("SP05-adv");
+    expect(identity.eui).toBeNull();
+    expect(identity.lp0).toBeNull();
+    expect(identity.hardwareKey).toBeNull();
   });
 });

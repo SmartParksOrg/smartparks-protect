@@ -45,12 +45,15 @@ export function OffloadStationDialog({
   open,
   onOpenChange,
   deviceId,
+  onAddDevice,
 }: {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The station to complete; nothing for a new one. */
   deviceId: string | null;
+  /** Opens the dialog that makes the RangerEdge a device first, when it is none yet. */
+  onAddDevice?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -69,6 +72,7 @@ export function OffloadStationDialog({
             projectId={projectId}
             initialDeviceId={deviceId}
             onDone={() => onOpenChange(false)}
+            onAddDevice={onAddDevice}
           />
         )}
       </DialogContent>
@@ -81,10 +85,12 @@ function SetupForm({
   projectId,
   initialDeviceId,
   onDone,
+  onAddDevice,
 }: {
   projectId: string;
   initialDeviceId: string | null;
   onDone: () => void;
+  onAddDevice?: () => void;
 }) {
   const { t } = useTranslation();
   const devices = useQuery({
@@ -244,6 +250,14 @@ function SetupForm({
             </button>
           ))}
         </div>
+        {onAddDevice && (
+          <p className="text-xs text-muted-foreground">
+            {t("The RangerEdge is not a device yet?")}{" "}
+            <button type="button" className="underline" onClick={onAddDevice}>
+              {t("Add it, by hand or over Bluetooth")}
+            </button>
+          </p>
+        )}
         {chosen && !chosen.serial_number && (
           <Callout kind="warning">
             {t(

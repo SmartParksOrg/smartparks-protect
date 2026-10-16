@@ -203,6 +203,65 @@ export function decodeStatus(data: Uint8Array): StatusMessage {
   };
 }
 
+/** The hardware a status message names (research 3.4), as the driver names it. */
+export const HARDWARE_TYPES: Record<number, string> = {
+  1: "rhinoedge",
+  2: "elephantedge",
+  3: "wisentedge",
+  4: "cattracker",
+  5: "rangeredge",
+  6: "rhinopuck",
+  7: "rhinopuck35",
+  8: "collaredge",
+  9: "freeedge",
+};
+
+export interface DeviceIdentity {
+  /** The device's own name setting, else the advertised name. */
+  name: string;
+  /** The LoRaWAN DevEUI as 16 upper case hex digits, the serial of every OpenCollar. */
+  eui: string | null;
+  hardwareType: number | null;
+  /** The driver's name for the hardware, `rangeredge` for an offload station. */
+  hardwareKey: string | null;
+  firmwareVersion: string | null;
+  /** The LP0 address and session keys as provisioned on the device, when all three are set. */
+  lp0: { devAddr: string; appSKey: string; nwkSKey: string } | null;
+}
+
+const ZERO = /^0+$/;
+
+/** What a device tells about itself over Bluetooth (phase 42, the Offload page's "Add a
+ * device"): its identity and LP0 credentials from the settings it reported, read by name
+ * through the catalogue, and its hardware from the status message. A key or address of all
+ * zeros is the firmware's default and counts as not set. */
+export function readIdentity(catalog: Catalog, values: Map<number, Uint8Array>, status: StatusMessage | null, advertisedName: string): DeviceIdentity {
+  const byName = new Map(catalog.settings.map((s) => [s.name, s]));
+  const raw = (name: string): Uint8Array | undefined => {
+    const setting = byName.get(name);
+    return setting ? values.get(setting.id) : undefined;
+  };
+  const hexOf = (name: string): string | null => {
+    const bytes = raw(name);
+    if (!bytes) return null;
+    const text = hex(bytes).toUpperCase();
+    return ZERO.test(text) ? null : text;
+  };
+  const nameBytes = raw("device_name");
+  const ownName = nameBytes ? String(decodeSettingValue("string", nameBytes)).replace(/\0+$/, "").trim() : "";
+  const devAddr = hexOf("lp0_dev_addr");
+  const appSKey = hexOf("lp0_app_key");
+  const nwkSKey = hexOf("lp0_network_key");
+  return {
+    name: ownName || advertisedName,
+    eui: hexOf("device_eui"),
+    hardwareType: status?.hardwareType ?? null,
+    hardwareKey: status ? (HARDWARE_TYPES[status.hardwareType] ?? null) : null,
+    firmwareVersion: status?.firmwareVersion ?? null,
+    lp0: devAddr && appSKey && nwkSKey ? { devAddr, appSKey, nwkSKey } : null,
+  };
+}
+
 /** Flash status data (research 3.12): used percentage and stored message count. */
 export function decodeFlashStatus(data: Uint8Array): { usedPercent: number; messages: number } {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);

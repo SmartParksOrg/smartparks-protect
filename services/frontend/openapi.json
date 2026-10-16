@@ -5958,6 +5958,65 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/devices": {
+   "post": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Create Project Device",
+    "description": "Create a device and assign it to this project from now, in one call (decision D326):\nthe Offload page's \"Add a device\", by hand or from a Bluetooth read of the hardware. For a\ndriver whose serial is the DevEUI the serial is kept upper case (decision D101). With `lp0`\nthe device's LP0 address and keys are set at once, as the LP0 offload card would; an address\nanother device holds is refused with that device's name. No attribution job: a device made\nnow has no records yet.",
+    "operationId": "create_project_device_api_v1_projects__project_id__devices_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectDeviceCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/entity-types": {
    "get": {
     "tags": [
@@ -6308,6 +6367,55 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/DeviceTypeRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/device-types/{device_type_id}/driver-catalog": {
+   "get": {
+    "tags": [
+     "catalog"
+    ],
+    "summary": "Device Type Driver Catalog",
+    "description": "The driver's protocol catalogue by device type, for reading a device over Bluetooth\nbefore it exists in Protect (the Offload page's \"Add a device\"); the per-device route in\n`log_files.py` serves a device that does. Empty for drivers without one.",
+    "operationId": "device_type_driver_catalog_api_v1_device_types__device_type_id__driver_catalog_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_type_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Type Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DriverCatalog"
         }
        }
       }
@@ -37197,6 +37305,45 @@
     "title": "Lp0CredentialsUpdate",
     "description": "The address and both keys typed in, or `from_device` to take the three values the\ndevice reported in its settings readback."
    },
+   "Lp0Provisioned": {
+    "properties": {
+     "dev_addr": {
+      "type": "string",
+      "maxLength": 16,
+      "title": "Dev Addr",
+      "description": "Eight hex digits"
+     },
+     "app_s_key": {
+      "type": "string",
+      "maxLength": 48,
+      "title": "App S Key",
+      "description": "32 hex digits"
+     },
+     "nwk_s_key": {
+      "type": "string",
+      "maxLength": 48,
+      "title": "Nwk S Key",
+      "description": "32 hex digits"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "person",
+       "device"
+      ],
+      "title": "Source",
+      "default": "device"
+     }
+    },
+    "type": "object",
+    "required": [
+     "dev_addr",
+     "app_s_key",
+     "nwk_s_key"
+    ],
+    "title": "Lp0Provisioned",
+    "description": "A device's LP0 address and session keys as provisioned on it, read over Bluetooth in the\nbrowser (`source` device) or typed (`source` person), saved on creation (phase 42)."
+   },
    "Lp0Readback": {
     "properties": {
      "dev_addr": {
@@ -41214,6 +41361,93 @@
      "slug"
     ],
     "title": "ProjectCreate"
+   },
+   "ProjectDeviceCreate": {
+    "properties": {
+     "device_type_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Type Id"
+     },
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "serial_number": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 128
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Serial Number"
+     },
+     "status": {
+      "$ref": "#/components/schemas/DeviceStatus",
+      "default": "active"
+     },
+     "firmware_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Firmware Version"
+     },
+     "attributes": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Attributes"
+     },
+     "notes": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Notes"
+     },
+     "location_source": {
+      "$ref": "#/components/schemas/LocationSource",
+      "default": "device"
+     },
+     "location_fallback_hours": {
+      "type": "integer",
+      "maximum": 720.0,
+      "minimum": 1.0,
+      "title": "Location Fallback Hours",
+      "description": "Hours without a device fix before a network location stands in (D164)",
+      "default": 24
+     },
+     "lp0": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Lp0Provisioned"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_type_id",
+     "name"
+    ],
+    "title": "ProjectDeviceCreate",
+    "description": "A device created inside a project by a project admin (decision D326): made at server\nlevel as every device is, assigned to the project from now, and, when the hardware was read\nover Bluetooth, with its LP0 credentials set at once."
    },
    "ProjectIconCreate": {
     "properties": {

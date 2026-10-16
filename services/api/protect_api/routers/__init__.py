@@ -40,6 +40,7 @@ from protect_api.routers.network import router as network_router
 from protect_api.routers.offload import router as offload_router
 from protect_api.routers.permissions import router as permissions_router
 from protect_api.routers.platform import router as platform_router
+from protect_api.routers.project_devices import router as project_devices_router
 from protect_api.routers.projects import router as projects_router
 from protect_api.routers.records import router as records_router
 from protect_api.routers.rules import router as rules_router
@@ -54,6 +55,7 @@ for router in (
     entities_router,
     groups_router,
     devices_router,
+    project_devices_router,
     catalog_router,
     data_sources_router,
     admin_router,

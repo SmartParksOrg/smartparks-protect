@@ -1478,6 +1478,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Project Device
+         * @description Create a device and assign it to this project from now, in one call (decision D326):
+         *     the Offload page's "Add a device", by hand or from a Bluetooth read of the hardware. For a
+         *     driver whose serial is the DevEUI the serial is kept upper case (decision D101). With `lp0`
+         *     the device's LP0 address and keys are set at once, as the LP0 offload card would; an address
+         *     another device holds is refused with that device's name. No attribution job: a device made
+         *     now has no records yet.
+         */
+        post: operations["create_project_device_api_v1_projects__project_id__devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/entity-types": {
         parameters: {
             query?: never;
@@ -1527,6 +1552,28 @@ export interface paths {
         put?: never;
         /** Create Device Type */
         post: operations["create_device_type_api_v1_device_types_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/device-types/{device_type_id}/driver-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Type Driver Catalog
+         * @description The driver's protocol catalogue by device type, for reading a device over Bluetooth
+         *     before it exists in Protect (the Offload page's "Add a device"); the per-device route in
+         *     `log_files.py` serves a device that does. Empty for drivers without one.
+         */
+        get: operations["device_type_driver_catalog_api_v1_device_types__device_type_id__driver_catalog_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -10641,6 +10688,34 @@ export interface components {
             from_device: boolean;
         };
         /**
+         * Lp0Provisioned
+         * @description A device's LP0 address and session keys as provisioned on it, read over Bluetooth in the
+         *     browser (`source` device) or typed (`source` person), saved on creation (phase 42).
+         */
+        Lp0Provisioned: {
+            /**
+             * Dev Addr
+             * @description Eight hex digits
+             */
+            dev_addr: string;
+            /**
+             * App S Key
+             * @description 32 hex digits
+             */
+            app_s_key: string;
+            /**
+             * Nwk S Key
+             * @description 32 hex digits
+             */
+            nwk_s_key: string;
+            /**
+             * Source
+             * @default device
+             * @enum {string}
+             */
+            source: "person" | "device";
+        };
+        /**
          * Lp0Readback
          * @description What the device itself reported of its LP0 settings (the settings table, D228): the
          *     address in the clear, and whether the two keys are known, never their values.
@@ -12082,6 +12157,42 @@ export interface components {
             };
             /** Organization Id */
             organization_id?: string | null;
+        };
+        /**
+         * ProjectDeviceCreate
+         * @description A device created inside a project by a project admin (decision D326): made at server
+         *     level as every device is, assigned to the project from now, and, when the hardware was read
+         *     over Bluetooth, with its LP0 credentials set at once.
+         */
+        ProjectDeviceCreate: {
+            /**
+             * Device Type Id
+             * Format: uuid
+             */
+            device_type_id: string;
+            /** Name */
+            name: string;
+            /** Serial Number */
+            serial_number?: string | null;
+            /** @default active */
+            status: components["schemas"]["DeviceStatus"];
+            /** Firmware Version */
+            firmware_version?: string | null;
+            /** Attributes */
+            attributes?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string | null;
+            /** @default device */
+            location_source: components["schemas"]["LocationSource"];
+            /**
+             * Location Fallback Hours
+             * @description Hours without a device fix before a network location stands in (D164)
+             * @default 24
+             */
+            location_fallback_hours: number;
+            lp0?: components["schemas"]["Lp0Provisioned"] | null;
         };
         /** ProjectIconCreate */
         ProjectIconCreate: {
@@ -17310,6 +17421,41 @@ export interface operations {
             };
         };
     };
+    create_project_device_api_v1_projects__project_id__devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectDeviceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_entity_types_api_v1_entity_types_get: {
         parameters: {
             query?: {
@@ -17524,6 +17670,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceTypeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_type_driver_catalog_api_v1_device_types__device_type_id__driver_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverCatalog"];
                 };
             };
             /** @description Validation Error */
