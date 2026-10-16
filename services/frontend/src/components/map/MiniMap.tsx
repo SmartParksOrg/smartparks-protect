@@ -167,9 +167,14 @@ export function MiniMap({
       });
       const [west, south, east, north] = geometry.bounds;
       if (picking) {
-        // the person is placing the point: keep their view, unless it is still the world
-        if (map.getZoom() < 3)
-          map.jumpTo({ center: geometry.latest, zoom: 13 });
+        // the person is placing the point: a click lies in the view and keeps it; the world
+        // view, or a point from elsewhere (the browser's position, typed coordinates), brings
+        // the view to the point (Tim, 2026-10-16: "Use my position" placed no visible dot
+        // while the map stood at the device's own place)
+        const latest = geometry.latest as [number, number];
+        if (map.getZoom() < 3) map.jumpTo({ center: latest, zoom: 13 });
+        else if (!map.getBounds().contains(latest))
+          map.easeTo({ center: latest, duration: 300 });
       } else if (west === east && south === north)
         map.jumpTo({ center: geometry.latest, zoom: 13 });
       else
