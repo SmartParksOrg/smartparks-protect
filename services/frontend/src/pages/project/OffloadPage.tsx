@@ -32,7 +32,7 @@ import { formatAgo, formatTime } from "@/lib/format";
  * page does itself is the station's setup (Tim, 2026-10-16, the same day): "Make an offload
  * station" turns a device of the project into one in one dialog, the Setup column says what a
  * row still misses and opens that dialog for it, and the guide under "How to set up" is the
- * three steps in one place. Figures cover the last 30 days, as on the Gateways page.
+ * three steps in one place, hidden until the button is pressed (Tim, 2026-10-16). Figures cover the last 30 days, as on the Gateways page.
  */
 export function OffloadPage() {
   const { t } = useTranslation();
@@ -470,7 +470,7 @@ export function OffloadPage() {
         {overview.error && (
           <Callout kind="error">{overview.error.message}</Callout>
         )}
-        {(guideOpen || (data && stations.length === 0)) && (
+        {guideOpen && (
           <Callout kind="info">
             <p className="font-medium">{t("How to set up offload stations")}</p>
             <ol className="mt-1 list-decimal space-y-1 pl-4">

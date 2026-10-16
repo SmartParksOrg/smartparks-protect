@@ -126,7 +126,7 @@ station no entity, no place, not a gateway yet (each opens the dialog for that s
 yet (a link to its device page) and card not writable (its own report); for a tracker the
 address and keys not set, or an address that differs from the one the device reports (links to
 its device page). A complete row says so. **How to set up** unfolds the three steps on the
-page; they show by themselves while the project has no station.
+page and hides them again; they are hidden until asked for.
 
 ## The station's own report
 
