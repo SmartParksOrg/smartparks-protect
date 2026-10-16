@@ -13,6 +13,7 @@ import type {
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
+import { AddDeviceForm } from "@/components/devices/AddDeviceForm";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
 
 const coordinatesOf = (device: Device | undefined): [number, number] | null => {
@@ -39,21 +41,20 @@ const coordinatesOf = (device: Device | undefined): [number, number] | null => {
  * while standing at it) and it gets an Offload station entity (the entity it tracks today is
  * kept), the place, and its row among the gateways of the offload station source, so the page
  * lists it before its first card. The server does the three in one call and never undoes one.
+ * A RangerEdge that is not a device yet is added first, in the same dialog (decision D326: by
+ * hand or read over Bluetooth with its LP0 credentials), and the setup carries on with it.
  */
 export function OffloadStationDialog({
   projectId,
   open,
   onOpenChange,
   deviceId,
-  onAddDevice,
 }: {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The station to complete; nothing for a new one. */
   deviceId: string | null;
-  /** Opens the dialog that makes the RangerEdge a device first, when it is none yet. */
-  onAddDevice?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -63,7 +64,7 @@ export function OffloadStationDialog({
           <DialogTitle>{t("Make an offload station")}</DialogTitle>
           <DialogDescription>
             {t(
-              "A RangerEdge with an SD card that trackers offload their flash logs to. It becomes an Offload station entity with its place and a gateway of the offload station source; its card is uploaded on its device page afterwards.",
+              "A RangerEdge with an SD card that trackers offload their flash logs to. Pick it among the project's devices, or add it first, by hand or read over Bluetooth. It becomes an Offload station entity with its place and a gateway of the offload station source; its card is uploaded on its device page afterwards.",
             )}
           </DialogDescription>
         </DialogHeader>
@@ -72,7 +73,6 @@ export function OffloadStationDialog({
             projectId={projectId}
             initialDeviceId={deviceId}
             onDone={() => onOpenChange(false)}
-            onAddDevice={onAddDevice}
           />
         )}
       </DialogContent>
@@ -85,12 +85,10 @@ function SetupForm({
   projectId,
   initialDeviceId,
   onDone,
-  onAddDevice,
 }: {
   projectId: string;
   initialDeviceId: string | null;
   onDone: () => void;
-  onAddDevice?: () => void;
 }) {
   const { t } = useTranslation();
   const devices = useQuery({
@@ -101,6 +99,8 @@ function SetupForm({
       }),
   });
   const [deviceId, setDeviceId] = useState(initialDeviceId ?? "");
+  // the first step: a device the project has, or one made here and carried on with
+  const [source, setSource] = useState<"existing" | "new">("existing");
   const [q, setQ] = useState("");
   const [name, setName] = useState("");
   // the place as typed, clicked or located here; until then the device's own place, if any
@@ -193,9 +193,35 @@ function SetupForm({
     onSuccess: onDone,
   });
   const point: [number, number] | undefined = placeValid ? [lon, lat] : undefined;
+  const chooser = initialDeviceId ? null : (
+    <Tabs value={source} onValueChange={(v) => setSource(v as "existing" | "new")}>
+      <TabsList>
+        <TabsTrigger value="existing">{t("A device of the project")}</TabsTrigger>
+        <TabsTrigger value="new">{t("A new device")}</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+  if (source === "new") {
+    return (
+      <>
+        <div className="min-w-0 space-y-4">
+          {chooser}
+          <AddDeviceForm
+            projectId={projectId}
+            onCreated={(device) => {
+              setDeviceId(device.id);
+              setPlace(null);
+              setSource("existing");
+            }}
+          />
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="min-w-0 space-y-4">
+        {chooser}
         <Field
           label={t("Device")}
           htmlFor="station-device-search"
@@ -250,10 +276,10 @@ function SetupForm({
             </button>
           ))}
         </div>
-        {onAddDevice && (
+        {!initialDeviceId && (
           <p className="text-xs text-muted-foreground">
             {t("The RangerEdge is not a device yet?")}{" "}
-            <button type="button" className="underline" onClick={onAddDevice}>
+            <button type="button" className="underline" onClick={() => setSource("new")}>
               {t("Add it, by hand or over Bluetooth")}
             </button>
           </p>

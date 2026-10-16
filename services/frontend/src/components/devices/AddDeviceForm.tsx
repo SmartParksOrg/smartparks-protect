@@ -17,16 +17,8 @@ import type {
 import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -34,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
 import {
@@ -54,56 +45,21 @@ function describe(error: unknown): string {
 }
 
 /**
- * A device added inside the project (decision D326, Tim, 2026-10-16), from the Offload page, so
- * a project admin onboards a RangerEdge or a tracker without the Devices page or a server admin.
- * Two ways: over Bluetooth, where the hardware itself gives its name, DevEUI, hardware type,
- * firmware and LP0 credentials (read in this browser through the driver's catalogue and saved
- * on the device in the same call; the frames synced as a Bluetooth log for provenance), or by
- * hand. The caller hears what was made and whether it is a station, to carry on with its setup.
+ * A device added inside the project (decision D326, Tim, 2026-10-16), the first step of "Make an
+ * offload station" when the RangerEdge is not a device yet (Tim, the same day: adding the device
+ * is part of making a station, not a button of its own). Two ways: over Bluetooth, where the
+ * hardware itself gives its name, DevEUI, hardware type, firmware and LP0 credentials (read in
+ * this browser through the driver's catalogue and saved on the device in the same call; the
+ * frames synced as a Bluetooth log for provenance), or by hand. Only OpenCollar device types are
+ * offered, and the choice shows only when the server has more than one (Tim: no irrelevant
+ * options here). The caller hears what was made and carries on with it.
  */
-export function AddProjectDeviceDialog({
+export function AddDeviceForm({
   projectId,
-  open,
-  onOpenChange,
   onCreated,
 }: {
   projectId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreated: (device: Device, station: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("Add a device")}</DialogTitle>
-          <DialogDescription>
-            {t(
-              "A RangerEdge for an offload station, or a tracker, made a device of this project. Over Bluetooth the device gives its own name, DevEUI, hardware and LP0 credentials; by hand you type them.",
-            )}
-          </DialogDescription>
-        </DialogHeader>
-        {open && (
-          <AddDeviceForm
-            projectId={projectId}
-            onDone={() => onOpenChange(false)}
-            onCreated={onCreated}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function AddDeviceForm({
-  projectId,
-  onDone,
-  onCreated,
-}: {
-  projectId: string;
-  onDone: () => void;
-  onCreated: (device: Device, station: boolean) => void;
+  onCreated: (device: Device) => void;
 }) {
   const { t } = useTranslation();
   const bluetooth = webBluetoothAvailable();
@@ -115,7 +71,8 @@ function AddDeviceForm({
   });
   const openCollar = (types.data?.items ?? []).filter((x) => x.driver_key === "opencollar");
   const [chosenTypeId, setChosenTypeId] = useState("");
-  const typeId = chosenTypeId || openCollar[0]?.id || "";
+  const typeId =
+    (openCollar.some((x) => x.id === chosenTypeId) ? chosenTypeId : "") || openCollar[0]?.id || "";
   const catalog = useQuery({
     queryKey: [...queryKeys.deviceTypes, typeId, "driver-catalog"],
     queryFn: () => api.get<DriverCatalog>(`/api/v1/device-types/${typeId}/driver-catalog`),
@@ -123,7 +80,6 @@ function AddDeviceForm({
   });
   const [name, setName] = useState("");
   const [serial, setSerial] = useState("");
-  const [station, setStation] = useState<boolean | null>(null);
   const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
   const [reading, setReading] = useState<"idle" | "busy" | "failed">("idle");
   const [readError, setReadError] = useState("");
@@ -138,10 +94,10 @@ function AddDeviceForm({
     },
     [],
   );
-  const isOpenCollar = openCollar.some((x) => x.id === typeId);
-  const serialBad = isOpenCollar && serial.trim() !== "" && !EUI.test(serial.trim());
+  const serialBad = serial.trim() !== "" && !EUI.test(serial.trim());
   const missing = !typeId ? "type" : !name.trim() ? "name" : serialBad ? "serial" : null;
-  const isStation = station ?? identity?.hardwareKey === "rangeredge";
+  // a station is a RangerEdge; another hardware read here is most likely a tracker picked by mistake
+  const notAStation = identity?.hardwareKey != null && identity.hardwareKey !== "rangeredge";
 
   const read = async () => {
     if (!catalog.data) return;
@@ -158,7 +114,6 @@ function AddDeviceForm({
       setIdentity(found);
       setName(found.name);
       setSerial(found.eui ?? "");
-      setStation(null);
       setReading("idle");
     } catch (error) {
       setReading("failed");
@@ -225,10 +180,7 @@ function AddDeviceForm({
             name: device.name,
           })
         : t("{{name}} is a device of the project", { name: device.name }),
-    onSuccess: (device) => {
-      onDone();
-      onCreated(device, isStation);
-    },
+    onSuccess: (device) => onCreated(device),
   });
 
   return (
@@ -249,10 +201,18 @@ function AddDeviceForm({
             {t("Web Bluetooth needs Chrome or Edge over HTTPS; this browser has none, so the device is added by hand.")}
           </Callout>
         )}
-        {(types.data?.items.length ?? 0) > 1 && (
+        {types.data && openCollar.length === 0 && (
+          <Callout kind="warning">
+            {t(
+              "This server has no OpenCollar device type yet; a server admin adds one under Server admin, Device types.",
+            )}
+          </Callout>
+        )}
+        {openCollar.length > 1 && (
           <Field
             label={t("Device type")}
             htmlFor="add-device-type"
+            hint={t("The OpenCollar types of this server; a RangerEdge is one of them.")}
             error={attempted && missing === "type" ? t("Choose a device type") : undefined}
           >
             <Select value={typeId} onValueChange={setChosenTypeId}>
@@ -260,7 +220,7 @@ function AddDeviceForm({
                 <SelectValue placeholder={t("Choose a device type")} />
               </SelectTrigger>
               <SelectContent>
-                {(types.data?.items ?? []).map((x) => (
+                {openCollar.map((x) => (
                   <SelectItem key={x.id} value={x.id}>
                     {x.label}
                   </SelectItem>
@@ -277,7 +237,7 @@ function AddDeviceForm({
                 variant="outline"
                 size="sm"
                 onClick={read}
-                disabled={reading === "busy" || !catalog.data || !isOpenCollar}
+                disabled={reading === "busy" || !catalog.data}
               >
                 <Bluetooth className="size-4" />{" "}
                 {reading === "busy"
@@ -290,9 +250,6 @@ function AddDeviceForm({
                 {t("Hold the device near this computer; the browser asks which one to connect to.")}
               </span>
             </div>
-            {!isOpenCollar && typeId && (
-              <Callout kind="info">{t("Only OpenCollar devices can be read over Bluetooth.")}</Callout>
-            )}
             {reading === "failed" && <Callout kind="error">{readError}</Callout>}
             {identity && (
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-md border p-3 text-sm">
@@ -339,11 +296,7 @@ function AddDeviceForm({
             <Field
               label={t("Serial number")}
               htmlFor="add-device-serial"
-              hint={
-                isOpenCollar
-                  ? t("The DevEUI, sixteen hex digits: an offload station names the card's files after it.")
-                  : undefined
-              }
+              hint={t("The DevEUI, sixteen hex digits: an offload station names the card's files after it.")}
               error={attempted && missing === "serial" ? t("A DevEUI is sixteen hex digits") : undefined}
             >
               <Input
@@ -353,26 +306,25 @@ function AddDeviceForm({
                 onChange={(e) => setSerial(e.target.value)}
               />
             </Field>
-            <div className="flex items-center gap-3">
-              <Switch id="add-device-station" checked={isStation} onCheckedChange={setStation} />
-              <Label htmlFor="add-device-station">
-                {t("An offload station: continue with its entity and place after it is made")}
-              </Label>
-            </div>
+            {notAStation && (
+              <Callout kind="warning">
+                {t(
+                  "The device says it is a {{hardware}}, not a RangerEdge. An offload station is a RangerEdge with an SD card; a tracker gets its LP0 address and keys from this read all the same.",
+                  { hardware: identity?.hardwareKey ?? "" },
+                )}
+              </Callout>
+            )}
           </>
         )}
         {create.isError && <Callout kind="error">{create.error.message}</Callout>}
       </div>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onDone}>
-          {t("Cancel")}
-        </Button>
         <Button
           type="button"
-          disabled={create.isPending || (mode === "bluetooth" && !identity)}
+          disabled={create.isPending || !typeId || (mode === "bluetooth" && !identity)}
           onClick={() => (missing === null ? create.mutate() : setAttempted(true))}
         >
-          {create.isPending ? t("Adding…") : t("Add the device")}
+          {create.isPending ? t("Adding…") : t("Add the device and continue")}
         </Button>
       </DialogFooter>
     </>
