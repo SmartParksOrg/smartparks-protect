@@ -309,7 +309,7 @@ export function DataTable<T>({
               </li>
             ))}
           {!isLoading && table.getRowModel().rows.length === 0 && (
-            <li className="py-8 text-center text-sm text-muted-foreground">
+            <li className="px-4 py-8 text-center text-sm text-muted-foreground">
               {search !== "" && total > 0
                 ? t("Nothing matches the search.")
                 : empty}

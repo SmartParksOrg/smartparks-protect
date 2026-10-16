@@ -262,13 +262,12 @@ function SetupForm({
                 setPlace(null); // the new device's own place, if any
               }}
             >
-              <span className="min-w-0 flex-1 truncate font-medium">{d.name}</span>
+              <span className="font-medium">{d.name}</span>
               {d.serial_number && (
-                <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                  {d.serial_number}
-                </span>
+                <span className="font-mono text-xs text-muted-foreground">{d.serial_number}</span>
               )}
-              <span className="shrink-0 text-xs text-muted-foreground">
+              {/* the entity takes a line of its own on a phone, so the name is never cut */}
+              <span className="basis-full text-xs text-muted-foreground sm:ml-auto sm:basis-auto">
                 {d.entity_name
                   ? t("tracks {{entity}}", { entity: d.entity_name })
                   : t("no entity")}
@@ -328,7 +327,7 @@ function SetupForm({
               : undefined
           }
         >
-          <div className="h-48">
+          <div className="h-56">
             <MiniMap
               point={point}
               fallback={point ?? own ?? undefined}
@@ -339,25 +338,25 @@ function SetupForm({
               }}
             />
           </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              id="station-lat"
+              inputMode="decimal"
+              aria-label={t("Latitude")}
+              placeholder={t("Latitude")}
+              value={latitude}
+              onChange={(e) => setLatitude(e.target.value)}
+            />
+            <Input
+              id="station-lon"
+              inputMode="decimal"
+              aria-label={t("Longitude")}
+              placeholder={t("Longitude")}
+              value={longitude}
+              onChange={(e) => setLongitude(e.target.value)}
+            />
+          </div>
         </Field>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Input
-            id="station-lat"
-            inputMode="decimal"
-            aria-label={t("Latitude")}
-            placeholder={t("Latitude")}
-            value={latitude}
-            onChange={(e) => setLatitude(e.target.value)}
-          />
-          <Input
-            id="station-lon"
-            inputMode="decimal"
-            aria-label={t("Longitude")}
-            placeholder={t("Longitude")}
-            value={longitude}
-            onChange={(e) => setLongitude(e.target.value)}
-          />
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
