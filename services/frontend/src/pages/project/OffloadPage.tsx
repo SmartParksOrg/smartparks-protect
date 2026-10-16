@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
+import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { HardDrive } from "lucide-react";
+import { BookOpen, CircleCheck, HardDrive, Plus } from "lucide-react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -15,7 +16,9 @@ import type {
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { OffloadStationDialog } from "@/components/network/OffloadStationDialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useNow } from "@/hooks/useNow";
 import { usePermissions } from "@/hooks/useProjects";
 import { formatAgo, formatTime } from "@/lib/format";
@@ -24,15 +27,24 @@ import { formatAgo, formatTime } from "@/lib/format";
  * The project's LP0 network on one page (phase 42, Tim, 2026-10-16): every offload station
  * with what its cards brought and its own last report, every tracker with an LP0 address or
  * frames (the keys stay on the device page, behind Show), and the addresses the stations
- * received that no device has. The page lists and links; everything is set on the device
- * pages, so a station or a tracker is a link away. Figures cover the last 30 days, as on the
- * Gateways page.
+ * received that no device has. The page lists and links; a tracker's address and keys and a
+ * station's card are set on the device pages, so each row is a link away. The one thing the
+ * page does itself is the station's setup (Tim, 2026-10-16, the same day): "Make an offload
+ * station" turns a device of the project into one in one dialog, the Setup column says what a
+ * row still misses and opens that dialog for it, and the guide under "How to set up" is the
+ * three steps in one place. Figures cover the last 30 days, as on the Gateways page.
  */
 export function OffloadPage() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams();
   const now = useNow();
-  const { all: serverAdmin } = usePermissions(projectId);
+  const { can, all: serverAdmin } = usePermissions(projectId);
+  const canSetUp = can("devices:write");
+  const [setup, setSetup] = useState<{ open: boolean; deviceId: string | null }>({
+    open: false,
+    deviceId: null,
+  });
+  const [guideOpen, setGuideOpen] = useState(false);
   const overview = useQuery({
     queryKey: queryKeys.projectOffload(projectId),
     queryFn: () =>
@@ -49,6 +61,102 @@ export function OffloadPage() {
       <span title={formatTime(value)}>{formatAgo(value, now)}</span>
     ) : (
       <span className="text-muted-foreground">{t("none in 30 days")}</span>
+    );
+
+  // What a station still misses before a card can be read into it, in the order of the
+  // guide; a piece the dialog sets opens the dialog, the card is uploaded on the device page.
+  type Gap = { label: string; hint: string; fix: "dialog" | "device" | "none" };
+  const stationGaps = (s: OffloadOverviewStation): Gap[] => {
+    const gaps: Gap[] = [];
+    if (!s.entity_id)
+      gaps.push({
+        label: t("no entity"),
+        hint: t("The station has no Offload station entity, so it is not on the map or in the lists"),
+        fix: "dialog",
+      });
+    if (!s.has_location)
+      gaps.push({
+        label: t("no place"),
+        hint: t("A station does not move: set its place by hand"),
+        fix: "dialog",
+      });
+    if (!s.gateway_id)
+      gaps.push({
+        label: t("not a gateway yet"),
+        hint: t("The station has no row among the gateways of the offload station source until it is set up or its first card is read"),
+        fix: "dialog",
+      });
+    if (s.files === 0)
+      gaps.push({
+        label: t("no card yet"),
+        hint: t("Upload the card's files under Log files on the station's device page"),
+        fix: "device",
+      });
+    if (s.card_ok === false)
+      gaps.push({
+        label: t("card not writable"),
+        hint: t("The station's own report says its SD card is out or cannot be written"),
+        fix: "none",
+      });
+    return gaps;
+  };
+  const trackerGaps = (tr: OffloadOverviewTracker): Gap[] => {
+    if (!tr.dev_addr)
+      return [
+        {
+          label: t("address and keys not set"),
+          hint: t("Set the LP0 address and the two keys under LP0 offload on the device page"),
+          fix: "device",
+        },
+      ];
+    if (tr.reported_dev_addr && tr.reported_dev_addr !== tr.dev_addr)
+      return [
+        {
+          label: t("address differs from the device's"),
+          hint: t("The device reports another address in its settings; check which one is provisioned"),
+          fix: "device",
+        },
+      ];
+    return [];
+  };
+  const gapBadges = (gaps: Gap[], deviceId: string) =>
+    gaps.length === 0 ? (
+      <span className="inline-flex items-center gap-1 text-muted-foreground">
+        <CircleCheck className="size-3.5" /> {t("complete")}
+      </span>
+    ) : (
+      <span className="flex flex-wrap gap-1">
+        {gaps.map((gap) =>
+          gap.fix === "dialog" && canSetUp ? (
+            <button
+              key={gap.label}
+              type="button"
+              className="inline-flex"
+              title={gap.hint}
+              onClick={() => setSetup({ open: true, deviceId })}
+            >
+              <Badge variant="outline" className="cursor-pointer text-destructive">
+                {gap.label}
+              </Badge>
+            </button>
+          ) : gap.fix === "none" ? (
+            <Badge
+              key={gap.label}
+              variant="outline"
+              className="text-destructive"
+              title={gap.hint}
+            >
+              {gap.label}
+            </Badge>
+          ) : (
+            <Link key={gap.label} to={devicePath(deviceId)} title={gap.hint}>
+              <Badge variant="outline" className="text-destructive">
+                {gap.label}
+              </Badge>
+            </Link>
+          ),
+        )}
+      </span>
     );
 
   const stationColumns: ColumnDef<OffloadOverviewStation, unknown>[] = [
@@ -153,22 +261,9 @@ export function OffloadPage() {
         ),
     },
     {
-      header: t("Place"),
-      accessorKey: "has_location",
-      cell: ({ row }) =>
-        row.original.has_location ? (
-          t("set")
-        ) : (
-          <Link
-            className="text-destructive underline"
-            to={devicePath(row.original.device_id)}
-            title={t(
-              "A station does not move: set its place by hand on its device page",
-            )}
-          >
-            {t("not set")}
-          </Link>
-        ),
+      header: t("Setup"),
+      id: "setup",
+      cell: ({ row }) => gapBadges(stationGaps(row.original), row.original.device_id),
     },
   ];
 
@@ -302,6 +397,11 @@ export function OffloadPage() {
           ""
         ),
     },
+    {
+      header: t("Setup"),
+      id: "setup",
+      cell: ({ row }) => gapBadges(trackerGaps(row.original), row.original.device_id),
+    },
   ];
 
   const unknownColumns: ColumnDef<OffloadUnknownAddress, unknown>[] = [
@@ -343,10 +443,62 @@ export function OffloadPage() {
           "The LP0 network: the offload stations, the trackers they serve and the addresses no device has. Figures cover the last {{days}} days.",
           { days: data?.window_days ?? 30 },
         )}
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-pressed={guideOpen}
+              onClick={() => setGuideOpen((v) => !v)}
+            >
+              <BookOpen className="size-4" /> {t("How to set up")}
+            </Button>
+            {canSetUp && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setSetup({ open: true, deviceId: null })}
+              >
+                <Plus className="size-4" /> {t("Make an offload station")}
+              </Button>
+            )}
+          </>
+        }
       />
       <Page>
         {overview.error && (
           <Callout kind="error">{overview.error.message}</Callout>
+        )}
+        {(guideOpen || (data && stations.length === 0)) && (
+          <Callout kind="info">
+            <p className="font-medium">{t("How to set up offload stations")}</p>
+            <ol className="mt-1 list-decimal space-y-1 pl-4">
+              <li>
+                {t(
+                  "The station: a RangerEdge with an SD card, a device of this project with its DevEUI as serial number. \"Make an offload station\" gives it an Offload station entity, its place and its row among the gateways. A station does not move, so its place is set by hand.",
+                )}
+              </li>
+              <li>
+                {t(
+                  "The trackers: on each tracker's device page, under LP0 offload, set the LP0 address and the two session keys provisioned on the device, or take them from the device's own readback. The address is how a frame on a card finds its device; the keys decrypt it.",
+                )}
+              </li>
+              <li>
+                {t(
+                  "The card: on the station's device page, under Log files, upload one .jsonl file or a zip of the card's LOG folders. Every frame is verified and decrypted with its tracker's own keys and the records appear on the trackers' entities. The Setup column here says what a row still misses.",
+                )}
+              </li>
+            </ol>
+          </Callout>
+        )}
+        {canSetUp && (
+          <OffloadStationDialog
+            projectId={projectId}
+            open={setup.open}
+            deviceId={setup.deviceId}
+            onOpenChange={(open) => setSetup((s) => ({ ...s, open }))}
+          />
         )}
         <section className="space-y-2">
           <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -356,7 +508,7 @@ export function OffloadPage() {
             columns={stationColumns}
             data={data ? stations : undefined}
             isLoading={overview.isPending}
-            defaultHiddenSmall={["last_upload_at", "report", "has_location"]}
+            defaultHiddenSmall={["last_upload_at", "report"]}
             cardOf={(s) => (
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -374,12 +526,8 @@ export function OffloadPage() {
                       {s.entity_name}
                     </Link>
                   )}
-                  {!s.has_location && (
-                    <Badge variant="outline" className="text-destructive">
-                      {t("no place")}
-                    </Badge>
-                  )}
                 </div>
+                <div className="text-xs">{gapBadges(stationGaps(s), s.device_id)}</div>
                 {s.station_eui && (
                   <div className="font-mono text-xs text-muted-foreground">
                     {s.station_eui}
@@ -415,9 +563,15 @@ export function OffloadPage() {
                 )}
               </div>
             )}
-            emptyMessage={t(
-              "No offload station yet. Create the RangerEdge as a device of this project, give it an Offload station entity with its place, and upload its card under Log files on its device page.",
-            )}
+            emptyMessage={
+              canSetUp
+                ? t(
+                    "No offload station yet. Make one from a RangerEdge of this project with \"Make an offload station\" above; the guide says what comes next.",
+                  )
+                : t(
+                    "No offload station yet. A project admin makes one from a RangerEdge of this project with \"Make an offload station\".",
+                  )
+            }
           />
         </section>
         <section className="space-y-2">
@@ -426,7 +580,7 @@ export function OffloadPage() {
             columns={trackerColumns}
             data={data ? trackers : undefined}
             isLoading={overview.isPending}
-            defaultHiddenSmall={["keys_set", "last_f_cnt"]}
+            defaultHiddenSmall={["keys_set", "last_f_cnt", "setup"]}
             searchable
             cardOf={(tr) => (
               <div className="space-y-1">
@@ -471,6 +625,9 @@ export function OffloadPage() {
                         : "")
                     : t("No offload in 30 days")}
                 </div>
+                {trackerGaps(tr).length > 0 && (
+                  <div className="text-xs">{gapBadges(trackerGaps(tr), tr.device_id)}</div>
+                )}
               </div>
             )}
             emptyMessage={t(

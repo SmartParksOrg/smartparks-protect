@@ -51,7 +51,8 @@ network whose devices share one pair is every device holding the same pair.
 
 The first frame of a card makes the station a gateway of this source, named after the device
 whose card it is and linked to it (`gateways.device_id`), with `kind: offload_station` in its
-attributes. Every frame is a reception of that gateway with the line's RSSI, SNR and frequency,
+attributes; "Make an offload station" on the project's Offload page makes that row earlier,
+with nothing seen yet, so the station is listed before its first card. Every frame is a reception of that gateway with the line's RSSI, SNR and frequency,
 so the Gateways page, the coverage layer and the trackers' Connectivity tabs read it as they read
 a LoRaWAN gateway. A station's place is set by hand on its device page; the gateway's location
 can be set by hand too (Gateways page).

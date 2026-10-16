@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from protect_api.schemas.log_files import DeviceLogFileRead
 
@@ -170,3 +170,47 @@ class OffloadOverviewRead(BaseModel):
     devices_without_address: int = Field(
         default=0, description="Devices of the project with no LP0 address, stations apart"
     )
+
+
+class OffloadStationSetup(BaseModel):
+    """Make a device of the project an offload station from the Offload page, or complete one
+    that is missing a piece (Tim, 2026-10-16): the Offload station entity (the entity the device
+    tracks today is kept; else an entity of the project by id, or a new Offload station entity
+    with this name, the device's name by default), its place when given, and its gateway row on
+    the offload station source, which otherwise waits for the first card."""
+
+    device_id: uuid.UUID
+    entity_id: uuid.UUID | None = Field(
+        default=None, description="An entity of the project, when the device tracks none today"
+    )
+    entity_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="The name of a new Offload station entity, when the device tracks none today",
+    )
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "OffloadStationSetup":
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude go together")
+        if self.entity_id is not None and self.entity_name is not None:
+            raise ValueError("give entity_id or entity_name, not both")
+        return self
+
+
+class OffloadStationSetupResult(BaseModel):
+    """What the setup did, piece by piece, so the page can say it."""
+
+    device_id: uuid.UUID
+    device_name: str
+    station_eui: str
+    entity_id: uuid.UUID
+    entity_name: str
+    entity_created: bool = Field(description="A new Offload station entity was made")
+    entity_kept: bool = Field(description="The device tracked this entity already")
+    placed: bool = Field(description="The place was set in this call")
+    gateway_id: uuid.UUID
+    gateway_created: bool = Field(description="The gateway row did not exist before")

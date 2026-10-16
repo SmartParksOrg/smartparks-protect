@@ -1,6 +1,7 @@
 """Offload stations and the trackers' LP0 credentials (phase 42, decisions D319 to D324).
 
-A tracker's LP0 address and keys live on the device (D320), set here and never returned. A
+A tracker's LP0 address and keys live on the device (D320), set here and returned to those who
+may set them. A station is set up from the Offload page in one call (entity, place, gateway row). A
 station's card is uploaded on the station's device page as the files are, one JSONL or a zip of
 the card's `LOG_*` folders (D321), each file a raw log file row of the station with channel
 `lp0`. The Offload station card reads what the cards brought and whom the station served."""
@@ -11,15 +12,19 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
+from protect_api.crud import flush_or_409, get_or_404
 from protect_api.deps import ProjectContext, require_permission
 from protect_api.routers.control import _control_permissions
 from protect_api.routers.devices import _visible_device
+from protect_api.routers.entities import _new_entity, _project_entity
 from protect_api.routers.log_files import _publish, _writable_device
+from protect_api.schemas.domain import EntityCreate
 from protect_api.schemas.offload import (
     Lp0CredentialsRead,
     Lp0CredentialsResult,
@@ -29,6 +34,8 @@ from protect_api.schemas.offload import (
     OffloadOverviewStation,
     OffloadOverviewTracker,
     OffloadStationRead,
+    OffloadStationSetup,
+    OffloadStationSetupResult,
     OffloadTracker,
     OffloadUnknownAddress,
     OffloadUpload,
@@ -37,6 +44,7 @@ from protect_api.schemas.offload import (
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
 from shared.database import get_session
+from shared.domain.assignments import resolve_attribution
 from shared.domain.device_settings import known_settings
 from shared.domain.lp0 import (
     AddressTaken,
@@ -47,9 +55,11 @@ from shared.domain.lp0 import (
     lp0_source,
     normalise_dev_addr,
     parse_key,
+    register_station_gateway,
     set_credentials,
     station_eui_from_name,
 )
+from shared.domain.static_place import place_device, place_entity_of
 from shared.enums import AcquisitionChannel
 from shared.ingest import queue_identity_reprocess, retained_events
 from shared.logfiles import (
@@ -67,13 +77,14 @@ from shared.models import (
     DeviceLp0Credentials,
     DeviceProjectAssignment,
     Entity,
+    EntityType,
     ExternalIdentity,
     Gateway,
     GatewayReception,
     SourceEvent,
     User,
 )
-from shared.permissions import Permission
+from shared.permissions import Permission, permissions_for
 from shared.timeutil import utc_now
 from shared.trace import ApplicationError
 
@@ -83,6 +94,8 @@ router = APIRouter(tags=["offload stations"])
 TRACKERS_WINDOW = timedelta(days=30)
 MAX_TRACKERS = 200
 READBACK_KEYS = ("lp0_dev_addr", "lp0_app_key", "lp0_network_key")
+#: The catalogue row a station's entity is made of (migration 0053, under Equipment).
+STATION_TYPE_KEY = "offload_station"
 
 
 async def _readback(session: AsyncSession, device_id: uuid.UUID) -> Lp0Readback:
@@ -481,20 +494,150 @@ async def _project_device_ids(session: AsyncSession, context: ProjectContext) ->
 
 async def _current_entities(
     session: AsyncSession, device_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
+) -> dict[uuid.UUID, tuple[uuid.UUID, str, str]]:
+    """The entity each device tracks now: its id, its name and its type's key."""
     if not device_ids:
         return {}
     rows = (
         await session.execute(
-            select(DeviceEntityAssignment.device_id, Entity.id, Entity.name)
+            select(DeviceEntityAssignment.device_id, Entity.id, Entity.name, EntityType.key)
             .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
+            .join(EntityType, EntityType.id == Entity.entity_type_id)
             .where(
                 DeviceEntityAssignment.device_id.in_(device_ids),
                 DeviceEntityAssignment.validity.op("@>")(utc_now()),
             )
         )
     ).all()
-    return {device_id: (entity_id, name) for device_id, entity_id, name in rows}
+    return {device_id: (entity_id, name, key) for device_id, entity_id, name, key in rows}
+
+
+async def _station_eui(session: AsyncSession, device: Device) -> str | None:
+    """The EUI a station's files are named after: the device's serial (an OpenCollar's serial
+    is its DevEUI, decision D101), else a `dev_eui` identity of the device on any source."""
+    if device.serial_number:
+        return device.serial_number.upper()
+    identity = await session.scalar(
+        select(ExternalIdentity.external_id).where(
+            ExternalIdentity.device_id == device.id, ExternalIdentity.identity_type == "dev_eui"
+        )
+    )
+    return identity.upper() if identity else None
+
+
+@router.post(
+    "/projects/{project_id}/offload/stations",
+    response_model=OffloadStationSetupResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def set_up_offload_station(
+    body: OffloadStationSetup,
+    context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
+    session: AsyncSession = Depends(get_session),
+) -> OffloadStationSetupResult:
+    """A device of the project becomes an offload station in one call (the Offload page's
+    "Make an offload station", Tim, 2026-10-16), or a station missing a piece is completed:
+    the entity (the one the device tracks today is kept; else the entity named, or a new one
+    of the Offload station type, which needs `entities:write` as the device page's "Assign to
+    entity" does), the place when given (a station does not move, decision D261), and the
+    gateway row on the offload station source, linked to the device, so the station is listed
+    before its first card. The station's EUI must be known, as its serial number or a DevEUI
+    identity: the card's files are named after it. Calling it again changes nothing that is
+    set already."""
+    device = await get_or_404(session, Device, body.device_id, "Device")
+    now = utc_now()
+    attribution = await resolve_attribution(session, device.id, now)
+    if attribution.project_id != context.project.id or not context.visibility.device_visible(
+        device.id
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Device not found in this project")
+    eui = await _station_eui(session, device)
+    if eui is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"The DevEUI of {device.name} is not known: set it as the device's serial number "
+            "first, since the station names its files after it",
+        )
+    entity_created = False
+    entity_kept = attribution.entity_id is not None
+    if attribution.entity_id is not None:
+        entity = await get_or_404(session, Entity, attribution.entity_id, "Entity")
+        if body.entity_id is not None and body.entity_id != entity.id:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"{device.name} tracks {entity.name} today; release it on its device page first",
+            )
+    else:
+        if body.entity_id is not None:
+            entity = await _project_entity(session, context, body.entity_id)
+        else:
+            allowed = permissions_for(context.role, server_admin=context.user.is_superuser)
+            if Permission.ENTITIES_WRITE not in allowed:
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN, "Creating an entity needs entities:write"
+                )
+            station_type = await session.scalar(
+                select(EntityType).where(EntityType.key == STATION_TYPE_KEY)
+            )
+            if station_type is None:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    "The Offload station entity type is missing from the catalogue",
+                )
+            entity = await _new_entity(
+                session,
+                context,
+                EntityCreate(entity_type_id=station_type.id, name=body.entity_name or device.name),
+            )
+            entity_created = True
+        session.add(
+            DeviceEntityAssignment(
+                device_id=device.id,
+                entity_id=entity.id,
+                validity=Range(now, None, bounds="[)"),
+                reason="offload station",
+                created_by_user_id=context.user.id,
+            )
+        )
+        await flush_or_409(session, "Entity assignment")
+    placed = False
+    if body.latitude is not None and body.longitude is not None:
+        await place_device(session, device, body.longitude, body.latitude, now)
+        placed = True
+    elif not entity_kept:
+        # a device placed before it had an entity carries its place to it (decision D261)
+        await place_entity_of(session, device.id, now)
+    source = await lp0_source(session)
+    gateway, gateway_created = await register_station_gateway(session, source, eui, device, now)
+    await record_audit(
+        session,
+        user=context.user,
+        action="offload_station.set_up",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=context.project.id,
+        details={
+            "station_eui": eui,
+            "entity_id": str(entity.id),
+            "entity_created": entity_created,
+            "placed": placed,
+            "gateway_id": str(gateway.id),
+            "gateway_created": gateway_created,
+        },
+    )
+    await session.commit()
+    return OffloadStationSetupResult(
+        device_id=device.id,
+        device_name=device.name,
+        station_eui=eui,
+        entity_id=entity.id,
+        entity_name=entity.name,
+        entity_created=entity_created,
+        entity_kept=entity_kept,
+        placed=placed,
+        gateway_id=gateway.id,
+        gateway_created=gateway_created,
+    )
 
 
 @router.get("/projects/{project_id}/offload", response_model=OffloadOverviewRead)
@@ -518,7 +661,8 @@ async def project_offload(
     until = utc_now()
     since = until - TRACKERS_WINDOW
 
-    # the stations: a device with card files, a gateway row of the source, or a report of itself
+    # the stations: a device with card files, a gateway row of the source, a report of itself,
+    # or an Offload station entity
     files = (
         await session.scalars(
             select(DeviceLogFile).where(
@@ -545,6 +689,8 @@ async def project_offload(
     }
     station_ids = {f.device_id for f in files} | {g.device_id for g in gateways if g.device_id}
     station_ids |= set(states)
+    # a station set up and waiting for its first card: its entity says what it is
+    station_ids |= {d for d, (_, _, key) in entities.items() if key == STATION_TYPE_KEY}
     station_ids &= set(devices)
     gateway_of = {g.device_id: g for g in gateways if g.device_id}
     eui_of: dict[uuid.UUID, str] = {}

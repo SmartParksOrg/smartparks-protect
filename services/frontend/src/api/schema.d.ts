@@ -4518,6 +4518,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/offload/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Up Offload Station
+         * @description A device of the project becomes an offload station in one call (the Offload page's
+         *     "Make an offload station", Tim, 2026-10-16), or a station missing a piece is completed:
+         *     the entity (the one the device tracks today is kept; else the entity named, or a new one
+         *     of the Offload station type, which needs `entities:write` as the device page's "Assign to
+         *     entity" does), the place when given (a station does not move, decision D261), and the
+         *     gateway row on the offload station source, linked to the device, so the station is listed
+         *     before its first card. The station's EUI must be known, as its serial number or a DevEUI
+         *     identity: the card's files are named after it. Calling it again changes nothing that is
+         *     set already.
+         */
+        post: operations["set_up_offload_station_api_v1_projects__project_id__offload_stations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/offload": {
         parameters: {
             query?: never;
@@ -11349,6 +11377,82 @@ export interface components {
             } | null;
             /** State Time */
             state_time?: string | null;
+        };
+        /**
+         * OffloadStationSetup
+         * @description Make a device of the project an offload station from the Offload page, or complete one
+         *     that is missing a piece (Tim, 2026-10-16): the Offload station entity (the entity the device
+         *     tracks today is kept; else an entity of the project by id, or a new Offload station entity
+         *     with this name, the device's name by default), its place when given, and its gateway row on
+         *     the offload station source, which otherwise waits for the first card.
+         */
+        OffloadStationSetup: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Entity Id
+             * @description An entity of the project, when the device tracks none today
+             */
+            entity_id?: string | null;
+            /**
+             * Entity Name
+             * @description The name of a new Offload station entity, when the device tracks none today
+             */
+            entity_name?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+        };
+        /**
+         * OffloadStationSetupResult
+         * @description What the setup did, piece by piece, so the page can say it.
+         */
+        OffloadStationSetupResult: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Station Eui */
+            station_eui: string;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Entity Name */
+            entity_name: string;
+            /**
+             * Entity Created
+             * @description A new Offload station entity was made
+             */
+            entity_created: boolean;
+            /**
+             * Entity Kept
+             * @description The device tracked this entity already
+             */
+            entity_kept: boolean;
+            /**
+             * Placed
+             * @description The place was set in this call
+             */
+            placed: boolean;
+            /**
+             * Gateway Id
+             * Format: uuid
+             */
+            gateway_id: string;
+            /**
+             * Gateway Created
+             * @description The gateway row did not exist before
+             */
+            gateway_created: boolean;
         };
         /** OffloadTracker */
         OffloadTracker: {
@@ -23763,6 +23867,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OffloadStationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_up_offload_station_api_v1_projects__project_id__offload_stations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OffloadStationSetup"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffloadStationSetupResult"];
                 };
             };
             /** @description Validation Error */

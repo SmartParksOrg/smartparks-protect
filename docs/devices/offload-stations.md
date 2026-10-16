@@ -41,12 +41,16 @@ deduplicates nothing and leaves that to Protect.
 ## Setting up
 
 1. **The station.** Create the RangerEdge as a device if it is not one already (its serial
-   number is its DevEUI, as for every OpenCollar), assign it to the project, and make an entity
-   of the type **Offload station** (under Equipment) with the device assigned, so it has a name
-   and a place: set the place by hand on the device page (the Static position card), since a
-   station does not move. The station is also a gateway of the built-in data source "Offload
-   station files" from the first card on, linked to the device, so the Gateways page, the
-   coverage layer and every tracker's Connectivity tab see what it received.
+   number is its DevEUI, as for every OpenCollar; the station names the card's files after it)
+   and assign it to the project. Then, on the Offload page under Network, **Make an offload
+   station**: pick the device, give it a place (a click on the map, the coordinates, or the
+   browser's position while standing at it) and it gets an entity of the type **Offload
+   station** (under Equipment; the entity the device tracks today is kept), the place, and its
+   row among the gateways of the built-in data source "Offload station files", linked to the
+   device, so the Gateways page, the coverage layer and every tracker's Connectivity tab know
+   it before its first card. The same can be done by hand: an Offload station entity with the
+   device assigned, the place on the device page (the Place card), and the gateway row comes
+   with the first card. A station does not move, so its place is never read from its data.
 2. **The trackers.** On each tracker's device page, the **LP0 offload** card takes the LP0
    address and the two session keys (eight and twice 32 hex digits) that were provisioned on
    the device; "Use the device's reported values" takes the three from the device's own
@@ -111,9 +115,18 @@ what the device itself reports as its address when that differs, the frames and 
 window, the last station, the last verified counter), and the addresses the stations received
 that no device has, with the tracker's EUI when a line named it. The keys are never on this page;
 they stay on the device page behind Show. The page lists and links: a station or a tracker is a
-link away, and a tracker without an address or a station without a place is marked. The footer
-counts the devices of the project that have no address yet. Built before a real card was read
-(Tim, 2026-10-16), to be tuned once there is data.
+link away. The footer counts the devices of the project that have no address yet. Built before
+a real card was read (Tim, 2026-10-16), to be tuned once there is data.
+
+The one thing the page does itself is the station's setup (Tim, the same day: a guide and an
+easy way to turn a device into a station belong in one place). **Make an offload station**
+opens the dialog of step 1 above for project admins; a station with an Offload station entity
+is listed from then on, with no card. The **Setup** column says what a row still misses: for a
+station no entity, no place, not a gateway yet (each opens the dialog for that station), no card
+yet (a link to its device page) and card not writable (its own report); for a tracker the
+address and keys not set, or an address that differs from the one the device reports (links to
+its device page). A complete row says so. **How to set up** unfolds the three steps on the
+page; they show by themselves while the project has no station.
 
 ## The station's own report
 
@@ -148,5 +161,10 @@ takes minutes and the row's bar says where it is.
   station.
 - `GET /api/v1/devices/{device_id}/offload`: the Offload station card.
 - `GET /api/v1/projects/{project_id}/offload`: the Offload page, for anyone who reads the project.
+- `POST /api/v1/projects/{project_id}/offload/stations` (`device_id`, optional `entity_id` or
+  `entity_name`, optional `latitude` and `longitude`): a device of the project becomes an offload
+  station, or a station is completed; answers what was made (`entity_created`, `entity_kept`,
+  `placed`, `gateway_created`). Needs `devices:write`, and `entities:write` for a new entity; the
+  device's DevEUI must be known (its serial number or a `dev_eui` identity), else 409.
 - `GET /api/v1/devices/{device_id}/connectivity`: the `offload` block per LP0 source.
 - Uploading and setting keys need `devices:control` in the device's project, or server admin.

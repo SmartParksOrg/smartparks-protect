@@ -21,6 +21,8 @@ from shared.ingest import commit_and_publish, store_inbound
 from shared.models import (
     DataSource,
     DeviceType,
+    Entity,
+    EntityType,
     ExternalIdentity,
     Gateway,
     GatewayReception,
@@ -28,7 +30,7 @@ from shared.models import (
     SourceDelivery,
     SourceEvent,
 )
-from tests.api.conftest import actor, project_actor
+from tests.api.conftest import actor, create_project, project_actor
 from tests.api.test_ingest_and_attention import _decode_pending
 from tests.api.test_log_files_api import _decode
 from tests.api.test_network_and_map import _setup
@@ -545,3 +547,75 @@ async def test_a_file_that_is_not_a_card_is_refused(client, db):
         headers=h,
     )
     assert response.status_code == 422 and "holds no station file" in response.text
+
+
+async def test_a_device_becomes_a_station_from_the_offload_page(client, db):
+    """The Offload page's setup (Tim, 2026-10-16): one call gives a device of the project its
+    Offload station entity, its place and its gateway row, so the page lists the station before
+    its first card; a second call changes nothing that is set; an operator may not make it; a
+    device whose DevEUI is not known is refused by name, since the card's files carry it."""
+    admin = await actor(client, db, superuser=True)
+    h = admin.headers
+    project = await create_project(db)
+    oc = await _opencollar_type(client, h)
+    eui = "0016C001F0" + uuid.uuid4().hex[:6].upper()
+    station = await _device(client, h, oc["id"], project.id, serial=eui)
+    nameless = await _device(client, h, oc["id"], project.id)
+    operator = await project_actor(client, db, project, Role.PROJECT_OPERATOR)
+    url = f"/api/v1/projects/{project.id}/offload/stations"
+
+    refused = await client.post(url, json={"device_id": station["id"]}, headers=operator.headers)
+    assert refused.status_code == 403, refused.text
+
+    response = await client.post(
+        url,
+        json={"device_id": station["id"], "latitude": -17.9, "longitude": 25.8},
+        headers=h,
+    )
+    assert response.status_code == 201, response.text
+    made = response.json()
+    assert made["station_eui"] == eui
+    assert made["entity_created"] and not made["entity_kept"]
+    assert made["placed"] and made["gateway_created"]
+    assert made["entity_name"] == station["name"]
+
+    await db.rollback()  # the API committed in another session
+    type_key = await db.scalar(
+        select(EntityType.key)
+        .join(Entity, Entity.entity_type_id == EntityType.id)
+        .where(Entity.id == uuid.UUID(made["entity_id"]))
+    )
+    assert type_key == "offload_station"
+    gateway = await db.scalar(
+        select(Gateway).where(
+            Gateway.data_source_id == LP0_SOURCE_ID, Gateway.external_id == eui.lower()
+        )
+    )
+    assert gateway is not None
+    assert gateway.device_id == uuid.UUID(station["id"])
+    assert gateway.name == station["name"]
+    assert gateway.attributes["kind"] == "offload_station"
+    assert gateway.last_seen_at is None  # nothing was received yet, and the row says so
+
+    device = (await client.get(f"/api/v1/devices/{station['id']}", headers=h)).json()
+    assert device["entity_id"] == made["entity_id"]
+    assert device["static_position"]["coordinates"] == [25.8, -17.9]
+
+    page = (await client.get(f"/api/v1/projects/{project.id}/offload", headers=h)).json()
+    rows = {s["device_id"]: s for s in page["stations"]}
+    assert station["id"] in rows, "a station without a card is listed by its entity"
+    row = rows[station["id"]]
+    assert row["files"] == 0 and row["receptions"] == 0
+    assert row["has_location"] is True
+    assert row["gateway_id"] == str(gateway.id)
+    assert row["entity_name"] == station["name"]
+    assert all(t["device_id"] != station["id"] for t in page["trackers"])
+
+    again = (await client.post(url, json={"device_id": station["id"]}, headers=h)).json()
+    assert again["entity_id"] == made["entity_id"]
+    assert again["entity_kept"] and not again["entity_created"]
+    assert not again["placed"] and not again["gateway_created"]
+
+    refused = await client.post(url, json={"device_id": nameless["id"]}, headers=h)
+    assert refused.status_code == 409, refused.text
+    assert "DevEUI" in refused.json()["detail"]

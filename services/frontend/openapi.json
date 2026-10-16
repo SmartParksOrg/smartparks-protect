@@ -19177,6 +19177,65 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/offload/stations": {
+   "post": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Set Up Offload Station",
+    "description": "A device of the project becomes an offload station in one call (the Offload page's\n\"Make an offload station\", Tim, 2026-10-16), or a station missing a piece is completed:\nthe entity (the one the device tracks today is kept; else the entity named, or a new one\nof the Offload station type, which needs `entities:write` as the device page's \"Assign to\nentity\" does), the place when given (a station does not move, decision D261), and the\ngateway row on the offload station source, linked to the device, so the station is listed\nbefore its first card. The station's EUI must be known, as its serial number or a DevEUI\nidentity: the card's files are named after it. Calling it again changes nothing that is\nset already.",
+    "operationId": "set_up_offload_station_api_v1_projects__project_id__offload_stations_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OffloadStationSetup"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OffloadStationSetupResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/offload": {
    "get": {
     "tags": [
@@ -39052,6 +39111,140 @@
     ],
     "title": "OffloadStationRead",
     "description": "What a station's card brought to Protect: the files, their frames and records, the\ntrackers it served in the last 30 days, and the station's own report when it sent one."
+   },
+   "OffloadStationSetup": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id",
+      "description": "An entity of the project, when the device tracks none today"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name",
+      "description": "The name of a new Offload station entity, when the device tracks none today"
+     },
+     "latitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 90.0,
+        "minimum": -90.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latitude"
+     },
+     "longitude": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 180.0,
+        "minimum": -180.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Longitude"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id"
+    ],
+    "title": "OffloadStationSetup",
+    "description": "Make a device of the project an offload station from the Offload page, or complete one\nthat is missing a piece (Tim, 2026-10-16): the Offload station entity (the entity the device\ntracks today is kept; else an entity of the project by id, or a new Offload station entity\nwith this name, the device's name by default), its place when given, and its gateway row on\nthe offload station source, which otherwise waits for the first card."
+   },
+   "OffloadStationSetupResult": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "station_eui": {
+      "type": "string",
+      "title": "Station Eui"
+     },
+     "entity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "type": "string",
+      "title": "Entity Name"
+     },
+     "entity_created": {
+      "type": "boolean",
+      "title": "Entity Created",
+      "description": "A new Offload station entity was made"
+     },
+     "entity_kept": {
+      "type": "boolean",
+      "title": "Entity Kept",
+      "description": "The device tracked this entity already"
+     },
+     "placed": {
+      "type": "boolean",
+      "title": "Placed",
+      "description": "The place was set in this call"
+     },
+     "gateway_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Gateway Id"
+     },
+     "gateway_created": {
+      "type": "boolean",
+      "title": "Gateway Created",
+      "description": "The gateway row did not exist before"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_name",
+     "station_eui",
+     "entity_id",
+     "entity_name",
+     "entity_created",
+     "entity_kept",
+     "placed",
+     "gateway_id",
+     "gateway_created"
+    ],
+    "title": "OffloadStationSetupResult",
+    "description": "What the setup did, piece by piece, so the page can say it."
    },
    "OffloadTracker": {
     "properties": {

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.connectivity.adapters import lp0_station
 from shared.connectivity.adapters.lp0_station.lorawan import Credentials
 from shared.connectivity.base import GatewayUpdate
+from shared.enums import ConnectivityStatus
 from shared.ingest import apply_gateway_update, builtin_source
 from shared.models import DataSource, Device, DeviceLp0Credentials, ExternalIdentity, Gateway
 from shared.secrets import decrypt_json, encrypt_json
@@ -240,6 +241,39 @@ async def ensure_station_gateway(
     return gateway
 
 
+async def register_station_gateway(
+    session: AsyncSession, source: DataSource, station_eui: str, device: Device, now: datetime
+) -> tuple[Gateway, bool]:
+    """The station's gateway row made by hand before any card (the Offload page's setup, Tim,
+    2026-10-16), so the station is listed, on the Gateways page and in the coverage layer from
+    the moment it is set up and not from its first card. Nothing has been seen, so the row says
+    so: `first_seen_at` and `last_seen_at` stay empty until a card's first file stamps them
+    through `ensure_station_gateway`. A row that exists is linked to the device and named after
+    it when it has no name of its own. Returns the row and whether it was made here."""
+    external_id = station_eui.lower()
+    gateway = await session.scalar(
+        select(Gateway).where(
+            Gateway.data_source_id == source.id, Gateway.external_id == external_id
+        )
+    )
+    created = gateway is None
+    if gateway is None:
+        gateway = Gateway(
+            data_source_id=source.id,
+            external_id=external_id,
+            status=ConnectivityStatus.UNKNOWN,
+            stats={},
+            attributes={},
+        )
+        session.add(gateway)
+    gateway.device_id = device.id
+    if not gateway.name or gateway.name.lower() == external_id:
+        gateway.name = device.name
+    gateway.attributes = {**(gateway.attributes or {}), "kind": "offload_station"}
+    await session.flush()
+    return gateway, created
+
+
 async def station_device(session: AsyncSession, station_eui: str) -> Device | None:
     """The device a station EUI names: by serial number (an OpenCollar's serial is its DevEUI,
     decision D101) or by a `dev_eui` identity on any source."""
@@ -283,6 +317,7 @@ __all__ = [
     "lp0_source",
     "normalise_dev_addr",
     "parse_key",
+    "register_station_gateway",
     "remember_counter",
     "set_credentials",
     "station_device",
