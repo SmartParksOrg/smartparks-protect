@@ -13,6 +13,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { TraceDialog } from "@/components/devices/ProvenancePanel";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { WindowSelect } from "@/components/network/WindowSelect";
 import { formatTime } from "@/lib/format";
 
 const STATUSES = ["pending", "processing", "success", "skipped", "duplicate", "retrying", "failed", "dead_letter"];
@@ -51,7 +52,7 @@ export function TracesPage() {
             <SelectTrigger className="w-40"><SelectValue placeholder={t("All statuses")} /></SelectTrigger>
             <SelectContent><SelectItem value="all">{t("All statuses")}</SelectItem>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
           </Select>
-          <Input type="number" min={1} max={720} className="w-24" value={hours} onChange={(e) => setParams((p) => { p.set("hours", e.target.value); return p; })} aria-label={t("Hours back")} />
+          <WindowSelect hours={hours} onChange={(h) => setParams((p) => { p.set("hours", String(h)); return p; })} />
         </>}
       />
       <Page>

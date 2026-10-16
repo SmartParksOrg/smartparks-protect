@@ -15,6 +15,8 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { CommandDetailDialog } from "@/components/control/DeviceControl";
 import { DataTable } from "@/components/data/DataTable";
 import { TrafficTable } from "@/components/network/TrafficTable";
+import { WindowSelect } from "@/components/network/WindowSelect";
+import { windowFooter } from "@/lib/windows";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -91,11 +93,11 @@ function InboundTab({ params, set }: TabProps) {
           <SelectTrigger className="w-44"><SelectValue placeholder={t("All types")} /></SelectTrigger>
           <SelectContent><SelectItem value="all">{t("All types")}</SelectItem>{EVENT_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
         </Select>
-        <Input type="number" min={1} max={720} className="w-24" value={hours} onChange={(e) => set("hours", e.target.value)} aria-label={t("Hours back")} />
+        <WindowSelect hours={hours} onChange={(h) => set("hours", String(h))} />
         <Button variant="outline" size="icon" onClick={() => traffic.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
       </div>
       {traffic.error && <Callout kind="error">{traffic.error.message}</Callout>}
-      <TrafficTable showSource showIdentity rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window.")} onSelect={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && t("{{count}} messages, last {{hours}} hours", { count: traffic.data.length, hours })} />
+      <TrafficTable showSource showIdentity rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("Nothing received in this window.")} onSelect={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && windowFooter(traffic.data.length, hours, t)} />
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>
   );

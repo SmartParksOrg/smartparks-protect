@@ -9,9 +9,10 @@ import { queryKeys } from "@/api/queryKeys";
 import type { TrafficRow } from "@/api/types";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { TrafficTable } from "@/components/network/TrafficTable";
+import { WindowSelect } from "@/components/network/WindowSelect";
+import { windowFooter } from "@/lib/windows";
 import { SourceEventDialog } from "@/components/devices/ProvenancePanel";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const EVENT_TYPES = ["uplink", "join", "status", "downlink_ack", "downlink_transmitted", "log", "location"];
@@ -43,12 +44,12 @@ export function TrafficPage() {
             <SelectTrigger className="w-44"><SelectValue placeholder={t("All types")} /></SelectTrigger>
             <SelectContent><SelectItem value="all">{t("All types")}</SelectItem>{EVENT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
           </Select>
-          <Input type="number" min={1} max={720} className="w-24" value={hours} onChange={(e) => setParams((p) => { p.set("hours", e.target.value); return p; })} aria-label={t("Hours back")} />
+          <WindowSelect hours={hours} onChange={(h) => setParams((p) => { p.set("hours", String(h)); return p; })} />
           <Button variant="outline" size="icon" onClick={() => traffic.refetch()} aria-label={t("Refresh")}><RefreshCw className="size-4" /></Button>
         </>}
       />
       <Page>
-        <TrafficTable rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("No traffic in this window.")} onSelect={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && `${traffic.data.length} messages, last ${hours} hours`} />
+        <TrafficTable rows={traffic.data} isLoading={traffic.isPending} emptyMessage={t("No traffic in this window.")} onSelect={(r) => setSelected({ id: r.source_event_id, ingestedAt: r.ingested_at })} footer={traffic.data && windowFooter(traffic.data.length, hours, t)} />
       </Page>
       <SourceEventDialog id={selected?.id ?? null} ingestedAt={selected?.ingestedAt ?? null} onClose={() => setSelected(null)} />
     </>

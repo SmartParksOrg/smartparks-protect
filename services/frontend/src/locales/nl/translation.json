@@ -122,8 +122,6 @@
   "{{count}} members_other": "{{count}} leden",
   "{{count}} members hold this role_one": "{{count}} lid heeft deze rol",
   "{{count}} members hold this role_other": "{{count}} leden hebben deze rol",
-  "{{count}} messages, last {{hours}} hours_one": "{{count}} bericht, laatste {{hours}} uur",
-  "{{count}} messages, last {{hours}} hours_other": "{{count}} berichten, laatste {{hours}} uur",
   "{{count}} metrics_one": "{{count}} metriek",
   "{{count}} metrics_other": "{{count}} metrieken",
   "{{count}} monitors_one": "{{count}} bewaker",
@@ -1382,7 +1380,6 @@
   "hours": "uur",
   "Hours": "Uren",
   "Hours above the warn temperature": "Uren boven de waarschuwingstemperatuur",
-  "Hours back": "Uren terug",
   "Hours since last use": "Uren sinds laatste gebruik",
   "Hours to add (negative subtracts)": "Uren om op te tellen (negatief trekt af)",
   "Hours together": "Uren samen",
@@ -3126,5 +3123,12 @@
   "The station: a RangerEdge with an SD card. \"Make an offload station\" picks it among the project's devices, or adds it first, by hand or read over Bluetooth, with its DevEUI as serial number; then it gets an Offload station entity, its place and its row among the gateways. A station does not move, so its place is set by hand.": "Het station: een RangerEdge met een SD-kaart. \"Een offloadstation maken\" kiest het uit de apparaten van het project, of voegt het eerst toe, met de hand of uitgelezen via Bluetooth, met zijn DevEUI als serienummer; daarna krijgt het een entiteit Offloadstation, zijn plaats en zijn rij onder de gateways. Een station beweegt niet, dus zijn plaats wordt met de hand ingesteld.",
   "The trackers: on each tracker's device page, under LP0 offload, set the LP0 address and the two session keys provisioned on the device, or take them from the device's own readback; a tracker added over Bluetooth in the station dialog brings them with it. The address is how a frame on a card finds its device; the keys decrypt it.": "De trackers: stel op de apparaatpagina van elke tracker, onder LP0-offload, het LP0-adres en de twee sessiesleutels in die op het apparaat zijn geprovisioneerd, of neem ze uit de eigen uitlezing van het apparaat; een tracker die via Bluetooth in het stationsvenster is toegevoegd brengt ze mee. Het adres is hoe een frame op een kaart zijn apparaat vindt; de sleutels ontsleutelen het.",
   "The OpenCollar types of this server; a RangerEdge is one of them.": "De OpenCollar-typen van deze server; een RangerEdge is er een van.",
-  "This server has no OpenCollar device type yet; a server admin adds one under Server admin, Device types.": "Deze server heeft nog geen OpenCollar-apparaattype; een serverbeheerder voegt er een toe onder Serverbeheer, Apparaattypen."
+  "This server has no OpenCollar device type yet; a server admin adds one under Server admin, Device types.": "Deze server heeft nog geen OpenCollar-apparaattype; een serverbeheerder voegt er een toe onder Serverbeheer, Apparaattypen.",
+  "{{count}} messages, {{window}}_one": "{{count}} bericht, {{window}}",
+  "{{count}} messages, {{window}}_other": "{{count}} berichten, {{window}}",
+  "Last {{count}} hours_one": "Laatste {{count}} uur",
+  "Last {{count}} hours_other": "Laatste {{count}} uur",
+  "Window": "Venster",
+  "the newest {{count}} messages, {{window}}_one": "het nieuwste {{count}} bericht, {{window}}",
+  "the newest {{count}} messages, {{window}}_other": "de nieuwste {{count}} berichten, {{window}}"
 }

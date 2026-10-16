@@ -64,7 +64,7 @@ which keeps grpc-web on the plain proxy and sends only native gRPC to `grpc_pass
 
 ## A platform is connected but nothing shows
 
-Server admin, Traffic (or Data sources, Traffic for one source) lists every message received in the last hours, linked to a device or not, with the raw payload and the processing status. Empty means the platform never posted: check its own integration log. Rows with an unknown identity mean the DevEUI is not linked yet: accept it from Needs attention.
+Server admin, Traffic (or Data sources, Traffic for one source) lists every message received in the window picked (the last hour up to the last 2 years, the newest 200), linked to a device or not, with the raw payload and the processing status. Empty means the platform never posted: check its own integration log. Rows with an unknown identity mean the DevEUI is not linked yet: accept it from Needs attention.
 
 A device sends a measurement nobody defined: the metric registers itself on arrival (its values are stored and charted at once) and waits in Needs attention, New metrics, with the number of devices sending it and the last value; give it a label, a unit and a category there. Until then the Data Explorer marks it "not defined yet".
 
