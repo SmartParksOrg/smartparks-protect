@@ -44,6 +44,25 @@ function stationRows(f: DeviceLogFile, t: TFunction) {
   return rows;
 }
 
+/** The assignments the file's history moved back (decision D330): a device made today whose
+ * only project membership, and only entity, now start at its first record. */
+function extendedRows(f: DeviceLogFile, t: TFunction): [string, string][] {
+  const a = f.attributes as {
+    attribution_extended?: { device_id: string; kind: string; to: string; from: string }[];
+    trackers?: Record<string, { device_id?: string | null }>;
+  };
+  const moved = a.attribution_extended ?? [];
+  if (moved.length === 0) return [];
+  const addressOf = (deviceId: string) =>
+    Object.entries(a.trackers ?? {}).find(([, v]) => v.device_id === deviceId)?.[0];
+  return moved.map((m) => {
+    const who = addressOf(m.device_id);
+    const label =
+      m.kind === "project" ? t("In the project since") : t("On its entity since");
+    return [who ? `${label} (${who})` : label, formatTime(m.to)];
+  });
+}
+
 /**
  * One file's properties, as a file explorer opens them (Tim, 2026-10-16): the kind, size and
  * times, the decoder's progress or what the file brought, a station card's extra counts, the
@@ -145,6 +164,17 @@ export function LogFileDialog({
                   <Fragment key={label}>
                     <dt className="text-muted-foreground">{label}</dt>
                     <dd>{value}</dd>
+                  </Fragment>
+                ))}
+                {extendedRows(f, t).map(([label, value]) => (
+                  <Fragment key={label}>
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd>
+                      {value}{" "}
+                      <span className="text-muted-foreground">
+                        {t("(moved back for the history this file brought)")}
+                      </span>
+                    </dd>
                   </Fragment>
                 ))}
               </dl>

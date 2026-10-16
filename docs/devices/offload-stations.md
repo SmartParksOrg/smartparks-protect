@@ -92,6 +92,13 @@ are: positions keep their fix time, clockless messages the time the device store
   at, as a LoRaWAN receiver does, and the MIC decides. After 65536 frames the tracker's counter
   wraps and reuses its keystream under unchanged keys; that is a limit of the firmware, which
   Protect records (`f_cnt32` on the frame) and does not work around.
+- A tracker made today holds its project from today, while its card carries weeks of history.
+  When the device has had one project assignment ever, that assignment is moved back to the
+  earliest record the file brought once the file is decoded, and so is its entity assignment
+  when the device and the entity never had another; the records then belong to the project and
+  the animal without a hand on the window (decision D330). The file's properties say what moved
+  and to when. A device with an earlier membership or a gap keeps its start, since the gap
+  means something; the device page offers the move by hand, as before.
 - A frame whose station-given tracker EUI (`lp0.source_eui`) is not the EUI of the device its
   address belongs to fails with `DEVICE_IDENTITY_AMBIGUOUS` and lands on no device: either the
   address is set on the wrong device, or a serial is wrong. Correct the registry, then "Decode

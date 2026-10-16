@@ -148,6 +148,101 @@ async def queue_reattribution(
     return QueueResult(job, created=True)
 
 
+@dataclass(slots=True)
+class FirstLifeExtension:
+    """What `extend_first_assignments` moved: the assignment, from where to where."""
+
+    kind: str  # project or entity
+    assignment_id: uuid.UUID
+    target_id: uuid.UUID  # the project or the entity
+    moved_from: datetime
+    moved_to: datetime
+
+
+async def extend_first_assignments(
+    session: AsyncSession, device_id: uuid.UUID, earliest: datetime, *, reason: str
+) -> tuple[list[FirstLifeExtension], list[AttributionJob]]:
+    """A device with one life gets its history (decision D330, Tim, 2026-10-16: after a card
+    decoded he had to move the attribution window back by hand). When a file brought records
+    from before the device's assignments and the device has had exactly one project
+    assignment ever, that assignment is moved back to the earliest record: nobody else can
+    claim those records. The same for its entity assignment when the device has had one and
+    the entity never had another device before it. A device with an earlier project, or a gap
+    in its membership, is left alone: the gap means something and the device page offers the
+    move by hand. Returns what was moved and the attribution jobs to publish after the commit."""
+    from sqlalchemy.dialects.postgresql import Range
+
+    from shared.models import DeviceEntityAssignment, DeviceProjectAssignment
+
+    require_aware(earliest)
+    moved: list[FirstLifeExtension] = []
+    jobs: list[AttributionJob] = []
+    projects = (
+        await session.scalars(
+            select(DeviceProjectAssignment).where(DeviceProjectAssignment.device_id == device_id)
+        )
+    ).all()
+    if len(projects) != 1:
+        return moved, jobs
+    project = projects[0]
+    project_from = project.validity.lower
+    if project_from is None or project_from <= earliest:
+        return moved, jobs
+    project.validity = Range(earliest, project.validity.upper, bounds="[)")
+    await session.flush()
+    queued = await queue_reattribution(
+        session,
+        device_id=device_id,
+        start=earliest,
+        end=project_from,
+        reason=reason,
+        user_id=None,
+        project_id=project.project_id,
+    )
+    if queued.created and queued.job is not None:
+        jobs.append(queued.job)
+    moved.append(
+        FirstLifeExtension("project", project.id, project.project_id, project_from, earliest)
+    )
+    entities = (
+        await session.scalars(
+            select(DeviceEntityAssignment).where(DeviceEntityAssignment.device_id == device_id)
+        )
+    ).all()
+    if len(entities) == 1:
+        entity = entities[0]
+        entity_from = entity.validity.lower
+        others_before = await session.scalar(
+            select(func.count())
+            .select_from(DeviceEntityAssignment)
+            .where(
+                DeviceEntityAssignment.entity_id == entity.entity_id,
+                DeviceEntityAssignment.device_id != device_id,
+                DeviceEntityAssignment.validity.op("&&")(
+                    func.tstzrange(earliest, entity_from, "[)")
+                ),
+            )
+        )
+        if entity_from is not None and entity_from > earliest and not others_before:
+            entity.validity = Range(earliest, entity.validity.upper, bounds="[)")
+            await session.flush()
+            queued = await queue_reattribution(
+                session,
+                device_id=device_id,
+                start=earliest,
+                end=entity_from,
+                reason=reason,
+                user_id=None,
+                project_id=project.project_id,
+            )
+            if queued.created and queued.job is not None:
+                jobs.append(queued.job)
+            moved.append(
+                FirstLifeExtension("entity", entity.id, entity.entity_id, entity_from, earliest)
+            )
+    return moved, jobs
+
+
 def job_message(job: AttributionJob) -> tuple[str, dict[str, Any]]:
     # the device id keeps the device's jobs in one lane of the bus, in order (decision D291)
     return Topic.ATTRIBUTION_REQUESTED, {"job_id": str(job.id), "device_id": str(job.device_id)}

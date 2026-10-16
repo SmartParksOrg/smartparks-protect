@@ -107,14 +107,22 @@ async def _opencollar_type(client, h) -> dict:
     ).json()
 
 
-async def _device(client, h, type_id: str, project_id, *, serial: str | None = None) -> dict:
+async def _device(
+    client,
+    h,
+    type_id: str,
+    project_id,
+    *,
+    serial: str | None = None,
+    valid_from: str = "2023-01-01T00:00:00+00:00",
+) -> dict:
     body = {"device_type_id": type_id, "name": unique_name("dev"), "status": "active"}
     if serial:
         body["serial_number"] = serial
     device = (await client.post("/api/v1/devices", json=body, headers=h)).json()
     response = await client.post(
         f"/api/v1/devices/{device['id']}/project-assignments",
-        json={"project_id": str(project_id), "valid_from": "2023-01-01T00:00:00+00:00"},
+        json={"project_id": str(project_id), "valid_from": valid_from},
         headers=h,
     )
     assert response.status_code == 201, response.text
@@ -887,3 +895,129 @@ async def test_a_v5_card_is_read_per_device_and_contradictions_are_refused(clien
         )
         == 3
     )
+
+
+async def test_a_cards_history_moves_a_new_devices_assignments_back(client, db, bus):
+    """Decision D330 (Tim, 2026-10-16: after a card decoded he had to move the attribution
+    window back by hand). A tracker made today, with one project assignment and one entity
+    assignment, gets both moved back to the earliest record its card brought, with the
+    attribution job queued; a tracker that had an earlier membership is left alone."""
+    from datetime import UTC, datetime
+
+    from shared.models import AttributionJob, DeviceEntityAssignment, DeviceProjectAssignment
+
+    admin = await actor(client, db, superuser=True)
+    h = admin.headers
+    project = await create_project(db)
+    project_id = project.id
+    oc = await _opencollar_type(client, h)
+    station_eui = "0016C001F0" + uuid.uuid4().hex[:6].upper()
+    station = await _device(client, h, oc["id"], project_id, serial=station_eui)
+    now = datetime.now(UTC).replace(microsecond=0).isoformat()
+    fresh = await _device(client, h, oc["id"], project_id, valid_from=now)  # made today
+    veteran = await _device(client, h, oc["id"], project_id, valid_from=now)
+    # the veteran had an earlier life: a membership that ended
+    await client.post(
+        f"/api/v1/devices/{veteran['id']}/project-assignments",
+        json={
+            "project_id": str(project_id),
+            "valid_from": "2020-01-01T00:00:00+00:00",
+            "valid_to": "2020-06-01T00:00:00+00:00",
+        },
+        headers=h,
+    )
+    hippo_type = next(
+        t
+        for t in (
+            await client.get("/api/v1/entity-types", params={"limit": 500}, headers=h)
+        ).json()["items"]
+        if t["key"] in ("hippo", "wildlife")
+    )
+    assigned = await client.post(
+        f"/api/v1/projects/{project_id}/entity-assignments",
+        json={
+            "device_id": fresh["id"],
+            "valid_from": now,
+            "new_entity": {"name": unique_name("Hippo"), "entity_type_id": hippo_type["id"]},
+        },
+        headers=h,
+    )
+    assert assigned.status_code == 201, assigned.text
+    addr_fresh = "28A" + uuid.uuid4().hex[:5].upper()
+    addr_veteran = "28B" + uuid.uuid4().hex[:5].upper()
+    keys_fresh = Keys(addr_fresh, APP_S_KEY, NWK_S_KEY)
+    keys_veteran = Keys(addr_veteran, bytes(range(16, 32)), bytes(range(32, 48)))
+    for device, keys in ((fresh, keys_fresh), (veteran, keys_veteran)):
+        put = await client.put(
+            f"/api/v1/devices/{device['id']}/lp0-credentials",
+            json={
+                "dev_addr": keys.dev_addr,
+                "app_s_key": keys.app_s_key.hex(),
+                "nwk_s_key": keys.nwk_s_key.hex(),
+            },
+            headers=h,
+        )
+        assert put.status_code == 200, put.text
+    text = (
+        "\n".join(
+            [
+                "",
+                line(
+                    build_uplink(keys_fresh, 1, 29, RECORDS),
+                    lp0=v5("0016C001F1000001"),
+                    station=station_eui,
+                ),
+                line(
+                    build_uplink(keys_veteran, 1, 29, RECORDS),
+                    lp0=v5("0016C001F1000002"),
+                    station=station_eui,
+                ),
+            ]
+        )
+        + "\n"
+    )
+    upload = await client.post(
+        f"/api/v1/devices/{station['id']}/offload-files",
+        files={"file": (f"{station_eui}_1791795031.jsonl", text.encode(), "text/plain")},
+        headers=h,
+    )
+    assert upload.status_code == 201, upload.text
+    row_id = upload.json()["files"][0]["id"]
+    await _decode(bus, row_id)
+    await db.rollback()
+
+    fresh_id = uuid.UUID(fresh["id"])
+    earliest = await db.scalar(
+        select(Position.time).where(Position.device_id == fresh_id).order_by(Position.time).limit(1)
+    )
+    assert earliest is not None and earliest.year < 2027
+    membership = await db.scalar(
+        select(DeviceProjectAssignment).where(DeviceProjectAssignment.device_id == fresh_id)
+    )
+    assert membership.validity.lower == earliest, "the only membership starts at the first record"
+    tracking = await db.scalar(
+        select(DeviceEntityAssignment).where(DeviceEntityAssignment.device_id == fresh_id)
+    )
+    assert tracking.validity.lower == earliest, "and so does the only entity assignment"
+    jobs = (
+        await db.scalars(select(AttributionJob).where(AttributionJob.device_id == fresh_id))
+    ).all()
+    assert jobs and all(j.time_from == earliest for j in jobs)
+    # the file's row says what moved
+    row = (await client.get(f"/api/v1/log-files/{row_id}", headers=h)).json()
+    moved = row["attributes"]["attribution_extended"]
+    assert sorted(m["kind"] for m in moved if m["device_id"] == fresh["id"]) == [
+        "entity",
+        "project",
+    ]
+    assert all(m["to"] == earliest.isoformat() for m in moved)
+    # the veteran's current membership keeps its start: an earlier life means a gap on purpose
+    veteran_id = uuid.UUID(veteran["id"])
+    current = await db.scalar(
+        select(DeviceProjectAssignment)
+        .where(DeviceProjectAssignment.device_id == veteran_id)
+        .order_by(DeviceProjectAssignment.validity.desc())
+        .limit(1)
+    )
+    assert current.validity.lower.isoformat() == now
+    assert all(m["device_id"] != veteran["id"] for m in moved)

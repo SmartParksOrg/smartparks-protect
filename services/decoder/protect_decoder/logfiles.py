@@ -32,6 +32,7 @@ from shared.config import get_settings
 from shared.connectivity.adapters.lp0_station.lorawan import FrameError, parse_uplink
 from shared.connectivity.base import GatewayReceptionData, InboundMessage
 from shared.database import session_scope
+from shared.domain.attribution import extend_first_assignments, publish_job
 from shared.domain.lp0 import ensure_station_gateway, station_eui_from_name
 from shared.enums import (
     AcquisitionChannel,
@@ -233,11 +234,25 @@ class Counters:
                 "without_keys": 0,
                 "records_new": 0,
                 "records_known": 0,
+                "earliest": None,
             },
         )
         if device_id is not None:
             entry["device_id"] = str(device_id)
         return entry
+
+    def earliest_per_device(self, own_device_id: uuid.UUID) -> dict[uuid.UUID, datetime]:
+        """The earliest record each device got from this file: the trackers of a card, else
+        the file's own device (decision D330)."""
+        if self.trackers:
+            result: dict[uuid.UUID, datetime] = {}
+            for entry in self.trackers.values():
+                if entry.get("device_id") and entry.get("earliest"):
+                    result[uuid.UUID(entry["device_id"])] = datetime.fromisoformat(
+                        entry["earliest"]
+                    )
+            return result
+        return {own_device_id: self.earliest} if self.earliest else {}
 
     def add(self, outcome: Outcome | None, *, error_code: str | None = None) -> None:
         self.frames += 1
@@ -317,6 +332,10 @@ def _count(
     else:
         entry["records_new"] += sum(outcome.created.values())
         entry["records_known"] += outcome.duplicates
+        if outcome.earliest and (
+            entry["earliest"] is None or outcome.earliest.isoformat() < entry["earliest"]
+        ):
+            entry["earliest"] = outcome.earliest.isoformat()
 
 
 async def process_log_file(
@@ -371,6 +390,7 @@ async def process_log_file(
         log.warning("log file failed", log_file_id=str(log_file_id), error=str(error))
         return
 
+    jobs: list[Any] = []
     async with session_scope() as session:
         row = await session.get(DeviceLogFile, log_file_id)
         assert row is not None
@@ -388,8 +408,31 @@ async def process_log_file(
             )
             if counters.found and counters.new == 0:
                 step.duplicate(of="records known through another path")
+        # a device with one life gets the history the file brought (decision D330)
+        extended: list[dict[str, Any]] = []
+        for device_id, earliest in counters.earliest_per_device(row.device_id).items():
+            moved, queued = await extend_first_assignments(
+                session, device_id, earliest, reason="log_file.history"
+            )
+            jobs += queued
+            extended += [
+                {
+                    "device_id": str(device_id),
+                    "kind": m.kind,
+                    "target_id": str(m.target_id),
+                    "from": m.moved_from.isoformat(),
+                    "to": m.moved_to.isoformat(),
+                }
+                for m in moved
+            ]
+        if extended:
+            row.attributes = {**(row.attributes or {}), "attribution_extended": extended}
+            async with tracer.step("logfiles", "assignments extended") as step:
+                step.metadata.update(extended=extended)
         await tracer.finish()
         await session.commit()
+    for job in jobs:
+        await publish_job(bus, job)
     log.info(
         "log file decoded",
         log_file_id=str(log_file_id),
