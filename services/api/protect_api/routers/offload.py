@@ -6,7 +6,7 @@ the card's `LOG_*` folders (D321), each file a raw log file row of the station w
 `lp0`. The Offload station card reads what the cards brought and whom the station served."""
 
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
+from protect_api.deps import ProjectContext, require_permission
 from protect_api.routers.control import _control_permissions
 from protect_api.routers.devices import _visible_device
 from protect_api.routers.log_files import _publish, _writable_device
@@ -24,8 +25,12 @@ from protect_api.schemas.offload import (
     Lp0CredentialsResult,
     Lp0CredentialsUpdate,
     Lp0Readback,
+    OffloadOverviewRead,
+    OffloadOverviewStation,
+    OffloadOverviewTracker,
     OffloadStationRead,
     OffloadTracker,
+    OffloadUnknownAddress,
     OffloadUpload,
     SkippedMember,
 )
@@ -57,10 +62,15 @@ from shared.logfiles import (
 from shared.models import (
     Device,
     DeviceCurrentState,
+    DeviceEntityAssignment,
     DeviceLogFile,
     DeviceLp0Credentials,
+    DeviceProjectAssignment,
+    Entity,
     ExternalIdentity,
+    Gateway,
     GatewayReception,
+    SourceEvent,
     User,
 )
 from shared.permissions import Permission
@@ -452,3 +462,336 @@ async def offload_station(
         read.state_time = current.latest_state_time if current else None
         read.is_station = True
     return read
+
+
+async def _project_device_ids(session: AsyncSession, context: ProjectContext) -> list[uuid.UUID]:
+    """The devices assigned to the project now, the caller's visibility applied."""
+    ids = set(
+        await session.scalars(
+            select(DeviceProjectAssignment.device_id).where(
+                DeviceProjectAssignment.project_id == context.project.id,
+                DeviceProjectAssignment.validity.op("@>")(utc_now()),
+            )
+        )
+    )
+    if context.visibility.limited:
+        ids &= set(context.visibility.device_ids or ())
+    return list(ids)
+
+
+async def _current_entities(
+    session: AsyncSession, device_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
+    if not device_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(DeviceEntityAssignment.device_id, Entity.id, Entity.name)
+            .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
+            .where(
+                DeviceEntityAssignment.device_id.in_(device_ids),
+                DeviceEntityAssignment.validity.op("@>")(utc_now()),
+            )
+        )
+    ).all()
+    return {device_id: (entity_id, name) for device_id, entity_id, name in rows}
+
+
+@router.get("/projects/{project_id}/offload", response_model=OffloadOverviewRead)
+async def project_offload(
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> OffloadOverviewRead:
+    """The Offload page (phase 42): the project's offload stations with what their cards
+    brought and their own last report, the trackers with an LP0 address or frames (never the
+    keys), the addresses the stations received that no device has, and how many devices of
+    the project have no address yet. Every figure of the window covers the last 30 days."""
+    device_ids = await _project_device_ids(session, context)
+    if not device_ids:
+        return OffloadOverviewRead(window_days=TRACKERS_WINDOW.days)
+    devices = {
+        d.id: d
+        for d in (await session.scalars(select(Device).where(Device.id.in_(device_ids)))).all()
+    }
+    entities = await _current_entities(session, device_ids)
+    source = await lp0_source(session)
+    until = utc_now()
+    since = until - TRACKERS_WINDOW
+
+    # the stations: a device with card files, a gateway row of the source, or a report of itself
+    files = (
+        await session.scalars(
+            select(DeviceLogFile).where(
+                DeviceLogFile.device_id.in_(device_ids),
+                DeviceLogFile.acquisition_channel == AcquisitionChannel.LP0,
+            )
+        )
+    ).all()
+    gateways = (
+        await session.scalars(
+            select(Gateway).where(
+                Gateway.data_source_id == source.id, Gateway.device_id.in_(device_ids)
+            )
+        )
+    ).all()
+    states = {
+        c.device_id: c
+        for c in (
+            await session.scalars(
+                select(DeviceCurrentState).where(DeviceCurrentState.device_id.in_(device_ids))
+            )
+        ).all()
+        if isinstance((c.latest_state or {}).get("lp0_station"), dict)
+    }
+    station_ids = {f.device_id for f in files} | {g.device_id for g in gateways if g.device_id}
+    station_ids |= set(states)
+    station_ids &= set(devices)
+    gateway_of = {g.device_id: g for g in gateways if g.device_id}
+    eui_of: dict[uuid.UUID, str] = {}
+    for device_id in station_ids:
+        device = devices[device_id]
+        eui = (device.serial_number or "").upper()
+        if not eui and device_id in gateway_of:
+            eui = gateway_of[device_id].external_id.upper()
+        if not eui:
+            eui = next(
+                (
+                    str(f.attributes.get("station_eui")).upper()
+                    for f in files
+                    if f.device_id == device_id and f.attributes.get("station_eui")
+                ),
+                "",
+            )
+        if eui:
+            eui_of[device_id] = eui
+    station_by_eui = {eui.lower(): device_id for device_id, eui in eui_of.items()}
+
+    # what each station received in the window, and what each tracker was received by
+    per_station = (
+        {
+            row.gateway_id: row
+            for row in (
+                await session.execute(
+                    select(
+                        GatewayReception.gateway_id,
+                        func.count().label("receptions"),
+                        func.count(func.distinct(GatewayReception.device_id)).label("trackers"),
+                        func.max(GatewayReception.time).label("last"),
+                    )
+                    .where(
+                        GatewayReception.data_source_id == source.id,
+                        GatewayReception.gateway_id.in_(list(station_by_eui)),
+                        GatewayReception.time >= since,
+                        GatewayReception.time <= until,
+                    )
+                    .group_by(GatewayReception.gateway_id)
+                )
+            ).all()
+        }
+        if station_by_eui
+        else {}
+    )
+    per_tracker = {
+        row.device_id: row
+        for row in (
+            await session.execute(
+                select(
+                    GatewayReception.device_id,
+                    func.count().label("receptions"),
+                    func.count(func.distinct(GatewayReception.gateway_id)).label("stations"),
+                    func.max(GatewayReception.time).label("last"),
+                )
+                .where(
+                    GatewayReception.data_source_id == source.id,
+                    GatewayReception.device_id.in_(device_ids),
+                    GatewayReception.time >= since,
+                    GatewayReception.time <= until,
+                )
+                .group_by(GatewayReception.device_id)
+            )
+        ).all()
+    }
+    last_station: dict[uuid.UUID, str] = {}
+    if per_tracker:
+        newest = (
+            select(GatewayReception.device_id, GatewayReception.gateway_id)
+            .where(
+                GatewayReception.data_source_id == source.id,
+                GatewayReception.device_id.in_(list(per_tracker)),
+                GatewayReception.time >= since,
+                GatewayReception.time <= until,
+            )
+            .distinct(GatewayReception.device_id)
+            .order_by(GatewayReception.device_id, GatewayReception.time.desc())
+        )
+        last_station = {
+            device_id: gateway_id for device_id, gateway_id in (await session.execute(newest)).all()
+        }
+    station_names = (
+        {
+            g.external_id: (g.device_id, g.name or g.external_id)
+            for g in (
+                await session.scalars(
+                    select(Gateway).where(
+                        Gateway.data_source_id == source.id,
+                        Gateway.external_id.in_(list(set(last_station.values()))),
+                    )
+                )
+            ).all()
+        }
+        if last_station
+        else {}
+    )
+
+    stations: list[OffloadOverviewStation] = []
+    for device_id in station_ids:
+        device = devices[device_id]
+        own = [f for f in files if f.device_id == device_id]
+        station_eui: str | None = eui_of.get(device_id)
+        received = per_station.get(station_eui.lower()) if station_eui else None
+        report = states[device_id].latest_state["lp0_station"] if device_id in states else None
+        status_bits = (report or {}).get("status") or {}
+        counters = (report or {}).get("counters") or {}
+        card_ok = None
+        if (
+            status_bits.get("card_detected") is not None
+            and status_bits.get("card_writable") is not None
+        ):
+            card_ok = bool(status_bits["card_detected"] and status_bits["card_writable"])
+        entity = entities.get(device_id)
+        stations.append(
+            OffloadOverviewStation(
+                device_id=device_id,
+                device_name=device.name,
+                station_eui=station_eui,
+                entity_id=entity[0] if entity else None,
+                entity_name=entity[1] if entity else None,
+                gateway_id=gateway_of[device_id].id if device_id in gateway_of else None,
+                has_location=device.static_geom is not None,
+                files=len(own),
+                frames=sum(f.frames_total for f in own),
+                frames_retained=sum(int(f.attributes.get("frames_retained") or 0) for f in own),
+                last_upload_at=max((f.uploaded_at for f in own), default=None),
+                trackers=int(received.trackers) if received else 0,
+                receptions=int(received.receptions) if received else 0,
+                last_reception_at=received.last if received else None,
+                card_ok=card_ok,
+                listening=status_bits.get("lp0_listening"),
+                storage_pending=(report or {}).get("storage_pending"),
+                visits_complete=counters.get("visits_complete"),
+                state_time=states[device_id].latest_state_time if device_id in states else None,
+            )
+        )
+    floor = datetime.min.replace(tzinfo=UTC)
+    stations.sort(key=lambda s: s.last_reception_at or s.last_upload_at or floor, reverse=True)
+
+    # the trackers: an address set, or frames received, stations apart
+    credentials = {
+        c.device_id: c
+        for c in (
+            await session.scalars(
+                select(DeviceLp0Credentials).where(DeviceLp0Credentials.device_id.in_(device_ids))
+            )
+        ).all()
+    }
+    tracker_ids = (set(credentials) | set(per_tracker)) - station_ids
+    reported: dict[uuid.UUID, str] = {}
+    for device_id in tracker_ids:
+        readback = await _readback(session, device_id)
+        if readback.dev_addr:
+            reported[device_id] = readback.dev_addr
+    trackers: list[OffloadOverviewTracker] = []
+    for device_id in tracker_ids:
+        tracker = devices.get(device_id)
+        if tracker is None:
+            continue
+        row = credentials.get(device_id)
+        got = per_tracker.get(device_id)
+        station = station_names.get(last_station.get(device_id, ""), (None, None))
+        entity = entities.get(device_id)
+        trackers.append(
+            OffloadOverviewTracker(
+                device_id=device_id,
+                device_name=tracker.name,
+                entity_id=entity[0] if entity else None,
+                entity_name=entity[1] if entity else None,
+                dev_addr=row.dev_addr if row else None,
+                keys_set=row is not None,
+                source=row.source if row else None,
+                set_at=row.set_at if row else None,
+                reported_dev_addr=reported.get(device_id),
+                last_f_cnt=row.last_f_cnt if row else None,
+                last_frame_at=row.last_frame_at if row else None,
+                receptions=int(got.receptions) if got else 0,
+                stations=int(got.stations) if got else 0,
+                last_reception_at=got.last if got else None,
+                last_station_device_id=station[0],
+                last_station_name=station[1],
+            )
+        )
+    trackers.sort(key=lambda t: t.last_reception_at or t.set_at or floor, reverse=True)
+
+    # the addresses the project's stations received that no device has
+    unknown: list[OffloadUnknownAddress] = []
+    if station_by_eui:
+        seen = (
+            await session.execute(
+                select(
+                    SourceEvent.external_id,
+                    func.count().label("receptions"),
+                    func.min(GatewayReception.time).label("first"),
+                    func.max(GatewayReception.time).label("last"),
+                )
+                .join(
+                    SourceEvent,
+                    (SourceEvent.id == GatewayReception.source_event_id)
+                    & (SourceEvent.ingested_at == GatewayReception.source_event_ingested_at),
+                )
+                .where(
+                    GatewayReception.data_source_id == source.id,
+                    GatewayReception.device_id.is_(None),
+                    GatewayReception.gateway_id.in_(list(station_by_eui)),
+                )
+                .group_by(SourceEvent.external_id)
+                .order_by(func.max(GatewayReception.time).desc())
+                .limit(MAX_TRACKERS)
+            )
+        ).all()
+        identities = (
+            {
+                i.external_id: i
+                for i in (
+                    await session.scalars(
+                        select(ExternalIdentity).where(
+                            ExternalIdentity.data_source_id == source.id,
+                            ExternalIdentity.external_id.in_([s.external_id for s in seen]),
+                        )
+                    )
+                ).all()
+            }
+            if seen
+            else {}
+        )
+        for s in seen:
+            identity = identities.get(s.external_id)
+            if identity is not None and identity.device_id is not None:
+                continue  # linked since: the walk takes its receptions along
+            name = (identity.attributes or {}).get("name") if identity is not None else None
+            unknown.append(
+                OffloadUnknownAddress(
+                    dev_addr=s.external_id,
+                    dev_eui=_text(name) if name else None,
+                    receptions=int(s.receptions),
+                    first_seen_at=s.first,
+                    last_seen_at=s.last,
+                )
+            )
+
+    without = len(set(devices) - set(credentials) - station_ids)
+    return OffloadOverviewRead(
+        window_days=TRACKERS_WINDOW.days,
+        stations=stations,
+        trackers=trackers,
+        unknown=unknown,
+        devices_without_address=without,
+    )

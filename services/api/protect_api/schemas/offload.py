@@ -95,3 +95,78 @@ class OffloadStationRead(BaseModel):
         default=None, description="The station's last port 23 report (decision D323)"
     )
     state_time: datetime | None = None
+
+
+class OffloadOverviewStation(BaseModel):
+    """One offload station of the project on the Offload page: its device, its entity when it
+    has one, what its cards brought, and the gist of its own last report."""
+
+    device_id: uuid.UUID
+    device_name: str
+    station_eui: str | None = None
+    entity_id: uuid.UUID | None = None
+    entity_name: str | None = None
+    gateway_id: uuid.UUID | None = Field(default=None, description="Its row on the Gateways page")
+    has_location: bool = False
+    files: int = 0
+    frames: int = 0
+    frames_retained: int = Field(default=0, description="Frames of addresses no device has")
+    last_upload_at: datetime | None = None
+    trackers: int = Field(default=0, description="Trackers served in the window")
+    receptions: int = Field(default=0, description="Frames received in the window")
+    last_reception_at: datetime | None = None
+    card_ok: bool | None = Field(default=None, description="From the station's own report")
+    listening: bool | None = None
+    storage_pending: int | None = None
+    visits_complete: int | None = None
+    state_time: datetime | None = None
+
+
+class OffloadOverviewTracker(BaseModel):
+    """One tracker of the project on the Offload page: its address and whether its keys are
+    set, never the keys, and what the stations received of it in the window."""
+
+    device_id: uuid.UUID
+    device_name: str
+    entity_id: uuid.UUID | None = None
+    entity_name: str | None = None
+    dev_addr: str | None = None
+    keys_set: bool = False
+    source: str | None = Field(default=None, description="person or device")
+    set_at: datetime | None = None
+    reported_dev_addr: str | None = Field(
+        default=None, description="The address the device itself last reported in its settings"
+    )
+    last_f_cnt: int | None = None
+    last_frame_at: datetime | None = Field(
+        default=None, description="The last frame verified under the device's keys"
+    )
+    receptions: int = 0
+    stations: int = Field(default=0, description="Stations that received it in the window")
+    last_reception_at: datetime | None = None
+    last_station_device_id: uuid.UUID | None = None
+    last_station_name: str | None = None
+
+
+class OffloadUnknownAddress(BaseModel):
+    """An address the project's stations received that no device has: Needs attention links it."""
+
+    dev_addr: str
+    dev_eui: str | None = Field(default=None, description="The tracker's EUI when a line named it")
+    receptions: int = 0
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
+
+
+class OffloadOverviewRead(BaseModel):
+    """The project's LP0 network on one page (phase 42): every offload station, every tracker
+    with an address or frames, the addresses nobody has, and how many of the project's devices
+    have no address yet."""
+
+    window_days: int
+    stations: list[OffloadOverviewStation] = Field(default_factory=list)
+    trackers: list[OffloadOverviewTracker] = Field(default_factory=list)
+    unknown: list[OffloadUnknownAddress] = Field(default_factory=list)
+    devices_without_address: int = Field(
+        default=0, description="Devices of the project with no LP0 address, stations apart"
+    )

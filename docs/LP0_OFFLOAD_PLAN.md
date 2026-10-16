@@ -129,4 +129,6 @@ O1 to O7 landed in one session, in the order of section 7, after Tim's correctio
 
 Which of the device's credentials the firmware will use (its own LP0 pair, or the LoRaWAN or satellite session keys) changes nothing in Protect but the words on the card: the three values set on the device are whatever the device encrypts its offloaded records with.
 
+**The Offload page, 2026-10-16.** Tim asked for the per-project overview before a real card was read: `GET /projects/{project_id}/offload` and the Offload page under Network beside Gateways (O9 in the plan). It lists the stations (cards, receptions of the window, the own report's gist, the place), the trackers (address, keys set, the device's own reported address when it differs, frames, last station, last verified counter), the addresses no device has, and the count of devices without an address; it never carries a key and sets nothing, every row links to the device page where things are set. To be tuned on real data.
+
 Open from section 8 (O8): the dev server, Tim's keys and addresses on the four trackers, a real card against the station's log, and the firmware's answer to issue 772 (the frame on the card, the counter width, the credentials used).

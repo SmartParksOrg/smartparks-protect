@@ -318,6 +318,25 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     identities = (await client.get("/api/v1/attention/identities", headers=h)).json()["items"]
     waiting = next(i for i in identities if i["external_id"] == ADDR_B)
     assert waiting["identity_type"] == "dev_addr"
+    # the project's Offload page: the station, tracker A, and address B as unknown
+    page = (await client.get(f"/api/v1/projects/{project_id}/offload", headers=h)).json()
+    assert [s["device_id"] for s in page["stations"]] == [station["id"]]
+    listed = page["stations"][0]
+    assert listed["station_eui"] == STATION_EUI and listed["gateway_id"] is not None
+    assert (listed["files"], listed["frames"], listed["frames_retained"]) == (2, 4, 1)
+    assert (listed["receptions"], listed["trackers"]) == (4, 1)
+    assert listed["last_reception_at"] is not None and listed["card_ok"] is None
+    assert [t["device_id"] for t in page["trackers"]] == [tracker_a["id"]]
+    assert page["trackers"][0]["dev_addr"] == ADDR_A and page["trackers"][0]["keys_set"] is True
+    assert page["trackers"][0]["receptions"] == 3 and page["trackers"][0]["stations"] == 1
+    assert page["trackers"][0]["last_station_device_id"] == station["id"]
+    assert page["trackers"][0]["last_f_cnt"] == 1
+    assert APP_S_KEY.hex().upper() not in json.dumps(page)
+    assert [u["dev_addr"] for u in page["unknown"]] == [ADDR_B]
+    assert page["unknown"][0]["receptions"] == 1 and page["unknown"][0]["last_seen_at"]
+    without_before = page["devices_without_address"]
+    assert without_before >= 1  # tracker B at least
+
     group, _handler, walk = await _decode_pending(db, bus)
     before = (
         await client.get(f"/api/v1/devices/{tracker_b['id']}/lp0-credentials", headers=h)
@@ -353,6 +372,14 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
         )
     )
     assert linked is not None
+
+    # the page after the link: B is a tracker now, nothing unknown, one device fewer without
+    page = (await client.get(f"/api/v1/projects/{project_id}/offload", headers=h)).json()
+    assert {t["device_id"] for t in page["trackers"]} == {tracker_a["id"], tracker_b["id"]}
+    b_row = next(t for t in page["trackers"] if t["device_id"] == tracker_b["id"])
+    assert b_row["receptions"] == 1 and b_row["dev_addr"] == ADDR_B
+    assert page["unknown"] == []
+    assert page["devices_without_address"] == without_before - 1
 
     # the station card
     card = (await client.get(f"/api/v1/devices/{station['id']}/offload", headers=h)).json()
@@ -410,6 +437,9 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert (
         await client.get(f"/api/v1/devices/{station['id']}/offload", headers=viewer.headers)
     ).status_code == 200
+    for_viewer = await client.get(f"/api/v1/projects/{project_id}/offload", headers=viewer.headers)
+    assert for_viewer.status_code == 200 and len(for_viewer.json()["stations"]) == 1
+    assert APP_S_KEY.hex().upper() not in for_viewer.text
     summary = await client.get(
         f"/api/v1/devices/{tracker_a['id']}/lp0-credentials", headers=viewer.headers
     )

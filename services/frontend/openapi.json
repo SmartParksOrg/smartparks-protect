@@ -19177,6 +19177,55 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/offload": {
+   "get": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Project Offload",
+    "description": "The Offload page (phase 42): the project's offload stations with what their cards\nbrought and their own last report, the trackers with an LP0 address or frames (never the\nkeys), the addresses the stations received that no device has, and how many devices of\nthe project have no address yet. Every figure of the window covers the last 30 days.",
+    "operationId": "project_offload_api_v1_projects__project_id__offload_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OffloadOverviewRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/analysis-layers": {
    "get": {
     "tags": [
@@ -38412,6 +38461,393 @@
     "title": "OffloadLink",
     "description": "What offload stations carried for the device in the period (decision D322): the frames\nstored for it on their cards, by station, with repeats and the frames that did not\nverify counted apart."
    },
+   "OffloadOverviewRead": {
+    "properties": {
+     "window_days": {
+      "type": "integer",
+      "title": "Window Days"
+     },
+     "stations": {
+      "items": {
+       "$ref": "#/components/schemas/OffloadOverviewStation"
+      },
+      "type": "array",
+      "title": "Stations"
+     },
+     "trackers": {
+      "items": {
+       "$ref": "#/components/schemas/OffloadOverviewTracker"
+      },
+      "type": "array",
+      "title": "Trackers"
+     },
+     "unknown": {
+      "items": {
+       "$ref": "#/components/schemas/OffloadUnknownAddress"
+      },
+      "type": "array",
+      "title": "Unknown"
+     },
+     "devices_without_address": {
+      "type": "integer",
+      "title": "Devices Without Address",
+      "description": "Devices of the project with no LP0 address, stations apart",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "required": [
+     "window_days"
+    ],
+    "title": "OffloadOverviewRead",
+    "description": "The project's LP0 network on one page (phase 42): every offload station, every tracker\nwith an address or frames, the addresses nobody has, and how many of the project's devices\nhave no address yet."
+   },
+   "OffloadOverviewStation": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "station_eui": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Station Eui"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "gateway_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gateway Id",
+      "description": "Its row on the Gateways page"
+     },
+     "has_location": {
+      "type": "boolean",
+      "title": "Has Location",
+      "default": false
+     },
+     "files": {
+      "type": "integer",
+      "title": "Files",
+      "default": 0
+     },
+     "frames": {
+      "type": "integer",
+      "title": "Frames",
+      "default": 0
+     },
+     "frames_retained": {
+      "type": "integer",
+      "title": "Frames Retained",
+      "description": "Frames of addresses no device has",
+      "default": 0
+     },
+     "last_upload_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Upload At"
+     },
+     "trackers": {
+      "type": "integer",
+      "title": "Trackers",
+      "description": "Trackers served in the window",
+      "default": 0
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions",
+      "description": "Frames received in the window",
+      "default": 0
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     },
+     "card_ok": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Card Ok",
+      "description": "From the station's own report"
+     },
+     "listening": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Listening"
+     },
+     "storage_pending": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Storage Pending"
+     },
+     "visits_complete": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Visits Complete"
+     },
+     "state_time": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State Time"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_name"
+    ],
+    "title": "OffloadOverviewStation",
+    "description": "One offload station of the project on the Offload page: its device, its entity when it\nhas one, what its cards brought, and the gist of its own last report."
+   },
+   "OffloadOverviewTracker": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "dev_addr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Addr"
+     },
+     "keys_set": {
+      "type": "boolean",
+      "title": "Keys Set",
+      "default": false
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source",
+      "description": "person or device"
+     },
+     "set_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Set At"
+     },
+     "reported_dev_addr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reported Dev Addr",
+      "description": "The address the device itself last reported in its settings"
+     },
+     "last_f_cnt": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last F Cnt"
+     },
+     "last_frame_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Frame At",
+      "description": "The last frame verified under the device's keys"
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions",
+      "default": 0
+     },
+     "stations": {
+      "type": "integer",
+      "title": "Stations",
+      "description": "Stations that received it in the window",
+      "default": 0
+     },
+     "last_reception_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Reception At"
+     },
+     "last_station_device_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Station Device Id"
+     },
+     "last_station_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Station Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_name"
+    ],
+    "title": "OffloadOverviewTracker",
+    "description": "One tracker of the project on the Offload page: its address and whether its keys are\nset, never the keys, and what the stations received of it in the window."
+   },
    "OffloadStation": {
     "properties": {
      "station_eui": {
@@ -38684,6 +39120,61 @@
     },
     "type": "object",
     "title": "OffloadTracker"
+   },
+   "OffloadUnknownAddress": {
+    "properties": {
+     "dev_addr": {
+      "type": "string",
+      "title": "Dev Addr"
+     },
+     "dev_eui": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Eui",
+      "description": "The tracker's EUI when a line named it"
+     },
+     "receptions": {
+      "type": "integer",
+      "title": "Receptions",
+      "default": 0
+     },
+     "first_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "First Seen At"
+     },
+     "last_seen_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seen At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "dev_addr"
+    ],
+    "title": "OffloadUnknownAddress",
+    "description": "An address the project's stations received that no device has: Needs attention links it."
    },
    "OffloadUpload": {
     "properties": {

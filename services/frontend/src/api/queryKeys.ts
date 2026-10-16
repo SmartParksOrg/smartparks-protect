@@ -149,6 +149,8 @@ export const queryKeys = {
     ["devices", deviceId, "lp0-credentials"] as const,
   offloadStation: (deviceId: string) =>
     ["devices", deviceId, "offload"] as const,
+  projectOffload: (projectId: string) =>
+    ["projects", projectId, "offload"] as const,
   deviceWalks: (deviceId: string) => ["devices", deviceId, "walks"] as const,
   driverCatalog: (deviceId: string) =>
     ["devices", deviceId, "driver-catalog"] as const,

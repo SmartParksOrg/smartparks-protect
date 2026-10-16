@@ -4518,6 +4518,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/offload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Offload
+         * @description The Offload page (phase 42): the project's offload stations with what their cards
+         *     brought and their own last report, the trackers with an LP0 address or frames (never the
+         *     keys), the addresses the stations received that no device has, and how many devices of
+         *     the project have no address yet. Every figure of the window covers the last 30 days.
+         */
+        get: operations["project_offload_api_v1_projects__project_id__offload_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/analysis-layers": {
         parameters: {
             query?: never;
@@ -11086,6 +11109,164 @@ export interface components {
             /** Stations */
             stations?: components["schemas"]["OffloadStation"][];
         };
+        /**
+         * OffloadOverviewRead
+         * @description The project's LP0 network on one page (phase 42): every offload station, every tracker
+         *     with an address or frames, the addresses nobody has, and how many of the project's devices
+         *     have no address yet.
+         */
+        OffloadOverviewRead: {
+            /** Window Days */
+            window_days: number;
+            /** Stations */
+            stations?: components["schemas"]["OffloadOverviewStation"][];
+            /** Trackers */
+            trackers?: components["schemas"]["OffloadOverviewTracker"][];
+            /** Unknown */
+            unknown?: components["schemas"]["OffloadUnknownAddress"][];
+            /**
+             * Devices Without Address
+             * @description Devices of the project with no LP0 address, stations apart
+             * @default 0
+             */
+            devices_without_address: number;
+        };
+        /**
+         * OffloadOverviewStation
+         * @description One offload station of the project on the Offload page: its device, its entity when it
+         *     has one, what its cards brought, and the gist of its own last report.
+         */
+        OffloadOverviewStation: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Station Eui */
+            station_eui?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /**
+             * Gateway Id
+             * @description Its row on the Gateways page
+             */
+            gateway_id?: string | null;
+            /**
+             * Has Location
+             * @default false
+             */
+            has_location: boolean;
+            /**
+             * Files
+             * @default 0
+             */
+            files: number;
+            /**
+             * Frames
+             * @default 0
+             */
+            frames: number;
+            /**
+             * Frames Retained
+             * @description Frames of addresses no device has
+             * @default 0
+             */
+            frames_retained: number;
+            /** Last Upload At */
+            last_upload_at?: string | null;
+            /**
+             * Trackers
+             * @description Trackers served in the window
+             * @default 0
+             */
+            trackers: number;
+            /**
+             * Receptions
+             * @description Frames received in the window
+             * @default 0
+             */
+            receptions: number;
+            /** Last Reception At */
+            last_reception_at?: string | null;
+            /**
+             * Card Ok
+             * @description From the station's own report
+             */
+            card_ok?: boolean | null;
+            /** Listening */
+            listening?: boolean | null;
+            /** Storage Pending */
+            storage_pending?: number | null;
+            /** Visits Complete */
+            visits_complete?: number | null;
+            /** State Time */
+            state_time?: string | null;
+        };
+        /**
+         * OffloadOverviewTracker
+         * @description One tracker of the project on the Offload page: its address and whether its keys are
+         *     set, never the keys, and what the stations received of it in the window.
+         */
+        OffloadOverviewTracker: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /** Dev Addr */
+            dev_addr?: string | null;
+            /**
+             * Keys Set
+             * @default false
+             */
+            keys_set: boolean;
+            /**
+             * Source
+             * @description person or device
+             */
+            source?: string | null;
+            /** Set At */
+            set_at?: string | null;
+            /**
+             * Reported Dev Addr
+             * @description The address the device itself last reported in its settings
+             */
+            reported_dev_addr?: string | null;
+            /** Last F Cnt */
+            last_f_cnt?: number | null;
+            /**
+             * Last Frame At
+             * @description The last frame verified under the device's keys
+             */
+            last_frame_at?: string | null;
+            /**
+             * Receptions
+             * @default 0
+             */
+            receptions: number;
+            /**
+             * Stations
+             * @description Stations that received it in the window
+             * @default 0
+             */
+            stations: number;
+            /** Last Reception At */
+            last_reception_at?: string | null;
+            /** Last Station Device Id */
+            last_station_device_id?: string | null;
+            /** Last Station Name */
+            last_station_name?: string | null;
+        };
         /** OffloadStation */
         OffloadStation: {
             /** Station Eui */
@@ -11186,6 +11367,28 @@ export interface components {
             last_reception_at?: string | null;
             /** Mean Rssi */
             mean_rssi?: number | null;
+        };
+        /**
+         * OffloadUnknownAddress
+         * @description An address the project's stations received that no device has: Needs attention links it.
+         */
+        OffloadUnknownAddress: {
+            /** Dev Addr */
+            dev_addr: string;
+            /**
+             * Dev Eui
+             * @description The tracker's EUI when a line named it
+             */
+            dev_eui?: string | null;
+            /**
+             * Receptions
+             * @default 0
+             */
+            receptions: number;
+            /** First Seen At */
+            first_seen_at?: string | null;
+            /** Last Seen At */
+            last_seen_at?: string | null;
         };
         /** OffloadUpload */
         OffloadUpload: {
@@ -23560,6 +23763,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OffloadStationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_offload_api_v1_projects__project_id__offload_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffloadOverviewRead"];
                 };
             };
             /** @description Validation Error */

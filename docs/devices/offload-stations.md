@@ -101,6 +101,20 @@ signal, each a link to the station's device. The Traffic page lists every frame 
 counter, spreading factor, signal, the station and when the card was read; the source event
 dialog shows the line as the station wrote it.
 
+## The Offload page
+
+Under Network, **Offload** shows the project's LP0 network on one page: every offload station
+(its entity, its EUI, the cards uploaded with their frames, what it received in the last 30 days
+and of how many trackers, the gist of its own last report, and whether its place is set), every
+tracker with an LP0 address or with frames (its address, whether the keys are set and since when,
+what the device itself reports as its address when that differs, the frames and stations of the
+window, the last station, the last verified counter), and the addresses the stations received
+that no device has, with the tracker's EUI when a line named it. The keys are never on this page;
+they stay on the device page behind Show. The page lists and links: a station or a tracker is a
+link away, and a tracker without an address or a station without a place is marked. The footer
+counts the devices of the project that have no address yet. Built before a real card was read
+(Tim, 2026-10-16), to be tuned once there is data.
+
 ## The station's own report
 
 Firmware 8.1 lets a station report on itself every `lp0_statistics_interval` seconds on port 23:
@@ -133,5 +147,6 @@ takes minutes and the row's bar says where it is.
   the rows made, the members skipped with their reason, and the files named after another
   station.
 - `GET /api/v1/devices/{device_id}/offload`: the Offload station card.
+- `GET /api/v1/projects/{project_id}/offload`: the Offload page, for anyone who reads the project.
 - `GET /api/v1/devices/{device_id}/connectivity`: the `offload` block per LP0 source.
 - Uploading and setting keys need `devices:control` in the device's project, or server admin.
