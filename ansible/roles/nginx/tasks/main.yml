@@ -53,6 +53,12 @@
   command: nginx -t
   changed_when: false
 
+# Handlers run at the end of the play by default, after the app-deploy role has restarted the
+# stack; the configuration this role changed must be live before that (the first deploy of the
+# update page still showed bare 502s for that reason, 2026-10-16).
+- name: Apply the nginx configuration now
+  meta: flush_handlers
+
 - name: nginx runs
   systemd:
     name: nginx
