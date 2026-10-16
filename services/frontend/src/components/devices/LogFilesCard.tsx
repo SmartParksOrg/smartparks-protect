@@ -1,6 +1,18 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Download, FileUp, RefreshCw, ScrollText } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import {
+  Bluetooth,
+  Download,
+  FileText,
+  FileUp,
+  HardDrive,
+  LayoutGrid,
+  List,
+  MoreHorizontal,
+  RefreshCw,
+  ScrollText,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -8,19 +20,39 @@ import { api, downloadFile } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { DeviceLogFile, OffloadUpload } from "@/api/types";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable } from "@/components/data/DataTable";
+import { LogFileDialog } from "@/components/devices/LogFileDialog";
 import { TraceDialog } from "@/components/devices/ProvenancePanel";
-import { ProgressBar } from "@/components/common/ProgressBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMutationToast } from "@/hooks/useMutationToast";
+import { usePreference } from "@/hooks/usePreference";
 import { formatAgo, formatTime } from "@/lib/format";
+import {
+  folderOf,
+  kindLabel,
+  type LogFileKind,
+  kindOf,
+  percentDone,
+  sizeLabel,
+  summaryOf,
+} from "@/lib/logFiles";
 
-const CHANNEL_LABEL: Record<string, string> = {
-  log_file: "uploaded file",
-  webble: "browser sync",
-  lp0: "station card",
+const KIND_ICON: Record<LogFileKind, typeof FileText> = {
+  raw_log: FileText,
+  browser_sync: Bluetooth,
+  station_card: HardDrive,
+  other: FileText,
 };
+
+type View = "list" | "tiles";
 
 /** A station's card: one JSONL file of the card, or a zip of its LOG folders (phase 42). */
 function isStationUpload(file: File): boolean {
@@ -28,116 +60,24 @@ function isStationUpload(file: File): boolean {
   return name.endsWith(".jsonl") || name.endsWith(".zip");
 }
 
-/** How far the decoder is with a file: the frames done of the frames in the file, as a bar
- * with the percentage; the row is refetched every few seconds while it is processing. */
-function Progress({ f }: { f: DeviceLogFile }) {
-  const { t } = useTranslation();
-  if (f.frames_total === 0)
-    return (
-      <span className="text-muted-foreground">{t("reading the file")}</span>
-    );
-  const percent = Math.min(
-    100,
-    Math.floor((f.frames_done / f.frames_total) * 100),
-  );
-  return (
-    <div className="max-w-xs space-y-1">
-      <div className="text-muted-foreground">
-        {t("{{done}} of {{total}} frames decoded, {{percent}}%", {
-          done: f.frames_done,
-          total: f.frames_total,
-          percent,
-        })}
-      </div>
-      <ProgressBar percent={percent} />
-    </div>
-  );
-}
-
-function Counts({ f }: { f: DeviceLogFile }) {
-  const { t } = useTranslation();
-  if (f.status === "queued")
-    return (
-      <span className="text-muted-foreground">
-        {t("waiting for the decoder")}
-      </span>
-    );
-  if (f.status === "processing") return <Progress f={f} />;
-  return (
-    <span className="text-muted-foreground">
-      {t(
-        "{{frames}} frames, {{fresh}} new, {{known}} known through another path",
-        {
-          frames: f.frames_total,
-          fresh: f.records_new,
-          known: f.records_duplicate,
-        },
-      )}
-      {f.frames_failed > 0
-        ? t(", {{count}} malformed", { count: f.frames_failed })
-        : ""}
-      {f.period_start && f.period_end
-        ? `, ${formatTime(f.period_start)} to ${formatTime(f.period_end)}`
-        : ""}
-      {f.firmware_version ? `, firmware ${f.firmware_version}` : ""}
-      {f.acquisition_channel === "lp0" && <StationCounts f={f} />}
-    </span>
-  );
-}
-
-/** What a station's file adds to the counts: frames a station saved again, frames of trackers
- * nobody named yet, frames of a tracker without keys (phase 42, decision D321). */
-function StationCounts({ f }: { f: DeviceLogFile }) {
-  const { t } = useTranslation();
-  const a = f.attributes as {
-    frames_repeated?: number;
-    frames_retained?: number;
-    errors?: Record<string, number>;
-    folder?: string;
-  };
-  const withoutKeys = a.errors?.CREDENTIALS_MISSING ?? 0;
-  const unverified = a.errors?.PAYLOAD_DECODE_FAILED ?? 0;
-  return (
-    <>
-      {a.frames_repeated
-        ? t(", {{count}} repeated", { count: a.frames_repeated })
-        : ""}
-      {a.frames_retained
-        ? t(", {{count}} of trackers not known yet", {
-            count: a.frames_retained,
-          })
-        : ""}
-      {withoutKeys
-        ? t(", {{count}} of a tracker without keys", { count: withoutKeys })
-        : ""}
-      {unverified
-        ? t(", {{count}} that did not verify", { count: unverified })
-        : ""}
-      {a.folder ? ` · ${a.folder}` : ""}
-    </>
-  );
-}
-
-/** Raw log files and browser syncs of a device as managed assets (architecture 25.6): upload,
- * status and counts, the original for download, decode again after a decoder update. */
-export function LogFilesCard({
-  deviceId,
-  canWrite,
-}: {
-  deviceId: string;
-  canWrite: boolean;
-}) {
+/**
+ * Raw log files and browser syncs of a device as managed assets (architecture 25.6), shown as a
+ * file explorer shows files (Tim, 2026-10-16: the rows of a card's 31 files ran to several
+ * lines each): a list with one line per file, or tiles, switched at the top and remembered per
+ * person; a click opens the file's properties, where the counts, the error, the trace, the
+ * original and "decode again" live. Upload stays in the header.
+ */
+export function LogFilesCard({ deviceId, canWrite }: { deviceId: string; canWrite: boolean }) {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   const [trace, setTrace] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = usePreference<View>("log_files_view", "list");
   const files = useQuery({
     queryKey: queryKeys.logFiles(deviceId),
-    queryFn: () =>
-      api.get<DeviceLogFile[]>(`/api/v1/devices/${deviceId}/log-files`),
+    queryFn: () => api.get<DeviceLogFile[]>(`/api/v1/devices/${deviceId}/log-files`),
     refetchInterval: (q) =>
-      q.state.data?.some(
-        (f) => f.status === "queued" || f.status === "processing",
-      )
+      q.state.data?.some((f) => f.status === "queued" || f.status === "processing")
         ? 3_000
         : false,
   });
@@ -147,33 +87,19 @@ export function LogFilesCard({
       body.append("file", file);
       if (isStationUpload(file)) {
         // a station's card goes through its own endpoint: a zip becomes one row per file
-        const result = await api.post<OffloadUpload>(
-          `/api/v1/devices/${deviceId}/offload-files`,
-          { body },
-        );
-        return {
-          name: file.name,
-          files: result.files.length,
-          skipped: (result.skipped ?? []).length,
-        };
+        const result = await api.post<OffloadUpload>(`/api/v1/devices/${deviceId}/offload-files`, {
+          body,
+        });
+        return { name: file.name, files: result.files.length, skipped: (result.skipped ?? []).length };
       }
-      const row = await api.post<DeviceLogFile>(
-        `/api/v1/devices/${deviceId}/log-files`,
-        { body },
-      );
+      const row = await api.post<DeviceLogFile>(`/api/v1/devices/${deviceId}/log-files`, { body });
       return { name: row.original_filename, files: 1, skipped: 0 };
     },
-    invalidate: [
-      queryKeys.logFiles(deviceId),
-      queryKeys.offloadStation(deviceId),
-    ],
+    invalidate: [queryKeys.logFiles(deviceId), queryKeys.offloadStation(deviceId)],
     success: (r) =>
       r.files === 1 && r.skipped === 0
         ? `${r.name} uploaded, decoding`
-        : t(
-            "{{name}}: {{files}} files uploaded, {{skipped}} skipped, decoding",
-            r,
-          ),
+        : t("{{name}}: {{files}} files uploaded, {{skipped}} skipped, decoding", r),
     onError: (error) =>
       toast.error(
         error.message.includes("uploaded before")
@@ -182,124 +108,278 @@ export function LogFilesCard({
       ),
   });
   const redecode = useMutationToast({
-    mutationFn: (id: string) =>
-      api.post<DeviceLogFile>(`/api/v1/log-files/${id}/redecode`),
+    mutationFn: (id: string) => api.post<DeviceLogFile>(`/api/v1/log-files/${id}/redecode`),
     invalidate: [queryKeys.logFiles(deviceId)],
     success: t("Decoding the stored frames again"),
   });
+  const download = (f: DeviceLogFile) =>
+    downloadFile(`/api/v1/log-files/${f.id}/download`, f.original_filename).catch((e: Error) =>
+      toast.error(e.message),
+    );
+  // the properties dialog reads the live row, so a processing file's bar moves while it is open
+  const selected = files.data?.find((f) => f.id === selectedId) ?? null;
+
+  const menu = (f: DeviceLogFile) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          aria-label={t("Actions for {{name}}", { name: f.original_filename })}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onSelect={() => setSelectedId(f.id)}>{t("Properties")}</DropdownMenuItem>
+        {f.trace_id && (
+          <DropdownMenuItem onSelect={() => setTrace(f.trace_id)}>{t("Trace")}</DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={() => void download(f)}>
+          <Download className="size-4" /> {t("Download the original")}
+        </DropdownMenuItem>
+        {canWrite && (
+          <DropdownMenuItem
+            disabled={f.status === "processing" || redecode.isPending}
+            onSelect={() => redecode.mutate(f.id)}
+          >
+            <RefreshCw className="size-4" /> {t("Decode again")}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const name = (f: DeviceLogFile, className = "") => {
+    const Icon = KIND_ICON[kindOf(f.acquisition_channel)];
+    const folder = folderOf(f);
+    return (
+      <span className={`flex min-w-0 items-center gap-2 ${className}`}>
+        <Icon className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 max-w-[14rem] truncate font-medium" title={f.original_filename}>
+          {folder && <span className="font-normal text-muted-foreground">{folder}/</span>}
+          {f.original_filename}
+        </span>
+      </span>
+    );
+  };
+  const status = (f: DeviceLogFile) => {
+    const percent = f.status === "processing" ? percentDone(f) : null;
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <StatusBadge value={f.status} />
+        {percent !== null && <span className="text-xs text-muted-foreground">{percent}%</span>}
+      </span>
+    );
+  };
+
+  const columns: ColumnDef<DeviceLogFile, unknown>[] = [
+    { header: t("Name"), accessorKey: "original_filename", cell: ({ row }) => name(row.original) },
+    {
+      header: t("Kind"),
+      accessorKey: "acquisition_channel",
+      cell: ({ row }) => (
+        <Badge variant="outline">{kindLabel(kindOf(row.original.acquisition_channel), t)}</Badge>
+      ),
+    },
+    { header: t("Status"), accessorKey: "status", cell: ({ row }) => status(row.original) },
+    {
+      header: t("Frames"),
+      accessorKey: "frames_total",
+      cell: ({ row }) => (
+        <span className="tabular-nums">
+          {row.original.frames_total}
+          {row.original.frames_failed > 0 && (
+            <span className="text-destructive"> ({row.original.frames_failed})</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      header: t("Records"),
+      id: "records",
+      cell: ({ row }) => (
+        <span className="tabular-nums" title={t("new, known through another path")}>
+          {row.original.records_new}
+          <span className="text-muted-foreground"> / {row.original.records_duplicate}</span>
+        </span>
+      ),
+    },
+    {
+      header: t("Period"),
+      id: "period",
+      cell: ({ row }) =>
+        row.original.period_start && row.original.period_end ? (
+          <span className="whitespace-nowrap text-xs">
+            {formatTime(row.original.period_start)} {t("to")} {formatTime(row.original.period_end)}
+          </span>
+        ) : (
+          ""
+        ),
+    },
+    {
+      header: t("Size"),
+      accessorKey: "size_bytes",
+      cell: ({ getValue }) => <span className="tabular-nums">{sizeLabel(getValue<number>())}</span>,
+    },
+    {
+      header: t("Uploaded"),
+      accessorKey: "uploaded_at",
+      cell: ({ getValue }) => (
+        <span className="whitespace-nowrap" title={formatTime(getValue<string>())}>
+          {formatAgo(getValue<string>())}
+        </span>
+      ),
+    },
+    { header: "", id: "actions", cell: ({ row }) => menu(row.original) },
+  ];
+
+  const tiles = (rows: DeviceLogFile[]) => (
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-3 2xl:grid-cols-4">
+      {rows.map((f) => {
+        const Icon = KIND_ICON[kindOf(f.acquisition_channel)];
+        const folder = folderOf(f);
+        return (
+          <div
+            key={f.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setSelectedId(f.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setSelectedId(f.id);
+            }}
+            className="relative flex min-w-0 cursor-pointer flex-col gap-1 rounded-md border p-3 text-left hover:bg-muted/60"
+          >
+            <div className="absolute right-1 top-1">{menu(f)}</div>
+            <Icon className="size-8 text-muted-foreground" />
+            <div className="line-clamp-2 break-all text-sm font-medium" title={f.original_filename}>
+              {folder && <span className="font-normal text-muted-foreground">{folder}/</span>}
+              {f.original_filename}
+            </div>
+            <div>{status(f)}</div>
+            <div className="line-clamp-2 text-xs text-muted-foreground">{summaryOf(f, t)}</div>
+            <div className="text-xs text-muted-foreground">
+              {sizeLabel(f.size_bytes)} · {formatAgo(f.uploaded_at)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <CardTitle className="flex items-center gap-2">
             <ScrollText className="size-4" /> {t("Log files")}
+            {files.data && files.data.length > 0 && (
+              <span className="text-sm font-normal text-muted-foreground">{files.data.length}</span>
+            )}
           </CardTitle>
-          {canWrite && (
-            <>
-              <input
-                ref={input}
-                type="file"
-                accept=".txt,.log,.jsonl,.zip,text/plain,application/zip"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) upload.mutate(file);
-                  e.target.value = "";
-                }}
-              />
+          <div className="flex items-center gap-1">
+            <div className="flex rounded-md border p-0.5" role="group" aria-label={t("View")}>
               <Button
-                size="sm"
-                variant="outline"
-                disabled={upload.isPending}
-                onClick={() => input.current?.click()}
+                type="button"
+                variant={view === "list" ? "secondary" : "ghost"}
+                size="icon"
+                className="size-7"
+                aria-pressed={view === "list"}
+                aria-label={t("List")}
+                onClick={() => setView("list")}
               >
-                <FileUp className="size-4" />{" "}
-                {upload.isPending ? t("Uploading…") : t("Upload raw log")}
+                <List className="size-4" />
               </Button>
-            </>
-          )}
+              <Button
+                type="button"
+                variant={view === "tiles" ? "secondary" : "ghost"}
+                size="icon"
+                className="size-7"
+                aria-pressed={view === "tiles"}
+                aria-label={t("Tiles")}
+                onClick={() => setView("tiles")}
+              >
+                <LayoutGrid className="size-4" />
+              </Button>
+            </div>
+            {canWrite && (
+              <>
+                <input
+                  ref={input}
+                  type="file"
+                  accept=".txt,.log,.jsonl,.zip,text/plain,application/zip"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) upload.mutate(file);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={upload.isPending}
+                  onClick={() => input.current?.click()}
+                >
+                  <FileUp className="size-4" /> {upload.isPending ? t("Uploading…") : t("Upload")}
+                </Button>
+              </>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p className="text-xs text-muted-foreground">
             {t(
-              "Raw logs retrieved from the device: one frame per line as the OpenCollar BLE app exports them, the frames synced from this browser, or the files of an offload station's SD card (a .jsonl file, or a zip of its LOG folders). Every frame is a delivery; records already known from another path are recognised, not duplicated.",
+              "Raw logs retrieved from the device: one frame per line as the OpenCollar BLE app exports them, the frames synced from this browser, or the files of an offload station's SD card (a .jsonl file, or a zip of its LOG folders). Every frame is a delivery; records already known from another path are recognised, not duplicated. A click on a file opens its properties.",
             )}
           </p>
-          {files.isSuccess && files.data.length === 0 && (
-            <div className="text-muted-foreground">
-              {t("No log files yet.")}
-            </div>
-          )}
-          <ul className="divide-y">
-            {files.data?.map((f) => (
-              <li key={f.id} className="space-y-1 py-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{f.original_filename}</span>
-                  <Badge variant="outline">
-                    {CHANNEL_LABEL[f.acquisition_channel] ??
-                      f.acquisition_channel}
-                  </Badge>
-                  <StatusBadge value={f.status} />
-                  <span className="text-xs text-muted-foreground">
-                    {t("{{size}} kB, {{ago}}", {
-                      size: Math.round(f.size_bytes / 1024),
-                      ago: formatAgo(f.uploaded_at),
-                    })}
-                    {f.ble_synced_at
-                      ? t(", read from the device {{time}}", {
-                          time: formatTime(f.ble_synced_at),
-                        })
-                      : ""}
-                  </span>
-                  <span className="ml-auto flex gap-1">
-                    {f.trace_id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setTrace(f.trace_id)}
-                      >
-                        {t("trace")}
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        downloadFile(
-                          `/api/v1/log-files/${f.id}/download`,
-                          f.original_filename,
-                        ).catch((e: Error) => toast.error(e.message))
-                      }
-                    >
-                      <Download className="size-4" /> {t("original")}
-                    </Button>
-                    {canWrite && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={
-                          f.status === "processing" || redecode.isPending
-                        }
-                        onClick={() => redecode.mutate(f.id)}
-                      >
-                        <RefreshCw className="size-4" /> {t("decode again")}
-                      </Button>
-                    )}
-                  </span>
-                </div>
-                <div className="text-xs">
-                  <Counts f={f} />
-                </div>
-                {f.error_message && (
-                  <div className="text-xs text-destructive">
-                    {f.error_code}: {f.error_message}
+          {view === "tiles" && files.data && files.data.length > 0 ? (
+            tiles(files.data)
+          ) : (
+            <DataTable
+              columns={columns}
+              data={files.data}
+              isLoading={files.isPending}
+              // the card shares its row with another on a desktop: the kind is the icon, the
+              // records, the period and the size are in the properties, the Columns menu
+              // shows them
+              defaultHidden={["acquisition_channel", "records", "period", "size_bytes"]}
+              defaultHiddenSmall={["acquisition_channel", "records", "period", "size_bytes"]}
+              onRowClick={(f) => setSelectedId(f.id)}
+              emptyMessage={t("No log files yet.")}
+              cardOf={(f) => (
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    {name(f)}
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {status(f)}
+                      <span className="text-muted-foreground">
+                        {sizeLabel(f.size_bytes)} · {formatAgo(f.uploaded_at)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{summaryOf(f, t)}</div>
                   </div>
-                )}
-              </li>
-            ))}
-          </ul>
+                  {menu(f)}
+                </div>
+              )}
+            />
+          )}
         </CardContent>
       </Card>
+      <LogFileDialog
+        file={selected}
+        canWrite={canWrite}
+        onClose={() => setSelectedId(null)}
+        onTrace={(id) => {
+          setSelectedId(null);
+          setTrace(id);
+        }}
+        onRedecode={(id) => redecode.mutate(id)}
+        redecoding={redecode.isPending}
+      />
       <TraceDialog traceId={trace} onClose={() => setTrace(null)} />
     </>
   );
