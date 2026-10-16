@@ -71,7 +71,8 @@ smartparks-protect/
 ├── docker/postgres/         # pgBackRest config and the protect-pgbackrest wrapper
 ├── docker/backup/           # object mirror script, compose overrides of the restore-test stack
 ├── examples/                # adapter, driver and payload skeletons to copy from
-├── scripts/dev.sh           # daily commands; backup.sh, restore.sh, restore-verify.sh, verify-server.sh for servers
+├── scripts/dev.sh           # daily commands; backup.sh, restore.sh, restore-verify.sh, verify-server.sh for servers,
+│                            # lp0_demo_cards.py for a month of synthetic LP0 cards in a project
 ├── .githooks/commit-msg     # strips assistant trailers (D28), installed with scripts/dev.sh hooks
 ├── .github/workflows/ci.yml
 ├── docker-compose.yml

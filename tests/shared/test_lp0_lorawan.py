@@ -12,6 +12,7 @@ from shared.connectivity.adapters.lp0_station.lorawan import (
     Credentials,
     FrameError,
     Uplink,
+    build_uplink,
     counter_candidates,
     decrypt_payload,
     parse_uplink,
@@ -63,41 +64,6 @@ def test_not_an_uplink():
         parse_uplink(b"\x40\x01\x02")
     with pytest.raises(FrameError, match="MHDR"):
         parse_uplink(b"\x60" + SAVED_REPLAY_PACKET[1:])
-
-
-def build_uplink(
-    credentials: Credentials, f_cnt: int, f_port: int, payload: bytes, *, f_opts: bytes = b""
-) -> bytes:
-    """A LoRaWAN 1.0 uplink the way `make_test_log.py` builds one, for the round trip."""
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-    from cryptography.hazmat.primitives.cmac import CMAC
-
-    dev_addr_le = bytes.fromhex(credentials.dev_addr)[::-1]
-    fhdr = dev_addr_le + bytes([len(f_opts) & 0x0F, f_cnt & 0xFF, (f_cnt >> 8) & 0xFF]) + f_opts
-    key = credentials.nwk_s_key if f_port == 0 else credentials.app_s_key
-    cipher = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
-    encrypted = bytearray()
-    for index in range(0, len(payload), 16):
-        block = (
-            bytes([0x01, 0, 0, 0, 0, 0])
-            + dev_addr_le
-            + (f_cnt & 0xFFFFFFFF).to_bytes(4, "little")
-            + bytes([0, index // 16 + 1])
-        )
-        stream = cipher.update(block)
-        chunk = payload[index : index + 16]
-        encrypted += bytes(a ^ b for a, b in zip(chunk, stream, strict=False))
-    mac_payload = fhdr + bytes([f_port]) + bytes(encrypted)
-    signed = b"\x40" + mac_payload
-    b0 = (
-        bytes([0x49, 0, 0, 0, 0, 0])
-        + dev_addr_le
-        + (f_cnt & 0xFFFFFFFF).to_bytes(4, "little")
-        + bytes([0, len(signed)])
-    )
-    cmac = CMAC(algorithms.AES(credentials.nwk_s_key))
-    cmac.update(b0 + signed)
-    return signed + cmac.finalize()[:4]
 
 
 def test_round_trip_matches_the_fixture_and_skips_fopts():

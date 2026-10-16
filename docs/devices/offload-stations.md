@@ -158,6 +158,20 @@ the Offload station card shows the report, and the rule template **Offload stati
 card** raises an alert on a station whose card is out. The observations a station could not make
 are unknown, never false.
 
+## Demo data
+
+`uv run scripts/lp0_demo_cards.py --project-id <id> --email <ops> --password <secret>` fills a
+project with a month of synthetic LP0 traffic to try the page and the import before a real card
+exists (Tim, 2026-10-16): three RangerEdge stations (SP050101 to SP050103) around a pygmy hippo's
+range in the Gola Rainforest, each an Offload station entity with its place and its own LP0
+credentials, and a CollarEdge (SP100001) on a hippo entity. The collar fixes every 15 minutes
+(port 2), reports its status hourly (port 4) and offloads once a day to the station of the day;
+each station reports itself hourly on port 23 into its own card. The cards are LP0 v5 files, one
+zip per station, uploaded on the station's device and decoded by the server in the background
+(about a quarter of an hour on the dev server). The keys are synthetic, derived from `--seed`,
+and never printed; a re-run finds the devices by serial and the server refuses a card it holds.
+`--out DIR` writes the zips and uploads nothing.
+
 ## Limits
 
 A file of at most `LOG_FILE_MAX_BYTES` (64 MB), a zip of at most `LP0_ZIP_MAX_BYTES` (512 MB)

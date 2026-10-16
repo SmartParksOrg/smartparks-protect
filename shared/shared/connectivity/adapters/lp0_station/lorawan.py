@@ -133,6 +133,28 @@ def decrypt_payload(
     return bytes(out)
 
 
+def build_uplink(
+    credentials: Credentials, f_cnt: int, f_port: int, payload: bytes, *, f_opts: bytes = b""
+) -> bytes:
+    """A LoRaWAN 1.0 unconfirmed uplink the way the firmware's `lorawan_tools_build` and the
+    public replay app's `make_test_log.py` build one: the inverse of `unwrap`, for the tests
+    and the demo cards. The counter's 16 bits go in the header and the whole value into the
+    blocks, which is the firmware's 16-bit mode when `f_cnt` is below 65536."""
+    dev_addr_le = bytes.fromhex(credentials.dev_addr)[::-1]
+    fhdr = dev_addr_le + bytes([len(f_opts) & 0x0F, f_cnt & 0xFF, (f_cnt >> 8) & 0xFF]) + f_opts
+    key = credentials.nwk_s_key if f_port == 0 else credentials.app_s_key
+    encryptor = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
+    encrypted = bytearray()
+    for index in range(0, len(payload), 16):
+        stream = encryptor.update(_block(0x01, credentials.dev_addr, f_cnt, index // 16 + 1))
+        chunk = payload[index : index + 16]
+        encrypted += bytes(a ^ b for a, b in zip(chunk, stream, strict=False))
+    signed = bytes([MHDR_UNCONFIRMED_UP]) + fhdr + bytes([f_port]) + bytes(encrypted)
+    mac = CMAC(algorithms.AES(credentials.nwk_s_key))
+    mac.update(_block(0x49, credentials.dev_addr, f_cnt, len(signed)) + signed)
+    return signed + mac.finalize()[:MIC_BYTES]
+
+
 @dataclass(frozen=True, slots=True)
 class Unwrapped:
     payload: bytes
