@@ -5,7 +5,7 @@ description = "Smart Parks Protect MCP server: read-only tools, resources and pr
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "smartparks-protect-shared",
-    "mcp==2.1.1",
+    "mcp==2.2.0",
     "uvicorn[standard]==0.52.4",
     "httpx==0.28.1",
 ]
