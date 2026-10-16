@@ -18,7 +18,7 @@ from typing import Any
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from sqlalchemy import func, select
+from sqlalchemy import func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.bus import RedisStreamsBus, Topic
@@ -684,6 +684,30 @@ def _summarize(outcome: Outcome, records: DecodedRecords) -> None:
             outcome.firmware_version = str(version)
 
 
+def _delivery_row(
+    event: SourceEvent,
+    canonical_type: str,
+    canonical_id: int,
+    canonical_time: datetime,
+    first: bool,
+) -> dict[str, Any]:
+    """A delivery as the one INSERT per frame takes it (`_insert_deliveries`)."""
+    return {
+        "canonical_type": canonical_type,
+        "canonical_id": canonical_id,
+        "canonical_time": canonical_time,
+        "source_event_id": event.id,
+        "source_event_ingested_at": event.ingested_at,
+        "acquisition_channel": event.acquisition_channel,
+        "first": first,
+    }
+
+
+async def _insert_deliveries(session: AsyncSession, rows: list[dict[str, Any]]) -> None:
+    if rows:
+        await session.execute(insert(SourceDelivery), rows)
+
+
 async def _link_delivery(
     session: AsyncSession,
     event: SourceEvent,
@@ -692,16 +716,8 @@ async def _link_delivery(
     canonical_time: datetime,
     first: bool,
 ) -> None:
-    session.add(
-        SourceDelivery(
-            canonical_type=canonical_type,
-            canonical_id=canonical_id,
-            canonical_time=canonical_time,
-            source_event_id=event.id,
-            source_event_ingested_at=event.ingested_at,
-            acquisition_channel=event.acquisition_channel,
-            first=first,
-        )
+    await _insert_deliveries(
+        session, [_delivery_row(event, canonical_type, canonical_id, canonical_time, first)]
     )
 
 
@@ -750,14 +766,15 @@ async def _write_positions(
         ).all()
     }
     previous_in_frame: tuple[float, float, datetime] | None = None
-    new: list[tuple[Position, Any, Any]] = []  # the row, its record and its attribution
+    new: list[tuple[dict[str, Any], Any, Any]] = []  # the row, its record, its attribution
+    deliveries: list[dict[str, Any]] = []
     seen: set[tuple[str, datetime]] = set()
     for record, key in sorted(keyed, key=lambda item: item[0].time):
         found = existing.get((key, record.time))
         if found is not None or (key, record.time) in seen:
             outcome.duplicates += 1
             if found is not None and ("position", found[0]) not in delivered:
-                await _link_delivery(session, event, "position", found[0], found[1], first=False)
+                deliveries.append(_delivery_row(event, "position", found[0], found[1], False))
                 delivered.add(("position", found[0]))
             continue
         seen.add((key, record.time))
@@ -808,38 +825,45 @@ async def _write_positions(
             previous_in_frame = (record.latitude, record.longitude, record.time)
         new.append(
             (
-                Position(
-                    time=record.time,
-                    device_id=device.id,
-                    project_id=attribution.project_id,
-                    entity_id=attribution.entity_id,
-                    data_source_id=event.data_source_id,
-                    source_event_id=event.id,
-                    source_event_ingested_at=event.ingested_at,
-                    record_type=record.record_type,
-                    canonical_key=key,
-                    valid=valid,
-                    geom=from_shape(Point(record.longitude, record.latitude), srid=4326),
-                    altitude_m=record.altitude_m,
-                    speed_mps=record.speed_mps,
-                    heading_deg=record.heading_deg,
-                    accuracy_m=record.accuracy_m,
-                    satellites=record.satellites,
-                    attributes=attributes,
-                    trace_id=event.trace_id,
-                ),
+                {
+                    "time": record.time,
+                    "device_id": device.id,
+                    "project_id": attribution.project_id,
+                    "entity_id": attribution.entity_id,
+                    "data_source_id": event.data_source_id,
+                    "source_event_id": event.id,
+                    "source_event_ingested_at": event.ingested_at,
+                    "record_type": record.record_type,
+                    "canonical_key": key,
+                    "valid": valid,
+                    "geom": from_shape(Point(record.longitude, record.latitude), srid=4326),
+                    "altitude_m": record.altitude_m,
+                    "speed_mps": record.speed_mps,
+                    "heading_deg": record.heading_deg,
+                    "accuracy_m": record.accuracy_m,
+                    "satellites": record.satellites,
+                    "attributes": attributes,
+                    "trace_id": event.trace_id,
+                    "curated_fields": [],
+                },
                 record,
                 attribution,
             )
         )
     if not new:
+        await _insert_deliveries(session, deliveries)
         return
-    session.add_all([row for row, _, _ in new])
-    await session.flush()
-    for position, record, attribution in new:
-        await _link_delivery(session, event, "position", position.id, position.time, first=True)
+    # one INSERT for the frame's new fixes; the ids come back by canonical key, since a
+    # hypertable's composite key (id, time) keeps the ORM from batching objects
+    returned = await session.execute(
+        insert(Position).returning(Position.id, Position.canonical_key), [row for row, _, _ in new]
+    )
+    ids = {key: identifier for identifier, key in returned.all()}
+    for row, record, attribution in new:
+        position_id = ids[row["canonical_key"]]
+        deliveries.append(_delivery_row(event, "position", position_id, record.time, True))
         outcome.created["positions"] += 1
-        if not position.valid:
+        if not row["valid"]:
             # an invalid fix (a clock ahead, an outlier) moves no map, fires no rule and
             # reaches no integration; it waits for a curation
             continue
@@ -847,8 +871,8 @@ async def _write_positions(
             (
                 Topic.POSITION_CREATED,
                 {
-                    "position_id": position.id,
-                    "time": position.time.isoformat(),
+                    "position_id": position_id,
+                    "time": record.time.isoformat(),
                     "record_type": record.record_type,
                     "device_id": str(device.id),
                     "project_id": str(attribution.project_id) if attribution.project_id else None,
@@ -856,10 +880,11 @@ async def _write_positions(
                     "latitude": record.latitude,
                     "longitude": record.longitude,
                     "source_event_id": event.id,
-                    "age_seconds": event_age(position.time, event.ingested_at),
+                    "age_seconds": event_age(record.time, event.ingested_at),
                 },
             )
         )
+    await _insert_deliveries(session, deliveries)
 
 
 def _stored_number(state: DeviceCurrentState, metric: str) -> float | None:
@@ -1188,14 +1213,15 @@ async def _write_measurements(
             )
         ).all()
     }
-    new: list[Measurement] = []
+    new: list[dict[str, Any]] = []
+    deliveries: list[dict[str, Any]] = []
     seen: set[tuple[str, datetime]] = set()
     for record, key, filed in keyed:
         found = existing.get((key, filed))
         if found is not None or (key, filed) in seen:
             outcome.duplicates += 1
             if found is not None and ("measurement", found[0]) not in delivered:
-                await _link_delivery(session, event, "measurement", found[0], found[1], first=False)
+                deliveries.append(_delivery_row(event, "measurement", found[0], found[1], False))
                 delivered.add(("measurement", found[0]))
             continue
         seen.add((key, filed))
@@ -1209,37 +1235,53 @@ async def _write_measurements(
             outcome.clock_ahead += 1
             outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
         new.append(
-            Measurement(
-                time=filed,
-                device_id=device.id,
-                project_id=attribution.project_id,
-                entity_id=attribution.entity_id,
-                data_source_id=event.data_source_id,
-                source_event_id=event.id,
-                source_event_ingested_at=event.ingested_at,
-                metric_key=record.metric_key,
-                canonical_key=key,
-                valid=not ahead,
-                trace_id=event.trace_id,
-                **columns,
-            )
+            {
+                "time": filed,
+                "device_id": device.id,
+                "project_id": attribution.project_id,
+                "entity_id": attribution.entity_id,
+                "data_source_id": event.data_source_id,
+                "source_event_id": event.id,
+                "source_event_ingested_at": event.ingested_at,
+                "metric_key": record.metric_key,
+                "canonical_key": key,
+                "valid": not ahead,
+                "trace_id": event.trace_id,
+                "curated_fields": [],
+                **columns,  # the one value column the reading has; an explicit None in the
+                # JSONB column would be a JSON null, which the one-value check refuses
+            }
         )
     if not new:
+        await _insert_deliveries(session, deliveries)
         return
-    session.add_all(new)
-    await session.flush()
-    for measurement in new:
-        await _link_delivery(
-            session, event, "measurement", measurement.id, measurement.time, first=True
+    # one INSERT per set of columns (the value column differs by type), each with RETURNING;
+    # the ids come back by canonical key
+    ids: dict[str, int] = {}
+    for columns_present in {tuple(sorted(row)) for row in new}:
+        group = [row for row in new if tuple(sorted(row)) == columns_present]
+        returned = await session.execute(
+            insert(Measurement).returning(Measurement.id, Measurement.canonical_key), group
         )
+        ids.update({key: identifier for identifier, key in returned.all()})
+    for row in new:
+        deliveries.append(
+            _delivery_row(event, "measurement", ids[row["canonical_key"]], row["time"], True)
+        )
+    await _insert_deliveries(session, deliveries)
     outcome.created["measurements"] += len(new)
+    times = [row["time"] for row in new]
     outcome.messages.append(
         (
             Topic.MEASUREMENT_CREATED,
             {
-                "measurement_ids": [m.id for m in new],
+                "measurement_ids": [ids[row["canonical_key"]] for row in new],
                 "device_id": str(device.id),
                 "source_event_id": event.id,
+                # the consumers read the rows by id; the bounds let the hypertable skip every
+                # chunk outside them (30 to 75 ms a frame on dev without, 2026-10-16)
+                "time_from": min(times).isoformat(),
+                "time_to": max(times).isoformat(),
             },
         )
     )

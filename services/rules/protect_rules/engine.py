@@ -356,6 +356,15 @@ async def handle_position(bus: RedisStreamsBus, cache: RuleCache, payload: dict[
     await run_rules(bus, rules, subject, sample, entity_type_id)
 
 
+def _time_bounds(payload: dict[str, Any]) -> list[Any]:
+    """The frame's time span when the decoder named it (2026-10-16), so the hypertable reads
+    the chunks of those times alone instead of every chunk's index for the ids."""
+    start, end = payload.get("time_from"), payload.get("time_to")
+    if not start or not end:
+        return []
+    return [Measurement.time.between(datetime.fromisoformat(start), datetime.fromisoformat(end))]
+
+
 async def handle_measurements(
     bus: RedisStreamsBus, cache: RuleCache, payload: dict[str, Any]
 ) -> None:
@@ -377,7 +386,7 @@ async def handle_measurements(
                     Measurement.source_event_ingested_at,
                     Measurement.ingested_at,
                 )
-                .where(Measurement.id.in_(ids))
+                .where(Measurement.id.in_(ids), *_time_bounds(payload))
                 .order_by(Measurement.time)
             )
         ).all()

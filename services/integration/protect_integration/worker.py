@@ -99,7 +99,17 @@ async def refs_from_message(session: AsyncSession, message: Message) -> list[Obj
         ids = [int(i) for i in payload.get("measurement_ids") or []]
         if not ids:
             return []
-        rows = (await session.scalars(select(Measurement).where(Measurement.id.in_(ids)))).all()
+        bounds = []  # the frame's span, when the decoder named it: those chunks alone
+        if payload.get("time_from") and payload.get("time_to"):
+            bounds = [
+                Measurement.time.between(
+                    datetime.fromisoformat(str(payload["time_from"])),
+                    datetime.fromisoformat(str(payload["time_to"])),
+                )
+            ]
+        rows = (
+            await session.scalars(select(Measurement).where(Measurement.id.in_(ids), *bounds))
+        ).all()
         return [measurement_ref(row) for row in rows if row.project_id]
     return []
 
