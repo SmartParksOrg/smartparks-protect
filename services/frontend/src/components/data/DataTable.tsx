@@ -462,7 +462,9 @@ export function DataTable<T>({
               <TableRow>
                 <TableCell
                   colSpan={table.getVisibleLeafColumns().length}
-                  className="py-8 text-center text-muted-foreground"
+                  // the cells never wrap, but an empty message is a sentence or two that must
+                  // (the Offload page's ran past the table's edge, 2026-10-16)
+                  className="py-8 text-center whitespace-normal text-muted-foreground"
                 >
                   {search !== "" && total > 0
                     ? t("Nothing matches the search.")
