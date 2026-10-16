@@ -27,6 +27,27 @@
     GIT_COMMIT: "{{ deployed_commit.stdout }}"
   tags: [env-refresh]
 
+# While the containers restart, nginx answers every request with the "being updated" page
+# or message instead of a bare 502 (decision D329): the flag goes up before the restart and
+# down once the API and the frontend answer again.
+- name: Directory of the update flag (the nginx role makes it too; a deploy alone must not fail on it)
+  file:
+    path: /var/www/protect
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [env-refresh, sync-config]
+
+- name: Tell nginx the stack is being updated
+  copy:
+    content: "{{ (deployed_commit | default({})).stdout | default('') }}\n"
+    dest: /var/www/protect/updating
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [env-refresh, sync-config]
+
 - name: Start the stack (the migrate service runs first)
   command: docker compose up -d --remove-orphans
   args:
@@ -42,6 +63,22 @@
   until: health.status == 200
   retries: 30
   delay: 5
+  tags: [env-refresh, sync-config]
+
+- name: Wait for the frontend
+  uri:
+    url: http://127.0.0.1:3000/
+    status_code: 200
+  register: frontend
+  until: frontend.status == 200
+  retries: 30
+  delay: 2
+  tags: [env-refresh, sync-config]
+
+- name: The update is done
+  file:
+    path: /var/www/protect/updating
+    state: absent
   tags: [env-refresh, sync-config]
 
 - name: Log directory for the scheduled jobs

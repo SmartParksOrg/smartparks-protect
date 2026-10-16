@@ -17,6 +17,22 @@
   register: ssl_cert
   when: enable_ssl | default(false) and domain_name is defined
 
+- name: Directory of the page nginx shows while the stack is down
+  file:
+    path: /var/www/protect
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: The page shown while the stack is down (decision D329)
+  template:
+    src: unavailable.html.j2
+    dest: /var/www/protect/unavailable.html
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Site configuration
   template:
     src: protect.conf.j2

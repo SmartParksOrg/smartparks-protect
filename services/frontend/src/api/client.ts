@@ -5,7 +5,9 @@
  * origin), so the same build works behind nginx and behind the Vite dev proxy.
  */
 import i18n from "@/i18n";
+import { isUnavailableStatus, reasonOf } from "@/lib/availability";
 import { useAuthStore } from "@/stores/auth";
+import { useAvailabilityStore } from "@/stores/availability";
 
 export class ApiError extends Error {
   status: number;
@@ -18,6 +20,12 @@ export class ApiError extends Error {
   }
 
   static describe(status: number, detail: unknown): string {
+    // a gateway error during a deploy or an outage says what is going on, not "status 502"
+    if (isUnavailableStatus(status))
+      return reasonOf(status, detail) === "updating"
+        ? i18n.t("Protect is being updated; this tries again in a moment.")
+        : i18n.t("The server does not answer at the moment; this tries again in a moment.");
+    if (status === 0) return i18n.t("No connection to the server; this tries again in a moment.");
     if (typeof detail === "string") return detail;
     if (detail && typeof detail === "object" && "message" in detail) {
       return String((detail as { message: unknown }).message);
@@ -60,6 +68,38 @@ export interface RequestOptions {
   anonymous?: boolean;
 }
 
+/** The availability store hears every answer (decision D329): a gateway status or a failed
+ * connection marks the server unavailable, any other answer marks it back. An aborted request
+ * says nothing. A failed connection becomes an `ApiError` with status 0. */
+async function noteAvailability(
+  pending: Promise<Response>,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const availability = useAvailabilityStore.getState();
+  let response: Response;
+  try {
+    response = await pending;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    availability.markUnavailable("unreachable");
+    throw new ApiError(0, null);
+  }
+  if (isUnavailableStatus(response.status)) {
+    availability.markUnavailable(reasonOf(response.status, await peekDetail(response)));
+  } else {
+    availability.markAvailable();
+  }
+  return response;
+}
+
+async function peekDetail(response: Response): Promise<unknown> {
+  try {
+    return await response.clone().json();
+  } catch {
+    return null;
+  }
+}
+
 function buildUrl(path: string, query?: Query): string {
   const url = new URL(BASE + path, window.location.origin);
   if (query) {
@@ -96,12 +136,15 @@ async function request<T>(
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(options.body);
   }
-  const response = await fetch(buildUrl(path, options.query), {
-    method,
-    headers,
-    body,
-    signal: options.signal,
-  });
+  const response = await noteAvailability(
+    fetch(buildUrl(path, options.query), {
+      method,
+      headers,
+      body,
+      signal: options.signal,
+    }),
+    options.signal,
+  );
   if (response.status === 401 && !options.anonymous) {
     useAuthStore.getState().expire();
   }

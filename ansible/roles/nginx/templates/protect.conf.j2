@@ -34,11 +34,33 @@ server {
     add_header X-Frame-Options SAMEORIGIN always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
 
+    # While the stack restarts (the deploy raises the flag, D329) or an upstream is down, a
+    # page load gets a small page that retries by itself and an API call a JSON message, not
+    # nginx's bare 502. The flag file is written and removed by the app-deploy role.
+    if (-f /var/www/protect/updating) {
+        return 503;
+    }
+    error_page 502 503 504 /unavailable.html;
+    location = /unavailable.html {
+        root /var/www/protect;
+        internal;
+        add_header Retry-After 10 always;
+        add_header Cache-Control no-store always;
+    }
+    location @api_unavailable {
+        default_type application/json;
+        add_header Retry-After 10 always;
+        add_header Cache-Control no-store always;
+        return 503 '{"detail": "Protect is being updated or restarting. Try again in a moment.", "unavailable": true}';
+    }
+
     location /api/v1/auth/ {
         limit_req zone=protect_auth burst=10 nodelay;
         gzip off;
         proxy_pass http://127.0.0.1:8000;
         include /etc/nginx/proxy_params;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @api_unavailable;
     }
 
     location /api/v1/ingest/ {
@@ -46,6 +68,8 @@ server {
         proxy_pass http://127.0.0.1:8000;
         include /etc/nginx/proxy_params;
         proxy_read_timeout 30s;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @api_unavailable;
     }
 
     location /api/v1/ws/ {
@@ -62,6 +86,8 @@ server {
         proxy_pass http://127.0.0.1:8000;
         include /etc/nginx/proxy_params;
         proxy_read_timeout 120s;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @api_unavailable;
     }
 
     # AI clients (architecture 27): OAuth discovery on the API, the MCP server on :8001.
@@ -82,10 +108,13 @@ server {
         include /etc/nginx/proxy_params;
         proxy_buffering off;
         proxy_read_timeout 300s;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @api_unavailable;
     }
 
     location / {
         proxy_pass http://127.0.0.1:3000;
         include /etc/nginx/proxy_params;
+        proxy_intercept_errors on;
     }
 }

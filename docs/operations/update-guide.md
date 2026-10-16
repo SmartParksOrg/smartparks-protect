@@ -21,6 +21,16 @@ bash scripts/verify-server.sh
 
 Rollback is the same with the previous tag. A migration that cannot be reversed is called out in the changelog of the release.
 
+## What people see during an update
+
+The playbook raises a flag (`/var/www/protect/updating`) before the containers restart and
+lowers it once the API and the frontend answer again (decision D329). While it is up, and
+whenever a container is down, nginx answers a page load with a small page that says Protect is
+being updated and retries every ten seconds, and an API call with a JSON message and a
+`Retry-After`. A tab that is open shows a bar under the top bar, asks the health endpoint every
+five seconds and refreshes its data when the server is back; nothing typed is lost. By hand,
+`touch /var/www/protect/updating` puts the server in that state and removing the file ends it.
+
 ## Migration 0054 (compression after 90 days)
 
 The update of 2026-10-16 moves the compression window from 7 to 90 days (decision D328) and

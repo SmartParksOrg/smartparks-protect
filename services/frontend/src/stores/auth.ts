@@ -6,7 +6,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import type { User } from "@/api/types";
 
 interface AuthState {
@@ -49,7 +49,14 @@ export const useAuthStore = create<AuthState>()(
         try {
           const user = await api.get<User>("/api/v1/users/me");
           set({ user, status: "authenticated" });
-        } catch {
+        } catch (error) {
+          // only the server's own word ends the session; a server that is being updated or
+          // out of reach (decision D329) keeps the token and is asked again shortly, so a
+          // reload during a deploy does not throw the person to the login page
+          if (error instanceof ApiError && error.status !== 401 && error.status !== 403) {
+            setTimeout(() => void get().loadMe(), 5_000);
+            return;
+          }
           set({ token: null, user: null, status: "expired" });
         }
       },

@@ -2,6 +2,8 @@ import { useTranslation } from "react-i18next";
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router";
 
+import { ServerUnavailableBar } from "@/components/layout/ServerUnavailableBar";
+
 import {
   useAnalysisModules,
   usePermissions,
@@ -22,7 +24,10 @@ export function RequireAuth() {
       void loadMe();
   }, [token, status, loadMe]);
 
-  if (!token || status === "expired" || status === "anonymous") {
+  // a token with the start-up status is a session not loaded yet, not a stranger: the effect
+  // above asks the server, and while the server is being updated (decision D329) the loading
+  // screen says so instead of the login page
+  if (!token || status === "expired") {
     const from = encodeURIComponent(location.pathname + location.search);
     return (
       <Navigate
@@ -32,9 +37,13 @@ export function RequireAuth() {
     );
   }
   if (status === "loading" || !useAuthStore.getState().user) {
+    // the bar says why the loading lasts when the server is being updated (decision D329)
     return (
-      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
-        {t("Loading…")}
+      <div className="flex min-h-dvh flex-col">
+        <ServerUnavailableBar />
+        <div className="flex flex-1 items-center justify-center text-muted-foreground">
+          {t("Loading…")}
+        </div>
       </div>
     );
   }

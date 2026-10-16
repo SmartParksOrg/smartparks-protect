@@ -7,6 +7,7 @@ import logoLandscape from "@/assets/brand/logo-landscape.webp";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { HealthDot } from "@/components/layout/HealthDot";
 import { NewVersionBar } from "@/components/layout/NewVersionBar";
+import { ServerUnavailableBar } from "@/components/layout/ServerUnavailableBar";
 import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
 import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -133,6 +134,8 @@ export function AppLayout() {
         {/* the page is one bundle loaded once, so a tab left open runs through every deploy
             without knowing it (Tim, 2026-09-21); this line says so and offers the reload */}
         <NewVersionBar />
+        {/* and this one says the server is being updated or does not answer (D329) */}
+        <ServerUnavailableBar />
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <Outlet />
         </main>
