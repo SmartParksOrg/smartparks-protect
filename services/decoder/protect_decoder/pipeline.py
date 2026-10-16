@@ -47,7 +47,7 @@ from shared.device_drivers.base import (
     raw_frame,
 )
 from shared.device_drivers.registry import DRIVERS
-from shared.domain.assignments import Attribution, resolve_attribution
+from shared.domain.assignments import Attribution, resolve_attribution, resolve_attributions
 from shared.domain.contacts import (
     HUMAN_PRESENCE_EVENT,
     HUMAN_PRESENCE_METRIC,
@@ -466,12 +466,30 @@ async def process_source_event(
                 step.skip("; ".join(records.notes) or "payload holds no records")
 
         async with tracer.step("decoder", "canonical rows written") as step:
-            attributions: dict[datetime, Attribution] = {}
+            # every record time of the frame in two queries (resolve_attributions); a time
+            # that turns up later (a derived record, a corrected clock) is resolved on its own
+            attributions: dict[datetime, Attribution] = await resolve_attributions(
+                session,
+                device.id,
+                {
+                    r.time
+                    for group in (
+                        records.positions,
+                        records.measurements,
+                        records.states,
+                        records.events,
+                    )
+                    for r in group
+                },
+            )
 
             async def attribution_at(time: datetime) -> Attribution:
                 if time not in attributions:
                     attributions[time] = await resolve_attribution(session, device.id, time)
                 return attributions[time]
+
+            # the deliveries this event already has, read once (a re-decode links no row twice)
+            delivered = await _existing_deliveries(session, event)
 
             # movement from the accelerometer sample of a status message: the change against
             # the sample before it, stored as `activity` (shared/domain/movement.py)
@@ -502,8 +520,12 @@ async def process_source_event(
                         wiring_closed_when_active=closed_when_active(device.attributes),
                         was_closed=previous_closed(before.latest_measurements if before else None),
                     )
-            await _write_positions(session, event, device, records, outcome, attribution_at)
-            await _write_measurements(session, event, device, records, outcome, attribution_at)
+            await _write_positions(
+                session, event, device, records, outcome, attribution_at, delivered
+            )
+            await _write_measurements(
+                session, event, device, records, outcome, attribution_at, delivered
+            )
             await _write_states(session, event, device, records, outcome, attribution_at)
             await _write_events(session, event, device, records, outcome, attribution_at)
             await _write_contacts(session, event, device, records, outcome, attribution_at)
@@ -683,18 +705,16 @@ async def _link_delivery(
     )
 
 
-async def _existing_delivery(
-    session: AsyncSession, event: SourceEvent, canonical_type: str, canonical_id: int
-) -> bool:
-    return (
-        await session.scalar(
-            select(SourceDelivery.id).where(
-                SourceDelivery.canonical_type == canonical_type,
-                SourceDelivery.canonical_id == canonical_id,
-                SourceDelivery.source_event_id == event.id,
+async def _existing_deliveries(session: AsyncSession, event: SourceEvent) -> set[tuple[str, int]]:
+    """The canonical rows this event already delivered, as (type, id), in one query."""
+    rows = (
+        await session.execute(
+            select(SourceDelivery.canonical_type, SourceDelivery.canonical_id).where(
+                SourceDelivery.source_event_id == event.id
             )
         )
-    ) is not None
+    ).all()
+    return {(str(kind), int(identifier)) for kind, identifier in rows}
 
 
 async def _write_positions(
@@ -704,19 +724,43 @@ async def _write_positions(
     records: DecodedRecords,
     outcome: Outcome,
     attribution_at: AttributionAt,
+    delivered: set[tuple[str, int]],
 ) -> None:
-    for record in records.positions:
-        key = canonical_key(device.id, record.time, record.record_type, record.fingerprint)
-        existing = await session.scalar(
-            select(Position).where(Position.canonical_key == key, Position.time == record.time)
-        )
-        if existing is not None:
-            outcome.duplicates += 1
-            if not await _existing_delivery(session, event, "position", existing.id):
-                await _link_delivery(
-                    session, event, "position", existing.id, existing.time, first=False
+    """The frame's positions in a batch (2026-10-16): the rows that exist are read in one
+    query by their canonical keys, the new ones are inserted in one statement and their
+    deliveries in another; a frame's records were written one by one before, two round trips
+    each, which made a card of a month decode for an hour. The outlier check judges a fix
+    against the last valid one before it, in the frame when the frame has one, else in the
+    table (a fix flushed earlier in this transaction counts there too)."""
+    if not records.positions:
+        return
+    keyed = [
+        (record, canonical_key(device.id, record.time, record.record_type, record.fingerprint))
+        for record in records.positions
+    ]
+    existing = {
+        (key, time): (identifier, time)
+        for identifier, time, key in (
+            await session.execute(
+                select(Position.id, Position.time, Position.canonical_key).where(
+                    Position.canonical_key.in_([key for _, key in keyed]),
+                    Position.time.in_([record.time for record, _ in keyed]),
                 )
+            )
+        ).all()
+    }
+    previous_in_frame: tuple[float, float, datetime] | None = None
+    new: list[tuple[Position, Any, Any]] = []  # the row, its record and its attribution
+    seen: set[tuple[str, datetime]] = set()
+    for record, key in sorted(keyed, key=lambda item: item[0].time):
+        found = existing.get((key, record.time))
+        if found is not None or (key, record.time) in seen:
+            outcome.duplicates += 1
+            if found is not None and ("position", found[0]) not in delivered:
+                await _link_delivery(session, event, "position", found[0], found[1], first=False)
+                delivered.add(("position", found[0]))
             continue
+        seen.add((key, record.time))
         attribution = await attribution_at(record.time)
         ahead = _ahead_of_delivery(event, record.time)
         if ahead:
@@ -725,7 +769,11 @@ async def _write_positions(
         attributes = dict(record.attributes)
         outlier = None
         if not ahead and record.record_type not in ESTIMATE_RECORD_TYPES:
-            previous = await _previous_fix(session, device.id, record.time)
+            previous = (
+                previous_in_frame
+                if previous_in_frame is not None and previous_in_frame[2] < record.time
+                else await _previous_fix(session, device.id, record.time)
+            )
             if previous is not None:
                 settings = get_settings()
                 outlier = outlier_of(
@@ -755,28 +803,40 @@ async def _write_positions(
                     longitude=record.longitude,
                 )
             )
-        position = Position(
-            time=record.time,
-            device_id=device.id,
-            project_id=attribution.project_id,
-            entity_id=attribution.entity_id,
-            data_source_id=event.data_source_id,
-            source_event_id=event.id,
-            source_event_ingested_at=event.ingested_at,
-            record_type=record.record_type,
-            canonical_key=key,
-            valid=not ahead and outlier is None,
-            geom=from_shape(Point(record.longitude, record.latitude), srid=4326),
-            altitude_m=record.altitude_m,
-            speed_mps=record.speed_mps,
-            heading_deg=record.heading_deg,
-            accuracy_m=record.accuracy_m,
-            satellites=record.satellites,
-            attributes=attributes,
-            trace_id=event.trace_id,
+        valid = not ahead and outlier is None
+        if valid and record.record_type not in ESTIMATE_RECORD_TYPES:
+            previous_in_frame = (record.latitude, record.longitude, record.time)
+        new.append(
+            (
+                Position(
+                    time=record.time,
+                    device_id=device.id,
+                    project_id=attribution.project_id,
+                    entity_id=attribution.entity_id,
+                    data_source_id=event.data_source_id,
+                    source_event_id=event.id,
+                    source_event_ingested_at=event.ingested_at,
+                    record_type=record.record_type,
+                    canonical_key=key,
+                    valid=valid,
+                    geom=from_shape(Point(record.longitude, record.latitude), srid=4326),
+                    altitude_m=record.altitude_m,
+                    speed_mps=record.speed_mps,
+                    heading_deg=record.heading_deg,
+                    accuracy_m=record.accuracy_m,
+                    satellites=record.satellites,
+                    attributes=attributes,
+                    trace_id=event.trace_id,
+                ),
+                record,
+                attribution,
+            )
         )
-        session.add(position)
-        await session.flush()
+    if not new:
+        return
+    session.add_all([row for row, _, _ in new])
+    await session.flush()
+    for position, record, attribution in new:
         await _link_delivery(session, event, "position", position.id, position.time, first=True)
         outcome.created["positions"] += 1
         if not position.valid:
@@ -1102,8 +1162,13 @@ async def _write_measurements(
     records: DecodedRecords,
     outcome: Outcome,
     attribution_at: AttributionAt,
+    delivered: set[tuple[str, int]],
 ) -> None:
-    created_ids: list[int] = []
+    """The frame's measurements in a batch, as the positions: one lookup, one insert, the
+    deliveries after it. A key that appears twice in one frame is written once."""
+    if not records.measurements:
+        return
+    keyed = []
     for record in records.measurements:
         extra = record.metric_key + (f":{record.fingerprint}" if record.fingerprint else "")
         filed = (
@@ -1111,59 +1176,73 @@ async def _write_measurements(
             if record.device_clock
             else record.time
         )
-        key = canonical_key(device.id, filed, record.record_type, extra)
-        existing = await session.scalar(
-            select(Measurement).where(Measurement.canonical_key == key, Measurement.time == filed)
-        )
-        if existing is not None:
-            outcome.duplicates += 1
-            if not await _existing_delivery(session, event, "measurement", existing.id):
-                await _link_delivery(
-                    session, event, "measurement", existing.id, existing.time, first=False
+        keyed.append((record, canonical_key(device.id, filed, record.record_type, extra), filed))
+    existing = {
+        (key, time): (identifier, time)
+        for identifier, time, key in (
+            await session.execute(
+                select(Measurement.id, Measurement.time, Measurement.canonical_key).where(
+                    Measurement.canonical_key.in_([key for _, key, _ in keyed]),
+                    Measurement.time.in_(sorted({filed for _, _, filed in keyed})),
                 )
+            )
+        ).all()
+    }
+    new: list[Measurement] = []
+    seen: set[tuple[str, datetime]] = set()
+    for record, key, filed in keyed:
+        found = existing.get((key, filed))
+        if found is not None or (key, filed) in seen:
+            outcome.duplicates += 1
+            if found is not None and ("measurement", found[0]) not in delivered:
+                await _link_delivery(session, event, "measurement", found[0], found[1], first=False)
+                delivered.add(("measurement", found[0]))
             continue
+        seen.add((key, filed))
         columns, value_type = _value_columns(record.value)
         await _ensure_metric(session, record.metric_key, value_type)
         # a reading of a scan follows that scan's sightings (D259); everything else keeps the
         # time it was given, because a backfill carries the past on purpose
-        when = filed
-        attribution = await attribution_at(when)
+        attribution = await attribution_at(filed)
         ahead = _ahead_of_delivery(event, record.time)
         if ahead:
             outcome.clock_ahead += 1
             outcome.clock_ahead_seconds = max(outcome.clock_ahead_seconds, ahead)
-        measurement = Measurement(
-            time=when,
-            device_id=device.id,
-            project_id=attribution.project_id,
-            entity_id=attribution.entity_id,
-            data_source_id=event.data_source_id,
-            source_event_id=event.id,
-            source_event_ingested_at=event.ingested_at,
-            metric_key=record.metric_key,
-            canonical_key=key,
-            valid=not ahead,
-            trace_id=event.trace_id,
-            **columns,
+        new.append(
+            Measurement(
+                time=filed,
+                device_id=device.id,
+                project_id=attribution.project_id,
+                entity_id=attribution.entity_id,
+                data_source_id=event.data_source_id,
+                source_event_id=event.id,
+                source_event_ingested_at=event.ingested_at,
+                metric_key=record.metric_key,
+                canonical_key=key,
+                valid=not ahead,
+                trace_id=event.trace_id,
+                **columns,
+            )
         )
-        session.add(measurement)
-        await session.flush()
+    if not new:
+        return
+    session.add_all(new)
+    await session.flush()
+    for measurement in new:
         await _link_delivery(
             session, event, "measurement", measurement.id, measurement.time, first=True
         )
-        outcome.created["measurements"] += 1
-        created_ids.append(measurement.id)
-    if created_ids:
-        outcome.messages.append(
-            (
-                Topic.MEASUREMENT_CREATED,
-                {
-                    "measurement_ids": created_ids,
-                    "device_id": str(device.id),
-                    "source_event_id": event.id,
-                },
-            )
+    outcome.created["measurements"] += len(new)
+    outcome.messages.append(
+        (
+            Topic.MEASUREMENT_CREATED,
+            {
+                "measurement_ids": [m.id for m in new],
+                "device_id": str(device.id),
+                "source_event_id": event.id,
+            },
         )
+    )
 
 
 async def _write_states(
@@ -1174,6 +1253,23 @@ async def _write_states(
     outcome: Outcome,
     attribution_at: AttributionAt,
 ) -> None:
+    if not records.states:
+        return
+    # the moments this device already has a state for, among the frame's, in one query
+    believed = [
+        (_believed_time(event, r.time, records.stored)[0] if r.device_clock else r.time)
+        for r in records.states
+    ]
+    existing_states: set[datetime] = set(
+        (
+            await session.scalars(
+                select(DeviceStateHistory.time).where(
+                    DeviceStateHistory.device_id == device.id,
+                    DeviceStateHistory.time.in_(sorted(set(believed))),
+                )
+            )
+        ).all()
+    )
     for record in records.states:
         # the same correction its sightings get, or one scan lands twice under two times (D259)
         when, behind = (
@@ -1191,14 +1287,10 @@ async def _write_states(
             else record.state
         )
         attribution = await attribution_at(when)
-        exists = await session.scalar(
-            select(DeviceStateHistory.id).where(
-                DeviceStateHistory.device_id == device.id, DeviceStateHistory.time == when
-            )
-        )
-        if exists is not None:
+        if when in existing_states:
             outcome.duplicates += 1
             continue
+        existing_states.add(when)  # the same moment twice in one frame is written once
         row = DeviceStateHistory(
             time=when,
             device_id=device.id,
@@ -1321,6 +1413,21 @@ async def _write_events(
     outcome: Outcome,
     attribution_at: AttributionAt,
 ) -> None:
+    if not records.events:
+        return
+    fingerprints = {
+        id(record): fingerprint([str(device.id), record.time.isoformat(), record.event_type])
+        for record in records.events
+    }
+    existing_events: set[str] = set(
+        (
+            await session.scalars(
+                select(Event.context["dedup"].astext).where(
+                    Event.context["dedup"].astext.in_(sorted(set(fingerprints.values())))
+                )
+            )
+        ).all()
+    )
     for record in records.events:
         attribution = await attribution_at(record.time)
         if attribution.project_id is None:
@@ -1330,13 +1437,11 @@ async def _write_events(
                 event_type=record.event_type,
             )
             continue
-        dedup = fingerprint([str(device.id), record.time.isoformat(), record.event_type])
-        exists = await session.scalar(
-            select(Event.id).where(Event.context["dedup"].astext == dedup)
-        )
-        if exists is not None:
+        dedup = fingerprints[id(record)]
+        if dedup in existing_events:
             outcome.duplicates += 1
             continue
+        existing_events.add(dedup)
         row = Event(
             time=record.time,
             project_id=attribution.project_id,

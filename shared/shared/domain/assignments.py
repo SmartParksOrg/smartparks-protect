@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.models import DeviceEntityAssignment, DeviceProjectAssignment
@@ -45,6 +45,51 @@ async def resolve_attribution(
         )
     )
     return Attribution(project_id=project_id, entity_id=entity_id)
+
+
+def _contains(validity: Any, at: datetime) -> bool:
+    """Whether a `tstzrange` as asyncpg hands it back holds `at` (the assignments use `[)`)."""
+    lower, upper = validity.lower, validity.upper
+    below = lower is not None and (at < lower or (at == lower and not validity.lower_inc))
+    above = upper is not None and (at > upper or (at == upper and not validity.upper_inc))
+    return not below and not above
+
+
+async def resolve_attributions(
+    session: AsyncSession, device_id: uuid.UUID, times: set[datetime]
+) -> dict[datetime, Attribution]:
+    """`resolve_attribution` for many times in two queries: the device's project and entity
+    assignments that overlap the span of the times are read once and each time is placed in
+    memory. A frame of a log file or a card carries dozens of records at distinct times, and
+    two queries per time were a tenth of the decoder's round trips (2026-10-16)."""
+    if not times:
+        return {}
+    for at in times:
+        require_aware(at)
+    earliest, latest = min(times), max(times)
+    span = func.tstzrange(earliest, latest, "[]")
+    projects = (
+        await session.execute(
+            select(DeviceProjectAssignment.project_id, DeviceProjectAssignment.validity).where(
+                DeviceProjectAssignment.device_id == device_id,
+                DeviceProjectAssignment.validity.op("&&")(span),
+            )
+        )
+    ).all()
+    entities = (
+        await session.execute(
+            select(DeviceEntityAssignment.entity_id, DeviceEntityAssignment.validity).where(
+                DeviceEntityAssignment.device_id == device_id,
+                DeviceEntityAssignment.validity.op("&&")(span),
+            )
+        )
+    ).all()
+    result: dict[datetime, Attribution] = {}
+    for at in times:
+        project_id = next((p for p, v in projects if _contains(v, at)), None)
+        entity_id = next((e for e, v in entities if _contains(v, at)), None)
+        result[at] = Attribution(project_id=project_id, entity_id=entity_id)
+    return result
 
 
 async def rewrite_attribution(

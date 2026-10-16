@@ -33,6 +33,25 @@ Grafana is on `http://localhost:3001` (admin / admin, change it). Traces are und
 
 On a server the ports of the collector are bound to localhost only; reach Grafana through an SSH tunnel: `ssh -L 3001:127.0.0.1:3001 <server>`.
 
+## Slow queries
+
+The compose file preloads `pg_stat_statements` and migration 0054 creates the extension, so a
+slow path can be named instead of guessed at (Tim, 2026-10-16: why is the decoder so slow). The
+statements by total time:
+
+```sql
+select calls, round(total_exec_time::numeric / 1000, 1) as total_s,
+       round(mean_exec_time::numeric, 2) as mean_ms, rows,
+       left(regexp_replace(query, '\s+', ' ', 'g'), 120) as query
+from pg_stat_statements
+where dbid = (select oid from pg_database where datname = 'smartparks_protect')
+order by total_exec_time desc limit 20;
+```
+
+`select pg_stat_statements_reset()` starts a fresh count before a measurement. A server that
+started without the preload (an older compose file) has the extension but no counts; restart
+the database container once with the current compose file.
+
 ## Logs
 
 Every service writes one JSON line per event to stdout with `service`, `trace_id` and `request_id`; `docker compose logs -f <service>` follows them and Loki in the observability profile can collect them from Docker. The scheduled backup jobs log to `logs/` in the application directory.

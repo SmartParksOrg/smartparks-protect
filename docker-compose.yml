@@ -28,6 +28,10 @@ services:
       - wal_level=replica
       - -c
       - archive_timeout=900
+      # the image preloads timescaledb and pg_textsearch; pg_stat_statements names a slow
+      # query (migration 0054 creates the extension)
+      - -c
+      - shared_preload_libraries=timescaledb,pg_textsearch,pg_stat_statements
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

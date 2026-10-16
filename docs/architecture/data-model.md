@@ -40,7 +40,7 @@ Schema as of migration 0001, the base every later migration builds on; the head 
 | `gateway_receptions` | `time` | `gateway_id` | none |
 | `device_state_history` | `time` | `device_id` | none |
 
-Chunks are 7 days (30 for state history). Compression starts after 7 days. TimescaleDB does not allow foreign keys to a hypertable, so references from canonical rows to their source event carry `source_event_id` and `source_event_ingested_at` as plain columns.
+Chunks are 7 days (30 for state history). Compression starts after 90 days (decision D328; it was 7 days until migration 0054 of 2026-10-16: a card or a raw log carries weeks of history, and a row written into a chunk already compressed costs a decompression first, which made a month's card decode for an hour). TimescaleDB does not allow foreign keys to a hypertable, so references from canonical rows to their source event carry `source_event_id` and `source_event_ingested_at` as plain columns.
 
 Current state lives in regular tables that are updated in the same transaction as the canonical rows: `device_current_state`, `entity_current_state` and `connectivity_state` (per device and data source).
 

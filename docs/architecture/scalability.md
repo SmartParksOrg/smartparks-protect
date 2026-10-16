@@ -20,7 +20,7 @@ Compressing the chunks older than 200 days by hand (the policy does it after sev
 | measurements (24 chunks) | 2,741 MB | 168 MB | 16.3 |
 | positions (24 chunks) | 674 MB | 65 MB | 10.4 |
 
-At those ratios the full envelope is roughly 40 GB of compressed measurements and 10 GB of positions, plus the recent uncompressed week: five years online on ordinary hardware. Retention exists as a policy only for raw source events (730 days); canonical rows stay.
+At those ratios the full envelope is roughly 40 GB of compressed measurements and 10 GB of positions, plus the recent uncompressed 90 days (decision D328): five years online on ordinary hardware. Retention exists as a policy only for raw source events (730 days); canonical rows stay.
 
 ## Read paths
 
@@ -60,6 +60,6 @@ Until one of them lands, the realtime budget (p95 under 2 seconds from commit) h
 ## What still needs proving
 
 - The benchmark ran at one tenth of the envelope on a laptop and at one fifth on the dev server (decision D91, [benchmarks](../operations/benchmarks.md)): every read path within budget, the decoder path the bottleneck under a burst (15 uplinks per second end to end on 4 vCPU), a direct export at the edge of its budget. The full envelope is extrapolated until a production-sized server exists; the generator writes in time order and compresses behind the write frontier, so the disk holds compressed history plus one block (scale 0.2 took 4.1 hours and 10 GB on disk).
-- Compression was measured by compressing old chunks by hand and, since the 0.2 run, by the generator's `--compress`; the policy job itself (every twelve hours, chunks older than seven days) has not been watched over a full cycle on a long-running stack.
+- Compression was measured by compressing old chunks by hand and, since the 0.2 run, by the generator's `--compress`; the policy job itself (every twelve hours, chunks older than 90 days since 2026-10-16, seven before; chunks older than seven days) has not been watched over a full cycle on a long-running stack.
 - The per-event cost of the decoder path needs profiling before the full envelope is claimed; more decoder replicas are the known remedy.
 - Rules with rolling windows and geofences (phase 5) add the first read path that scans recent history per event; the benchmark gets a case for it then.
