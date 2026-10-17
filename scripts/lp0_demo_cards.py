@@ -4,7 +4,8 @@ one collar with a month of synthetic data, uploaded to a project so the Offload 
 import can be tried before a real card exists.
 
     uv run scripts/lp0_demo_cards.py --project-id <id> --email <ops> --password <secret> \\
-        [--base-url https://dev-protect.smartparks.org] [--days 30] [--seed 42] [--out DIR]
+        [--base-url https://dev-protect.smartparks.org] [--days 30] [--until YYYY-MM-DD] \\
+        [--seed 42] [--out DIR]
 
 What it makes: three RangerEdge stations (SP05xxxx) standing around a pygmy hippo's range in the
 Gola Rainforest, each an Offload station entity with its place and its own LP0 credentials, and
@@ -15,7 +16,11 @@ LP0 v5 files (the `lp0` object, ordinary LoRaWAN frames under each device's own 
 counter that wraps once in the month) in `LOG_N` folders, one zip per station, uploaded on the
 station's device. Keys are synthetic, derived from the seed, and never printed. A re-run finds
 the devices by serial and the server refuses a file it already holds, so nothing doubles.
-With `--out` the zips are written there and nothing is uploaded.
+With `--out` the zips are written there, and beside each zip the card's own layout (a folder per
+station with its `LOG_N` folders) for an SD card or Protect Go's folder picker, and nothing is
+uploaded. The data ends at the run's hour unless `--until` names a day (the data then ends at
+00:00 UTC of that day), so a second set for the same stations can cover another period and is
+new to the server rather than a day-shifted copy of the first.
 """
 
 import argparse
@@ -202,9 +207,11 @@ def walk(
     return fixes
 
 
-def generate(days: int, seed: int) -> tuple[list[Station], Credentials, datetime, datetime]:
+def generate(
+    days: int, seed: int, until: datetime | None = None
+) -> tuple[list[Station], Credentials, datetime, datetime]:
     rng = random.Random(seed)
-    end = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    end = until or datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
     start = end - timedelta(days=days)
     stations = [
         Station(name=name, eui=eui, place=place, credentials=keys_for(seed, eui))
@@ -484,10 +491,17 @@ def main() -> None:
     parser.add_argument("--email")
     parser.add_argument("--password")
     parser.add_argument("--days", type=int, default=30)
+    parser.add_argument(
+        "--until",
+        type=lambda s: datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=UTC),
+        help="the day the data ends at (00:00 UTC); default: the hour of the run",
+    )
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--out", type=Path, help="write the zips here and upload nothing")
+    parser.add_argument(
+        "--out", type=Path, help="write the zips and the cards' folders here and upload nothing"
+    )
     args = parser.parse_args()
-    stations, collar, start, end = generate(args.days, args.seed)
+    stations, collar, start, end = generate(args.days, args.seed, args.until)
     print(f"{args.days} days, {start:%Y-%m-%d %H:%M} to {end:%Y-%m-%d %H:%M} UTC")
     for station in stations:
         own = sum(1 for f in station.frames if f.source_eui == station.eui)
@@ -498,9 +512,14 @@ def main() -> None:
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
         for station in stations:
+            card = card_zip(station)
             path = args.out / f"{station.name}-card.zip"
-            path.write_bytes(card_zip(station))
-            print(f"wrote {path} ({path.stat().st_size} bytes)")
+            path.write_bytes(card)
+            folder = args.out / f"{station.name}-card"
+            with zipfile.ZipFile(io.BytesIO(card)) as archive:
+                archive.extractall(folder)
+            files = sum(1 for _ in folder.rglob("*.jsonl"))
+            print(f"wrote {path} ({path.stat().st_size} bytes) and {folder}/ ({files} files)")
         return
     if not (args.project_id and args.email and args.password):
         sys.exit("--project-id, --email and --password are needed to upload (or use --out)")

@@ -170,7 +170,10 @@ are unknown, never false.
 ## Demo data
 
 `uv run scripts/lp0_demo_cards.py --project-id <id> --email <ops> --password <secret>` fills a
-project with a month of synthetic LP0 traffic to try the page and the import before a real card
+project with a month of synthetic LP0 traffic (`--days`; `--until YYYY-MM-DD` ends the data at
+that day instead of the run's hour, so a second set covers another period and is new to the
+server; `--out DIR` writes the zips and the cards' folders for Protect Go or an SD card instead
+of uploading) to try the page and the import before a real card
 exists (Tim, 2026-10-16): three RangerEdge stations (SP050101 to SP050103) around a pygmy hippo's
 range in the Gola Rainforest, each an Offload station entity with its place and its own LP0
 credentials, and a CollarEdge (SP100001) on a hippo entity. The collar fixes every 15 minutes
