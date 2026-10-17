@@ -4657,10 +4657,11 @@ export interface paths {
         /**
          * Request Field Map
          * @description Ask for the project's offline map (phase 43 P3): the export worker cuts the area, with
-         *     a margin, from the newest Protomaps planet build. One job per project at a time; a map
-         *     younger than a month that covers the area is kept unless `force`. The area is the extent of
-         *     the project's features, entity places and device places, so a project with none yet has no
-         *     map to cut.
+         *     a margin, from the newest Protomaps planet build. A file made for a member, so the
+         *     permission is the exports' (`exports:create`: analysts and admins); every member downloads
+         *     it. One job per project at a time; a map younger than a month that covers the area is kept
+         *     unless `force`. The area is the extent of the project's features, entity places and device
+         *     places, so a project with none yet has no map to cut.
          */
         post: operations["request_field_map_api_v1_projects__project_id__field_bundle_map_post"];
         delete?: never;
