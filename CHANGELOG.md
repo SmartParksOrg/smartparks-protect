@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- One decode path for an offload station's frame, shared with Protect Field (phase 43 P6): `shared/station_decode.py` opens a frame with the tracker's keys, refuses it with the codes and words the trace carries, and has the driver read the records; the pipeline uses it, and a test decodes a frame both ways and compares the positions.
+
 - The offline map for Protect Field (phase 43 P3): `POST /projects/{id}/field-bundle/map` has the export worker cut the project's area, with a margin, from the newest Protomaps planet build with `pmtiles extract`, kept in MinIO; `GET` streams the PMTiles file once ready. Migration 0055, the `map-extracts` bucket, go-pmtiles in the Python image. Tiles by Protomaps from OpenStreetMap.
 
 - "Field for the laptop" on the Offload page (decision D332): the installer of Protect Field for the computer you are on, this server's address to give Field at its first start, and "Open Field", which opens an installed Field connected to this server. Field is the separate program that reads a station's card where there is no connection.

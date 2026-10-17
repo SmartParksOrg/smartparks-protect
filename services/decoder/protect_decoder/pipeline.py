@@ -601,9 +601,8 @@ async def _unwrap_lp0(
     meta = dict(event.provider_metadata or {})
     if "frame_hex" in meta:
         return lorawan_frame(payload, meta)
-    from shared.connectivity.adapters.lp0_station import FrameError, Lp0StationAdapter
-    from shared.connectivity.adapters.lp0_station.lorawan import parse_uplink
     from shared.domain.lp0 import device_eui
+    from shared.station_decode import FrameRefused, frame_metadata, unwrap_station_frame
 
     rxpk = payload.get("rxpk") if isinstance(payload, dict) else None
     data = rxpk.get("data") if isinstance(rxpk, dict) else None
@@ -616,56 +615,32 @@ async def _unwrap_lp0(
             component="decoder",
         ) from None
     credentials = await credentials_for(session, device.id)
-    if credentials is None:
-        raise ApplicationError(
-            code=ErrorCode.CREDENTIALS_MISSING,
-            message=f"{device.name} has no LP0 keys; set the address and keys on the device, "
-            "then decode again",
-            component="decoder",
-            retryable=False,
-            user_actionable=True,
-        )
     claimed = meta.get("source_eui")
-    if claimed:
-        known = await device_eui(session, device)
-        if known is not None and str(claimed).upper() != known:
-            raise ApplicationError(
-                code=ErrorCode.DEVICE_IDENTITY_AMBIGUOUS,
-                message=f"the station says the frame is from tracker {claimed}, but address "
-                f"{meta.get('dev_addr')} belongs to {device.name} ({known}); check the "
-                "device's LP0 address and keys, or its serial, then decode again",
-                component="decoder",
-                retryable=False,
-                user_actionable=True,
-            )
     version = meta.get("lp0_version")
     try:
-        unwrapped = Lp0StationAdapter.unwrap_frame(
+        # the checks and the opening are shared with Protect Field (phase 43 P6)
+        frame = unwrap_station_frame(
             phy,
             credentials,
-            last_f_cnt=await last_counter(session, device.id),
+            device_name=device.name,
+            device_eui=await device_eui(session, device) if claimed else None,
+            source_eui=str(claimed) if claimed else None,
             lp0_version=int(version) if version is not None else None,
+            last_f_cnt=await last_counter(session, device.id),
         )
-    except FrameError as exc:
+    except FrameRefused as exc:
         raise ApplicationError(
-            code=ErrorCode.PAYLOAD_DECODE_FAILED,
-            message=str(exc),
+            code=exc.code,
+            message=exc.message,
             component="decoder",
             retryable=False,
-            user_actionable=True,
+            user_actionable=exc.user_actionable,
         ) from None
-    uplink = parse_uplink(phy)
-    await remember_counter(session, device.id, unwrapped.f_cnt, event.network_received_at)
-    meta.update(
-        frame_hex=unwrapped.payload.hex(),
-        f_port=unwrapped.f_port,
-        f_cnt=uplink.f_cnt,
-        f_cnt32=unwrapped.f_cnt,
-        mic_ok=True,
-    )
+    await remember_counter(session, device.id, frame.f_cnt, event.network_received_at)
+    meta.update(frame_metadata(frame))
     event.provider_metadata = meta
-    step.metadata.update(unwrapped=True, f_cnt=unwrapped.f_cnt, f_port=unwrapped.f_port)
-    return unwrapped.payload, unwrapped.f_port
+    step.metadata.update(unwrapped=True, f_cnt=frame.f_cnt, f_port=frame.f_port)
+    return frame.payload, frame.f_port
 
 
 def _summarize(outcome: Outcome, records: DecodedRecords) -> None:

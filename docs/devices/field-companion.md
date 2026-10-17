@@ -19,6 +19,8 @@ The Offload page's "Field for the laptop" button opens a card that gets a person
 
 Every download is an audit log entry (`project.field_bundle_downloaded`) with how many devices, stations and keys it carried. The caller's visibility applies as everywhere: a member limited to some groups gets those groups' devices.
 
+**The decode path**, `shared/station_decode.py`: `unwrap_station_frame` opens a frame with the tracker's keys and refuses it with the same code and words the server's trace carries (no keys, a station naming another tracker than the address belongs to, an LP0 metadata version this code does not read, a frame that does not verify); `decode_station_frame` has the device's driver read the records exactly as the pipeline has it read them. The pipeline calls the same two functions, and a test decodes one frame both ways and compares the positions, so Field's reading of a card and Protect's cannot drift.
+
 **The parser**, `shared/station_files.py`: the module that reads a station's files and unpacks a card's zip, with no database, broker or settings import, so Field reads a card on a laptop with the same code the file worker runs on the server. Field installs Protect's `shared` package pinned to a commit and imports this module, the LP0 codec and the OpenCollar driver.
 
 ## The offline map

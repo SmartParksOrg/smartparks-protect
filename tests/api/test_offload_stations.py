@@ -11,11 +11,13 @@ import zipfile
 
 import pytest
 import pytest_asyncio
+from geoalchemy2.shape import to_shape
 from sqlalchemy import select
 
 from protect_decoder.pipeline import process_source_event
 from shared.bus import RedisStreamsBus, Topic
 from shared.connectivity.adapters.lp0_station import SOURCE_ID as LP0_SOURCE_ID
+from shared.device_drivers.opencollar import OpenCollarDriver
 from shared.enums import AcquisitionChannel, Role
 from shared.ingest import commit_and_publish, store_inbound
 from shared.models import (
@@ -30,6 +32,8 @@ from shared.models import (
     SourceDelivery,
     SourceEvent,
 )
+from shared.station_decode import decode_station_frame, unwrap_station_frame
+from shared.timeutil import utc_now
 from tests.api.conftest import actor, create_project, project_actor
 from tests.api.test_ingest_and_attention import _decode_pending
 from tests.api.test_log_files_api import _decode
@@ -302,6 +306,29 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
         await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tracker_a["id"])))
     ).all()
     assert len(positions) == 3
+    # the same frame through the shared decode path gives the same records (phase 43 P6):
+    # Protect Field decodes a card on a laptop with these two calls and nothing else
+    opened = unwrap_station_frame(
+        frames[0],
+        KEYS_A,
+        device_name="a",
+        device_eui=None,
+        source_eui=None,
+        lp0_version=None,
+        last_f_cnt=None,
+    )
+    shared_records = decode_station_frame(
+        OpenCollarDriver(),
+        opened,
+        document=json.loads(line(frames[0])),
+        received_at=None,
+        fallback_time=utc_now(),
+        firmware_version=None,
+    )
+    assert sorted(p.time for p in shared_records.positions) == sorted(p.time for p in positions)
+    assert sorted(
+        (round(p.latitude, 5), round(p.longitude, 5)) for p in shared_records.positions
+    ) == sorted((round(to_shape(p.geom).y, 5), round(to_shape(p.geom).x, 5)) for p in positions)
     # the newest verified counter is kept per device (firmware issue 772: a frame carries 16
     # bits of it; the next one is read in the right half)
     from shared.models import DeviceLp0Credentials
