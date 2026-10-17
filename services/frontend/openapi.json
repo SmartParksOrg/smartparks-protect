@@ -227,6 +227,75 @@
     }
    }
   },
+  "/api/v1/auth/go-handoff": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Issue Handoff Code",
+    "description": "A one-time code for the signed-in person, for the `protect-go://connect` link.",
+    "operationId": "issue_handoff_code_api_v1_auth_go_handoff_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HandoffCode"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/auth/go-handoff/exchange": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Exchange Handoff Code",
+    "description": "The code for Protect Go's token; a code is good once, for two minutes, for the account it\nwas issued to while that account is active.",
+    "operationId": "exchange_handoff_code_api_v1_auth_go_handoff_exchange_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/HandoffExchange"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TokenResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/users/me": {
    "get": {
     "tags": [
@@ -35509,6 +35578,40 @@
     },
     "type": "object",
     "title": "HTTPValidationError"
+   },
+   "HandoffCode": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "expires_in": {
+      "type": "integer",
+      "title": "Expires In"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "expires_in"
+    ],
+    "title": "HandoffCode"
+   },
+   "HandoffExchange": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "maxLength": 128,
+      "minLength": 16,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Code"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code"
+    ],
+    "title": "HandoffExchange"
    },
    "HealthResponse": {
     "properties": {

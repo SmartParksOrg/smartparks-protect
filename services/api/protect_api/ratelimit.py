@@ -1,7 +1,8 @@
 """Application-level throttling of the calls an unauthenticated party can make (decision D94):
-login, password reset, registration and OAuth token exchange per client address, webhook posts
-per data source, AI actions per client address. Holds without nginx; nginx keeps its own,
-usually stricter, limits on deployed servers. Answers 429 with `Retry-After`."""
+login, password reset, registration, OAuth token exchange and Protect Go's code exchange per
+client address, webhook posts per data source, AI actions per client address. Holds without
+nginx; nginx keeps its own, usually stricter, limits on deployed servers. Answers 429 with
+`Retry-After`."""
 
 import json
 import re
@@ -27,7 +28,10 @@ RULES: tuple[Rule, ...] = (
     Rule(
         "auth",
         frozenset({"POST"}),
-        re.compile(r"^/api/v1/(auth/(login|register|forgot-password|reset-password)|oauth/token)$"),
+        re.compile(
+            r"^/api/v1/(auth/(login|register|forgot-password|reset-password|go-handoff/exchange)"
+            r"|oauth/token)$"
+        ),
         lambda s: s.rate_limit_auth_per_minute,
         "client",
     ),

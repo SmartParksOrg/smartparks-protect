@@ -21,7 +21,7 @@
   "; curated: {{fields}}": "; curated: {{fields}}",
   "; marked invalid": "; marked invalid",
   ". Created {{time}}": ". Created {{time}}",
-  "\"Open Protect Go\" starts the installed app with this server filled in; it does nothing until the app is installed. Then sign in with your Protect email and password.": "\"Open Protect Go\" starts the installed app with this server filled in; it does nothing until the app is installed. Then sign in with your Protect email and password.",
+  "\"Open Protect Go\" starts the installed app connected to this server and signed in as you, for a few weeks; it does nothing until the app is installed. The address above is for typing it in by hand.": "\"Open Protect Go\" starts the installed app connected to this server and signed in as you, for a few weeks; it does nothing until the app is installed. The address above is for typing it in by hand.",
   "\"Recompute attribution\" on the device page's Data tab runs it again.": "\"Recompute attribution\" on the device page's Data tab runs it again.",
   "({{count}} failed)_one": "({{count}} failed)",
   "({{count}} failed)_other": "({{count}} failed)",

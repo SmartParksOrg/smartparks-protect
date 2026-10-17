@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- Protect Go signed in from the Offload page (decision D333): "Open Protect Go" mints a one-time code (`POST /api/v1/auth/go-handoff`) and hands it to the installed app in the `protect-go://connect` link; the app exchanges it once (`POST /api/v1/auth/go-handoff/exchange`, throttled like the login) for a token that lasts `GO_TOKEN_LIFETIME_DAYS` (30), so nobody types the server address or the password on the laptop. Both ends are audited; the code lives two minutes in Redis under its hash.
 - One decode path for an offload station's frame, shared with Protect Go (phase 43 P6): `shared/station_decode.py` opens a frame with the tracker's keys, refuses it with the codes and words the trace carries, and has the driver read the records; the pipeline uses it, and a test decodes a frame both ways and compares the positions.
 
 - The offline map for Protect Go (phase 43 P3): `POST /projects/{id}/field-bundle/map` has the export worker cut the project's area, with a margin, from the newest Protomaps planet build with `pmtiles extract`, kept in MinIO; `GET` streams the PMTiles file once ready. Migration 0055, the `map-extracts` bucket, go-pmtiles in the Python image. Tiles by Protomaps from OpenStreetMap.

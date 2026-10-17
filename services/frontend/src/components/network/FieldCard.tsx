@@ -1,6 +1,9 @@
 import { useTranslation } from "react-i18next";
+import { useMutation } from "@tanstack/react-query";
 import { Copy, Download, ExternalLink, Laptop } from "lucide-react";
 import { toast } from "sonner";
+
+import { api } from "@/api/client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +14,23 @@ import { detectSystem, FIELD_GUIDE_URL, fieldConnectLink, fieldInstallers } from
  * install starts here, users are not technical; named Protect Go the same day). The installer
  * for the visitor's system first, the others behind it, the server address to type during the
  * app's setup with a copy button, and "Open Protect Go", which an installed app answers to with
- * this server filled in; a browser with no app installed does nothing with the link, which the
- * hint says.
+ * this server filled in and signed in: the button first asks the server for a one-time code
+ * (decision D333), which the app exchanges for a sign-in of its own, so nobody types the address
+ * or the password on the laptop; a browser with no app installed does nothing with the link,
+ * which the hint says.
  */
 export function FieldCard() {
   const { t } = useTranslation();
   const system = typeof navigator === "undefined" ? null : detectSystem(navigator.userAgent);
   const [first, ...others] = fieldInstallers(system);
   const server = typeof window === "undefined" ? "" : window.location.origin;
+  const open = useMutation({
+    mutationFn: () => api.post<{ code: string; expires_in: number }>("/api/v1/auth/go-handoff"),
+    onSuccess: ({ code }) => {
+      window.location.href = `${fieldConnectLink(server)}&code=${encodeURIComponent(code)}`;
+    },
+    onError: (error) => toast.error(error.message),
+  });
   return (
     <Card>
       <CardHeader>
@@ -71,14 +83,12 @@ export function FieldCard() {
             >
               <Copy className="size-4" />
             </Button>
-            <Button asChild variant="outline" size="sm">
-              <a href={fieldConnectLink(server)}>
-                <ExternalLink className="size-4" /> {t("Open Protect Go")}
-              </a>
+            <Button type="button" variant="outline" size="sm" disabled={open.isPending} onClick={() => open.mutate()}>
+              <ExternalLink className="size-4" /> {t("Open Protect Go")}
             </Button>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            {t("\"Open Protect Go\" starts the installed app with this server filled in; it does nothing until the app is installed. Then sign in with your Protect email and password.")}
+            {t("\"Open Protect Go\" starts the installed app connected to this server and signed in as you, for a few weeks; it does nothing until the app is installed. The address above is for typing it in by hand.")}
           </p>
         </div>
         <p className="text-xs text-muted-foreground">

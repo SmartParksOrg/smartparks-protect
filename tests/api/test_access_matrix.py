@@ -24,6 +24,7 @@ OPEN = {
     ("POST", "/api/v1/auth/forgot-password"),
     ("POST", "/api/v1/auth/reset-password"),
     ("GET", "/api/v1/auth/invitation"),
+    ("POST", "/api/v1/auth/go-handoff/exchange"),
     ("POST", "/api/v1/ingest/http/{data_source_id}"),
 }
 # Paths only server admins may use, by prefix.

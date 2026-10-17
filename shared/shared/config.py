@@ -41,6 +41,12 @@ class Settings(BaseSettings):
 
     jwt_secret: str = Field(min_length=32, description="At least 32 bytes, RFC 7518 3.2")
     jwt_lifetime_seconds: int = 3600
+    go_token_lifetime_days: int = Field(
+        default=30, description="Life of the token Protect Go receives from a handoff (D333)"
+    )
+    go_handoff_ttl_seconds: int = Field(
+        default=120, description="Seconds a one-time code for Protect Go stays good (D333)"
+    )
     cors_origins: str = "http://localhost:3000"
     maptiler_key: str | None = Field(
         default=None,

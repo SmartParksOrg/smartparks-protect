@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
+from protect_api.auth.go_handoff import router as go_handoff_router
 from protect_api.auth.manager import UserManager
 from protect_api.auth.schemas import (
     ChangePasswordRequest,
@@ -36,6 +37,7 @@ log = get_logger("api.auth")
 router = APIRouter()
 router.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/auth", tags=["auth"])
 router.include_router(fastapi_users.get_reset_password_router(), prefix="/auth", tags=["auth"])
+router.include_router(go_handoff_router, prefix="/auth", tags=["auth"])
 router.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate), prefix="/users", tags=["users"]
 )

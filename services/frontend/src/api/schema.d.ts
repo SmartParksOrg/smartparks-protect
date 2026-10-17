@@ -89,6 +89,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/go-handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Handoff Code
+         * @description A one-time code for the signed-in person, for the `protect-go://connect` link.
+         */
+        post: operations["issue_handoff_code_api_v1_auth_go_handoff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/go-handoff/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange Handoff Code
+         * @description The code for Protect Go's token; a code is good once, for two minutes, for the account it
+         *     was issued to while that account is active.
+         */
+        post: operations["exchange_handoff_code_api_v1_auth_go_handoff_exchange_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/me": {
         parameters: {
             query?: never;
@@ -10044,6 +10085,18 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HandoffCode */
+        HandoffCode: {
+            /** Code */
+            code: string;
+            /** Expires In */
+            expires_in: number;
+        };
+        /** HandoffExchange */
+        HandoffExchange: {
+            /** Code */
+            code: string;
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -14459,6 +14512,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_handoff_code_api_v1_auth_go_handoff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffCode"];
+                };
+            };
+        };
+    };
+    exchange_handoff_code_api_v1_auth_go_handoff_exchange_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffExchange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
                 };
             };
             /** @description Validation Error */

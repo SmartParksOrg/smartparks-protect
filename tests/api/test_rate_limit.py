@@ -49,6 +49,8 @@ def test_rules_cover_the_unauthenticated_surface():
     assert ratelimit.match("POST", "/api/v1/auth/login").name == "auth"
     assert ratelimit.match("POST", "/api/v1/oauth/token").name == "auth"
     assert ratelimit.match("POST", "/api/v1/auth/forgot-password").name == "auth"
+    assert ratelimit.match("POST", "/api/v1/auth/go-handoff/exchange").name == "auth"
+    assert ratelimit.match("POST", "/api/v1/auth/go-handoff") is None  # behind a login
     assert ratelimit.match("POST", "/api/v1/ingest/http/abc").name == "ingest"
     assert ratelimit.match("POST", "/api/v1/mcp/actions").name == "actions"
     assert ratelimit.match("GET", "/api/v1/auth/login") is None
