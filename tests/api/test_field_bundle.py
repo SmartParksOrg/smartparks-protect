@@ -90,6 +90,11 @@ async def test_bundle_carries_the_project_with_keys_for_those_who_may_set_them(c
         and by_id[station["id"]]["dev_eui"] == STATION_EUI
     )
     (listed,) = [s for s in bundle["stations"] if s["device_id"] == station["id"]]
+    # the metric registry rides along, so the app names and units the values (D334)
+    assert bundle["metrics"] and all(
+        m["key"] and m["label"] and m["value_type"] and m["category"] for m in bundle["metrics"]
+    )
+    assert [m["key"] for m in bundle["metrics"]] == sorted(m["key"] for m in bundle["metrics"])
     assert listed["station_eui"] == STATION_EUI
     assert listed["geometry"]["coordinates"] == [-11.3, -7.75]
     assert entity["id"] in {e["id"] for e in bundle["entities"]}

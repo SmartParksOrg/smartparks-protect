@@ -15,6 +15,7 @@ The Offload page's "Protect Go, the app for the laptop" button opens a card that
 - each tracker's LP0 address, and its two session keys when the caller may set keys in this project (device control in the project, or a server admin, the rule of the device page's credentials card); a viewer gets the address and `keys_set` and no key;
 - the entities those devices track, with type and icon and a place set by hand;
 - the offload stations with their EUI and where they stand;
+- the metric registry (key, label, unit, value type, category, description; decision D334), so the app's Data explorer names and units the values it decodes as Protect does;
 - the project's area: the bounding box of its features, its entities' places and its devices' places, which Protect Go cuts its offline map for.
 
 Every download is an audit log entry (`project.field_bundle_downloaded`) with how many devices, stations and keys it carried. The caller's visibility applies as everywhere: a member limited to some groups gets those groups' devices.

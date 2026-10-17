@@ -6,6 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- The field bundle carries the metric registry (decision D334: key, label, unit, value type, category, description), so Protect Go's Data explorer names and units the values it decodes as Protect does (Tim, 2026-10-17).
 - `scripts/lp0_demo_cards.py` takes `--until YYYY-MM-DD` (the day the data ends at, so a second set for the same stations covers another period) and, with `--out`, writes each card's folder layout beside its zip for an SD card or Protect Go's folder picker (Tim, 2026-10-17: test files for the Protect Go app).
 - Protect Go signed in from the Offload page (decision D333): "Open Protect Go" mints a one-time code (`POST /api/v1/auth/go-handoff`) and hands it to the installed app in the `protect-go://connect` link; the app exchanges it once (`POST /api/v1/auth/go-handoff/exchange`, throttled like the login) for a token that lasts `GO_TOKEN_LIFETIME_DAYS` (30), so nobody types the server address or the password on the laptop. Both ends are audited; the code lives two minutes in Redis under its hash.
 - One decode path for an offload station's frame, shared with Protect Go (phase 43 P6): `shared/station_decode.py` opens a frame with the tracker's keys, refuses it with the codes and words the trace carries, and has the driver read the records; the pipeline uses it, and a test decodes a frame both ways and compares the positions.

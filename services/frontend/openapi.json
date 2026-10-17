@@ -34578,6 +34578,14 @@
       "type": "array",
       "title": "Devices"
      },
+     "metrics": {
+      "items": {
+       "$ref": "#/components/schemas/FieldMetric"
+      },
+      "type": "array",
+      "title": "Metrics",
+      "description": "The metric registry: key, label, unit, type"
+     },
      "entities": {
       "items": {
        "$ref": "#/components/schemas/FieldEntity"
@@ -34952,6 +34960,57 @@
     },
     "type": "object",
     "title": "FieldMapRequest"
+   },
+   "FieldMetric": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "unit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit"
+     },
+     "value_type": {
+      "type": "string",
+      "title": "Value Type"
+     },
+     "category": {
+      "type": "string",
+      "title": "Category"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "value_type",
+     "category"
+    ],
+    "title": "FieldMetric",
+    "description": "A metric's definition from Protect's registry, so Protect Go names and units the values\nit decodes as Protect does (decision D334)."
    },
    "FieldProject": {
     "properties": {

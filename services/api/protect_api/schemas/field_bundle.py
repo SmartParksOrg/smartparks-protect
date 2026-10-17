@@ -75,6 +75,18 @@ class FieldStation(BaseModel):
     )
 
 
+class FieldMetric(BaseModel):
+    """A metric's definition from Protect's registry, so Protect Go names and units the values
+    it decodes as Protect does (decision D334)."""
+
+    key: str
+    label: str
+    unit: str | None = None
+    value_type: str
+    category: str
+    description: str | None = None
+
+
 class FieldMapRead(BaseModel):
     """The project's offline map (phase 43 P3): a PMTiles extract of the area with a margin,
     cut from a Protomaps planet build; `ready` means `GET /projects/{id}/field-bundle/map`
@@ -118,5 +130,8 @@ class FieldBundleRead(BaseModel):
         description="The caller may see keys, so every tracker with keys carries them"
     )
     devices: list[FieldDevice] = Field(default_factory=list)
+    metrics: list[FieldMetric] = Field(
+        default_factory=list, description="The metric registry: key, label, unit, type"
+    )
     entities: list[FieldEntity] = Field(default_factory=list)
     stations: list[FieldStation] = Field(default_factory=list)

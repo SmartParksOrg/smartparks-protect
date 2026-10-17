@@ -28,6 +28,7 @@ from protect_api.schemas.field_bundle import (
     FieldLp0,
     FieldMapRead,
     FieldMapRequest,
+    FieldMetric,
     FieldProject,
     FieldStation,
 )
@@ -46,6 +47,7 @@ from shared.models import (
     Feature,
     Gateway,
     MapExtract,
+    Metric,
 )
 from shared.permissions import Permission
 from shared.storage import stream_object
@@ -234,6 +236,9 @@ async def field_bundle(
     )
 
     map_row = await session.get(MapExtract, context.project.id)
+    # the metric registry is shared by every project and small; the app names and units the
+    # values it decodes with it (decision D334)
+    metric_rows = (await session.scalars(select(Metric).order_by(Metric.key))).all()
     await record_audit(
         session,
         user=context.user,
@@ -271,6 +276,17 @@ async def field_bundle(
             for entity, key, label, geometry in entity_rows
         ],
         stations=stations,
+        metrics=[
+            FieldMetric(
+                key=m.key,
+                label=m.label,
+                unit=m.unit,
+                value_type=m.value_type,
+                category=m.category,
+                description=m.description,
+            )
+            for m in metric_rows
+        ],
     )
 
 

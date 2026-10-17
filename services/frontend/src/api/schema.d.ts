@@ -9744,6 +9744,11 @@ export interface components {
             credentials_included: boolean;
             /** Devices */
             devices?: components["schemas"]["FieldDevice"][];
+            /**
+             * Metrics
+             * @description The metric registry: key, label, unit, type
+             */
+            metrics?: components["schemas"]["FieldMetric"][];
             /** Entities */
             entities?: components["schemas"]["FieldEntity"][];
             /** Stations */
@@ -9881,6 +9886,25 @@ export interface components {
              * @default false
              */
             force: boolean;
+        };
+        /**
+         * FieldMetric
+         * @description A metric's definition from Protect's registry, so Protect Go names and units the values
+         *     it decodes as Protect does (decision D334).
+         */
+        FieldMetric: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit?: string | null;
+            /** Value Type */
+            value_type: string;
+            /** Category */
+            category: string;
+            /** Description */
+            description?: string | null;
         };
         /** FieldProject */
         FieldProject: {
