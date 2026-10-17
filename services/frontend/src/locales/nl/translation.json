@@ -3148,12 +3148,16 @@
   "The server does not answer at the moment. The page checks every few seconds.": "De server antwoordt op dit moment niet. De pagina controleert het om de paar seconden.",
   "(moved back for the history this file brought)": "(teruggezet voor de geschiedenis die dit bestand bracht)",
   "On its entity since": "Op zijn entiteit sinds",
-  "Protect Go, the app for the laptop": "Protect Go, de app voor de laptop",
   "Open Protect Go": "Protect Go openen",
   "Reads a station's SD card where there is no connection and uploads the files here when you are back online.": "Leest de SD-kaart van een station waar geen verbinding is en uploadt de bestanden hierheen zodra je weer online bent.",
   "Install for {{system}}": "Installeren voor {{system}}",
   "Installed already? Open it: it connects to this server and signs you in. Not yet? Install it, then open it from here.": "Al geïnstalleerd? Open de app: ze verbindt met deze server en meldt je aan. Nog niet? Installeer de app en open ze daarna vanaf hier.",
   "Guide": "Handleiding",
   "Files": "Bestanden",
-  "Every file uploaded for the project's devices: the SD card files of the offload stations, the raw logs and the browser syncs, newest first. A click on a file opens its properties; the device's name opens its page, where files are uploaded.": "Elk bestand dat voor de apparaten van het project is geüpload: de SD-kaartbestanden van de offload-stations, de ruwe logs en de browsersynchronisaties, nieuwste eerst. Een klik op een bestand opent de eigenschappen; de naam van het apparaat opent zijn pagina, waar bestanden worden geüpload."
+  "Every file uploaded for the project's devices: the SD card files of the offload stations, the raw logs and the browser syncs, newest first. A click on a file opens its properties; the device's name opens its page, where files are uploaded.": "Elk bestand dat voor de apparaten van het project is geüpload: de SD-kaartbestanden van de offload-stations, de ruwe logs en de browsersynchronisaties, nieuwste eerst. Een klik op een bestand opent de eigenschappen; de naam van het apparaat opent zijn pagina, waar bestanden worden geüpload.",
+  "{{count}} loaded_one": "{{count}} geladen",
+  "{{count}} loaded_other": "{{count}} geladen",
+  "Load {{count}} more_one": "Nog {{count}} laden",
+  "Load {{count}} more_other": "Nog {{count}} laden",
+  "Protect Go": "Protect Go"
 }

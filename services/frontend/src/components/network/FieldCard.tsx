@@ -33,7 +33,7 @@ export function FieldCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Laptop className="size-4" /> {t("Protect Go, the app for the laptop")}
+          <Laptop className="size-4" /> {t("Protect Go")}
         </CardTitle>
         <CardDescription>
           {t("Reads a station's SD card where there is no connection and uploads the files here when you are back online.")}

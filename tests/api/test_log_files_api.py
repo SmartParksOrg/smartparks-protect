@@ -103,6 +103,35 @@ async def test_upload_list_download_and_redecode(client, db, bus):
     # the project's files in one place, each with its device's name (Tim, 2026-10-17)
     across = (await client.get(f"/api/v1/projects/{project.id}/log-files", headers=h)).json()
     assert any(f["id"] == row["id"] and f["device_name"] == device["name"] for f in across)
+    # a page at a time, newest first; `before` the last row's upload time fetches the next
+    first_page = (
+        await client.get(f"/api/v1/projects/{project.id}/log-files", params={"limit": 1}, headers=h)
+    ).json()
+    assert len(first_page) == 1 and first_page[0]["id"] == across[0]["id"]
+    next_page = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/log-files",
+            params={"limit": 1, "before": first_page[0]["uploaded_at"]},
+            headers=h,
+        )
+    ).json()
+    assert [f["id"] for f in next_page] == [f["id"] for f in across[1:2]]
+    one_device = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/log-files",
+            params={"device_id": device["id"]},
+            headers=h,
+        )
+    ).json()
+    assert one_device and all(f["device_id"] == device["id"] for f in one_device)
+    nobody = (
+        await client.get(
+            f"/api/v1/projects/{project.id}/log-files",
+            params={"device_id": str(uuid.uuid4())},
+            headers=h,
+        )
+    ).json()
+    assert nobody == []
     assert [f["id"] for f in listing] == [row["id"]]
     download = await client.get(f"/api/v1/log-files/{row['id']}/download", headers=h)
     assert download.status_code == 200 and download.content == content

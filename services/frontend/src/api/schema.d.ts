@@ -4464,7 +4464,9 @@ export interface paths {
          * List Project Log Files
          * @description Every log file of the project's devices in one place (Tim, 2026-10-17: the files
          *     explorer of Protect Go, here for what was uploaded), newest first, each with its device's
-         *     name; the caller's visibility applies through the devices it may see.
+         *     name; the caller's visibility applies through the devices it may see. A page at a time:
+         *     `before` the last row's `uploaded_at` fetches the next, so a project with years of cards
+         *     never arrives as one wall (Protect's decision D143).
          */
         get: operations["list_project_log_files_api_v1_projects__project_id__log_files_get"];
         put?: never;
@@ -24216,6 +24218,10 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Files uploaded before this moment: the next page */
+                before?: string | null;
+                /** @description One device's files */
+                device_id?: string | null;
             };
             header?: never;
             path: {

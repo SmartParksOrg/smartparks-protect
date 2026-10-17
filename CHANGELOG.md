@@ -6,11 +6,11 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
-- **Files** at the foot of the Offload page: every file uploaded for the project's devices in one place, as the device page's log files explorer shows them, with the device as a column and a filter, a search box and sortable columns (`GET /projects/{id}/log-files`, each row with its device's name). Tim, 2026-10-17: the files explorer of Protect Go, here for what was uploaded, on the Offload page rather than a page of its own.
+- **Files** at the foot of the Offload page: every file uploaded for the project's devices in one place, as the device page's log files explorer shows them, with the device as a column and a filter the server applies, a search box and sortable columns, a page of 200 at a time with "Load more" (`GET /projects/{id}/log-files` with `limit`, `before` and `device_id`, each row with its device's name). Tim, 2026-10-17: the files explorer of Protect Go, here for what was uploaded, on the Offload page rather than a page of its own.
 
 ### Changed
 
-- The Offload page's Protect Go card says as little as it can: "Open Protect Go" and "Install for Windows" (or macOS, Linux), one line on which to press, the other systems and the guide a link away; the server address with its copy button and the explanations are gone (Tim, 2026-10-17).
+- The Offload page's Protect Go button is called "Protect Go", no more; its card says as little as it can: "Open Protect Go" and "Install for Windows" (or macOS, Linux), one line on which to press, the other systems and the guide a link away; the server address with its copy button and the explanations are gone (Tim, 2026-10-17).
 
 ### Added
 

@@ -2,6 +2,7 @@
 (architecture 25.4): upload or sync, list, inspect, download the original, decode again."""
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
@@ -218,27 +219,38 @@ async def list_log_files(
 
 @router.get("/projects/{project_id}/log-files", response_model=list[DeviceLogFileRead])
 async def list_project_log_files(
-    limit: int = Query(500, ge=1, le=2000),
+    limit: int = Query(200, ge=1, le=500),
+    before: datetime | None = Query(
+        default=None, description="Files uploaded before this moment: the next page"
+    ),
+    device_id: uuid.UUID | None = Query(default=None, description="One device's files"),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
 ) -> list[DeviceLogFileRead]:
     """Every log file of the project's devices in one place (Tim, 2026-10-17: the files
     explorer of Protect Go, here for what was uploaded), newest first, each with its device's
-    name; the caller's visibility applies through the devices it may see."""
+    name; the caller's visibility applies through the devices it may see. A page at a time:
+    `before` the last row's `uploaded_at` fetches the next, so a project with years of cards
+    never arrives as one wall (Protect's decision D143)."""
     # imported here: the offload router imports this module's neighbours, so the module level
     # would run in a circle
     from protect_api.routers.offload import _project_device_ids
 
     device_ids = await _project_device_ids(session, context)
+    if device_id is not None:
+        device_ids = [d for d in device_ids if d == device_id]
     if not device_ids:
         return []
+    query = (
+        select(DeviceLogFile, Device.name)
+        .join(Device, Device.id == DeviceLogFile.device_id)
+        .where(DeviceLogFile.device_id.in_(device_ids))
+    )
+    if before is not None:
+        query = query.where(DeviceLogFile.uploaded_at < before)
     rows = (
         await session.execute(
-            select(DeviceLogFile, Device.name)
-            .join(Device, Device.id == DeviceLogFile.device_id)
-            .where(DeviceLogFile.device_id.in_(device_ids))
-            .order_by(DeviceLogFile.uploaded_at.desc())
-            .limit(limit)
+            query.order_by(DeviceLogFile.uploaded_at.desc(), DeviceLogFile.id.desc()).limit(limit)
         )
     ).all()
     out: list[DeviceLogFileRead] = []
