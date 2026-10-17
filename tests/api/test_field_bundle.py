@@ -205,14 +205,13 @@ async def test_the_offline_map_is_cut_for_the_area_and_streamed(
     )
     assert forced.json()["status"] == "queued"
 
-    # a viewer may ask too, a stranger may not
+    # a viewer downloads the map but does not ask for one (a file made for members, as an
+    # export is); an analyst asks; a stranger gets nothing
     viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
-    assert (
-        await client.get(f"/api/v1/projects/{project_id}/field-bundle/map", headers=viewer.headers)
-    ).status_code == 202
+    path = f"/api/v1/projects/{project_id}/field-bundle/map"
+    assert (await client.get(path, headers=viewer.headers)).status_code == 202
+    assert (await client.post(path, json={}, headers=viewer.headers)).status_code == 403
+    analyst = await project_actor(client, db, project, Role.PROJECT_ANALYST)
+    assert (await client.post(path, json={}, headers=analyst.headers)).status_code == 202
     stranger = await actor(client, db)
-    assert (
-        await client.get(
-            f"/api/v1/projects/{project_id}/field-bundle/map", headers=stranger.headers
-        )
-    ).status_code == 403
+    assert (await client.get(path, headers=stranger.headers)).status_code == 403

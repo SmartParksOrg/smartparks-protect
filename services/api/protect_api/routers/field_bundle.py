@@ -298,15 +298,16 @@ def _map_read(row: MapExtract) -> FieldMapRead:
 )
 async def request_field_map(
     body: FieldMapRequest,
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    context: ProjectContext = Depends(require_permission(Permission.EXPORTS_CREATE)),
     session: AsyncSession = Depends(get_session),
     bus: RedisStreamsBus = Depends(get_bus),
 ) -> FieldMapRead:
     """Ask for the project's offline map (phase 43 P3): the export worker cuts the area, with
-    a margin, from the newest Protomaps planet build. One job per project at a time; a map
-    younger than a month that covers the area is kept unless `force`. The area is the extent of
-    the project's features, entity places and device places, so a project with none yet has no
-    map to cut."""
+    a margin, from the newest Protomaps planet build. A file made for a member, so the
+    permission is the exports' (`exports:create`: analysts and admins); every member downloads
+    it. One job per project at a time; a map younger than a month that covers the area is kept
+    unless `force`. The area is the extent of the project's features, entity places and device
+    places, so a project with none yet has no map to cut."""
     device_ids = await _project_device_ids(session, context)
     area = await _area(session, context.project.id, device_ids)
     if area is None:
