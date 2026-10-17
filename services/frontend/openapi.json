@@ -18908,6 +18908,71 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/log-files": {
+   "get": {
+    "tags": [
+     "log files"
+    ],
+    "summary": "List Project Log Files",
+    "description": "Every log file of the project's devices in one place (Tim, 2026-10-17: the files\nexplorer of Protect Go, here for what was uploaded), newest first, each with its device's\nname; the caller's visibility applies through the devices it may see.",
+    "operationId": "list_project_log_files_api_v1_projects__project_id__log_files_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 2000,
+       "minimum": 1,
+       "default": 500,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/DeviceLogFileRead"
+         },
+         "title": "Response List Project Log Files Api V1 Projects  Project Id  Log Files Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/driver-catalog": {
    "get": {
     "tags": [
@@ -29959,6 +30024,18 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "device_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device Name",
+      "description": "Filled on the project's listing, where files of many devices meet"
      }
     },
     "type": "object",

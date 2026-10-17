@@ -13,6 +13,7 @@ from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
 from protect_api.crud import get_or_404
+from protect_api.deps import ProjectContext, require_permission
 from protect_api.routers.control import _control_permissions
 from protect_api.routers.devices import _visible_device
 from protect_api.schemas.log_files import BleSyncRequest, DeviceLogFileRead, DriverCatalog
@@ -213,6 +214,39 @@ async def list_log_files(
         .limit(limit)
     )
     return list(rows)
+
+
+@router.get("/projects/{project_id}/log-files", response_model=list[DeviceLogFileRead])
+async def list_project_log_files(
+    limit: int = Query(500, ge=1, le=2000),
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> list[DeviceLogFileRead]:
+    """Every log file of the project's devices in one place (Tim, 2026-10-17: the files
+    explorer of Protect Go, here for what was uploaded), newest first, each with its device's
+    name; the caller's visibility applies through the devices it may see."""
+    # imported here: the offload router imports this module's neighbours, so the module level
+    # would run in a circle
+    from protect_api.routers.offload import _project_device_ids
+
+    device_ids = await _project_device_ids(session, context)
+    if not device_ids:
+        return []
+    rows = (
+        await session.execute(
+            select(DeviceLogFile, Device.name)
+            .join(Device, Device.id == DeviceLogFile.device_id)
+            .where(DeviceLogFile.device_id.in_(device_ids))
+            .order_by(DeviceLogFile.uploaded_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    out: list[DeviceLogFileRead] = []
+    for row, device_name in rows:
+        read = DeviceLogFileRead.model_validate(row)
+        read.device_name = device_name
+        out.append(read)
+    return out
 
 
 @router.get("/devices/{device_id}/driver-catalog", response_model=DriverCatalog)

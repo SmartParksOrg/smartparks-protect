@@ -4453,6 +4453,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/log-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Log Files
+         * @description Every log file of the project's devices in one place (Tim, 2026-10-17: the files
+         *     explorer of Protect Go, here for what was uploaded), newest first, each with its device's
+         *     name; the caller's visibility applies through the devices it may see.
+         */
+        get: operations["list_project_log_files_api_v1_projects__project_id__log_files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/driver-catalog": {
         parameters: {
             query?: never;
@@ -8048,6 +8070,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Device Name
+             * @description Filled on the project's listing, where files of many devices meet
+             */
+            device_name?: string | null;
         };
         /** DeviceRead */
         DeviceRead: {
@@ -24172,6 +24199,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceLogFileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_log_files_api_v1_projects__project_id__log_files_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLogFileRead"][];
                 };
             };
             /** @description Validation Error */

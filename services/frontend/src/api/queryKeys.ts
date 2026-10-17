@@ -145,6 +145,7 @@ export const queryKeys = {
     ["devices", deviceId, "downlink-queue"] as const,
   deviceRoutes: (deviceId: string) => ["devices", deviceId, "routes"] as const,
   logFiles: (deviceId: string) => ["devices", deviceId, "log-files"] as const,
+  projectLogFiles: (projectId: string) => ["projects", projectId, "log-files"] as const,
   lp0Credentials: (deviceId: string) =>
     ["devices", deviceId, "lp0-credentials"] as const,
   offloadStation: (deviceId: string) =>

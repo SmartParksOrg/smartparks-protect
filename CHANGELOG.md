@@ -4,6 +4,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+### Added
+
+- **Files** under Network: every file uploaded for the project's devices in one place, as the device page's log files explorer shows them, with the device as a column and a filter (`GET /projects/{id}/log-files`, each row with its device's name). Tim, 2026-10-17: the files explorer of Protect Go, here for what was uploaded.
+
 ### Changed
 
 - The Offload page's Protect Go card says as little as it can: "Open Protect Go" and "Install for Windows" (or macOS, Linux), one line on which to press, the other systems and the guide a link away; the server address with its copy button and the explanations are gone (Tim, 2026-10-17).

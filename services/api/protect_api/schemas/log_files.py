@@ -52,6 +52,10 @@ class DeviceLogFileRead(ORMModel):
     attributes: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    device_name: str | None = Field(
+        default=None,
+        description="Filled on the project's listing, where files of many devices meet",
+    )
 
 
 class BleSyncRequest(BaseModel):

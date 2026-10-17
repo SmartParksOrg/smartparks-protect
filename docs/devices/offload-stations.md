@@ -152,6 +152,10 @@ address and keys not set, or an address that differs from the one the device rep
 its device page). A complete row says so. **How to set up** unfolds the three steps on the
 page and hides them again; they are hidden until asked for.
 
+## The project's files
+
+**Files** under Network (Tim, 2026-10-17) shows every file uploaded for the project's devices in one place: the SD card files of the offload stations, the raw logs and the browser syncs, newest first, as the device page's log files explorer shows them, with the device as a column and a filter. A click on a file opens its properties; the device's name opens its page, where files are uploaded. The listing is `GET /projects/{id}/log-files` (project read; the caller sees the files of the devices it may see), each row with its `device_name`.
+
 ## The station's own report
 
 Firmware 8.1 lets a station report on itself every `lp0_statistics_interval` seconds on port 23:

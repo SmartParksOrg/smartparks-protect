@@ -100,6 +100,9 @@ async def test_upload_list_download_and_redecode(client, db, bus):
     )
     assert got["trace_id"] and got["period_start"] < got["period_end"]
     listing = (await client.get(f"/api/v1/devices/{device['id']}/log-files", headers=h)).json()
+    # the project's files in one place, each with its device's name (Tim, 2026-10-17)
+    across = (await client.get(f"/api/v1/projects/{project.id}/log-files", headers=h)).json()
+    assert any(f["id"] == row["id"] and f["device_name"] == device["name"] for f in across)
     assert [f["id"] for f in listing] == [row["id"]]
     download = await client.get(f"/api/v1/log-files/{row['id']}/download", headers=h)
     assert download.status_code == 200 and download.content == content

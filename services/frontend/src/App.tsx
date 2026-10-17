@@ -232,6 +232,11 @@ const OffloadPage = lazy(() =>
     default: m.OffloadPage,
   })),
 );
+const FilesPage = lazy(() =>
+  import("@/pages/project/FilesPage").then((m) => ({
+    default: m.FilesPage,
+  })),
+);
 const ConnectionsPage = lazy(() =>
   import("@/pages/account/ConnectionsPage").then((m) => ({
     default: m.ConnectionsPage,
@@ -331,6 +336,7 @@ export default function App() {
               <Route path="network/traffic" element={<TrafficPage />} />
               <Route path="network/gateways" element={<GatewaysPage />} />
               <Route path="network/offload" element={<OffloadPage />} />
+              <Route path="network/files" element={<FilesPage />} />
               <Route
                 path="integrate/integrations"
                 element={<IntegrationsPage />}
