@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- "Field for the laptop" on the Offload page (decision D332): the installer of Protect Field for the computer you are on, this server's address to give Field at its first start, and "Open Field", which opens an installed Field connected to this server. Field is the separate program that reads a station's card where there is no connection.
+
 - The field bundle for Smart Parks Protect Field, the companion that reads an offload station's card on a laptop without a connection (phase 43, decision D331): `GET /projects/{id}/field-bundle` gives a project member the project's devices with the entity each tracks, the entities, the stations with EUI and place, the area, and each tracker's LP0 address with its keys for a caller who may set them; every download is audited. Field's own repository is `SmartParksOrg/smartparks-protect-field`; `docs/devices/field-companion.md`.
 
 - **A device with one life gets the history its file brought** (decision D330; Tim, 2026-10-16: after the demo cards decoded, the attribution window had to be moved back by hand). When a log file or a card is decoded and the device has had exactly one project assignment, that assignment is moved back to the earliest record, and so is its only entity assignment when the entity never had another device before; the attribution job follows, and the file's properties say what moved and to when. A device with an earlier membership or a gap is left alone, since a gap means something, and keeps today's move by hand.

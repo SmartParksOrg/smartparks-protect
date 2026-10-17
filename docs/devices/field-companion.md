@@ -2,6 +2,10 @@
 
 Smart Parks Protect Field is a separate program ([`SmartParksOrg/smartparks-protect-field`](https://github.com/SmartParksOrg/smartparks-protect-field), [its documentation](https://smartparksorg.github.io/smartparks-protect-field/)) that a person runs on a laptop they take to the [offload stations](offload-stations.md). It reads a station's SD card where there is no connection, decodes the trackers' frames with Protect's own code, shows the positions and measurements, and hands the untouched card files to Protect when there is a connection again. Protect decodes them itself; nothing decoded in the field comes back. Decision D331 (2026-10-17); Field's own design is its ADR 0001.
 
+## Installing Field from the Offload page
+
+The Offload page's "Field for the laptop" button opens a card that gets a person from Protect to a running Field in three steps, without leaving the page (decision D332): the installer for the computer they are on (Windows `ProtectField-Setup.exe`, macOS `ProtectField-arm64.dmg` for Apple Silicon, Debian and Ubuntu `ProtectField-amd64.deb`; the other two a link away), always the newest release since the links point at `releases/latest/download`; this server's address with a copy button, which Field asks for at its first start; and "Open Field", a `protect-field://connect?server=…` link that an installed Field answers to by opening with this server filled in, after which the person signs in with their Protect email and password. The card links Field's own step-by-step page, which also says what to do about the warnings an unsigned installer draws on Windows and macOS until Smart Parks holds code-signing certificates. Field is installed and updated the way the desktop AddaxAI is (Field's decision D6): a release on GitHub carries the three installers, and Field tells its user at start when a newer one exists.
+
 ## What Protect gives Field
 
 **The field bundle**, `GET /projects/{id}/field-bundle`, for a member of the project. One document with:

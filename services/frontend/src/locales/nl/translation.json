@@ -3147,5 +3147,15 @@
   "The server does not answer at the moment; this tries again in a moment.": "De server antwoordt op dit moment niet; dit probeert het zo opnieuw.",
   "The server does not answer at the moment. The page checks every few seconds.": "De server antwoordt op dit moment niet. De pagina controleert het om de paar seconden.",
   "(moved back for the history this file brought)": "(teruggezet voor de geschiedenis die dit bestand bracht)",
-  "On its entity since": "Op zijn entiteit sinds"
+  "On its entity since": "Op zijn entiteit sinds",
+  "\"Open Field\" starts an installed Field with this server filled in; it does nothing until Field is installed. Then sign in with your Protect email and password.": "\"Field openen\" start een geïnstalleerde Field met deze server ingevuld; het doet niets zolang Field niet is geïnstalleerd. Meld je daarna aan met je e-mailadres en wachtwoord van Protect.",
+  "Copy the server address": "Serveradres kopiëren",
+  "Download for {{system}}": "Downloaden voor {{system}}",
+  "During Field's setup, give it this server:": "Geef Field bij het instellen deze server:",
+  "Field for the laptop": "Field voor de laptop",
+  "How to install and use Field, step by step": "Field installeren en gebruiken, stap voor stap",
+  "Open Field": "Field openen",
+  "Other systems:": "Andere systemen:",
+  "Protect Field reads a station's SD card on a laptop where there is no connection, with Protect's own decoding, and uploads the files to this server when you are back online. Install it on the laptop you take to the stations.": "Protect Field leest de SD-kaart van een station op een laptop waar geen verbinding is, met de decodering van Protect zelf, en uploadt de bestanden naar deze server zodra je weer online bent. Installeer het op de laptop die je meeneemt naar de stations.",
+  "Server address copied": "Serveradres gekopieerd"
 }

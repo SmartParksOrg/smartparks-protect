@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { BookOpen, CircleCheck, HardDrive, Plus } from "lucide-react";
+import { BookOpen, CircleCheck, HardDrive, Laptop, Plus } from "lucide-react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -16,6 +16,7 @@ import type {
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { FieldCard } from "@/components/network/FieldCard";
 import { OffloadStationDialog } from "@/components/network/OffloadStationDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,9 @@ import { formatAgo, formatTime } from "@/lib/format";
  * row still misses and opens that dialog for it, and the guide under "How to set up" is the
  * three steps in one place, hidden until the button is pressed (Tim, 2026-10-16). A RangerEdge
  * that is not a device yet is added inside that dialog, by hand or read over Bluetooth with its
- * LP0 credentials (decision D326). Figures cover the last 30 days, as on the Gateways page.
+ * LP0 credentials (decision D326). "Field for the laptop" (decision D332, Tim, 2026-10-17) opens the
+ * card that installs Protect Field, the companion for the place without a connection, from here.
+ * Figures cover the last 30 days, as on the Gateways page.
  */
 export function OffloadPage() {
   const { t } = useTranslation();
@@ -47,6 +50,7 @@ export function OffloadPage() {
     deviceId: null,
   });
   const [guideOpen, setGuideOpen] = useState(false);
+  const [fieldOpen, setFieldOpen] = useState(false);
   const overview = useQuery({
     queryKey: queryKeys.projectOffload(projectId),
     queryFn: () =>
@@ -456,6 +460,15 @@ export function OffloadPage() {
             >
               <BookOpen className="size-4" /> {t("How to set up")}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-pressed={fieldOpen}
+              onClick={() => setFieldOpen((v) => !v)}
+            >
+              <Laptop className="size-4" /> {t("Field for the laptop")}
+            </Button>
             {canSetUp && (
               <Button
                 type="button"
@@ -472,6 +485,7 @@ export function OffloadPage() {
         {overview.error && (
           <Callout kind="error">{overview.error.message}</Callout>
         )}
+        {fieldOpen && <FieldCard />}
         {guideOpen && (
           <Callout kind="info">
             <p className="font-medium">{t("How to set up offload stations")}</p>
