@@ -78,6 +78,7 @@ nav:
       - Cardiac monitoring: devices/cardiac-monitoring.md
       - Raw log files: devices/raw-log-files.md
       - Offload stations: devices/offload-stations.md
+      - Field, the companion: devices/field-companion.md
   - Integrations:
       - integrations/index.md
       - Adapter interface: integrations/adapter-interface.md

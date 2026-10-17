@@ -4616,6 +4616,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/field-bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Field Bundle
+         * @description The project for the field (decision D331): devices with the entity each tracks now and
+         *     their DevEUI, the entities, the offload stations with EUI and place, the area, and each
+         *     tracker's LP0 address with its keys when the caller may set keys in this project. Field reads
+         *     a card with this offline and uploads the card's files, never what it decoded.
+         */
+        get: operations["field_bundle_api_v1_projects__project_id__field_bundle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/analysis-layers": {
         parameters: {
             query?: never;
@@ -9594,6 +9617,183 @@ export interface components {
             changed_at: string | null;
             /** Updated At */
             updated_at: string | null;
+        };
+        /**
+         * FieldArea
+         * @description The project's bounding box in degrees, from its features, its entities' places and its
+         *     devices' places; what the offline map is cut for.
+         */
+        FieldArea: {
+            /** West */
+            west: number;
+            /** South */
+            south: number;
+            /** East */
+            east: number;
+            /** North */
+            north: number;
+        };
+        /**
+         * FieldBundleRead
+         * @description One project for the field: its devices with the entity each tracks now, the entities,
+         *     the stations with their EUI and place, the trackers' LP0 credentials the caller may see, the
+         *     area, and the versions that made it. Field decodes a card with these and uploads the card's
+         *     files untouched to `POST /devices/{id}/offload-files`; nothing decoded comes back.
+         */
+        FieldBundleRead: {
+            /**
+             * Format Version
+             * @description The shape of this document
+             * @default 1
+             */
+            format_version: number;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Protect Version */
+            protect_version: string;
+            /** Protect Commit */
+            protect_commit: string;
+            /**
+             * Server Url
+             * @description Where the bundle came from, for the upload
+             */
+            server_url: string;
+            project: components["schemas"]["FieldProject"];
+            area?: components["schemas"]["FieldArea"] | null;
+            /**
+             * Credentials Included
+             * @description The caller may see keys, so every tracker with keys carries them
+             */
+            credentials_included: boolean;
+            /** Devices */
+            devices?: components["schemas"]["FieldDevice"][];
+            /** Entities */
+            entities?: components["schemas"]["FieldEntity"][];
+            /** Stations */
+            stations?: components["schemas"]["FieldStation"][];
+        };
+        /** FieldDevice */
+        FieldDevice: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Serial Number */
+            serial_number: string | null;
+            /**
+             * Dev Eui
+             * @description Sixteen hex digits when known
+             */
+            dev_eui?: string | null;
+            /** Device Type Key */
+            device_type_key: string;
+            /** Device Type Label */
+            device_type_label: string;
+            /** Driver Key */
+            driver_key: string;
+            /** Status */
+            status: string;
+            /** Firmware Version */
+            firmware_version: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /**
+             * Is Station
+             * @description An offload station of the project
+             * @default false
+             */
+            is_station: boolean;
+            lp0?: components["schemas"]["FieldLp0"] | null;
+        };
+        /** FieldEntity */
+        FieldEntity: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Entity Type Key */
+            entity_type_key: string;
+            /** Entity Type Label */
+            entity_type_label: string;
+            /** Icon Key */
+            icon_key: string | null;
+            /**
+             * Geometry
+             * @description GeoJSON, a place set by hand
+             */
+            geometry?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * FieldLp0
+         * @description A tracker's LP0 credentials: the address always, the keys for a caller who may set them
+         *     in Protect (device control in the project, or a server admin), as 32 hex digits.
+         */
+        FieldLp0: {
+            /** Dev Addr */
+            dev_addr: string;
+            /** Keys Set */
+            keys_set: boolean;
+            /** App S Key */
+            app_s_key?: string | null;
+            /** Nwk S Key */
+            nwk_s_key?: string | null;
+            /** Set At */
+            set_at?: string | null;
+            /**
+             * Source
+             * @description person or device
+             */
+            source?: string | null;
+        };
+        /** FieldProject */
+        FieldProject: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Timezone */
+            timezone: string;
+        };
+        /** FieldStation */
+        FieldStation: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Station Eui */
+            station_eui: string;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Entity Name */
+            entity_name?: string | null;
+            /**
+             * Geometry
+             * @description GeoJSON point, where it stands
+             */
+            geometry?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** GatewayDetail */
         GatewayDetail: {
@@ -24110,6 +24310,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OffloadOverviewRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    field_bundle_api_v1_projects__project_id__field_bundle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldBundleRead"];
                 };
             };
             /** @description Validation Error */

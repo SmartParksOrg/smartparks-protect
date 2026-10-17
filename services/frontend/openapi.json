@@ -19393,6 +19393,55 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/field-bundle": {
+   "get": {
+    "tags": [
+     "offload"
+    ],
+    "summary": "Field Bundle",
+    "description": "The project for the field (decision D331): devices with the entity each tracks now and\ntheir DevEUI, the entities, the offload stations with EUI and place, the area, and each\ntracker's LP0 address with its keys when the caller may set keys in this project. Field reads\na card with this offline and uploads the card's files, never what it decoded.",
+    "operationId": "field_bundle_api_v1_projects__project_id__field_bundle_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FieldBundleRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/analysis-layers": {
    "get": {
     "tags": [
@@ -34253,6 +34302,435 @@
     ],
     "title": "FenceStatusRead",
     "description": "A fence line's reading (decisions D264 and D265): its level with the staleness rule\napplied at the time of reading, its sections, and what each monitor last said."
+   },
+   "FieldArea": {
+    "properties": {
+     "west": {
+      "type": "number",
+      "title": "West"
+     },
+     "south": {
+      "type": "number",
+      "title": "South"
+     },
+     "east": {
+      "type": "number",
+      "title": "East"
+     },
+     "north": {
+      "type": "number",
+      "title": "North"
+     }
+    },
+    "type": "object",
+    "required": [
+     "west",
+     "south",
+     "east",
+     "north"
+    ],
+    "title": "FieldArea",
+    "description": "The project's bounding box in degrees, from its features, its entities' places and its\ndevices' places; what the offline map is cut for."
+   },
+   "FieldBundleRead": {
+    "properties": {
+     "format_version": {
+      "type": "integer",
+      "title": "Format Version",
+      "description": "The shape of this document",
+      "default": 1
+     },
+     "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Generated At"
+     },
+     "protect_version": {
+      "type": "string",
+      "title": "Protect Version"
+     },
+     "protect_commit": {
+      "type": "string",
+      "title": "Protect Commit"
+     },
+     "server_url": {
+      "type": "string",
+      "title": "Server Url",
+      "description": "Where the bundle came from, for the upload"
+     },
+     "project": {
+      "$ref": "#/components/schemas/FieldProject"
+     },
+     "area": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FieldArea"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "credentials_included": {
+      "type": "boolean",
+      "title": "Credentials Included",
+      "description": "The caller may see keys, so every tracker with keys carries them"
+     },
+     "devices": {
+      "items": {
+       "$ref": "#/components/schemas/FieldDevice"
+      },
+      "type": "array",
+      "title": "Devices"
+     },
+     "entities": {
+      "items": {
+       "$ref": "#/components/schemas/FieldEntity"
+      },
+      "type": "array",
+      "title": "Entities"
+     },
+     "stations": {
+      "items": {
+       "$ref": "#/components/schemas/FieldStation"
+      },
+      "type": "array",
+      "title": "Stations"
+     }
+    },
+    "type": "object",
+    "required": [
+     "generated_at",
+     "protect_version",
+     "protect_commit",
+     "server_url",
+     "project",
+     "credentials_included"
+    ],
+    "title": "FieldBundleRead",
+    "description": "One project for the field: its devices with the entity each tracks now, the entities,\nthe stations with their EUI and place, the trackers' LP0 credentials the caller may see, the\narea, and the versions that made it. Field decodes a card with these and uploads the card's\nfiles untouched to `POST /devices/{id}/offload-files`; nothing decoded comes back."
+   },
+   "FieldDevice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "serial_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Serial Number"
+     },
+     "dev_eui": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dev Eui",
+      "description": "Sixteen hex digits when known"
+     },
+     "device_type_key": {
+      "type": "string",
+      "title": "Device Type Key"
+     },
+     "device_type_label": {
+      "type": "string",
+      "title": "Device Type Label"
+     },
+     "driver_key": {
+      "type": "string",
+      "title": "Driver Key"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "firmware_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Firmware Version"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "is_station": {
+      "type": "boolean",
+      "title": "Is Station",
+      "description": "An offload station of the project",
+      "default": false
+     },
+     "lp0": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FieldLp0"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "serial_number",
+     "device_type_key",
+     "device_type_label",
+     "driver_key",
+     "status",
+     "firmware_version"
+    ],
+    "title": "FieldDevice"
+   },
+   "FieldEntity": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "entity_type_key": {
+      "type": "string",
+      "title": "Entity Type Key"
+     },
+     "entity_type_label": {
+      "type": "string",
+      "title": "Entity Type Label"
+     },
+     "icon_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Icon Key"
+     },
+     "geometry": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Geometry",
+      "description": "GeoJSON, a place set by hand"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "entity_type_key",
+     "entity_type_label",
+     "icon_key"
+    ],
+    "title": "FieldEntity"
+   },
+   "FieldLp0": {
+    "properties": {
+     "dev_addr": {
+      "type": "string",
+      "title": "Dev Addr"
+     },
+     "keys_set": {
+      "type": "boolean",
+      "title": "Keys Set"
+     },
+     "app_s_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "App S Key"
+     },
+     "nwk_s_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nwk S Key"
+     },
+     "set_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Set At"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source",
+      "description": "person or device"
+     }
+    },
+    "type": "object",
+    "required": [
+     "dev_addr",
+     "keys_set"
+    ],
+    "title": "FieldLp0",
+    "description": "A tracker's LP0 credentials: the address always, the keys for a caller who may set them\nin Protect (device control in the project, or a server admin), as 32 hex digits."
+   },
+   "FieldProject": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "slug": {
+      "type": "string",
+      "title": "Slug"
+     },
+     "timezone": {
+      "type": "string",
+      "title": "Timezone"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "slug",
+     "timezone"
+    ],
+    "title": "FieldProject"
+   },
+   "FieldStation": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "station_eui": {
+      "type": "string",
+      "title": "Station Eui"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     },
+     "entity_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Name"
+     },
+     "geometry": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Geometry",
+      "description": "GeoJSON point, where it stands"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_name",
+     "station_eui"
+    ],
+    "title": "FieldStation"
    },
    "GatewayDetail": {
     "properties": {

@@ -58,18 +58,11 @@ from shared.domain.lp0 import (
     parse_key,
     register_station_gateway,
     set_credentials,
-    station_eui_from_name,
 )
 from shared.domain.static_place import place_device, place_entity_of
 from shared.enums import AcquisitionChannel
 from shared.ingest import queue_identity_reprocess, retained_events
-from shared.logfiles import (
-    DuplicateLogFile,
-    looks_like_station_file,
-    parse_station_jsonl,
-    store_log_file,
-    unpack_card_zip,
-)
+from shared.logfiles import DuplicateLogFile, store_log_file
 from shared.models import (
     Device,
     DeviceCurrentState,
@@ -86,6 +79,12 @@ from shared.models import (
     User,
 )
 from shared.permissions import Permission, permissions_for
+from shared.station_files import (
+    looks_like_station_file,
+    parse_station_jsonl,
+    station_eui_from_name,
+    unpack_card_zip,
+)
 from shared.timeutil import utc_now
 from shared.trace import ApplicationError
 

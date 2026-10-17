@@ -33,7 +33,7 @@ from shared.connectivity.adapters.lp0_station.lorawan import FrameError, parse_u
 from shared.connectivity.base import GatewayReceptionData, InboundMessage
 from shared.database import session_scope
 from shared.domain.attribution import extend_first_assignments, publish_job
-from shared.domain.lp0 import ensure_station_gateway, station_eui_from_name
+from shared.domain.lp0 import ensure_station_gateway
 from shared.enums import (
     AcquisitionChannel,
     ErrorCode,
@@ -43,17 +43,15 @@ from shared.enums import (
     TraceClass,
 )
 from shared.ingest import StoredEvent, store_inbound
-from shared.logfiles import (
-    ParsedFrame,
-    ParsedLog,
-    ParsedStationLog,
-    StationFrame,
-    channel_source,
-    parse_log_text,
-    parse_station_jsonl,
-)
+from shared.logfiles import ParsedFrame, ParsedLog, channel_source, parse_log_text
 from shared.logger import get_logger
 from shared.models import DataSource, Device, DeviceLogFile, SourceEvent
+from shared.station_files import (
+    ParsedStationLog,
+    StationFrame,
+    parse_station_jsonl,
+    station_eui_from_name,
+)
 from shared.storage import get_object, sha256
 from shared.timeutil import utc_now
 from shared.trace import ApplicationError, Tracer

@@ -25,6 +25,7 @@ from protect_api.routers.environment import router as environment_router
 from protect_api.routers.events import admin_router as admin_events_router
 from protect_api.routers.events import router as events_router
 from protect_api.routers.exports import router as exports_router
+from protect_api.routers.field_bundle import router as field_bundle_router
 from protect_api.routers.gateways import admin_router as admin_gateways_router
 from protect_api.routers.gateways import router as gateways_router
 from protect_api.routers.groups import router as groups_router
@@ -79,6 +80,7 @@ for router in (
     curation_router,
     log_files_router,
     offload_router,
+    field_bundle_router,
     layers_router,
     integrations_router,
     gateways_router,

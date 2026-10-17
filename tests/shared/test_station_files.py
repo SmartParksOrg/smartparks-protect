@@ -7,11 +7,12 @@ import json
 import zipfile
 from datetime import UTC, datetime
 
-from shared.domain.lp0 import normalise_dev_addr, parse_key, station_eui_from_name
-from shared.logfiles import (
+from shared.domain.lp0 import normalise_dev_addr, parse_key
+from shared.station_files import (
     looks_like_station_file,
     parse_station_jsonl,
     parse_station_line,
+    station_eui_from_name,
     unpack_card_zip,
 )
 from tests.shared.test_lp0_lorawan import SAVED_REPLAY_PACKET

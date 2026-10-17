@@ -27,7 +27,6 @@ from shared.timeutil import utc_now
 DEV_ADDR_DIGITS = 8
 KEY_DIGITS = 32
 #: `STATIONEUI_timestamp[_NNN].jsonl`, the station's EUI in sixteen hex digits.
-STATION_FILE = re.compile(r"^([0-9A-Fa-f]{16})_(\d+)(?:_(\d+))?\.jsonl$")
 
 
 class AddressTaken(Exception):
@@ -50,12 +49,6 @@ def parse_key(text: str) -> bytes:
     if len(digits) != KEY_DIGITS or not re.fullmatch(r"[0-9A-Fa-f]+", digits):
         raise ValueError("a session key is 32 hex digits")
     return bytes.fromhex(digits)
-
-
-def station_eui_from_name(filename: str) -> str | None:
-    """The station EUI a card's file is named after, upper case, or None for another name."""
-    match = STATION_FILE.match(filename.replace("\\", "/").rsplit("/", 1)[-1])
-    return match.group(1).upper() if match else None
 
 
 async def lp0_source(session: AsyncSession) -> DataSource:
@@ -337,5 +330,4 @@ __all__ = [
     "remember_counter",
     "set_credentials",
     "station_device",
-    "station_eui_from_name",
 ]
