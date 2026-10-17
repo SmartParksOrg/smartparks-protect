@@ -4639,6 +4639,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/field-bundle/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Field Map
+         * @description The project's offline map as a PMTiles file, streamed from MinIO, once it is ready;
+         *     while it is being made, its state with 202; 404 when none was asked for; 409 with the
+         *     reason when the last attempt failed.
+         */
+        get: operations["download_field_map_api_v1_projects__project_id__field_bundle_map_get"];
+        put?: never;
+        /**
+         * Request Field Map
+         * @description Ask for the project's offline map (phase 43 P3): the export worker cuts the area, with
+         *     a margin, from the newest Protomaps planet build. One job per project at a time; a map
+         *     younger than a month that covers the area is kept unless `force`. The area is the extent of
+         *     the project's features, entity places and device places, so a project with none yet has no
+         *     map to cut.
+         */
+        post: operations["request_field_map_api_v1_projects__project_id__field_bundle_map_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/analysis-layers": {
         parameters: {
             query?: never;
@@ -9663,6 +9693,8 @@ export interface components {
             server_url: string;
             project: components["schemas"]["FieldProject"];
             area?: components["schemas"]["FieldArea"] | null;
+            /** @description The offline map's state, once one was asked for */
+            map?: components["schemas"]["FieldMapRead"] | null;
             /**
              * Credentials Included
              * @description The caller may see keys, so every tracker with keys carries them
@@ -9757,6 +9789,56 @@ export interface components {
              * @description person or device
              */
             source?: string | null;
+        };
+        /**
+         * FieldMapRead
+         * @description The project's offline map (phase 43 P3): a PMTiles extract of the area with a margin,
+         *     cut from a Protomaps planet build; `ready` means `GET /projects/{id}/field-bundle/map`
+         *     streams it.
+         */
+        FieldMapRead: {
+            /**
+             * Status
+             * @description queued, running, ready or failed
+             */
+            status: string;
+            /** West */
+            west: number;
+            /** South */
+            south: number;
+            /** East */
+            east: number;
+            /** North */
+            north: number;
+            /** Max Zoom */
+            max_zoom: number;
+            /**
+             * Build
+             * @description The planet build's date, YYYYMMDD
+             */
+            build?: string | null;
+            /** Size Bytes */
+            size_bytes?: number | null;
+            /** Sha256 */
+            sha256?: string | null;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Ready At */
+            ready_at?: string | null;
+            /** Error */
+            error?: string | null;
+        };
+        /** FieldMapRequest */
+        FieldMapRequest: {
+            /**
+             * Force
+             * @description Cut again although a fresh map covers the area
+             * @default false
+             */
+            force: boolean;
         };
         /** FieldProject */
         FieldProject: {
@@ -24341,6 +24423,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FieldBundleRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_field_map_api_v1_projects__project_id__field_bundle_map_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The map file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/vnd.pmtiles": unknown;
+                };
+            };
+            /** @description Being made; the state */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldMapRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_field_map_api_v1_projects__project_id__field_bundle_map_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldMapRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldMapRead"];
                 };
             };
             /** @description Validation Error */

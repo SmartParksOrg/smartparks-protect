@@ -52,6 +52,7 @@ class Topic:
     ANALYSIS_REQUESTED = "analysis.requested"
     ATTRIBUTION_REQUESTED = "attribution.requested"
     ANALYSIS_REPORT_REQUESTED = "analysis_report.requested"
+    MAP_EXTRACT_REQUESTED = "map_extract.requested"
     CURATION_APPLIED = "curation.applied"
     IDENTITY_REPROCESS_REQUESTED = "identity.reprocess_requested"
 

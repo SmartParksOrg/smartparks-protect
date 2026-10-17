@@ -6,6 +6,8 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- The offline map for Protect Field (phase 43 P3): `POST /projects/{id}/field-bundle/map` has the export worker cut the project's area, with a margin, from the newest Protomaps planet build with `pmtiles extract`, kept in MinIO; `GET` streams the PMTiles file once ready. Migration 0055, the `map-extracts` bucket, go-pmtiles in the Python image. Tiles by Protomaps from OpenStreetMap.
+
 - "Field for the laptop" on the Offload page (decision D332): the installer of Protect Field for the computer you are on, this server's address to give Field at its first start, and "Open Field", which opens an installed Field connected to this server. Field is the separate program that reads a station's card where there is no connection.
 
 - The field bundle for Smart Parks Protect Field, the companion that reads an offload station's card on a laptop without a connection (phase 43, decision D331): `GET /projects/{id}/field-bundle` gives a project member the project's devices with the entity each tracks, the entities, the stations with EUI and place, the area, and each tracker's LP0 address with its keys for a caller who may set them; every download is audited. Field's own repository is `SmartParksOrg/smartparks-protect-field`; `docs/devices/field-companion.md`.

@@ -75,6 +75,29 @@ class FieldStation(BaseModel):
     )
 
 
+class FieldMapRead(BaseModel):
+    """The project's offline map (phase 43 P3): a PMTiles extract of the area with a margin,
+    cut from a Protomaps planet build; `ready` means `GET /projects/{id}/field-bundle/map`
+    streams it."""
+
+    status: str = Field(description="queued, running, ready or failed")
+    west: float
+    south: float
+    east: float
+    north: float
+    max_zoom: int
+    build: str | None = Field(default=None, description="The planet build's date, YYYYMMDD")
+    size_bytes: int | None = None
+    sha256: str | None = None
+    requested_at: datetime
+    ready_at: datetime | None = None
+    error: str | None = None
+
+
+class FieldMapRequest(BaseModel):
+    force: bool = Field(default=False, description="Cut again although a fresh map covers the area")
+
+
 class FieldBundleRead(BaseModel):
     """One project for the field: its devices with the entity each tracks now, the entities,
     the stations with their EUI and place, the trackers' LP0 credentials the caller may see, the
@@ -88,6 +111,9 @@ class FieldBundleRead(BaseModel):
     server_url: str = Field(description="Where the bundle came from, for the upload")
     project: FieldProject
     area: FieldArea | None = None
+    map: FieldMapRead | None = Field(
+        default=None, description="The offline map's state, once one was asked for"
+    )
     credentials_included: bool = Field(
         description="The caller may see keys, so every tracker with keys carries them"
     )

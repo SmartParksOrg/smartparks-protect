@@ -169,6 +169,31 @@ class Settings(BaseSettings):
         default=512 * 1024 * 1024,
         description="Largest zip of an SD card's LOG folders accepted in one upload (phase 42)",
     )
+    minio_bucket_map_extracts: str = Field(
+        default="map-extracts",
+        description="The offline maps of project areas for Protect Field (phase 43 P3)",
+    )
+    pmtiles_bin: str = Field(
+        default="pmtiles",
+        description="The go-pmtiles command that cuts a planet build (docker/python.Dockerfile)",
+    )
+    map_extract_source: str | None = Field(
+        default=None,
+        description="A Protomaps planet build to cut the offline maps from (a URL or a file); "
+        "empty takes the newest at https://build.protomaps.com",
+    )
+    map_extract_max_zoom: int = Field(
+        default=14, ge=8, le=15, description="Zoom level the offline map goes down to"
+    )
+    map_extract_margin_km: float = Field(
+        default=5.0, ge=0, description="Margin around the project's area in the offline map"
+    )
+    map_extract_max_bytes: int = Field(
+        default=300 * 1024 * 1024, description="Largest offline map kept for a project"
+    )
+    map_extract_timeout_seconds: int = Field(
+        default=1800, ge=60, description="How long one extract may run"
+    )
     log_file_batch_size: int = Field(
         default=200, ge=1, description="Frames of a log file decoded per transaction"
     )

@@ -2,9 +2,16 @@
 field, with the keys only for a caller who may set them, the stations with their EUI and place,
 the area, and the download in the audit log."""
 
+import hashlib
+import shutil
+
 import pytest
+import pytest_asyncio
 from sqlalchemy import select
 
+import shared.maps.extract as extract_module
+from shared.bus import RedisStreamsBus
+from shared.config import get_settings
 from shared.enums import Role
 from shared.models import AuditLog
 from tests.api.conftest import actor, project_actor
@@ -12,8 +19,17 @@ from tests.api.test_network_and_map import _setup
 from tests.api.test_offload_stations import _device, _opencollar_type
 from tests.conftest import unique_name
 from tests.shared.test_lp0_lorawan import APP_S_KEY, NWK_S_KEY
+from tests.shared.test_map_extract import make_planet
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest_asyncio.fixture
+async def bus():
+    bus = RedisStreamsBus()
+    yield bus
+    await bus.close()
+
 
 STATION_EUI = "0016C001F0ABCD31"  # its own station; serials are unique across the test database
 
@@ -122,3 +138,81 @@ async def test_bundle_carries_the_project_with_keys_for_those_who_may_set_them(c
     ).all()
     assert len(entries) == 3
     assert sorted(e.details["keys"] for e in entries) == [0, 1, 1]
+
+
+@pytest.mark.skipif(shutil.which("pmtiles") is None, reason="the pmtiles command is not installed")
+async def test_the_offline_map_is_cut_for_the_area_and_streamed(
+    client, db, bus, tmp_path, monkeypatch
+):
+    admin, project, _entity, _source, _live, _ext = await _setup(client, db)
+    h = admin.headers
+    project_id = project.id
+
+    # a project without an area has no map to cut
+    empty = await client.post(f"/api/v1/projects/{project_id}/field-bundle/map", json={}, headers=h)
+    assert empty.status_code == 409 and "no area yet" in empty.text
+
+    oc = await _opencollar_type(client, h)
+    station = await _device(client, h, oc["id"], project_id, serial="0016C001F0ABCD32")
+    setup = await client.post(
+        f"/api/v1/projects/{project_id}/offload/stations",
+        json={
+            "device_id": station["id"],
+            "entity_name": unique_name("Station"),
+            "latitude": 7.75,
+            "longitude": -10.9,
+        },
+        headers=h,
+    )
+    assert setup.status_code == 201, setup.text
+
+    # zoom 3 for the test's small planet; the setting is 14 on a server
+    monkeypatch.setattr(get_settings(), "map_extract_max_zoom", 3)
+    asked = await client.post(f"/api/v1/projects/{project_id}/field-bundle/map", json={}, headers=h)
+    assert asked.status_code == 202, asked.text
+    state = asked.json()
+    assert state["status"] == "queued" and state["max_zoom"] == 3
+    assert state["west"] < -10.9 < state["east"] and state["south"] < 7.75 < state["north"]
+    waiting = await client.get(f"/api/v1/projects/{project_id}/field-bundle/map", headers=h)
+    assert waiting.status_code == 202 and waiting.json()["status"] == "queued"
+    again = await client.post(f"/api/v1/projects/{project_id}/field-bundle/map", json={}, headers=h)
+    assert again.status_code == 202 and again.json()["requested_at"] == state["requested_at"]
+
+    # the worker's job, on a planet of our own (tests/shared/test_map_extract.py) at zoom 3
+    planet = tmp_path / "planet.pmtiles"
+    make_planet(planet, max_zoom=4)
+
+    async def source() -> tuple[str, str]:
+        return str(planet), "20261015"
+
+    monkeypatch.setattr(extract_module, "resolve_source", source)
+    await extract_module.run_map_extract_job({"project_id": str(project_id)})
+
+    ready = await client.get(f"/api/v1/projects/{project_id}/field-bundle/map", headers=h)
+    assert ready.status_code == 200, ready.text
+    assert ready.headers["content-type"] == "application/vnd.pmtiles"
+    assert ready.headers["x-map-build"] == "20261015"
+    assert hashlib.sha256(ready.content).hexdigest() == ready.headers["x-content-sha256"]
+    assert int(ready.headers["content-length"]) == len(ready.content)
+    bundle = (await client.get(f"/api/v1/projects/{project_id}/field-bundle", headers=h)).json()
+    assert bundle["map"]["status"] == "ready" and bundle["map"]["build"] == "20261015"
+
+    # a fresh map that covers the area is kept; force cuts again
+    kept = await client.post(f"/api/v1/projects/{project_id}/field-bundle/map", json={}, headers=h)
+    assert kept.json()["status"] == "ready"
+    forced = await client.post(
+        f"/api/v1/projects/{project_id}/field-bundle/map", json={"force": True}, headers=h
+    )
+    assert forced.json()["status"] == "queued"
+
+    # a viewer may ask too, a stranger may not
+    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    assert (
+        await client.get(f"/api/v1/projects/{project_id}/field-bundle/map", headers=viewer.headers)
+    ).status_code == 202
+    stranger = await actor(client, db)
+    assert (
+        await client.get(
+            f"/api/v1/projects/{project_id}/field-bundle/map", headers=stranger.headers
+        )
+    ).status_code == 403

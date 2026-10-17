@@ -48,6 +48,7 @@ from shared.models.events import (
     RuleState,
     RuleVersion,
 )
+from shared.models.field import MapExtract
 from shared.models.integrations import Integration, IntegrationDelivery
 from shared.models.log_files import DeviceLogFile
 from shared.models.lp0 import DeviceLp0Credentials
@@ -118,6 +119,7 @@ __all__ = [
     "Integration",
     "IntegrationDelivery",
     "Invitation",
+    "MapExtract",
     "McpPendingAction",
     "Measurement",
     "Metric",

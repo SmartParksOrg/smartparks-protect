@@ -1417,6 +1417,12 @@ wheels = [
 ]
 
 [[package]]
+name = "pmtiles"
+version = "3.4.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/21/69/5c2e4eb58aaf6303aebbaad3e6d7394b96d28f94af5bc16a6540d815bb09/pmtiles-3.4.1.tar.gz", hash = "sha256:48d6d8f317e7ec1f4150a715b1c220777f89f0c1061874a6022255a0859836ee", size = 13895, upload-time = "2024-10-12T05:33:45.891Z" }
+
+[[package]]
 name = "proto-plus"
 version = "1.28.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1905,6 +1911,7 @@ dev = [
     { name = "httpx" },
     { name = "httpx-ws" },
     { name = "mypy" },
+    { name = "pmtiles" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -1932,6 +1939,7 @@ dev = [
     { name = "httpx", specifier = "==0.28.1" },
     { name = "httpx-ws", specifier = "==0.9.0" },
     { name = "mypy", specifier = "==2.3.1" },
+    { name = "pmtiles", specifier = "==3.4.1" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "ruff", specifier = "==0.16.5" },

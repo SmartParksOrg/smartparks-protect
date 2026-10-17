@@ -1,7 +1,8 @@
 """Export service: consumes `export.requested`, runs the job, stores the result in MinIO. It is
 also the batch worker for curation jobs (`curation.job_requested`, architecture 28.5), for
 attribution jobs (`attribution.requested`, decision D206) and for the PDF reports of analysis
-runs (`analysis_report.requested`, decision D211)."""
+runs (`analysis_report.requested`, decision D211) and for the offline maps of Protect Field
+(`map_extract.requested`, phase 43 P3)."""
 
 import asyncio
 import uuid
@@ -14,6 +15,7 @@ from shared.domain.attribution import run_attribution_job
 from shared.exports.cleanup import expire_exports
 from shared.exports.runner import run_export
 from shared.logger import get_logger
+from shared.maps.extract import run_map_extract_job
 from shared.models import ExportJob
 from shared.worker import Worker
 
@@ -43,6 +45,9 @@ def build_worker() -> Worker:
     async def on_report(message: Message) -> None:
         await run_report_job(message.payload)
 
+    async def on_map_extract(message: Message) -> None:
+        await run_map_extract_job(message.payload)
+
     async def cleanup_loop() -> None:
         """Every hour: remove the files of exports past their retention (architecture 14)."""
         while not worker.bus._stop.is_set():
@@ -59,6 +64,7 @@ def build_worker() -> Worker:
     worker.subscribe(Topic.CURATION_JOB_REQUESTED, on_curation)
     worker.subscribe(Topic.ATTRIBUTION_REQUESTED, on_attribution)
     worker.subscribe(Topic.ANALYSIS_REPORT_REQUESTED, on_report)
+    worker.subscribe(Topic.MAP_EXTRACT_REQUESTED, on_map_extract)
     worker.background(cleanup_loop)
     return worker
 

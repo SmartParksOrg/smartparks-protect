@@ -19442,6 +19442,121 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/field-bundle/map": {
+   "post": {
+    "tags": [
+     "offload"
+    ],
+    "summary": "Request Field Map",
+    "description": "Ask for the project's offline map (phase 43 P3): the export worker cuts the area, with\na margin, from the newest Protomaps planet build. One job per project at a time; a map\nyounger than a month that covers the area is kept unless `force`. The area is the extent of\nthe project's features, entity places and device places, so a project with none yet has no\nmap to cut.",
+    "operationId": "request_field_map_api_v1_projects__project_id__field_bundle_map_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FieldMapRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FieldMapRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "offload"
+    ],
+    "summary": "Download Field Map",
+    "description": "The project's offline map as a PMTiles file, streamed from MinIO, once it is ready;\nwhile it is being made, its state with 202; 404 when none was asked for; 409 with the\nreason when the last attempt failed.",
+    "operationId": "download_field_map_api_v1_projects__project_id__field_bundle_map_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The map file",
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "application/vnd.pmtiles": {}
+      }
+     },
+     "202": {
+      "description": "Being made; the state",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FieldMapRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/analysis-layers": {
    "get": {
     "tags": [
@@ -34371,6 +34486,17 @@
        }
       ]
      },
+     "map": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FieldMapRead"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The offline map's state, once one was asked for"
+     },
      "credentials_included": {
       "type": "boolean",
       "title": "Credentials Included",
@@ -34642,6 +34768,121 @@
     ],
     "title": "FieldLp0",
     "description": "A tracker's LP0 credentials: the address always, the keys for a caller who may set them\nin Protect (device control in the project, or a server admin), as 32 hex digits."
+   },
+   "FieldMapRead": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "title": "Status",
+      "description": "queued, running, ready or failed"
+     },
+     "west": {
+      "type": "number",
+      "title": "West"
+     },
+     "south": {
+      "type": "number",
+      "title": "South"
+     },
+     "east": {
+      "type": "number",
+      "title": "East"
+     },
+     "north": {
+      "type": "number",
+      "title": "North"
+     },
+     "max_zoom": {
+      "type": "integer",
+      "title": "Max Zoom"
+     },
+     "build": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Build",
+      "description": "The planet build's date, YYYYMMDD"
+     },
+     "size_bytes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Size Bytes"
+     },
+     "sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sha256"
+     },
+     "requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Requested At"
+     },
+     "ready_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ready At"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "west",
+     "south",
+     "east",
+     "north",
+     "max_zoom",
+     "requested_at"
+    ],
+    "title": "FieldMapRead",
+    "description": "The project's offline map (phase 43 P3): a PMTiles extract of the area with a margin,\ncut from a Protomaps planet build; `ready` means `GET /projects/{id}/field-bundle/map`\nstreams it."
+   },
+   "FieldMapRequest": {
+    "properties": {
+     "force": {
+      "type": "boolean",
+      "title": "Force",
+      "description": "Cut again although a fresh map covers the area",
+      "default": false
+     }
+    },
+    "type": "object",
+    "title": "FieldMapRequest"
    },
    "FieldProject": {
     "properties": {

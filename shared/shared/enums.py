@@ -291,6 +291,15 @@ class ExportStatus(StrEnum):
     EXPIRED = "expired"  # the file was removed after its retention (architecture 14)
 
 
+class MapExtractStatus(StrEnum):
+    """The offline map of a project's area for Protect Field (phase 43 P3)."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    READY = "ready"
+    FAILED = "failed"
+
+
 class AnalysisStatus(StrEnum):
     """The life of an analysis run (docs/ANALYTICS_PHASE1_PLAN.md, section 7)."""
 

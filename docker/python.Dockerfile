@@ -19,6 +19,24 @@ RUN apt-get update \
         libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
+# go-pmtiles cuts the offline maps of Protect Field from a Protomaps planet build (phase 43 P3).
+# One static binary, pinned; the digest was computed on 2026-10-17 since the release publishes
+# none. The image is built for amd64; another architecture fails here on purpose.
+ARG PMTILES_VERSION=1.31.2
+ARG PMTILES_SHA256=3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f
+RUN python3 - "$PMTILES_VERSION" "$PMTILES_SHA256" <<'PY' \
+    && tar -xzf /tmp/pmtiles.tgz -C /usr/local/bin pmtiles && rm /tmp/pmtiles.tgz
+import hashlib, platform, sys, urllib.request
+version, expected = sys.argv[1], sys.argv[2]
+if platform.machine() not in ("x86_64", "AMD64"):
+    sys.exit(f"pmtiles is pinned for x86_64; this image builds on {platform.machine()}")
+url = f"https://github.com/protomaps/go-pmtiles/releases/download/v{version}/go-pmtiles_{version}_Linux_x86_64.tar.gz"
+data = urllib.request.urlopen(url, timeout=120).read()
+if hashlib.sha256(data).hexdigest() != expected:
+    sys.exit("pmtiles download does not match its pinned digest")
+open("/tmp/pmtiles.tgz", "wb").write(data)
+PY
+
 COPY pyproject.toml uv.lock ./
 COPY shared/pyproject.toml shared/pyproject.toml
 COPY services/api/pyproject.toml services/api/pyproject.toml

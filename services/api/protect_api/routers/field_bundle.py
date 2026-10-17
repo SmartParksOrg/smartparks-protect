@@ -10,12 +10,14 @@ import re
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import JSONResponse, StreamingResponse
 from geoalchemy2 import Geometry
 from sqlalchemy import cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
+from protect_api.bus import get_bus
 from protect_api.deps import ProjectContext, require_permission
 from protect_api.routers.offload import STATION_TYPE_KEY, _current_entities, _project_device_ids
 from protect_api.schemas.field_bundle import (
@@ -24,12 +26,17 @@ from protect_api.schemas.field_bundle import (
     FieldDevice,
     FieldEntity,
     FieldLp0,
+    FieldMapRead,
+    FieldMapRequest,
     FieldProject,
     FieldStation,
 )
+from shared.bus import RedisStreamsBus
 from shared.config import get_settings
 from shared.database import get_session
 from shared.domain.lp0 import credentials_for, device_eui, lp0_source
+from shared.enums import MapExtractStatus
+from shared.maps.extract import Bbox, queue_map_extract
 from shared.models import (
     Device,
     DeviceLp0Credentials,
@@ -38,8 +45,10 @@ from shared.models import (
     EntityType,
     Feature,
     Gateway,
+    MapExtract,
 )
 from shared.permissions import Permission
+from shared.storage import stream_object
 from shared.timeutil import utc_now
 from shared.version import __version__
 
@@ -224,6 +233,7 @@ async def field_bundle(
         else []
     )
 
+    map_row = await session.get(MapExtract, context.project.id)
     await record_audit(
         session,
         user=context.user,
@@ -246,6 +256,7 @@ async def field_bundle(
             timezone=context.project.timezone,
         ),
         area=await _area(session, context.project.id, device_ids),
+        map=_map_read(map_row) if map_row else None,
         credentials_included=reveal,
         devices=devices,
         entities=[
@@ -260,4 +271,105 @@ async def field_bundle(
             for entity, key, label, geometry in entity_rows
         ],
         stations=stations,
+    )
+
+
+def _map_read(row: MapExtract) -> FieldMapRead:
+    return FieldMapRead(
+        status=row.status,
+        west=row.west,
+        south=row.south,
+        east=row.east,
+        north=row.north,
+        max_zoom=row.max_zoom,
+        build=row.build,
+        size_bytes=row.size_bytes,
+        sha256=row.sha256,
+        requested_at=row.requested_at,
+        ready_at=row.ready_at,
+        error=row.error,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/field-bundle/map",
+    response_model=FieldMapRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_field_map(
+    body: FieldMapRequest,
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> FieldMapRead:
+    """Ask for the project's offline map (phase 43 P3): the export worker cuts the area, with
+    a margin, from the newest Protomaps planet build. One job per project at a time; a map
+    younger than a month that covers the area is kept unless `force`. The area is the extent of
+    the project's features, entity places and device places, so a project with none yet has no
+    map to cut."""
+    device_ids = await _project_device_ids(session, context)
+    area = await _area(session, context.project.id, device_ids)
+    if area is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "The project has no area yet: place an offload station, an entity or a feature first",
+        )
+    row, queued = await queue_map_extract(
+        session,
+        bus,
+        context.project.id,
+        Bbox(area.west, area.south, area.east, area.north),
+        requested_by=context.user.id,
+        force=body.force,
+    )
+    if queued:
+        await record_audit(
+            session,
+            user=context.user,
+            action="project.field_map_requested",
+            object_type="project",
+            object_id=str(context.project.id),
+            project_id=context.project.id,
+            details={"max_zoom": row.max_zoom, "force": body.force},
+        )
+    await session.commit()
+    return _map_read(row)
+
+
+@router.get(
+    "/projects/{project_id}/field-bundle/map",
+    responses={
+        200: {"content": {"application/vnd.pmtiles": {}}, "description": "The map file"},
+        202: {"model": FieldMapRead, "description": "Being made; the state"},
+    },
+)
+async def download_field_map(
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """The project's offline map as a PMTiles file, streamed from MinIO, once it is ready;
+    while it is being made, its state with 202; 404 when none was asked for; 409 with the
+    reason when the last attempt failed."""
+    row = await session.get(MapExtract, context.project.id)
+    if row is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "No offline map yet; ask for one with POST on this path"
+        )
+    if row.status == MapExtractStatus.FAILED:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"The last map failed: {row.error}")
+    if row.status != MapExtractStatus.READY or row.object_key is None:
+        return JSONResponse(
+            _map_read(row).model_dump(mode="json"), status_code=status.HTTP_202_ACCEPTED
+        )
+    return StreamingResponse(
+        stream_object(get_settings().minio_bucket_map_extracts, row.object_key),
+        media_type="application/vnd.pmtiles",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{context.project.slug}-{row.build}.pmtiles"'
+            ),
+            "Content-Length": str(row.size_bytes or ""),
+            "X-Content-SHA256": row.sha256 or "",
+            "X-Map-Build": row.build or "",
+        },
     )

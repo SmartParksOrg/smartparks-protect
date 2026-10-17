@@ -21,6 +21,10 @@ Every download is an audit log entry (`project.field_bundle_downloaded`) with ho
 
 **The parser**, `shared/station_files.py`: the module that reads a station's files and unpacks a card's zip, with no database, broker or settings import, so Field reads a card on a laptop with the same code the file worker runs on the server. Field installs Protect's `shared` package pinned to a commit and imports this module, the LP0 codec and the OpenCollar driver.
 
+## The offline map
+
+Field draws positions on a map where there is no connection, so the map must travel with the bundle (Field's decision D4; phase 43 P3). Protect cuts it: `POST /projects/{id}/field-bundle/map` asks the export worker to run `pmtiles extract` on the newest Protomaps planet build, a single file of some 140 GB at `build.protomaps.com` that answers range requests, for the project's area with a five kilometre margin down to zoom 14. The worker reads only the ranges the box needs, keeps the result in the `map-extracts` bucket and writes its size, digest and build date on the project's row; `GET` on the same path streams the file once it is ready, answers 202 with the state while it is being made, and 409 with the reason when the attempt failed. A map younger than a month that covers the area is kept; `force` cuts again. The bundle names the map's state. A park-sized area at zoom 14 is a few tens of megabytes; `MAP_EXTRACT_MAX_ZOOM`, `MAP_EXTRACT_MAX_BYTES` and `MAP_EXTRACT_SOURCE` (a build pinned by URL, or a file for a server without internet) are the settings. The tiles are OpenStreetMap's, under the ODbL, built by Protomaps; Field's map says so. Satellite imagery stays online: its terms do not allow caching.
+
 ## What Field gives Protect
 
 The card's files, exactly as read, through `POST /devices/{id}/offload-files`, the same upload the station's device page makes. Protect decodes them, attributes the records as of their record time, and refuses a file it already holds by its content digest and a frame it already holds by its hash, so a card read in the field and uploaded later costs nothing twice.
@@ -31,4 +35,4 @@ No decoded row, no master key (Protect holds none, decision D327), and for now n
 
 ## Still to come
 
-The offline map extract (PMTiles of the project's area, cut on the server from a Protomaps planet build) is Field's decision D4 and Protect's phase 43 P3; until it exists Field shows positions on a blank canvas or on tiles cached by hand.
+Field's own pages for the bundle, the cards and the upload (Field's phase 2); on this side, nothing is open.
