@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { BookOpen, CircleCheck, HardDrive, Laptop, Plus } from "lucide-react";
+import { BookOpen, CircleCheck, CircleHelp, HardDrive, Laptop, Plus, Radio } from "lucide-react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -592,7 +592,9 @@ export function OffloadPage() {
           />
         </section>
         <section className="space-y-2">
-          <h2 className="text-base font-semibold">{t("Trackers")}</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <Radio className="size-4" /> {t("Trackers")}
+          </h2>
           <DataTable
             columns={trackerColumns}
             data={data ? trackers : undefined}
@@ -664,8 +666,8 @@ export function OffloadPage() {
         </section>
         {unknown.length > 0 && (
           <section className="space-y-2">
-            <h2 className="text-base font-semibold">
-              {t("Addresses no device has")}
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <CircleHelp className="size-4" /> {t("Addresses no device has")}
             </h2>
             <Callout kind="warning">
               {t(
