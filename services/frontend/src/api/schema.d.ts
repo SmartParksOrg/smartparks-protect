@@ -4627,8 +4627,8 @@ export interface paths {
          * Field Bundle
          * @description The project for the field (decision D331): devices with the entity each tracks now and
          *     their DevEUI, the entities, the offload stations with EUI and place, the area, and each
-         *     tracker's LP0 address with its keys when the caller may set keys in this project. Field reads
-         *     a card with this offline and uploads the card's files, never what it decoded.
+         *     tracker's LP0 address with its keys when the caller may set keys in this project. Protect Go
+         *     reads a card with this offline and uploads the card's files, never what it decoded.
          */
         get: operations["field_bundle_api_v1_projects__project_id__field_bundle_get"];
         put?: never;
@@ -9668,7 +9668,7 @@ export interface components {
          * FieldBundleRead
          * @description One project for the field: its devices with the entity each tracks now, the entities,
          *     the stations with their EUI and place, the trackers' LP0 credentials the caller may see, the
-         *     area, and the versions that made it. Field decodes a card with these and uploads the card's
+         *     area, and the versions that made it. Protect Go decodes a card with these and uploads the card's
          *     files untouched to `POST /devices/{id}/offload-files`; nothing decoded comes back.
          */
         FieldBundleRead: {
