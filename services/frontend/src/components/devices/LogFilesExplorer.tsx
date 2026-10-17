@@ -220,6 +220,7 @@ export function LogFilesExplorer({
     {
       header: t("Records"),
       id: "records",
+      accessorFn: (f) => f.records_new,
       cell: ({ row }) => (
         <span className="tabular-nums" title={t("new, known through another path")}>
           {row.original.records_new}
@@ -230,6 +231,7 @@ export function LogFilesExplorer({
     {
       header: t("Period"),
       id: "period",
+      accessorFn: (f) => f.period_start ?? "",
       cell: ({ row }) =>
         row.original.period_start && row.original.period_end ? (
           <span className="whitespace-nowrap text-xs">

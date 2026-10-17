@@ -17,6 +17,7 @@ import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
 import { FieldCard } from "@/components/network/FieldCard";
+import { FilesSection } from "@/components/network/FilesSection";
 import { OffloadStationDialog } from "@/components/network/OffloadStationDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -686,6 +687,7 @@ export function OffloadPage() {
             />
           </section>
         )}
+        <FilesSection projectId={projectId} canWrite={can("devices:control")} />
       </Page>
     </>
   );

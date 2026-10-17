@@ -6,7 +6,7 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
-- **Files** under Network: every file uploaded for the project's devices in one place, as the device page's log files explorer shows them, with the device as a column and a filter (`GET /projects/{id}/log-files`, each row with its device's name). Tim, 2026-10-17: the files explorer of Protect Go, here for what was uploaded.
+- **Files** at the foot of the Offload page: every file uploaded for the project's devices in one place, as the device page's log files explorer shows them, with the device as a column and a filter, a search box and sortable columns (`GET /projects/{id}/log-files`, each row with its device's name). Tim, 2026-10-17: the files explorer of Protect Go, here for what was uploaded, on the Offload page rather than a page of its own.
 
 ### Changed
 
