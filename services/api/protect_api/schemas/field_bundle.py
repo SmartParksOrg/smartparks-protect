@@ -1,4 +1,4 @@
-"""The field bundle for Smart Parks Protect Field (phase 43, decision D331): what a project's
+"""The field bundle for Smart Parks Protect Go (phase 43, decision D331): what a project's
 member takes along to read an offload station's card where there is no connection."""
 
 import uuid
@@ -101,7 +101,7 @@ class FieldMapRequest(BaseModel):
 class FieldBundleRead(BaseModel):
     """One project for the field: its devices with the entity each tracks now, the entities,
     the stations with their EUI and place, the trackers' LP0 credentials the caller may see, the
-    area, and the versions that made it. Field decodes a card with these and uploads the card's
+    area, and the versions that made it. Protect Go decodes a card with these and uploads the card's
     files untouched to `POST /devices/{id}/offload-files`; nothing decoded comes back."""
 
     format_version: int = Field(default=1, description="The shape of this document")

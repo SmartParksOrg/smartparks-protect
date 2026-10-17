@@ -1,6 +1,6 @@
-/** Protect Field, the companion for the laptop (decision D332): the installers of its newest
+/** Protect Go, the app for the laptop (decision D332; named Protect Go on 2026-10-17): the installers of its newest
  * release under fixed names, the one for the visitor's system first, and the link that opens an
- * installed Field connected to this server. */
+ * installed Protect Go connected to this server. */
 
 export type FieldSystem = "windows" | "macos" | "linux";
 
@@ -12,13 +12,13 @@ export interface FieldInstaller {
   url: string;
 }
 
-const RELEASE = "https://github.com/SmartParksOrg/smartparks-protect-field/releases/latest/download";
-export const FIELD_GUIDE_URL = "https://smartparksorg.github.io/smartparks-protect-field/using-field/";
+const RELEASE = "https://github.com/SmartParksOrg/smartparks-protect-go/releases/latest/download";
+export const FIELD_GUIDE_URL = "https://smartparksorg.github.io/smartparks-protect-go/using-protect-go/";
 
 const INSTALLERS: Record<FieldSystem, Omit<FieldInstaller, "url">> = {
-  windows: { system: "windows", label: "Windows", note: "Windows 10 and 11", file: "ProtectField-Setup.exe" },
-  macos: { system: "macos", label: "macOS", note: "Apple Silicon", file: "ProtectField-arm64.dmg" },
-  linux: { system: "linux", label: "Linux", note: "Debian and Ubuntu", file: "ProtectField-amd64.deb" },
+  windows: { system: "windows", label: "Windows", note: "Windows 10 and 11", file: "ProtectGo-Setup.exe" },
+  macos: { system: "macos", label: "macOS", note: "Apple Silicon", file: "ProtectGo-arm64.dmg" },
+  linux: { system: "linux", label: "Linux", note: "Debian and Ubuntu", file: "ProtectGo-amd64.deb" },
 };
 
 /** The visitor's system from the user agent, or null for a phone or something else. */
@@ -41,7 +41,7 @@ export function fieldInstallers(system: FieldSystem | null): FieldInstaller[] {
   return order.map((key) => ({ ...INSTALLERS[key], url: `${RELEASE}/${INSTALLERS[key].file}` }));
 }
 
-/** The link an installed Field answers to: it opens with this server filled in. */
+/** The link an installed Protect Go answers to: the app opens with this server filled in. */
 export function fieldConnectLink(serverOrigin: string): string {
-  return `protect-field://connect?server=${encodeURIComponent(serverOrigin)}`;
+  return `protect-go://connect?server=${encodeURIComponent(serverOrigin)}`;
 }

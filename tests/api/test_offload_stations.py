@@ -307,7 +307,7 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     ).all()
     assert len(positions) == 3
     # the same frame through the shared decode path gives the same records (phase 43 P6):
-    # Protect Field decodes a card on a laptop with these two calls and nothing else
+    # Protect Go decodes a card on a laptop with these two calls and nothing else
     opened = unwrap_station_frame(
         frames[0],
         KEYS_A,

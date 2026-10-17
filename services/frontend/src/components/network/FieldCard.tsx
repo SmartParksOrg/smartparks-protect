@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { detectSystem, FIELD_GUIDE_URL, fieldConnectLink, fieldInstallers } from "@/lib/field";
 
 /**
- * Protect Field for the laptop, from the Offload page (decision D332; Tim, 2026-10-17: the
- * install starts here, users are not technical). The installer for the visitor's system first,
- * the others behind it, the server address to type during Field's setup with a copy button, and
- * "Open Field", which an installed Field answers to with this server filled in; a browser with no
- * Field installed does nothing with the link, which the hint says.
+ * Protect Go, the app for the laptop, from the Offload page (decision D332; Tim, 2026-10-17: the
+ * install starts here, users are not technical; named Protect Go the same day). The installer
+ * for the visitor's system first, the others behind it, the server address to type during the
+ * app's setup with a copy button, and "Open Protect Go", which an installed app answers to with
+ * this server filled in; a browser with no app installed does nothing with the link, which the
+ * hint says.
  */
 export function FieldCard() {
   const { t } = useTranslation();
@@ -22,11 +23,11 @@ export function FieldCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Laptop className="size-4" /> {t("Field for the laptop")}
+          <Laptop className="size-4" /> {t("Protect Go, the app for the laptop")}
         </CardTitle>
         <CardDescription>
           {t(
-            "Protect Field reads a station's SD card on a laptop where there is no connection, with Protect's own decoding, and uploads the files to this server when you are back online. Install it on the laptop you take to the stations.",
+            "Protect Go reads a station's SD card on a laptop where there is no connection, with Protect's own decoding, and uploads the files to this server when you are back online. Install the app on the laptop you take to the stations.",
           )}
         </CardDescription>
       </CardHeader>
@@ -55,7 +56,7 @@ export function FieldCard() {
           ))}
         </p>
         <div>
-          <p className="font-medium">{t("During Field's setup, give it this server:")}</p>
+          <p className="font-medium">{t("During the app's setup, give it this server:")}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <code className="rounded bg-muted px-2 py-1">{server}</code>
             <Button
@@ -72,17 +73,17 @@ export function FieldCard() {
             </Button>
             <Button asChild variant="outline" size="sm">
               <a href={fieldConnectLink(server)}>
-                <ExternalLink className="size-4" /> {t("Open Field")}
+                <ExternalLink className="size-4" /> {t("Open Protect Go")}
               </a>
             </Button>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            {t("\"Open Field\" starts an installed Field with this server filled in; it does nothing until Field is installed. Then sign in with your Protect email and password.")}
+            {t("\"Open Protect Go\" starts the installed app with this server filled in; it does nothing until the app is installed. Then sign in with your Protect email and password.")}
           </p>
         </div>
         <p className="text-xs text-muted-foreground">
           <a className="underline underline-offset-4" href={FIELD_GUIDE_URL} target="_blank" rel="noreferrer">
-            {t("How to install and use Field, step by step")}
+            {t("How to install and use Protect Go, step by step")}
           </a>
         </p>
       </CardContent>

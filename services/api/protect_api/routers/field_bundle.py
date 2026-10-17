@@ -1,5 +1,5 @@
-"""The field bundle (phase 43, decision D331): what Smart Parks Protect Field, the companion for
-the place without a connection, downloads from a project before leaving, so a card reads offline
+"""The field bundle (phase 43, decision D331): what Smart Parks Protect Go, the app for the
+place without a connection, downloads from a project before leaving, so a card reads offline
 with the same code and the same credentials the server would use. One project per call, the
 caller's visibility applied, the keys only for a caller who may set them (the rule of
 `GET /devices/{id}/lp0-credentials`), the download in the audit log."""
@@ -124,8 +124,8 @@ async def field_bundle(
 ) -> FieldBundleRead:
     """The project for the field (decision D331): devices with the entity each tracks now and
     their DevEUI, the entities, the offload stations with EUI and place, the area, and each
-    tracker's LP0 address with its keys when the caller may set keys in this project. Field reads
-    a card with this offline and uploads the card's files, never what it decoded."""
+    tracker's LP0 address with its keys when the caller may set keys in this project. Protect Go
+    reads a card with this offline and uploads the card's files, never what it decoded."""
     reveal = context.is_server_admin or Permission.DEVICES_CONTROL in context.permissions
     device_ids = await _project_device_ids(session, context)
     rows = (

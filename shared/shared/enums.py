@@ -292,7 +292,7 @@ class ExportStatus(StrEnum):
 
 
 class MapExtractStatus(StrEnum):
-    """The offline map of a project's area for Protect Field (phase 43 P3)."""
+    """The offline map of a project's area for Protect Go (phase 43 P3)."""
 
     QUEUED = "queued"
     RUNNING = "running"

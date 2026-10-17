@@ -5,7 +5,7 @@ The station writes `LOG_N/STATIONEUI_timestamp[_NNN].jsonl`: one Semtech `rxpk` 
 line with the frame it stored, an ordinary LoRaWAN 1.0 uplink under the tracker's keys, and the
 reception; since LP0 v5 an `lp0` object beside it. This module parses those files and unpacks a
 card's zip. It imports nothing that needs a database, a broker or Protect's settings, so Smart
-Parks Protect Field reads a card with it on a laptop exactly as the file worker does on the
+Parks Protect Go reads a card with it on a laptop exactly as the file worker does on the
 server; `shared/logfiles.py` holds the storing half.
 """
 

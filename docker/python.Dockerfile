@@ -19,7 +19,7 @@ RUN apt-get update \
         libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
-# go-pmtiles cuts the offline maps of Protect Field from a Protomaps planet build (phase 43 P3).
+# go-pmtiles cuts the offline maps of Protect Go from a Protomaps planet build (phase 43 P3).
 # One static binary, pinned; the digest was computed on 2026-10-17 since the release publishes
 # none. The image is built for amd64; another architecture fails here on purpose.
 ARG PMTILES_VERSION=1.31.2

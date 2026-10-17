@@ -11,4 +11,4 @@
 - [Fences and traps](fences-and-traps.md): a fence line that reads its status section by section from the FenceEdge devices on it, and a trap whose door a TrapEdge watches.
 - [Raw log files](raw-log-files.md): uploaded logs as managed assets, decoded through the same pipeline.
 - [Offload stations](offload-stations.md): a RangerEdge with an SD card that trackers offload their flash logs to over LP0, the card's files read into Protect with each tracker's own keys, the station an entity and a gateway.
-- [Field, the companion](field-companion.md): the separate program that reads a station's card on a laptop without a connection, what Protect gives it (the field bundle, the parser) and what comes back (the card files, nothing decoded).
+- [Protect Go, the app for the laptop](protect-go.md): the separate program that reads a station's card on a laptop without a connection, what Protect gives it (the field bundle, the parser) and what comes back (the card files, nothing decoded).

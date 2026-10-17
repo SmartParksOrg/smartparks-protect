@@ -12,17 +12,17 @@ test("puts the visitor's installer first with the fixed release names", () => {
   const forMac = fieldInstallers("macos");
   expect(forMac.map((i) => i.system)).toEqual(["macos", "windows", "linux"]);
   expect(forMac[0].url).toBe(
-    "https://github.com/SmartParksOrg/smartparks-protect-field/releases/latest/download/ProtectField-arm64.dmg",
+    "https://github.com/SmartParksOrg/smartparks-protect-go/releases/latest/download/ProtectGo-arm64.dmg",
   );
   expect(fieldInstallers(null).map((i) => i.file)).toEqual([
-    "ProtectField-Setup.exe",
-    "ProtectField-arm64.dmg",
-    "ProtectField-amd64.deb",
+    "ProtectGo-Setup.exe",
+    "ProtectGo-arm64.dmg",
+    "ProtectGo-amd64.deb",
   ]);
 });
 
 test("the connect link carries the server", () => {
   expect(fieldConnectLink("https://dev-protect.smartparks.org")).toBe(
-    "protect-field://connect?server=https%3A%2F%2Fdev-protect.smartparks.org",
+    "protect-go://connect?server=https%3A%2F%2Fdev-protect.smartparks.org",
   );
 });

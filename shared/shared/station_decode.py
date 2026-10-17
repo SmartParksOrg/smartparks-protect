@@ -1,11 +1,11 @@
 """One decode path for a frame an offload station stored (phase 43 P6, decision D331).
 
-The decoder's pipeline and Protect Field both turn a card's line into records: the frame is
+The decoder's pipeline and Protect Go both turn a card's line into records: the frame is
 verified and decrypted with the tracker's own keys, the station's word on who the tracker is
 is checked against the registry, and the driver reads the records. The checks and the shape
-of what the driver sees live here, with no database in sight, so Field decodes a card on a
+of what the driver sees live here, with no database in sight, so Protect Go decodes a card on a
 laptop exactly as the server does; the pipeline looks the keys and the counter up and writes
-the metadata, Field reads them from its bundle. A frame that cannot be decoded is refused
+the metadata, Protect Go reads them from its bundle. A frame that cannot be decoded is refused
 with the same code and words in both.
 """
 
@@ -95,7 +95,7 @@ def unwrap_station_frame(
 
 def frame_metadata(frame: UnwrappedFrame) -> dict[str, Any]:
     """What the pipeline writes to the event's provider metadata once a frame is open, and
-    what Field passes the driver: the payload in hex, the port and both counters."""
+    what Protect Go passes the driver: the payload in hex, the port and both counters."""
     return {
         "frame_hex": frame.payload.hex(),
         "f_port": frame.f_port,

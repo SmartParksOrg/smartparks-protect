@@ -1,11 +1,11 @@
-"""The offline map of a project's area for Protect Field (phase 43 P3; Field's decision D4).
+"""The offline map of a project's area for Protect Go (phase 43 P3; Protect Go's decision D4).
 
 Protomaps publishes a planet build most days at https://build.protomaps.com/YYYYMMDD.pmtiles, one
 PMTiles file of some 140 GB that answers range requests, and its `pmtiles extract` command cuts
 a bounding box out of it by reading only the ranges it needs. The export worker runs that
 command for a project's area, padded by a margin, down to a zoom level, keeps the result in
-MinIO and the row says where; Field downloads it beside the field bundle and serves it to
-MapLibre offline. The data is OpenStreetMap's under the ODbL; Field's map credits it.
+MinIO and the row says where; Protect Go downloads it beside the field bundle and serves it to
+MapLibre offline. The data is OpenStreetMap's under the ODbL; Protect Go's map credits it.
 """
 
 import asyncio

@@ -1,7 +1,7 @@
 """Export service: consumes `export.requested`, runs the job, stores the result in MinIO. It is
 also the batch worker for curation jobs (`curation.job_requested`, architecture 28.5), for
 attribution jobs (`attribution.requested`, decision D206) and for the PDF reports of analysis
-runs (`analysis_report.requested`, decision D211) and for the offline maps of Protect Field
+runs (`analysis_report.requested`, decision D211) and for the offline maps of Protect Go
 (`map_extract.requested`, phase 43 P3)."""
 
 import asyncio

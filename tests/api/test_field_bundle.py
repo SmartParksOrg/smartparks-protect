@@ -1,4 +1,4 @@
-"""The field bundle for Protect Field (phase 43, decision D331): one project for a laptop in the
+"""The field bundle for Protect Go (phase 43, decision D331): one project for a laptop in the
 field, with the keys only for a caller who may set them, the stations with their EUI and place,
 the area, and the download in the audit log."""
 

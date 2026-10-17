@@ -171,7 +171,7 @@ class Settings(BaseSettings):
     )
     minio_bucket_map_extracts: str = Field(
         default="map-extracts",
-        description="The offline maps of project areas for Protect Field (phase 43 P3)",
+        description="The offline maps of project areas for Protect Go (phase 43 P3)",
     )
     pmtiles_bin: str = Field(
         default="pmtiles",

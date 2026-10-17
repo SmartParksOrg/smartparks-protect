@@ -1,4 +1,4 @@
-"""What Protect keeps for Protect Field, the companion for the place without a connection
+"""What Protect keeps for Protect Go, the companion for the place without a connection
 (phase 43, decision D331): the offline map of a project's area, one extract per project."""
 
 import uuid
@@ -23,8 +23,8 @@ from shared.models.base import Base
 
 class MapExtract(Base):
     """A PMTiles extract of the project's area, cut from a Protomaps planet build by the export
-    worker and kept in MinIO (phase 43 P3; Field's decision D4). One row per project: the newest
-    extract, or the one being made, or the reason the last attempt failed."""
+    worker and kept in MinIO (phase 43 P3; Protect Go's decision D4). One row per project: the
+    newest extract, or the one being made, or the reason the last attempt failed."""
 
     __tablename__ = "map_extracts"
     __table_args__ = (

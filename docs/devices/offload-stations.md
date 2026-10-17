@@ -11,7 +11,7 @@ own keys, decodes the records through the pipeline it uses for a raw log file, a
 station's reception beside each one. Phase 42, decisions D319 to D324; the design is in
 [`LP0_OFFLOAD_PLAN.md`](../LP0_OFFLOAD_PLAN.md).
 
-Where the people who collect a card have no connection for days, [Field](field-companion.md), a separate program on a laptop, reads the card with Protect's own code and uploads its files later.
+Where the people who collect a card have no connection for days, [Protect Go](protect-go.md), a separate app on a laptop, reads the card with Protect's own code and uploads its files later.
 
 ## What is on the card
 
