@@ -3012,3 +3012,4 @@ Listed by the phase where they are first needed.
 ### 2026-10-17, the metric registry for Protect Go (Claude and Tim)
 
 - Tim: the Go app must get the metric definitions from Protect, since its new Data explorer (its D21) showed bare keys. D334: the field bundle carries the registry; the app serves it at `GET /api/bundle/metrics` and the explorer shows labels and units (its v0.9.2). Committed, CI, deployed to dev.
+- Tim: make the connection to the app on the Offload page simpler, either install or open, not the extensive text. The card is two buttons and one line now (`FieldCard.tsx`): Open Protect Go, Install for the visitor's system, the other systems and the guide as links; the address block and the hints are gone. Committed, deployed to dev.

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
-import { Copy, Download, ExternalLink, Laptop } from "lucide-react";
+import { Download, ExternalLink, Laptop } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
@@ -11,13 +11,11 @@ import { detectSystem, FIELD_GUIDE_URL, fieldConnectLink, fieldInstallers } from
 
 /**
  * Protect Go, the app for the laptop, from the Offload page (decision D332; Tim, 2026-10-17: the
- * install starts here, users are not technical; named Protect Go the same day). The installer
- * for the visitor's system first, the others behind it, the server address to type during the
- * app's setup with a copy button, and "Open Protect Go", which an installed app answers to with
- * this server filled in and signed in: the button first asks the server for a one-time code
- * (decision D333), which the app exchanges for a sign-in of its own, so nobody types the address
- * or the password on the laptop; a browser with no app installed does nothing with the link,
- * which the hint says.
+ * install starts here, users are not technical, and the card says as little as it can). Two
+ * buttons: "Open Protect Go", which an installed app answers to with this server filled in and
+ * signed in (the button asks the server for a one-time code, decision D333, which the app
+ * exchanges for a sign-in of its own), and "Install" with the installer for the visitor's
+ * system, the others a link away. One line says which to press; the guide holds the rest.
  */
 export function FieldCard() {
   const { t } = useTranslation();
@@ -38,62 +36,33 @@ export function FieldCard() {
           <Laptop className="size-4" /> {t("Protect Go, the app for the laptop")}
         </CardTitle>
         <CardDescription>
-          {t(
-            "Protect Go reads a station's SD card on a laptop where there is no connection, with Protect's own decoding, and uploads the files to this server when you are back online. Install the app on the laptop you take to the stations.",
-          )}
+          {t("Reads a station's SD card where there is no connection and uploads the files here when you are back online.")}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-sm">
+      <CardContent className="flex flex-col gap-2 text-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild size="sm">
+          <Button type="button" size="sm" disabled={open.isPending} onClick={() => open.mutate()}>
+            <ExternalLink className="size-4" /> {t("Open Protect Go")}
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <a href={first.url}>
               <Download className="size-4" />
-              {t("Download for {{system}}", { system: first.label })}
+              {t("Install for {{system}}", { system: first.label })}
             </a>
           </Button>
-          <span className="text-xs text-muted-foreground">
-            {first.note} · <code>{first.file}</code>
-          </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          {t("Other systems:")}{" "}
-          {others.map((installer, index) => (
+          {t("Installed already? Open it: it connects to this server and signs you in. Not yet? Install it, then open it from here.")}{" "}
+          {others.map((installer) => (
             <span key={installer.system}>
-              {index > 0 && ", "}
               <a className="underline underline-offset-4" href={installer.url}>
                 {installer.label}
-              </a>{" "}
-              ({installer.note})
+              </a>
+              {" · "}
             </span>
           ))}
-        </p>
-        <div>
-          <p className="font-medium">{t("During the app's setup, give it this server:")}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <code className="rounded bg-muted px-2 py-1">{server}</code>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              aria-label={t("Copy the server address")}
-              onClick={() => {
-                void navigator.clipboard.writeText(server);
-                toast.success(t("Server address copied"));
-              }}
-            >
-              <Copy className="size-4" />
-            </Button>
-            <Button type="button" variant="outline" size="sm" disabled={open.isPending} onClick={() => open.mutate()}>
-              <ExternalLink className="size-4" /> {t("Open Protect Go")}
-            </Button>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("\"Open Protect Go\" starts the installed app connected to this server and signed in as you, for a few weeks; it does nothing until the app is installed. The address above is for typing it in by hand.")}
-          </p>
-        </div>
-        <p className="text-xs text-muted-foreground">
           <a className="underline underline-offset-4" href={FIELD_GUIDE_URL} target="_blank" rel="noreferrer">
-            {t("How to install and use Protect Go, step by step")}
+            {t("Guide")}
           </a>
         </p>
       </CardContent>

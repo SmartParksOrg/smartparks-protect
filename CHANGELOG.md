@@ -4,6 +4,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- The Offload page's Protect Go card says as little as it can: "Open Protect Go" and "Install for Windows" (or macOS, Linux), one line on which to press, the other systems and the guide a link away; the server address with its copy button and the explanations are gone (Tim, 2026-10-17).
+
 ### Added
 
 - The field bundle carries the metric registry (decision D334: key, label, unit, value type, category, description), so Protect Go's Data explorer names and units the values it decodes as Protect does (Tim, 2026-10-17).
