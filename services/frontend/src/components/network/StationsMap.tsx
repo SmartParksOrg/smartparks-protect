@@ -39,7 +39,9 @@ function markerElement(
     : station.device_name;
   const disc = document.createElement("span");
   disc.className =
-    "flex size-8 items-center justify-center rounded-full border-2 border-[#2f5d50] bg-white shadow [&>svg]:size-5";
+    // the icon takes the disc's own colour, not the page's text colour, which is white in dark
+    // mode and vanished on the white disc (Tim, 2026-10-18)
+    "flex size-8 items-center justify-center rounded-full border-2 border-[#2f5d50] bg-white text-[#2f5d50] shadow [&>svg]:size-5";
   disc.innerHTML = icon;
   const label = document.createElement("span");
   label.className =
