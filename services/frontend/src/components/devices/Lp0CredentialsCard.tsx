@@ -23,8 +23,9 @@ const clean = (text: string) => text.replace(/[\s:_-]/g, "");
  * DevEUI, they are what lets Protect verify and decrypt the frames an offload station stored
  * for it. Typed in, or taken from what the device reported in its own settings readback. The
  * keys are shown and changeable to whoever may set them (Tim, 2026-10-15: the credentials are
- * important and must be visible and changeable when needed), folded behind "Show" so a screen
- * over a shoulder does not carry them; a viewer sees only that they are set.
+ * important and must be visible and changeable when needed): each key has its line, named as
+ * the LoRaWAN variable, its value masked until the eye beside it is pressed (Tim, 2026-10-18),
+ * so a screen over a shoulder does not carry them; a viewer sees only that they are set.
  */
 export function Lp0CredentialsCard({
   deviceId,
@@ -36,7 +37,6 @@ export function Lp0CredentialsCard({
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const [shown, setShown] = useState(false);
   const [address, setAddress] = useState("");
   const [appKey, setAppKey] = useState("");
   const [nwkKey, setNwkKey] = useState("");
@@ -148,61 +148,21 @@ export function Lp0CredentialsCard({
                       time: formatTime(c.set_at),
                     })
                 : t("not set")}
-              {c.keys_set && c.app_s_key && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="ml-2 h-6 px-2"
-                  onClick={() => setShown((v) => !v)}
-                >
-                  {shown ? (
-                    <>
-                      <EyeOff className="size-3.5" /> {t("Hide")}
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="size-3.5" /> {t("Show")}
-                    </>
-                  )}
-                </Button>
-              )}
             </dd>
-            {shown && c.app_s_key && c.nwk_s_key && (
+            {c.keys_set && (
               <>
-                <dt className="text-muted-foreground">
-                  {t("Application session key")}
-                </dt>
-                <dd className="flex items-center gap-1 font-mono text-xs">
-                  {c.app_s_key}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-1"
-                    aria-label={t("Copy the application session key")}
-                    onClick={() =>
-                      copy(c.app_s_key ?? "", t("Application session key"))
-                    }
-                  >
-                    <Copy className="size-3.5" />
-                  </Button>
-                </dd>
-                <dt className="text-muted-foreground">
-                  {t("Network session key")}
-                </dt>
-                <dd className="flex items-center gap-1 font-mono text-xs">
-                  {c.nwk_s_key}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-1"
-                    aria-label={t("Copy the network session key")}
-                    onClick={() =>
-                      copy(c.nwk_s_key ?? "", t("Network session key"))
-                    }
-                  >
-                    <Copy className="size-3.5" />
-                  </Button>
-                </dd>
+                <KeyRow
+                  label="AppSKey"
+                  title={t("Application session key")}
+                  value={c.app_s_key ?? null}
+                  onCopy={() => copy(c.app_s_key ?? "", "AppSKey")}
+                />
+                <KeyRow
+                  label="NwkSKey"
+                  title={t("Network session key")}
+                  value={c.nwk_s_key ?? null}
+                  onCopy={() => copy(c.nwk_s_key ?? "", "NwkSKey")}
+                />
               </>
             )}
             {c.frames_waiting > 0 && (
@@ -268,7 +228,7 @@ export function Lp0CredentialsCard({
               />
             </label>
             <label className="block text-xs text-muted-foreground">
-              {t("Application session key (32 hex digits)")}
+              {t("AppSKey, the application session key (32 hex digits)")}
               <Input
                 className="mt-1 font-mono"
                 value={appKey}
@@ -278,7 +238,7 @@ export function Lp0CredentialsCard({
               />
             </label>
             <label className="block text-xs text-muted-foreground">
-              {t("Network session key (32 hex digits)")}
+              {t("NwkSKey, the network session key (32 hex digits)")}
               <Input
                 className="mt-1 font-mono"
                 value={nwkKey}
@@ -319,5 +279,59 @@ export function Lp0CredentialsCard({
         pending={clear.isPending}
       />
     </Card>
+  );
+}
+
+/** One key's line: the variable's name, the value masked or shown, the eye and the copy button.
+ * A viewer who may not change the keys sees that the key is set and nothing more. */
+function KeyRow({
+  label,
+  title,
+  value,
+  onCopy,
+}: {
+  label: string;
+  title: string;
+  value: string | null;
+  onCopy: () => void;
+}) {
+  const { t } = useTranslation();
+  const [shown, setShown] = useState(false);
+  return (
+    <>
+      <dt className="text-muted-foreground" title={title}>
+        {label}
+      </dt>
+      <dd className="flex min-w-0 items-center gap-1">
+        {value ? (
+          <>
+            <span className="min-w-0 break-all font-mono text-xs">
+              {shown ? value : "•".repeat(32)}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 shrink-0 px-1"
+              aria-pressed={shown}
+              aria-label={shown ? t("Hide {{label}}", { label }) : t("Show {{label}}", { label })}
+              onClick={() => setShown((v) => !v)}
+            >
+              {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 shrink-0 px-1"
+              aria-label={t("Copy {{label}}", { label })}
+              onClick={onCopy}
+            >
+              <Copy className="size-3.5" />
+            </Button>
+          </>
+        ) : (
+          <span className="text-muted-foreground">{t("set, shown to those who may change it")}</span>
+        )}
+      </dd>
+    </>
   );
 }

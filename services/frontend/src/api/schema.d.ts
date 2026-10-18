@@ -4658,6 +4658,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/offload-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Project Offload Files
+         * @description The files of one or more offload stations' SD cards, uploaded on the Offload page
+         *     (Tim, 2026-10-18: the person who collected the cards should not have to find each
+         *     station's page): one `.jsonl`, or a zip of `LOG_*` folders, every file put with the station
+         *     its name carries, the EUI matched to a device of the project by serial number or DevEUI
+         *     identity, as `GET /projects/{id}/offload` names the stations. A file of an EUI no device of
+         *     the project has is skipped with that EUI, so the person sees which station is missing,
+         *     and nothing is guessed; a file seen before is skipped as on the device page.
+         */
+        post: operations["upload_project_offload_files_api_v1_projects__project_id__offload_files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/offload": {
         parameters: {
             query?: never;
@@ -6600,6 +6626,11 @@ export interface components {
         };
         /** Body_upload_project_layer_api_v1_projects__project_id__layers_post */
         Body_upload_project_layer_api_v1_projects__project_id__layers_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_project_offload_files_api_v1_projects__project_id__offload_files_post */
+        Body_upload_project_offload_files_api_v1_projects__project_id__offload_files_post: {
             /** File */
             file: string;
         };
@@ -24560,6 +24591,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OffloadStationSetupResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_project_offload_files_api_v1_projects__project_id__offload_files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_project_offload_files_api_v1_projects__project_id__offload_files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffloadUpload"];
                 };
             };
             /** @description Validation Error */

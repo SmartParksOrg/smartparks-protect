@@ -14,9 +14,9 @@ const KIND_OF_CHANNEL: Record<string, LogFileKind> = {
 };
 
 const KIND_LABEL: Record<LogFileKind, string> = {
-  raw_log: mark("uploaded file"),
+  raw_log: mark("raw log"),
   browser_sync: mark("browser sync"),
-  station_card: mark("station card"),
+  station_card: mark("SD card"),
   other: mark("file"),
 };
 

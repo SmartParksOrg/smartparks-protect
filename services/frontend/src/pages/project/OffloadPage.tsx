@@ -16,6 +16,7 @@ import type {
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { CardUploadButton } from "@/components/network/CardUploadButton";
 import { FieldCard } from "@/components/network/FieldCard";
 import { FilesSection } from "@/components/network/FilesSection";
 import { OffloadStationDialog } from "@/components/network/OffloadStationDialog";
@@ -46,6 +47,7 @@ export function OffloadPage() {
   const now = useNow();
   const { can, all: serverAdmin } = usePermissions(projectId);
   const canSetUp = can("devices:write");
+  const canUpload = can("devices:control");
   const [setup, setSetup] = useState<{ open: boolean; deviceId: string | null }>({
     open: false,
     deviceId: null,
@@ -474,11 +476,13 @@ export function OffloadPage() {
               <Button
                 type="button"
                 size="sm"
+                variant={canUpload ? "outline" : "default"}
                 onClick={() => setSetup({ open: true, deviceId: null })}
               >
                 <Plus className="size-4" /> {t("Make an offload station")}
               </Button>
             )}
+            {canUpload && <CardUploadButton projectId={projectId} />}
           </>
         }
       />
@@ -503,7 +507,7 @@ export function OffloadPage() {
               </li>
               <li>
                 {t(
-                  "The card: on the station's device page, under Log files, upload one .jsonl file or a zip of the card's LOG folders. Every frame is verified and decrypted with its tracker's own keys and the records appear on the trackers' entities. The Setup column here says what a row still misses.",
+                  "The card: \"Upload SD card files\" here takes the .jsonl files or zips of the LOG folders of any number of cards and puts each file with the station named in it; a station's device page takes its own files too, under Log files. Every frame is verified and decrypted with its tracker's own keys and the records appear on the trackers' entities. The Setup column here says what a row still misses.",
                 )}
               </li>
             </ol>
@@ -518,9 +522,14 @@ export function OffloadPage() {
           />
         )}
         <section className="space-y-2">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <HardDrive className="size-4" /> {t("Stations")}
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <HardDrive className="size-4" /> {t("Stations")}
+            </h2>
+            {canUpload && stations.length > 0 && (
+              <CardUploadButton projectId={projectId} variant="outline" />
+            )}
+          </div>
           <DataTable
             columns={stationColumns}
             data={data ? stations : undefined}
@@ -689,7 +698,7 @@ export function OffloadPage() {
             />
           </section>
         )}
-        <FilesSection projectId={projectId} canWrite={can("devices:control")} />
+        <FilesSection projectId={projectId} canWrite={canUpload} />
       </Page>
     </>
   );

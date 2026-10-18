@@ -19535,6 +19535,65 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/offload-files": {
+   "post": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Upload Project Offload Files",
+    "description": "The files of one or more offload stations' SD cards, uploaded on the Offload page\n(Tim, 2026-10-18: the person who collected the cards should not have to find each\nstation's page): one `.jsonl`, or a zip of `LOG_*` folders, every file put with the station\nits name carries, the EUI matched to a device of the project by serial number or DevEUI\nidentity, as `GET /projects/{id}/offload` names the stations. A file of an EUI no device of\nthe project has is skipped with that EUI, so the person sees which station is missing,\nand nothing is guessed; a file seen before is skipped as on the device page.",
+    "operationId": "upload_project_offload_files_api_v1_projects__project_id__offload_files_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_project_offload_files_api_v1_projects__project_id__offload_files_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OffloadUpload"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/offload": {
    "get": {
     "tags": [
@@ -26150,6 +26209,20 @@
      "file"
     ],
     "title": "Body_upload_project_layer_api_v1_projects__project_id__layers_post"
+   },
+   "Body_upload_project_offload_files_api_v1_projects__project_id__offload_files_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_project_offload_files_api_v1_projects__project_id__offload_files_post"
    },
    "BrowserResult": {
     "properties": {

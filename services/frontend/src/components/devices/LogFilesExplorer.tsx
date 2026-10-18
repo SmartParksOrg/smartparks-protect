@@ -84,7 +84,9 @@ export function LogFilesViewSwitch({ view, onView }: { view: LogFilesView; onVie
  * to several lines each): a list with one line per file, or tiles; a click opens the file's
  * properties, where the counts, the error, the trace, the original and "decode again" live.
  * One component for a device's card and for the project's Files page (Tim, 2026-10-17), which
- * adds the device's name as a column and a link to its page.
+ * adds the device's name as a column and a link to its page. Every file says what it is, an SD
+ * card file, a raw log or a browser sync, in the list's Kind column and on its tile (Tim,
+ * 2026-10-18: a station has raw logs beside its card files, and the two were not told apart).
  */
 export function LogFilesExplorer({
   files,
@@ -94,7 +96,7 @@ export function LogFilesExplorer({
   invalidate,
   withDevice = false,
   projectId,
-  defaultHidden = ["acquisition_channel", "records", "period", "size_bytes"],
+  defaultHidden = ["records", "period", "size_bytes"],
 }: {
   files: DeviceLogFile[] | undefined;
   isLoading: boolean;
@@ -285,7 +287,10 @@ export function LogFilesExplorer({
               {folder && <span className="font-normal text-muted-foreground">{folder}/</span>}
               {f.original_filename}
             </div>
-            <div>{status(f)}</div>
+            <div className="flex flex-wrap items-center gap-1">
+              <Badge variant="outline">{kindLabel(kindOf(f.acquisition_channel), t)}</Badge>
+              {status(f)}
+            </div>
             <div className="line-clamp-2 text-xs text-muted-foreground">{summaryOf(f, t)}</div>
             <div className="text-xs text-muted-foreground">
               {sizeLabel(f.size_bytes)} · {formatAgo(f.uploaded_at)}

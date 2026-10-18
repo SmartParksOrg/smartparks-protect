@@ -6,10 +6,13 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 
 ### Added
 
+- **Upload SD card files** on the Offload page, in the header and beside the stations (Tim, 2026-10-18: the person who collected the cards should not have to find each station's page): one or more `.jsonl` files or zips of the cards' `LOG_*` folders, of any number of stations, each file put with the station named in it. `POST /projects/{id}/offload-files` (`devices:control`) matches the EUI in a file's name to a device of the project by serial number or DevEUI identity, skips a file of an EUI no station of the project has and says which, and skips a file uploaded before; the toast counts the files and stations, a second one lists what was skipped and why.
 - **Files** at the foot of the Offload page: every file uploaded for the project's devices in one place, as the device page's log files explorer shows them, with the device as a column and a filter the server applies, a search box and sortable columns, a page of 200 at a time with "Load more" (`GET /projects/{id}/log-files` with `limit`, `before` and `device_id`, each row with its device's name). Tim, 2026-10-17: the files explorer of Protect Go, here for what was uploaded, on the Offload page rather than a page of its own.
 
 ### Changed
 
+- **A tracker's LP0 keys are two lines, AppSKey and NwkSKey**, each masked until the eye beside it is pressed, with a copy button per line (Tim, 2026-10-18: always show the variables, mask the values); the card fits a phone with the keys shown. A viewer who may not change the keys sees that they are set.
+- **Every log files list says what each file is**: the Kind column is on by default and every tile carries the kind, "SD card", "raw log" or "browser sync" (Tim, 2026-10-18: a station has raw logs beside its card files, and the two were not told apart).
 - The Offload page's Protect Go button is called "Protect Go", no more; its card says as little as it can: "Open Protect Go" and "Install for Windows" (or macOS, Linux), one line on which to press, the other systems and the guide a link away; the server address with its copy button and the explanations are gone (Tim, 2026-10-17).
 
 ### Added

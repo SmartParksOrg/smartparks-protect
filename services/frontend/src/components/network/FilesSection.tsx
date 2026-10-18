@@ -110,7 +110,7 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
         invalidate={[queryKeys.projectLogFiles(projectId, deviceId || null)]}
         withDevice
         projectId={projectId}
-        defaultHidden={["acquisition_channel", "records", "size_bytes"]}
+        defaultHidden={["records", "size_bytes"]}
       />
       {files.hasNextPage && (
         <div className="flex justify-center">

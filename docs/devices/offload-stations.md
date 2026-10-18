@@ -64,13 +64,20 @@ deduplicates nothing and leaves that to Protect.
    address and the two session keys (eight and twice 32 hex digits) that were provisioned on
    the device; "Use the device's reported values" takes the three from the device's own
    settings readback when it has sent one. The address becomes the tracker's identity on the
-   offload station source; the keys are encrypted at rest and shown, behind Show, to whoever may set them; a viewer sees only that they are set. A tracker
+   offload station source; the keys are encrypted at rest and shown to whoever may set them, each on its own line named as the LoRaWAN variable (AppSKey, NwkSKey), masked until the eye beside it is pressed; a viewer sees only that they are set. A tracker
    whose address another device holds is refused with that device's name. Project admins and
    operators (`devices:control`) set them, as they upload log files.
-3. **A card.** On the station's device page, under Log files, upload one `.jsonl` file or a zip
-   of the card's `LOG_*` folders. Each file becomes a row with the station as its device and the
-   channel "station card"; the decoder reads it line by line, in batches, with the progress bar
-   the raw log files have.
+3. **A card.** On the Offload page, **Upload SD card files** takes one or more `.jsonl` files or
+   zips of the cards' `LOG_*` folders, of any number of stations at once, and puts each file
+   with the station named in it: the EUI in the file's name, matched to a device of the project
+   by serial number or DevEUI identity (`POST /projects/{id}/offload-files`, `devices:control`;
+   Tim, 2026-10-18: the person who collected the cards should not have to find each station's
+   page). A file of an EUI no station of the project has is skipped and named with that EUI, so
+   the missing station is plain and nothing is guessed. A station's device page takes its own
+   files too, under Log files. Each file becomes a row with the station as its device and the
+   kind "SD card"; the decoder reads it line by line, in batches, with the progress bar the raw
+   log files have. In every log files list the kind of each file is on show, SD card, raw log or
+   browser sync, since a station has raw logs beside its card files.
 
 ## What happens to a line
 
@@ -136,8 +143,9 @@ tracker with an LP0 address or with frames (its address, whether the keys are se
 what the device itself reports as its address when that differs, the frames and stations of the
 window, the last station, the last verified counter), and the addresses the stations received
 that no device has, with the tracker's EUI when a line named it. The keys are never on this page;
-they stay on the device page behind Show. The page lists and links: a station or a tracker is a
-link away. The footer counts the devices of the project that have no address yet. Built before
+they stay on the device page, masked until shown. The page lists and links: a station or a tracker is a
+link away. **Upload SD card files**, in the page's header and beside the stations, takes the
+files of any number of cards and puts each with its station (step 3 above). The footer counts the devices of the project that have no address yet. Built before
 a real card was read (Tim, 2026-10-16), to be tuned once there is data.
 
 The one thing the page does itself is the station's setup (Tim, the same day: a guide and an

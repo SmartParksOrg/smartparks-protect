@@ -594,6 +594,105 @@ async def test_a_file_that_is_not_a_card_is_refused(client, db):
     assert response.status_code == 422 and "holds no station file" in response.text
 
 
+async def test_cards_uploaded_on_the_offload_page_find_their_stations(client, db):
+    """Tim, 2026-10-18: the person who collected the cards uploads them on the Offload page,
+    and each file goes to the station its name carries; a file of a station the project does
+    not have is skipped with its EUI, never guessed."""
+    admin = await actor(client, db, superuser=True)
+    h = admin.headers
+    project = await create_project(db)
+    project_id = project.id
+    oc = await _opencollar_type(client, h)
+    first = await _device(client, h, oc["id"], project_id, serial="0016C001F0AB1001")
+    second = await _device(client, h, oc["id"], project_id, serial="0016C001F0AB1002")
+    frame = line(build_uplink(KEYS_A, 1, 29, RECORDS))
+    frame_two = line(build_uplink(KEYS_A, 2, 29, RECORDS), station="0016C001F0AB1002")
+    frame_other = line(build_uplink(KEYS_A, 3, 29, RECORDS), station="0016C001F0AB1999")
+    archive = card_zip(
+        {
+            "LOG_1/0016C001F0AB1001_1791795031.jsonl": frame + "\n",
+            "LOG_1/0016C001F0AB1002_1791795032.jsonl": frame_two + "\n",
+            "LOG_2/0016C001F0AB1999_1791795033.jsonl": frame_other + "\n",
+        }
+    )
+
+    viewer = await project_actor(client, db, project, Role.PROJECT_VIEWER)
+    refused = await client.post(
+        f"/api/v1/projects/{project_id}/offload-files",
+        files={"file": ("cards.zip", archive, "application/zip")},
+        headers=viewer.headers,
+    )
+    assert refused.status_code == 403
+
+    upload = await client.post(
+        f"/api/v1/projects/{project_id}/offload-files",
+        files={"file": ("cards.zip", archive, "application/zip")},
+        headers=h,
+    )
+    assert upload.status_code == 201, upload.text
+    result = upload.json()
+    by_name = {f["original_filename"]: f for f in result["files"]}
+    assert set(by_name) == {
+        "0016C001F0AB1001_1791795031.jsonl",
+        "0016C001F0AB1002_1791795032.jsonl",
+    }
+    assert by_name["0016C001F0AB1001_1791795031.jsonl"]["device_id"] == first["id"]
+    assert by_name["0016C001F0AB1001_1791795031.jsonl"]["device_name"] == first["name"]
+    assert by_name["0016C001F0AB1002_1791795032.jsonl"]["device_id"] == second["id"]
+    assert by_name["0016C001F0AB1002_1791795032.jsonl"]["device_name"] == second["name"]
+    assert all(f["acquisition_channel"] == "lp0" for f in result["files"])
+    assert result["skipped"] == [
+        {
+            "name": "0016C001F0AB1999_1791795033.jsonl",
+            "reason": "no offload station of this project has EUI 0016C001F0AB1999",
+        }
+    ]
+
+    # a lone file finds its station too, and the same file twice is skipped
+    again = await client.post(
+        f"/api/v1/projects/{project_id}/offload-files",
+        files={
+            "file": ("0016C001F0AB1001_1791795031.jsonl", (frame + "\n").encode(), "text/plain")
+        },
+        headers=h,
+    )
+    assert again.status_code == 422 and "uploaded before" in again.text
+    lone = await client.post(
+        f"/api/v1/projects/{project_id}/offload-files",
+        files={
+            "file": (
+                "0016C001F0AB1002_1791795040.jsonl",
+                (
+                    line(build_uplink(KEYS_A, 4, 29, RECORDS), station="0016C001F0AB1002") + "\n"
+                ).encode(),
+                "text/plain",
+            )
+        },
+        headers=h,
+    )
+    assert lone.status_code == 201, lone.text
+    assert lone.json()["files"][0]["device_id"] == second["id"]
+
+    # a station of another project is not this project's
+    elsewhere = await create_project(db)
+    stranger = await _device(client, h, oc["id"], elsewhere.id, serial="0016C001F0AB1003")
+    strange = await client.post(
+        f"/api/v1/projects/{project_id}/offload-files",
+        files={
+            "file": (
+                "0016C001F0AB1003_1791795050.jsonl",
+                (
+                    line(build_uplink(KEYS_A, 5, 29, RECORDS), station="0016C001F0AB1003") + "\n"
+                ).encode(),
+                "text/plain",
+            )
+        },
+        headers=h,
+    )
+    assert strange.status_code == 422 and "0016C001F0AB1003" in strange.text
+    assert stranger["id"] not in strange.text
+
+
 async def test_a_device_becomes_a_station_from_the_offload_page(client, db):
     """The Offload page's setup (Tim, 2026-10-16): one call gives a device of the project its
     Offload station entity, its place and its gateway row, so the page lists the station before

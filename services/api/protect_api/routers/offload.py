@@ -25,6 +25,7 @@ from protect_api.routers.devices import _visible_device
 from protect_api.routers.entities import _new_entity, _project_entity
 from protect_api.routers.log_files import _publish, _writable_device
 from protect_api.schemas.domain import EntityCreate
+from protect_api.schemas.log_files import DeviceLogFileRead
 from protect_api.schemas.offload import (
     Lp0CredentialsRead,
     Lp0CredentialsResult,
@@ -58,6 +59,7 @@ from shared.domain.lp0 import (
     parse_key,
     register_station_gateway,
     set_credentials,
+    station_device,
 )
 from shared.domain.static_place import place_device, place_entity_of
 from shared.enums import AcquisitionChannel
@@ -266,23 +268,14 @@ async def delete_lp0_credentials(
     await session.commit()
 
 
-@router.post(
-    "/devices/{device_id}/offload-files",
-    response_model=OffloadUpload,
-    status_code=status.HTTP_201_CREATED,
-)
-async def upload_offload_files(
-    device_id: uuid.UUID,
-    file: UploadFile,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_session),
-    bus: RedisStreamsBus = Depends(get_bus),
-) -> OffloadUpload:
-    """The files of an offload station's SD card (decision D321): one `.jsonl`, or a zip of
-    the card's `LOG_*` folders, uploaded on the station's device page. Every file becomes a
-    raw log file row of the station with channel `lp0`; a file seen before is skipped with
-    its reason, as is a member that is not a station file."""
-    device = await _writable_device(session, user, device_id)
+#: One file of an upload: its name, the card folder it came from ("" for a lone file), its bytes.
+CardMember = tuple[str, str, bytes]
+
+
+async def _read_card_upload(file: UploadFile) -> tuple[str, list[CardMember], list[SkippedMember]]:
+    """The files in an upload of a station's card: the one `.jsonl`, or every station file of a
+    zip of the card's `LOG_*` folders, with the members that are not station files skipped by
+    name. Refuses an empty, oversized or unrecognised upload."""
     settings = get_settings()
     data = await file.read(settings.lp0_zip_max_bytes + 1)
     if len(data) > settings.lp0_zip_max_bytes:
@@ -293,7 +286,7 @@ async def upload_offload_files(
     if not data.strip():
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The file is empty")
     name = file.filename or "card.jsonl"
-    members: list[tuple[str, str, bytes]] = []
+    members: list[CardMember] = []
     skipped: list[SkippedMember] = []
     if name.lower().endswith(".zip") or data[:2] == b"PK":
         try:
@@ -320,6 +313,34 @@ async def upload_offload_files(
                 "card's LOG folders",
             )
         members = [(name.rsplit("/", 1)[-1], "", data)]
+    return name, members, skipped
+
+
+def _nothing_stored(skipped: list[SkippedMember]) -> HTTPException:
+    return HTTPException(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "; ".join(f"{s.name}: {s.reason}" for s in skipped[:5]),
+    )
+
+
+@router.post(
+    "/devices/{device_id}/offload-files",
+    response_model=OffloadUpload,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_offload_files(
+    device_id: uuid.UUID,
+    file: UploadFile,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> OffloadUpload:
+    """The files of an offload station's SD card (decision D321): one `.jsonl`, or a zip of
+    the card's `LOG_*` folders, uploaded on the station's device page. Every file becomes a
+    raw log file row of the station with channel `lp0`; a file seen before is skipped with
+    its reason, as is a member that is not a station file."""
+    device = await _writable_device(session, user, device_id)
+    name, members, skipped = await _read_card_upload(file)
     serial = (device.serial_number or "").upper()
     rows: list[DeviceLogFile] = []
     other_station: list[str] = []
@@ -360,10 +381,7 @@ async def upload_offload_files(
             continue
         rows.append(row)
     if not rows and skipped:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "; ".join(f"{s.name}: {s.reason}" for s in skipped[:5]),
-        )
+        raise _nothing_stored(skipped)
     await record_audit(
         session,
         user=user,
@@ -625,6 +643,101 @@ async def set_up_offload_station(
         gateway_id=gateway.id,
         gateway_created=gateway_created,
     )
+
+
+@router.post(
+    "/projects/{project_id}/offload-files",
+    response_model=OffloadUpload,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_project_offload_files(
+    file: UploadFile,
+    context: ProjectContext = Depends(require_permission(Permission.DEVICES_CONTROL)),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> OffloadUpload:
+    """The files of one or more offload stations' SD cards, uploaded on the Offload page
+    (Tim, 2026-10-18: the person who collected the cards should not have to find each
+    station's page): one `.jsonl`, or a zip of `LOG_*` folders, every file put with the station
+    its name carries, the EUI matched to a device of the project by serial number or DevEUI
+    identity, as `GET /projects/{id}/offload` names the stations. A file of an EUI no device of
+    the project has is skipped with that EUI, so the person sees which station is missing,
+    and nothing is guessed; a file seen before is skipped as on the device page."""
+    name, members, skipped = await _read_card_upload(file)
+    visible = set(await _project_device_ids(session, context))
+    stations: dict[str, Device | None] = {}
+    rows: list[tuple[DeviceLogFile, Device]] = []
+    for member_name, folder, content in members:
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            skipped.append(SkippedMember(name=member_name, reason="not a text file"))
+            continue
+        parsed = parse_station_jsonl(text)
+        if not parsed.frames:
+            first = f" (line {parsed.errors[0][0]}: {parsed.errors[0][1]})" if parsed.errors else ""
+            skipped.append(SkippedMember(name=member_name, reason=f"no frame found{first}"))
+            continue
+        eui = (station_eui_from_name(member_name) or parsed.frames[0].station_eui).upper()
+        if eui not in stations:
+            device = await station_device(session, eui)
+            stations[eui] = device if device is not None and device.id in visible else None
+        station = stations[eui]
+        if station is None:
+            skipped.append(
+                SkippedMember(
+                    name=member_name, reason=f"no offload station of this project has EUI {eui}"
+                )
+            )
+            continue
+        try:
+            row = await store_log_file(
+                session,
+                device=station,
+                data=content,
+                filename=member_name,
+                channel=AcquisitionChannel.LP0,
+                user_id=context.user.id,
+                attributes={
+                    "content_type": file.content_type or "",
+                    "folder": folder,
+                    "station_eui": eui,
+                    "frames_in_file": len(parsed.frames),
+                },
+            )
+        except DuplicateLogFile:
+            skipped.append(SkippedMember(name=member_name, reason="uploaded before"))
+            continue
+        except ApplicationError as error:
+            skipped.append(SkippedMember(name=member_name, reason=str(error)))
+            continue
+        rows.append((row, station))
+    if not rows and skipped:
+        raise _nothing_stored(skipped)
+    per_station: dict[str, list[str]] = {}
+    for row, station in rows:
+        per_station.setdefault(str(station.id), []).append(row.original_filename)
+    await record_audit(
+        session,
+        user=context.user,
+        action="offload_files.uploaded",
+        object_type="project",
+        object_id=str(context.project.id),
+        project_id=context.project.id,
+        details={
+            "upload": name,
+            "files": per_station,
+            "skipped": [s.name for s in skipped],
+        },
+    )
+    await session.commit()
+    out: list[DeviceLogFileRead] = []
+    for row, station in rows:
+        await _publish(bus, row)
+        read = DeviceLogFileRead.model_validate(row)
+        read.device_name = station.name
+        out.append(read)
+    return OffloadUpload(files=out, skipped=skipped)
 
 
 @router.get("/projects/{project_id}/offload", response_model=OffloadOverviewRead)
