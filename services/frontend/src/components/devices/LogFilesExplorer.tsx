@@ -321,6 +321,7 @@ export function LogFilesExplorer({
                 {name(f)}
                 {withDevice && <div className="text-xs text-muted-foreground">{device(f)}</div>}
                 <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <Badge variant="outline">{kindLabel(kindOf(f.acquisition_channel), t)}</Badge>
                   {status(f)}
                   <span className="text-muted-foreground">
                     {sizeLabel(f.size_bytes)} · {formatAgo(f.uploaded_at)}
