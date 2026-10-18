@@ -3169,5 +3169,7 @@
   "{{count}} stations without a place are not on the map; the list names them._one": "{{count}} station zonder plaats staat niet op de kaart; de lijst noemt het.",
   "{{count}} stations without a place are not on the map; the list names them._other": "{{count}} stations zonder plaats staan niet op de kaart; de lijst noemt ze.",
   "No offload station yet.": "Nog geen offloadstation.",
-  "None of the stations has a place yet. Set it on the station's device page, under Place, or in the station dialog.": "Geen van de stations heeft al een plaats. Stel die in op de apparaatpagina van het station, onder Plaats, of in het stationsvenster."
+  "None of the stations has a place yet. Set it on the station's device page, under Place, or in the station dialog.": "Geen van de stations heeft al een plaats. Stel die in op de apparaatpagina van het station, onder Plaats, of in het stationsvenster.",
+  "Show {{name}} on the live map": "{{name}} op de livekaart tonen",
+  "Show on the live map": "Op de livekaart tonen"
 }

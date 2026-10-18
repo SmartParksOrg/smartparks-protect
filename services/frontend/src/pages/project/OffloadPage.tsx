@@ -11,6 +11,7 @@ import {
   Laptop,
   List,
   Map as MapIcon,
+  MapPin,
   Plus,
   Radio,
 } from "lucide-react";
@@ -198,6 +199,30 @@ export function OffloadPage() {
         )}
       </span>
     );
+  // the live map on the tracker: its entity when it has one, else the device itself (Tim,
+  // 2026-10-18: a small button per tracker)
+  const trackerMapPath = (tr: OffloadOverviewTracker) =>
+    tr.entity_id
+      ? `/projects/${projectId}/map?entity=${tr.entity_id}`
+      : `/projects/${projectId}/map?device=${tr.device_id}`;
+  const trackerMapButton = (tr: OffloadOverviewTracker) => (
+    <Button
+      asChild
+      variant="ghost"
+      size="icon-xs"
+      className="ml-1 align-middle"
+    >
+      <Link
+        to={trackerMapPath(tr)}
+        aria-label={t("Show {{name}} on the live map", {
+          name: tr.device_name,
+        })}
+        title={t("Show on the live map")}
+      >
+        <MapPin className="size-3.5" />
+      </Link>
+    </Button>
+  );
 
   const stationColumns: ColumnDef<OffloadOverviewStation, unknown>[] = [
     {
@@ -328,6 +353,7 @@ export function OffloadPage() {
               {row.original.entity_name}
             </Link>
           )}
+          {trackerMapButton(row.original)}
         </span>
       ),
     },
@@ -692,6 +718,7 @@ export function OffloadPage() {
                       {tr.entity_name}
                     </Link>
                   )}
+                  {trackerMapButton(tr)}
                 </div>
                 <div className="text-xs">
                   {tr.dev_addr ? (
