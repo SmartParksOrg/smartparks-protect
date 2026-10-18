@@ -9,13 +9,6 @@ import type { DeviceLogFile, OffloadOverview } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { LogFilesExplorer, LogFilesViewSwitch } from "@/components/devices/LogFilesExplorer";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useLogFilesView } from "@/hooks/useLogFilesView";
 
 const PAGE = 200;
@@ -83,21 +76,21 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
           )}
         </h2>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={deviceId || "all"} onValueChange={(v) => setDeviceId(v === "all" ? "" : v)}>
-            <SelectTrigger className="h-8 w-48" aria-label={t("Device")}>
-              <SelectValue />
-            </SelectTrigger>
-            {/* floating under the trigger: the item-aligned list, which Protect's selects use
-                elsewhere, locked the page on a phone (Tim, 2026-10-18) */}
-            <SelectContent position="popper">
-              <SelectItem value="all">{t("All devices")}</SelectItem>
-              {devices.map(([id, name]) => (
-                <SelectItem key={id} value={id}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* the browser's own select: the floating list locked the page on a phone and on a
+              desktop (Tim, 2026-10-18), a native one cannot */}
+          <select
+            className="h-8 max-w-56 rounded-md border border-input bg-background px-2 text-sm"
+            aria-label={t("Device")}
+            value={deviceId}
+            onChange={(e) => setDeviceId(e.target.value)}
+          >
+            <option value="">{t("All devices")}</option>
+            {devices.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
           <LogFilesViewSwitch view={view} onView={setView} />
         </div>
       </div>
