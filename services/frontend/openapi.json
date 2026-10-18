@@ -40024,6 +40024,43 @@
       ],
       "title": "Entity Name"
      },
+     "entity_icon": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Icon",
+      "description": "The entity type's icon key"
+     },
+     "last_position": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Position",
+      "description": "Its last known position as a GeoJSON point, for the map"
+     },
+     "last_position_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Position At"
+     },
      "dev_addr": {
       "anyOf": [
        {

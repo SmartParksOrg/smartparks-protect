@@ -1,52 +1,91 @@
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
+import { List, Map as MapIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 
-import type { OffloadOverviewStation } from "@/api/types";
-import { resolveIcon } from "@/components/icons/registry";
 import {
   basemapsFor,
   basemapStyle,
   loadBasemap,
 } from "@/components/map/basemap";
 import { maplibregl } from "@/components/map/maplibre";
+import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
 
-type Placed = OffloadOverviewStation & { lonLat: [number, number] };
-
-function placed(stations: OffloadOverviewStation[]): Placed[] {
-  const out: Placed[] = [];
-  for (const s of stations) {
-    const c = (s.location as { coordinates?: number[] } | null)?.coordinates;
-    if (c && c.length >= 2) out.push({ ...s, lonLat: [c[0], c[1]] });
-  }
-  return out;
+/** One thing on the map: where it is, what it is called, its icon as SVG markup, where a
+ * press takes the person. */
+export interface Place {
+  id: string;
+  name: string;
+  lonLat: [number, number];
+  /** Raw SVG markup from the icon registry; drawn in the marker's own colour. */
+  icon: string;
+  to: string;
+  /** The tooltip; the name when absent. */
+  title?: string;
 }
 
-/** A station's marker: Protect's station icon in a white disc, the device's name under it; a
- * press opens the device's page. Built from DOM nodes, so a name is text, never markup. */
-function markerElement(
-  station: Placed,
-  icon: string,
-  onOpen: () => void,
-): HTMLElement {
+export type ListOrMap = "list" | "map";
+
+/** The two buttons, list or map, for the heading of a section that offers both. */
+export function ListMapSwitch({
+  view,
+  onView,
+}: {
+  view: ListOrMap;
+  onView: (view: ListOrMap) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="flex rounded-md border p-0.5"
+      role="group"
+      aria-label={t("View")}
+    >
+      <Button
+        type="button"
+        variant={view === "list" ? "secondary" : "ghost"}
+        size="icon"
+        className="size-7"
+        aria-pressed={view === "list"}
+        aria-label={t("List")}
+        onClick={() => onView("list")}
+      >
+        <List className="size-4" />
+      </Button>
+      <Button
+        type="button"
+        variant={view === "map" ? "secondary" : "ghost"}
+        size="icon"
+        className="size-7"
+        aria-pressed={view === "map"}
+        aria-label={t("Map")}
+        onClick={() => onView("map")}
+      >
+        <MapIcon className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
+/** A place's marker: its icon in a white disc, its name under it; a press opens its page.
+ * Built from DOM nodes, so a name is text, never markup. The icon takes the disc's own colour,
+ * not the page's text colour, which is white in dark mode and vanished on the white disc
+ * (Tim, 2026-10-18). */
+function markerElement(place: Place, onOpen: () => void): HTMLElement {
   const el = document.createElement("button");
   el.type = "button";
   el.className = "flex cursor-pointer flex-col items-center";
-  el.title = station.station_eui
-    ? `${station.device_name} · ${station.station_eui}`
-    : station.device_name;
+  el.title = place.title ?? place.name;
   const disc = document.createElement("span");
   disc.className =
-    // the icon takes the disc's own colour, not the page's text colour, which is white in dark
-    // mode and vanished on the white disc (Tim, 2026-10-18)
     "flex size-8 items-center justify-center rounded-full border-2 border-[#2f5d50] bg-white text-[#2f5d50] shadow [&>svg]:size-5";
-  disc.innerHTML = icon;
+  disc.innerHTML = place.icon;
   const label = document.createElement("span");
   label.className =
     "mt-0.5 rounded bg-card/90 px-1 text-[11px] font-medium shadow-sm";
-  label.textContent = station.device_name;
+  label.textContent = place.name;
   el.append(disc, label);
   el.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -56,18 +95,27 @@ function markerElement(
 }
 
 /**
- * The project's offload stations on a small map (Tim, 2026-10-18: a map view of the Stations
- * section, toggled with the list): every station with a place as Protect's station marker,
- * named, fitted to all of them; a press on a marker opens the station's device page, the
- * corner link opens the live map. The map pans and zooms by drag and buttons, not by the
- * wheel, so the page keeps scrolling over it. Stations without a place are counted under it.
+ * A small map of places on the Offload page (Tim, 2026-10-18: the stations, then the trackers'
+ * last known positions, each section a list or a map): every place as a named marker, fitted
+ * to all of them; a press on a marker opens the place's page, the corner link opens the live
+ * map. The map pans and zooms by drag and buttons, not by the wheel, so the page keeps
+ * scrolling over it. What has no place yet is counted under the map.
  */
-export function StationsMap({
-  stations,
-  projectId,
+export function PlacesMap({
+  places,
+  unplaced,
+  unplacedNote,
+  emptyMessage,
+  liveMapTo,
 }: {
-  stations: OffloadOverviewStation[];
-  projectId: string;
+  places: Place[];
+  /** How many of the section's rows have no place and so are not on the map. */
+  unplaced: number;
+  /** The line under the map that counts them; it takes `count`. */
+  unplacedNote: string;
+  /** What the map says when nothing has a place. */
+  emptyMessage: string;
+  liveMapTo: string;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -78,9 +126,6 @@ export function StationsMap({
   const pendingRef = useRef<(() => void) | null>(null);
   const { resolved } = useTheme();
   const dark = resolved === "dark";
-  const shown = placed(stations);
-  const unplaced = stations.length - shown.length;
-  const icon = resolveIcon("device.lora_gateway").svg;
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
@@ -114,31 +159,29 @@ export function StationsMap({
     };
   }, [dark]);
 
-  const key = shown
-    .map((s) => `${s.device_id}:${s.lonLat.join(",")}:${s.device_name}`)
+  const key = places
+    .map((p) => `${p.id}:${p.lonLat.join(",")}:${p.name}:${p.to}`)
     .join("|");
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const draw = () => {
       for (const m of markersRef.current) m.remove();
-      markersRef.current = shown.map((s) =>
+      markersRef.current = places.map((p) =>
         new maplibregl.Marker({
-          element: markerElement(s, icon, () =>
-            navigate(`/projects/${projectId}/devices/${s.device_id}`),
-          ),
+          element: markerElement(p, () => navigate(p.to)),
           anchor: "top",
         })
-          .setLngLat(s.lonLat)
+          .setLngLat(p.lonLat)
           .addTo(map),
       );
-      if (shown.length === 0) return;
-      if (shown.length === 1) {
-        map.jumpTo({ center: shown[0].lonLat, zoom: 13 });
+      if (places.length === 0) return;
+      if (places.length === 1) {
+        map.jumpTo({ center: places[0].lonLat, zoom: 13 });
         return;
       }
-      const lons = shown.map((s) => s.lonLat[0]);
-      const lats = shown.map((s) => s.lonLat[1]);
+      const lons = places.map((p) => p.lonLat[0]);
+      const lats = places.map((p) => p.lonLat[1]);
       map.fitBounds(
         [
           Math.min(...lons),
@@ -159,16 +202,12 @@ export function StationsMap({
       if (pendingRef.current === draw) pendingRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, icon, projectId, dark]);
+  }, [key, dark]);
 
-  if (shown.length === 0) {
+  if (places.length === 0) {
     return (
       <div className="flex h-56 items-center justify-center rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
-        {stations.length === 0
-          ? t("No offload station yet.")
-          : t(
-              "None of the stations has a place yet. Set it on the station's device page, under Place, or in the station dialog.",
-            )}
+        {emptyMessage}
       </div>
     );
   }
@@ -177,7 +216,7 @@ export function StationsMap({
       <div className="relative h-72 overflow-hidden rounded-xl border shadow-sm md:h-96">
         <div ref={container} className="h-full w-full" />
         <Link
-          to={`/projects/${projectId}/map`}
+          to={liveMapTo}
           className="absolute right-2 top-2 rounded bg-card/90 px-2 py-0.5 text-xs shadow-sm hover:underline"
         >
           {t("Open in live map")}
@@ -187,14 +226,7 @@ export function StationsMap({
         </span>
       </div>
       {unplaced > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {t(
-            "{{count}} stations without a place are not on the map; the list names them.",
-            {
-              count: unplaced,
-            },
-          )}
-        </p>
+        <p className="text-xs text-muted-foreground">{unplacedNote}</p>
       )}
     </div>
   );

@@ -160,7 +160,7 @@ async def field_bundle(
         if g.device_id is not None
     }
     station_ids = set(gateways) | {
-        device_id for device_id, (_, _, key) in entities.items() if key == STATION_TYPE_KEY
+        device_id for device_id, (_, _, key, _) in entities.items() if key == STATION_TYPE_KEY
     }
 
     devices: list[FieldDevice] = []
@@ -221,7 +221,7 @@ async def field_bundle(
                 )
             )
 
-    entity_ids = [entity_id for entity_id, _, _ in entities.values()]
+    entity_ids = [entity_id for entity_id, _, _, _ in entities.values()]
     entity_rows = (
         (
             await session.execute(

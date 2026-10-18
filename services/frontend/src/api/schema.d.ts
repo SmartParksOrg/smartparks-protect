@@ -11753,6 +11753,20 @@ export interface components {
             entity_id?: string | null;
             /** Entity Name */
             entity_name?: string | null;
+            /**
+             * Entity Icon
+             * @description The entity type's icon key
+             */
+            entity_icon?: string | null;
+            /**
+             * Last Position
+             * @description Its last known position as a GeoJSON point, for the map
+             */
+            last_position?: {
+                [key: string]: unknown;
+            } | null;
+            /** Last Position At */
+            last_position_at?: string | null;
             /** Dev Addr */
             dev_addr?: string | null;
             /**

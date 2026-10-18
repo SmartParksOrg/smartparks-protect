@@ -9,8 +9,6 @@ import {
   CircleHelp,
   HardDrive,
   Laptop,
-  List,
-  Map as MapIcon,
   MapPin,
   Plus,
   Radio,
@@ -25,18 +23,23 @@ import type {
   OffloadUnknownAddress,
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
+import { resolveIcon } from "@/components/icons/registry";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
 import { CardUploadButton } from "@/components/network/CardUploadButton";
 import { FieldCard } from "@/components/network/FieldCard";
 import { FilesSection } from "@/components/network/FilesSection";
 import { OffloadStationDialog } from "@/components/network/OffloadStationDialog";
-import { StationsMap } from "@/components/network/StationsMap";
+import {
+  ListMapSwitch,
+  type Place,
+  PlacesMap,
+} from "@/components/network/PlacesMap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/hooks/useNow";
 import { usePermissions } from "@/hooks/useProjects";
-import { useStationsView } from "@/hooks/useStationsView";
+import { useOffloadView } from "@/hooks/useOffloadView";
 import { formatAgo, formatTime } from "@/lib/format";
 
 /**
@@ -69,7 +72,8 @@ export function OffloadPage() {
     deviceId: null,
   });
   const [guideOpen, setGuideOpen] = useState(false);
-  const [stationsView, setStationsView] = useStationsView();
+  const [stationsView, setStationsView] = useOffloadView("stations");
+  const [trackersView, setTrackersView] = useOffloadView("trackers");
   const [fieldOpen, setFieldOpen] = useState(false);
   const overview = useQuery({
     queryKey: queryKeys.projectOffload(projectId),
@@ -205,6 +209,50 @@ export function OffloadPage() {
     tr.entity_id
       ? `/projects/${projectId}/map?entity=${tr.entity_id}`
       : `/projects/${projectId}/map?device=${tr.device_id}`;
+  const pointOf = (geometry: unknown): [number, number] | null => {
+    const c = (geometry as { coordinates?: number[] } | null)?.coordinates;
+    return c && c.length >= 2 ? [c[0], c[1]] : null;
+  };
+  const stationPlaces: Place[] = (data?.stations ?? []).flatMap((s) => {
+    const lonLat = pointOf(s.location);
+    return lonLat
+      ? [
+          {
+            id: s.device_id,
+            name: s.device_name,
+            lonLat,
+            icon: resolveIcon("device.lora_gateway").svg,
+            to: devicePath(s.device_id),
+            title: s.station_eui
+              ? `${s.device_name} · ${s.station_eui}`
+              : s.device_name,
+          },
+        ]
+      : [];
+  });
+  // the trackers' last known positions, each with its entity's icon (a hippo as a hippo), the
+  // device's icon when it tracks nothing
+  const trackerPlaces: Place[] = (data?.trackers ?? []).flatMap((tr) => {
+    const lonLat = pointOf(tr.last_position);
+    return lonLat
+      ? [
+          {
+            id: tr.device_id,
+            name: tr.device_name,
+            lonLat,
+            icon: resolveIcon(tr.entity_icon ?? "device.opencollar").svg,
+            to: trackerMapPath(tr),
+            title: [
+              tr.device_name,
+              tr.entity_name,
+              tr.last_position_at ? formatAgo(tr.last_position_at, now) : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          },
+        ]
+      : [];
+  });
   const trackerMapButton = (tr: OffloadOverviewTracker) => (
     <Button
       asChild
@@ -585,38 +633,26 @@ export function OffloadPage() {
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <HardDrive className="size-4" /> {t("Stations")}
             </h2>
-            {/* a list or a map of the stations (Tim, 2026-10-18), remembered per person */}
-            <div
-              className="flex rounded-md border p-0.5"
-              role="group"
-              aria-label={t("View")}
-            >
-              <Button
-                type="button"
-                variant={stationsView === "list" ? "secondary" : "ghost"}
-                size="icon"
-                className="size-7"
-                aria-pressed={stationsView === "list"}
-                aria-label={t("List")}
-                onClick={() => setStationsView("list")}
-              >
-                <List className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                variant={stationsView === "map" ? "secondary" : "ghost"}
-                size="icon"
-                className="size-7"
-                aria-pressed={stationsView === "map"}
-                aria-label={t("Map")}
-                onClick={() => setStationsView("map")}
-              >
-                <MapIcon className="size-4" />
-              </Button>
-            </div>
+            {/* a list or a map (Tim, 2026-10-18), remembered per person */}
+            <ListMapSwitch view={stationsView} onView={setStationsView} />
           </div>
           {stationsView === "map" && data ? (
-            <StationsMap stations={stations} projectId={projectId} />
+            <PlacesMap
+              places={stationPlaces}
+              unplaced={stations.length - stationPlaces.length}
+              unplacedNote={t(
+                "{{count}} stations without a place are not on the map; the list names them.",
+                { count: stations.length - stationPlaces.length },
+              )}
+              emptyMessage={
+                stations.length === 0
+                  ? t("No offload station yet.")
+                  : t(
+                      "None of the stations has a place yet. Set it on the station's device page, under Place, or in the station dialog.",
+                    )
+              }
+              liveMapTo={`/projects/${projectId}/map`}
+            />
           ) : (
             <DataTable
               columns={stationColumns}
@@ -692,80 +728,102 @@ export function OffloadPage() {
           )}
         </section>
         <section className="space-y-2">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <Radio className="size-4" /> {t("Trackers")}
-          </h2>
-          <DataTable
-            columns={trackerColumns}
-            data={data ? trackers : undefined}
-            isLoading={overview.isPending}
-            defaultHiddenSmall={["keys_set", "last_f_cnt", "setup"]}
-            searchable
-            cardOf={(tr) => (
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link
-                    className="font-medium underline"
-                    to={devicePath(tr.device_id)}
-                  >
-                    {tr.device_name}
-                  </Link>
-                  {tr.entity_id && tr.entity_name && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <Radio className="size-4" /> {t("Trackers")}
+            </h2>
+            <ListMapSwitch view={trackersView} onView={setTrackersView} />
+          </div>
+          {trackersView === "map" && data ? (
+            <PlacesMap
+              places={trackerPlaces}
+              unplaced={trackers.length - trackerPlaces.length}
+              unplacedNote={t(
+                "{{count}} trackers without a known position are not on the map; the list names them.",
+                { count: trackers.length - trackerPlaces.length },
+              )}
+              emptyMessage={
+                trackers.length === 0
+                  ? t("No tracker yet.")
+                  : t("None of the trackers has a known position yet.")
+              }
+              liveMapTo={`/projects/${projectId}/map`}
+            />
+          ) : (
+            <DataTable
+              columns={trackerColumns}
+              data={data ? trackers : undefined}
+              isLoading={overview.isPending}
+              defaultHiddenSmall={["keys_set", "last_f_cnt", "setup"]}
+              searchable
+              cardOf={(tr) => (
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Link
-                      className="text-xs underline"
-                      to={entityPath(tr.entity_id)}
+                      className="font-medium underline"
+                      to={devicePath(tr.device_id)}
                     >
-                      {tr.entity_name}
+                      {tr.device_name}
                     </Link>
-                  )}
-                  {trackerMapButton(tr)}
-                </div>
-                <div className="text-xs">
-                  {tr.dev_addr ? (
-                    <span className="font-mono">{tr.dev_addr}</span>
-                  ) : (
-                    <span className="text-destructive">{t("no address")}</span>
-                  )}
-                  {" · "}
-                  {tr.keys_set ? (
-                    t("keys set {{ago}}", { ago: formatAgo(tr.set_at, now) })
-                  ) : (
-                    <span className="text-destructive">{t("no keys")}</span>
-                  )}
-                </div>
-                <div className="text-xs">
-                  {tr.receptions > 0
-                    ? t("{{frames}} frames at {{stations}} stations", {
-                        frames: tr.receptions,
-                        stations: tr.stations,
-                      }) +
-                      `, ${formatAgo(tr.last_reception_at, now)}` +
-                      (tr.last_station_name
-                        ? ` ${t("at")} ${tr.last_station_name}`
-                        : "")
-                    : t("No offload in 30 days")}
-                </div>
-                {trackerGaps(tr).length > 0 && (
-                  <div className="text-xs">
-                    {gapBadges(trackerGaps(tr), tr.device_id)}
+                    {tr.entity_id && tr.entity_name && (
+                      <Link
+                        className="text-xs underline"
+                        to={entityPath(tr.entity_id)}
+                      >
+                        {tr.entity_name}
+                      </Link>
+                    )}
+                    {trackerMapButton(tr)}
                   </div>
-                )}
-              </div>
-            )}
-            emptyMessage={t(
-              "No tracker has an LP0 address yet. Set the address and the keys on each tracker's device page, under LP0 offload.",
-            )}
-            footer={
-              data && data.devices_without_address > 0
-                ? t(
-                    "{{count}} devices of the project have no LP0 address yet",
-                    {
-                      count: data.devices_without_address,
-                    },
-                  )
-                : undefined
-            }
-          />
+                  <div className="text-xs">
+                    {tr.dev_addr ? (
+                      <span className="font-mono">{tr.dev_addr}</span>
+                    ) : (
+                      <span className="text-destructive">
+                        {t("no address")}
+                      </span>
+                    )}
+                    {" · "}
+                    {tr.keys_set ? (
+                      t("keys set {{ago}}", { ago: formatAgo(tr.set_at, now) })
+                    ) : (
+                      <span className="text-destructive">{t("no keys")}</span>
+                    )}
+                  </div>
+                  <div className="text-xs">
+                    {tr.receptions > 0
+                      ? t("{{frames}} frames at {{stations}} stations", {
+                          frames: tr.receptions,
+                          stations: tr.stations,
+                        }) +
+                        `, ${formatAgo(tr.last_reception_at, now)}` +
+                        (tr.last_station_name
+                          ? ` ${t("at")} ${tr.last_station_name}`
+                          : "")
+                      : t("No offload in 30 days")}
+                  </div>
+                  {trackerGaps(tr).length > 0 && (
+                    <div className="text-xs">
+                      {gapBadges(trackerGaps(tr), tr.device_id)}
+                    </div>
+                  )}
+                </div>
+              )}
+              emptyMessage={t(
+                "No tracker has an LP0 address yet. Set the address and the keys on each tracker's device page, under LP0 offload.",
+              )}
+              footer={
+                data && data.devices_without_address > 0
+                  ? t(
+                      "{{count}} devices of the project have no LP0 address yet",
+                      {
+                        count: data.devices_without_address,
+                      },
+                    )
+                  : undefined
+              }
+            />
+          )}
         </section>
         {unknown.length > 0 && (
           <section className="space-y-2">

@@ -512,13 +512,19 @@ async def _project_device_ids(session: AsyncSession, context: ProjectContext) ->
 
 async def _current_entities(
     session: AsyncSession, device_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, tuple[uuid.UUID, str, str]]:
-    """The entity each device tracks now: its id, its name and its type's key."""
+) -> dict[uuid.UUID, tuple[uuid.UUID, str, str, str]]:
+    """The entity each device tracks now: its id, its name, its type's key and icon key."""
     if not device_ids:
         return {}
     rows = (
         await session.execute(
-            select(DeviceEntityAssignment.device_id, Entity.id, Entity.name, EntityType.key)
+            select(
+                DeviceEntityAssignment.device_id,
+                Entity.id,
+                Entity.name,
+                EntityType.key,
+                EntityType.icon_key,
+            )
             .join(Entity, Entity.id == DeviceEntityAssignment.entity_id)
             .join(EntityType, EntityType.id == Entity.entity_type_id)
             .where(
@@ -527,7 +533,9 @@ async def _current_entities(
             )
         )
     ).all()
-    return {device_id: (entity_id, name, key) for device_id, entity_id, name, key in rows}
+    return {
+        device_id: (entity_id, name, key, icon) for device_id, entity_id, name, key, icon in rows
+    }
 
 
 @router.post(
@@ -778,19 +786,23 @@ async def project_offload(
             )
         )
     ).all()
-    states = {
+    current_states = {
         c.device_id: c
         for c in (
             await session.scalars(
                 select(DeviceCurrentState).where(DeviceCurrentState.device_id.in_(device_ids))
             )
         ).all()
+    }
+    states = {
+        device_id: c
+        for device_id, c in current_states.items()
         if isinstance((c.latest_state or {}).get("lp0_station"), dict)
     }
     station_ids = {f.device_id for f in files} | {g.device_id for g in gateways if g.device_id}
     station_ids |= set(states)
     # a station set up and waiting for its first card: its entity says what it is
-    station_ids |= {d for d, (_, _, key) in entities.items() if key == STATION_TYPE_KEY}
+    station_ids |= {d for d, (_, _, key, _) in entities.items() if key == STATION_TYPE_KEY}
     station_ids &= set(devices)
     gateway_of = {g.device_id: g for g in gateways if g.device_id}
     eui_of: dict[uuid.UUID, str] = {}
@@ -956,12 +968,16 @@ async def project_offload(
         got = per_tracker.get(device_id)
         station = station_names.get(last_station.get(device_id, ""), (None, None))
         entity = entities.get(device_id)
+        current = current_states.get(device_id)
         trackers.append(
             OffloadOverviewTracker(
                 device_id=device_id,
                 device_name=tracker.name,
                 entity_id=entity[0] if entity else None,
                 entity_name=entity[1] if entity else None,
+                entity_icon=entity[3] if entity else None,
+                last_position=geom_to_geojson(current.latest_position) if current else None,
+                last_position_at=current.latest_position_time if current else None,
                 dev_addr=row.dev_addr if row else None,
                 keys_set=row is not None,
                 source=row.source if row else None,

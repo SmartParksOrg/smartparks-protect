@@ -133,6 +133,11 @@ class OffloadOverviewTracker(BaseModel):
     device_name: str
     entity_id: uuid.UUID | None = None
     entity_name: str | None = None
+    entity_icon: str | None = Field(default=None, description="The entity type's icon key")
+    last_position: dict[str, Any] | None = Field(
+        default=None, description="Its last known position as a GeoJSON point, for the map"
+    )
+    last_position_at: datetime | None = None
     dev_addr: str | None = None
     keys_set: bool = False
     source: str | None = Field(default=None, description="person or device")

@@ -376,6 +376,9 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert [t["device_id"] for t in page["trackers"]] == [tracker_a["id"]]
     assert page["trackers"][0]["dev_addr"] == ADDR_A and page["trackers"][0]["keys_set"] is True
     assert page["trackers"][0]["receptions"] == 3 and page["trackers"][0]["stations"] == 1
+    # the Offload page's map of the trackers reads the last known position (Tim, 2026-10-18)
+    assert page["trackers"][0]["last_position"]["type"] == "Point"
+    assert page["trackers"][0]["last_position_at"] is not None
     assert page["trackers"][0]["last_station_device_id"] == station["id"]
     assert page["trackers"][0]["last_f_cnt"] == 1
     assert APP_S_KEY.hex().upper() not in json.dumps(page)

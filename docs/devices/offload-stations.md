@@ -149,7 +149,10 @@ cards and puts each with its station (step 3 above). The Stations section is a l
 switched at its heading and remembered per person (Tim, 2026-10-18): the map shows every station
 with a place as Protect's station marker with its name, a press on a marker opens the station's
 device page, and stations without a place are counted under the map (the overview carries each
-station's `location` as a GeoJSON point). The footer counts the devices of the project that have no address yet. Built before
+station's `location` as a GeoJSON point). The Trackers section has the same switch: its map
+shows each tracker's last known position with its entity's icon and its name, a press opens the
+live map on the tracker (the overview carries `last_position`, `last_position_at` and
+`entity_icon` per tracker), and a pin beside each tracker's name in the list does the same. The footer counts the devices of the project that have no address yet. Built before
 a real card was read (Tim, 2026-10-16), to be tuned once there is data.
 
 The one thing the page does itself is the station's setup (Tim, the same day: a guide and an
