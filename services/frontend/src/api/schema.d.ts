@@ -24220,6 +24220,8 @@ export interface operations {
                 limit?: number;
                 /** @description Files uploaded before this moment: the next page */
                 before?: string | null;
+                /** @description With `before`: the last row's id, so rows uploaded in the same second (a card's zip makes dozens) are not skipped */
+                before_id?: string | null;
                 /** @description One device's files */
                 device_id?: string | null;
             };

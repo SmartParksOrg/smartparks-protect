@@ -18964,6 +18964,25 @@
       "description": "Files uploaded before this moment: the next page"
      },
      {
+      "name": "before_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "With `before`: the last row's id, so rows uploaded in the same second (a card's zip makes dozens) are not skipped",
+       "title": "Before Id"
+      },
+      "description": "With `before`: the last row's id, so rows uploaded in the same second (a card's zip makes dozens) are not skipped"
+     },
+     {
       "name": "device_id",
       "in": "query",
       "required": false,

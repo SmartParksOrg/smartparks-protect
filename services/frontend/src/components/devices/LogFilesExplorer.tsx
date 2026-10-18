@@ -10,7 +10,7 @@ import {
   MoreHorizontal,
   RefreshCw,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Link } from "react-router";
 
@@ -192,7 +192,8 @@ export function LogFilesExplorer({
       <span>{f.device_name ?? f.device_id.slice(0, 8)}</span>
     );
 
-  const columns: ColumnDef<DeviceLogFile, unknown>[] = [
+  const columns = useMemo<ColumnDef<DeviceLogFile, unknown>[]>(
+    () => [
     { header: t("Name"), accessorKey: "original_filename", cell: ({ row }) => name(row.original) },
     ...(withDevice
       ? [{ header: t("Device"), accessorKey: "device_name", cell: ({ row }: { row: { original: DeviceLogFile } }) => device(row.original) } satisfies ColumnDef<DeviceLogFile, unknown>]
@@ -256,7 +257,10 @@ export function LogFilesExplorer({
       ),
     },
     { header: "", id: "actions", cell: ({ row }) => menu(row.original) },
-  ];
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, withDevice, projectId, canWrite, redecode.isPending],
+  );
 
 
   const tiles = (rows: DeviceLogFile[]) => (

@@ -51,13 +51,18 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
       api.get<DeviceLogFile[]>(`/api/v1/projects/${projectId}/log-files`, {
         query: {
           limit: PAGE,
-          ...(pageParam ? { before: pageParam } : {}),
+          ...(pageParam ? { before: pageParam.uploaded_at, before_id: pageParam.id } : {}),
           ...(deviceId ? { device_id: deviceId } : {}),
         },
       }),
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) =>
-      lastPage.length === PAGE ? lastPage[lastPage.length - 1].uploaded_at : null,
+    initialPageParam: null as { uploaded_at: string; id: string } | null,
+    // the last row's time and id: a card's zip uploads dozens of files in one second, so the
+    // time alone would skip the rest of that second
+    getNextPageParam: (lastPage) => {
+      if (lastPage.length !== PAGE) return null;
+      const last = lastPage[lastPage.length - 1];
+      return { uploaded_at: last.uploaded_at, id: last.id };
+    },
     refetchInterval: (q) =>
       q.state.data?.pages.some((page) =>
         page.some((f) => f.status === "queued" || f.status === "processing"),

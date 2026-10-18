@@ -223,6 +223,11 @@ async def list_project_log_files(
     before: datetime | None = Query(
         default=None, description="Files uploaded before this moment: the next page"
     ),
+    before_id: uuid.UUID | None = Query(
+        default=None,
+        description="With `before`: the last row's id, so rows uploaded in the same second "
+        "(a card's zip makes dozens) are not skipped",
+    ),
     device_id: uuid.UUID | None = Query(default=None, description="One device's files"),
     context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
     session: AsyncSession = Depends(get_session),
@@ -246,7 +251,12 @@ async def list_project_log_files(
         .join(Device, Device.id == DeviceLogFile.device_id)
         .where(DeviceLogFile.device_id.in_(device_ids))
     )
-    if before is not None:
+    if before is not None and before_id is not None:
+        query = query.where(
+            (DeviceLogFile.uploaded_at < before)
+            | ((DeviceLogFile.uploaded_at == before) & (DeviceLogFile.id < before_id))
+        )
+    elif before is not None:
         query = query.where(DeviceLogFile.uploaded_at < before)
     rows = (
         await session.execute(

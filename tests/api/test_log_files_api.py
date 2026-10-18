@@ -111,7 +111,11 @@ async def test_upload_list_download_and_redecode(client, db, bus):
     next_page = (
         await client.get(
             f"/api/v1/projects/{project.id}/log-files",
-            params={"limit": 1, "before": first_page[0]["uploaded_at"]},
+            params={
+                "limit": 1,
+                "before": first_page[0]["uploaded_at"],
+                "before_id": first_page[0]["id"],
+            },
             headers=h,
         )
     ).json()
