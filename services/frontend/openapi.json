@@ -39854,6 +39854,12 @@
       "title": "Gateway Id",
       "description": "Its row on the Gateways page"
      },
+     "mobile": {
+      "type": "boolean",
+      "title": "Mobile",
+      "description": "The station travels and reports its own position (decision D336); its location is then its last known position, not a place set by hand",
+      "default": false
+     },
      "has_location": {
       "type": "boolean",
       "title": "Has Location",
@@ -39870,7 +39876,20 @@
        }
       ],
       "title": "Location",
-      "description": "Its place as a GeoJSON point, for the Offload page's map"
+      "description": "Where the Offload page's map draws it: the place set by hand, or a mobile station's last known position, as a GeoJSON point"
+     },
+     "location_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location At",
+      "description": "When a mobile station's last known position was taken"
      },
      "files": {
       "type": "integer",
@@ -40300,7 +40319,13 @@
      "is_station": {
       "type": "boolean",
       "title": "Is Station",
-      "description": "The device has received files or reports as a station"
+      "description": "The device has received files or reports as a station, or was set up as one"
+     },
+     "mobile": {
+      "type": "boolean",
+      "title": "Mobile",
+      "description": "The station reports its own position (D336)",
+      "default": false
      },
      "files": {
       "type": "integer",
@@ -40456,6 +40481,18 @@
        }
       ],
       "title": "Longitude"
+     },
+     "mobile": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mobile",
+      "description": "A mobile station travels and reports its own position, like a tracker (decision D336); a static one, the default, stands where a person placed it. Left out, the station stays as it is"
      }
     },
     "type": "object",
@@ -40503,6 +40540,12 @@
       "type": "boolean",
       "title": "Placed",
       "description": "The place was set in this call"
+     },
+     "mobile": {
+      "type": "boolean",
+      "title": "Mobile",
+      "description": "The station reports its own position",
+      "default": false
      },
      "gateway_id": {
       "type": "string",

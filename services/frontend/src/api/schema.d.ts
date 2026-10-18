@@ -11679,17 +11679,28 @@ export interface components {
              */
             gateway_id?: string | null;
             /**
+             * Mobile
+             * @description The station travels and reports its own position (decision D336); its location is then its last known position, not a place set by hand
+             * @default false
+             */
+            mobile: boolean;
+            /**
              * Has Location
              * @default false
              */
             has_location: boolean;
             /**
              * Location
-             * @description Its place as a GeoJSON point, for the Offload page's map
+             * @description Where the Offload page's map draws it: the place set by hand, or a mobile station's last known position, as a GeoJSON point
              */
             location?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Location At
+             * @description When a mobile station's last known position was taken
+             */
+            location_at?: string | null;
             /**
              * Files
              * @default 0
@@ -11845,9 +11856,15 @@ export interface components {
             station_eui?: string | null;
             /**
              * Is Station
-             * @description The device has received files or reports as a station
+             * @description The device has received files or reports as a station, or was set up as one
              */
             is_station: boolean;
+            /**
+             * Mobile
+             * @description The station reports its own position (D336)
+             * @default false
+             */
+            mobile: boolean;
             /**
              * Files
              * @default 0
@@ -11922,6 +11939,11 @@ export interface components {
             latitude?: number | null;
             /** Longitude */
             longitude?: number | null;
+            /**
+             * Mobile
+             * @description A mobile station travels and reports its own position, like a tracker (decision D336); a static one, the default, stands where a person placed it. Left out, the station stays as it is
+             */
+            mobile?: boolean | null;
         };
         /**
          * OffloadStationSetupResult
@@ -11959,6 +11981,12 @@ export interface components {
              * @description The place was set in this call
              */
             placed: boolean;
+            /**
+             * Mobile
+             * @description The station reports its own position
+             * @default false
+             */
+            mobile: boolean;
             /**
              * Gateway Id
              * Format: uuid

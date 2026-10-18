@@ -61,7 +61,7 @@ from shared.domain.lp0 import (
     set_credentials,
     station_device,
 )
-from shared.domain.static_place import place_device, place_entity_of
+from shared.domain.static_place import place_device, place_entity_of, unplace_device
 from shared.enums import AcquisitionChannel
 from shared.ingest import queue_identity_reprocess, retained_events
 from shared.logfiles import DuplicateLogFile, store_log_file
@@ -440,6 +440,15 @@ async def offload_station(
     )
     if eui:
         source = await lp0_source(session)
+        gateway_row = await session.scalar(
+            select(Gateway).where(
+                Gateway.data_source_id == source.id, Gateway.external_id == eui.lower()
+            )
+        )
+        if gateway_row is not None:
+            # set up from the Offload page: a station before its first card
+            read.is_station = True
+            read.mobile = (gateway_row.attributes or {}).get("mobility") == "mobile"
         until = utc_now()
         since = until - TRACKERS_WINDOW
         stats = (
@@ -622,6 +631,17 @@ async def set_up_offload_station(
         await place_entity_of(session, device.id, now)
     source = await lp0_source(session)
     gateway, gateway_created = await register_station_gateway(session, source, eui, device, now)
+    # static by default (decision D261); mobile when asked (D336): the station travels and
+    # reports its own position, so a place set by hand goes
+    mobile = (gateway.attributes or {}).get("mobility") == "mobile"
+    if body.mobile is not None and body.mobile != mobile:
+        mobile = body.mobile
+        gateway.attributes = {
+            **(gateway.attributes or {}),
+            "mobility": "mobile" if mobile else "static",
+        }
+        if mobile and device.static_geom is not None:
+            await unplace_device(session, device, entity.id)
     await record_audit(
         session,
         user=context.user,
@@ -634,6 +654,7 @@ async def set_up_offload_station(
             "entity_id": str(entity.id),
             "entity_created": entity_created,
             "placed": placed,
+            "mobile": mobile,
             "gateway_id": str(gateway.id),
             "gateway_created": gateway_created,
         },
@@ -648,6 +669,7 @@ async def set_up_offload_station(
         entity_created=entity_created,
         entity_kept=entity_kept,
         placed=placed,
+        mobile=mobile,
         gateway_id=gateway.id,
         gateway_created=gateway_created,
     )
@@ -917,6 +939,16 @@ async def project_offload(
         ):
             card_ok = bool(status_bits["card_detected"] and status_bits["card_writable"])
         entity = entities.get(device_id)
+        gateway_row = gateway_of.get(device_id)
+        mobile = bool(gateway_row and (gateway_row.attributes or {}).get("mobility") == "mobile")
+        current = current_states.get(device_id)
+        location_at: datetime | None = None
+        if mobile:
+            # a mobile station is where it last reported itself (D336)
+            location = geom_to_geojson(current.latest_position) if current else None
+            location_at = current.latest_position_time if current and location else None
+        else:
+            location = geom_to_geojson(device.static_geom)
         stations.append(
             OffloadOverviewStation(
                 device_id=device_id,
@@ -924,9 +956,11 @@ async def project_offload(
                 station_eui=station_eui,
                 entity_id=entity[0] if entity else None,
                 entity_name=entity[1] if entity else None,
-                gateway_id=gateway_of[device_id].id if device_id in gateway_of else None,
-                has_location=device.static_geom is not None,
-                location=geom_to_geojson(device.static_geom),
+                gateway_id=gateway_row.id if gateway_row else None,
+                mobile=mobile,
+                has_location=location is not None,
+                location=location,
+                location_at=location_at,
                 files=len(own),
                 frames=sum(f.frames_total for f in own),
                 frames_retained=sum(int(f.attributes.get("frames_retained") or 0) for f in own),

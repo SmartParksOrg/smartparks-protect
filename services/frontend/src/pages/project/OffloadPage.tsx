@@ -106,10 +106,20 @@ export function OffloadPage() {
         ),
         fix: "dialog",
       });
-    if (!s.has_location)
+    if (s.mobile && !s.has_location)
+      gaps.push({
+        label: t("no position yet"),
+        hint: t(
+          "A mobile station reports its own position; none has arrived yet",
+        ),
+        fix: "none",
+      });
+    if (!s.mobile && !s.has_location)
       gaps.push({
         label: t("no place"),
-        hint: t("A station does not move: set its place by hand"),
+        hint: t(
+          "A static station stands where a person placed it: set its place by hand, or make it mobile",
+        ),
         fix: "dialog",
       });
     if (!s.gateway_id)
@@ -223,9 +233,14 @@ export function OffloadPage() {
             lonLat,
             icon: resolveIcon("device.lora_gateway").svg,
             to: devicePath(s.device_id),
-            title: s.station_eui
-              ? `${s.device_name} · ${s.station_eui}`
-              : s.device_name,
+            title: [
+              s.device_name,
+              s.station_eui,
+              s.mobile ? t("mobile") : null,
+              s.location_at ? formatAgo(s.location_at, now) : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
           },
         ]
       : [];
@@ -296,6 +311,11 @@ export function OffloadPage() {
             <span className="ml-2 font-mono text-xs text-muted-foreground">
               {row.original.station_eui}
             </span>
+          )}
+          {row.original.mobile && (
+            <Badge variant="outline" className="ml-2">
+              {t("mobile")}
+            </Badge>
           )}
         </span>
       ),
@@ -604,7 +624,7 @@ export function OffloadPage() {
             <ol className="mt-1 list-decimal space-y-1 pl-4">
               <li>
                 {t(
-                  'The station: a RangerEdge with an SD card. "Make an offload station" picks it among the project\'s devices, or adds it first, by hand or read over Bluetooth, with its DevEUI as serial number; then it gets an Offload station entity, its place and its row among the gateways. A station does not move, so its place is set by hand.',
+                  'The station: a RangerEdge with an SD card. "Make an offload station" picks it among the project\'s devices, or adds it first, by hand or read over Bluetooth, with its DevEUI as serial number; then it gets an Offload station entity, its place and its row among the gateways. A station stands still by default, so its place is set by hand; one that travels, on a vehicle or with a ranger, is made mobile and reports its position itself.',
                 )}
               </li>
               <li>
@@ -625,6 +645,9 @@ export function OffloadPage() {
             projectId={projectId}
             open={setup.open}
             deviceId={setup.deviceId}
+            mobile={
+              stations.find((s) => s.device_id === setup.deviceId)?.mobile
+            }
             onOpenChange={(open) => setSetup((s) => ({ ...s, open }))}
           />
         )}
@@ -641,7 +664,7 @@ export function OffloadPage() {
               places={stationPlaces}
               unplaced={stations.length - stationPlaces.length}
               unplacedNote={t(
-                "{{count}} stations without a place are not on the map; the list names them.",
+                "{{count}} stations without a place or a known position are not on the map; the list names them.",
                 { count: stations.length - stationPlaces.length },
               )}
               emptyMessage={
@@ -676,6 +699,7 @@ export function OffloadPage() {
                         {s.entity_name}
                       </Link>
                     )}
+                    {s.mobile && <Badge variant="outline">{t("mobile")}</Badge>}
                   </div>
                   <div className="text-xs">
                     {gapBadges(stationGaps(s), s.device_id)}

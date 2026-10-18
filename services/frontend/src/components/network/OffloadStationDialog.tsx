@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
 
@@ -49,12 +50,15 @@ export function OffloadStationDialog({
   open,
   onOpenChange,
   deviceId,
+  mobile = false,
 }: {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The station to complete; nothing for a new one. */
   deviceId: string | null;
+  /** Whether the station to complete is mobile already (decision D336). */
+  mobile?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -72,6 +76,7 @@ export function OffloadStationDialog({
           <SetupForm
             projectId={projectId}
             initialDeviceId={deviceId}
+            initialMobile={mobile}
             onDone={() => onOpenChange(false)}
           />
         )}
@@ -84,10 +89,12 @@ export function OffloadStationDialog({
 function SetupForm({
   projectId,
   initialDeviceId,
+  initialMobile,
   onDone,
 }: {
   projectId: string;
   initialDeviceId: string | null;
+  initialMobile: boolean;
   onDone: () => void;
 }) {
   const { t } = useTranslation();
@@ -105,6 +112,9 @@ function SetupForm({
   const [name, setName] = useState("");
   // the place as typed, clicked or located here; until then the device's own place, if any
   const [place, setPlace] = useState<{ lat: string; lon: string } | null>(null);
+  // static by default (decision D261); mobile when the station travels and reports its own
+  // position (decision D336, Tim, 2026-10-18)
+  const [mobile, setMobile] = useState(initialMobile);
   const [locating, setLocating] = useState<"idle" | "waiting" | "denied">(
     "idle",
   );
@@ -138,7 +148,7 @@ function SetupForm({
     Math.abs(lon) <= 180;
   const missing = !deviceId
     ? "device"
-    : !placeEmpty && !placeValid
+    : !mobile && !placeEmpty && !placeValid
       ? "place"
       : null;
   const useMyPosition = () => {
@@ -163,7 +173,8 @@ function SetupForm({
     mutationFn: () => {
       const body: OffloadStationSetup = { device_id: deviceId };
       if (!chosen?.entity_id && name.trim()) body.entity_name = name.trim();
-      if (placeValid) {
+      body.mobile = mobile;
+      if (!mobile && placeValid) {
         body.latitude = lat;
         body.longitude = lon;
       }
@@ -186,17 +197,27 @@ function SetupForm({
             device: r.device_name,
             entity: r.entity_name,
           })
-        : t("{{device}} is set up as an offload station; it stays on {{entity}}", {
-            device: r.device_name,
-            entity: r.entity_name,
-          }),
+        : t(
+            "{{device}} is set up as an offload station; it stays on {{entity}}",
+            {
+              device: r.device_name,
+              entity: r.entity_name,
+            },
+          ),
     onSuccess: onDone,
   });
-  const point: [number, number] | undefined = placeValid ? [lon, lat] : undefined;
+  const point: [number, number] | undefined = placeValid
+    ? [lon, lat]
+    : undefined;
   const chooser = initialDeviceId ? null : (
-    <Tabs value={source} onValueChange={(v) => setSource(v as "existing" | "new")}>
+    <Tabs
+      value={source}
+      onValueChange={(v) => setSource(v as "existing" | "new")}
+    >
       <TabsList>
-        <TabsTrigger value="existing">{t("A device of the project")}</TabsTrigger>
+        <TabsTrigger value="existing">
+          {t("A device of the project")}
+        </TabsTrigger>
         <TabsTrigger value="new">{t("A new device")}</TabsTrigger>
       </TabsList>
     </Tabs>
@@ -228,7 +249,11 @@ function SetupForm({
           hint={t(
             "A device of this project whose serial number is its DevEUI: the station names the card's files after it.",
           )}
-          error={attempted && missing === "device" ? t("Pick a device from the list") : undefined}
+          error={
+            attempted && missing === "device"
+              ? t("Pick a device from the list")
+              : undefined
+          }
         >
           <Input
             id="station-device-search"
@@ -243,11 +268,15 @@ function SetupForm({
           aria-label={t("Devices")}
         >
           {devices.isPending && (
-            <div className="p-3 text-sm text-muted-foreground">{t("Loading devices…")}</div>
+            <div className="p-3 text-sm text-muted-foreground">
+              {t("Loading devices…")}
+            </div>
           )}
           {devices.data && shown.length === 0 && (
             <div className="p-3 text-sm text-muted-foreground">
-              {q ? t("No device matches.") : t("No devices in this project yet.")}
+              {q
+                ? t("No device matches.")
+                : t("No devices in this project yet.")}
             </div>
           )}
           {shown.map((d) => (
@@ -264,7 +293,9 @@ function SetupForm({
             >
               <span className="font-medium">{d.name}</span>
               {d.serial_number && (
-                <span className="font-mono text-xs text-muted-foreground">{d.serial_number}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {d.serial_number}
+                </span>
               )}
               {/* the entity takes a line of its own on a phone, so the name is never cut */}
               <span className="basis-full text-xs text-muted-foreground sm:ml-auto sm:basis-auto">
@@ -278,7 +309,11 @@ function SetupForm({
         {!initialDeviceId && (
           <p className="text-xs text-muted-foreground">
             {t("The RangerEdge is not a device yet?")}{" "}
-            <button type="button" className="underline" onClick={() => setSource("new")}>
+            <button
+              type="button"
+              className="underline"
+              onClick={() => setSource("new")}
+            >
               {t("Add it, by hand or over Bluetooth")}
             </button>
           </p>
@@ -316,64 +351,94 @@ function SetupForm({
             </Field>
           ))}
         <Field
-          label={t("Place")}
-          htmlFor="station-lat"
+          label={t("Position")}
+          htmlFor="station-mobility"
           hint={t(
-            "A station does not move, so its place is set by hand: click the map, type the coordinates, or take your position while standing at it. Leave it empty to set it later on the device page.",
+            "A static station stands where a person placed it. A mobile one travels, on a vehicle or with a ranger, and reports its position itself, like a tracker; the map shows where it last was.",
           )}
-          error={
-            attempted && missing === "place"
-              ? t("Give both coordinates, or neither")
-              : undefined
-          }
         >
-          <div className="h-56">
-            <MiniMap
-              point={point}
-              fallback={point ?? own ?? undefined}
-              to=""
-              label={t("Click to place")}
-              onPick={([pickedLon, pickedLat]) => {
-                setPlace({ lat: pickedLat.toFixed(6), lon: pickedLon.toFixed(6) });
-              }}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Input
-              id="station-lat"
-              inputMode="decimal"
-              aria-label={t("Latitude")}
-              placeholder={t("Latitude")}
-              value={latitude}
-              onChange={(e) => setLatitude(e.target.value)}
-            />
-            <Input
-              id="station-lon"
-              inputMode="decimal"
-              aria-label={t("Longitude")}
-              placeholder={t("Longitude")}
-              value={longitude}
-              onChange={(e) => setLongitude(e.target.value)}
-            />
-          </div>
-        </Field>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={useMyPosition}
-            disabled={locating === "waiting"}
+          <RadioGroup
+            id="station-mobility"
+            value={mobile ? "mobile" : "static"}
+            onValueChange={(v) => setMobile(v === "mobile")}
+            className="flex flex-wrap gap-x-6 gap-y-2"
           >
-            <LocateFixed className="size-4" />{" "}
-            {locating === "waiting" ? t("Locating…") : t("Use my position")}
-          </Button>
-          {locating === "denied" && (
-            <span className="text-xs text-muted-foreground">
-              {t("The browser gave no position.")}
-            </span>
-          )}
-        </div>
+            <label className="flex items-center gap-2 text-sm">
+              <RadioGroupItem value="static" />{" "}
+              {t("Static, with a place set here")}
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <RadioGroupItem value="mobile" />{" "}
+              {t("Mobile, its own fixes say where it is")}
+            </label>
+          </RadioGroup>
+        </Field>
+        {!mobile && (
+          <>
+            <Field
+              label={t("Place")}
+              htmlFor="station-lat"
+              hint={t(
+                "A static station's place is set by hand: click the map, type the coordinates, or take your position while standing at it. Leave it empty to set it later on the device page.",
+              )}
+              error={
+                attempted && missing === "place"
+                  ? t("Give both coordinates, or neither")
+                  : undefined
+              }
+            >
+              <div className="h-56">
+                <MiniMap
+                  point={point}
+                  fallback={point ?? own ?? undefined}
+                  to=""
+                  label={t("Click to place")}
+                  onPick={([pickedLon, pickedLat]) => {
+                    setPlace({
+                      lat: pickedLat.toFixed(6),
+                      lon: pickedLon.toFixed(6),
+                    });
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input
+                  id="station-lat"
+                  inputMode="decimal"
+                  aria-label={t("Latitude")}
+                  placeholder={t("Latitude")}
+                  value={latitude}
+                  onChange={(e) => setLatitude(e.target.value)}
+                />
+                <Input
+                  id="station-lon"
+                  inputMode="decimal"
+                  aria-label={t("Longitude")}
+                  placeholder={t("Longitude")}
+                  value={longitude}
+                  onChange={(e) => setLongitude(e.target.value)}
+                />
+              </div>
+            </Field>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={useMyPosition}
+                disabled={locating === "waiting"}
+              >
+                <LocateFixed className="size-4" />{" "}
+                {locating === "waiting" ? t("Locating…") : t("Use my position")}
+              </Button>
+              {locating === "denied" && (
+                <span className="text-xs text-muted-foreground">
+                  {t("The browser gave no position.")}
+                </span>
+              )}
+            </div>
+          </>
+        )}
         {setUp.isError && <Callout kind="error">{setUp.error.message}</Callout>}
       </div>
       <DialogFooter>
@@ -383,7 +448,9 @@ function SetupForm({
         <Button
           type="button"
           disabled={setUp.isPending}
-          onClick={() => (missing === null ? setUp.mutate() : setAttempted(true))}
+          onClick={() =>
+            missing === null ? setUp.mutate() : setAttempted(true)
+          }
         >
           {setUp.isPending ? t("Setting up…") : t("Make it a station")}
         </Button>

@@ -768,6 +768,33 @@ async def test_a_device_becomes_a_station_from_the_offload_page(client, db):
     assert refused.status_code == 409, refused.text
     assert "DevEUI" in refused.json()["detail"]
 
+    # a mobile station (Tim, 2026-10-18, decision D336): no place by hand, its own fixes say
+    # where it is; the map draws its last known position, none yet here
+    refused = await client.post(
+        url,
+        json={"device_id": station["id"], "mobile": True, "latitude": -17.9, "longitude": 25.8},
+        headers=h,
+    )
+    assert refused.status_code == 422, refused.text
+    moved = (
+        await client.post(url, json={"device_id": station["id"], "mobile": True}, headers=h)
+    ).json()
+    assert moved["mobile"] is True and moved["placed"] is False
+    device = (await client.get(f"/api/v1/devices/{station['id']}", headers=h)).json()
+    assert device["static_position"] is None
+    page = (await client.get(f"/api/v1/projects/{project.id}/offload", headers=h)).json()
+    row = next(s for s in page["stations"] if s["device_id"] == station["id"])
+    assert row["mobile"] is True and row["has_location"] is False and row["location"] is None
+    card = (await client.get(f"/api/v1/devices/{station['id']}/offload", headers=h)).json()
+    assert card["mobile"] is True and card["is_station"] is True
+    fixed = (
+        await client.post(url, json={"device_id": station["id"], "mobile": False}, headers=h)
+    ).json()
+    assert fixed["mobile"] is False
+    page = (await client.get(f"/api/v1/projects/{project.id}/offload", headers=h)).json()
+    row = next(s for s in page["stations"] if s["device_id"] == station["id"])
+    assert row["mobile"] is False and row["has_location"] is False
+
 
 def v5(eui: str, *, session: int = 1, window: int = 1, slot: int = 0, version: int = 5) -> dict:
     """The `lp0` object a v5 station writes beside `rxpk`."""

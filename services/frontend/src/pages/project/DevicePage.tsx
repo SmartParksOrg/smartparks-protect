@@ -612,7 +612,11 @@ export function DevicePage() {
                   }
                 />
               )}
-              <OffloadStationCard deviceId={d.id} projectId={projectId} />
+              <OffloadStationCard
+                deviceId={d.id}
+                projectId={projectId}
+                canEdit={Boolean(user?.is_superuser) || can("devices:write")}
+              />
               {projectId && currentEntityId && (
                 <TrapCard
                   deviceId={d.id}

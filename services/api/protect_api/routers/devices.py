@@ -104,9 +104,10 @@ from shared.domain.reporting_rules import decode_setting_value, encode_setting_v
 from shared.domain.static_place import (
     place_device,
     place_past_sightings_of,
+    unplace_device,
 )
 from shared.domain.trap import TRAP_ATTRIBUTE, closed_when_active
-from shared.enums import AcquisitionChannel, DeviceStatus, LocationSource, ProcessingStatus
+from shared.enums import AcquisitionChannel, DeviceStatus, ProcessingStatus
 from shared.models import (
     AttributionJob,
     ConnectivityState,
@@ -1122,16 +1123,7 @@ async def set_device_static_position(
         placed = await place_device(session, device, body.longitude, body.latitude, now)
     else:
         placed = 0
-        device.static_geom = None
-        device.static_position_at = None
-        if device.location_source == LocationSource.STATIC:
-            device.location_source = LocationSource.DEVICE
-        # the place was stamped on the current states and no record put it there, so only a
-        # rebuild takes it off: the device goes back to whatever it reports, and so does the
-        # entity it is on (reviewed 2026-09-19: both kept standing at the old place, marked
-        # "fixed place", after the place was cleared)
-        await session.flush()
-        await recompute_current_state(session, device.id, {attribution.entity_id})
+        await unplace_device(session, device, attribution.entity_id)
     await record_audit(
         session,
         user=user,

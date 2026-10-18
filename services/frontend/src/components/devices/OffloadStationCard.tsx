@@ -5,8 +5,10 @@ import { Link } from "react-router";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
-import type { OffloadStation } from "@/api/types";
+import type { OffloadStation, OffloadStationSetupResult } from "@/api/types";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMutationToast } from "@/hooks/useMutationToast";
 import { useNow } from "@/hooks/useNow";
 import { formatAgo, formatDuration, formatTime } from "@/lib/format";
 
@@ -19,9 +21,12 @@ import { formatAgo, formatDuration, formatTime } from "@/lib/format";
 export function OffloadStationCard({
   deviceId,
   projectId,
+  canEdit = false,
 }: {
   deviceId: string;
   projectId?: string;
+  /** Whether the person may make the station static or mobile (devices:write). */
+  canEdit?: boolean;
 }) {
   const { t } = useTranslation();
   const now = useNow();
@@ -29,6 +34,37 @@ export function OffloadStationCard({
     queryKey: queryKeys.offloadStation(deviceId),
     queryFn: () =>
       api.get<OffloadStation>(`/api/v1/devices/${deviceId}/offload`),
+  });
+  // static or mobile (decision D336): the Offload page's setup call, with `mobile` alone
+  const mobility = useMutationToast({
+    mutationFn: (mobile: boolean) =>
+      api.post<OffloadStationSetupResult>(
+        `/api/v1/projects/${projectId}/offload/stations`,
+        {
+          body: { device_id: deviceId, mobile },
+        },
+      ),
+    invalidate: [
+      queryKeys.offloadStation(deviceId),
+      queryKeys.device(deviceId),
+      ...(projectId
+        ? [
+            queryKeys.projectOffload(projectId),
+            queryKeys.currentState(projectId),
+          ]
+        : []),
+    ],
+    success: (r) =>
+      r.mobile
+        ? t(
+            "{{device}} is a mobile station now; its own fixes say where it is",
+            {
+              device: r.device_name,
+            },
+          )
+        : t("{{device}} is a static station now; set its place under Place", {
+            device: r.device_name,
+          }),
   });
   const s = read.data;
   if (!s || !s.is_station) return null;
@@ -58,6 +94,23 @@ export function OffloadStationCard({
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+          <dt className="text-muted-foreground">{t("Position")}</dt>
+          <dd>
+            {s.mobile
+              ? t("mobile: it travels and reports its position itself")
+              : t("static: a place set by hand")}
+            {canEdit && projectId && (
+              <Button
+                size="sm"
+                variant="link"
+                className="h-auto px-2 py-0"
+                disabled={mobility.isPending}
+                onClick={() => mobility.mutate(!s.mobile)}
+              >
+                {s.mobile ? t("Make it static") : t("Make it mobile")}
+              </Button>
+            )}
+          </dd>
           <dt className="text-muted-foreground">{t("Card files")}</dt>
           <dd>
             {t("{{files}} files, {{frames}} frames", {

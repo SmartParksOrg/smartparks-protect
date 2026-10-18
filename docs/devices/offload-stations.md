@@ -152,7 +152,18 @@ device page, and stations without a place are counted under the map (the overvie
 station's `location` as a GeoJSON point). The Trackers section has the same switch: its map
 shows each tracker's last known position with its entity's icon and its name, a press opens the
 live map on the tracker (the overview carries `last_position`, `last_position_at` and
-`entity_icon` per tracker), and a pin beside each tracker's name in the list does the same. The footer counts the devices of the project that have no address yet. Built before
+`entity_icon` per tracker), and a pin beside each tracker's name in the list does the same.
+
+**Static or mobile** (decision D336, Tim, 2026-10-18). A station is static by default: it stands
+where a person placed it (decision D261), and the Setup column asks for that place. A station
+that travels, on a vehicle or with a ranger, is made mobile, in the station dialog or on its
+device page ("Make it mobile", `devices:write`): it then reports its position itself, like a
+tracker, a place set by hand is taken away, the Offload page marks it with a badge, its row
+says "no position yet" until a fix arrives, and the stations map draws it at its last known
+position with the time of that fix. The choice lives on the station's gateway row
+(`attributes.mobility`), so `POST /projects/{id}/offload/stations` with `mobile` alone switches
+it; the overview's stations carry `mobile`, `location` and `location_at`. A mobile station's
+row on the Gateways page keeps the location it had; the coverage layer does not follow it yet. The footer counts the devices of the project that have no address yet. Built before
 a real card was read (Tim, 2026-10-16), to be tuned once there is data.
 
 The one thing the page does itself is the station's setup (Tim, the same day: a guide and an

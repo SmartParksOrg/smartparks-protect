@@ -100,6 +100,24 @@ async def place_device(
     return await place_past_sightings(session, device)
 
 
+async def unplace_device(
+    session: AsyncSession, device: Device, entity_id: uuid.UUID | None
+) -> None:
+    """Take a device's place by hand away, the reverse of `place_device`: the device goes back
+    to whatever it reports, and so does the entity it is on. The place was stamped on the
+    current states and no record put it there, so only a rebuild takes it off (reviewed
+    2026-09-19: both kept standing at the old place, marked "fixed place", after the place was
+    cleared). The device page's "clear" and a station made mobile (decision D336) come here."""
+    from shared.curation.apply import recompute_current_state
+
+    device.static_geom = None
+    device.static_position_at = None
+    if device.location_source == LocationSource.STATIC:
+        device.location_source = LocationSource.DEVICE
+    await session.flush()
+    await recompute_current_state(session, device.id, {entity_id} if entity_id else set())
+
+
 async def place_entity_of(session: AsyncSession, device_id: uuid.UUID, when: datetime) -> bool:
     """Give the entity a device was just assigned to the device's place, if it has one.
 

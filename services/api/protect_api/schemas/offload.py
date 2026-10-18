@@ -81,7 +81,10 @@ class OffloadStationRead(BaseModel):
 
     device_id: uuid.UUID
     station_eui: str | None = None
-    is_station: bool = Field(description="The device has received files or reports as a station")
+    is_station: bool = Field(
+        description="The device has received files or reports as a station, or was set up as one"
+    )
+    mobile: bool = Field(default=False, description="The station reports its own position (D336)")
     files: int = 0
     frames: int = 0
     frames_retained: int = 0
@@ -107,9 +110,19 @@ class OffloadOverviewStation(BaseModel):
     entity_id: uuid.UUID | None = None
     entity_name: str | None = None
     gateway_id: uuid.UUID | None = Field(default=None, description="Its row on the Gateways page")
+    mobile: bool = Field(
+        default=False,
+        description="The station travels and reports its own position (decision D336); its "
+        "location is then its last known position, not a place set by hand",
+    )
     has_location: bool = False
     location: dict[str, Any] | None = Field(
-        default=None, description="Its place as a GeoJSON point, for the Offload page's map"
+        default=None,
+        description="Where the Offload page's map draws it: the place set by hand, or a "
+        "mobile station's last known position, as a GeoJSON point",
+    )
+    location_at: datetime | None = Field(
+        default=None, description="When a mobile station's last known position was taken"
     )
     files: int = 0
     frames: int = 0
@@ -199,11 +212,19 @@ class OffloadStationSetup(BaseModel):
     )
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+    mobile: bool | None = Field(
+        default=None,
+        description="A mobile station travels and reports its own position, like a tracker "
+        "(decision D336); a static one, the default, stands where a person placed it. "
+        "Left out, the station stays as it is",
+    )
 
     @model_validator(mode="after")
     def _consistent(self) -> "OffloadStationSetup":
         if (self.latitude is None) != (self.longitude is None):
             raise ValueError("latitude and longitude go together")
+        if self.mobile and self.latitude is not None:
+            raise ValueError("a mobile station has no place set by hand; it reports its position")
         if self.entity_id is not None and self.entity_name is not None:
             raise ValueError("give entity_id or entity_name, not both")
         return self
@@ -220,5 +241,6 @@ class OffloadStationSetupResult(BaseModel):
     entity_created: bool = Field(description="A new Offload station entity was made")
     entity_kept: bool = Field(description="The device tracked this entity already")
     placed: bool = Field(description="The place was set in this call")
+    mobile: bool = Field(default=False, description="The station reports its own position")
     gateway_id: uuid.UUID
     gateway_created: bool = Field(description="The gateway row did not exist before")
