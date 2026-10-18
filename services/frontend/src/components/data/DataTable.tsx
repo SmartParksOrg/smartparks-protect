@@ -104,6 +104,13 @@ interface Props<T> {
 /** Below this many rows a search box is noise; it still appears once a term is typed. */
 const SEARCH_FROM_ROWS = 6;
 
+/** The rows while there are none, one array for every render. TanStack Table queues a page
+ * index reset whenever the data's identity changes; a fresh `[]` per render made that reset
+ * re-render the table, which made another `[]`, without end (Tim, 2026-10-18: the Offload page
+ * froze when the files section's device changed in the list view, the table re-rendering with
+ * its rows not loaded yet). */
+const NO_ROWS: never[] = [];
+
 /** Wide tables scroll inside this container; the page never scrolls horizontally. */
 export function DataTable<T>({
   columns,
@@ -189,8 +196,11 @@ export function DataTable<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chosen, phone, defaultHidden.join("|"), defaultHiddenSmall.join("|")]);
   const table = useReactTable({
-    data: data ?? [],
+    data: data ?? NO_ROWS,
     columns: allColumns,
+    // the table never paginates, so a page index reset after a data change is wasted work and,
+    // with changing data, a re-render per render
+    autoResetPageIndex: false,
     state: {
       sorting,
       globalFilter: search,
