@@ -87,7 +87,9 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
             <SelectTrigger className="h-8 w-48" aria-label={t("Device")}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            {/* floating under the trigger: the item-aligned list, which Protect's selects use
+                elsewhere, locked the page on a phone (Tim, 2026-10-18) */}
+            <SelectContent position="popper">
               <SelectItem value="all">{t("All devices")}</SelectItem>
               {devices.map(([id, name]) => (
                 <SelectItem key={id} value={id}>
