@@ -11684,6 +11684,13 @@ export interface components {
              */
             has_location: boolean;
             /**
+             * Location
+             * @description Its place as a GeoJSON point, for the Offload page's map
+             */
+            location?: {
+                [key: string]: unknown;
+            } | null;
+            /**
              * Files
              * @default 0
              */

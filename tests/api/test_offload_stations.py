@@ -751,6 +751,7 @@ async def test_a_device_becomes_a_station_from_the_offload_page(client, db):
     row = rows[station["id"]]
     assert row["files"] == 0 and row["receptions"] == 0
     assert row["has_location"] is True
+    assert row["location"]["coordinates"] == [25.8, -17.9]  # the Offload page's map
     assert row["gateway_id"] == str(gateway.id)
     assert row["entity_name"] == station["name"]
     assert all(t["device_id"] != station["id"] for t in page["trackers"])

@@ -3165,5 +3165,9 @@
   "set, shown to those who may change it": "ingesteld, zichtbaar voor wie hem mag wijzigen",
   "Show {{label}}": "{{label}} tonen",
   "The card: \"Upload SD card files\" here takes the .jsonl files or zips of the LOG folders of any number of cards and puts each file with the station named in it; a station's device page takes its own files too, under Log files. Every frame is verified and decrypted with its tracker's own keys and the records appear on the trackers' entities. The Setup column here says what a row still misses.": "De kaart: \"SD-kaartbestanden uploaden\" hier neemt de .jsonl-bestanden of zips van de LOG-mappen van elk aantal kaarten aan en zet elk bestand bij het station dat erin genoemd wordt; de apparaatpagina van een station neemt zijn eigen bestanden ook aan, onder Logbestanden. Elk frame wordt geverifieerd en ontsleuteld met de eigen sleutels van zijn tracker en de records verschijnen bij de entiteiten van de trackers. De kolom Instelling zegt hier wat een rij nog mist.",
-  "Upload SD card files": "SD-kaartbestanden uploaden"
+  "Upload SD card files": "SD-kaartbestanden uploaden",
+  "{{count}} stations without a place are not on the map; the list names them._one": "{{count}} station zonder plaats staat niet op de kaart; de lijst noemt het.",
+  "{{count}} stations without a place are not on the map; the list names them._other": "{{count}} stations zonder plaats staan niet op de kaart; de lijst noemt ze.",
+  "No offload station yet.": "Nog geen offloadstation.",
+  "None of the stations has a place yet. Set it on the station's device page, under Place, or in the station dialog.": "Geen van de stations heeft al een plaats. Stel die in op de apparaatpagina van het station, onder Plaats, of in het stationsvenster."
 }

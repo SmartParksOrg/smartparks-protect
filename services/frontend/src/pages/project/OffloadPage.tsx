@@ -3,7 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { BookOpen, CircleCheck, CircleHelp, HardDrive, Laptop, Plus, Radio } from "lucide-react";
+import {
+  BookOpen,
+  CircleCheck,
+  CircleHelp,
+  HardDrive,
+  Laptop,
+  List,
+  Map as MapIcon,
+  Plus,
+  Radio,
+} from "lucide-react";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
@@ -20,10 +30,12 @@ import { CardUploadButton } from "@/components/network/CardUploadButton";
 import { FieldCard } from "@/components/network/FieldCard";
 import { FilesSection } from "@/components/network/FilesSection";
 import { OffloadStationDialog } from "@/components/network/OffloadStationDialog";
+import { StationsMap } from "@/components/network/StationsMap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/hooks/useNow";
 import { usePermissions } from "@/hooks/useProjects";
+import { useStationsView } from "@/hooks/useStationsView";
 import { formatAgo, formatTime } from "@/lib/format";
 
 /**
@@ -48,11 +60,15 @@ export function OffloadPage() {
   const { can, all: serverAdmin } = usePermissions(projectId);
   const canSetUp = can("devices:write");
   const canUpload = can("devices:control");
-  const [setup, setSetup] = useState<{ open: boolean; deviceId: string | null }>({
+  const [setup, setSetup] = useState<{
+    open: boolean;
+    deviceId: string | null;
+  }>({
     open: false,
     deviceId: null,
   });
   const [guideOpen, setGuideOpen] = useState(false);
+  const [stationsView, setStationsView] = useStationsView();
   const [fieldOpen, setFieldOpen] = useState(false);
   const overview = useQuery({
     queryKey: queryKeys.projectOffload(projectId),
@@ -80,7 +96,9 @@ export function OffloadPage() {
     if (!s.entity_id)
       gaps.push({
         label: t("no entity"),
-        hint: t("The station has no Offload station entity, so it is not on the map or in the lists"),
+        hint: t(
+          "The station has no Offload station entity, so it is not on the map or in the lists",
+        ),
         fix: "dialog",
       });
     if (!s.has_location)
@@ -92,19 +110,25 @@ export function OffloadPage() {
     if (!s.gateway_id)
       gaps.push({
         label: t("not a gateway yet"),
-        hint: t("The station has no row among the gateways of the offload station source until it is set up or its first card is read"),
+        hint: t(
+          "The station has no row among the gateways of the offload station source until it is set up or its first card is read",
+        ),
         fix: "dialog",
       });
     if (s.files === 0)
       gaps.push({
         label: t("no card yet"),
-        hint: t("Upload the card's files under Log files on the station's device page"),
+        hint: t(
+          "Upload the card's files under Log files on the station's device page",
+        ),
         fix: "device",
       });
     if (s.card_ok === false)
       gaps.push({
         label: t("card not writable"),
-        hint: t("The station's own report says its SD card is out or cannot be written"),
+        hint: t(
+          "The station's own report says its SD card is out or cannot be written",
+        ),
         fix: "none",
       });
     return gaps;
@@ -114,7 +138,9 @@ export function OffloadPage() {
       return [
         {
           label: t("address and keys not set"),
-          hint: t("Set the LP0 address and the two keys under LP0 offload on the device page"),
+          hint: t(
+            "Set the LP0 address and the two keys under LP0 offload on the device page",
+          ),
           fix: "device",
         },
       ];
@@ -122,7 +148,9 @@ export function OffloadPage() {
       return [
         {
           label: t("address differs from the device's"),
-          hint: t("The device reports another address in its settings; check which one is provisioned"),
+          hint: t(
+            "The device reports another address in its settings; check which one is provisioned",
+          ),
           fix: "device",
         },
       ];
@@ -144,7 +172,10 @@ export function OffloadPage() {
               title={gap.hint}
               onClick={() => setSetup({ open: true, deviceId })}
             >
-              <Badge variant="outline" className="cursor-pointer text-destructive">
+              <Badge
+                variant="outline"
+                className="cursor-pointer text-destructive"
+              >
                 {gap.label}
               </Badge>
             </button>
@@ -272,7 +303,8 @@ export function OffloadPage() {
     {
       header: t("Setup"),
       id: "setup",
-      cell: ({ row }) => gapBadges(stationGaps(row.original), row.original.device_id),
+      cell: ({ row }) =>
+        gapBadges(stationGaps(row.original), row.original.device_id),
     },
   ];
 
@@ -409,7 +441,8 @@ export function OffloadPage() {
     {
       header: t("Setup"),
       id: "setup",
-      cell: ({ row }) => gapBadges(trackerGaps(row.original), row.original.device_id),
+      cell: ({ row }) =>
+        gapBadges(trackerGaps(row.original), row.original.device_id),
     },
   ];
 
@@ -497,7 +530,7 @@ export function OffloadPage() {
             <ol className="mt-1 list-decimal space-y-1 pl-4">
               <li>
                 {t(
-                  "The station: a RangerEdge with an SD card. \"Make an offload station\" picks it among the project's devices, or adds it first, by hand or read over Bluetooth, with its DevEUI as serial number; then it gets an Offload station entity, its place and its row among the gateways. A station does not move, so its place is set by hand.",
+                  'The station: a RangerEdge with an SD card. "Make an offload station" picks it among the project\'s devices, or adds it first, by hand or read over Bluetooth, with its DevEUI as serial number; then it gets an Offload station entity, its place and its row among the gateways. A station does not move, so its place is set by hand.',
                 )}
               </li>
               <li>
@@ -526,79 +559,111 @@ export function OffloadPage() {
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <HardDrive className="size-4" /> {t("Stations")}
             </h2>
-            {canUpload && stations.length > 0 && (
-              <CardUploadButton projectId={projectId} variant="outline" />
-            )}
+            {/* a list or a map of the stations (Tim, 2026-10-18), remembered per person */}
+            <div
+              className="flex rounded-md border p-0.5"
+              role="group"
+              aria-label={t("View")}
+            >
+              <Button
+                type="button"
+                variant={stationsView === "list" ? "secondary" : "ghost"}
+                size="icon"
+                className="size-7"
+                aria-pressed={stationsView === "list"}
+                aria-label={t("List")}
+                onClick={() => setStationsView("list")}
+              >
+                <List className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant={stationsView === "map" ? "secondary" : "ghost"}
+                size="icon"
+                className="size-7"
+                aria-pressed={stationsView === "map"}
+                aria-label={t("Map")}
+                onClick={() => setStationsView("map")}
+              >
+                <MapIcon className="size-4" />
+              </Button>
+            </div>
           </div>
-          <DataTable
-            columns={stationColumns}
-            data={data ? stations : undefined}
-            isLoading={overview.isPending}
-            defaultHiddenSmall={["last_upload_at", "report"]}
-            cardOf={(s) => (
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link
-                    className="font-medium underline"
-                    to={devicePath(s.device_id)}
-                  >
-                    {s.device_name}
-                  </Link>
-                  {s.entity_id && s.entity_name && (
+          {stationsView === "map" && data ? (
+            <StationsMap stations={stations} projectId={projectId} />
+          ) : (
+            <DataTable
+              columns={stationColumns}
+              data={data ? stations : undefined}
+              isLoading={overview.isPending}
+              defaultHiddenSmall={["last_upload_at", "report"]}
+              cardOf={(s) => (
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Link
-                      className="text-xs underline"
-                      to={entityPath(s.entity_id)}
+                      className="font-medium underline"
+                      to={devicePath(s.device_id)}
                     >
-                      {s.entity_name}
+                      {s.device_name}
                     </Link>
+                    {s.entity_id && s.entity_name && (
+                      <Link
+                        className="text-xs underline"
+                        to={entityPath(s.entity_id)}
+                      >
+                        {s.entity_name}
+                      </Link>
+                    )}
+                  </div>
+                  <div className="text-xs">
+                    {gapBadges(stationGaps(s), s.device_id)}
+                  </div>
+                  {s.station_eui && (
+                    <div className="font-mono text-xs text-muted-foreground">
+                      {s.station_eui}
+                    </div>
+                  )}
+                  <div className="text-xs">
+                    {s.files > 0
+                      ? t("{{files}} files, {{frames}} frames", {
+                          files: s.files,
+                          frames: s.frames,
+                        }) +
+                        t(", last uploaded {{ago}}", {
+                          ago: formatAgo(s.last_upload_at, now),
+                        })
+                      : t("No card uploaded yet")}
+                  </div>
+                  <div className="text-xs">
+                    {s.receptions > 0
+                      ? t("{{frames}} frames of {{trackers}} trackers", {
+                          frames: s.receptions,
+                          trackers: s.trackers,
+                        }) + `, ${formatAgo(s.last_reception_at, now)}`
+                      : t("No offload in 30 days")}
+                  </div>
+                  {s.state_time && (
+                    <div className="text-xs text-muted-foreground">
+                      {t("card {{ok}}", { ok: yesNo(s.card_ok) })}
+                      {", "}
+                      {t("listening {{ok}}", { ok: yesNo(s.listening) })}
+                      {", "}
+                      {formatAgo(s.state_time, now)}
+                    </div>
                   )}
                 </div>
-                <div className="text-xs">{gapBadges(stationGaps(s), s.device_id)}</div>
-                {s.station_eui && (
-                  <div className="font-mono text-xs text-muted-foreground">
-                    {s.station_eui}
-                  </div>
-                )}
-                <div className="text-xs">
-                  {s.files > 0
-                    ? t("{{files}} files, {{frames}} frames", {
-                        files: s.files,
-                        frames: s.frames,
-                      }) +
-                      t(", last uploaded {{ago}}", {
-                        ago: formatAgo(s.last_upload_at, now),
-                      })
-                    : t("No card uploaded yet")}
-                </div>
-                <div className="text-xs">
-                  {s.receptions > 0
-                    ? t("{{frames}} frames of {{trackers}} trackers", {
-                        frames: s.receptions,
-                        trackers: s.trackers,
-                      }) + `, ${formatAgo(s.last_reception_at, now)}`
-                    : t("No offload in 30 days")}
-                </div>
-                {s.state_time && (
-                  <div className="text-xs text-muted-foreground">
-                    {t("card {{ok}}", { ok: yesNo(s.card_ok) })}
-                    {", "}
-                    {t("listening {{ok}}", { ok: yesNo(s.listening) })}
-                    {", "}
-                    {formatAgo(s.state_time, now)}
-                  </div>
-                )}
-              </div>
-            )}
-            emptyMessage={
-              canSetUp
-                ? t(
-                    "No offload station yet. \"Make an offload station\" picks the RangerEdge among the project's devices or adds it first; the guide says what comes next.",
-                  )
-                : t(
-                    "No offload station yet. A project admin makes one from a RangerEdge of this project with \"Make an offload station\".",
-                  )
-            }
-          />
+              )}
+              emptyMessage={
+                canSetUp
+                  ? t(
+                      'No offload station yet. "Make an offload station" picks the RangerEdge among the project\'s devices or adds it first; the guide says what comes next.',
+                    )
+                  : t(
+                      'No offload station yet. A project admin makes one from a RangerEdge of this project with "Make an offload station".',
+                    )
+              }
+            />
+          )}
         </section>
         <section className="space-y-2">
           <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -654,7 +719,9 @@ export function OffloadPage() {
                     : t("No offload in 30 days")}
                 </div>
                 {trackerGaps(tr).length > 0 && (
-                  <div className="text-xs">{gapBadges(trackerGaps(tr), tr.device_id)}</div>
+                  <div className="text-xs">
+                    {gapBadges(trackerGaps(tr), tr.device_id)}
+                  </div>
                 )}
               </div>
             )}

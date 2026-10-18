@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from protect_api.audit import record_audit
 from protect_api.auth.users import current_active_user
 from protect_api.bus import get_bus
-from protect_api.crud import flush_or_409, get_or_404
+from protect_api.crud import flush_or_409, geom_to_geojson, get_or_404
 from protect_api.deps import ProjectContext, require_permission
 from protect_api.routers.control import _control_permissions
 from protect_api.routers.devices import _visible_device
@@ -914,6 +914,7 @@ async def project_offload(
                 entity_name=entity[1] if entity else None,
                 gateway_id=gateway_of[device_id].id if device_id in gateway_of else None,
                 has_location=device.static_geom is not None,
+                location=geom_to_geojson(device.static_geom),
                 files=len(own),
                 frames=sum(f.frames_total for f in own),
                 frames_retained=sum(int(f.attributes.get("frames_retained") or 0) for f in own),

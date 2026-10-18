@@ -39859,6 +39859,19 @@
       "title": "Has Location",
       "default": false
      },
+     "location": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location",
+      "description": "Its place as a GeoJSON point, for the Offload page's map"
+     },
      "files": {
       "type": "integer",
       "title": "Files",

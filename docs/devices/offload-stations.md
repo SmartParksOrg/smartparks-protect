@@ -144,8 +144,12 @@ what the device itself reports as its address when that differs, the frames and 
 window, the last station, the last verified counter), and the addresses the stations received
 that no device has, with the tracker's EUI when a line named it. The keys are never on this page;
 they stay on the device page, masked until shown. The page lists and links: a station or a tracker is a
-link away. **Upload SD card files**, in the page's header and beside the stations, takes the
-files of any number of cards and puts each with its station (step 3 above). The footer counts the devices of the project that have no address yet. Built before
+link away. **Upload SD card files**, in the page's header, takes the files of any number of
+cards and puts each with its station (step 3 above). The Stations section is a list or a map,
+switched at its heading and remembered per person (Tim, 2026-10-18): the map shows every station
+with a place as Protect's station marker with its name, a press on a marker opens the station's
+device page, and stations without a place are counted under the map (the overview carries each
+station's `location` as a GeoJSON point). The footer counts the devices of the project that have no address yet. Built before
 a real card was read (Tim, 2026-10-16), to be tuned once there is data.
 
 The one thing the page does itself is the station's setup (Tim, the same day: a guide and an

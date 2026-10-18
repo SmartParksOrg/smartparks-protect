@@ -108,6 +108,9 @@ class OffloadOverviewStation(BaseModel):
     entity_name: str | None = None
     gateway_id: uuid.UUID | None = Field(default=None, description="Its row on the Gateways page")
     has_location: bool = False
+    location: dict[str, Any] | None = Field(
+        default=None, description="Its place as a GeoJSON point, for the Offload page's map"
+    )
     files: int = 0
     frames: int = 0
     frames_retained: int = Field(default=0, description="Frames of addresses no device has")
