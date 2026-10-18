@@ -79,6 +79,8 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
           {/* the browser's own select: the floating list locked the page on a phone and on a
               desktop (Tim, 2026-10-18), a native one cannot */}
           <select
+            id="offload-files-device"
+            name="device"
             className="h-8 max-w-56 rounded-md border border-input bg-background px-2 text-sm"
             aria-label={t("Device")}
             value={deviceId}
