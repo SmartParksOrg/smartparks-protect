@@ -102,6 +102,10 @@ MAX_TRACKERS = 200
 READBACK_KEYS = ("lp0_dev_addr", "lp0_app_key", "lp0_network_key")
 #: The catalogue row a station's entity is made of (migration 0053, under Equipment).
 STATION_TYPE_KEY = "offload_station"
+#: The ports a frame carries in the clear (decision D341): a station's own status report (D323)
+#: and a tracker's stored stream (D262).
+STATION_REPORT_PORT = 23
+STORED_STREAM_PORT = 29
 
 
 async def _readback(session: AsyncSession, device_id: uuid.UUID) -> Lp0Readback:
@@ -1149,10 +1153,40 @@ async def project_offload(
             if seen
             else {}
         )
+        # the ports the frames carry in the clear (decision D341): a station's own status
+        # report travels on port 23, a tracker's stored stream on port 29, so the page says what
+        # an unknown device most likely is before anyone has its keys
+        port_expr = SourceEvent.provider_metadata["f_port"].astext
+        port_rows = (
+            (
+                await session.execute(
+                    select(SourceEvent.external_id, port_expr, func.count())
+                    .where(
+                        SourceEvent.data_source_id == source.id,
+                        SourceEvent.external_id.in_([s.external_id for s in seen]),
+                    )
+                    .group_by(SourceEvent.external_id, port_expr)
+                )
+            ).all()
+            if seen
+            else []
+        )
+        ports_of: dict[str, set[int]] = {}
+        for external_id, port, _frames in port_rows:
+            if port is not None and str(port).isdigit():
+                ports_of.setdefault(external_id, set()).add(int(port))
         for s in seen:
             identity = identities.get(s.external_id)
             if identity is not None and identity.device_id is not None:
                 continue  # linked since: the walk takes its receptions along
+            ports = sorted(ports_of.get(s.external_id, set()))
+            kind_hint = (
+                "station"
+                if ports == [STATION_REPORT_PORT]
+                else "tracker"
+                if STORED_STREAM_PORT in ports
+                else None
+            )
             name = (identity.attributes or {}).get("name") if identity is not None else None
             heard_by = sorted(
                 {
@@ -1166,6 +1200,8 @@ async def project_offload(
                     dev_addr=s.external_id,
                     dev_eui=_text(name) if name else None,
                     stations=heard_by,
+                    ports=ports,
+                    kind_hint=kind_hint,
                     receptions=int(s.receptions),
                     first_seen_at=s.first,
                     last_seen_at=s.last,

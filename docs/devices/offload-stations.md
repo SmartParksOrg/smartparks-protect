@@ -93,6 +93,14 @@ once. The DevEUI is never guessed. The name defaults to the DevEUI; the form ask
 name (SP…), since the keys are looked up by it anyway. Protect Go lists the unknown trackers of
 the cards it read and hands one over to this page with `?add=<address>`.
 
+With the newer firmware a station also records the status reports of the other stations in
+range, so an unknown device may be a station rather than a tracker (decision D341). The ports a
+frame carries in the clear tell them apart before anyone has the keys: a station's own status
+report travels on port 23, a tracker's stored stream on port 29. The Unknown devices table says
+what each looks like, and the add dialog opens on that choice, a tracker or an offload station;
+a station is set up at once, with its entity and its gateway row, and its place is set on its
+page afterwards.
+
 Once such a device is heard on a LoRaWAN server, its DevEUI identity links itself to the device
 whose serial it is (decision D339), so nothing waits on Needs attention for it. When the network
 names it otherwise, Needs attention's **Names** lists the pair, to rename the device or keep its

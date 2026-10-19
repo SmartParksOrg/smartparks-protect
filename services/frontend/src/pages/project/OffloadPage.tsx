@@ -627,6 +627,25 @@ export function OffloadPage() {
       ),
     },
     {
+      header: t("Looks like"),
+      accessorKey: "kind_hint",
+      cell: ({ row }) =>
+        row.original.kind_hint ? (
+          <Badge
+            variant="outline"
+            title={t("Ports {{ports}}", {
+              ports: (row.original.ports ?? []).join(", "),
+            })}
+          >
+            {row.original.kind_hint === "station"
+              ? t("a station")
+              : t("a tracker")}
+          </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">{t("unknown")}</span>
+        ),
+    },
+    {
       header: t("Heard by"),
       accessorKey: "stations",
       cell: ({ getValue }) => (

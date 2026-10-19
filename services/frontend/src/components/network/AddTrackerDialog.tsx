@@ -7,6 +7,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type {
   Device,
   Lp0Credentials,
+  OffloadStationSetupResult,
   OffloadUnknownAddress,
   Page as PageType,
 } from "@/api/types";
@@ -22,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutationToast } from "@/hooks/useMutationToast";
 
@@ -51,24 +53,9 @@ export function AddTrackerDialog({
     <Dialog open={address !== null} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{t("Add the tracker")}</DialogTitle>
+          <DialogTitle>{t("Add the device")}</DialogTitle>
           <DialogDescription>
-            {address?.dev_eui
-              ? t(
-                  "The stations received {{frames}} frames of LP0 address {{address}}; the card names the tracker {{eui}}. Give it its name from the label (SP…) when you know it, or read the device over Bluetooth, which brings the name, the DevEUI and the keys. The DevEUI is never guessed.",
-                  {
-                    frames: address.receptions,
-                    address: address.dev_addr,
-                    eui: address.dev_eui,
-                  },
-                )
-              : t(
-                  "The stations received {{frames}} frames of LP0 address {{address}}, and no device has it. Give the tracker its name from the label (SP…) when you know it, or read the device over Bluetooth, which brings the name, the DevEUI and the keys.",
-                  {
-                    frames: address?.receptions ?? 0,
-                    address: address?.dev_addr ?? "",
-                  },
-                )}
+            {address && <KindWords address={address} />}
           </DialogDescription>
         </DialogHeader>
         {address && (
@@ -94,7 +81,35 @@ function TrackerForm({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
+  // the first decision (decision D341): a station, when its frames are the status reports a
+  // station sends of itself (port 23), or a tracker, when they are a stored stream (port 29);
+  // the ports say which is likely, the person decides
+  const [kind, setKind] = useState<"tracker" | "station">(
+    address.kind_hint === "station" ? "station" : "tracker",
+  );
   const [way, setWay] = useState<"new" | "existing">("new");
+  const makeStation = useMutationToast({
+    mutationFn: (device: Device) =>
+      api.post<OffloadStationSetupResult>(
+        `/api/v1/projects/${projectId}/offload/stations`,
+        {
+          body: { device_id: device.id },
+        },
+      ),
+    invalidate: [
+      queryKeys.projectOffload(projectId),
+      queryKeys.entities(projectId),
+    ],
+    success: (r) =>
+      t(
+        "{{device}} is an offload station now, as the entity {{entity}}; set its place on its page",
+        {
+          device: r.device_name,
+          entity: r.entity_name,
+        },
+      ),
+    onSuccess: onDone,
+  });
   const [deviceId, setDeviceId] = useState("");
   const [q, setQ] = useState("");
   const [appKey, setAppKey] = useState("");
@@ -162,6 +177,37 @@ function TrackerForm({
   const suggestedName = address.dev_eui ?? `LP0 ${address.dev_addr}`;
   return (
     <div className="min-w-0 space-y-4">
+      <Field
+        label={t("What is it?")}
+        htmlFor="tracker-kind"
+        hint={
+          address.kind_hint === "station"
+            ? t(
+                "Its frames are the status reports a station sends of itself (port 23): most likely an offload station.",
+              )
+            : address.kind_hint === "tracker"
+              ? t(
+                  "Its frames are a stored stream (port 29): most likely a tracker.",
+                )
+              : t(
+                  "Its frames say nothing certain; choose what the hardware is.",
+                )
+        }
+      >
+        <RadioGroup
+          id="tracker-kind"
+          value={kind}
+          onValueChange={(v) => setKind(v as "tracker" | "station")}
+          className="flex flex-wrap gap-x-6 gap-y-2"
+        >
+          <label className="flex items-center gap-2 text-sm">
+            <RadioGroupItem value="tracker" /> {t("A tracker")}
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <RadioGroupItem value="station" /> {t("An offload station")}
+          </label>
+        </RadioGroup>
+      </Field>
       <Tabs value={way} onValueChange={(v) => setWay(v as "new" | "existing")}>
         <TabsList>
           <TabsTrigger value="new">{t("A new device")}</TabsTrigger>
@@ -178,7 +224,9 @@ function TrackerForm({
             serial: address.dev_eui ?? "",
             lp0Address: address.dev_addr,
           }}
-          onCreated={onDone}
+          onCreated={(device) =>
+            kind === "station" ? makeStation.mutate(device) : onDone()
+          }
         />
       ) : (
         <>
@@ -287,5 +335,29 @@ function TrackerForm({
         </>
       )}
     </div>
+  );
+}
+
+/** What the stations heard of the address, and what the ports say it is (decision D341). */
+function KindWords({ address }: { address: OffloadUnknownAddress }) {
+  const { t } = useTranslation();
+  const heard = t(
+    "The stations received {{frames}} frames of LP0 address {{address}}",
+    {
+      frames: address.receptions,
+      address: address.dev_addr,
+    },
+  );
+  const named = address.dev_eui
+    ? t("; the card names the device {{eui}}.", { eui: address.dev_eui })
+    : t(", and the card does not name the device.");
+  return (
+    <>
+      {heard}
+      {named}{" "}
+      {t(
+        "Give it the name from its label (SP…) when you know it, or read the device over Bluetooth, which brings the name, the DevEUI and the keys. The DevEUI is never guessed.",
+      )}
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -192,6 +192,16 @@ class OffloadUnknownAddress(BaseModel):
     dev_eui: str | None = Field(default=None, description="The tracker's EUI when a line named it")
     stations: list[str] = Field(
         default_factory=list, description="The stations that received it (Tim, 2026-10-19)"
+    )
+    ports: list[int] = Field(
+        default_factory=list,
+        description="The ports its frames carry in the clear: 23 is a station's own status "
+        "report, 29 a tracker's stored stream (decision D341)",
+    )
+    kind_hint: Literal["station", "tracker"] | None = Field(
+        default=None,
+        description="What the ports say the device most likely is: a station when it sends "
+        "status reports alone, a tracker when it sends a stored stream; nothing when neither",
     )
     receptions: int = 0
     first_seen_at: datetime | None = None

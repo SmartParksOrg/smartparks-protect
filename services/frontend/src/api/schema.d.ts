@@ -12220,6 +12220,16 @@ export interface components {
              */
             stations?: string[];
             /**
+             * Ports
+             * @description The ports its frames carry in the clear: 23 is a station's own status report, 29 a tracker's stored stream (decision D341)
+             */
+            ports?: number[];
+            /**
+             * Kind Hint
+             * @description What the ports say the device most likely is: a station when it sends status reports alone, a tracker when it sends a stored stream; nothing when neither
+             */
+            kind_hint?: ("station" | "tracker") | null;
+            /**
              * Receptions
              * @default 0
              */

@@ -41089,6 +41089,30 @@
       "title": "Stations",
       "description": "The stations that received it (Tim, 2026-10-19)"
      },
+     "ports": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Ports",
+      "description": "The ports its frames carry in the clear: 23 is a station's own status report, 29 a tracker's stored stream (decision D341)"
+     },
+     "kind_hint": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "station",
+         "tracker"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kind Hint",
+      "description": "What the ports say the device most likely is: a station when it sends status reports alone, a tracker when it sends a stored stream; nothing when neither"
+     },
      "receptions": {
       "type": "integer",
       "title": "Receptions",

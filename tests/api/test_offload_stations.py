@@ -53,6 +53,8 @@ KEYS_A = Keys(ADDR_A, APP_S_KEY, NWK_S_KEY)
 ADDR_C = "26010209"  # the second test's tracker; the test database is shared
 KEYS_C = Keys(ADDR_C, APP_S_KEY, NWK_S_KEY)
 KEYS_B = Keys(ADDR_B, bytes(range(16, 32)), bytes(range(32, 48)))
+ADDR_S = "26010208"  # a station nobody set yet, heard by another station (decision D341)
+KEYS_S = Keys(ADDR_S, bytes(range(48, 64)), bytes(range(64, 80)))
 OTHER_KEYS = Keys(ADDR_A, bytes(range(1, 17)), bytes(range(2, 18)))
 RECORDS = bytes.fromhex(FLASH)
 
@@ -213,9 +215,19 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
         build_uplink(KEYS_A, 1, 29, RECORDS),  # the station saved it again (lost receipt)
         build_uplink(KEYS_B, 5, 29, RECORDS),  # an address nobody set yet
         build_uplink(OTHER_KEYS, 2, 29, RECORDS),  # tracker A's address, the wrong keys
+        build_uplink(KEYS_S, 1, 23, RECORDS[:16]),  # a station nobody set yet, its own report
     ]
     first = "\n".join(["", line(frames[0]), line(frames[1]), line(frames[2])]) + "\n"
-    second = "\n".join(["", line(frames[3], time="1970-01-06T00:00:00Z", rssi=-90)]) + "\n"
+    second = (
+        "\n".join(
+            [
+                "",
+                line(frames[3], time="1970-01-06T00:00:00Z", rssi=-90),
+                line(frames[4], time="2026-10-12T09:10:00Z"),
+            ]
+        )
+        + "\n"
+    )
     upload = await client.post(
         f"/api/v1/devices/{station['id']}/offload-files",
         files={
@@ -359,7 +371,7 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
             select(GatewayReception).where(GatewayReception.gateway_id == STATION_EUI.lower())
         )
     ).all()
-    assert len(receptions) == 4 and {r.rssi for r in receptions} == {-71.0, -90.0}
+    assert len(receptions) == 5 and {r.rssi for r in receptions} == {-71.0, -90.0}
 
     # the unknown address waits on Needs attention; setting its keys walks the frame
     identities = (await client.get("/api/v1/attention/identities", headers=h)).json()["items"]
@@ -370,8 +382,8 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert [s["device_id"] for s in page["stations"]] == [station["id"]]
     listed = page["stations"][0]
     assert listed["station_eui"] == STATION_EUI and listed["gateway_id"] is not None
-    assert (listed["files"], listed["frames"], listed["frames_retained"]) == (2, 4, 1)
-    assert (listed["receptions"], listed["trackers"]) == (4, 1)
+    assert (listed["files"], listed["frames"], listed["frames_retained"]) == (2, 5, 2)
+    assert (listed["receptions"], listed["trackers"]) == (5, 1)
     assert listed["last_reception_at"] is not None and listed["card_ok"] is None
     assert [t["device_id"] for t in page["trackers"]] == [tracker_a["id"]]
     assert page["trackers"][0]["dev_addr"] == ADDR_A and page["trackers"][0]["keys_set"] is True
@@ -382,9 +394,13 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert page["trackers"][0]["last_station_device_id"] == station["id"]
     assert page["trackers"][0]["last_f_cnt"] == 1
     assert APP_S_KEY.hex().upper() not in json.dumps(page)
-    assert [u["dev_addr"] for u in page["unknown"]] == [ADDR_B]
-    assert page["unknown"][0]["receptions"] == 1 and page["unknown"][0]["last_seen_at"]
-    assert page["unknown"][0]["stations"] == [station["name"]]  # who heard it (Tim, 2026-10-19)
+    unknown_rows = {u["dev_addr"]: u for u in page["unknown"]}
+    assert set(unknown_rows) == {ADDR_B, ADDR_S}
+    assert unknown_rows[ADDR_B]["receptions"] == 1 and unknown_rows[ADDR_B]["last_seen_at"]
+    assert unknown_rows[ADDR_B]["stations"] == [station["name"]]  # who heard it (Tim, 2026-10-19)
+    # the ports say what each most likely is (decision D341)
+    assert unknown_rows[ADDR_B]["ports"] == [29] and unknown_rows[ADDR_B]["kind_hint"] == "tracker"
+    assert unknown_rows[ADDR_S]["ports"] == [23] and unknown_rows[ADDR_S]["kind_hint"] == "station"
     without_before = page["devices_without_address"]
     assert without_before >= 1  # tracker B at least
 
@@ -414,7 +430,7 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert event_b is not None and str(event_b.device_id) == tracker_b["id"]
     assert event_b.processing_status == "failed", "no keys yet: the frame fails plainly"
     page = (await client.get(f"/api/v1/projects/{project_id}/offload", headers=h)).json()
-    assert page["unknown"] == []
+    assert [u["dev_addr"] for u in page["unknown"]] == [ADDR_S]  # the station-like one waits
     b_row = next(t for t in page["trackers"] if t["device_id"] == tracker_b["id"])
     assert b_row["dev_addr"] == ADDR_B and b_row["keys_set"] is False
     taken = await client.put(
@@ -460,7 +476,7 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert {t["device_id"] for t in page["trackers"]} == {tracker_a["id"], tracker_b["id"]}
     b_row = next(t for t in page["trackers"] if t["device_id"] == tracker_b["id"])
     assert b_row["receptions"] == 1 and b_row["dev_addr"] == ADDR_B
-    assert page["unknown"] == []
+    assert [u["dev_addr"] for u in page["unknown"]] == [ADDR_S]  # the station-like one waits
     assert page["devices_without_address"] == without_before - 1
 
     # the station card
@@ -468,11 +484,11 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert card["is_station"] is True and card["station_eui"] == STATION_EUI
     assert (card["files"], card["frames"], card["records_new"], card["records_known"]) == (
         2,
-        4,
+        5,
         2,
         1,
     )
-    assert card["frames_repeated"] == 1 and card["frames_retained"] == 1
+    assert card["frames_repeated"] == 1 and card["frames_retained"] == 2
     served = {t["device_id"]: t for t in card["trackers"]}
     assert served[tracker_a["id"]]["frames"] == 3 and served[tracker_a["id"]]["dev_addr"] == ADDR_A
     assert served[tracker_b["id"]]["frames"] == 1
