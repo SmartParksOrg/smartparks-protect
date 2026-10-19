@@ -4832,12 +4832,32 @@ export interface paths {
         };
         /**
          * Field Bundle
-         * @description The project for the field (decision D331): devices with the entity each tracks now and
-         *     their DevEUI, the entities, the offload stations with EUI and place, the area, and each
-         *     tracker's LP0 address with its keys when the caller may set keys in this project. Protect Go
-         *     reads a card with this offline and uploads the card's files, never what it decoded.
+         * @description The project for the field (decision D331). Protect Go reads a card with this offline and
+         *     uploads the card's files, never what it decoded. The download is audited.
          */
         get: operations["field_bundle_api_v1_projects__project_id__field_bundle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/field-bundle/revision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Field Bundle Revision
+         * @description The bundle's fingerprint alone (decision D344): Protect Go asks for it now and then and
+         *     loads the project again by itself when it moved, so a station or a tracker added here is
+         *     on the laptop without a hand. Not audited: nothing leaves but sixteen hex digits.
+         */
+        get: operations["field_bundle_revision_api_v1_projects__project_id__field_bundle_revision_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9920,6 +9940,12 @@ export interface components {
              */
             format_version: number;
             /**
+             * Revision
+             * @description A fingerprint of the content (devices, entities, stations, keys, map), the same until the project changes; Protect Go compares it to refresh itself (decision D344)
+             * @default
+             */
+            revision: string;
+            /**
              * Generated At
              * Format: date-time
              */
@@ -9953,6 +9979,19 @@ export interface components {
             entities?: components["schemas"]["FieldEntity"][];
             /** Stations */
             stations?: components["schemas"]["FieldStation"][];
+        };
+        /**
+         * FieldBundleRevision
+         * @description The bundle's fingerprint alone, cheap to ask for often (decision D344).
+         */
+        FieldBundleRevision: {
+            /** Revision */
+            revision: string;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
         };
         /** FieldDevice */
         FieldDevice: {
@@ -25123,6 +25162,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FieldBundleRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    field_bundle_revision_api_v1_projects__project_id__field_bundle_revision_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldBundleRevision"];
                 };
             };
             /** @description Validation Error */

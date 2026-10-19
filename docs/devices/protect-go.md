@@ -39,3 +39,13 @@ No decoded row, no master key (Protect holds none, decision D327), and for now n
 ## Still to come
 
 Protect Go's own pages for the bundle, the cards and the upload (Protect Go's phase 2); on this side, nothing is open.
+
+## The project follows the server
+
+The app compares the loaded project's fingerprint with the server's every five minutes while it
+is online and signed in (`GET /projects/{id}/field-bundle/revision`, decision D344; the app's
+decision D28, 2026-10-19). When the project changed on the server, a device, a station, a
+tracker's keys, an entity or the map, the app loads the project again by itself, reads the
+frames of trackers unknown before with it, and every page shows the new state; a line in the
+app says when that happened. Loading by hand on the Server page still works for a laptop that
+was offline for long.

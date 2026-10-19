@@ -4,6 +4,7 @@ with the same code and the same credentials the server would use. One project pe
 caller's visibility applied, the keys only for a caller who may set them (the rule of
 `GET /devices/{id}/lp0-credentials`), the download in the audit log."""
 
+import hashlib
 import json
 import os
 import re
@@ -23,6 +24,7 @@ from protect_api.routers.offload import STATION_TYPE_KEY, _current_entities, _pr
 from protect_api.schemas.field_bundle import (
     FieldArea,
     FieldBundleRead,
+    FieldBundleRevision,
     FieldDevice,
     FieldEntity,
     FieldLp0,
@@ -119,15 +121,13 @@ async def _area(
     return _merge(boxes)
 
 
-@router.get("/projects/{project_id}/field-bundle", response_model=FieldBundleRead)
-async def field_bundle(
-    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
-    session: AsyncSession = Depends(get_session),
-) -> FieldBundleRead:
+async def _build_bundle(
+    session: AsyncSession, context: ProjectContext
+) -> tuple[FieldBundleRead, dict[str, int]]:
     """The project for the field (decision D331): devices with the entity each tracks now and
     their DevEUI, the entities, the offload stations with EUI and place, the area, and each
-    tracker's LP0 address with its keys when the caller may set keys in this project. Protect Go
-    reads a card with this offline and uploads the card's files, never what it decoded."""
+    tracker's LP0 address with its keys when the caller may set keys in this project. Returns
+    the bundle, its revision set, and the figures the audit names."""
     reveal = context.is_server_admin or Permission.DEVICES_CONTROL in context.permissions
     device_ids = await _project_device_ids(session, context)
     rows = (
@@ -239,17 +239,7 @@ async def field_bundle(
     # the metric registry is shared by every project and small; the app names and units the
     # values it decodes with it (decision D334)
     metric_rows = (await session.scalars(select(Metric).order_by(Metric.key))).all()
-    await record_audit(
-        session,
-        user=context.user,
-        action="project.field_bundle_downloaded",
-        object_type="project",
-        object_id=str(context.project.id),
-        project_id=context.project.id,
-        details={"devices": len(devices), "stations": len(stations), "keys": keys_sent},
-    )
-    await session.commit()
-    return FieldBundleRead(
+    bundle = FieldBundleRead(
         generated_at=utc_now(),
         protect_version=__version__,
         protect_commit=os.environ.get("GIT_COMMIT", "unknown"),
@@ -288,6 +278,51 @@ async def field_bundle(
             for m in metric_rows
         ],
     )
+    bundle.revision = _revision(bundle)
+    return bundle, {"devices": len(devices), "stations": len(stations), "keys": keys_sent}
+
+
+def _revision(bundle: FieldBundleRead) -> str:
+    """A fingerprint of what the bundle carries, the same until the project changes: the
+    generation time and the server's build are left out, so two reads of an unchanged project
+    agree (decision D344)."""
+    content = bundle.model_dump_json(
+        exclude={"generated_at", "protect_commit", "protect_version", "revision"}
+    )
+    return hashlib.sha256(content.encode()).hexdigest()[:16]
+
+
+@router.get("/projects/{project_id}/field-bundle", response_model=FieldBundleRead)
+async def field_bundle(
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> FieldBundleRead:
+    """The project for the field (decision D331). Protect Go reads a card with this offline and
+    uploads the card's files, never what it decoded. The download is audited."""
+    bundle, figures = await _build_bundle(session, context)
+    await record_audit(
+        session,
+        user=context.user,
+        action="project.field_bundle_downloaded",
+        object_type="project",
+        object_id=str(context.project.id),
+        project_id=context.project.id,
+        details=figures,
+    )
+    await session.commit()
+    return bundle
+
+
+@router.get("/projects/{project_id}/field-bundle/revision", response_model=FieldBundleRevision)
+async def field_bundle_revision(
+    context: ProjectContext = Depends(require_permission(Permission.PROJECT_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> FieldBundleRevision:
+    """The bundle's fingerprint alone (decision D344): Protect Go asks for it now and then and
+    loads the project again by itself when it moved, so a station or a tracker added here is
+    on the laptop without a hand. Not audited: nothing leaves but sixteen hex digits."""
+    bundle, _figures = await _build_bundle(session, context)
+    return FieldBundleRevision(revision=bundle.revision, checked_at=utc_now())
 
 
 def _map_read(row: MapExtract) -> FieldMapRead:

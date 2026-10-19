@@ -220,3 +220,25 @@ async def test_the_offline_map_is_cut_for_the_area_and_streamed(
     assert (await client.post(path, json={}, headers=analyst.headers)).status_code == 202
     stranger = await actor(client, db)
     assert (await client.get(path, headers=stranger.headers)).status_code == 403
+
+
+async def test_the_bundle_revision_moves_when_the_project_changes(client, db):
+    """Decision D344: the fingerprint stands while the project stands, and moves when a device
+    is added, so Protect Go knows to load the project again."""
+    admin, project, _entity, _source, _live_device, _live_external = await _setup(client, db)
+    h = admin.headers
+    first = (await client.get(f"/api/v1/projects/{project.id}/field-bundle", headers=h)).json()
+    rev = (
+        await client.get(f"/api/v1/projects/{project.id}/field-bundle/revision", headers=h)
+    ).json()
+    assert rev["revision"] == first["revision"] and len(rev["revision"]) == 16
+    again = (
+        await client.get(f"/api/v1/projects/{project.id}/field-bundle/revision", headers=h)
+    ).json()
+    assert again["revision"] == rev["revision"], "an unchanged project reads the same"
+    oc = await _opencollar_type(client, h)
+    await _device(client, h, oc["id"], project.id)
+    moved = (
+        await client.get(f"/api/v1/projects/{project.id}/field-bundle/revision", headers=h)
+    ).json()
+    assert moved["revision"] != rev["revision"]

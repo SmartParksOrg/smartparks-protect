@@ -117,6 +117,12 @@ class FieldBundleRead(BaseModel):
     files untouched to `POST /devices/{id}/offload-files`; nothing decoded comes back."""
 
     format_version: int = Field(default=1, description="The shape of this document")
+    revision: str = Field(
+        default="",
+        description="A fingerprint of the content (devices, entities, stations, keys, map), "
+        "the same until the project changes; Protect Go compares it to refresh itself "
+        "(decision D344)",
+    )
     generated_at: datetime
     protect_version: str
     protect_commit: str
@@ -135,3 +141,10 @@ class FieldBundleRead(BaseModel):
     )
     entities: list[FieldEntity] = Field(default_factory=list)
     stations: list[FieldStation] = Field(default_factory=list)
+
+
+class FieldBundleRevision(BaseModel):
+    """The bundle's fingerprint alone, cheap to ask for often (decision D344)."""
+
+    revision: str
+    checked_at: datetime

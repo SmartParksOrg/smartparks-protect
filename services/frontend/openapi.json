@@ -19925,7 +19925,7 @@
      "offload"
     ],
     "summary": "Field Bundle",
-    "description": "The project for the field (decision D331): devices with the entity each tracks now and\ntheir DevEUI, the entities, the offload stations with EUI and place, the area, and each\ntracker's LP0 address with its keys when the caller may set keys in this project. Protect Go\nreads a card with this offline and uploads the card's files, never what it decoded.",
+    "description": "The project for the field (decision D331). Protect Go reads a card with this offline and\nuploads the card's files, never what it decoded. The download is audited.",
     "operationId": "field_bundle_api_v1_projects__project_id__field_bundle_get",
     "security": [
      {
@@ -19951,6 +19951,55 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/FieldBundleRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/projects/{project_id}/field-bundle/revision": {
+   "get": {
+    "tags": [
+     "offload"
+    ],
+    "summary": "Field Bundle Revision",
+    "description": "The bundle's fingerprint alone (decision D344): Protect Go asks for it now and then and\nloads the project again by itself when it moved, so a station or a tracker added here is\non the laptop without a hand. Not audited: nothing leaves but sixteen hex digits.",
+    "operationId": "field_bundle_revision_api_v1_projects__project_id__field_bundle_revision_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FieldBundleRevision"
         }
        }
       }
@@ -35043,6 +35092,12 @@
       "description": "The shape of this document",
       "default": 1
      },
+     "revision": {
+      "type": "string",
+      "title": "Revision",
+      "description": "A fingerprint of the content (devices, entities, stations, keys, map), the same until the project changes; Protect Go compares it to refresh itself (decision D344)",
+      "default": ""
+     },
      "generated_at": {
       "type": "string",
       "format": "date-time",
@@ -35131,6 +35186,26 @@
     ],
     "title": "FieldBundleRead",
     "description": "One project for the field: its devices with the entity each tracks now, the entities,\nthe stations with their EUI and place, the trackers' LP0 credentials the caller may see, the\narea, and the versions that made it. Protect Go decodes a card with these and uploads the card's\nfiles untouched to `POST /devices/{id}/offload-files`; nothing decoded comes back."
+   },
+   "FieldBundleRevision": {
+    "properties": {
+     "revision": {
+      "type": "string",
+      "title": "Revision"
+     },
+     "checked_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Checked At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "revision",
+     "checked_at"
+    ],
+    "title": "FieldBundleRevision",
+    "description": "The bundle's fingerprint alone, cheap to ask for often (decision D344)."
    },
    "FieldDevice": {
     "properties": {
