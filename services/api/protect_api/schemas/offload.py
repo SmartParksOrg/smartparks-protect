@@ -190,6 +190,9 @@ class OffloadUnknownAddress(BaseModel):
 
     dev_addr: str
     dev_eui: str | None = Field(default=None, description="The tracker's EUI when a line named it")
+    stations: list[str] = Field(
+        default_factory=list, description="The stations that received it (Tim, 2026-10-19)"
+    )
     receptions: int = 0
     first_seen_at: datetime | None = None
     last_seen_at: datetime | None = None

@@ -1117,6 +1117,7 @@ async def project_offload(
                     func.count().label("receptions"),
                     func.min(GatewayReception.time).label("first"),
                     func.max(GatewayReception.time).label("last"),
+                    func.array_agg(func.distinct(GatewayReception.gateway_id)).label("gateways"),
                 )
                 .join(
                     SourceEvent,
@@ -1153,10 +1154,18 @@ async def project_offload(
             if identity is not None and identity.device_id is not None:
                 continue  # linked since: the walk takes its receptions along
             name = (identity.attributes or {}).get("name") if identity is not None else None
+            heard_by = sorted(
+                {
+                    devices[station_by_eui[g]].name
+                    for g in (s.gateways or [])
+                    if g in station_by_eui and station_by_eui[g] in devices
+                }
+            )
             unknown.append(
                 OffloadUnknownAddress(
                     dev_addr=s.external_id,
                     dev_eui=_text(name) if name else None,
+                    stations=heard_by,
                     receptions=int(s.receptions),
                     first_seen_at=s.first,
                     last_seen_at=s.last,

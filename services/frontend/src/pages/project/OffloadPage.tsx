@@ -311,24 +311,27 @@ export function OffloadPage() {
         ]
       : [];
   });
-  const trackerMapButton = (tr: OffloadOverviewTracker) => (
-    <Button
-      asChild
-      variant="ghost"
-      size="icon-xs"
-      className="ml-1 align-middle"
-    >
-      <Link
-        to={trackerMapPath(tr)}
-        aria-label={t("Show {{name}} on the live map", {
-          name: tr.device_name,
-        })}
-        title={t("Show on the live map")}
+  // the live map shows an entity, or a device with a position; a tracker with neither has
+  // nothing to open there (Tim, 2026-10-19)
+  const trackerMapButton = (tr: OffloadOverviewTracker) =>
+    !tr.entity_id && !tr.last_position ? null : (
+      <Button
+        asChild
+        variant="ghost"
+        size="icon-xs"
+        className="ml-1 align-middle"
       >
-        <MapPin className="size-3.5" />
-      </Link>
-    </Button>
-  );
+        <Link
+          to={trackerMapPath(tr)}
+          aria-label={t("Show {{name}} on the live map", {
+            name: tr.device_name,
+          })}
+          title={t("Show on the live map")}
+        >
+          <MapPin className="size-3.5" />
+        </Link>
+      </Button>
+    );
 
   const stationColumns: ColumnDef<OffloadOverviewStation, unknown>[] = [
     {
@@ -596,6 +599,34 @@ export function OffloadPage() {
       accessorKey: "dev_eui",
       cell: ({ getValue }) => (
         <span className="font-mono">{getValue<string | null>() ?? ""}</span>
+      ),
+    },
+    {
+      header: t("Heard by"),
+      accessorKey: "stations",
+      cell: ({ getValue }) => (
+        <span className="text-xs">
+          {getValue<string[]>().map((name, i) => {
+            const station = (data?.stations ?? []).find(
+              (st) => st.device_name === name,
+            );
+            return (
+              <span key={name}>
+                {i > 0 && ", "}
+                {station ? (
+                  <Link
+                    className="underline"
+                    to={devicePath(station.device_id)}
+                  >
+                    {name}
+                  </Link>
+                ) : (
+                  name
+                )}
+              </span>
+            );
+          })}
+        </span>
       ),
     },
     { header: t("Frames"), accessorKey: "receptions" },

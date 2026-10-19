@@ -12215,6 +12215,11 @@ export interface components {
              */
             dev_eui?: string | null;
             /**
+             * Stations
+             * @description The stations that received it (Tim, 2026-10-19)
+             */
+            stations?: string[];
+            /**
              * Receptions
              * @default 0
              */

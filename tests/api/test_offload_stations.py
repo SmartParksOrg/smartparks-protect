@@ -384,6 +384,7 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     assert APP_S_KEY.hex().upper() not in json.dumps(page)
     assert [u["dev_addr"] for u in page["unknown"]] == [ADDR_B]
     assert page["unknown"][0]["receptions"] == 1 and page["unknown"][0]["last_seen_at"]
+    assert page["unknown"][0]["stations"] == [station["name"]]  # who heard it (Tim, 2026-10-19)
     without_before = page["devices_without_address"]
     assert without_before >= 1  # tracker B at least
 

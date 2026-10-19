@@ -41081,6 +41081,14 @@
       "title": "Dev Eui",
       "description": "The tracker's EUI when a line named it"
      },
+     "stations": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Stations",
+      "description": "The stations that received it (Tim, 2026-10-19)"
+     },
      "receptions": {
       "type": "integer",
       "title": "Receptions",
