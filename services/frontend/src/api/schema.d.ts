@@ -4679,6 +4679,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/lp0-credentials/walk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Walk Lp0 Frames
+         * @description Hand the frames of the device's LP0 address that wait, failed or unassigned, to the
+         *     decoder's walk (decision D121), after a serial or the keys were corrected (Tim,
+         *     2026-10-19). Nothing waits, and nothing is published.
+         */
+        post: operations["walk_lp0_frames_api_v1_devices__device_id__lp0_credentials_walk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/offload-files": {
         parameters: {
             query?: never;
@@ -11275,6 +11297,14 @@ export interface components {
             /** Observed At */
             observed_at?: string | null;
         };
+        /** Lp0WalkResult */
+        Lp0WalkResult: {
+            /**
+             * Queued
+             * @description Frames of the address handed to the decoder's walk
+             */
+            queued: number;
+        };
         /** MapConfig */
         MapConfig: {
             /** Maptiler Key */
@@ -11813,6 +11843,11 @@ export interface components {
             device_name: string;
             /** Station Eui */
             station_eui?: string | null;
+            /**
+             * Files Eui
+             * @description The EUI the station's card files carry; a serial that differs is a slip to check (Tim, 2026-10-19)
+             */
+            files_eui?: string | null;
             /** Entity Id */
             entity_id?: string | null;
             /** Entity Name */
@@ -11913,6 +11948,13 @@ export interface components {
              * @description The entity type's icon key
              */
             entity_icon?: string | null;
+            /**
+             * Card Dev Eui
+             * @description The tracker EUI a v5 card wrote beside this address; a serial that differs is a slip to check (Tim, 2026-10-19)
+             */
+            card_dev_eui?: string | null;
+            /** Serial Number */
+            serial_number?: string | null;
             /**
              * Last Position
              * @description Its last known position as a GeoJSON point, for the map
@@ -24827,6 +24869,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    walk_lp0_frames_api_v1_devices__device_id__lp0_credentials_walk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Lp0WalkResult"];
+                };
             };
             /** @description Validation Error */
             422: {

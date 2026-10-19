@@ -77,6 +77,20 @@ export function Lp0CredentialsCard({
           : t("LP0 keys saved"),
     onSuccess: () => setEditing(false),
   });
+  // the frames that wait, after a serial or the keys were corrected (Tim, 2026-10-19)
+  const walk = useMutationToast({
+    mutationFn: () =>
+      api.post<{ queued: number }>(
+        `/api/v1/devices/${deviceId}/lp0-credentials/walk`,
+      ),
+    invalidate,
+    success: (r) =>
+      r.queued > 0
+        ? t("{{count}} waiting frames handed to the decoder", {
+            count: r.queued,
+          })
+        : t("Nothing waits for this address"),
+  });
   const clear = useMutationToast({
     mutationFn: () =>
       api.delete<void>(`/api/v1/devices/${deviceId}/lp0-credentials`),
@@ -182,11 +196,26 @@ export function Lp0CredentialsCard({
               <>
                 <dt className="text-muted-foreground">{t("Waiting")}</dt>
                 <dd>
-                  {t(
-                    "{{count}} frames stored for this address wait for the keys",
-                    {
-                      count: c.frames_waiting,
-                    },
+                  {c.keys_set
+                    ? t("{{count}} frames stored for this address wait", {
+                        count: c.frames_waiting,
+                      })
+                    : t(
+                        "{{count}} frames stored for this address wait for the keys",
+                        {
+                          count: c.frames_waiting,
+                        },
+                      )}
+                  {canEdit && c.keys_set && (
+                    <Button
+                      size="sm"
+                      variant="link"
+                      className="h-auto px-2 py-0"
+                      disabled={walk.isPending}
+                      onClick={() => walk.mutate(undefined)}
+                    >
+                      {t("Decode them now")}
+                    </Button>
                   )}
                 </dd>
               </>

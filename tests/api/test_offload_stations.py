@@ -607,6 +607,9 @@ async def test_a_device_without_keys_fails_plainly_and_decodes_again_once_set(cl
         await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tracker["id"])))
     ).all()
     assert len(positions) == 3
+    # nothing waits any more: the walk button answers so (Tim, 2026-10-19)
+    walked = await client.post(f"/api/v1/devices/{tracker['id']}/lp0-credentials/walk", headers=h)
+    assert walked.status_code == 200 and walked.json()["queued"] == 0
     redecode = await client.post(f"/api/v1/log-files/{row['id']}/redecode", headers=h)
     assert redecode.status_code == 200
     await _decode(bus, row["id"], reprocess=True)

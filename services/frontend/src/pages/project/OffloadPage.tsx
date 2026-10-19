@@ -111,6 +111,15 @@ export function OffloadPage() {
         ),
         fix: "dialog",
       });
+    if (s.files_eui && s.station_eui && s.files_eui !== s.station_eui)
+      gaps.push({
+        label: t("serial differs from the cards"),
+        hint: t(
+          "The card files name the station {{eui}}, the device's serial says otherwise; correct the serial on the device page, under Edit",
+          { eui: s.files_eui },
+        ),
+        fix: "device",
+      });
     if (s.mobile && !s.has_location)
       gaps.push({
         label: t("no position yet"),
@@ -154,6 +163,25 @@ export function OffloadPage() {
     return gaps;
   };
   const trackerGaps = (tr: OffloadOverviewTracker): Gap[] => {
+    if (
+      tr.card_dev_eui &&
+      tr.serial_number &&
+      tr.card_dev_eui !== tr.serial_number.toUpperCase()
+    )
+      return [
+        {
+          label: t("the card names another tracker"),
+          hint: t(
+            "The station wrote that address {{address}} belongs to tracker {{eui}}, the device's serial says {{serial}}: a slip in the serial, or two trackers on one address. Correct the serial on the device page, under Edit, then decode the waiting frames under LP0 offload",
+            {
+              address: tr.dev_addr ?? "",
+              eui: tr.card_dev_eui,
+              serial: tr.serial_number,
+            },
+          ),
+          fix: "device",
+        },
+      ];
     if (tr.dev_addr && !tr.keys_set)
       return [
         {

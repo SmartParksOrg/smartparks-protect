@@ -204,6 +204,29 @@ async def addresses_of(session: AsyncSession, device_ids: list[uuid.UUID]) -> di
     return {device_id: external_id.upper() for device_id, external_id in rows}
 
 
+async def card_euis_of(session: AsyncSession, device_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """The tracker EUI a v5 card wrote beside each device's LP0 address, as the identity keeps
+    it (`dev_eui` in its attributes): what the station says the hardware is."""
+    if not device_ids:
+        return {}
+    source_row = await lp0_source(session)
+    rows = (
+        await session.execute(
+            select(ExternalIdentity.device_id, ExternalIdentity.attributes).where(
+                ExternalIdentity.data_source_id == source_row.id,
+                ExternalIdentity.identity_type == lp0_station.IDENTITY_TYPE,
+                ExternalIdentity.device_id.in_(device_ids),
+            )
+        )
+    ).all()
+    out: dict[uuid.UUID, str] = {}
+    for device_id, attributes in rows:
+        eui = (attributes or {}).get("dev_eui")
+        if eui:
+            out[device_id] = str(eui).upper()
+    return out
+
+
 async def _unlink_identity(
     session: AsyncSession, source: DataSource, dev_addr: str, device_id: uuid.UUID
 ) -> None:

@@ -409,7 +409,7 @@ export function DevicePage() {
                 size="sm"
                 onClick={() => setRenaming(true)}
               >
-                <Pencil className="size-4" /> {t("Rename")}
+                <Pencil className="size-4" /> {t("Edit")}
               </Button>
             )}
             {user?.is_superuser && (

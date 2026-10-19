@@ -73,7 +73,7 @@ from protect_api.schemas.domain import (
     RecordCounts,
 )
 from protect_api.schemas.log_files import WalkRead
-from protect_api.serial import fill_serial_from_identity
+from protect_api.serial import SERIAL_FROM_IDENTITY, fill_serial_from_identity
 from protect_api.visibility import group_and_subgroups, visibility_for
 from shared import reprocessing
 from shared.bus import RedisStreamsBus
@@ -532,6 +532,22 @@ async def update_device(
         await get_or_404(session, DeviceType, body.device_type_id, "Device type")
     if body.name is not None and body.name.strip().lower() != device.name.lower():
         await _refuse_taken_name(session, body.name, except_id=device.id)
+    if body.serial_number is not None and body.serial_number.strip():
+        other = await session.scalar(
+            select(Device).where(
+                func.upper(Device.serial_number) == body.serial_number.strip().upper(),
+                Device.id != device.id,
+            )
+        )
+        if other is not None:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"The serial number {body.serial_number.strip()} belongs to {other.name} "
+                "already; a DevEUI names one device.",
+            )
+        device_type = await session.get(DeviceType, body.device_type_id or device.device_type_id)
+        if device_type and device_type.driver_key in SERIAL_FROM_IDENTITY:
+            body.serial_number = body.serial_number.strip().upper()  # an OpenCollar's DevEUI
     changed = apply_patch(device, body)
     if changed.keys() & {"location_source", "location_fallback_hours"}:
         # the setting decides which positions become current (decision D164): rebuild the

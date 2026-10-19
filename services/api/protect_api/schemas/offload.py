@@ -49,6 +49,10 @@ class Lp0CredentialsUpdate(BaseModel):
     from_device: bool = False
 
 
+class Lp0WalkResult(BaseModel):
+    queued: int = Field(description="Frames of the address handed to the decoder's walk")
+
+
 class Lp0CredentialsResult(Lp0CredentialsRead):
     queued: int = Field(default=0, description="Retained frames handed to the decoder's walk")
 
@@ -108,6 +112,11 @@ class OffloadOverviewStation(BaseModel):
     device_id: uuid.UUID
     device_name: str
     station_eui: str | None = None
+    files_eui: str | None = Field(
+        default=None,
+        description="The EUI the station's card files carry; a serial that differs is a slip "
+        "to check (Tim, 2026-10-19)",
+    )
     entity_id: uuid.UUID | None = None
     entity_name: str | None = None
     gateway_id: uuid.UUID | None = Field(default=None, description="Its row on the Gateways page")
@@ -148,6 +157,12 @@ class OffloadOverviewTracker(BaseModel):
     entity_id: uuid.UUID | None = None
     entity_name: str | None = None
     entity_icon: str | None = Field(default=None, description="The entity type's icon key")
+    card_dev_eui: str | None = Field(
+        default=None,
+        description="The tracker EUI a v5 card wrote beside this address; a serial that "
+        "differs is a slip to check (Tim, 2026-10-19)",
+    )
+    serial_number: str | None = None
     last_position: dict[str, Any] | None = Field(
         default=None, description="Its last known position as a GeoJSON point, for the map"
     )

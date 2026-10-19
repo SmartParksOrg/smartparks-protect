@@ -31,6 +31,7 @@ from protect_api.schemas.offload import (
     Lp0CredentialsResult,
     Lp0CredentialsUpdate,
     Lp0Readback,
+    Lp0WalkResult,
     OffloadOverviewRead,
     OffloadOverviewStation,
     OffloadOverviewTracker,
@@ -50,6 +51,7 @@ from shared.domain.device_settings import known_settings
 from shared.domain.lp0 import (
     AddressTaken,
     addresses_of,
+    card_euis_of,
     claim_address,
     clear_credentials,
     credentials_for,
@@ -281,6 +283,31 @@ async def set_lp0_credentials(
     queued = await queue_identity_reprocess(session, bus, result.identity)
     read = await _credentials_read(session, device, reveal=True)
     return Lp0CredentialsResult(**read.model_dump(), queued=queued)
+
+
+@router.post("/devices/{device_id}/lp0-credentials/walk", response_model=Lp0WalkResult)
+async def walk_lp0_frames(
+    device_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
+) -> Lp0WalkResult:
+    """Hand the frames of the device's LP0 address that wait, failed or unassigned, to the
+    decoder's walk (decision D121), after a serial or the keys were corrected (Tim,
+    2026-10-19). Nothing waits, and nothing is published."""
+    device = await _writable_device(session, user, device_id)
+    source_row = await lp0_source(session)
+    identity = await session.scalar(
+        select(ExternalIdentity).where(
+            ExternalIdentity.data_source_id == source_row.id,
+            ExternalIdentity.device_id == device.id,
+            ExternalIdentity.identity_type == "dev_addr",
+        )
+    )
+    if identity is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The device has no LP0 address")
+    queued = await queue_identity_reprocess(session, bus, identity)
+    return Lp0WalkResult(queued=queued)
 
 
 @router.delete("/devices/{device_id}/lp0-credentials", status_code=status.HTTP_204_NO_CONTENT)
@@ -979,6 +1006,14 @@ async def project_offload(
             card_ok = bool(status_bits["card_detected"] and status_bits["card_writable"])
         entity = entities.get(device_id)
         gateway_row = gateway_of.get(device_id)
+        files_eui = next(
+            (
+                str(f.attributes.get("station_eui")).upper()
+                for f in own
+                if f.attributes.get("station_eui")
+            ),
+            gateway_row.external_id.upper() if gateway_row else None,
+        )
         mobile = bool(gateway_row and (gateway_row.attributes or {}).get("mobility") == "mobile")
         current = current_states.get(device_id)
         location_at: datetime | None = None
@@ -993,6 +1028,7 @@ async def project_offload(
                 device_id=device_id,
                 device_name=device.name,
                 station_eui=station_eui,
+                files_eui=files_eui,
                 entity_id=entity[0] if entity else None,
                 entity_name=entity[1] if entity else None,
                 gateway_id=gateway_row.id if gateway_row else None,
@@ -1027,6 +1063,7 @@ async def project_offload(
         ).all()
     }
     claimed_addresses = await addresses_of(session, device_ids)
+    card_euis = await card_euis_of(session, device_ids)
     tracker_ids = (set(credentials) | set(per_tracker) | set(claimed_addresses)) - station_ids
     reported: dict[uuid.UUID, str] = {}
     for device_id in tracker_ids:
@@ -1050,6 +1087,8 @@ async def project_offload(
                 entity_id=entity[0] if entity else None,
                 entity_name=entity[1] if entity else None,
                 entity_icon=entity[3] if entity else None,
+                card_dev_eui=card_euis.get(device_id),
+                serial_number=tracker.serial_number,
                 last_position=geom_to_geojson(current.latest_position) if current else None,
                 last_position_at=current.latest_position_time if current else None,
                 dev_addr=row.dev_addr if row else claimed_addresses.get(device_id),

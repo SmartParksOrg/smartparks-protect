@@ -19595,6 +19595,55 @@
     }
    }
   },
+  "/api/v1/devices/{device_id}/lp0-credentials/walk": {
+   "post": {
+    "tags": [
+     "offload stations"
+    ],
+    "summary": "Walk Lp0 Frames",
+    "description": "Hand the frames of the device's LP0 address that wait, failed or unassigned, to the\ndecoder's walk (decision D121), after a serial or the keys were corrected (Tim,\n2026-10-19). Nothing waits, and nothing is published.",
+    "operationId": "walk_lp0_frames_api_v1_devices__device_id__lp0_credentials_walk_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Lp0WalkResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/devices/{device_id}/offload-files": {
    "post": {
     "tags": [
@@ -38747,6 +38796,20 @@
     "title": "Lp0Readback",
     "description": "What the device itself reported of its LP0 settings (the settings table, D228): the\naddress in the clear, and whether the two keys are known, never their values."
    },
+   "Lp0WalkResult": {
+    "properties": {
+     "queued": {
+      "type": "integer",
+      "title": "Queued",
+      "description": "Frames of the address handed to the decoder's walk"
+     }
+    },
+    "type": "object",
+    "required": [
+     "queued"
+    ],
+    "title": "Lp0WalkResult"
+   },
    "MapConfig": {
     "properties": {
      "maptiler_key": {
@@ -40141,6 +40204,18 @@
       ],
       "title": "Station Eui"
      },
+     "files_eui": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Files Eui",
+      "description": "The EUI the station's card files carry; a serial that differs is a slip to check (Tim, 2026-10-19)"
+     },
      "entity_id": {
       "anyOf": [
        {
@@ -40377,6 +40452,29 @@
       ],
       "title": "Entity Icon",
       "description": "The entity type's icon key"
+     },
+     "card_dev_eui": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Card Dev Eui",
+      "description": "The tracker EUI a v5 card wrote beside this address; a serial that differs is a slip to check (Tim, 2026-10-19)"
+     },
+     "serial_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Serial Number"
      },
      "last_position": {
       "anyOf": [
