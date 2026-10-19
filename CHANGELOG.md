@@ -28,14 +28,6 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 - **Upload SD card files** in the Offload page's header (Tim, 2026-10-18: the person who collected the cards should not have to find each station's page): one or more `.jsonl` files or zips of the cards' `LOG_*` folders, of any number of stations, each file put with the station named in it. `POST /projects/{id}/offload-files` (`devices:control`) matches the EUI in a file's name to a device of the project by serial number or DevEUI identity, skips a file of an EUI no station of the project has and says which, and skips a file uploaded before; the toast counts the files and stations, a second one lists what was skipped and why.
 - **Files** at the foot of the Offload page: every file uploaded for the project's devices in one place, as the device page's log files explorer shows them, with the device as a column and a filter the server applies, a search box and sortable columns, a page of 200 at a time with "Load more" (`GET /projects/{id}/log-files` with `limit`, `before` and `device_id`, each row with its device's name). Tim, 2026-10-17: the files explorer of Protect Go, here for what was uploaded, on the Offload page rather than a page of its own.
 
-### Changed
-
-- **A tracker's LP0 keys are two lines, AppSKey and NwkSKey**, each masked until the eye beside it is pressed, with a copy button per line (Tim, 2026-10-18: always show the variables, mask the values); the card fits a phone with the keys shown. A viewer who may not change the keys sees that they are set.
-- **Every log files list says what each file is**: the Kind column is on by default, and every tile and every row of a phone's list carries the kind as a badge, "SD card", "raw log" or "browser sync" (Tim, 2026-10-18: a station has raw logs beside its card files, and the two were not told apart).
-- The Offload page's Protect Go button is called "Protect Go", no more; its card says as little as it can: "Open Protect Go" and "Install for Windows" (or macOS, Linux), one line on which to press, the other systems and the guide a link away; the server address with its copy button and the explanations are gone (Tim, 2026-10-17).
-
-### Added
-
 - The field bundle carries the metric registry (decision D334: key, label, unit, value type, category, description), so Protect Go's Data explorer names and units the values it decodes as Protect does (Tim, 2026-10-17).
 - `scripts/lp0_demo_cards.py` takes `--until YYYY-MM-DD` (the day the data ends at, so a second set for the same stations covers another period) and, with `--out`, writes each card's folder layout beside its zip for an SD card or Protect Go's folder picker (Tim, 2026-10-17: test files for the Protect Go app).
 - Protect Go signed in from the Offload page (decision D333): "Open Protect Go" mints a one-time code (`POST /api/v1/auth/go-handoff`) and hands it to the installed app in the `protect-go://connect` link; the app exchanges it once (`POST /api/v1/auth/go-handoff/exchange`, throttled like the login) for a token that lasts `GO_TOKEN_LIFETIME_DAYS` (30), so nobody types the server address or the password on the laptop. Both ends are audited; the code lives two minutes in Redis under its hash.
@@ -134,6 +126,10 @@ All notable changes to Smart Parks Protect are recorded here. The format follows
 - The Data explorer's table sorts and filters (Tim, 2026-09-20): the time first and newest first by default, a click on any header sorts the loaded rows by it (again reverses; empty cells stay last), and under every header a filter, a piece of text, or for a number column `> 3.5`, `<= 2`, `3.5-4` or a plain number, with a line saying how many loaded rows match. The device type, the data source, the kinds of record a moment holds and the position's kind are columns on by default; the identifiers, the device and entity ids, the source event, its ingestion time and the trace, are in the column picker, off until added, and the choice sticks per user.
 
 ### Changed
+
+- **A tracker's LP0 keys are two lines, AppSKey and NwkSKey**, each masked until the eye beside it is pressed, with a copy button per line (Tim, 2026-10-18: always show the variables, mask the values); the card fits a phone with the keys shown. A viewer who may not change the keys sees that they are set.
+- **Every log files list says what each file is**: the Kind column is on by default, and every tile and every row of a phone's list carries the kind as a badge, "SD card", "raw log" or "browser sync" (Tim, 2026-10-18: a station has raw logs beside its card files, and the two were not told apart).
+- The Offload page's Protect Go button is called "Protect Go", no more; its card says as little as it can: "Open Protect Go" and "Install for Windows" (or macOS, Linux), one line on which to press, the other systems and the guide a link away; the server address with its copy button and the explanations are gone (Tim, 2026-10-17).
 
 - The offload station file parser (`StationFrame`, `parse_station_jsonl`, `unpack_card_zip`, `station_eui_from_name` and the rest) lives in `shared/station_files.py`, a module without a database, broker or settings import, so Protect Go reads a card with it on a laptop (phase 43 P1, decision D331). Moving or renaming it breaks Protect Go's proof test at its next pin.
 
@@ -279,7 +275,6 @@ Contact tracing end to end, built between 2026-09-18 and 2026-09-19 from the PWN
 **`v2.7.0` was never cut.** The plan gave that number to phase 29 (analytics phase 2), whose vegetation half is in this release and whose corrected home range, movement strategy and movement module are still to build. Rather than tag a half-finished phase under its own number, its delivered half rides here and the number is skipped, as phases 22 and 28 were folded into v2.6.0.
 
 What the phase learned, which is the part worth keeping: nine defects surfaced in the last day and only three were caught by the test suite. The rest came from running the module against real devices and from opening the page and looking, a subject limit no request could reach, a module key the database refused, a map that dropped any geometry kind it had not been told about, charts that drew empty boxes because the series sat under the wrong key, and a module with no page at all. One of them, `device_fix()` counting a position one device gave another as that device's own fix, was not about contact tracing and had been wrong across the platform since phase 30.
-
 
 ### Added
 
