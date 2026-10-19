@@ -1,11 +1,12 @@
 import { useTranslation } from "react-i18next";
 import { Upload } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { OffloadUpload } from "@/api/types";
+import { UnknownStationDialog } from "@/components/network/UnknownStationDialog";
 import { Button } from "@/components/ui/button";
 import { useMutationToast } from "@/hooks/useMutationToast";
 
@@ -15,6 +16,8 @@ type Outcome = {
   files: number;
   stations: Set<string>;
   skipped: Note[];
+  /** Stations the project does not have, named by the server (decision D343). */
+  unknownStations: string[];
 };
 
 /**
@@ -35,9 +38,18 @@ export function CardUploadButton({
 }) {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
+  // the files the person picked, kept for a second round once an unknown station exists
+  const [picked, setPicked] = useState<File[]>([]);
+  const [unknownStations, setUnknownStations] = useState<string[] | null>(null);
   const upload = useMutationToast({
     mutationFn: async (files: File[]) => {
-      const outcome: Outcome = { files: 0, stations: new Set(), skipped: [] };
+      setPicked(files);
+      const outcome: Outcome = {
+        files: 0,
+        stations: new Set(),
+        skipped: [],
+        unknownStations: [],
+      };
       for (const file of files) {
         const body = new FormData();
         body.append("file", file);
@@ -47,13 +59,22 @@ export function CardUploadButton({
             { body },
           );
           outcome.files += result.files.length;
-          for (const row of result.files) outcome.stations.add(row.device_name ?? row.device_id);
+          for (const row of result.files)
+            outcome.stations.add(row.device_name ?? row.device_id);
           outcome.skipped.push(...(result.skipped ?? []));
+          for (const eui of result.unknown_stations ?? [])
+            if (!outcome.unknownStations.includes(eui))
+              outcome.unknownStations.push(eui);
         } catch (error) {
           // the server refused the whole file: its message names each member and the reason
-          outcome.skipped.push({ name: file.name, reason: (error as Error).message });
+          outcome.skipped.push({
+            name: file.name,
+            reason: (error as Error).message,
+          });
         }
       }
+      if (outcome.files === 0 && outcome.unknownStations.length > 0)
+        return outcome;
       if (outcome.files === 0) {
         throw new Error(
           outcome.skipped.map((s) => `${s.name}: ${s.reason}`).join("; ") ||
@@ -62,25 +83,44 @@ export function CardUploadButton({
       }
       return outcome;
     },
-    invalidate: [queryKeys.projectOffload(projectId), ["projects", projectId, "log-files"]],
+    invalidate: [
+      queryKeys.projectOffload(projectId),
+      ["projects", projectId, "log-files"],
+    ],
     success: (o) =>
-      t("{{files}} files for {{stations}} stations uploaded, decoding", {
-        files: o.files,
-        stations: o.stations.size,
-      }),
+      o.files > 0
+        ? t("{{files}} files for {{stations}} stations uploaded, decoding", {
+            files: o.files,
+            stations: o.stations.size,
+          })
+        : t("The card is from a station this project does not have yet"),
     onSuccess: (o) => {
-      if (o.skipped.length > 0)
-        toast.warning(t("{{count}} files skipped", { count: o.skipped.length }), {
-          description: o.skipped
-            .slice(0, 5)
-            .map((s) => `${s.name}: ${s.reason}`)
-            .join("\n"),
-          duration: 10_000,
-        });
+      // a station the project does not have: the dialog makes it and uploads again (D343)
+      if (o.unknownStations.length > 0) setUnknownStations(o.unknownStations);
+      if (o.skipped.length > 0 && o.unknownStations.length === 0)
+        toast.warning(
+          t("{{count}} files skipped", { count: o.skipped.length }),
+          {
+            description: o.skipped
+              .slice(0, 5)
+              .map((s) => `${s.name}: ${s.reason}`)
+              .join("\n"),
+            duration: 10_000,
+          },
+        );
     },
   });
   return (
     <>
+      <UnknownStationDialog
+        projectId={projectId}
+        euis={unknownStations}
+        files={picked}
+        onOpenChange={(open) => {
+          if (!open) setUnknownStations(null);
+        }}
+        onUploaded={() => setPicked([])}
+      />
       <input
         ref={input}
         type="file"

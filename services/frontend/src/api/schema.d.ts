@@ -11905,6 +11905,12 @@ export interface components {
              */
             trackers: number;
             /**
+             * Unknown Addresses
+             * @description Addresses no device has that it received in the window
+             * @default 0
+             */
+            unknown_addresses: number;
+            /**
              * Receptions
              * @description Frames received in the window
              * @default 0
@@ -12250,6 +12256,11 @@ export interface components {
              * @description Files named after another station's EUI, accepted as they are
              */
             other_station?: string[];
+            /**
+             * Unknown Stations
+             * @description The EUIs of stations the project does not have, whose files were skipped (decision D343): the page offers to make the station and upload again
+             */
+            unknown_stations?: string[];
         };
         /**
          * OrganizationCreate

@@ -72,8 +72,9 @@ deduplicates nothing and leaves that to Protect.
    with the station named in it: the EUI in the file's name, matched to a device of the project
    by serial number or DevEUI identity (`POST /projects/{id}/offload-files`, `devices:control`;
    Tim, 2026-10-18: the person who collected the cards should not have to find each station's
-   page). A file of an EUI no station of the project has is skipped and named with that EUI, so
-   the missing station is plain and nothing is guessed. A station's device page takes its own
+   page). A file of an EUI no station of the project has is kept back and the EUI is named: the
+   page then offers to make the station, with its label name and the EUI as serial, set it up
+   and upload the files again to it (decision D343), so nothing is guessed and nothing is lost. A station's device page takes its own
    files too, under Log files. Each file becomes a row with the station as its device and the
    kind "SD card"; the decoder reads it line by line, in batches, with the progress bar the raw
    log files have. In every log files list the kind of each file is on show, SD card, raw log or
@@ -92,6 +93,11 @@ the keys, set under LP0 offload on the device page, hand the waiting frames to t
 once. The DevEUI is never guessed. The name defaults to the DevEUI; the form asks for the label
 name (SP…), since the keys are looked up by it anyway. Protect Go lists the unknown trackers of
 the cards it read and hands one over to this page with `?add=<address>`.
+
+When a tracker is added after its cards were read, the decoder walks the frames that waited for it
+and sums the card files it touched anew (decision D342), so the Files section shows the records,
+the period and the figures per tracker without a second decode. The stations' figures on the
+page count by arrival at Protect, the upload of a card, not by the station's clock.
 
 With the newer firmware a station also records the status reports of the other stations in
 range, so an unknown device may be a station rather than a tracker (decision D341). The ports a

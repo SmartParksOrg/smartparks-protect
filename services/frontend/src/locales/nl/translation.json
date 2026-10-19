@@ -3263,5 +3263,17 @@
   "Looks like": "Lijkt op",
   "Ports {{ports}}": "Poorten {{ports}}",
   "The stations received {{frames}} frames of LP0 address {{address}}": "De stations ontvingen {{frames}} frames van LP0-adres {{address}}",
-  "What is it?": "Wat is het?"
+  "What is it?": "Wat is het?",
+  "{{frames}} frames of {{trackers}} trackers and {{unknown}} unknown": "{{frames}} frames van {{trackers}} trackers en {{unknown}} onbekende",
+  "{{stations}} set up as offload stations; {{files}} files uploaded, decoding": "{{stations}} als offloadstation ingesteld; {{files}} bestanden geüpload, worden gedecodeerd",
+  "Make the station and upload_one": "Maak het station en upload",
+  "Make the station and upload_other": "Maak de stations en upload",
+  "Station {{eui}}": "Station {{eui}}",
+  "Station {{name}}": "Station {{name}}",
+  "The card is from a station this project does not have_one": "De kaart is van een station dat dit project niet heeft",
+  "The card is from a station this project does not have_other": "De kaart is van stations die dit project niet heeft",
+  "The card is from a station this project does not have yet": "De kaart is van een station dat dit project nog niet heeft",
+  "The files are named after a station's DevEUI and were not kept. Give the station its name from the label (SP…) when you know it, or leave the DevEUI; it is made with the DevEUI as serial, set up as an offload station, and the files go up to it. Its place is set on its page afterwards.": "De bestanden zijn genoemd naar de DevEUI van een station en zijn niet bewaard. Geef het station zijn naam van het label (SP…) als u die kent, of laat de DevEUI staan; het wordt gemaakt met de DevEUI als serienummer, ingesteld als offloadstation, en de bestanden gaan ernaartoe. Zijn plaats wordt daarna op zijn pagina ingesteld.",
+  "The name on its label (SP…); the DevEUI {{eui}} becomes its serial number.": "De naam op zijn label (SP…); de DevEUI {{eui}} wordt zijn serienummer.",
+  "This server has no OpenCollar device type yet": "Deze server heeft nog geen OpenCollar-apparaattype"
 }

@@ -69,6 +69,11 @@ class OffloadUpload(BaseModel):
         default_factory=list,
         description="Files named after another station's EUI, accepted as they are",
     )
+    unknown_stations: list[str] = Field(
+        default_factory=list,
+        description="The EUIs of stations the project does not have, whose files were skipped "
+        "(decision D343): the page offers to make the station and upload again",
+    )
 
 
 class OffloadTracker(BaseModel):
@@ -139,6 +144,9 @@ class OffloadOverviewStation(BaseModel):
     frames_retained: int = Field(default=0, description="Frames of addresses no device has")
     last_upload_at: datetime | None = None
     trackers: int = Field(default=0, description="Trackers served in the window")
+    unknown_addresses: int = Field(
+        default=0, description="Addresses no device has that it received in the window"
+    )
     receptions: int = Field(default=0, description="Frames received in the window")
     last_reception_at: datetime | None = None
     card_ok: bool | None = Field(default=None, description="From the station's own report")

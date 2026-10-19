@@ -7,7 +7,10 @@ import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { DeviceLogFile, OffloadOverview } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
-import { LogFilesExplorer, LogFilesViewSwitch } from "@/components/devices/LogFilesExplorer";
+import {
+  LogFilesExplorer,
+  LogFilesViewSwitch,
+} from "@/components/devices/LogFilesExplorer";
 import { Button } from "@/components/ui/button";
 import { useLogFilesView } from "@/hooks/useLogFilesView";
 
@@ -22,7 +25,13 @@ const PAGE = 200;
  * server applies, the search box over the loaded rows, a click on a header to sort them.
  * Uploading stays on the device's page, where a file belongs to one device.
  */
-export function FilesSection({ projectId, canWrite }: { projectId: string; canWrite: boolean }) {
+export function FilesSection({
+  projectId,
+  canWrite,
+}: {
+  projectId: string;
+  canWrite: boolean;
+}) {
   const { t } = useTranslation();
   const [view, setView] = useLogFilesView();
   const [deviceId, setDeviceId] = useState("");
@@ -30,13 +39,21 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
   // offered, not only those whose files are loaded yet
   const overview = useQuery({
     queryKey: queryKeys.projectOffload(projectId),
-    queryFn: () => api.get<OffloadOverview>(`/api/v1/projects/${projectId}/offload`),
+    queryFn: () =>
+      api.get<OffloadOverview>(`/api/v1/projects/${projectId}/offload`),
   });
+  // the stations and the trackers apart in the filter (Tim, 2026-10-19: one list said nothing
+  // about which was which)
   const devices = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const s of overview.data?.stations ?? []) seen.set(s.device_id, s.device_name);
-    for (const tr of overview.data?.trackers ?? []) seen.set(tr.device_id, tr.device_name);
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    const stations = (overview.data?.stations ?? [])
+      .map((s) => [s.device_id, s.device_name] as const)
+      .sort((a, b) => a[1].localeCompare(b[1]));
+    const stationIds = new Set(stations.map(([id]) => id));
+    const trackers = (overview.data?.trackers ?? [])
+      .filter((tr) => !stationIds.has(tr.device_id))
+      .map((tr) => [tr.device_id, tr.device_name] as const)
+      .sort((a, b) => a[1].localeCompare(b[1]));
+    return { stations, trackers };
   }, [overview.data]);
   const files = useInfiniteQuery({
     queryKey: queryKeys.projectLogFiles(projectId, deviceId || null),
@@ -44,7 +61,9 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
       api.get<DeviceLogFile[]>(`/api/v1/projects/${projectId}/log-files`, {
         query: {
           limit: PAGE,
-          ...(pageParam ? { before: pageParam.uploaded_at, before_id: pageParam.id } : {}),
+          ...(pageParam
+            ? { before: pageParam.uploaded_at, before_id: pageParam.id }
+            : {}),
           ...(deviceId ? { device_id: deviceId } : {}),
         },
       }),
@@ -71,7 +90,9 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
           <FolderOpen className="size-4" /> {t("Files")}
           {rows.length > 0 && (
             <span className="text-sm font-normal text-muted-foreground">
-              {files.hasNextPage ? t("{{count}} loaded", { count: rows.length }) : rows.length}
+              {files.hasNextPage
+                ? t("{{count}} loaded", { count: rows.length })
+                : rows.length}
             </span>
           )}
         </h2>
@@ -87,11 +108,24 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
             onChange={(e) => setDeviceId(e.target.value)}
           >
             <option value="">{t("All devices")}</option>
-            {devices.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
+            {devices.stations.length > 0 && (
+              <optgroup label={t("Stations")}>
+                {devices.stations.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {devices.trackers.length > 0 && (
+              <optgroup label={t("Trackers")}>
+                {devices.trackers.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
           <LogFilesViewSwitch view={view} onView={setView} />
         </div>
@@ -121,7 +155,9 @@ export function FilesSection({ projectId, canWrite }: { projectId: string; canWr
             disabled={files.isFetchingNextPage}
             onClick={() => void files.fetchNextPage()}
           >
-            {files.isFetchingNextPage ? t("Loading…") : t("Load {{count}} more", { count: PAGE })}
+            {files.isFetchingNextPage
+              ? t("Loading…")
+              : t("Load {{count}} more", { count: PAGE })}
           </Button>
         </div>
       )}

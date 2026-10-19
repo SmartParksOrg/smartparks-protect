@@ -3,13 +3,14 @@ events after the commit. Also the file processing worker of architecture 25.6: i
 uploaded log file or a browser sync into frames and decodes them through the same pipeline."""
 
 import asyncio
+import contextlib
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import tuple_
 
-from protect_decoder.logfiles import handle_log_file
+from protect_decoder.logfiles import handle_log_file, refresh_summary
 from protect_decoder.pipeline import Outcome, process_source_event, publish_outcome
 from shared import reprocessing
 from shared.bus import Message, Topic
@@ -21,7 +22,7 @@ from shared.ingest import (
     unlinked_receptions,
 )
 from shared.logger import get_logger
-from shared.models import ExternalIdentity, SourceEvent
+from shared.models import DeviceLogFile, ExternalIdentity, SourceEvent
 from shared.worker import Worker
 
 log = get_logger("decoder")
@@ -94,6 +95,7 @@ def build_worker() -> Worker:
             session.expunge(identity)
         after: tuple[datetime, int] | None = None
         processed = failed = 0
+        touched_files: set[uuid.UUID] = set()  # the card files whose frames were walked (D342)
         while True:
             async with session_scope() as session:
                 statement = retained_events(identity).limit(WALK_PAGE)
@@ -102,10 +104,19 @@ def build_worker() -> Worker:
                         tuple_(SourceEvent.ingested_at, SourceEvent.id) > after
                     )
                 rows = (
-                    await session.execute(statement.add_columns(SourceEvent.network_received_at))
+                    await session.execute(
+                        statement.add_columns(
+                            SourceEvent.network_received_at,
+                            SourceEvent.provider_metadata["log_file_id"].astext,
+                        )
+                    )
                 ).all()
-                page = [(int(event_id), ingested_at) for event_id, ingested_at, _ in rows]
-                received = [r for _, _, r in rows if r is not None]
+                page = [(int(event_id), ingested_at) for event_id, ingested_at, _, _ in rows]
+                received = [r for _, _, r, _ in rows if r is not None]
+                for _, _, _, file_id in rows:
+                    if file_id:
+                        with contextlib.suppress(ValueError):
+                            touched_files.add(uuid.UUID(str(file_id)))
                 receptions = await unlinked_receptions(
                     session, page, earliest=min(received) if received else None
                 )
@@ -126,12 +137,21 @@ def build_worker() -> Worker:
                     log.exception("retained event failed", source_event_id=event_id)
                 after = (ingested_at, event_id)
             await reprocessing.advance_walk(worker.bus.redis, identity_id, processed + failed)
+        # the SD card files the walk touched say what their frames became now (decision D342:
+        # a tracker added after the card was read, its files processed without a second upload)
+        for file_id in touched_files:
+            async with session_scope() as session:
+                row = await session.get(DeviceLogFile, file_id)
+                if row is not None:
+                    await refresh_summary(session, row)
+                    await session.commit()
         await reprocessing.end_walk(worker.bus.redis, identity_id)
         log.info(
             "identity reprocessed",
             external_identity_id=str(identity_id),
             processed=processed,
             failed=failed,
+            files_refreshed=len(touched_files),
         )
 
     async def on_log_file(message: Message) -> None:

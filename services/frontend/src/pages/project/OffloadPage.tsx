@@ -405,10 +405,19 @@ export function OffloadPage() {
       accessorKey: "receptions",
       cell: ({ row }) =>
         row.original.receptions > 0
-          ? t("{{frames}} frames of {{trackers}} trackers", {
-              frames: row.original.receptions,
-              trackers: row.original.trackers,
-            })
+          ? row.original.unknown_addresses > 0
+            ? t(
+                "{{frames}} frames of {{trackers}} trackers and {{unknown}} unknown",
+                {
+                  frames: row.original.receptions,
+                  trackers: row.original.trackers,
+                  unknown: row.original.unknown_addresses,
+                },
+              )
+            : t("{{frames}} frames of {{trackers}} trackers", {
+                frames: row.original.receptions,
+                trackers: row.original.trackers,
+              })
           : "",
     },
     {
@@ -869,10 +878,19 @@ export function OffloadPage() {
                   </div>
                   <div className="text-xs">
                     {s.receptions > 0
-                      ? t("{{frames}} frames of {{trackers}} trackers", {
-                          frames: s.receptions,
-                          trackers: s.trackers,
-                        }) + `, ${formatAgo(s.last_reception_at, now)}`
+                      ? (s.unknown_addresses > 0
+                          ? t(
+                              "{{frames}} frames of {{trackers}} trackers and {{unknown}} unknown",
+                              {
+                                frames: s.receptions,
+                                trackers: s.trackers,
+                                unknown: s.unknown_addresses,
+                              },
+                            )
+                          : t("{{frames}} frames of {{trackers}} trackers", {
+                              frames: s.receptions,
+                              trackers: s.trackers,
+                            })) + `, ${formatAgo(s.last_reception_at, now)}`
                       : t("No offload in 30 days")}
                   </div>
                   {s.state_time && (

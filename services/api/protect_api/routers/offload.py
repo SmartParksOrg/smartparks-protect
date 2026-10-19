@@ -96,7 +96,10 @@ from shared.trace import ApplicationError
 
 router = APIRouter(tags=["offload stations"])
 
-#: The trackers a station served: its receptions over this window, one gateway's segment.
+#: The trackers a station served: its receptions over this window, one gateway's segment. The
+#: window is the arrival at Protect (`source_event_ingested_at`, the upload of a card), not the
+#: station's clock (Tim, 2026-10-19: SP052099 stamps a month behind, so "frames of 1 trackers"
+#: counted 46 of 13,671); the first and last reception keep the station's time.
 TRACKERS_WINDOW = timedelta(days=30)
 MAX_TRACKERS = 200
 READBACK_KEYS = ("lp0_dev_addr", "lp0_app_key", "lp0_network_key")
@@ -527,8 +530,8 @@ async def offload_station(
                 .where(
                     GatewayReception.data_source_id == source.id,
                     GatewayReception.gateway_id == eui.lower(),
-                    GatewayReception.time >= since,
-                    GatewayReception.time <= until,
+                    GatewayReception.source_event_ingested_at >= since,
+                    GatewayReception.source_event_ingested_at <= until,
                 )
                 .group_by(GatewayReception.device_id)
                 .order_by(func.max(GatewayReception.time).desc())
@@ -762,6 +765,7 @@ async def upload_project_offload_files(
     visible = set(await _project_device_ids(session, context))
     stations: dict[str, Device | None] = {}
     rows: list[tuple[DeviceLogFile, Device]] = []
+    unknown_stations: list[str] = []
     for member_name, folder, content in members:
         try:
             text = content.decode("utf-8")
@@ -784,6 +788,8 @@ async def upload_project_offload_files(
                     name=member_name, reason=f"no offload station of this project has EUI {eui}"
                 )
             )
+            if eui not in unknown_stations:
+                unknown_stations.append(eui)
             continue
         try:
             row = await store_log_file(
@@ -807,7 +813,7 @@ async def upload_project_offload_files(
             skipped.append(SkippedMember(name=member_name, reason=str(error)))
             continue
         rows.append((row, station))
-    if not rows and skipped:
+    if not rows and skipped and not unknown_stations:
         raise _nothing_stored(skipped)
     per_station: dict[str, list[str]] = {}
     for row, station in rows:
@@ -832,7 +838,7 @@ async def upload_project_offload_files(
         read = DeviceLogFileRead.model_validate(row)
         read.device_name = station.name
         out.append(read)
-    return OffloadUpload(files=out, skipped=skipped)
+    return OffloadUpload(files=out, skipped=skipped, unknown_stations=sorted(unknown_stations))
 
 
 @router.get("/projects/{project_id}/offload", response_model=OffloadOverviewRead)
@@ -931,8 +937,36 @@ async def project_offload(
                     .where(
                         GatewayReception.data_source_id == source.id,
                         GatewayReception.gateway_id.in_(list(station_by_eui)),
-                        GatewayReception.time >= since,
-                        GatewayReception.time <= until,
+                        GatewayReception.source_event_ingested_at >= since,
+                        GatewayReception.source_event_ingested_at <= until,
+                    )
+                    .group_by(GatewayReception.gateway_id)
+                )
+            ).all()
+        }
+        if station_by_eui
+        else {}
+    )
+    unknown_per_station: dict[str, int] = (
+        {
+            row.gateway_id: int(row.addresses)
+            for row in (
+                await session.execute(
+                    select(
+                        GatewayReception.gateway_id,
+                        func.count(func.distinct(SourceEvent.external_id)).label("addresses"),
+                    )
+                    .join(
+                        SourceEvent,
+                        (SourceEvent.id == GatewayReception.source_event_id)
+                        & (SourceEvent.ingested_at == GatewayReception.source_event_ingested_at),
+                    )
+                    .where(
+                        GatewayReception.data_source_id == source.id,
+                        GatewayReception.device_id.is_(None),
+                        GatewayReception.gateway_id.in_(list(station_by_eui)),
+                        GatewayReception.source_event_ingested_at >= since,
+                        GatewayReception.source_event_ingested_at <= until,
                     )
                     .group_by(GatewayReception.gateway_id)
                 )
@@ -954,8 +988,8 @@ async def project_offload(
                 .where(
                     GatewayReception.data_source_id == source.id,
                     GatewayReception.device_id.in_(device_ids),
-                    GatewayReception.time >= since,
-                    GatewayReception.time <= until,
+                    GatewayReception.source_event_ingested_at >= since,
+                    GatewayReception.source_event_ingested_at <= until,
                 )
                 .group_by(GatewayReception.device_id)
             )
@@ -968,8 +1002,8 @@ async def project_offload(
             .where(
                 GatewayReception.data_source_id == source.id,
                 GatewayReception.device_id.in_(list(per_tracker)),
-                GatewayReception.time >= since,
-                GatewayReception.time <= until,
+                GatewayReception.source_event_ingested_at >= since,
+                GatewayReception.source_event_ingested_at <= until,
             )
             .distinct(GatewayReception.device_id)
             .order_by(GatewayReception.device_id, GatewayReception.time.desc())
@@ -1045,6 +1079,9 @@ async def project_offload(
                 frames_retained=sum(int(f.attributes.get("frames_retained") or 0) for f in own),
                 last_upload_at=max((f.uploaded_at for f in own), default=None),
                 trackers=int(received.trackers) if received else 0,
+                unknown_addresses=unknown_per_station.get(station_eui.lower(), 0)
+                if station_eui
+                else 0,
                 receptions=int(received.receptions) if received else 0,
                 last_reception_at=received.last if received else None,
                 card_ok=card_ok,

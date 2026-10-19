@@ -45,7 +45,7 @@ from shared.enums import (
 from shared.ingest import StoredEvent, store_inbound
 from shared.logfiles import ParsedFrame, ParsedLog, channel_source, parse_log_text
 from shared.logger import get_logger
-from shared.models import DataSource, Device, DeviceLogFile, SourceEvent
+from shared.models import DataSource, Device, DeviceLogFile, SourceDelivery, SourceEvent
 from shared.station_files import (
     ParsedStationLog,
     StationFrame,
@@ -292,6 +292,87 @@ class Counters:
                 "errors": dict(self.errors),
                 "trackers": self.trackers,
             }
+
+
+async def refresh_summary(session: AsyncSession, row: DeviceLogFile) -> None:
+    """A file's counts summed anew from what the database holds of its frames (decision D342):
+    after the decoder's walk gave a tracker's frames their device, the Files section must say
+    so, with the records, the period and the figures per tracker, without a second decode of
+    the file. The frames of a file are the source events that carry its id; its records are
+    their deliveries."""
+    if row.acquisition_channel != AcquisitionChannel.LP0:
+        return
+    events = (
+        await session.execute(
+            select(
+                SourceEvent.id,
+                SourceEvent.ingested_at,
+                SourceEvent.external_id,
+                SourceEvent.device_id,
+                SourceEvent.processing_status,
+                SourceEvent.error_code,
+            ).where(
+                SourceEvent.data_source_id == row.data_source_id,
+                SourceEvent.ingested_at >= row.uploaded_at,
+                SourceEvent.provider_metadata["log_file_id"].astext == str(row.id),
+            )
+        )
+    ).all()
+    if not events:
+        return
+    deliveries = (
+        await session.execute(
+            select(
+                SourceDelivery.source_event_id,
+                SourceDelivery.first,
+                SourceDelivery.canonical_time,
+            ).where(SourceDelivery.source_event_id.in_([e.id for e in events]))
+        )
+    ).all()
+    per_event: dict[int, list[tuple[bool, datetime]]] = {}
+    for event_id, first, when in deliveries:
+        per_event.setdefault(int(event_id), []).append((bool(first), when))
+    counters = Counters()
+    for event in events:
+        own = per_event.get(int(event.id), [])
+        counters.frames += 1
+        entry = counters.tracker(event.external_id, event.device_id)
+        entry["frames"] += 1
+        status = str(event.processing_status)
+        if status == ProcessingStatus.FAILED:
+            counters.failed += 1
+            entry["failed"] += 1
+            if event.error_code:
+                counters.errors[str(event.error_code)] = (
+                    counters.errors.get(str(event.error_code), 0) + 1
+                )
+                if str(event.error_code) == ErrorCode.CREDENTIALS_MISSING:
+                    entry["without_keys"] += 1
+            continue
+        if status == ProcessingStatus.UNASSIGNED or event.device_id is None:
+            counters.retained += 1
+            entry["retained"] += 1
+            continue
+        if status == ProcessingStatus.DUPLICATE:
+            counters.repeated += 1
+            entry["repeats"] += 1
+            continue
+        new = sum(1 for first, _ in own if first)
+        known = len(own) - new
+        counters.found += len(own)
+        counters.new += new
+        counters.duplicate += known
+        entry["records_new"] += new
+        entry["records_known"] += known
+        for _, when in own:
+            if counters.earliest is None or when < counters.earliest:
+                counters.earliest = when
+            if counters.latest is None or when > counters.latest:
+                counters.latest = when
+            if entry["earliest"] is None or when.isoformat() < entry["earliest"]:
+                entry["earliest"] = when.isoformat()
+    counters.apply(row)
+    row.frames_done = max(row.frames_done or 0, counters.frames)
 
 
 async def _decode_stored(

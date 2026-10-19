@@ -464,6 +464,18 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
         await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tracker_b["id"])))
     ).all()
     assert len(positions_b) == 3
+    # the card file says so now, without a second decode (decision D342)
+    first_file = (
+        await client.get(
+            f"/api/v1/log-files/{rows[f'{STATION_EUI}_1791795031.jsonl']['id']}", headers=h
+        )
+    ).json()
+    assert first_file["attributes"]["frames_retained"] == 0
+    assert first_file["attributes"]["trackers"][ADDR_B]["records_new"] == 3
+    assert first_file["attributes"]["trackers"][ADDR_B]["device_id"] == tracker_b["id"]
+    # A's second fix came over LoRaWAN first, so the card knew it: 2 + 3 new, 1 known
+    assert first_file["records_new"] == 5 and first_file["records_duplicate"] == 1
+    assert first_file["frames_failed"] == 0 and first_file["period_start"] is not None
     linked = await db.scalar(
         select(GatewayReception).where(
             GatewayReception.source_event_id == event_b.id, GatewayReception.device_id.is_not(None)
@@ -482,13 +494,14 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
     # the station card
     card = (await client.get(f"/api/v1/devices/{station['id']}/offload", headers=h)).json()
     assert card["is_station"] is True and card["station_eui"] == STATION_EUI
+    # the walk gave B's three fixes to its file too (decision D342): 2 + 3 new
     assert (card["files"], card["frames"], card["records_new"], card["records_known"]) == (
         2,
         5,
-        2,
+        5,
         1,
     )
-    assert card["frames_repeated"] == 1 and card["frames_retained"] == 2
+    assert card["frames_repeated"] == 1 and card["frames_retained"] == 1  # B's frame is its own now
     served = {t["device_id"]: t for t in card["trackers"]}
     assert served[tracker_a["id"]]["frames"] == 3 and served[tracker_a["id"]]["dev_addr"] == ADDR_A
     assert served[tracker_b["id"]]["frames"] == 1
@@ -710,6 +723,7 @@ async def test_cards_uploaded_on_the_offload_page_find_their_stations(client, db
             "reason": "no offload station of this project has EUI 0016C001F0AB1999",
         }
     ]
+    assert result["unknown_stations"] == ["0016C001F0AB1999"]  # the page offers to make it (D343)
 
     # a lone file finds its station too, and the same file twice is skipped
     again = await client.post(
@@ -752,7 +766,12 @@ async def test_cards_uploaded_on_the_offload_page_find_their_stations(client, db
         },
         headers=h,
     )
-    assert strange.status_code == 422 and "0016C001F0AB1003" in strange.text
+    # a card of a station the project does not have is not refused: it answers with the EUI,
+    # so the page offers to make the station and upload again (decision D343)
+    assert strange.status_code == 201, strange.text
+    assert strange.json()["files"] == [] and strange.json()["unknown_stations"] == [
+        "0016C001F0AB1003"
+    ]
     assert stranger["id"] not in strange.text
 
 
