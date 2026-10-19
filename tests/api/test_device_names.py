@@ -75,6 +75,21 @@ async def test_a_dev_eui_finds_the_device_with_that_serial_and_its_name_is_raise
     got = (await client.get(f"/api/v1/devices/{device['id']}", headers=h)).json()
     assert got["name"] == network_name and got["serial_number"] == eui
 
+    # an identifier is not a name: a DevEUI the network reports as the name is not raised
+    await store_inbound(
+        db,
+        live_source,
+        inbound(
+            eui.lower(),
+            {"fPort": 13, "data": "AA=="},
+            identity_type="dev_eui",
+            identity_attributes={"name": "0016C001F0ABCDEF"},
+        ),
+    )
+    await db.commit()
+    conflicts = (await client.get("/api/v1/attention/names", headers=h)).json()
+    assert all(c["device_id"] != device["id"] for c in conflicts)
+
     # a second name from the network, kept this time
     await store_inbound(
         db,

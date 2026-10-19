@@ -1,6 +1,7 @@
 """Needs Attention (architecture 26.6 and 28.6): unknown identities, failed source events, dead
 letters. Server admin only in phase 2. Every action is audited."""
 
+import re
 import uuid
 from datetime import datetime, timedelta
 from typing import Any
@@ -332,12 +333,13 @@ async def _clock_ahead_devices(session: AsyncSession) -> list[ClockAheadDevice]:
 
 async def _name_conflicts(session: AsyncSession) -> list[NameConflict]:
     """Linked identities whose `name` attribute, the network's name for the device, differs
-    from the device's name; the device's serial is not a name (an LP0 station names a tracker
-    by its EUI), and a name a person chose to keep is not raised again."""
+    from the device's name. An identifier is not a name: a DevEUI (sixteen hex digits), the
+    device's serial, and whatever the offload station source names a tracker by (its EUI from
+    the card) are left out; a name a person chose to keep is not raised again."""
     now = utc_now()
     rows = (
         await session.execute(
-            select(ExternalIdentity, Device, DataSource.name)
+            select(ExternalIdentity, Device, DataSource.name, DataSource.adapter_key)
             .join(Device, Device.id == ExternalIdentity.device_id)
             .join(DataSource, DataSource.id == ExternalIdentity.data_source_id)
             .where(
@@ -347,10 +349,12 @@ async def _name_conflicts(session: AsyncSession) -> list[NameConflict]:
         )
     ).all()
     found: list[NameConflict] = []
-    for identity, device, source_name in rows:
+    for identity, device, source_name, adapter_key in rows:
         attributes = identity.attributes or {}
         network_name = str(attributes.get("name") or "").strip()
         if not network_name or network_name.lower() == device.name.strip().lower():
+            continue
+        if adapter_key == "lp0_station" or re.fullmatch(r"[0-9A-Fa-f]{16}", network_name):
             continue
         if device.serial_number and network_name.upper() == device.serial_number.upper():
             continue
