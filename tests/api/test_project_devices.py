@@ -161,6 +161,28 @@ async def test_a_project_admin_manages_the_devices_of_the_project(client, db):
             f"/api/v1/devices/{device['id']}", json={"name": "x"}, headers=who.headers
         )
         assert refused.status_code == 403, refused.text
+    # a name another device carries is refused with that device named (Tim, 2026-10-19)
+    other = (
+        await client.post(
+            f"/api/v1/projects/{elsewhere.id}/devices",
+            json={"device_type_id": oc["id"], "name": unique_name("Desk")},
+            headers=stranger.headers,
+        )
+    ).json()
+    taken = await client.patch(
+        f"/api/v1/devices/{device['id']}",
+        json={"name": other["name"].lower()},
+        headers=admin.headers,
+    )
+    assert taken.status_code == 409, taken.text
+    assert other["name"] in taken.json()["detail"] and "unique across the server" in taken.text
+    assert elsewhere.name in taken.json()["detail"]
+    twin = await client.post(
+        f"/api/v1/projects/{project.id}/devices",
+        json={"device_type_id": oc["id"], "name": other["name"]},
+        headers=admin.headers,
+    )
+    assert twin.status_code == 409 and other["name"] in twin.json()["detail"]
 
     eui = "0016C001F0" + uuid.uuid4().hex[:6].upper()
     linked = await client.post(

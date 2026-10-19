@@ -159,6 +159,34 @@ async def _require_project_admin(session: AsyncSession, user: User, project_id: 
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Project admin access required")
 
 
+async def _refuse_taken_name(
+    session: AsyncSession, name: str, *, except_id: uuid.UUID | None = None
+) -> None:
+    """Device names are unique across the server: when another device carries this one, say
+    which, and in what project, instead of the database's line (Tim, 2026-10-19: renaming a
+    tracker to the name of the Iridium desk device answered with `devices_name_key`)."""
+    statement = select(Device).where(func.lower(Device.name) == name.strip().lower())
+    if except_id is not None:
+        statement = statement.where(Device.id != except_id)
+    other = await session.scalar(statement)
+    if other is None:
+        return
+    attribution = await resolve_attribution(session, other.id, utc_now())
+    project_name = None
+    if attribution.project_id is not None:
+        project_name = await session.scalar(
+            select(Project.name).where(Project.id == attribution.project_id)
+        )
+    where = f" in the project {project_name}" if project_name else ", in no project"
+    serial = f", serial {other.serial_number}" if other.serial_number else ""
+    raise HTTPException(
+        status.HTTP_409_CONFLICT,
+        f"Another device is called {other.name} already{where}{serial}. Device names are "
+        "unique across the server: choose another name, or, if it is the same hardware, link "
+        "this device's identity to that one and remove this device.",
+    )
+
+
 async def _manageable_device(session: AsyncSession, user: User, device_id: uuid.UUID) -> Device:
     """A device a person may manage (decision D337): a server admin any device; a member with
     `devices:write` the devices of the project the device is in today, as decision D326 lets
@@ -501,6 +529,8 @@ async def update_device(
     device = await _manageable_device(session, user, device_id)
     if body.device_type_id is not None:
         await get_or_404(session, DeviceType, body.device_type_id, "Device type")
+    if body.name is not None and body.name.strip().lower() != device.name.lower():
+        await _refuse_taken_name(session, body.name, except_id=device.id)
     changed = apply_patch(device, body)
     if changed.keys() & {"location_source", "location_fallback_hours"}:
         # the setting decides which positions become current (decision D164): rebuild the

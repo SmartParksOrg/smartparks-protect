@@ -63,11 +63,28 @@ def geom_to_geojson(geom: WKBElement | None) -> dict[str, Any] | None:
     return dict(mapping(to_shape(geom)))
 
 
+#: The constraints a person runs into by name, in words (Tim, 2026-10-19: a rename answered
+#: with the database's own line about `devices_name_key`, which said nothing to him).
+CONSTRAINT_WORDS: dict[str, str] = {
+    "devices_name_key": "a device with this name exists already; device names are unique "
+    "across the server",
+    "devices_serial_number_key": "a device with this serial number exists already",
+    "uq_entities_project_name": "an entity with this name exists in the project already",
+    "uq_features_project_name": "a feature with this name exists in the project already",
+    "uq_groups_project_name": "a group with this name exists in the project already",
+}
+
+
 async def flush_or_409(session: AsyncSession, what: str) -> None:
-    """Flush and turn a constraint violation into a 409 with a readable message."""
+    """Flush and turn a constraint violation into a 409 with a readable message: the
+    constraint's words when it is one a person runs into, else the database's first line."""
     try:
         await session.flush()
     except IntegrityError as exc:
         await session.rollback()
         message = str(exc.orig).splitlines()[0] if exc.orig else str(exc)
+        for constraint, words in CONSTRAINT_WORDS.items():
+            if constraint in message:
+                message = words
+                break
         raise HTTPException(status.HTTP_409_CONFLICT, f"{what}: {message}") from None

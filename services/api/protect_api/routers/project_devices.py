@@ -13,6 +13,7 @@ from protect_api.bus import get_bus
 from protect_api.crud import flush_or_409, get_or_404
 from protect_api.deps import ProjectContext, require_permission
 from protect_api.device_reads import with_state
+from protect_api.routers.devices import _refuse_taken_name
 from protect_api.schemas.domain import DeviceRead, ProjectDeviceCreate
 from protect_api.serial import SERIAL_FROM_IDENTITY
 from shared.bus import RedisStreamsBus
@@ -40,6 +41,7 @@ async def create_project_device(
     another device holds is refused with that device's name. No attribution job: a device made
     now has no records yet."""
     device_type = await get_or_404(session, DeviceType, body.device_type_id, "Device type")
+    await _refuse_taken_name(session, body.name)
     values = body.model_dump(exclude={"lp0"})
     serial = (values.get("serial_number") or "").strip() or None
     if serial and device_type.driver_key in SERIAL_FROM_IDENTITY:

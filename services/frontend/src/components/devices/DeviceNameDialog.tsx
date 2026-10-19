@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type { Device } from "@/api/types";
+import { Callout } from "@/components/common/Callout";
 import { Field } from "@/components/common/FormField";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +45,8 @@ export function DeviceNameDialog({
     invalidate: [queryKeys.device(device.id), ["devices"], ["projects"]],
     success: (d) => t("The device is called {{name}} now", { name: d.name }),
     onSuccess: () => onOpenChange(false),
+    // the refusal stays in the dialog, where the name is corrected; no toast over it
+    onError: () => undefined,
   });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,6 +78,7 @@ export function DeviceNameDialog({
             {t("Serial number {{serial}}", { serial: device.serial_number })}
           </p>
         )}
+        {save.isError && <Callout kind="error">{save.error.message}</Callout>}
         <DialogFooter className="gap-2">
           <Button
             type="button"
