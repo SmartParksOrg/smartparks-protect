@@ -9,6 +9,7 @@ import {
   Pencil,
   RefreshCw,
   Table2,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -73,6 +74,7 @@ import { TrapCard } from "@/components/devices/TrapCard";
 import { BleAddress } from "@/components/devices/BleAddress";
 import { ReportingCard } from "@/components/devices/ReportingCard";
 import { StaticPositionCard } from "@/components/devices/StaticPositionCard";
+import { DeleteDeviceDialog } from "@/components/devices/DeleteDeviceDialog";
 import { DeviceNameDialog } from "@/components/devices/DeviceNameDialog";
 import { Lp0CredentialsCard } from "@/components/devices/Lp0CredentialsCard";
 import { OffloadStationCard } from "@/components/devices/OffloadStationCard";
@@ -107,6 +109,7 @@ export function DevicePage() {
   // the device is its project admins' to manage (decision D337); a server admin manages every one
   const canManage = Boolean(user?.is_superuser) || can("devices:write");
   const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const modules = useAnalysisModules(projectId);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
     null,
@@ -388,6 +391,17 @@ export function DevicePage() {
                   </Link>
                 </Button>
               )}
+            {canManage && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-destructive"
+                onClick={() => setDeleting(true)}
+              >
+                <Trash2 className="size-4" /> {t("Delete")}
+              </Button>
+            )}
             {canManage && (
               <Button
                 type="button"
@@ -1039,6 +1053,17 @@ export function DevicePage() {
           if (outcome && !outcome.skipped)
             void navigate(`/projects/${r.project_id}/devices/${d.id}`);
         }}
+      />
+      <DeleteDeviceDialog
+        device={d}
+        open={deleting}
+        serverAdmin={Boolean(user?.is_superuser)}
+        onOpenChange={setDeleting}
+        onDeleted={() =>
+          void navigate(
+            projectId ? `/projects/${projectId}/devices` : "/admin/devices",
+          )
+        }
       />
       {canManage && (
         <DeviceNameDialog

@@ -1,15 +1,17 @@
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRightLeft,
   Car,
   Footprints,
   HeartPulse,
-  TreePine,
   MapPin,
   Pencil,
   Plus,
   Table2,
+  Trash2,
+  TreePine,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -44,6 +46,7 @@ import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { Icon } from "@/components/icons/Icon";
 import { PictureCard } from "@/components/entities/PictureCard";
 import type { EntityFeatureProperties } from "@/components/map/layers";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { recordsHref } from "@/lib/records";
 import { MiniMap } from "@/components/map/MiniMap";
@@ -103,6 +106,23 @@ export function EntityPage() {
   );
   const now = useNow();
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // an entity made by mistake goes; one with history is archived under Edit instead
+  const remove = useMutationToast({
+    mutationFn: () =>
+      api.delete<void>(`/api/v1/projects/${projectId}/entities/${entityId}`),
+    invalidate: [
+      queryKeys.entities(projectId),
+      queryKeys.currentState(projectId),
+      ["projects", projectId],
+    ],
+    success: t("The entity is deleted"),
+    onSuccess: () => void navigate(`/projects/${projectId}/entities`),
+    onError: (error) => {
+      setDeleting(false);
+      toast.error(error.message);
+    },
+  });
   const [moving, setMoving] = useState(false);
   const navigate = useNavigate();
   const [assigning, setAssigning] = useState(false);
@@ -401,6 +421,16 @@ export function EntityPage() {
                 onClick={() => setEditing(true)}
               >
                 <Pencil className="size-4" /> {t("Edit")}
+              </Button>
+            )}
+            {admin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive"
+                onClick={() => setDeleting(true)}
+              >
+                <Trash2 className="size-4" /> {t("Delete")}
               </Button>
             )}
             {admin && (
@@ -972,6 +1002,17 @@ export function EntityPage() {
         entity={e}
         open={editing}
         onOpenChange={setEditing}
+      />
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={t("Delete {{name}}?", { name: e.name })}
+        description={t(
+          "An entity made by mistake goes with its assignments. An entity with history should be archived instead, under Edit, so its records and its place in the reports stay; the server refuses to delete one that records point at.",
+        )}
+        confirmLabel={t("Delete")}
+        onConfirm={() => remove.mutate()}
+        pending={remove.isPending}
       />
       <AssignDeviceDialog
         projectId={projectId}

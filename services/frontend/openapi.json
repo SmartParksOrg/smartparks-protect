@@ -4711,6 +4711,58 @@
       }
      }
     }
+   },
+   "delete": {
+    "tags": [
+     "devices"
+    ],
+    "summary": "Delete Device",
+    "description": "Remove a device made by mistake (Tim, 2026-10-19: a tracker added twice under two names).\nA device without data goes at once: one that has received no message, holds no log file and\nhas no record; whoever manages the device may (decision D337). A device with data is refused\nwith its counts, unless a server admin asks for it with its data: then every row of it in\nthe time series and the raw messages goes, segment by segment and week by week, and the\ndevice last. Its identities stay on their sources, unlinked, so a message that comes later\nwaits on Needs attention or finds the device whose serial it is (D339).",
+    "operationId": "delete_device_api_v1_devices__device_id__delete",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "device_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Device Id"
+      }
+     },
+     {
+      "name": "with_data",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Delete the device with every message, record and file it has; a server admin alone, after the person typed DELETE",
+       "default": false,
+       "title": "With Data"
+      },
+      "description": "Delete the device with every message, record and file it has; a server admin alone, after the person typed DELETE"
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/api/v1/devices/move": {

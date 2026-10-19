@@ -1060,7 +1060,17 @@ export interface paths {
         get: operations["get_device_api_v1_devices__device_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Device
+         * @description Remove a device made by mistake (Tim, 2026-10-19: a tracker added twice under two names).
+         *     A device without data goes at once: one that has received no message, holds no log file and
+         *     has no record; whoever manages the device may (decision D337). A device with data is refused
+         *     with its counts, unless a server admin asks for it with its data: then every row of it in
+         *     the time series and the raw messages goes, segment by segment and week by week, and the
+         *     device last. Its identities stay on their sources, unlinked, so a message that comes later
+         *     waits on Needs attention or finds the device whose serial it is (D339).
+         */
+        delete: operations["delete_device_api_v1_devices__device_id__delete"];
         options?: never;
         head?: never;
         /** Update Device */
@@ -17257,6 +17267,38 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceWithAssignments"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_device_api_v1_devices__device_id__delete: {
+        parameters: {
+            query?: {
+                /** @description Delete the device with every message, record and file it has; a server admin alone, after the person typed DELETE */
+                with_data?: boolean;
+            };
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

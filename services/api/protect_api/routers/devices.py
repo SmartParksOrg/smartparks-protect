@@ -28,6 +28,7 @@ from protect_api.deps import (
     language,
     require_server_admin,
 )
+from protect_api.device_purge import purge_device_data
 from protect_api.device_reads import walk_reads, with_state
 from protect_api.moves import audit_plan, move_result, require_admin_of_every_project
 from protect_api.pagination import Page, PageResponse, page, paginate
@@ -592,6 +593,76 @@ class BulkAssignResult(BaseModel):
         "project, one per device with records (decision D206)",
     )
     skipped: list[BulkAssignSkipped]
+
+
+@router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_device(
+    device_id: uuid.UUID,
+    with_data: bool = Query(
+        False,
+        description="Delete the device with every message, record and file it has; a server "
+        "admin alone, after the person typed DELETE",
+    ),
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Remove a device made by mistake (Tim, 2026-10-19: a tracker added twice under two names).
+    A device without data goes at once: one that has received no message, holds no log file and
+    has no record; whoever manages the device may (decision D337). A device with data is refused
+    with its counts, unless a server admin asks for it with its data: then every row of it in
+    the time series and the raw messages goes, segment by segment and week by week, and the
+    device last. Its identities stay on their sources, unlinked, so a message that comes later
+    waits on Needs attention or finds the device whose serial it is (D339)."""
+    device = await _manageable_device(session, user, device_id)
+    if with_data and not user.is_superuser:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Deleting a device with its data is for a server admin"
+        )
+    reasons: list[str] = []
+    events = await session.scalar(
+        select(func.count()).select_from(SourceEvent).where(SourceEvent.device_id == device.id)
+    )
+    if events:
+        reasons.append(f"{events} messages")
+    files = await session.scalar(
+        select(func.count()).select_from(DeviceLogFile).where(DeviceLogFile.device_id == device.id)
+    )
+    if files:
+        reasons.append(f"{files} log files")
+    positions = await session.scalar(
+        select(func.count()).select_from(Position).where(Position.device_id == device.id)
+    )
+    if positions:
+        reasons.append(f"{positions} positions")
+    measurements = await session.scalar(
+        select(func.count()).select_from(Measurement).where(Measurement.device_id == device.id)
+    )
+    if measurements:
+        reasons.append(f"{measurements} measurements")
+    if reasons and not with_data:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{device.name} has data ({', '.join(reasons)}) and is not deleted; set its status "
+            "to retired instead, so its history stays, or, as a server admin, delete it with "
+            "its data.",
+        )
+    attribution = await resolve_attribution(session, device.id, utc_now())
+    purged: dict[str, int] = {}
+    if reasons:
+        purged = await purge_device_data(session, device)
+        device = await get_or_404(session, Device, device_id, "Device")
+    await record_audit(
+        session,
+        user=user,
+        action="device.deleted_with_data" if reasons else "device.deleted",
+        object_type="device",
+        object_id=str(device.id),
+        project_id=attribution.project_id,
+        details={"name": device.name, "serial_number": device.serial_number, **purged},
+    )
+    await session.delete(device)
+    await flush_or_409(session, "Device")
+    await session.commit()
 
 
 @router.post("/move", response_model=MoveResult)
@@ -1737,8 +1808,31 @@ async def add_identity(
 ) -> ExternalIdentity:
     device = await _manageable_device(session, user, device_id)
     await get_or_404(session, DataSource, body.data_source_id, "Data source")
-    identity = ExternalIdentity(device_id=device.id, **body.model_dump())
-    session.add(identity)
+    existing = await session.scalar(
+        select(ExternalIdentity).where(
+            ExternalIdentity.data_source_id == body.data_source_id,
+            func.upper(ExternalIdentity.external_id) == body.external_id.strip().upper(),
+        )
+    )
+    if existing is not None and existing.device_id is not None and existing.device_id != device.id:
+        holder = await session.get(Device, existing.device_id)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{existing.external_id} on this data source belongs to "
+            f"{holder.name if holder else 'another device'} already; remove it there first, "
+            "or retire that device.",
+        )
+    if existing is not None:
+        # the identity was seen before anybody linked it (Needs attention's row): linked now,
+        # and its retained messages are the device's (decision D121)
+        identity = existing
+        identity.device_id = device.id
+        identity.ignored = False
+        if body.attributes:
+            identity.attributes = {**(identity.attributes or {}), **body.attributes}
+    else:
+        identity = ExternalIdentity(device_id=device.id, **body.model_dump())
+        session.add(identity)
     await flush_or_409(session, "External identity")
     await fill_serial_from_identity(session, device, identity)  # D101
     await record_audit(

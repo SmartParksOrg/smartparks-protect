@@ -272,3 +272,88 @@ async def test_a_device_is_made_with_its_address_alone_and_the_keys_follow(clien
     )
     assert keys.status_code == 200, keys.text
     assert keys.json()["keys_set"] is True and keys.json()["queued"] == 0
+
+
+async def test_a_device_without_data_is_deleted_and_one_with_data_is_not(client, db):
+    """Tim, 2026-10-19: a tracker added twice under two names. The mistake goes while it has no
+    data; a device with a log file stays and is retired instead. An identity the mistake held
+    is unlinked, and linking it to the right device from its page takes the existing row."""
+    server_admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    oc = await _opencollar_type(client, server_admin.headers)
+    admin = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    operator = await project_actor(client, db, project, Role.PROJECT_OPERATOR)
+    eui = "0016C001F0" + uuid.uuid4().hex[:6].upper()
+    mistake = (
+        await client.post(
+            f"/api/v1/projects/{project.id}/devices",
+            json={"device_type_id": oc["id"], "name": unique_name("SP0518")},
+            headers=admin.headers,
+        )
+    ).json()
+    linked = await client.post(
+        f"/api/v1/devices/{mistake['id']}/identities",
+        json={"data_source_id": str(LP0_SOURCE_ID), "external_id": eui},
+        headers=admin.headers,
+    )
+    assert linked.status_code == 201, linked.text
+    right = (
+        await client.post(
+            f"/api/v1/projects/{project.id}/devices",
+            json={"device_type_id": oc["id"], "name": unique_name("SP0518")},
+            headers=admin.headers,
+        )
+    ).json()
+    held = await client.post(
+        f"/api/v1/devices/{right['id']}/identities",
+        json={"data_source_id": str(LP0_SOURCE_ID), "external_id": eui},
+        headers=admin.headers,
+    )
+    assert held.status_code == 409 and mistake["name"] in held.json()["detail"]
+
+    refused = await client.delete(f"/api/v1/devices/{mistake['id']}", headers=operator.headers)
+    assert refused.status_code == 403
+    gone = await client.delete(f"/api/v1/devices/{mistake['id']}", headers=admin.headers)
+    assert gone.status_code == 204, gone.text
+    assert (
+        await client.get(f"/api/v1/devices/{mistake['id']}", headers=admin.headers)
+    ).status_code == 404
+    # the identity stayed, unlinked, and the right device takes it from its page
+    taken = await client.post(
+        f"/api/v1/devices/{right['id']}/identities",
+        json={"data_source_id": str(LP0_SOURCE_ID), "external_id": eui.lower()},
+        headers=admin.headers,
+    )
+    assert taken.status_code == 201, taken.text
+    assert taken.json()["device_id"] == right["id"] and taken.json()["external_id"] == eui
+
+    # a device with a log file has data and stays
+    upload = await client.post(
+        f"/api/v1/devices/{right['id']}/log-files",
+        files={"file": ("log.txt", b"AAEC\n", "text/plain")},
+        headers=admin.headers,
+    )
+    assert upload.status_code == 201, upload.text
+    kept = await client.delete(f"/api/v1/devices/{right['id']}", headers=admin.headers)
+    assert kept.status_code == 409 and "retired" in kept.json()["detail"]
+    assert (
+        await client.get(f"/api/v1/devices/{right['id']}", headers=admin.headers)
+    ).status_code == 200
+
+    # with its data: a server admin alone, after the typed confirmation in the dialog
+    refused = await client.delete(
+        f"/api/v1/devices/{right['id']}", params={"with_data": "true"}, headers=admin.headers
+    )
+    assert refused.status_code == 403
+    purged = await client.delete(
+        f"/api/v1/devices/{right['id']}",
+        params={"with_data": "true"},
+        headers=server_admin.headers,
+    )
+    assert purged.status_code == 204, purged.text
+    assert (
+        await client.get(f"/api/v1/devices/{right['id']}", headers=admin.headers)
+    ).status_code == 404
+    assert (
+        await client.get(f"/api/v1/log-files/{upload.json()['id']}", headers=admin.headers)
+    ).status_code == 404

@@ -3228,5 +3228,14 @@
   "Rename {{name}}": "{{name}} hernoemen",
   "Serial number {{serial}}": "Serienummer {{serial}}",
   "The device is called {{name}} now": "Het apparaat heet nu {{name}}",
-  "The name the lists, the map and the reports show for this device; the label name (SP…) as a rule. The serial number stays as it is.": "De naam die de lijsten, de kaart en de rapporten voor dit apparaat tonen; als regel de labelnaam (SP…). Het serienummer blijft zoals het is."
+  "The name the lists, the map and the reports show for this device; the label name (SP…) as a rule. The serial number stays as it is.": "De naam die de lijsten, de kaart en de rapporten voor dit apparaat tonen; als regel de labelnaam (SP…). Het serienummer blijft zoals het is.",
+  "An entity made by mistake goes with its assignments. An entity with history should be archived instead, under Edit, so its records and its place in the reports stay; the server refuses to delete one that records point at.": "Een per vergissing gemaakte entiteit verdwijnt met haar toewijzingen. Een entiteit met geschiedenis hoort gearchiveerd te worden, onder Bewerken, zodat haar records en haar plaats in de rapporten blijven; de server weigert er een te verwijderen waar records naar wijzen.",
+  "Delete {{name}}?": "{{name}} verwijderen?",
+  "The device is deleted": "Het apparaat is verwijderd",
+  "The entity is deleted": "De entiteit is verwijderd",
+  "A device made by mistake goes while it has no data: no message received, no log file, no record. Its identities stay on their networks, unlinked, so they can be given to the right device.": "Een per vergissing gemaakt apparaat verdwijnt zolang het geen gegevens heeft: geen bericht ontvangen, geen logbestand, geen record. Zijn identiteiten blijven op hun netwerken, losgekoppeld, zodat ze aan het juiste apparaat gegeven kunnen worden.",
+  "Delete with all its data": "Verwijderen met al zijn gegevens",
+  "Deleting…": "Verwijderen…",
+  "Every message, record and file of this device goes, week by week, and nothing brings it back. Retiring the device keeps its history instead.": "Elk bericht, record en bestand van dit apparaat verdwijnt, week na week, en niets brengt het terug. Het apparaat buiten gebruik stellen bewaart zijn geschiedenis.",
+  "Type DELETE to delete the device with all its data": "Typ DELETE om het apparaat met al zijn gegevens te verwijderen"
 }
