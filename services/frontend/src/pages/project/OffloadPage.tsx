@@ -587,6 +587,31 @@ export function OffloadPage() {
   ];
 
   const unknownColumns: ColumnDef<OffloadUnknownAddress, unknown>[] = [
+    // the add action first, a plain plus, so a phone reaches it without scrolling (Tim,
+    // 2026-10-19)
+    ...(canSetUp
+      ? [
+          {
+            header: "",
+            id: "add",
+            cell: ({ row }: { row: { original: OffloadUnknownAddress } }) => (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="outline"
+                className="rounded-full"
+                aria-label={t("Add the tracker {{address}}", {
+                  address: row.original.dev_addr,
+                })}
+                title={t("Add the tracker")}
+                onClick={() => setAdding(row.original)}
+              >
+                <Plus className="size-4" />
+              </Button>
+            ),
+          } satisfies ColumnDef<OffloadUnknownAddress, unknown>,
+        ]
+      : []),
     {
       header: t("LP0 address"),
       accessorKey: "dev_addr",
@@ -640,23 +665,6 @@ export function OffloadPage() {
       accessorKey: "last_seen_at",
       cell: ({ getValue }) => ago(getValue<string | null>()),
     },
-    ...(canSetUp
-      ? [
-          {
-            header: "",
-            id: "add",
-            cell: ({ row }: { row: { original: OffloadUnknownAddress } }) => (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setAdding(row.original)}
-              >
-                <Plus className="size-4" /> {t("Add the tracker")}
-              </Button>
-            ),
-          } satisfies ColumnDef<OffloadUnknownAddress, unknown>,
-        ]
-      : []),
   ];
 
   const stations = data?.stations ?? [];
@@ -742,7 +750,7 @@ export function OffloadPage() {
               </li>
               <li>
                 {t(
-                  'The trackers: on each tracker\'s device page, under LP0 offload, set the LP0 address and the two session keys provisioned on the device, or take them from the device\'s own readback; a tracker added over Bluetooth in the station dialog brings them with it. The address is how a frame on a card finds its device; the keys decrypt it. A card that names a tracker Protect does not know yet puts it under "Addresses no device has", where "Add the tracker" makes the device.',
+                  "The trackers: on each tracker's device page, under LP0 offload, set the LP0 address and the two session keys provisioned on the device, or take them from the device's own readback; a tracker added over Bluetooth in the station dialog brings them with it. The address is how a frame on a card finds its device; the keys decrypt it. A card that names a tracker Protect does not know yet puts it under \"Unknown devices\", where the plus makes the device.",
                 )}
               </li>
               <li>
@@ -972,11 +980,11 @@ export function OffloadPage() {
         {unknown.length > 0 && (
           <section className="space-y-2">
             <h2 className="flex items-center gap-2 text-base font-semibold">
-              <CircleHelp className="size-4" /> {t("Addresses no device has")}
+              <CircleHelp className="size-4" /> {t("Unknown devices")}
             </h2>
             <Callout kind="warning">
               {t(
-                'The stations received frames of these addresses, and no device holds them. They wait. "Add the tracker" makes the device, with the DevEUI the card named, or gives the address to a device of the project; the frames are decoded as soon as its keys are set.',
+                "The stations received frames of these LP0 addresses, and no device of Protect holds them. They wait. The plus makes the device, with the DevEUI the card named, or gives the address to a device of the project; the frames are decoded as soon as its keys are set.",
               )}
               {serverAdmin && (
                 <>

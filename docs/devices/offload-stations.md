@@ -82,8 +82,8 @@ deduplicates nothing and leaves that to Protect.
 ## A tracker the card knows before Protect does
 
 A card often arrives before every tracker on it is a device in Protect (decision D338). Its frames
-land under **Addresses no device has** on the Offload page, with the tracker's DevEUI when the
-station wrote it (a v5 card). **Add the tracker** on such a row makes the device: a new one, with
+land under **Unknown devices** on the Offload page, with the tracker's DevEUI when the
+station wrote it (a v5 card). The plus on such a row, first in the row so a phone reaches it, makes the device: a new one, with
 the LP0 address, the DevEUI as serial and a name filled in, read over Bluetooth, which brings the
 name, the DevEUI and the keys from the device itself, or typed; or a device of the project that
 takes the address. The keys are not on the card, so they may follow: the address alone makes the
