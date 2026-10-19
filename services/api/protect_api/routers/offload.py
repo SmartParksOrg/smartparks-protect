@@ -850,10 +850,15 @@ async def project_offload(
             )
         ).all()
     }
+    # a device's own station report makes it a station only while it says it listens: every
+    # RangerEdge with the LP0 firmware reports its card and radio, a tracker among them (Tim,
+    # 2026-10-19: SP051830, a tracker whose flash log carried the report, was listed as a
+    # station); a station that is quiet keeps its place through its gateway row or its entity
     states = {
         device_id: c
         for device_id, c in current_states.items()
         if isinstance((c.latest_state or {}).get("lp0_station"), dict)
+        and ((c.latest_state or {})["lp0_station"].get("status") or {}).get("lp0_listening") is True
     }
     station_ids = {f.device_id for f in files} | {g.device_id for g in gateways if g.device_id}
     station_ids |= set(states)
