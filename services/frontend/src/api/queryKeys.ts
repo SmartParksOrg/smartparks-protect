@@ -70,6 +70,8 @@ export const queryKeys = {
   entityTypes: ["entity-types"] as const,
   metrics: ["metrics"] as const,
   dataSources: ["data-sources"] as const,
+  projectDataSources: (projectId: string) =>
+    ["projects", projectId, "data-sources"] as const,
   adapters: ["data-sources", "adapters"] as const,
   dataSource: (id: string) => ["data-sources", id] as const,
   dataSourceStatus: (id: string) => ["data-sources", id, "status"] as const,

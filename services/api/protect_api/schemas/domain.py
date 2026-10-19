@@ -1047,6 +1047,16 @@ class DataSourceUpdate(BaseModel):
     channels: dict[str, bool] | None = None
 
 
+class DataSourceBrief(BaseModel):
+    """A data source by name, for a project's members (decision D337): enough to link a
+    device's identity to the network it reports on; the settings stay with the server admin."""
+
+    id: uuid.UUID
+    name: str
+    adapter_key: str
+    enabled: bool
+
+
 class DataSourceRead(ORMModel):
     id: uuid.UUID
     name: str

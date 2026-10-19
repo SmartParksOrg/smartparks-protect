@@ -1519,6 +1519,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/data-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Data Sources
+         * @description Every data source of the server by name and adapter, for a member of the project: the
+         *     choice when an identity is linked to a device of the project. Nothing of a source's
+         *     settings or credentials.
+         */
+        get: operations["list_project_data_sources_api_v1_projects__project_id__data_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/devices": {
         parameters: {
             query?: never;
@@ -7462,6 +7484,24 @@ export interface components {
             description?: string | null;
             /** Tiles */
             tiles?: components["schemas"]["DashboardTile"][] | null;
+        };
+        /**
+         * DataSourceBrief
+         * @description A data source by name, for a project's members (decision D337): enough to link a
+         *     device's identity to the network it reports on; the settings stay with the server admin.
+         */
+        DataSourceBrief: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Adapter Key */
+            adapter_key: string;
+            /** Enabled */
+            enabled: boolean;
         };
         /** DataSourceCreate */
         DataSourceCreate: {
@@ -17930,6 +17970,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceConnectivityRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_data_sources_api_v1_projects__project_id__data_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSourceBrief"][];
                 };
             };
             /** @description Validation Error */

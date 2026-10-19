@@ -6027,6 +6027,59 @@
     }
    }
   },
+  "/api/v1/projects/{project_id}/data-sources": {
+   "get": {
+    "tags": [
+     "data sources"
+    ],
+    "summary": "List Project Data Sources",
+    "description": "Every data source of the server by name and adapter, for a member of the project: the\nchoice when an identity is linked to a device of the project. Nothing of a source's\nsettings or credentials.",
+    "operationId": "list_project_data_sources_api_v1_projects__project_id__data_sources_get",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/DataSourceBrief"
+         },
+         "title": "Response List Project Data Sources Api V1 Projects  Project Id  Data Sources Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/projects/{project_id}/devices": {
    "post": {
     "tags": [
@@ -28493,6 +28546,36 @@
     },
     "type": "object",
     "title": "DashboardUpdate"
+   },
+   "DataSourceBrief": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "adapter_key": {
+      "type": "string",
+      "title": "Adapter Key"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "adapter_key",
+     "enabled"
+    ],
+    "title": "DataSourceBrief",
+    "description": "A data source by name, for a project's members (decision D337): enough to link a\ndevice's identity to the network it reports on; the settings stay with the server admin."
    },
    "DataSourceCreate": {
     "properties": {

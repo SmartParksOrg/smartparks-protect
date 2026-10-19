@@ -132,6 +132,7 @@ from shared.models import (
     SourceEvent,
     User,
 )
+from shared.permissions import Permission
 from shared.timeutil import require_aware, utc_now
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -156,6 +157,24 @@ def project_assignment_read(
 async def _require_project_admin(session: AsyncSession, user: User, project_id: uuid.UUID) -> None:
     if not await is_project_admin(session, user, project_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Project admin access required")
+
+
+async def _manageable_device(session: AsyncSession, user: User, device_id: uuid.UUID) -> Device:
+    """A device a person may manage (decision D337): a server admin any device; a member with
+    `devices:write` the devices of the project the device is in today, as decision D326 lets
+    them make one there. A device in no project is the server admin's alone."""
+    # imported here: the control router imports this module's `_visible_device`
+    from protect_api.routers.control import _control_permissions
+
+    device = await get_or_404(session, Device, device_id, "Device")
+    if user.is_superuser:
+        return device
+    _project, permissions = await _control_permissions(session, user, device)
+    if Permission.DEVICES_WRITE not in permissions:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, f"Permission {Permission.DEVICES_WRITE} required"
+        )
+    return device
 
 
 async def _visible_device(session: AsyncSession, user: User, device_id: uuid.UUID) -> Device:
@@ -353,11 +372,11 @@ async def get_device_picture(
 async def set_device_picture(
     device_id: uuid.UUID,
     file: UploadFile,
-    user: User = Depends(require_server_admin),
+    user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> DeviceRead:
     """Set the profile picture from a JPEG, PNG or WebP; the server keeps a small square."""
-    device = await get_or_404(session, Device, device_id, "Device")
+    device = await _manageable_device(session, user, device_id)
     device.picture_key, device.picture_updated_at = await store_picture("devices", device.id, file)
     await record_audit(
         session,
@@ -375,10 +394,10 @@ async def set_device_picture(
 @router.delete("/{device_id}/picture", response_model=DeviceRead)
 async def remove_device_picture(
     device_id: uuid.UUID,
-    user: User = Depends(require_server_admin),
+    user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> DeviceRead:
-    device = await get_or_404(session, Device, device_id, "Device")
+    device = await _manageable_device(session, user, device_id)
     await drop_picture(device.picture_key)
     device.picture_key, device.picture_updated_at = None, None
     await record_audit(
@@ -476,10 +495,10 @@ async def get_device(
 async def update_device(
     device_id: uuid.UUID,
     body: DeviceUpdate,
-    user: User = Depends(require_server_admin),
+    user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> Device:
-    device = await get_or_404(session, Device, device_id, "Device")
+    device = await _manageable_device(session, user, device_id)
     if body.device_type_id is not None:
         await get_or_404(session, DeviceType, body.device_type_id, "Device type")
     changed = apply_patch(device, body)
@@ -1683,10 +1702,10 @@ async def end_project_assignment(
 async def add_identity(
     device_id: uuid.UUID,
     body: ExternalIdentityCreate,
-    user: User = Depends(require_server_admin),
+    user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> ExternalIdentity:
-    device = await get_or_404(session, Device, device_id, "Device")
+    device = await _manageable_device(session, user, device_id)
     await get_or_404(session, DataSource, body.data_source_id, "Data source")
     identity = ExternalIdentity(device_id=device.id, **body.model_dump())
     session.add(identity)

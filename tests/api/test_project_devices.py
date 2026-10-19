@@ -118,3 +118,75 @@ async def test_the_driver_catalogue_is_served_by_device_type(client, db):
         f"/api/v1/device-types/{generic['id']}/driver-catalog", headers=viewer.headers
     )
     assert empty.status_code == 200 and empty.json()["catalog"] == {}
+
+
+async def test_a_project_admin_manages_the_devices_of_the_project(client, db):
+    """Decision D337 (Tim, 2026-10-19: a project admin had to be made server admin to add
+    stations): a device in a project is its project admins' to manage, its name, type, location
+    source and identities, while server admins keep devices outside a project, imports and the
+    data sources themselves."""
+    server_admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    elsewhere = await create_project(db)
+    oc = await _opencollar_type(client, server_admin.headers)
+    admin = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    stranger = await project_actor(client, db, elsewhere, Role.PROJECT_ADMIN)
+    operator = await project_actor(client, db, project, Role.PROJECT_OPERATOR)
+    device = (
+        await client.post(
+            f"/api/v1/projects/{project.id}/devices",
+            json={"device_type_id": oc["id"], "name": unique_name("RangerEdge")},
+            headers=admin.headers,
+        )
+    ).json()
+
+    # the sources by name, for the identity form; their settings stay with the server admin
+    sources = await client.get(
+        f"/api/v1/projects/{project.id}/data-sources", headers=operator.headers
+    )
+    assert sources.status_code == 200, sources.text
+    assert sources.json()
+    assert all(set(s) == {"id", "name", "adapter_key", "enabled"} for s in sources.json())
+    assert (await client.get("/api/v1/data-sources", headers=admin.headers)).status_code == 403
+
+    renamed = await client.patch(
+        f"/api/v1/devices/{device['id']}",
+        json={"name": device["name"] + " north", "location_source": "network"},
+        headers=admin.headers,
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["location_source"] == "network"
+    for who in (operator, stranger):
+        refused = await client.patch(
+            f"/api/v1/devices/{device['id']}", json={"name": "x"}, headers=who.headers
+        )
+        assert refused.status_code == 403, refused.text
+
+    eui = "0016C001F0" + uuid.uuid4().hex[:6].upper()
+    linked = await client.post(
+        f"/api/v1/devices/{device['id']}/identities",
+        json={"data_source_id": str(LP0_SOURCE_ID), "external_id": eui},
+        headers=admin.headers,
+    )
+    assert linked.status_code == 201, linked.text
+    refused = await client.post(
+        f"/api/v1/devices/{device['id']}/identities",
+        json={"data_source_id": str(LP0_SOURCE_ID), "external_id": eui + "1"},
+        headers=stranger.headers,
+    )
+    assert refused.status_code == 403
+    cleared = await client.delete(f"/api/v1/devices/{device['id']}/picture", headers=admin.headers)
+    assert cleared.status_code == 200, cleared.text
+
+    # a device in no project is the server admin's alone
+    loose = (
+        await client.post(
+            "/api/v1/devices",
+            json={"device_type_id": oc["id"], "name": unique_name("loose"), "status": "active"},
+            headers=server_admin.headers,
+        )
+    ).json()
+    refused = await client.patch(
+        f"/api/v1/devices/{loose['id']}", json={"name": "y"}, headers=admin.headers
+    )
+    assert refused.status_code == 403

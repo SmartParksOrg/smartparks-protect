@@ -52,6 +52,8 @@ A device is visible to server admins and to members of every project the device 
 
 Assigning a device to a project needs server admin or project admin in that project, one device or many at once. A move between projects, of a device or of an entity with its devices, needs server admin or project admin in every project involved. Creating an entity per device from a selection needs `devices:write` and `entities:write`.
 
+A device in a project is its project admins' to manage (decision D337, Tim, 2026-10-19: a project admin had to be made server admin to add offload stations). With `devices:write` a member adds a device to the project (the Devices page's "Add device" and the station dialog, `POST /projects/{id}/devices`, decision D326), changes its name, type, status, notes and location source (`PATCH /devices/{id}`), sets or clears its picture, and links an identity such as a DevEUI (`POST /devices/{id}/identities`), choosing the data source by name from `GET /projects/{id}/data-sources`, which carries names and adapters alone. Server admin stays required for a device in no project, for moving a device out of its project's reach, for the CSV import, for device types and for the data sources themselves.
+
 ## Registration
 
 Nobody can register without an invitation. Server admins invite a person as server admin and/or into any projects at once, each with a role and, when wanted, a scope (decision D190); members with `members:write` invite members of their own project, with a role and, when wanted, a scope. The new account receives every membership the invitation carries. The invitation link proves ownership of the email address, so accounts are verified on creation. Invitations expire (168 hours by default) and can be revoked before use.

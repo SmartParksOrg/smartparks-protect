@@ -26,11 +26,19 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable } from "@/components/data/DataTable";
 import { LoadMore } from "@/components/data/LoadMore";
 import { GroupSelect } from "@/components/entities/GroupSelect";
+import { AddDeviceForm } from "@/components/devices/AddDeviceForm";
 import { BulkAssignDialog } from "@/components/devices/BulkAssignDialog";
 import { CreateEntitiesDialog } from "@/components/devices/CreateEntitiesDialog";
 import { MoveToProjectDialog } from "@/components/devices/MoveToProjectDialog";
 import { HealthLine } from "@/components/devices/HealthCard";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Icon } from "@/components/icons/Icon";
 import { ObjectPicture } from "@/components/common/ObjectPicture";
 import { useNow } from "@/hooks/useNow";
@@ -61,6 +69,9 @@ export function DevicesPage() {
     can("analysis:run");
   // a project admin organises a selection: entities for it, or a move to another project (D294)
   const organisable = !allProjects && can("devices:write");
+  // a project admin adds hardware to the project here (decision D337): the form the station
+  // dialog has, with every device type
+  const [adding, setAdding] = useState(false);
   const selectable = allProjects || analysable || organisable;
   const projectName = (id: string | null | undefined) =>
     projectList.data?.items.find((p) => p.id === id)?.name ?? "";
@@ -239,9 +250,38 @@ export function DevicesPage() {
               onChange={setGroup}
               className="h-9 w-44"
             />
+            {organisable && (
+              <Button type="button" size="sm" onClick={() => setAdding(true)}>
+                <Plus className="size-4" /> {t("Add device")}
+              </Button>
+            )}
           </>
         }
       />
+      {organisable && (
+        <Dialog open={adding} onOpenChange={setAdding}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{t("Add device")}</DialogTitle>
+              <DialogDescription>
+                {t(
+                  "Hardware of this project: read over Bluetooth where the browser allows it, or typed in. The device belongs to the project from now.",
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            {adding && (
+              <AddDeviceForm
+                projectId={projectId}
+                allTypes
+                onCreated={(device) => {
+                  setAdding(false);
+                  void navigate(`/projects/${projectId}/devices/${device.id}`);
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
       <Page>
         {selectable && selected.size > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">

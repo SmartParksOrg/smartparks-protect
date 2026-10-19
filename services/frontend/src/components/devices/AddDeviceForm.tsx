@@ -57,26 +57,43 @@ function describe(error: unknown): string {
 export function AddDeviceForm({
   projectId,
   onCreated,
+  allTypes = false,
 }: {
   projectId: string;
   onCreated: (device: Device) => void;
+  /** Every device type of the server, not only the OpenCollar ones: the Devices page adds any
+   * hardware (decision D337); the station dialog keeps to OpenCollar, a station is one. */
+  allTypes?: boolean;
 }) {
   const { t } = useTranslation();
   const bluetooth = webBluetoothAvailable();
-  const [mode, setMode] = useState<"bluetooth" | "manual">(bluetooth ? "bluetooth" : "manual");
+  const [mode, setMode] = useState<"bluetooth" | "manual">(
+    bluetooth ? "bluetooth" : "manual",
+  );
   const types = useQuery({
     queryKey: queryKeys.deviceTypes,
     queryFn: () =>
-      api.get<PageType<DeviceType>>("/api/v1/device-types", { query: { limit: 500 } }),
+      api.get<PageType<DeviceType>>("/api/v1/device-types", {
+        query: { limit: 500 },
+      }),
   });
-  const openCollar = (types.data?.items ?? []).filter((x) => x.driver_key === "opencollar");
+  const openCollar = (types.data?.items ?? []).filter(
+    (x) => x.driver_key === "opencollar",
+  );
+  const offered = allTypes ? (types.data?.items ?? []) : openCollar;
   const [chosenTypeId, setChosenTypeId] = useState("");
   const typeId =
-    (openCollar.some((x) => x.id === chosenTypeId) ? chosenTypeId : "") || openCollar[0]?.id || "";
+    (offered.some((x) => x.id === chosenTypeId) ? chosenTypeId : "") ||
+    offered[0]?.id ||
+    "";
+  // the Bluetooth read speaks OpenCollar; another type is added by hand
+  const readable =
+    offered.find((x) => x.id === typeId)?.driver_key === "opencollar";
   const catalog = useQuery({
     queryKey: [...queryKeys.deviceTypes, typeId, "driver-catalog"],
-    queryFn: () => api.get<DriverCatalog>(`/api/v1/device-types/${typeId}/driver-catalog`),
-    enabled: Boolean(typeId) && mode === "bluetooth",
+    queryFn: () =>
+      api.get<DriverCatalog>(`/api/v1/device-types/${typeId}/driver-catalog`),
+    enabled: Boolean(typeId) && readable && mode === "bluetooth",
   });
   const [name, setName] = useState("");
   const [serial, setSerial] = useState("");
@@ -95,9 +112,16 @@ export function AddDeviceForm({
     [],
   );
   const serialBad = serial.trim() !== "" && !EUI.test(serial.trim());
-  const missing = !typeId ? "type" : !name.trim() ? "name" : serialBad ? "serial" : null;
+  const missing = !typeId
+    ? "type"
+    : !name.trim()
+      ? "name"
+      : serialBad
+        ? "serial"
+        : null;
   // a station is a RangerEdge; another hardware read here is most likely a tracker picked by mistake
-  const notAStation = identity?.hardwareKey != null && identity.hardwareKey !== "rangeredge";
+  const notAStation =
+    identity?.hardwareKey != null && identity.hardwareKey !== "rangeredge";
 
   const read = async () => {
     if (!catalog.data) return;
@@ -110,7 +134,12 @@ export function AddDeviceForm({
       session.current = active;
       const status = await active.requestStatus().catch(() => null);
       const values = await active.requestSettings();
-      const found = readIdentity(catalog.data.catalog as unknown as Catalog, values, status, active.name);
+      const found = readIdentity(
+        catalog.data.catalog as unknown as Catalog,
+        values,
+        status,
+        active.name,
+      );
       setIdentity(found);
       setName(found.name);
       setSerial(found.eui ?? "");
@@ -124,7 +153,10 @@ export function AddDeviceForm({
   const create = useMutationToast({
     mutationFn: async () => {
       // the server fills the location fields with their defaults
-      const body: Omit<ProjectDeviceCreate, "location_source" | "location_fallback_hours"> = {
+      const body: Omit<
+        ProjectDeviceCreate,
+        "location_source" | "location_fallback_hours"
+      > = {
         device_type_id: typeId,
         status: "active",
         name: name.trim(),
@@ -142,25 +174,37 @@ export function AddDeviceForm({
             }
           : null,
       };
-      const device = await api.post<Device>(`/api/v1/projects/${projectId}/devices`, { body });
+      const device = await api.post<Device>(
+        `/api/v1/projects/${projectId}/devices`,
+        { body },
+      );
       const active = session.current;
       if (active) {
         const frames = active.takeReceived();
         if (frames.length > 0) {
           try {
-            await api.post<DeviceLogFile>(`/api/v1/devices/${device.id}/log-files/ble-sync`, {
-              body: {
-                frames: frames.map((f) => hex(f.raw)),
-                ble_synced_at: frames[frames.length - 1].at.toISOString(),
-                label: "onboarding",
-                attributes: { device_name: active.name, user_agent: navigator.userAgent },
+            await api.post<DeviceLogFile>(
+              `/api/v1/devices/${device.id}/log-files/ble-sync`,
+              {
+                body: {
+                  frames: frames.map((f) => hex(f.raw)),
+                  ble_synced_at: frames[frames.length - 1].at.toISOString(),
+                  label: "onboarding",
+                  attributes: {
+                    device_name: active.name,
+                    user_agent: navigator.userAgent,
+                  },
+                },
               },
-            });
+            );
           } catch (error) {
             toast.error(
-              t("The device is made, but the Bluetooth frames could not be synced: {{error}}", {
-                error: describe(error),
-              }),
+              t(
+                "The device is made, but the Bluetooth frames could not be synced: {{error}}",
+                {
+                  error: describe(error),
+                },
+              ),
             );
           }
         }
@@ -176,9 +220,12 @@ export function AddDeviceForm({
     ],
     success: (device) =>
       identity?.lp0
-        ? t("{{name}} is a device of the project, with its LP0 address and keys", {
-            name: device.name,
-          })
+        ? t(
+            "{{name}} is a device of the project, with its LP0 address and keys",
+            {
+              name: device.name,
+            },
+          )
         : t("{{name}} is a device of the project", { name: device.name }),
     onSuccess: (device) => onCreated(device),
   });
@@ -186,9 +233,12 @@ export function AddDeviceForm({
   return (
     <>
       <div className="min-w-0 space-y-4">
-        <Tabs value={mode} onValueChange={(v) => setMode(v as "bluetooth" | "manual")}>
+        <Tabs
+          value={readable ? mode : "manual"}
+          onValueChange={(v) => setMode(v as "bluetooth" | "manual")}
+        >
           <TabsList>
-            <TabsTrigger value="bluetooth" disabled={!bluetooth}>
+            <TabsTrigger value="bluetooth" disabled={!bluetooth || !readable}>
               <Bluetooth className="size-4" /> {t("Over Bluetooth")}
             </TabsTrigger>
             <TabsTrigger value="manual">
@@ -198,29 +248,47 @@ export function AddDeviceForm({
         </Tabs>
         {!bluetooth && (
           <Callout kind="info">
-            {t("Web Bluetooth needs Chrome or Edge over HTTPS; this browser has none, so the device is added by hand.")}
-          </Callout>
-        )}
-        {types.data && openCollar.length === 0 && (
-          <Callout kind="warning">
             {t(
-              "This server has no OpenCollar device type yet; a server admin adds one under Server admin, Device types.",
+              "Web Bluetooth needs Chrome or Edge over HTTPS; this browser has none, so the device is added by hand.",
             )}
           </Callout>
         )}
-        {openCollar.length > 1 && (
+        {types.data && offered.length === 0 && (
+          <Callout kind="warning">
+            {allTypes
+              ? t(
+                  "This server has no device type yet; a server admin adds one under Server admin, Device types.",
+                )
+              : t(
+                  "This server has no OpenCollar device type yet; a server admin adds one under Server admin, Device types.",
+                )}
+          </Callout>
+        )}
+        {offered.length > 1 && (
           <Field
             label={t("Device type")}
             htmlFor="add-device-type"
-            hint={t("The OpenCollar types of this server; a RangerEdge is one of them.")}
-            error={attempted && missing === "type" ? t("Choose a device type") : undefined}
+            hint={
+              allTypes
+                ? t(
+                    "The device types of this server; an OpenCollar type can be read over Bluetooth.",
+                  )
+                : t(
+                    "The OpenCollar types of this server; a RangerEdge is one of them.",
+                  )
+            }
+            error={
+              attempted && missing === "type"
+                ? t("Choose a device type")
+                : undefined
+            }
           >
             <Select value={typeId} onValueChange={setChosenTypeId}>
               <SelectTrigger id="add-device-type">
                 <SelectValue placeholder={t("Choose a device type")} />
               </SelectTrigger>
               <SelectContent>
-                {openCollar.map((x) => (
+                {offered.map((x) => (
                   <SelectItem key={x.id} value={x.id}>
                     {x.label}
                   </SelectItem>
@@ -229,7 +297,7 @@ export function AddDeviceForm({
             </Select>
           </Field>
         )}
-        {mode === "bluetooth" && (
+        {mode === "bluetooth" && readable && (
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -247,15 +315,23 @@ export function AddDeviceForm({
                     : t("Connect and read")}
               </Button>
               <span className="text-xs text-muted-foreground">
-                {t("Hold the device near this computer; the browser asks which one to connect to.")}
+                {t(
+                  "Hold the device near this computer; the browser asks which one to connect to.",
+                )}
               </span>
             </div>
-            {reading === "failed" && <Callout kind="error">{readError}</Callout>}
+            {reading === "failed" && (
+              <Callout kind="error">{readError}</Callout>
+            )}
             {identity && (
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-md border p-3 text-sm">
                 <dt className="text-muted-foreground">{t("DevEUI")}</dt>
                 <dd className="font-mono">
-                  {identity.eui ?? <span className="text-destructive">{t("not reported")}</span>}
+                  {identity.eui ?? (
+                    <span className="text-destructive">
+                      {t("not reported")}
+                    </span>
+                  )}
                 </dd>
                 <dt className="text-muted-foreground">{t("Hardware")}</dt>
                 <dd>
@@ -266,7 +342,9 @@ export function AddDeviceForm({
                   {identity.firmwareVersion &&
                     `, ${t("firmware {{version}}", { version: identity.firmwareVersion })}`}
                 </dd>
-                <dt className="text-muted-foreground">{t("LP0 credentials")}</dt>
+                <dt className="text-muted-foreground">
+                  {t("LP0 credentials")}
+                </dt>
                 <dd>
                   {identity.lp0 ? (
                     <>
@@ -276,7 +354,9 @@ export function AddDeviceForm({
                     </>
                   ) : (
                     <span className="text-destructive">
-                      {t("not set on the device; set them later under LP0 offload on its page")}
+                      {t(
+                        "not set on the device; set them later under LP0 offload on its page",
+                      )}
                     </span>
                   )}
                 </dd>
@@ -289,15 +369,29 @@ export function AddDeviceForm({
             <Field
               label={t("Name")}
               htmlFor="add-device-name"
-              error={attempted && missing === "name" ? t("Give the device a name") : undefined}
+              error={
+                attempted && missing === "name"
+                  ? t("Give the device a name")
+                  : undefined
+              }
             >
-              <Input id="add-device-name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input
+                id="add-device-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </Field>
             <Field
               label={t("Serial number")}
               htmlFor="add-device-serial"
-              hint={t("The DevEUI, sixteen hex digits: an offload station names the card's files after it.")}
-              error={attempted && missing === "serial" ? t("A DevEUI is sixteen hex digits") : undefined}
+              hint={t(
+                "The DevEUI, sixteen hex digits: an offload station names the card's files after it.",
+              )}
+              error={
+                attempted && missing === "serial"
+                  ? t("A DevEUI is sixteen hex digits")
+                  : undefined
+              }
             >
               <Input
                 id="add-device-serial"
@@ -316,13 +410,19 @@ export function AddDeviceForm({
             )}
           </>
         )}
-        {create.isError && <Callout kind="error">{create.error.message}</Callout>}
+        {create.isError && (
+          <Callout kind="error">{create.error.message}</Callout>
+        )}
       </div>
       <DialogFooter>
         <Button
           type="button"
-          disabled={create.isPending || !typeId || (mode === "bluetooth" && !identity)}
-          onClick={() => (missing === null ? create.mutate() : setAttempted(true))}
+          disabled={
+            create.isPending || !typeId || (mode === "bluetooth" && !identity)
+          }
+          onClick={() =>
+            missing === null ? create.mutate() : setAttempted(true)
+          }
         >
           {create.isPending ? t("Adding…") : t("Add the device and continue")}
         </Button>

@@ -15,15 +15,17 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import type {
+  DataSourceBrief,
   DeviceDataSpan,
   DeviceDetail,
   DeviceType,
+  EntityAssignmentExtended,
+  ExternalIdentity,
   Page as PageType,
   Position,
-  TrafficRow,
-  EntityAssignmentExtended,
   ProjectAssignmentExtended,
   ReattributeResult,
+  TrafficRow,
 } from "@/api/types";
 import { Callout } from "@/components/common/Callout";
 import { Page, PageHeader } from "@/components/common/PageHeader";
@@ -47,6 +49,14 @@ import { Icon } from "@/components/icons/Icon";
 import { PictureEditor } from "@/components/common/PictureEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { recordsHref } from "@/lib/records";
 import { MiniMap } from "@/components/map/MiniMap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,6 +102,8 @@ export function DevicePage() {
   const { projectId, deviceId = "" } = useParams();
   const user = useAuthStore((s) => s.user);
   const { can } = usePermissions(projectId);
+  // the device is its project admins' to manage (decision D337); a server admin manages every one
+  const canManage = Boolean(user?.is_superuser) || can("devices:write");
   const modules = useAnalysisModules(projectId);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
     null,
@@ -323,7 +335,7 @@ export function DevicePage() {
             path={`/api/v1/devices/${d.id}/picture`}
             updatedAt={d.picture_updated_at}
             name={d.name}
-            editable={Boolean(user?.is_superuser)}
+            editable={canManage}
             invalidate={[queryKeys.device(d.id), ["devices"]]}
             fallback={<Icon iconKey={type?.icon_key} className="size-6" />}
           />
@@ -594,7 +606,7 @@ export function DevicePage() {
                 value={d.location_source ?? "device"}
                 fallbackHours={d.location_fallback_hours ?? 24}
                 invalidate={[queryKeys.device(d.id), ["devices"]]}
-                canEdit={Boolean(user?.is_superuser)}
+                canEdit={canManage}
               />
               <BatteryCard
                 deviceId={d.id}
@@ -777,6 +789,9 @@ export function DevicePage() {
                       </span>
                     </div>
                   ))}
+                  {canManage && projectId && (
+                    <AddIdentityForm deviceId={d.id} projectId={projectId} />
+                  )}
                 </CardContent>
               </Card>
               {projectId && (
@@ -1044,5 +1059,72 @@ export function DevicePage() {
         />
       )}
     </>
+  );
+}
+
+/** Link an identity to a device of the project (decision D337): the data source by name, the
+ * DevEUI or provider id as the network knows it. The sources' settings stay with the server
+ * admin; a member sees only their names. */
+function AddIdentityForm({
+  deviceId,
+  projectId,
+}: {
+  deviceId: string;
+  projectId: string;
+}) {
+  const { t } = useTranslation();
+  const [sourceId, setSourceId] = useState("");
+  const [externalId, setExternalId] = useState("");
+  const sources = useQuery({
+    queryKey: queryKeys.projectDataSources(projectId),
+    queryFn: () =>
+      api.get<DataSourceBrief[]>(`/api/v1/projects/${projectId}/data-sources`),
+  });
+  const link = useMutationToast({
+    mutationFn: () =>
+      api.post<ExternalIdentity>(`/api/v1/devices/${deviceId}/identities`, {
+        body: { data_source_id: sourceId, external_id: externalId.trim() },
+      }),
+    invalidate: [queryKeys.device(deviceId), ["devices"]],
+    success: t("Identity linked"),
+    onSuccess: () => setExternalId(""),
+  });
+  return (
+    <form
+      className="grid gap-2 border-t pt-3 sm:grid-cols-[1fr_1fr_auto]"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (sourceId && externalId.trim()) link.mutate();
+      }}
+    >
+      <Select value={sourceId} onValueChange={setSourceId}>
+        <SelectTrigger aria-label={t("Data source")}>
+          <SelectValue placeholder={t("Data source")} />
+        </SelectTrigger>
+        <SelectContent>
+          {(sources.data ?? []).map((source) => (
+            <SelectItem key={source.id} value={source.id}>
+              {source.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        aria-label={t("DevEUI or external id")}
+        placeholder={t("DevEUI or external id")}
+        className="font-mono"
+        value={externalId}
+        onChange={(e) => setExternalId(e.target.value.toUpperCase())}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <Button
+        type="submit"
+        size="sm"
+        disabled={!sourceId || !externalId.trim() || link.isPending}
+      >
+        {t("Link identity")}
+      </Button>
+    </form>
   );
 }
