@@ -92,10 +92,14 @@ async def test_entity_picture_lifecycle(client, db):
     assert {"entity.picture_set", "entity.picture_removed"} <= actions
 
 
-async def test_device_picture_by_server_admin_only(client, db):
+async def test_device_picture_by_the_devices_managers(client, db):
+    """The picture is set by whoever manages the device (decision D337): a server admin, or a
+    project admin of the project the device is in; an operator or another project's admin not."""
     admin = await actor(client, db, superuser=True)
     project = await create_project(db)
     manager = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    operator = await project_actor(client, db, project, Role.PROJECT_OPERATOR)
+    stranger = await project_actor(client, db, await create_project(db), Role.PROJECT_ADMIN)
     device_type = (
         await client.post(
             "/api/v1/device-types",
@@ -120,11 +124,15 @@ async def test_device_picture_by_server_admin_only(client, db):
         headers=admin.headers,
     )
     base = f"/api/v1/devices/{device['id']}/picture"
-    assert (
-        await client.put(
-            base, files={"file": ("d.png", _png(), "image/png")}, headers=manager.headers
+    for who in (operator, stranger):
+        refused = await client.put(
+            base, files={"file": ("d.png", _png(), "image/png")}, headers=who.headers
         )
-    ).status_code == 403
+        assert refused.status_code == 403, refused.text
+    by_manager = await client.put(
+        base, files={"file": ("d.png", _png(), "image/png")}, headers=manager.headers
+    )
+    assert by_manager.status_code == 200, by_manager.text
     set_response = await client.put(
         base, files={"file": ("d.jpg", _png(), "image/png")}, headers=admin.headers
     )
