@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import {
   BookOpen,
   CircleCheck,
@@ -26,6 +26,7 @@ import { Callout } from "@/components/common/Callout";
 import { resolveIcon } from "@/components/icons/registry";
 import { Page, PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/data/DataTable";
+import { AddTrackerDialog } from "@/components/network/AddTrackerDialog";
 import { CardUploadButton } from "@/components/network/CardUploadButton";
 import { FieldCard } from "@/components/network/FieldCard";
 import { FilesSection } from "@/components/network/FilesSection";
@@ -72,6 +73,10 @@ export function OffloadPage() {
     deviceId: null,
   });
   const [guideOpen, setGuideOpen] = useState(false);
+  // an unknown address made into a device (decision D338); `?add=<address>` opens it, the way
+  // Protect Go hands a tracker over
+  const [params, setParams] = useSearchParams();
+  const [adding, setAdding] = useState<OffloadUnknownAddress | null>(null);
   const [stationsView, setStationsView] = useOffloadView("stations");
   const [trackersView, setTrackersView] = useOffloadView("trackers");
   const [fieldOpen, setFieldOpen] = useState(false);
@@ -149,6 +154,16 @@ export function OffloadPage() {
     return gaps;
   };
   const trackerGaps = (tr: OffloadOverviewTracker): Gap[] => {
+    if (tr.dev_addr && !tr.keys_set)
+      return [
+        {
+          label: t("keys not set"),
+          hint: t(
+            "The address is the device's; its frames wait until the two session keys are set under LP0 offload on the device page",
+          ),
+          fix: "device",
+        },
+      ];
     if (!tr.dev_addr)
       return [
         {
@@ -566,11 +581,50 @@ export function OffloadPage() {
       accessorKey: "last_seen_at",
       cell: ({ getValue }) => ago(getValue<string | null>()),
     },
+    ...(canSetUp
+      ? [
+          {
+            header: "",
+            id: "add",
+            cell: ({ row }: { row: { original: OffloadUnknownAddress } }) => (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setAdding(row.original)}
+              >
+                <Plus className="size-4" /> {t("Add the tracker")}
+              </Button>
+            ),
+          } satisfies ColumnDef<OffloadUnknownAddress, unknown>,
+        ]
+      : []),
   ];
 
   const stations = data?.stations ?? [];
   const trackers = data?.trackers ?? [];
   const unknown = data?.unknown ?? [];
+  const wanted = params.get("add");
+  const toAdd =
+    adding ??
+    (wanted
+      ? (unknown.find(
+          (u) => u.dev_addr.toUpperCase() === wanted.toUpperCase(),
+        ) ?? {
+          dev_addr: wanted.toUpperCase(),
+          dev_eui: null,
+          receptions: 0,
+          first_seen_at: null,
+          last_seen_at: null,
+        })
+      : null);
+  const closeAdd = (open: boolean) => {
+    if (open) return;
+    setAdding(null);
+    if (params.has("add")) {
+      params.delete("add");
+      setParams(params, { replace: true });
+    }
+  };
   return (
     <>
       <PageHeader
@@ -629,7 +683,7 @@ export function OffloadPage() {
               </li>
               <li>
                 {t(
-                  "The trackers: on each tracker's device page, under LP0 offload, set the LP0 address and the two session keys provisioned on the device, or take them from the device's own readback; a tracker added over Bluetooth in the station dialog brings them with it. The address is how a frame on a card finds its device; the keys decrypt it.",
+                  'The trackers: on each tracker\'s device page, under LP0 offload, set the LP0 address and the two session keys provisioned on the device, or take them from the device\'s own readback; a tracker added over Bluetooth in the station dialog brings them with it. The address is how a frame on a card finds its device; the keys decrypt it. A card that names a tracker Protect does not know yet puts it under "Addresses no device has", where "Add the tracker" makes the device.',
                 )}
               </li>
               <li>
@@ -639,6 +693,13 @@ export function OffloadPage() {
               </li>
             </ol>
           </Callout>
+        )}
+        {canSetUp && (
+          <AddTrackerDialog
+            projectId={projectId}
+            address={toAdd}
+            onOpenChange={closeAdd}
+          />
         )}
         {canSetUp && (
           <OffloadStationDialog
@@ -856,7 +917,7 @@ export function OffloadPage() {
             </h2>
             <Callout kind="warning">
               {t(
-                "The stations received frames of these addresses, and no device holds them. They wait: set the address and the keys on the tracker's device page, and the frames are decoded.",
+                'The stations received frames of these addresses, and no device holds them. They wait. "Add the tracker" makes the device, with the DevEUI the card named, or gives the address to a device of the project; the frames are decoded as soon as its keys are set.',
               )}
               {serverAdmin && (
                 <>

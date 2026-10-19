@@ -54,13 +54,23 @@ function describe(error: unknown): string {
  * offered, and the choice shows only when the server has more than one (Tim: no irrelevant
  * options here). The caller hears what was made and carries on with it.
  */
+export interface AddDeviceInitial {
+  name?: string;
+  serial?: string;
+  /** The LP0 address an offload card named (decision D338); the frames stored for it become
+   * the new device's and wait for the keys. */
+  lp0Address?: string;
+}
+
 export function AddDeviceForm({
   projectId,
   onCreated,
   allTypes = false,
+  initial,
 }: {
   projectId: string;
   onCreated: (device: Device) => void;
+  initial?: AddDeviceInitial;
   /** Every device type of the server, not only the OpenCollar ones: the Devices page adds any
    * hardware (decision D337); the station dialog keeps to OpenCollar, a station is one. */
   allTypes?: boolean;
@@ -95,8 +105,13 @@ export function AddDeviceForm({
       api.get<DriverCatalog>(`/api/v1/device-types/${typeId}/driver-catalog`),
     enabled: Boolean(typeId) && readable && mode === "bluetooth",
   });
-  const [name, setName] = useState("");
-  const [serial, setSerial] = useState("");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [serial, setSerial] = useState(initial?.serial ?? "");
+  // the LP0 address and keys typed in (decision D338): the address alone claims the frames a
+  // card holds for it, the keys may follow on the device page
+  const [lp0Address, setLp0Address] = useState(initial?.lp0Address ?? "");
+  const [appKey, setAppKey] = useState("");
+  const [nwkKey, setNwkKey] = useState("");
   const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
   const [reading, setReading] = useState<"idle" | "busy" | "failed">("idle");
   const [readError, setReadError] = useState("");
@@ -112,13 +127,26 @@ export function AddDeviceForm({
     [],
   );
   const serialBad = serial.trim() !== "" && !EUI.test(serial.trim());
+  const cleanHex = (text: string) => text.replace(/[\s:_-]/g, "");
+  const addressBad =
+    lp0Address.trim() !== "" && !/^[0-9A-Fa-f]{8}$/.test(cleanHex(lp0Address));
+  const keysHalf = (cleanHex(appKey) === "") !== (cleanHex(nwkKey) === "");
+  const keysBad =
+    (cleanHex(appKey) !== "" && !/^[0-9A-Fa-f]{32}$/.test(cleanHex(appKey))) ||
+    (cleanHex(nwkKey) !== "" && !/^[0-9A-Fa-f]{32}$/.test(cleanHex(nwkKey)));
+  const keysWithoutAddress =
+    cleanHex(appKey) !== "" && cleanHex(lp0Address) === "";
   const missing = !typeId
     ? "type"
     : !name.trim()
       ? "name"
       : serialBad
         ? "serial"
-        : null;
+        : addressBad || keysWithoutAddress
+          ? "address"
+          : keysHalf || keysBad
+            ? "keys"
+            : null;
   // a station is a RangerEdge; another hardware read here is most likely a tracker picked by mistake
   const notAStation =
     identity?.hardwareKey != null && identity.hardwareKey !== "rangeredge";
@@ -172,7 +200,15 @@ export function AddDeviceForm({
               nwk_s_key: identity.lp0.nwkSKey,
               source: "device",
             }
-          : null,
+          : cleanHex(lp0Address) !== ""
+            ? {
+                dev_addr: cleanHex(lp0Address).toUpperCase(),
+                ...(cleanHex(appKey) !== ""
+                  ? { app_s_key: cleanHex(appKey), nwk_s_key: cleanHex(nwkKey) }
+                  : {}),
+                source: "person",
+              }
+            : null,
       };
       const device = await api.post<Device>(
         `/api/v1/projects/${projectId}/devices`,
@@ -219,14 +255,19 @@ export function AddDeviceForm({
       queryKeys.entities(projectId),
     ],
     success: (device) =>
-      identity?.lp0
+      identity?.lp0 || cleanHex(appKey) !== ""
         ? t(
             "{{name}} is a device of the project, with its LP0 address and keys",
             {
               name: device.name,
             },
           )
-        : t("{{name}} is a device of the project", { name: device.name }),
+        : cleanHex(lp0Address) !== ""
+          ? t(
+              "{{name}} is a device of the project with its LP0 address; the frames stored for it wait for the keys, set under LP0 offload on its page",
+              { name: device.name },
+            )
+          : t("{{name}} is a device of the project", { name: device.name }),
     onSuccess: (device) => onCreated(device),
   });
 
@@ -369,6 +410,13 @@ export function AddDeviceForm({
             <Field
               label={t("Name")}
               htmlFor="add-device-name"
+              hint={
+                initial?.name && name === initial.name
+                  ? t(
+                      "The name on the device's label (SP…) when you know it; the DevEUI stands in until then and stays the serial number either way.",
+                    )
+                  : undefined
+              }
               error={
                 attempted && missing === "name"
                   ? t("Give the device a name")
@@ -400,6 +448,52 @@ export function AddDeviceForm({
                 onChange={(e) => setSerial(e.target.value)}
               />
             </Field>
+            {!identity?.lp0 && (
+              <Field
+                label={t("LP0 offload")}
+                htmlFor="add-device-lp0-address"
+                hint={t(
+                  "The LP0 address (8 hex digits) and the two session keys (32 hex digits each) as provisioned on the device. The address alone is enough to claim the frames a card holds for it; the keys may follow on the device page, and the frames wait until then.",
+                )}
+                error={
+                  attempted && missing === "address"
+                    ? t("An LP0 address is 8 hex digits, and the keys need it")
+                    : attempted && missing === "keys"
+                      ? t("Give both keys of 32 hex digits, or neither")
+                      : undefined
+                }
+              >
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <Input
+                    id="add-device-lp0-address"
+                    className="font-mono"
+                    placeholder={t("LP0 address")}
+                    value={lp0Address}
+                    onChange={(e) => setLp0Address(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <Input
+                    className="font-mono"
+                    placeholder="AppSKey"
+                    aria-label="AppSKey"
+                    value={appKey}
+                    onChange={(e) => setAppKey(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <Input
+                    className="font-mono"
+                    placeholder="NwkSKey"
+                    aria-label="NwkSKey"
+                    value={nwkKey}
+                    onChange={(e) => setNwkKey(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+              </Field>
+            )}
             {notAStation && (
               <Callout kind="warning">
                 {t(

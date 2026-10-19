@@ -16,6 +16,7 @@ import type {
   Device,
   DeviceType,
   DeviceWalk,
+  NameConflict,
   NewMetric,
   NewMetricsResponse,
   Page as PageType,
@@ -662,11 +663,78 @@ export function AttentionPage() {
     refetchInterval: (query) =>
       query.state.data?.queued_source_events ? 3_000 : 30_000,
   });
+  const names = useQuery({
+    queryKey: ["attention", "names"],
+    queryFn: () => api.get<NameConflict[]>("/api/v1/attention/names"),
+  });
+  const renameFromNetwork = useMutationToast({
+    mutationFn: (c: NameConflict) =>
+      api.post<NameConflict>(`/api/v1/attention/names/${c.identity_id}/rename`),
+    invalidate: [["attention"], ["devices"]],
+    success: (c) =>
+      t("{{name}} is the device's name now", { name: c.device_name }),
+  });
+  const keepName = useMutationToast({
+    mutationFn: (c: NameConflict) =>
+      api.post<void>(`/api/v1/attention/names/${c.identity_id}/keep`),
+    invalidate: [["attention"]],
+    success: t("Protect's name stays"),
+  });
   const clocks = useQuery({
     queryKey: ["attention", "clock-ahead"],
     queryFn: () => api.get<ClockAheadDevice[]>("/api/v1/attention/clock-ahead"),
     refetchInterval: 60_000,
   });
+  const nameColumns: ColumnDef<NameConflict, unknown>[] = [
+    {
+      header: t("Device in Protect"),
+      accessorKey: "device_name",
+      cell: ({ row }) => (
+        <Link
+          className="font-medium underline"
+          to={
+            row.original.project_id
+              ? `/projects/${row.original.project_id}/devices/${row.original.device_id}`
+              : `/admin/devices?device=${row.original.device_id}`
+          }
+        >
+          {row.original.device_name}
+        </Link>
+      ),
+    },
+    {
+      header: t("Name on the network"),
+      accessorKey: "network_name",
+      cell: ({ getValue }) => (
+        <span className="font-medium">{getValue<string>()}</span>
+      ),
+    },
+    { header: t("Data source"), accessorKey: "data_source_name" },
+    {
+      header: "",
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={renameFromNetwork.isPending}
+            onClick={() => renameFromNetwork.mutate(row.original)}
+          >
+            {t("Rename to {{name}}", { name: row.original.network_name })}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={keepName.isPending}
+            onClick={() => keepName.mutate(row.original)}
+          >
+            {t("Keep Protect's name")}
+          </Button>
+        </div>
+      ),
+    },
+  ];
   const clockColumns: ColumnDef<ClockAheadDevice, unknown>[] = [
     {
       header: t("Device"),
@@ -1005,6 +1073,11 @@ export function AttentionPage() {
             value={s?.clock_ahead_devices ?? "…"}
             tone={s?.clock_ahead_devices ? "warn" : undefined}
           />
+          <Stat
+            label={t("Name conflicts")}
+            value={s?.name_conflicts ?? "…"}
+            tone={s?.name_conflicts ? "warn" : undefined}
+          />
         </div>
         <QueueProgress
           queued={s?.queued_source_events ?? 0}
@@ -1024,6 +1097,7 @@ export function AttentionPage() {
             </TabsTrigger>
             <TabsTrigger value="metrics">{t("New metrics")}</TabsTrigger>
             <TabsTrigger value="clocks">{t("Clocks ahead")}</TabsTrigger>
+            <TabsTrigger value="names">{t("Names")}</TabsTrigger>
             <TabsTrigger value="failed">
               {t("Failed source events")}
             </TabsTrigger>
@@ -1064,6 +1138,23 @@ export function AttentionPage() {
                 isLoading={clocks.isPending}
                 emptyMessage={t(
                   "Every device clock is within an hour of the delivery.",
+                )}
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="names">
+            <div className="rounded-md border">
+              <p className="border-b px-3 py-2 text-xs text-muted-foreground">
+                {t(
+                  "Devices the network names otherwise than Protect does: a tracker set up from an offload card under its DevEUI is found on the LoRaWAN server as its label name. Take the network's name, or keep Protect's; the DevEUI stays the device's serial either way.",
+                )}
+              </p>
+              <DataTable
+                columns={nameColumns}
+                data={names.data}
+                isLoading={names.isPending}
+                emptyMessage={t(
+                  "Every device is named as the network names it.",
                 )}
               />
             </div>

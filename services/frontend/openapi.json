@@ -8829,6 +8829,128 @@
     ]
    }
   },
+  "/api/v1/attention/names": {
+   "get": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "Name Conflicts",
+    "description": "Devices the network names otherwise than Protect does (decision D339).",
+    "operationId": "name_conflicts_api_v1_attention_names_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/NameConflict"
+         },
+         "type": "array",
+         "title": "Response Name Conflicts Api V1 Attention Names Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/attention/names/{identity_id}/rename": {
+   "post": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "Rename From Network",
+    "description": "Give the device the network's name (decision D339); a name another device carries is\nrefused with 409.",
+    "operationId": "rename_from_network_api_v1_attention_names__identity_id__rename_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "identity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Identity Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NameConflict"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/attention/names/{identity_id}/keep": {
+   "post": {
+    "tags": [
+     "needs attention"
+    ],
+    "summary": "Keep Device Name",
+    "description": "Keep Protect's name for the device; the network's name is not raised again until it\nchanges (decision D339).",
+    "operationId": "keep_device_name_api_v1_attention_names__identity_id__keep_post",
+    "security": [
+     {
+      "OAuth2PasswordBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "identity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Identity Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/attention/clock-ahead": {
    "get": {
     "tags": [
@@ -25157,6 +25279,12 @@
       "title": "Clock Ahead Devices",
       "default": 0
      },
+     "name_conflicts": {
+      "type": "integer",
+      "title": "Name Conflicts",
+      "description": "Devices the network names otherwise than Protect does (decision D339)",
+      "default": 0
+     },
      "queued_source_events": {
       "type": "integer",
       "title": "Queued Source Events",
@@ -38474,7 +38602,7 @@
     },
     "type": "object",
     "title": "Lp0CredentialsUpdate",
-    "description": "The address and both keys typed in, or `from_device` to take the three values the\ndevice reported in its settings readback."
+    "description": "The address and both keys typed in, the address alone to claim the frames a card holds\nfor it while the keys follow (decision D338), or `from_device` to take the three values the\ndevice reported in its settings readback."
    },
    "Lp0Provisioned": {
     "properties": {
@@ -38485,14 +38613,28 @@
       "description": "Eight hex digits"
      },
      "app_s_key": {
-      "type": "string",
-      "maxLength": 48,
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 48
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "App S Key",
       "description": "32 hex digits"
      },
      "nwk_s_key": {
-      "type": "string",
-      "maxLength": 48,
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 48
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Nwk S Key",
       "description": "32 hex digits"
      },
@@ -38508,9 +38650,7 @@
     },
     "type": "object",
     "required": [
-     "dev_addr",
-     "app_s_key",
-     "nwk_s_key"
+     "dev_addr"
     ],
     "title": "Lp0Provisioned",
     "description": "A device's LP0 address and session keys as provisioned on it, read over Bluetooth in the\nbrowser (`source` device) or typed (`source` person), saved on creation (phase 42)."
@@ -39439,6 +39579,54 @@
      "end"
     ],
     "title": "MoveSpanRead"
+   },
+   "NameConflict": {
+    "properties": {
+     "identity_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Identity Id"
+     },
+     "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Device Id"
+     },
+     "device_name": {
+      "type": "string",
+      "title": "Device Name"
+     },
+     "network_name": {
+      "type": "string",
+      "title": "Network Name"
+     },
+     "data_source_name": {
+      "type": "string",
+      "title": "Data Source Name"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "identity_id",
+     "device_id",
+     "device_name",
+     "network_name",
+     "data_source_name"
+    ],
+    "title": "NameConflict",
+    "description": "A device the network names otherwise than Protect does (decision D339): a tracker set\nup from an offload card under its DevEUI, found on the LoRaWAN server as \"SP052099\"."
    },
    "NetworkLocationsResponse": {
     "properties": {

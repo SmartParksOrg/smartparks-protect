@@ -49,6 +49,8 @@ from shared.domain.assignments import resolve_attribution
 from shared.domain.device_settings import known_settings
 from shared.domain.lp0 import (
     AddressTaken,
+    addresses_of,
+    claim_address,
     clear_credentials,
     credentials_for,
     credentials_summary,
@@ -156,13 +158,19 @@ async def _credentials_read(
 ) -> Lp0CredentialsRead:
     row = await session.get(DeviceLp0Credentials, device.id)
     summary = credentials_summary(row)
+    # an address claimed without keys (decision D338) is the device's identity alone
+    address: str | None = (
+        str(summary["dev_addr"])
+        if summary["dev_addr"]
+        else (await addresses_of(session, [device.id])).get(device.id)
+    )
     read = Lp0CredentialsRead(
-        dev_addr=summary["dev_addr"],
+        dev_addr=address,
         keys_set=bool(summary["keys_set"]),
         set_at=summary["set_at"],
         source=summary["source"],
         readback=await _readback(session, device.id),
-        frames_waiting=await _frames_waiting(session, row.dev_addr if row else None),
+        frames_waiting=await _frames_waiting(session, address),
     )
     if reveal and row is not None:
         keys = await credentials_for(session, device.id)
@@ -198,6 +206,31 @@ async def set_lp0_credentials(
     The answer carries the keys, since the caller may set them."""
     device = await _writable_device(session, user, device_id)
     source = "person"
+    if not body.from_device and body.dev_addr and not body.app_s_key and not body.nwk_s_key:
+        # the address alone (decision D338): the frames a card holds for it become the
+        # device's and wait for the keys
+        try:
+            claimed = await claim_address(session, device, body.dev_addr)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+        except AddressTaken as taken:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, f"The address is held by {taken.device.name}"
+            ) from None
+        await record_audit(
+            session,
+            user=user,
+            action="device.lp0_address_claimed",
+            object_type="device",
+            object_id=str(device.id),
+            details={"dev_addr": claimed.identity.external_id, "frames_waiting": claimed.waiting},
+        )
+        await session.commit()
+        queued = 0
+        if claimed.waiting:
+            queued = await queue_identity_reprocess(session, bus, claimed.identity)
+        read = await _credentials_read(session, device, reveal=True)
+        return Lp0CredentialsResult(**read.model_dump(), queued=queued)
     if body.from_device:
         settings = await known_settings(session, device.id)
         values = keys_from_readback({k: v.value for k, v in settings.items()})
@@ -242,9 +275,10 @@ async def set_lp0_credentials(
         },
     )
     await session.commit()
-    queued = 0
-    if result.linked_waiting:
-        queued = await queue_identity_reprocess(session, bus, result.identity)
+    # the frames that wait for these keys: stored before the address had a device, or claimed
+    # with the address alone and failed for want of keys (decision D338); none, and nothing
+    # is published
+    queued = await queue_identity_reprocess(session, bus, result.identity)
     read = await _credentials_read(session, device, reveal=True)
     return Lp0CredentialsResult(**read.model_dump(), queued=queued)
 
@@ -987,7 +1021,8 @@ async def project_offload(
             )
         ).all()
     }
-    tracker_ids = (set(credentials) | set(per_tracker)) - station_ids
+    claimed_addresses = await addresses_of(session, device_ids)
+    tracker_ids = (set(credentials) | set(per_tracker) | set(claimed_addresses)) - station_ids
     reported: dict[uuid.UUID, str] = {}
     for device_id in tracker_ids:
         readback = await _readback(session, device_id)
@@ -1012,7 +1047,7 @@ async def project_offload(
                 entity_icon=entity[3] if entity else None,
                 last_position=geom_to_geojson(current.latest_position) if current else None,
                 last_position_at=current.latest_position_time if current else None,
-                dev_addr=row.dev_addr if row else None,
+                dev_addr=row.dev_addr if row else claimed_addresses.get(device_id),
                 keys_set=row is not None,
                 source=row.source if row else None,
                 set_at=row.set_at if row else None,

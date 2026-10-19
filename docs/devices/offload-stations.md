@@ -79,6 +79,25 @@ deduplicates nothing and leaves that to Protect.
    log files have. In every log files list the kind of each file is on show, SD card, raw log or
    browser sync, since a station has raw logs beside its card files.
 
+## A tracker the card knows before Protect does
+
+A card often arrives before every tracker on it is a device in Protect (decision D338). Its frames
+land under **Addresses no device has** on the Offload page, with the tracker's DevEUI when the
+station wrote it (a v5 card). **Add the tracker** on such a row makes the device: a new one, with
+the LP0 address, the DevEUI as serial and a name filled in, read over Bluetooth, which brings the
+name, the DevEUI and the keys from the device itself, or typed; or a device of the project that
+takes the address. The keys are not on the card, so they may follow: the address alone makes the
+frames the device's, they fail plainly for want of keys and the Setup column says "keys not set";
+the keys, set under LP0 offload on the device page, hand the waiting frames to the decoder at
+once. The DevEUI is never guessed. The name defaults to the DevEUI; the form asks for the label
+name (SP…), since the keys are looked up by it anyway. Protect Go lists the unknown trackers of
+the cards it read and hands one over to this page with `?add=<address>`.
+
+Once such a device is heard on a LoRaWAN server, its DevEUI identity links itself to the device
+whose serial it is (decision D339), so nothing waits on Needs attention for it. When the network
+names it otherwise, Needs attention's **Names** lists the pair, to rename the device or keep its
+name; a kept name is not raised again until the network's changes.
+
 ## What happens to a line
 
 Every line is a delivery on the "Offload station files" source, addressed by the LP0 address in

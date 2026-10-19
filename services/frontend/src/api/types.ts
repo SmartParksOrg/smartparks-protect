@@ -172,3 +172,4 @@ export type OffloadStationSetup = Schemas["OffloadStationSetup"];
 export type OffloadStationSetupResult = Schemas["OffloadStationSetupResult"];
 export type ProjectDeviceCreate = Schemas["ProjectDeviceCreate"];
 export type DataSourceBrief = Schemas["DataSourceBrief"];
+export type NameConflict = Schemas["NameConflict"];

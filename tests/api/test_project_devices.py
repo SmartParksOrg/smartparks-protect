@@ -190,3 +190,63 @@ async def test_a_project_admin_manages_the_devices_of_the_project(client, db):
         f"/api/v1/devices/{loose['id']}", json={"name": "y"}, headers=admin.headers
     )
     assert refused.status_code == 403
+
+
+async def test_a_device_is_made_with_its_address_alone_and_the_keys_follow(client, db):
+    """Decision D338: the Offload page's "Add the tracker" makes the device with the LP0
+    address a card named and no keys; the address is the device's identity from then, the
+    keys follow on the device page, and the same address is refused to a second device."""
+    server_admin = await actor(client, db, superuser=True)
+    project = await create_project(db)
+    oc = await _opencollar_type(client, server_admin.headers)
+    admin = await project_actor(client, db, project, Role.PROJECT_ADMIN)
+    addr = "27" + uuid.uuid4().hex[:6].upper()
+    url = f"/api/v1/projects/{project.id}/devices"
+    half = await client.post(
+        url,
+        json={
+            "device_type_id": oc["id"],
+            "name": unique_name("found"),
+            "lp0": {"dev_addr": addr, "app_s_key": APP_S_KEY},
+        },
+        headers=admin.headers,
+    )
+    assert half.status_code == 422, "both keys or neither"
+    made = await client.post(
+        url,
+        json={
+            "device_type_id": oc["id"],
+            "name": unique_name("found"),
+            "lp0": {"dev_addr": addr, "source": "person"},
+        },
+        headers=admin.headers,
+    )
+    assert made.status_code == 201, made.text
+    device = made.json()
+    read = (
+        await client.get(f"/api/v1/devices/{device['id']}/lp0-credentials", headers=admin.headers)
+    ).json()
+    assert read["dev_addr"] == addr and read["keys_set"] is False
+    assert read["frames_waiting"] == 0
+    page = (
+        await client.get(f"/api/v1/projects/{project.id}/offload", headers=admin.headers)
+    ).json()
+    row = next(t for t in page["trackers"] if t["device_id"] == device["id"])
+    assert row["dev_addr"] == addr and row["keys_set"] is False
+    again = await client.post(
+        url,
+        json={
+            "device_type_id": oc["id"],
+            "name": unique_name("twin"),
+            "lp0": {"dev_addr": addr, "source": "person"},
+        },
+        headers=admin.headers,
+    )
+    assert again.status_code == 409 and device["name"] in again.text
+    keys = await client.put(
+        f"/api/v1/devices/{device['id']}/lp0-credentials",
+        json={"dev_addr": addr, "app_s_key": APP_S_KEY, "nwk_s_key": NWK_S_KEY},
+        headers=admin.headers,
+    )
+    assert keys.status_code == 200, keys.text
+    assert keys.json()["keys_set"] is True and keys.json()["queued"] == 0

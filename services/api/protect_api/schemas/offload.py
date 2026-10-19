@@ -39,7 +39,8 @@ class Lp0CredentialsRead(BaseModel):
 
 
 class Lp0CredentialsUpdate(BaseModel):
-    """The address and both keys typed in, or `from_device` to take the three values the
+    """The address and both keys typed in, the address alone to claim the frames a card holds
+    for it while the keys follow (decision D338), or `from_device` to take the three values the
     device reported in its settings readback."""
 
     dev_addr: str | None = Field(default=None, max_length=16)

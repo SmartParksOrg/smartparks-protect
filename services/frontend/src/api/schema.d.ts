@@ -2246,6 +2246,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attention/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Name Conflicts
+         * @description Devices the network names otherwise than Protect does (decision D339).
+         */
+        get: operations["name_conflicts_api_v1_attention_names_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attention/names/{identity_id}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename From Network
+         * @description Give the device the network's name (decision D339); a name another device carries is
+         *     refused with 409.
+         */
+        post: operations["rename_from_network_api_v1_attention_names__identity_id__rename_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attention/names/{identity_id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep Device Name
+         * @description Keep Protect's name for the device; the network's name is not raised again until it
+         *     changes (decision D339).
+         */
+        post: operations["keep_device_name_api_v1_attention_names__identity_id__keep_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attention/clock-ahead": {
         parameters: {
             query?: never;
@@ -6232,6 +6294,12 @@ export interface components {
              * @default 0
              */
             clock_ahead_devices: number;
+            /**
+             * Name Conflicts
+             * @description Devices the network names otherwise than Protect does (decision D339)
+             * @default 0
+             */
+            name_conflicts: number;
             /**
              * Queued Source Events
              * @description Events with a device that wait for the decoder, retained ones mostly
@@ -11131,7 +11199,8 @@ export interface components {
         };
         /**
          * Lp0CredentialsUpdate
-         * @description The address and both keys typed in, or `from_device` to take the three values the
+         * @description The address and both keys typed in, the address alone to claim the frames a card holds
+         *     for it while the keys follow (decision D338), or `from_device` to take the three values the
          *     device reported in its settings readback.
          */
         Lp0CredentialsUpdate: {
@@ -11162,12 +11231,12 @@ export interface components {
              * App S Key
              * @description 32 hex digits
              */
-            app_s_key: string;
+            app_s_key?: string | null;
             /**
              * Nwk S Key
              * @description 32 hex digits
              */
-            nwk_s_key: string;
+            nwk_s_key?: string | null;
             /**
              * Source
              * @default device
@@ -11502,6 +11571,31 @@ export interface components {
             start: string;
             /** End */
             end: string | null;
+        };
+        /**
+         * NameConflict
+         * @description A device the network names otherwise than Protect does (decision D339): a tracker set
+         *     up from an offload card under its DevEUI, found on the LoRaWAN server as "SP052099".
+         */
+        NameConflict: {
+            /**
+             * Identity Id
+             * Format: uuid
+             */
+            identity_id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string;
+            /** Network Name */
+            network_name: string;
+            /** Data Source Name */
+            data_source_name: string;
+            /** Project Id */
+            project_id?: string | null;
         };
         /** NetworkLocationsResponse */
         NetworkLocationsResponse: {
@@ -19707,6 +19801,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttentionSummary"];
+                };
+            };
+        };
+    };
+    name_conflicts_api_v1_attention_names_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameConflict"][];
+                };
+            };
+        };
+    };
+    rename_from_network_api_v1_attention_names__identity_id__rename_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameConflict"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    keep_device_name_api_v1_attention_names__identity_id__keep_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

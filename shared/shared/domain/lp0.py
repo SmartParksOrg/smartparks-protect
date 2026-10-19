@@ -12,7 +12,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.connectivity.adapters import lp0_station
@@ -127,6 +127,81 @@ async def set_credentials(
     return CredentialsSet(
         row=row, identity=identity, linked_waiting=linked_waiting, previous_dev_addr=previous
     )
+
+
+@dataclass
+class AddressClaimed:
+    identity: ExternalIdentity
+    waiting: int
+
+
+async def claim_address(session: AsyncSession, device: Device, dev_addr: str) -> AddressClaimed:
+    """Make an LP0 address the device's identity on the offload station source without its
+    keys (decision D338): a tracker a card named before anyone set it up in Protect. The frames
+    stored for the address are then the device's, failing with `CREDENTIALS_MISSING` until the
+    keys arrive, and the address leaves "Addresses no device has". An address another device
+    holds, by credentials or by identity, is refused (`AddressTaken`). Returns the identity and
+    how many frames wait for the keys."""
+    address = normalise_dev_addr(dev_addr)
+    other = await session.scalar(
+        select(DeviceLp0Credentials).where(
+            DeviceLp0Credentials.dev_addr == address, DeviceLp0Credentials.device_id != device.id
+        )
+    )
+    if other is not None:
+        holder = await session.get(Device, other.device_id)
+        assert holder is not None
+        raise AddressTaken(holder)
+    source_row = await lp0_source(session)
+    identity = await session.scalar(
+        select(ExternalIdentity).where(
+            ExternalIdentity.data_source_id == source_row.id,
+            ExternalIdentity.external_id == address,
+        )
+    )
+    now = utc_now()
+    if identity is None:
+        identity = ExternalIdentity(
+            data_source_id=source_row.id,
+            device_id=device.id,
+            external_id=address,
+            identity_type=lp0_station.IDENTITY_TYPE,
+            first_seen_at=now,
+        )
+        session.add(identity)
+    elif identity.device_id is not None and identity.device_id != device.id:
+        holder = await session.get(Device, identity.device_id)
+        assert holder is not None
+        raise AddressTaken(holder)
+    else:
+        identity.device_id = device.id
+        identity.ignored = False
+    await session.flush()
+    from shared.ingest import retained_events
+
+    waiting = int(
+        await session.scalar(select(func.count()).select_from(retained_events(identity).subquery()))
+        or 0
+    )
+    return AddressClaimed(identity=identity, waiting=waiting)
+
+
+async def addresses_of(session: AsyncSession, device_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """The LP0 address each device holds as an identity on the offload station source, keys
+    or no keys: a device that claimed its address (D338) is a tracker with an address."""
+    if not device_ids:
+        return {}
+    source_row = await lp0_source(session)
+    rows = (
+        await session.execute(
+            select(ExternalIdentity.device_id, ExternalIdentity.external_id).where(
+                ExternalIdentity.data_source_id == source_row.id,
+                ExternalIdentity.identity_type == lp0_station.IDENTITY_TYPE,
+                ExternalIdentity.device_id.in_(device_ids),
+            )
+        )
+    ).all()
+    return {device_id: external_id.upper() for device_id, external_id in rows}
 
 
 async def _unlink_identity(

@@ -71,6 +71,9 @@ class AttentionSummary(BaseModel):
     workers: dict[str, datetime | None]
     uncategorized_metrics: int = 0
     clock_ahead_devices: int = 0
+    name_conflicts: int = Field(
+        0, description="Devices the network names otherwise than Protect does (decision D339)"
+    )
     queued_source_events: int = Field(
         0, description="Events with a device that wait for the decoder, retained ones mostly"
     )
@@ -119,6 +122,18 @@ class UnknownIdentity(ExternalIdentityRead):
     #: (decision D236): the proposal when a device is created for it, never an assignment.
     suggested_project_id: uuid.UUID | None = None
     suggested_project_name: str | None = None
+
+
+class NameConflict(BaseModel):
+    """A device the network names otherwise than Protect does (decision D339): a tracker set
+    up from an offload card under its DevEUI, found on the LoRaWAN server as "SP052099"."""
+
+    identity_id: uuid.UUID
+    device_id: uuid.UUID
+    device_name: str
+    network_name: str
+    data_source_name: str
+    project_id: uuid.UUID | None = None
 
 
 class CreateDeviceForIdentity(BaseModel):
@@ -247,6 +262,7 @@ async def summary(
     )
     clock_ahead = len(await _clock_ahead_devices(session))
     return AttentionSummary(
+        name_conflicts=len(await _name_conflicts(session)),
         unknown_identities=int(unknown or 0),
         failed_source_events=int(failed or 0),
         unassigned_source_events=int(unassigned or 0),
@@ -312,6 +328,116 @@ async def _clock_ahead_devices(session: AsyncSession) -> list[ClockAheadDevice]:
         ),
         key=lambda d: d.name,
     )
+
+
+async def _name_conflicts(session: AsyncSession) -> list[NameConflict]:
+    """Linked identities whose `name` attribute, the network's name for the device, differs
+    from the device's name; the device's serial is not a name (an LP0 station names a tracker
+    by its EUI), and a name a person chose to keep is not raised again."""
+    now = utc_now()
+    rows = (
+        await session.execute(
+            select(ExternalIdentity, Device, DataSource.name)
+            .join(Device, Device.id == ExternalIdentity.device_id)
+            .join(DataSource, DataSource.id == ExternalIdentity.data_source_id)
+            .where(
+                ExternalIdentity.device_id.is_not(None),
+                ExternalIdentity.attributes["name"].astext.is_not(None),
+            )
+        )
+    ).all()
+    found: list[NameConflict] = []
+    for identity, device, source_name in rows:
+        attributes = identity.attributes or {}
+        network_name = str(attributes.get("name") or "").strip()
+        if not network_name or network_name.lower() == device.name.strip().lower():
+            continue
+        if device.serial_number and network_name.upper() == device.serial_number.upper():
+            continue
+        if attributes.get("name_kept") == network_name:
+            continue
+        project_id = await session.scalar(
+            select(DeviceProjectAssignment.project_id).where(
+                DeviceProjectAssignment.device_id == device.id,
+                DeviceProjectAssignment.validity.op("@>")(now),
+            )
+        )
+        found.append(
+            NameConflict(
+                identity_id=identity.id,
+                device_id=device.id,
+                device_name=device.name,
+                network_name=network_name,
+                data_source_name=source_name,
+                project_id=project_id,
+            )
+        )
+    return sorted(found, key=lambda c: c.device_name)
+
+
+@router.get("/names", response_model=list[NameConflict])
+async def name_conflicts(session: AsyncSession = Depends(get_session)) -> list[NameConflict]:
+    """Devices the network names otherwise than Protect does (decision D339)."""
+    return await _name_conflicts(session)
+
+
+@router.post("/names/{identity_id}/rename", response_model=NameConflict)
+async def rename_from_network(
+    identity_id: uuid.UUID,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> NameConflict:
+    """Give the device the network's name (decision D339); a name another device carries is
+    refused with 409."""
+    identity = await get_or_404(session, ExternalIdentity, identity_id, "External identity")
+    if identity.device_id is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The identity has no device")
+    device = await get_or_404(session, Device, identity.device_id, "Device")
+    network_name = str((identity.attributes or {}).get("name") or "").strip()
+    if not network_name:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The network gave no name")
+    previous = device.name
+    device.name = network_name
+    await flush_or_409(session, "Device")
+    await record_audit(
+        session,
+        user=user,
+        action="device.renamed_from_network",
+        object_type="device",
+        object_id=str(device.id),
+        details={"previous": previous, "name": network_name, "identity_id": str(identity.id)},
+    )
+    await session.commit()
+    source = await session.get(DataSource, identity.data_source_id)
+    return NameConflict(
+        identity_id=identity.id,
+        device_id=device.id,
+        device_name=device.name,
+        network_name=network_name,
+        data_source_name=source.name if source else "",
+    )
+
+
+@router.post("/names/{identity_id}/keep", status_code=status.HTTP_204_NO_CONTENT)
+async def keep_device_name(
+    identity_id: uuid.UUID,
+    user: User = Depends(require_server_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Keep Protect's name for the device; the network's name is not raised again until it
+    changes (decision D339)."""
+    identity = await get_or_404(session, ExternalIdentity, identity_id, "External identity")
+    network_name = str((identity.attributes or {}).get("name") or "").strip()
+    identity.attributes = {**(identity.attributes or {}), "name_kept": network_name}
+    await record_audit(
+        session,
+        user=user,
+        action="device.name_kept",
+        object_type="external_identity",
+        object_id=str(identity.id),
+        details={"device_id": str(identity.device_id), "network_name": network_name},
+    )
+    await session.commit()
 
 
 @router.get("/clock-ahead", response_model=list[ClockAheadDevice])

@@ -438,9 +438,17 @@ class Lp0Provisioned(BaseModel):
     browser (`source` device) or typed (`source` person), saved on creation (phase 42)."""
 
     dev_addr: str = Field(max_length=16, description="Eight hex digits")
-    app_s_key: str = Field(max_length=48, description="32 hex digits")
-    nwk_s_key: str = Field(max_length=48, description="32 hex digits")
+    app_s_key: str | None = Field(default=None, max_length=48, description="32 hex digits")
+    nwk_s_key: str | None = Field(default=None, max_length=48, description="32 hex digits")
     source: Literal["person", "device"] = "device"
+
+    @model_validator(mode="after")
+    def _both_keys_or_neither(self) -> "Lp0Provisioned":
+        # the address alone claims the frames a card holds for it (decision D338); the keys
+        # follow on the device page and the frames are decoded then
+        if (self.app_s_key is None) != (self.nwk_s_key is None):
+            raise ValueError("give both session keys, or neither")
+        return self
 
 
 class ProjectDeviceCreate(DeviceCreate):

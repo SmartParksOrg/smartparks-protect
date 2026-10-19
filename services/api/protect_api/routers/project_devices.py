@@ -9,13 +9,16 @@ from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from protect_api.audit import record_audit
+from protect_api.bus import get_bus
 from protect_api.crud import flush_or_409, get_or_404
 from protect_api.deps import ProjectContext, require_permission
 from protect_api.device_reads import with_state
 from protect_api.schemas.domain import DeviceRead, ProjectDeviceCreate
 from protect_api.serial import SERIAL_FROM_IDENTITY
+from shared.bus import RedisStreamsBus
 from shared.database import get_session
-from shared.domain.lp0 import AddressTaken, parse_key, set_credentials
+from shared.domain.lp0 import AddressTaken, claim_address, parse_key, set_credentials
+from shared.ingest import queue_identity_reprocess
 from shared.models import Device, DeviceProjectAssignment, DeviceType
 from shared.permissions import Permission
 from shared.timeutil import utc_now
@@ -28,6 +31,7 @@ async def create_project_device(
     body: ProjectDeviceCreate,
     context: ProjectContext = Depends(require_permission(Permission.DEVICES_WRITE)),
     session: AsyncSession = Depends(get_session),
+    bus: RedisStreamsBus = Depends(get_bus),
 ) -> DeviceRead:
     """Create a device and assign it to this project from now, in one call (decision D326):
     the Offload page's "Add a device", by hand or from a Bluetooth read of the hardware. For a
@@ -72,17 +76,23 @@ async def create_project_device(
         project_id=context.project.id,
         details={"device_id": str(device.id), "valid_from": now.isoformat()},
     )
+    claimed = None
     if body.lp0 is not None:
         try:
-            await set_credentials(
-                session,
-                device,
-                dev_addr=body.lp0.dev_addr,
-                app_s_key=parse_key(body.lp0.app_s_key),
-                nwk_s_key=parse_key(body.lp0.nwk_s_key),
-                user_id=context.user.id,
-                source=body.lp0.source,
-            )
+            if body.lp0.app_s_key is not None and body.lp0.nwk_s_key is not None:
+                await set_credentials(
+                    session,
+                    device,
+                    dev_addr=body.lp0.dev_addr,
+                    app_s_key=parse_key(body.lp0.app_s_key),
+                    nwk_s_key=parse_key(body.lp0.nwk_s_key),
+                    user_id=context.user.id,
+                    source=body.lp0.source,
+                )
+            else:
+                # the address alone (decision D338): a tracker a card named before anyone set
+                # it up; its frames become the device's and wait for the keys
+                claimed = await claim_address(session, device, body.lp0.dev_addr)
         except ValueError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
         except AddressTaken as exc:
@@ -93,12 +103,22 @@ async def create_project_device(
         await record_audit(
             session,
             user=context.user,
-            action="device.lp0_credentials_set",
+            action="device.lp0_credentials_set"
+            if claimed is None
+            else "device.lp0_address_claimed",
             object_type="device",
             object_id=str(device.id),
             project_id=context.project.id,
-            details={"dev_addr": body.lp0.dev_addr.upper(), "source": body.lp0.source},
+            details={
+                "dev_addr": body.lp0.dev_addr.upper(),
+                "source": body.lp0.source,
+                **({"frames_waiting": claimed.waiting} if claimed is not None else {}),
+            },
         )
     await session.commit()
+    if claimed is not None and claimed.waiting:
+        # the frames a station stored for the address are the device's now: the walk gives
+        # them to it, each failing plainly until the keys are set (CREDENTIALS_MISSING)
+        await queue_identity_reprocess(session, bus, claimed.identity)
     await session.refresh(device)
     return (await with_state(session, [device]))[0]

@@ -392,6 +392,37 @@ async def test_card_upload_decodes_each_tracker_with_its_own_keys(client, db, bu
         await client.get(f"/api/v1/devices/{tracker_b['id']}/lp0-credentials", headers=h)
     ).json()
     assert before["keys_set"] is False and before["frames_waiting"] == 0
+
+    # the address alone first (decision D338, Tim, 2026-10-19): the frame the card holds for
+    # it becomes tracker B's and waits for the keys; the address leaves the unknown list
+    claimed = await client.put(
+        f"/api/v1/devices/{tracker_b['id']}/lp0-credentials",
+        json={"dev_addr": ADDR_B},
+        headers=h,
+    )
+    assert claimed.status_code == 200, claimed.text
+    assert claimed.json()["dev_addr"] == ADDR_B and claimed.json()["keys_set"] is False
+    assert claimed.json()["frames_waiting"] == 1 and claimed.json()["queued"] == 1
+    await bus.consume(Topic.IDENTITY_REPROCESS_REQUESTED, group, "c1", walk, once=True)
+    await db.rollback()
+    event_b = await db.scalar(
+        select(SourceEvent).where(
+            SourceEvent.data_source_id == LP0_SOURCE_ID, SourceEvent.external_id == ADDR_B
+        )
+    )
+    assert event_b is not None and str(event_b.device_id) == tracker_b["id"]
+    assert event_b.processing_status == "failed", "no keys yet: the frame fails plainly"
+    page = (await client.get(f"/api/v1/projects/{project_id}/offload", headers=h)).json()
+    assert page["unknown"] == []
+    b_row = next(t for t in page["trackers"] if t["device_id"] == tracker_b["id"])
+    assert b_row["dev_addr"] == ADDR_B and b_row["keys_set"] is False
+    taken = await client.put(
+        f"/api/v1/devices/{tracker_a['id']}/lp0-credentials",
+        json={"dev_addr": ADDR_B},
+        headers=h,
+    )
+    assert taken.status_code == 409 and tracker_b["name"] in taken.text
+
     put = await client.put(
         f"/api/v1/devices/{tracker_b['id']}/lp0-credentials",
         json={
@@ -561,18 +592,27 @@ async def test_a_device_without_keys_fails_plainly_and_decodes_again_once_set(cl
     assert got["status"] == "complete" and got["frames_failed"] == 1
     assert got["attributes"]["errors"] == {"CREDENTIALS_MISSING": 1}
     assert got["attributes"]["trackers"][ADDR_C]["without_keys"] == 1
+    group, _handler, walk = await _decode_pending(db, bus)  # the group before the message
     put = await client.put(
         f"/api/v1/devices/{tracker['id']}/lp0-credentials",
         json={"dev_addr": ADDR_C, "app_s_key": APP_S_KEY.hex(), "nwk_s_key": NWK_S_KEY.hex()},
         headers=h,
     )
-    assert put.status_code == 200 and put.json()["queued"] == 0
+    # the keys hand the failed frame to the decoder's walk at once (decision D338); "Decode
+    # again" on the file is the other way and finds the records known then
+    assert put.status_code == 200 and put.json()["queued"] == 1, put.text
+    await bus.consume(Topic.IDENTITY_REPROCESS_REQUESTED, group, "c1", walk, once=True)
+    await db.rollback()
+    positions = (
+        await db.scalars(select(Position).where(Position.device_id == uuid.UUID(tracker["id"])))
+    ).all()
+    assert len(positions) == 3
     redecode = await client.post(f"/api/v1/log-files/{row['id']}/redecode", headers=h)
     assert redecode.status_code == 200
     await _decode(bus, row["id"], reprocess=True)
     got = (await client.get(f"/api/v1/log-files/{row['id']}", headers=h)).json()
     assert got["status"] == "complete" and got["frames_failed"] == 0
-    assert got["records_new"] == 3
+    assert got["records_new"] + got["records_duplicate"] == 3
 
 
 async def test_a_file_that_is_not_a_card_is_refused(client, db):

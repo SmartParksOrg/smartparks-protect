@@ -63,11 +63,18 @@ export function Lp0CredentialsCard({
       ),
     invalidate,
     success: (r) =>
-      r.queued > 0
-        ? t("LP0 keys saved; {{count}} waiting frames handed to the decoder", {
-            count: r.queued,
+      !r.keys_set
+        ? t("LP0 address saved; {{count}} frames wait for the keys", {
+            count: r.frames_waiting,
           })
-        : t("LP0 keys saved"),
+        : r.queued > 0
+          ? t(
+              "LP0 keys saved; {{count}} waiting frames handed to the decoder",
+              {
+                count: r.queued,
+              },
+            )
+          : t("LP0 keys saved"),
     onSuccess: () => setEditing(false),
   });
   const clear = useMutationToast({
@@ -79,10 +86,12 @@ export function Lp0CredentialsCard({
   });
   const c = read.data;
   const readback = c?.readback;
+  // the address alone claims the frames a card holds for it (decision D338); both keys or
+  // neither
+  const keysGiven = clean(appKey) !== "" || clean(nwkKey) !== "";
   const valid =
     ADDRESS.test(clean(address)) &&
-    KEY.test(clean(appKey)) &&
-    KEY.test(clean(nwkKey));
+    (!keysGiven || (KEY.test(clean(appKey)) && KEY.test(clean(nwkKey))));
   const readbackComplete =
     Boolean(readback?.dev_addr) &&
     Boolean(readback?.app_key_known) &&
@@ -111,7 +120,11 @@ export function Lp0CredentialsCard({
                 setEditing(true);
               }}
             >
-              {c.keys_set ? t("Change") : t("Set address and keys")}
+              {c.keys_set
+                ? t("Change")
+                : c.dev_addr
+                  ? t("Set the keys")
+                  : t("Set address and keys")}
             </Button>
             {c.keys_set && (
               <Button
@@ -212,8 +225,9 @@ export function Lp0CredentialsCard({
               if (valid)
                 save.mutate({
                   dev_addr: clean(address),
-                  app_s_key: clean(appKey),
-                  nwk_s_key: clean(nwkKey),
+                  ...(keysGiven
+                    ? { app_s_key: clean(appKey), nwk_s_key: clean(nwkKey) }
+                    : {}),
                 });
             }}
           >
@@ -227,6 +241,11 @@ export function Lp0CredentialsCard({
                 autoComplete="off"
               />
             </label>
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "The address alone is enough to claim the frames a card holds for it; the keys may follow, and the frames wait until then.",
+              )}
+            </p>
             <label className="block text-xs text-muted-foreground">
               {t("AppSKey, the application session key (32 hex digits)")}
               <Input
@@ -313,10 +332,18 @@ function KeyRow({
               variant="ghost"
               className="h-6 shrink-0 px-1"
               aria-pressed={shown}
-              aria-label={shown ? t("Hide {{label}}", { label }) : t("Show {{label}}", { label })}
+              aria-label={
+                shown
+                  ? t("Hide {{label}}", { label })
+                  : t("Show {{label}}", { label })
+              }
               onClick={() => setShown((v) => !v)}
             >
-              {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              {shown ? (
+                <EyeOff className="size-3.5" />
+              ) : (
+                <Eye className="size-3.5" />
+              )}
             </Button>
             <Button
               size="sm"
@@ -329,7 +356,9 @@ function KeyRow({
             </Button>
           </>
         ) : (
-          <span className="text-muted-foreground">{t("set, shown to those who may change it")}</span>
+          <span className="text-muted-foreground">
+            {t("set, shown to those who may change it")}
+          </span>
         )}
       </dd>
     </>

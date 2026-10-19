@@ -37,6 +37,7 @@ from shared.logger import get_logger
 from shared.models import (
     DataSource,
     DataSourceCursor,
+    Device,
     ExternalIdentity,
     Gateway,
     GatewayReception,
@@ -215,6 +216,16 @@ async def resolve_identity(
         session.add(identity)
     if identity.device_id is None and message.device_id is not None:
         identity.device_id = message.device_id  # the caller knows the device (browser, upload)
+    if identity.device_id is None and not identity.ignored and message.identity_type == "dev_eui":
+        # a device whose serial is this DevEUI (decision D101) is the device, wherever the
+        # message comes from (decision D339): a tracker set up from an offload card is found
+        # again on the network server, and nothing waits on Needs attention for it
+        owner = await session.scalar(
+            select(Device.id).where(func.upper(Device.serial_number) == message.external_id.upper())
+        )
+        if owner is not None:
+            identity.device_id = owner
+            identity.attributes = {**(identity.attributes or {}), "linked_by": "serial"}
     identity.last_seen_at = now
     identity.event_count = (identity.event_count or 0) + 1
     if message.identity_attributes:
