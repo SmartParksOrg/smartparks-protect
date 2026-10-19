@@ -6,6 +6,7 @@ import {
   Footprints,
   Gauge,
   MapPin,
+  Pencil,
   RefreshCw,
   Table2,
 } from "lucide-react";
@@ -72,6 +73,7 @@ import { TrapCard } from "@/components/devices/TrapCard";
 import { BleAddress } from "@/components/devices/BleAddress";
 import { ReportingCard } from "@/components/devices/ReportingCard";
 import { StaticPositionCard } from "@/components/devices/StaticPositionCard";
+import { DeviceNameDialog } from "@/components/devices/DeviceNameDialog";
 import { Lp0CredentialsCard } from "@/components/devices/Lp0CredentialsCard";
 import { OffloadStationCard } from "@/components/devices/OffloadStationCard";
 import { DeviceSettingsTab } from "@/components/devices/DeviceSettingsTab";
@@ -104,6 +106,7 @@ export function DevicePage() {
   const { can } = usePermissions(projectId);
   // the device is its project admins' to manage (decision D337); a server admin manages every one
   const canManage = Boolean(user?.is_superuser) || can("devices:write");
+  const [renaming, setRenaming] = useState(false);
   const modules = useAnalysisModules(projectId);
   const [event, setEvent] = useState<{ id: number; ingestedAt: string } | null>(
     null,
@@ -385,6 +388,16 @@ export function DevicePage() {
                   </Link>
                 </Button>
               )}
+            {canManage && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRenaming(true)}
+              >
+                <Pencil className="size-4" /> {t("Rename")}
+              </Button>
+            )}
             {user?.is_superuser && (
               <Button asChild variant="outline" size="sm">
                 <Link to={`/admin/devices?device=${d.id}`}>{t("Manage")}</Link>
@@ -1027,6 +1040,14 @@ export function DevicePage() {
             void navigate(`/projects/${r.project_id}/devices/${d.id}`);
         }}
       />
+      {canManage && (
+        <DeviceNameDialog
+          key={d.name}
+          device={d}
+          open={renaming}
+          onOpenChange={setRenaming}
+        />
+      )}
       <SourceEventDialog
         id={event?.id ?? null}
         ingestedAt={event?.ingestedAt ?? null}
