@@ -265,3 +265,28 @@ async def test_a_flash_stream_over_lorawan_keeps_the_times_of_its_records(db, bu
     ).scalars()
     times = sorted(int(r.time.timestamp()) for r in rows)
     assert times == [old, old + 300]
+
+
+def test_a_station_clock_behind_the_records_does_not_make_them_the_future():
+    """Decision D340: an offload card's line stamped before the record it carries is the
+    station's clock running behind, and the upload is the delivery then; on a live channel the
+    network's time stands."""
+    from types import SimpleNamespace
+
+    from protect_decoder.pipeline import _ahead_of_delivery, _delivery_time
+
+    record = datetime(2026, 10, 19, 10, 40, tzinfo=UTC)
+    card = SimpleNamespace(
+        acquisition_channel="lp0",
+        network_received_at=datetime(2026, 9, 19, 14, 18, tzinfo=UTC),
+        ingested_at=datetime(2026, 10, 19, 13, 35, tzinfo=UTC),
+    )
+    assert _delivery_time(card, record) == card.ingested_at
+    assert _ahead_of_delivery(card, record) == 0.0
+    sane = SimpleNamespace(
+        **{**card.__dict__, "network_received_at": datetime(2026, 10, 19, 11, 0, tzinfo=UTC)}
+    )
+    assert _delivery_time(sane, record) == sane.network_received_at
+    live = SimpleNamespace(**{**card.__dict__, "acquisition_channel": "lorawan"})
+    assert _delivery_time(live, record) == live.network_received_at
+    assert _ahead_of_delivery(live, record) > 0

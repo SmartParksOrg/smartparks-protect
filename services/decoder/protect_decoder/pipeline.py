@@ -185,10 +185,32 @@ async def _previous_fix(
     return float(row[0]), float(row[1]), row[2]
 
 
+def _delivery_time(event: SourceEvent, record_time: datetime) -> datetime:
+    """The moment a record was delivered, for the clock rules. An offload card's line is
+    stamped by the station's clock (decision D324), but a station cannot have received a frame
+    before the tracker recorded it: when its reception runs behind the record beyond the
+    tolerance, the station's clock is the one at fault and the upload is the delivery
+    (decision D340; Tim, 2026-10-19: SP052099 stamped September while the trackers' records
+    said October, so 696 positions never became a current position and the tracker stayed off
+    the map)."""
+    received = event.network_received_at or event.ingested_at
+    if (
+        event.network_received_at is not None
+        and event.acquisition_channel == AcquisitionChannel.LP0
+        and (record_time - event.network_received_at).total_seconds()
+        > get_settings().clock_ahead_tolerance_seconds
+    ):
+        return event.ingested_at
+    return received
+
+
 def _ahead_of_delivery(event: SourceEvent, record_time: datetime) -> float:
     """Seconds the record's device time runs ahead of the delivery beyond the tolerance."""
-    received = event.network_received_at or event.ingested_at
-    return clock_ahead(record_time, received, get_settings().clock_ahead_tolerance_seconds)
+    return clock_ahead(
+        record_time,
+        _delivery_time(event, record_time),
+        get_settings().clock_ahead_tolerance_seconds,
+    )
 
 
 def _behind_delivery(event: SourceEvent, record_time: datetime) -> float:
