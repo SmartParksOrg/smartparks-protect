@@ -154,9 +154,9 @@ export function OffloadPage() {
       });
     if (s.card_ok === false)
       gaps.push({
-        label: t("card not writable"),
+        label: t("card not usable"),
         hint: t(
-          "The station's own report says its SD card is out or cannot be written",
+          "The station's own report says its SD card is out, faulted or cannot be written",
         ),
         fix: "none",
       });
@@ -436,6 +436,9 @@ export function OffloadPage() {
             })}
           >
             {t("card {{ok}}", { ok: yesNo(row.original.card_ok) })}
+            {row.original.sd_free_percent != null
+              ? t(" ({{free}}% free)", { free: row.original.sd_free_percent })
+              : ""}
             {", "}
             {t("listening {{ok}}", { ok: yesNo(row.original.listening) })}
             {row.original.storage_pending != null &&
@@ -896,6 +899,9 @@ export function OffloadPage() {
                   {s.state_time && (
                     <div className="text-xs text-muted-foreground">
                       {t("card {{ok}}", { ok: yesNo(s.card_ok) })}
+                      {s.sd_free_percent != null
+                        ? t(" ({{free}}% free)", { free: s.sd_free_percent })
+                        : ""}
                       {", "}
                       {t("listening {{ok}}", { ok: yesNo(s.listening) })}
                       {", "}

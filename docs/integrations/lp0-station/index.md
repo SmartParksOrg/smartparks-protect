@@ -25,7 +25,9 @@ the tracker's AppSKey and a MIC under its NwkSKey. The payload is the flash reco
 (`port, msg_id, len, data, store time`, repeated), at most 228 bytes per frame. Since LP0 v5 a
 line also carries `lp0`: `{"version": 5, "source_eui": "<tracker EUI>", "session": n,
 "window": n, "slot": n}`, written by the station from its discovery with the tracker; files of
-earlier firmware have no `lp0` object.
+earlier firmware have no `lp0` object. The card's root may hold `sdcheck.bin`, the 64-byte file
+the station's storage test writes since the firmware of 2026-10-20; it is no archive, and the
+zip upload keeps only the `LOG_*/*.jsonl` members.
 
 ## LP0 v5, the model of firmware issue 772
 

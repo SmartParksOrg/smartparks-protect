@@ -75,6 +75,8 @@ export function OffloadStationCard({
         counters?: Record<string, number>;
         uptime_seconds?: number;
         storage_pending?: number;
+        sd_capacity_mb?: number | null;
+        sd_free_percent?: number | null;
       }
     | null
     | undefined;
@@ -200,6 +202,29 @@ export function OffloadStationCard({
               <dd>{yesNo(state.status?.card_detected)}</dd>
               <dt className="text-muted-foreground">{t("SD card writable")}</dt>
               <dd>{yesNo(state.status?.card_writable)}</dd>
+              {state.status?.sd_card_missing != null && (
+                <>
+                  <dt className="text-muted-foreground">{t("SD card missing")}</dt>
+                  <dd>{yesNo(state.status.sd_card_missing)}</dd>
+                </>
+              )}
+              {state.status?.sdfs_error != null && (
+                <>
+                  <dt className="text-muted-foreground">{t("Storage fault")}</dt>
+                  <dd>{yesNo(state.status.sdfs_error)}</dd>
+                </>
+              )}
+              {state.sd_capacity_mb != null && state.sd_free_percent != null && (
+                <>
+                  <dt className="text-muted-foreground">{t("SD card space")}</dt>
+                  <dd>
+                    {t("{{free}}% free of {{size}} MB", {
+                      free: state.sd_free_percent,
+                      size: state.sd_capacity_mb,
+                    })}
+                  </dd>
+                </>
+              )}
               <dt className="text-muted-foreground">{t("Listening")}</dt>
               <dd>{yesNo(state.status?.lp0_listening)}</dd>
               {state.uptime_seconds != null && (

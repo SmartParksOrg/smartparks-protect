@@ -19,7 +19,9 @@ The station keeps its files in numbered folders, `LOG_1`, `LOG_2` and so on, 64 
 folder, named `STATIONEUI_timestamp[_NNN].jsonl`: the station's EUI in sixteen hex digits, the
 Unix second of the first frame's reception, and a collision suffix. One file holds every frame
 of every tracker whose session opened within a quarter of an hour of its first frame, so a file
-is a window of reception, not a tracker or a visit. Each line is a JSON document in the shape a
+is a window of reception, not a tracker or a visit. The card's root may also hold `sdcheck.bin`,
+the 64-byte file the station writes and reads back to test its storage; it is not data, and the
+upload of a zip leaves it aside. Each line is a JSON document in the shape a
 LoRaWAN gateway forwards: the station's EUI as `gatewayEui`, and under `rxpk` the reception
 time (`time`, and `tmst` in Unix seconds), the frequency, the data rate and coding rate, RSSI and
 SNR, and the frame as base64 in `data`.
@@ -221,14 +223,21 @@ Firmware 8.1 lets a station report on itself every `lp0_statistics_interval` sec
 whether the card is in and writable, whether it is listening or in a visit, its uptime, the
 frames waiting for the card, and 21 counters since it started (visits complete, partial,
 cancelled and failed; frames received, saved, failed and dropped; bytes saved; card and reader
-errors; channel and signal rejections; radio errors; reports made and lost). The report reaches
+errors; channel and signal rejections; radio errors; reports made and lost). Since report
+version 2 it also carries the card's size in whole MB and its free share in whole percent
+(unknown until the reader's units are verified in the firmware), and since version 3 (the
+firmware of 2026-10-20) two more observations: that a completed card check found no card, and
+that a storage fault is latched until the station's own test of the card passes again; a
+station in that state offers no offloads and sends a report at once. The report reaches
 Protect over LoRaWAN when the station's send mask selects port 23, or on another station's card,
 or inside the station's own port 29 records. The driver keeps it as the state `lp0_station` and
 the figures as measurements in the `offload` category, so the health card shows an **SD card**
-line (critical when the card is absent or not writable), the card errors and the frames waiting,
-the Offload station card shows the report, and the rule template **Offload station without a
-card** raises an alert on a station whose card is out. The observations a station could not make
-are unknown, never false.
+line (critical when the card is absent, faulted or not writable), an **SD card free** line
+(warning under 10 %), the card errors and the frames waiting, the Offload station card shows
+the report with the card's space, the Offload page's Setup column says "card not usable", and
+the rule template **Offload station without a card** raises an alert on a station whose card
+is out or faulted. The observations a station could not make are unknown, never false, and a
+report version Protect does not know is refused by name.
 
 ## Demo data
 

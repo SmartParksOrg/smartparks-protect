@@ -306,6 +306,13 @@ function decodeUbloxSatellitesMessage(bytes)
 	decoded["N_reported"] = i;
 	return decoded;
 }
+/**
+ * Decode packed port-29 records with a port, application header, body and timestamp.
+ * Each application length counts body bytes; a record with an empty body uses seven bytes.
+ *
+ * @param {number[]} bytes Decrypted packed records without storage-only metadata.
+ * @returns {object} Numbered records, or an error if a record is incomplete.
+ */
 function decodeReadFlashMessage(bytes)
 {
 	var decoded = {};
@@ -318,10 +325,16 @@ function decodeReadFlashMessage(bytes)
 	var timestamp = [];
 	var object = [];
 	var parsed_msg = {};
-	while (i < msg_len - 7) {
+	while (i < msg_len) {
+		if (msg_len - i < 7) {
+			return {error : "Invalid flash record length"};
+		}
 		port = bytes[i]; // Read port
 		// We do not need id
-		len = bytes[i + 2];                    // Read msg len
+		len = bytes[i + 2]; // Read msg len
+		if (len + 7 > msg_len - i) {
+			return {error : "Invalid flash record length"};
+		}
 		msg = bytes.slice(i + 1, i + len + 3); // Slice message part
 		i += len + 3;
 		timestamp =
@@ -652,56 +665,78 @@ function decodeAirQualityBMV080(bytes, offset)
 	};
 }
 
+/**
+ * Decode a complete port-21 report using its sensor-body length.
+ * Supported bodies contain no data, BME690 data, BMV080 data, or both sensors.
+ *
+ * @param {number[]} bytes Application ID, body length and little-endian sensor data.
+ * @returns {object} Sensor readings, or an empty object for absent data or invalid lengths.
+ */
 function decodeAirQualityMessage(bytes)
 {
 	var decoded = {};
+	if (bytes.length < 2 || bytes[1] !== bytes.length - 2) {
+		return decoded;
+	}
 	var len = bytes[1];
 
-	if (len == 2) {
-		/* Only header was sent - No data available */
-		decoded = {};
-	} else if (len > 2 && len < 27) {
+	if (len == 20) {
 		/* Only BME690 data */
 		decoded = decodeAirQualityBME690(bytes, 2);
-	} else if (len == 27) {
+	} else if (len == 25) {
 		/* Only BMV080 data */
 		decoded = decodeAirQualityBMV080(bytes, 2);
-	} else if (len > 27 && len < 48) {
+	} else if (len == 45) {
 		/* Both BMV080 and BME690 data */
 		let bmv = decodeAirQualityBMV080(bytes, 2);
 		let bme = decodeAirQualityBME690(bytes, 27);
 		decoded = {...bmv, ...bme};
-	} else if (len > 47) {
-		/* Invalid message length */
-		decoded = {};
 	}
 
 	return decoded;
 }
 
 /**
- * Decode the complete port-23 version-1 application message, including ID and length.
- * Counters and uptime are unsigned; an unobserved status is null, never false.
+ * Decode a complete port-23 version-1, version-2 or version-3 message.
+ * Counters and uptime are unsigned. Unknown status and capacity decode as null.
  *
  * @param {number[]} bytes Decrypted application bytes, without flash time or record flags.
  * @returns {object} Decoded observations and boot totals, or an error for unsupported framing.
  */
 function decodeLP0Statistics(bytes)
 {
-	if (bytes.length !== 99 || bytes[0] !== 0x9D || bytes[1] !== 97 || bytes[2] !== 1) {
+	if (bytes[0] !== 0x9D || bytes[1] !== bytes.length - 2 ||
+	    !((bytes[2] === 1 && bytes.length === 99) ||
+	      ((bytes[2] === 2 || bytes[2] === 3) && bytes.length === 104))) {
 		return {error : "Invalid LP0 statistics schema"};
+	}
+	var capacity = null;
+	var freePercent = null;
+	if (bytes[2] >= 2) {
+		var rawCapacity =
+			(bytes[99] | bytes[100] << 8 | bytes[101] << 16 | bytes[102] << 24) >>> 0;
+		var rawFree = bytes[103];
+		if ((rawCapacity === 0xFFFFFFFF) !== (rawFree === 0xFF) || rawCapacity === 0 ||
+		    (rawFree !== 0xFF && rawFree > 100)) {
+			return {error : "Invalid LP0 statistics capacity"};
+		}
+		if (rawCapacity !== 0xFFFFFFFF) {
+			capacity = rawCapacity;
+			freePercent = rawFree;
+		}
 	}
 	var flags = bytes[3] | bytes[4] << 8;
 	var known = bytes[5] | bytes[6] << 8;
 	var pending = bytes[11] | bytes[12] << 8;
 	var highWater = bytes[13] | bytes[14] << 8;
-	if ((known & ~0x07FF) !== 0 || (flags & ~known) !== 0 || pending > highWater) {
+	var validFlags = bytes[2] >= 3 ? 0x1FFF : 0x07FF;
+	if ((known & ~validFlags) !== 0 || (flags & ~known) !== 0 || pending > highWater) {
 		return {error : "Invalid LP0 statistics observations"};
 	}
 	var flagNames = [
 		"card_detected", "card_writable", "sdfs_unresponsive", "sdfs_recovery_required",
 		"sdfs_active", "lp0_enabled", "lp0_listening", "session_active", "radio_fault",
-		"storage_queue_full", "flash_available"
+		"storage_queue_full", "flash_available", "sd_card_missing", "sdfs_error"
 	];
 	var counterNames = [
 		"visits_complete",   "visits_partial",     "visits_cancelled", "visits_timed_out",
@@ -719,6 +754,8 @@ function decodeLP0Statistics(bytes)
 			(bytes[7] | bytes[8] << 8 | bytes[9] << 16 | bytes[10] << 24) >>> 0,
 		storage_pending : pending,
 		storage_high_water : highWater,
+		sd_capacity_mb : capacity,
+		sd_free_percent : freePercent,
 		status : {},
 		counters : {}
 	};

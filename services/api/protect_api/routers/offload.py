@@ -46,6 +46,7 @@ from protect_api.schemas.offload import (
 from shared.bus import RedisStreamsBus
 from shared.config import get_settings
 from shared.database import get_session
+from shared.device_drivers.opencollar import lp0_sd_card_ok
 from shared.domain.assignments import resolve_attribution
 from shared.domain.device_settings import known_settings
 from shared.domain.lp0 import (
@@ -1036,12 +1037,7 @@ async def project_offload(
         report = states[device_id].latest_state["lp0_station"] if device_id in states else None
         status_bits = (report or {}).get("status") or {}
         counters = (report or {}).get("counters") or {}
-        card_ok = None
-        if (
-            status_bits.get("card_detected") is not None
-            and status_bits.get("card_writable") is not None
-        ):
-            card_ok = bool(status_bits["card_detected"] and status_bits["card_writable"])
+        card_ok = lp0_sd_card_ok(status_bits)  # the decoder's reading, decision D345
         entity = entities.get(device_id)
         gateway_row = gateway_of.get(device_id)
         files_eui = next(
@@ -1085,6 +1081,7 @@ async def project_offload(
                 receptions=int(received.receptions) if received else 0,
                 last_reception_at=received.last if received else None,
                 card_ok=card_ok,
+                sd_free_percent=(report or {}).get("sd_free_percent"),
                 listening=status_bits.get("lp0_listening"),
                 storage_pending=(report or {}).get("storage_pending"),
                 visits_complete=counters.get("visits_complete"),

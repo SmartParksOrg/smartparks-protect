@@ -3043,7 +3043,6 @@
   "A new entity of the type Offload station, so the station has a name on the map and in the lists. The device's name when left empty.": "Een nieuwe entiteit van het type Offloadstation, zodat het station een naam heeft op de kaart en in de lijsten. De naam van het apparaat als dit leeg blijft.",
   "address and keys not set": "adres en sleutels niet ingesteld",
   "address differs from the device's": "adres verschilt van dat van het apparaat",
-  "card not writable": "kaart niet beschrijfbaar",
   "complete": "compleet",
   "Give both coordinates, or neither": "Geef beide coördinaten, of geen van beide",
   "How to set up": "Hoe in te richten",
@@ -3061,7 +3060,6 @@
   "The device reports another address in its settings; check which one is provisioned": "Het apparaat meldt een ander adres in zijn instellingen; controleer welk adres is geprovisioneerd",
   "The station has no Offload station entity, so it is not on the map or in the lists": "Het station heeft geen entiteit Offloadstation, dus het staat niet op de kaart of in de lijsten",
   "The station has no row among the gateways of the offload station source until it is set up or its first card is read": "Het station heeft geen rij onder de gateways van de bron Offloadstationbestanden tot het is ingericht of zijn eerste kaart is gelezen",
-  "The station's own report says its SD card is out or cannot be written": "Het eigen rapport van het station zegt dat zijn SD-kaart eruit is of niet beschreven kan worden",
   "tracks {{entity}}": "volgt {{entity}}",
   "Upload the card's files under Log files on the station's device page": "Upload de bestanden van de kaart onder Logbestanden op de apparaatpagina van het station",
   "{{name}} is a device of the project": "{{name}} is een apparaat van het project",
@@ -3275,5 +3273,12 @@
   "The card is from a station this project does not have yet": "De kaart is van een station dat dit project nog niet heeft",
   "The files are named after a station's DevEUI and were not kept. Give the station its name from the label (SP…) when you know it, or leave the DevEUI; it is made with the DevEUI as serial, set up as an offload station, and the files go up to it. Its place is set on its page afterwards.": "De bestanden zijn genoemd naar de DevEUI van een station en zijn niet bewaard. Geef het station zijn naam van het label (SP…) als u die kent, of laat de DevEUI staan; het wordt gemaakt met de DevEUI als serienummer, ingesteld als offloadstation, en de bestanden gaan ernaartoe. Zijn plaats wordt daarna op zijn pagina ingesteld.",
   "The name on its label (SP…); the DevEUI {{eui}} becomes its serial number.": "De naam op zijn label (SP…); de DevEUI {{eui}} wordt zijn serienummer.",
-  "This server has no OpenCollar device type yet": "Deze server heeft nog geen OpenCollar-apparaattype"
+  "This server has no OpenCollar device type yet": "Deze server heeft nog geen OpenCollar-apparaattype",
+  " ({{free}}% free)": " ({{free}}% vrij)",
+  "{{free}}% free of {{size}} MB": "{{free}}% vrij van {{size}} MB",
+  "card not usable": "kaart niet bruikbaar",
+  "SD card missing": "SD-kaart ontbreekt",
+  "SD card space": "Ruimte op de SD-kaart",
+  "Storage fault": "Opslagfout",
+  "The station's own report says its SD card is out, faulted or cannot be written": "Het eigen rapport van het station zegt dat zijn SD-kaart eruit is, een fout heeft of niet beschreven kan worden"
 }

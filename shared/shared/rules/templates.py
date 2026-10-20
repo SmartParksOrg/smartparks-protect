@@ -217,8 +217,9 @@ TEMPLATES: dict[str, dict[str, Any]] = {
     "offload_station_no_card": {
         "name": "Offload station without a card",
         "description": (
-            "An offload station reports that its SD card is absent or not writable (phase 42, "
-            "decision D323): nothing a tracker offloads there is kept. Reminds once a day."
+            "An offload station reports that its SD card is absent, faulted or not writable "
+            "(phase 42, decision D323; the storage bits of report version 3, decision D345): "
+            "nothing a tracker offloads there is kept. Reminds once a day."
         ),
         "document": {
             "trigger": {"kind": "measurement", "metric_key": "lp0_sd_card_ok"},

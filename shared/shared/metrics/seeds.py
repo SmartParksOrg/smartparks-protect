@@ -35,6 +35,23 @@ METRIC_SEEDS: tuple[MetricSeed, ...] = (
         "The card is in and writable, as the station last reported",
     ),
     MetricSeed(
+        "lp0_sd_capacity_mb",
+        "SD card size",
+        "MB",
+        N,
+        "offload",
+        "Size of the card's partition in whole megabytes, as the station last reported "
+        "(report version 2 and later; unknown until the reader's units are verified)",
+    ),
+    MetricSeed(
+        "lp0_sd_free_percent",
+        "SD card free",
+        "%",
+        N,
+        "offload",
+        "Free share of the card in whole percent, rounded down, as the station last reported",
+    ),
+    MetricSeed(
         "lp0_uptime",
         "Station uptime",
         "s",

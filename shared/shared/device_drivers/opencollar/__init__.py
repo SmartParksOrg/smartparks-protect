@@ -18,6 +18,7 @@ import json
 import math
 import re
 import struct
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -95,7 +96,7 @@ KNOWN_PORTS: dict[int, tuple[int, int | None]] = {
     PORT_SWITCH_CHANGE: (0x98, 5),
     PORT_SWITCH_STATUS: (0x99, 5),
     21: (0x9A, None),
-    23: (0x9D, 97),
+    23: (0x9D, None),  # 97 data bytes in report version 1, 102 in versions 2 and 3
     27: (0x91, None),
     28: (0x90, None),
 }
@@ -143,7 +144,9 @@ PORT_RF_SCAN = 8  # firmware 4.x to 6.16, removed in 7.1.0 (research 3.23)
 PORT_OPEN_SKY = 17  # firmware 6.x, removed in 7.1.0; the message has no id byte
 PORT_AIR_QUALITY = 21  # firmware 7.2.0 and later
 PORT_LP0_STATISTICS = 23  # msg 0x9D, an offload station's report (firmware 8.1, phase 42)
-#: The status observations of the port 23 report, bit 0 first (the firmware's README).
+#: The status observations of the port 23 report, bit 0 first (the firmware's README); the
+#: last two came with report version 3 (firmware branch of 2026-10-20): a completed card check
+#: that found no card, and a storage fault latched until a verified recovery.
 LP0_STATUS_BITS = (
     "card_detected",
     "card_writable",
@@ -156,7 +159,17 @@ LP0_STATUS_BITS = (
     "radio_fault",
     "storage_queue_full",
     "flash_available",
+    "sd_card_missing",
+    "sdfs_error",
 )
+#: The data bytes of a report per schema version (after the id and length), and how many of
+#: the status bits a version may know. Version 2 added the card's capacity and free share,
+#: version 3 the two storage bits; a version this driver does not know is refused by name.
+LP0_STATISTICS_LENGTHS = {1: 97, 2: 102, 3: 102}
+LP0_STATISTICS_KNOWN_BITS = {1: 11, 2: 11, 3: 13}
+#: The sentinels of an unknown capacity, written together.
+LP0_CAPACITY_UNKNOWN = 0xFFFF_FFFF
+LP0_FREE_UNKNOWN = 0xFF
 #: The 21 cumulative counters of the report, in wire order.
 LP0_COUNTERS = (
     "visits_complete",
@@ -358,6 +371,20 @@ def _fail(message: str, **context: Any) -> ApplicationError:
     )
 
 
+def lp0_sd_card_ok(status: Mapping[str, bool | None]) -> bool | None:
+    """Whether an offload station's card is usable, read off the status observations of its
+    report (decision D345): no when the station says the card is missing or a storage fault is
+    latched (the version 3 bits, which it knows even while the card bits are unobserved), else
+    in and writable when both card bits are known, else unknown. The decoder's `lp0_sd_card_ok`
+    measurement and the Offload page's `card_ok` are both this."""
+    if status.get("sd_card_missing") or status.get("sdfs_error"):
+        return False
+    detected, writable = status.get("card_detected"), status.get("card_writable")
+    if detected is None or writable is None:
+        return None
+    return bool(detected and writable)
+
+
 def _mapped(byte: int) -> float:
     """The firmware maps -100..100 onto one byte for temperature and acceleration."""
     return byte * 200 / 255 - 100
@@ -408,9 +435,10 @@ OPENCOLLAR_HEALTH: tuple[HealthField, ...] = (
         "lp0_sd_card_ok",
         "SD card",
         kind="bool",
-        words=("in and writable", "absent or not writable"),
+        words=("in and writable", "absent, faulted or not writable"),
         critical_below=1,
     ),
+    HealthField("lp0_sd_free_percent", "SD card free", unit="%", warn_below=10, critical_below=2),
     HealthField("lp0_sd_media_errors", "SD card errors", warn_above=0),
     HealthField("lp0_storage_pending", "Frames waiting for the card", warn_above=2),
     HealthField("lp0_visits_complete", "Offload visits completed"),
@@ -772,28 +800,51 @@ class OpenCollarDriver:
     @staticmethod
     def _decode_lp0_statistics(data: bytes, time: datetime, records: DecodedRecords) -> None:
         """Port 23 (firmware 8.1, `decodeLP0Statistics` of the branch decoder; phase 42,
-        decision D323): an offload station's report of itself. The 97 data bytes after the
-        two byte header: the schema version, the value and known bitmaps of eleven status
-        observations (a bit that is not known is unknown, never false), uptime, the SD jobs
-        pending and the most at once, then 21 cumulative counters. The report is kept as the
-        state `lp0_station` and the figures as measurements, so the health card, the rules
-        and the trends read them like any other."""
-        if len(data) != 97 or data[0] != 1:
+        decision D323): an offload station's report of itself. After the two byte header: the
+        schema version, the value and known bitmaps of the status observations (a bit that is
+        not known is unknown, never false), uptime, the SD jobs pending and the most at once,
+        21 cumulative counters, and since version 2 the card's capacity in whole MB and its
+        free share in whole percent (both unknown together, as `0xFFFFFFFF` and `0xFF`).
+        Version 3 (2026-10-20) added the bits `sd_card_missing` and `sdfs_error` in the same
+        104 bytes. The report is kept as the state `lp0_station` and the figures as
+        measurements, so the health card, the rules and the trends read them like any other."""
+        version = data[0] if data else -1
+        expected = LP0_STATISTICS_LENGTHS.get(version)
+        if expected is None or len(data) != expected:
             raise _fail(
                 "LP0 statistics message has an unknown version or length",
-                version=data[0] if data else None,
+                version=version,
                 length=len(data),
+                known_versions=sorted(LP0_STATISTICS_LENGTHS),
             )
         flags, known = struct.unpack_from("<HH", data, 1)
         uptime, pending, high_water = struct.unpack_from("<IHH", data, 5)
-        if known & ~0x07FF or flags & ~known or pending > high_water:
+        valid_bits = (1 << LP0_STATISTICS_KNOWN_BITS[version]) - 1
+        if known & ~valid_bits or flags & ~known or pending > high_water:
             raise _fail(
                 "LP0 statistics observations are inconsistent",
+                version=version,
                 flags=flags,
                 known=known,
                 pending=pending,
                 high_water=high_water,
             )
+        capacity_mb: int | None = None
+        free_percent: int | None = None
+        if version >= 2:
+            raw_capacity, raw_free = struct.unpack_from("<IB", data, 97)
+            if (
+                (raw_capacity == LP0_CAPACITY_UNKNOWN) != (raw_free == LP0_FREE_UNKNOWN)
+                or raw_capacity == 0
+                or (raw_free != LP0_FREE_UNKNOWN and raw_free > 100)
+            ):
+                raise _fail(
+                    "LP0 statistics capacity is invalid",
+                    capacity_mb=raw_capacity,
+                    free_percent=raw_free,
+                )
+            if raw_capacity != LP0_CAPACITY_UNKNOWN:
+                capacity_mb, free_percent = raw_capacity, raw_free
         status = {
             name: (bool(flags & (1 << bit)) if known & (1 << bit) else None)
             for bit, name in enumerate(LP0_STATUS_BITS)
@@ -806,10 +857,12 @@ class OpenCollarDriver:
                 time=time,
                 state={
                     "lp0_station": {
-                        "version": data[0],
+                        "version": version,
                         "uptime_seconds": uptime,
                         "storage_pending": pending,
                         "storage_high_water": high_water,
+                        "sd_capacity_mb": capacity_mb,
+                        "sd_free_percent": free_percent,
                         "status": status,
                         "counters": counters,
                     }
@@ -823,8 +876,12 @@ class OpenCollarDriver:
             "lp0_storage_high_water": float(high_water),
             **{f"lp0_{name}": float(value) for name, value in counters.items()},
         }
-        if status["card_detected"] is not None and status["card_writable"] is not None:
-            figures["lp0_sd_card_ok"] = bool(status["card_detected"] and status["card_writable"])
+        if capacity_mb is not None and free_percent is not None:
+            figures["lp0_sd_capacity_mb"] = float(capacity_mb)
+            figures["lp0_sd_free_percent"] = float(free_percent)
+        card_ok = lp0_sd_card_ok(status)
+        if card_ok is not None:
+            figures["lp0_sd_card_ok"] = card_ok
         records.measurements += [
             DecodedMeasurement(time=time, metric_key=key, value=value, record_type="lp0_station")
             for key, value in figures.items()

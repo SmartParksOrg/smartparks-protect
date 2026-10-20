@@ -11959,9 +11959,14 @@ export interface components {
             last_reception_at?: string | null;
             /**
              * Card Ok
-             * @description From the station's own report
+             * @description From the station's own report: the card is in and writable, and the station reports no missing card or storage fault (decision D345)
              */
             card_ok?: boolean | null;
+            /**
+             * Sd Free Percent
+             * @description The card's free share, when the report carries it
+             */
+            sd_free_percent?: number | null;
             /** Listening */
             listening?: boolean | null;
             /** Storage Pending */

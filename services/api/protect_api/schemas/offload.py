@@ -149,7 +149,14 @@ class OffloadOverviewStation(BaseModel):
     )
     receptions: int = Field(default=0, description="Frames received in the window")
     last_reception_at: datetime | None = None
-    card_ok: bool | None = Field(default=None, description="From the station's own report")
+    card_ok: bool | None = Field(
+        default=None,
+        description="From the station's own report: the card is in and writable, and the "
+        "station reports no missing card or storage fault (decision D345)",
+    )
+    sd_free_percent: int | None = Field(
+        default=None, description="The card's free share, when the report carries it"
+    )
     listening: bool | None = None
     storage_pending: int | None = None
     visits_complete: int | None = None
