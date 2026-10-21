@@ -264,7 +264,7 @@
   "{{loaded}} of {{total}} records": "{{loaded}} of {{total}} records",
   "{{metric}} over the period": "{{metric}} over the period",
   "{{minutes}} min": "{{minutes}} min",
-  "{{missed}} of {{total}}": "{{missed}} of {{total}}",
+  "{{missed}} of {{total}} ({{percent}}%)": "{{missed}} of {{total}} ({{percent}}%)",
   "{{name}} comes along": "{{name}} comes along",
   "{{name}} comes back for its members, in the switcher and in All projects, and its rules run again.": "{{name}} comes back for its members, in the switcher and in All projects, and its rules run again.",
   "{{name}} created; its retained uplinks are being decoded": "{{name}} created; its retained uplinks are being decoded",

@@ -204,7 +204,6 @@
   "{{loaded}} of {{total}} records": "{{loaded}} van {{total}} records",
   "{{metric}} over the period": "{{metric}} over de periode",
   "{{minutes}} min": "{{minutes}} min",
-  "{{missed}} of {{total}}": "{{missed}} van {{total}}",
   "{{name}} comes along": "{{name}} gaat mee",
   "{{name}} comes back for its members, in the switcher and in All projects, and its rules run again.": "{{name}} komt terug voor zijn leden, in de projectkiezer en in Alle projecten, en zijn regels lopen weer.",
   "{{name}} created; its retained uplinks are being decoded": "{{name}} aangemaakt; de bewaarde uplinks worden gedecodeerd",
@@ -3328,5 +3327,6 @@
   "no identity": "geen identiteit",
   "No unassigned source events.": "Geen niet-toegewezen bronberichten.",
   "Select": "Selecteer",
-  "Unassigned": "Niet toegewezen"
+  "Unassigned": "Niet toegewezen",
+  "{{missed}} of {{total}} ({{percent}}%)": "{{missed}} van {{total}} ({{percent}}%)"
 }

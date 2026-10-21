@@ -338,9 +338,13 @@ function LoRaWANRows({
         label={t("Missed frames")}
         value={
           link.frames_seen > 1
-            ? t("{{missed}} of {{total}}", {
+            ? t("{{missed}} of {{total}} ({{percent}}%)", {
                 missed: link.missed_frames,
                 total: link.frames_seen + link.missed_frames,
+                percent: Math.round(
+                  (100 * link.missed_frames) /
+                    (link.frames_seen + link.missed_frames),
+                ),
               })
             : t("not enough frames yet")
         }
